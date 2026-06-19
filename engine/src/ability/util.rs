@@ -61,6 +61,41 @@ fn play_cost_reduction_matches(
     true
 }
 
+fn per_unit_cost_reduction(
+    effect: &crate::card::AbilityEffect,
+    stage: &crate::core::zones::Stage,
+    hand_count: usize,
+    card_db: &CardDatabase,
+) -> u32 {
+    let count_zone = effect
+        .per_unit_location
+        .as_deref()
+        .or(effect.location.as_deref())
+        .unwrap_or("hand");
+
+    let raw_count = if count_zone == "stage" && effect.group_names.is_some() {
+        let group_name = effect.group_name();
+        stage
+            .stage
+            .iter()
+            .filter(|&&id| id != -1)
+            .filter(|&&id| card_matches_group_str(card_db, id, group_name))
+            .count()
+    } else {
+        hand_count
+    };
+
+    let per_unit_count = effect.per_unit_count.unwrap_or(1).max(1) as usize;
+    let exclude_self = effect.exclude_self.unwrap_or(false);
+    let effective = if exclude_self {
+        raw_count.saturating_sub(1)
+    } else {
+        raw_count
+    };
+    let value = effect.value.unwrap_or(1) as u32;
+    ((effective / per_unit_count) as u32) * value
+}
+
 pub fn calculate_play_cost_reduction(
     stage: &crate::core::zones::Stage,
     success_live_cards: &[i16],
@@ -81,8 +116,7 @@ pub fn calculate_play_cost_reduction(
                     continue;
                 }
                 if mod_cost.per_unit.unwrap_or(false) {
-                    let per_unit = mod_cost.per_unit_count.unwrap_or(1) as usize;
-                    cost_reduction = (hand_count.saturating_sub(1) * per_unit) as u32;
+                    cost_reduction = per_unit_cost_reduction(mod_cost, stage, hand_count, card_db);
                 } else {
                     let reduction = mod_cost.value.unwrap_or(1);
                     cost_reduction = cost_reduction.max(reduction);
@@ -137,13 +171,8 @@ pub fn calculate_play_cost_reduction(
                                     continue;
                                 }
                             }
-                            // Handle per_unit scaling for stage card effects
-                            // (self-cost-reduction abilities when the card itself
-                            // is being played from hand — handled in the card's own
-                            // ability path above).
                             let reduction = if effect.per_unit.unwrap_or(false) {
-                                let per_unit = effect.per_unit_count.unwrap_or(1) as usize;
-                                (hand_count.saturating_sub(1) * per_unit) as u32
+                                per_unit_cost_reduction(effect, stage, hand_count, card_db)
                             } else {
                                 effect.value.unwrap_or(1)
                             };
@@ -194,8 +223,7 @@ pub fn calculate_play_cost_reduction(
                                 }
                             }
                             let reduction = if effect.per_unit.unwrap_or(false) {
-                                let per_unit = effect.per_unit_count.unwrap_or(1) as usize;
-                                (hand_count.saturating_sub(1) * per_unit) as u32
+                                per_unit_cost_reduction(effect, stage, hand_count, card_db)
                             } else {
                                 effect.value.unwrap_or(1)
                             };
