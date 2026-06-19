@@ -455,3 +455,101 @@ fn kowareyasuki_opponent_loses_2plus_hearts_gets_score_bonus() {
         "Kowareyasuki should gain +1 score bonus when opponent loses 2+ surplus hearts"
     );
 }
+
+/// Inject exactly 2 surplus heartss: condition ≥2 met → score +1.
+#[test]
+fn kowareyasuki_opponent_loses_exactly_2_gets_bonus() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let koware = game.id("PL!S-bp6-024-L");
+    let filler = game.id("PL!-sd1-010-SD");
+    let p1_member_a = game.id("PL!S-sd1-001-SD");
+    let p1_member_b = game.id("PL!S-PR-041-PR");
+
+    for _ in 0..15 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    game.state.player1.stage.stage[0] = p1_member_a;
+    game.state.player1.stage.stage[1] = p1_member_b;
+    game.add_to_hand(koware);
+    game.add_to_hand(filler);
+
+    for _ in 0..5 {
+        game.pass();
+    }
+    game.set_live_card(koware);
+    game.pass();
+    game.pass();
+    game.pass();
+    game.pass();
+
+    for snap in &mut game.state.performance_snapshots {
+        if snap.player_id == "p2" {
+            snap.total_hearts = [0, 2, 0, 0, 0, 0, 0, 0]; // Exactly 2 surplus
+        }
+    }
+
+    game.pass(); // LiveVictoryDetermination → LiveSuccess
+
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(koware),
+        1,
+        "Score +1 for exactly 2 surplus hearts"
+    );
+}
+
+/// Inject exactly 1 surplus heart: condition ≥2 fails → no bonus.
+#[test]
+fn kowareyasuki_opponent_loses_1_no_bonus() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let koware = game.id("PL!S-bp6-024-L");
+    let filler = game.id("PL!-sd1-010-SD");
+    let p1_member_a = game.id("PL!S-sd1-001-SD");
+    let p1_member_b = game.id("PL!S-PR-041-PR");
+
+    for _ in 0..15 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    game.state.player1.stage.stage[0] = p1_member_a;
+    game.state.player1.stage.stage[1] = p1_member_b;
+    game.add_to_hand(koware);
+    game.add_to_hand(filler);
+
+    for _ in 0..5 {
+        game.pass();
+    }
+    game.set_live_card(koware);
+    game.pass();
+    game.pass();
+    game.pass();
+    game.pass();
+
+    for snap in &mut game.state.performance_snapshots {
+        if snap.player_id == "p2" {
+            snap.total_hearts = [0, 1, 0, 0, 0, 0, 0, 0]; // Only 1 surplus
+        }
+    }
+
+    game.pass(); // LiveVictoryDetermination → LiveSuccess
+
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(koware),
+        0,
+        "No score bonus for only 1 surplus heart"
+    );
+}

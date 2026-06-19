@@ -136,49 +136,59 @@ export function resolveCardImagePath(cardNo) {
 
     const candidates = [];
 
-    // 1. Direct mapping lookup
-    const mapped = State.cardImageMapping?.[cardNo];
+    // Unicode NFKC normalization: full-width ＋ (U+FF0B) → half-width + (U+002B).
+    // This ensures consistent handling regardless of input character width,
+    // making 2, ＋, and + equivalent throughout the resolution pipeline.
+    const nfkc = cardNo.normalize('NFKC');
+
+    // 1. Direct mapping lookup — try normalized first (future-proof),
+    //    then original (current mapping uses full-width keys).
+    const mapped = State.cardImageMapping?.[nfkc] || State.cardImageMapping?.[cardNo];
     if (mapped) return fixImgPath(mapped);
-    
-    // 2. Try ＋ → 2, + → 2 variant in mapping (webp uses PR2 not PR＋)
-    if (cardNo.includes('＋') || cardNo.endsWith('+')) {
-        const with2 = cardNo.replace(/＋/g, '2').replace(/\+$/, '2');
+
+    // 2. Also try the opposite width variant in mapping
+    const altWidth = nfkc.includes('+')
+        ? nfkc.replace(/\+/g, '＋')
+        : cardNo.includes('＋') ? cardNo.replace(/＋/g, '+') : null;
+    if (altWidth && altWidth !== nfkc && altWidth !== cardNo) {
+        const altMapped = State.cardImageMapping?.[altWidth];
+        if (altMapped) return fixImgPath(altMapped);
+    }
+
+    // 3. Try ＋ → 2, + → 2 variant in mapping (webp uses PR2 not PR＋)
+    if (nfkc.includes('+')) {
+        const with2 = nfkc.replace(/\+/g, '2');
         const mapped2 = State.cardImageMapping?.[with2];
         if (mapped2) return fixImgPath(mapped2);
     }
-    
-    // 3. Try compressed name in mapping (PL!HS-PR-017-PR → PL!HS-017-PR)
-    const stripped = cardNo.replace(/^(PL![\w]*)-[A-Z]+-(\d*)-/, '$1-$2-');
-    if (stripped !== cardNo) {
+
+    // 4. Try compressed name in mapping (PL!HS-PR-017-PR → PL!HS-017-PR)
+    const stripped = nfkc.replace(/^(PL![\w]*)-[A-Z]+-(\d*)-/, '$1-$2-');
+    if (stripped !== nfkc) {
         const compressedMapped = State.cardImageMapping?.[stripped];
         if (compressedMapped) return fixImgPath(compressedMapped);
     }
-    
-    // 4. Compressed ＋ → 2
-    if (cardNo.includes('＋')) {
-        const normalized = cardNo.replace(/＋/g, '2');
-        const stripped2 = normalized.replace(/^(PL![\w]*)-[A-Z]+-(\d*)-/, '$1-$2-');
-        if (stripped2 !== normalized) {
+
+    // 5. Compressed ＋ → 2 (with ＋ ↔ + normalization first)
+    if (nfkc.includes('+')) {
+        const with2 = nfkc.replace(/\+/g, '2');
+        const stripped2 = with2.replace(/^(PL![\w]*)-[A-Z]+-(\d*)-/, '$1-$2-');
+        if (stripped2 !== with2) {
             const mapped2 = State.cardImageMapping?.[stripped2];
             if (mapped2) return fixImgPath(mapped2);
         }
     }
 
-    // Build candidate paths. Try the numeric variant first (R2 is the most
-    // common filesystem convention), then full-width plus (R＋), then + (R+).
+    // 6. Build candidate file paths. Always try all three filename conventions
+    //    regardless of input form: R2 (numeric), R＋ (full-width), R+ (half-width).
     const addWebp = (n) => candidates.push(fixImgPath(`img/cards_webp/${n}.webp`));
-    if (cardNo.includes('＋')) {
-        addWebp(cardNo.replace(/＋/g, '2'));
-        addWebp(cardNo);
-        addWebp(cardNo.replace(/＋/g, '+'));
-    } else if (cardNo.includes('+')) {
-        addWebp(cardNo.replace(/\+/g, '2'));
-        addWebp(cardNo);
-    } else {
-        addWebp(cardNo);
-    }
+    const seen = new Set();
+    const add = (n) => { if (!seen.has(n)) { seen.add(n); addWebp(n); } };
+    add(nfkc.replace(/\+/g, '2'));   // R2 variant
+    add(nfkc.replace(/\+/g, '＋'));  // R＋ variant (full-width)
+    add(nfkc);                       // R+ variant (half-width)
 
-    // 5. Rarity fallback: use rare_list from card database to find alternative rarities
+    // 7. Rarity fallback: use rare_list from card database to find alternative rarities
     if (State.staticCardDatabase && State.cardImageMapping) {
         const cardEntry = State.staticCardDatabase[cardNo];
         const rareList = cardEntry?.rare_list;
@@ -193,7 +203,7 @@ export function resolveCardImagePath(cardNo) {
         }
     }
 
-    // 6. Desperate fallback: strip the last rarity segment and try base-key match
+    // 8. Desperate fallback: strip the last rarity segment and try base-key match
     const rarityFallback = resolveCardImagePath._rarityCache || (() => {
         const cache = {};
         if (State.cardImageMapping) {

@@ -1553,6 +1553,10 @@ def _extract_generic_fields(condition, text):
     if "公開した" in text or "公開された" in text or "公開する" in text:
         condition["location"] = "revealed_cards"
 
+    # Delta tracking for surplus heart loss ("これにより失っている場合")
+    if "失っている" in text and "これにより" in text:
+        condition["delta"] = True
+
     # Heart count
     if "heart" in text and (
         "つ以上持つ" in text or "枚持つ" in text or "つ持つ" in text
@@ -8354,12 +8358,16 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                         pe.pop(k, None)
 
         # E: Revert over-eager conditional_on_result to sequential (surplus_heart)
+        # Keep the result_condition as a condition on the followup_action.
         if eff.get("action") == "conditional_on_result":
             pe = eff.get("primary_effect", {})
             if isinstance(pe, dict) and pe.get("resource") == "surplus_heart":
                 actions = [pe]
                 fa = eff.get("followup_action")
+                rc = eff.get("result_condition")
                 if isinstance(fa, dict):
+                    if isinstance(rc, dict):
+                        fa["condition"] = rc
                     actions.append(fa)
                 if actions:
                     eff["action"] = "sequential"

@@ -359,7 +359,8 @@ const stateInternal = {
                     let replaced = 0;
                     for (const [cardNo, card] of Object.entries(State.staticCardDatabase)) {
                         if (card.img && card.img.startsWith('http')) {
-                            const localPath = State.cardImageMapping[cardNo];
+                            const localPath = State.cardImageMapping[cardNo]
+                                || State.cardImageMapping[cardNo.normalize('NFKC')];
                             if (localPath) {
                                 card.img = localPath;
                                 replaced++;

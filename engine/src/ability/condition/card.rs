@@ -2637,6 +2637,11 @@ impl<'a> ConditionContext<'a> {
             }
         }
         if resource_type == Some("surplus_heart") {
+            // delta=true means the condition should check the count that was LOST
+            // by the preceding action, not the current absolute surplus.
+            if condition.delta == Some(true) {
+                return self.game_state.mods.last_surplus_loss_count;
+            }
             // After live clearance the computed surplus count is stored on GameState.
             // Prefer the stored snapshot value over a runtime recalculation
             // (includes yell ALL hearts that can fill any color gap).
@@ -2922,6 +2927,16 @@ impl<'a> ConditionContext<'a> {
                     .sum()
             }
             "surplus_heart" => {
+                // When delta=true, read the count saved before the preceding step
+                // zeroed the surplus, instead of computing from current state.
+                if condition.delta == Some(true) {
+                    let count = self.game_state.mods.last_surplus_loss_count;
+                    return compare_counts(
+                        condition.operator.as_deref(),
+                        count,
+                        condition.count.unwrap_or(1),
+                    );
+                }
                 // Count surplus hearts for the target player
                 let heart_total: u32 = player
                     .stage

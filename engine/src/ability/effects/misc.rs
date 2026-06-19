@@ -359,6 +359,11 @@ impl AbilityResolver {
 
         if resource == "surplus_heart" {
             if sign == Some("negative") && is_all {
+                let old = match target.as_str() {
+                    "opponent" => gs.opponent_live_surplus_count,
+                    _ => gs.self_live_surplus_count,
+                };
+                gs.mods.last_surplus_loss_count = old;
                 if target == "opponent" {
                     gs.opponent_live_surplus_count = 0;
                 } else {

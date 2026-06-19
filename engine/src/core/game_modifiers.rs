@@ -54,6 +54,9 @@ pub struct GameModifiers {
     /// Per-card delayed "cannot activate" flags. Card_id → remaining turns of
     /// activation block. Decremented each Active phase; member stays wait while >0.
     pub delayed_cannot_active: HashMap<i16, u32>,
+    /// The surplus heart count just before it was zeroed by gain_resource(surplus_heart).
+    /// Used by `delta: true` conditions on subsequent steps.
+    pub last_surplus_loss_count: u32,
 }
 
 impl Default for GameModifiers {
@@ -83,6 +86,7 @@ impl GameModifiers {
             last_cost_discard_count: 0,
             last_cost_energy_count: 0,
             delayed_cannot_active: HashMap::new(),
+            last_surplus_loss_count: 0,
         }
     }
 
