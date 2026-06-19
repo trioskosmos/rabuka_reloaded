@@ -93,12 +93,13 @@ fn hazuki_energy_phase_no_effect_flag() {
 
     trigger_auto(&mut v);
 
-    // NOTE: Currently triggers because comparison_condition has no operator.
-    // The condition should check last_energy_placed_by_effect.
-    // For now, the test documents current behavior.
+    // Energy placed by phase action (not a card effect) — Hazuki should NOT trigger
+    // because her text says "カードの効果によって" (by a card effect).
+    // The each_time guard checks last_energy_placed_by_effect for comparison conditions
+    // on energy_zone.
     assert_eq!(
         heart06_mod(&v, hazuki),
-        1,
-        "Currently triggers — comparison_condition always passes (no operator)"
+        0,
+        "Hazuki should NOT trigger when energy placed by phase action, not a card effect"
     );
 }

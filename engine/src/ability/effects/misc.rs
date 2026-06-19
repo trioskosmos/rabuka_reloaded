@@ -2000,6 +2000,11 @@ impl AbilityResolver {
                 .map(|e| e.player_id.clone());
             gs.last_area_move_card_id = Some(source_id2);
             gs.last_area_move_by_player = mover_pid;
+            let moved = gs.recently_moved_cards.get_or_insert_with(Vec::new);
+            moved.push(target_id2);
+            if source_id2 != -1 {
+                moved.push(source_id2);
+            }
             return Ok(());
         }
         // Handle specific card_no (for "multiple_targets" each-member pattern)
@@ -2048,6 +2053,11 @@ impl AbilityResolver {
                         .map(|e| e.player_id.clone());
                     gs.last_area_move_card_id = Some(source_id);
                     gs.last_area_move_by_player = mover_pid;
+                    let moved = gs.recently_moved_cards.get_or_insert_with(Vec::new);
+                    moved.push(target_id);
+                    if source_id != -1 {
+                        moved.push(source_id);
+                    }
                     return Ok(());
                 }
             }
@@ -2094,6 +2104,13 @@ impl AbilityResolver {
                         .map(|e| e.player_id.clone());
                     gs.last_area_move_card_id = Some(activating_card_id);
                     gs.last_area_move_by_player = mover_pid;
+                    // Update recently_moved_cards so the watcher scan fires
+                    // and each_time triggers see the movement event.
+                    let moved = gs.recently_moved_cards.get_or_insert_with(Vec::new);
+                    moved.push(target_id3);
+                    if source_id3 != -1 {
+                        moved.push(source_id3);
+                    }
                 } else {
                     return Err(format!(
                         "Activating card {} not found on stage",

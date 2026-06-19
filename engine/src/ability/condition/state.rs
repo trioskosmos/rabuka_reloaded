@@ -587,21 +587,23 @@ impl<'a> ConditionContext<'a> {
                 let snapshot_area_player =
                     self.game_state.entry_snapshot_last_area_move_by_player();
 
-                let area_ok = condition.self_effect_only.is_none_or(|_| {
-                    let area_id = snapshot_area.or(self.game_state.last_area_move_card_id);
-                    let area_by = snapshot_area_player
-                        .as_ref()
-                        .or_else(|| self.game_state.last_area_move_by_player.as_ref());
-                    // Card identity check — "このメンバーがエリアを移動する" means THIS card
-                    // must have moved, not just any card.  cards_moved_this_turn persists
-                    // for the whole turn (never cleared mid-turn), so it's reliable even
-                    // after clear_effect_tracking() wipes last_area_move_card_id.
-                    let this_card_moved =
-                        self.game_state.activating_card.map_or(false, |activating| {
-                            self.game_state.cards_moved_this_turn.contains(&activating)
-                        });
-                    this_card_moved && area_id.is_some() && area_by == Some(&player.id)
+                let this_card_moved = self.game_state.activating_card.map_or(false, |activating| {
+                    self.game_state.cards_moved_this_turn.contains(&activating)
                 });
+                let area_ok = if !this_card_moved {
+                    // "このメンバーがエリアを移動する" — THIS card must have moved.
+                    // The area_ok shortcut (self_effect_only=None) does NOT apply
+                    // because a different card moving does not satisfy "this member".
+                    false
+                } else {
+                    condition.self_effect_only.is_none_or(|_| {
+                        let area_id = snapshot_area.or(self.game_state.last_area_move_card_id);
+                        let area_by = snapshot_area_player
+                            .as_ref()
+                            .or_else(|| self.game_state.last_area_move_by_player.as_ref());
+                        area_id.is_some() && area_by == Some(&player.id)
+                    })
+                };
                 let energy_ok = condition.energy_placed.is_none_or(|_| {
                     let energy_val = if snapshot_energy {
                         true
@@ -618,7 +620,8 @@ impl<'a> ConditionContext<'a> {
                         && (!condition.self_effect_only.unwrap_or(false)
                             || energy_player == Some(&player.id))
                 });
-                let has_area_check = condition.self_effect_only.is_some();
+                let has_area_check = condition.self_effect_only.is_some()
+                    || condition.movement.as_deref() == Some("moves");
                 let has_energy_check = condition.energy_placed.is_some();
                 if !has_area_check && !has_energy_check {
                     true
