@@ -206,6 +206,7 @@ pub mod parser_fixes_e2e_test;
 pub mod pl_bp5_012_test;
 pub mod pl_bp6_003_test;
 pub mod pl_bp6_006_test;
+pub mod pl_n_bp1_008_test;
 pub mod pl_s_bp5_010_test;
 pub mod pl_s_bp6_006_test;
 pub mod pr_energy_place_cost_test;

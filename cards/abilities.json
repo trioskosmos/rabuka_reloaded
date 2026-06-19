@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-20T03:22:20.603680",
+  "generated_at": "2026-06-20T04:41:20.530093",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -8780,7 +8780,9 @@
         "count": 1,
         "card_type": "member_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "cost_reference": "previous_moved_card",
+        "cost_limit_operator": "<"
       }
     },
     {

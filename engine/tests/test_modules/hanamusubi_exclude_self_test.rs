@@ -32,9 +32,9 @@ fn advance_to_live_card_set(game: &mut TestGame) {
 fn finish_live_setup(game: &mut TestGame) {
     game.pass(); // LiveCardSetP1 → LiveCardSetP2
     game.pass(); // LiveCardSetP2 → LiveStart (triggers fire here)
-    // Other Renosora live cards (e.g. PL!HS-bp5-017-L) have their own live_start
-    // abilities with optional energy costs that enqueue SelectAutoAbility choices.
-    // Drain those so hanamusubi's effect (which is cost-free) runs.
+                 // Other Renosora live cards (e.g. PL!HS-bp5-017-L) have their own live_start
+                 // abilities with optional energy costs that enqueue SelectAutoAbility choices.
+                 // Drain those so hanamusubi's effect (which is cost-free) runs.
     game.drain_auto_ability_choices();
 }
 

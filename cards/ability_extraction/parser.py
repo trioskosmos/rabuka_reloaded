@@ -8171,6 +8171,30 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
 
     _add_appearance_source(data["unique_abilities"])
 
+    # FIX 15: cost_reference for "これにより控え室に置いたXXより、コストの低い" pattern
+    def _add_cost_reference(d):
+        if isinstance(d, dict):
+            if d.get("action") == "move_cards":
+                t = d.get("text", "")
+                if (
+                    "これにより控え室に置いた" in t
+                    and "より" in t
+                    and "コストの低い" in t
+                ):
+                    if "cost_reference" not in d:
+                        d["cost_reference"] = "previous_moved_card"
+                        d["cost_limit_operator"] = "<"
+                        fix_stats["cost_reference"] = (
+                            fix_stats.get("cost_reference", 0) + 1
+                        )
+            for v in d.values():
+                _add_cost_reference(v)
+        elif isinstance(d, list):
+            for item in d:
+                _add_cost_reference(item)
+
+    _add_cost_reference(data["unique_abilities"])
+
     # ============== POST-PROCESSING ==============
 
     for ability in data["unique_abilities"]:
