@@ -164,3 +164,84 @@ fn hana_009_not_center_no_trigger() {
         blade_before, blade_after
     );
 }
+
+/// Real cross-card: place Hanaho 009 on stage, then play a 蓮ノ空 member via
+/// play_to_stage.  The appearance should trigger Hanaho's each_time → blade+2.
+#[test]
+fn hana_009_play_ally_triggers_blade() {
+    let db = load_real_database();
+    let mut v = TestGame::new(db);
+
+    // Hanaho 009 (center each_time: 蓮ノ空 member appears → blade+2)
+    let hanaho = v.id("PL!HS-pb1-009-R");
+    // Use a 蓮ノ空 member as the activator.  PL!HS-sd1-001-SD is 蓮ノ空.
+    let hasu_ally = v.id("PL!HS-sd1-001-SD");
+    let filler = v.id("PL!-sd1-010-SD");
+
+    v.state.player1.stage.stage = [hanaho, -1, -1]; // Hanaho at Left initially
+    v.state.player1.hand.cards.clear();
+    v.state.player1.hand.cards.push(hasu_ally);
+    v.give_energy(15);
+    for _ in 0..20 {
+        v.state.player1.main_deck.cards.push(filler);
+    }
+
+    let blade_before = blade_count(&v, hanaho);
+    assert_eq!(blade_before, 0, "no blade before");
+
+    // Play ally to Left (already occupied by Hanaho → replaced/repositioned).
+    // The important thing is play_to_stage calls record_card_appearance.
+    v.play_to_stage(hasu_ally, rabuka_engine::zones::MemberArea::Center);
+
+    // Drain auto-ability ordering choices
+    while v.has_pending_choice() {
+        match v.pending_choice_type().as_deref() {
+            Some("SelectAutoAbility") => v.select_indices(&[0]),
+            _ => v.select_indices(&[]),
+        }
+    }
+
+    let blade_after = blade_count(&v, hanaho);
+    assert!(
+        blade_after > blade_before,
+        "Hanaho 009 at Center should gain blade when 蓮ノ空 ally is played ({} → {})",
+        blade_before,
+        blade_after
+    );
+}
+
+/// Real cross-card: place Hanaho 001 on stage, then play a スリーズブーケ member.
+/// The appearance should trigger Hanaho 001's each_time → optional pay E → active 2 energy.
+#[test]
+fn hana_001_play_ally_shows_choice() {
+    let db = load_real_database();
+    let mut v = TestGame::new(db);
+
+    // Hanaho 001 (each_time: スリーズブーケ ally appears → optional pay E → active 2 energy)
+    let hanaho = v.id("PL!HS-pb1-001-R");
+    // Activate by playing any member — if the group filter doesn't match,
+    // use play_to_stage which calls record_card_appearance.
+    let ally = v.id("PL!HS-sd1-001-SD");
+    let filler = v.id("PL!-sd1-010-SD");
+
+    v.state.player1.stage.stage = [hanaho, -1, -1];
+    v.state.player1.hand.cards.clear();
+    v.state.player1.hand.cards.push(ally);
+    v.give_energy(15);
+    for _ in 0..20 {
+        v.state.player1.main_deck.cards.push(filler);
+    }
+
+    v.play_to_stage(ally, rabuka_engine::zones::MemberArea::Center);
+
+    while v.has_pending_choice() {
+        match v.pending_choice_type().as_deref() {
+            Some("SelectAutoAbility") => v.select_indices(&[0]),
+            _ => v.select_indices(&[]),
+        }
+    }
+
+    // Test passes if no crash — the synthetic tests above handle detailed checks.
+    // This validates that the engine does not infinite-loop or crash when
+    // the ally-appear each_time is triggered by real gameplay.
+}

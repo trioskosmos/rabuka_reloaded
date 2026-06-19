@@ -150,3 +150,56 @@ fn rurino_use_limit_blocks_second_same_turn() {
     // heart01 may be 1 or 2 depending on post-resolve re-enqueue.
     // The important thing is no crash.
 }
+
+/// Real cross-card test: Play Rurino Ozora (PL!HS-bp2-005-R+) whose debut
+/// has an optional hand-discard cost.  Paying the discard should trigger
+/// Rurino watcher's each_time (hand→discard → heart01+blade).
+#[test]
+fn rurino_ozora_discard_cross_card_triggers_watcher() {
+    use rabuka_engine::turn::TurnEngine;
+
+    let db = load_real_database();
+    let mut v = TestGame::new(db);
+
+    // The watcher (PL!HS-pb1-003-R): each_time hand→discard → heart01+blade
+    let watcher = v.id("PL!HS-pb1-003-R");
+    // The activator (PL!HS-bp2-005-R+): debut with optional discard 1 from hand
+    let activator = v.id("PL!HS-bp2-005-R＋");
+
+    v.state.player1.stage.stage = [-1, watcher, -1];
+    v.state.player1.hand.cards.clear();
+    v.state.player1.hand.cards.push(activator);
+    v.state.player1.hand.cards.push(v.id("PL!-sd1-010-SD")); // discard fodder
+    v.give_energy(10); // activator costs 10
+
+    for _ in 0..20 {
+        v.state.player1.main_deck.cards.push(v.id("PL!-sd1-010-SD"));
+    }
+
+    assert_eq!(heart01_mod(&v, watcher), 0, "no heart01 before discard");
+
+    // Play activator → debut fires → optional discard cost
+    v.play_to_stage(activator, rabuka_engine::zones::MemberArea::Center);
+
+    // Drain all choices: SelectAutoAbility for ordering,
+    // SelectTarget for optional cost (select_option(1) = pay),
+    // SelectCard for which card to discard
+    while v.has_pending_choice() {
+        match v.pending_choice_type().as_deref() {
+            Some("SelectAutoAbility") => v.select_indices(&[0]),
+            Some("SelectCard") => v.select_indices(&[0]),
+            _ => v.select_option(0),
+        }
+    }
+
+    assert_eq!(
+        heart01_mod(&v, watcher),
+        1,
+        "Rurino watcher gains heart01 when another card's ability discards from hand"
+    );
+    assert_eq!(
+        blade_mod(&v, watcher),
+        1,
+        "Rurino watcher gains blade when another card's ability discards from hand"
+    );
+}
