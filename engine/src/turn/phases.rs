@@ -775,10 +775,24 @@ impl super::TurnEngine {
                                 .as_ref()
                                 .and_then(|e| e.condition.as_ref())
                                 .is_some_and(|c| {
-                                    matches!(
+                                    // Direct discard-location condition
+                                    let direct_discard = matches!(
                                         Zone::from_str(c.location.as_deref().unwrap_or("")),
                                         Some(Zone::Discard | Zone::Waitroom)
-                                    )
+                                    );
+                                    // Movement from stage to discard (preceding_moved + stage source + locations contains discard)
+                                    let movement_to_discard = c.source.as_deref()
+                                        == Some("preceding_moved")
+                                        && c.location.as_deref() == Some("stage")
+                                        && c.locations.as_ref().is_some_and(|locs| {
+                                            locs.iter().any(|loc| {
+                                                matches!(
+                                                    Zone::from_str(loc),
+                                                    Some(Zone::Discard | Zone::Waitroom)
+                                                )
+                                            })
+                                        });
+                                    direct_discard || movement_to_discard
                                 })
                     })
                     .map(|ability| {

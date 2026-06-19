@@ -926,6 +926,9 @@ def _try_temporal_this_turn(text):
             ct = extract_card_type(text)
             if ct:
                 result["card_type"] = ct
+            gns = extract_group_names(text)
+            if gns:
+                result["group_names"] = gns
             if (
                 "余剰のハートを持たずに" in text
                 or "余剰ハートを持たない" in text
@@ -1033,6 +1036,9 @@ def _try_temporal_count(text):
         result["all_areas"] = True
     if "移動している" in text:
         result["movement_state"] = "has_moved"
+    gns = extract_group_names(text)
+    if gns:
+        result["group_names"] = gns
     return result
 
 
@@ -1216,11 +1222,11 @@ def _try_appearance(text):
         or re.search(r"ほかの.*?メンバー", text)
     ):
         result["exclude_self"] = True
+    gns = extract_group_names(text)
+    if gns:
+        result["group_names"] = gns
     if "バトンタッチ" in text:
         result["baton_touch_trigger"] = True
-        gns = extract_group_names(text)
-        if gns:
-            result["group_names"] = gns
         bts = re.search(r"「([^」]+)」からバトンタッチ", text)
         if bts:
             result["baton_touch_source"] = bts.group(1)
@@ -1273,6 +1279,9 @@ def _try_state(text):
                 result["resource_type"] = "energy"
             if "すべて" in text:
                 result["all"] = True
+            gns = extract_group_names(text)
+            if gns:
+                result["group_names"] = gns
             return result
     return None
 
@@ -1536,6 +1545,11 @@ def _extract_generic_fields(condition, text):
         names = re.findall(r"「([^」]+)」", cm.group(1))
         if names:
             condition["characters"] = names
+
+    # Group/unit names: 『虹ヶ咲』 etc.
+    gns = extract_group_names(text)
+    if gns:
+        condition["group_names"] = gns
 
     # Use positional check for non-contiguous comparison patterns
     # Target
@@ -4540,9 +4554,21 @@ def _try_cost_modification(text):
             first, second = parts[0].strip(), parts[1].strip()
             if any(p in second for p in cost_prefixes):
                 op = "subtract"
-                # Return ONLY the modify_cost action — the cost reduction is a passive modifier,
-                # not a sibling action that runs alongside the main effect.
-                # The main effect (first part) will be handled by subsequent handlers or parse_action fallback.
+                # Parse the first part as the main effect and the second as a
+                # modify_cost modifier, then combine them as sequential so both
+                # are preserved in the output.
+                main_effect = parse_effect(first)
+                cost_mod = _make_cost_mod_action(second, op)
+                if main_effect and main_effect.get("action", "custom") not in (
+                    "custom",
+                    "do_nothing",
+                ):
+                    return {
+                        "text": text,
+                        "action": "sequential",
+                        "actions": [main_effect, cost_mod],
+                    }
+                # Fallback: if main effect didn't parse, return just cost mod
                 return _make_cost_mod_action(second, op)
     value_match = re.search(r"(\d+)(少なくなる|減る|増える|増やす)", text)
     value = int(value_match.group(1)) if value_match else energy_count
@@ -8629,10 +8655,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
         ):
             eff["allow_occupied_stage"] = True
 
-    if any(fix_stats.values()):
-        active = {k: v for k, v in fix_stats.items() if v}
-        print(f"  Fixes applied: {active}")
-
+    # Group/unit filter fields are validated in extract_card_abilities.py
     return data
 
 

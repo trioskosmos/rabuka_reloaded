@@ -533,6 +533,81 @@ def _validate_output(result):
     else:
         print("    No gaps detected -- all known patterns handled.")
 
+    # Group filter check: bracketed names in text should have group_names in JSON
+    _validate_group_filters(abilities)
+
+
+BRACKET_RE = re.compile(r"『([^』]+)』")
+FILTER_FIELDS = {
+    "group_names",
+    "exclude_group_names",
+    "characters",
+    "exclude_characters",
+}
+
+
+def _walk_filters(obj):
+    """Recursively walk JSON and return all (value, field_name) pairs from filter fields."""
+    filters = set()
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            if key in FILTER_FIELDS and isinstance(value, list):
+                for item in value:
+                    if isinstance(item, str):
+                        filters.add((item, key))
+            if isinstance(value, (dict, list)):
+                filters.update(_walk_filters(value))
+    elif isinstance(obj, list):
+        for item in obj:
+            if isinstance(item, (dict, list)):
+                filters.update(_walk_filters(item))
+    return filters
+
+
+def _validate_group_filters(abilities):
+    """Check that every bracketed 『X』 name in ability text has a corresponding
+    group_names/characters filter somewhere in the JSON structure."""
+    issues = []
+    for a in abilities:
+        text = a.get("full_text", "") + a.get("triggerless_text", "")
+        bracketed = set(BRACKET_RE.findall(text))
+        if not bracketed:
+            continue
+
+        # Normalize variants
+        def variants(name):
+            v = {name}
+            if "!" in name:
+                v.add(name.replace("!", "！"))
+            if "！" in name:
+                v.add(name.replace("！", "!"))
+            if "µ" in name:
+                v.add(name.replace("µ", "μ"))
+            if "μ" in name:
+                v.add(name.replace("μ", "µ"))
+            return v
+
+        filter_values = {fv for fv, _ in _walk_filters(a)}
+
+        for name in bracketed:
+            if not (variants(name) & filter_values):
+                card_list = a.get("cards", [])
+                text_preview = a.get("full_text", "")[:80]
+                issues.append(
+                    f'  『{name}』 in "{text_preview}…" — {card_list[0] if card_list else "?"}'
+                )
+                break  # one report per ability
+
+    if issues:
+        print(
+            f"\n  GROUP FILTER ISSUES ({len(issues)} abilities with missing group_names):"
+        )
+        for issue in issues:
+            safe = issue.encode("utf-8", errors="replace").decode("utf-8")
+            print(safe)
+    else:
+        print("    All bracketed names have matching filter fields.")
+
 
 if __name__ == "__main__":
     main()

@@ -66,7 +66,7 @@ fn hana_001_ally_appears_choice_shows() {
     let db = load_real_database();
     let mut v = TestGame::new(db);
     let hana = v.id("PL!HS-pb1-001-R");
-    let ally = v.id("PL!S-bp2-002-R"); // generic member (group filter missing from TC)
+    let ally = v.id("PL!HS-sd1-012-SD"); // Cerise Bouquet member
     setup_each_time_test(&mut v, hana, 1, Some(ally));
     trigger(&mut v);
 
@@ -120,7 +120,7 @@ fn hana_009_center_ally_appears_gains_blade() {
     let db = load_real_database();
     let mut v = TestGame::new(db);
     let hana_center = v.id("PL!HS-pb1-009-R");
-    let ally = v.id("PL!S-bp2-002-R"); // generic member (group filter missing from TC)
+    let ally = v.id("PL!HS-sd1-012-SD"); // Hasunosora / Cerise Bouquet member
 
     setup_each_time_test(&mut v, hana_center, 1, Some(ally)); // position 1 = center
     let blade_before = blade_count(&v, hana_center);

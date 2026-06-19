@@ -65,6 +65,7 @@ pub mod izumi_pb1_test;
 pub mod jellyfish_test;
 pub mod joint_card_live_start_test;
 pub mod kagayaiteru_test;
+pub mod kanata_bp1_test;
 pub mod kanata_restrict_test;
 pub mod kanon_invalidate_test;
 pub mod kanon_test;

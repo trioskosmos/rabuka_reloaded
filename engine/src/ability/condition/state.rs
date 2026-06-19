@@ -28,6 +28,28 @@ impl<'a> ConditionContext<'a> {
                     {
                         let target = condition.target.as_deref().unwrap_or("self");
                         let player = self.resolve_condition_player(target);
+                        if let Some(ref groups) = condition.group_names {
+                            if !groups.is_empty() {
+                                let card_db = &self.game_state.card_database;
+                                let debut_count_matching = player
+                                    .stage
+                                    .stage
+                                    .iter()
+                                    .filter(|&&cid| cid != -1)
+                                    .filter(|&&cid| {
+                                        groups.iter().any(|g| {
+                                            crate::ability::util::card_matches_group_str(
+                                                card_db,
+                                                cid,
+                                                Some(g),
+                                            )
+                                        })
+                                    })
+                                    .filter(|&&cid| self.game_state.has_card_moved_this_turn(cid))
+                                    .count();
+                                return debut_count_matching >= (count as usize);
+                            }
+                        }
                         return player.debut_count_this_turn >= count;
                     }
                 }
