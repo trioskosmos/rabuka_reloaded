@@ -826,10 +826,6 @@ impl GameState {
                 self.just_completed_ability_key = None;
             }
             if let Some(pid) = self.ability_master_id() {
-                // Process abilities enqueued by the scan above BEFORE returning
-                // to the main loop, so that their condition evaluation sees the
-                // tracking fields (last_energy_placed_by_effect, last_area_move_card_id)
-                // that were set by the just-completed ability.
                 self.process_pending_auto_abilities(&pid);
             }
             self.clear_effect_tracking();
@@ -912,6 +908,16 @@ impl GameState {
         self.ability_queue
             .current_entry()
             .and_then(|e| e.snapshot_last_area_move_by_player.clone())
+    }
+
+    /// Snapshot of recently_moved_cards captured at enqueue time (trigger_moved_cards).
+    /// Used by card_count_condition "preceding_moved" so each_time abilities see
+    /// what triggered their enqueue, even after clear_effect_tracking() clears
+    /// the global recently_moved_cards.
+    pub fn entry_trigger_moved_cards(&self) -> Option<Vec<i16>> {
+        self.ability_queue
+            .current_entry()
+            .and_then(|e| e.trigger_moved_cards.clone())
     }
 
     /// If the pending choice is routed to a specific player (PVP), return their player_id.

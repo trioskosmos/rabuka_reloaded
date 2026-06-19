@@ -1461,7 +1461,10 @@ impl AbilityResolver {
             || is_energy
         {
             self.moved_cards.extend(moved_cards);
-            gs.recently_moved_cards = Some(moved_cards.to_vec());
+            // Accumulate: each movement batch extends, not replaces, so
+            // cost and effect movements persist together for each_time watchers.
+            let acc = gs.recently_moved_cards.get_or_insert_with(Vec::new);
+            acc.extend(moved_cards.iter().copied());
             gs.recently_moved_from_zone = Some(source.to_string());
             if is_energy && !moved_cards.is_empty() {
                 gs.last_energy_placed_by_effect = true;
@@ -2022,7 +2025,8 @@ impl AbilityResolver {
         }
 
         if !moved.is_empty() {
-            gs.recently_moved_cards = Some(moved.clone());
+            let acc = gs.recently_moved_cards.get_or_insert_with(Vec::new);
+            acc.extend(moved.iter().copied());
             gs.recently_moved_from_zone = Some(zone.to_string());
         }
         Ok(())

@@ -178,7 +178,7 @@ fn hana_009_play_ally_triggers_blade() {
     let hasu_ally = v.id("PL!HS-sd1-001-SD");
     let filler = v.id("PL!-sd1-010-SD");
 
-    v.state.player1.stage.stage = [hanaho, -1, -1]; // Hanaho at Left initially
+    v.state.player1.stage.stage = [-1, hanaho, -1]; // Hanaho at Center
     v.state.player1.hand.cards.clear();
     v.state.player1.hand.cards.push(hasu_ally);
     v.give_energy(15);
@@ -189,9 +189,8 @@ fn hana_009_play_ally_triggers_blade() {
     let blade_before = blade_count(&v, hanaho);
     assert_eq!(blade_before, 0, "no blade before");
 
-    // Play ally to Left (already occupied by Hanaho → replaced/repositioned).
-    // The important thing is play_to_stage calls record_card_appearance.
-    v.play_to_stage(hasu_ally, rabuka_engine::zones::MemberArea::Center);
+    // Play ally to an empty area so Hanaho stays on stage to trigger
+    v.play_to_stage(hasu_ally, rabuka_engine::zones::MemberArea::LeftSide);
 
     // Drain auto-ability ordering choices
     while v.has_pending_choice() {

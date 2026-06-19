@@ -156,8 +156,6 @@ fn rurino_use_limit_blocks_second_same_turn() {
 /// Rurino watcher's each_time (hand→discard → heart01+blade).
 #[test]
 fn rurino_ozora_discard_cross_card_triggers_watcher() {
-    use rabuka_engine::turn::TurnEngine;
-
     let db = load_real_database();
     let mut v = TestGame::new(db);
 
@@ -166,11 +164,14 @@ fn rurino_ozora_discard_cross_card_triggers_watcher() {
     // The activator (PL!HS-bp2-005-R+): debut with optional discard 1 from hand
     let activator = v.id("PL!HS-bp2-005-R＋");
 
-    v.state.player1.stage.stage = [-1, watcher, -1];
+    // Place watcher at left — activator will be played to center, so the watcher
+    // stays on stage (not replaced) and the TAS scan can find it.
+    v.state.player1.stage.stage = [watcher, -1, -1];
     v.state.player1.hand.cards.clear();
     v.state.player1.hand.cards.push(activator);
+    // Watcher at Left satisfies "other members on stage" condition
     v.state.player1.hand.cards.push(v.id("PL!-sd1-010-SD")); // discard fodder
-    v.give_energy(10); // activator costs 10
+    v.give_energy(10); // need 10 for activator
 
     for _ in 0..20 {
         v.state.player1.main_deck.cards.push(v.id("PL!-sd1-010-SD"));
@@ -178,7 +179,7 @@ fn rurino_ozora_discard_cross_card_triggers_watcher() {
 
     assert_eq!(heart01_mod(&v, watcher), 0, "no heart01 before discard");
 
-    // Play activator → debut fires → optional discard cost
+    // Play activator → debut fires → optional discard cost → effect recovers
     v.play_to_stage(activator, rabuka_engine::zones::MemberArea::Center);
 
     // Drain all choices: SelectAutoAbility for ordering,

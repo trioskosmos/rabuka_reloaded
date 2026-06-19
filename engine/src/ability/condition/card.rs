@@ -1334,20 +1334,41 @@ impl<'a> ConditionContext<'a> {
             let negate = condition.negation.unwrap_or(false);
             let wants_blade_heart_prop =
                 condition.card_property.as_deref() == Some("has_blade_heart");
-            // Fallback to GameState.recently_moved_cards when the resolver's
-            // moved_cards is empty (e.g. auto-triggered abilities that fire
-            // without a preceding cost payment or effect step).
+            // Prefer the enqueue-time snapshot (trigger_moved_cards) when the global
+            // recently_moved_cards has already been cleared by clear_effect_tracking().
+            // The snapshot is captured in trigger_auto_ability when the ability is enqueued.
             let moved_source: Vec<i16> = if self.moved_cards.is_empty() {
-                self.game_state
-                    .recently_moved_cards
-                    .clone()
-                    .unwrap_or_default()
+                let enqueued = self.game_state.entry_trigger_moved_cards();
+                let global = self.game_state.recently_moved_cards.clone();
+                // Use enqueued snapshot if global is empty (cleared by clear_effect_tracking)
+                // AND the snapshot has real data.  If global is still live, prefer global
+                // so activation-cost flows (yoshiko) see the resolver's cumulative data.
+                match (&enqueued, &global) {
+                    // Use enqueued snapshot if global is empty (cleared by clear_effect_tracking)
+                    // AND the snapshot has real data.  If global is still live, prefer global
+                    // so activation-cost flows (yoshiko) see the resolver's cumulative data.
+                    (Some(ev), None) if !ev.is_empty() => ev.clone(),
+                    _ => global.unwrap_or_default(),
+                }
             } else {
                 self.moved_cards.to_vec()
             };
+            eprintln!(
+                "[CARD_CNT] source=preceding_moved snap={:?} global={:?} using={}",
+                self.game_state
+                    .entry_trigger_moved_cards()
+                    .as_deref()
+                    .map(|v| v.len()),
+                self.game_state
+                    .recently_moved_cards
+                    .as_deref()
+                    .map(|v| v.len()),
+                moved_source.len()
+            );
             log::debug!(
-                "[MOVED_DEBUG] moved_cards={:?} recently_moved={:?} using={:?}",
+                "[MOVED_DEBUG] moved_cards={:?} trigger_moved={:?} recently_moved={:?} using={:?}",
                 self.moved_cards,
+                self.game_state.entry_trigger_moved_cards(),
                 self.game_state.recently_moved_cards,
                 moved_source
             );
