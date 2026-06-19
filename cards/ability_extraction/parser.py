@@ -51,6 +51,14 @@ COMPARISON_TARGETS = {
 
 # ============== COMPARISON OPERATORS ==============
 COMPARISON_OPERATORS = {
+    # Continuative forms (used before かつ/、 in compound conditions)
+    "高く": ">",
+    "低く": "<",
+    "多く": ">",
+    "少なく": "<",
+    "大きく": ">",
+    "小さく": "<",
+    # Plain/dictionary forms
     "高い": ">",
     "低い": "<",
     "少ない": "<",
@@ -8325,7 +8333,13 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 for sub in node["conditions"]:
                     if isinstance(sub, dict):
                         if new_ctx.get("location") and not sub.get("location"):
-                            if not sub.get("temporal") and not sub.get("resource_type"):
+                            # Don't propagate location to score comparison conditions
+                            # — they need live_card_zone / success_live_zone, not stage
+                            if (
+                                not sub.get("temporal")
+                                and not sub.get("resource_type")
+                                and sub.get("comparison_type") != "score"
+                            ):
                                 sub["location"] = new_ctx["location"]
                         _propagate_context(sub, new_ctx)
 

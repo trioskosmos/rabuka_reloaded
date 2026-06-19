@@ -1353,25 +1353,6 @@ impl<'a> ConditionContext<'a> {
             } else {
                 self.moved_cards.to_vec()
             };
-            eprintln!(
-                "[CARD_CNT] source=preceding_moved snap={:?} global={:?} using={}",
-                self.game_state
-                    .entry_trigger_moved_cards()
-                    .as_deref()
-                    .map(|v| v.len()),
-                self.game_state
-                    .recently_moved_cards
-                    .as_deref()
-                    .map(|v| v.len()),
-                moved_source.len()
-            );
-            log::debug!(
-                "[MOVED_DEBUG] moved_cards={:?} trigger_moved={:?} recently_moved={:?} using={:?}",
-                self.moved_cards,
-                self.game_state.entry_trigger_moved_cards(),
-                self.game_state.recently_moved_cards,
-                moved_source
-            );
             let actual = moved_source
                 .iter()
                 .filter(|&&cid| {

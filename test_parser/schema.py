@@ -140,6 +140,14 @@ COMPARISON_TARGETS: Dict[str, str] = {
 }
 
 COMPARISON_OPERATORS: Dict[str, str] = {
+    # Continuative forms (used before かつ/、 in compound conditions)
+    "高く": ">",
+    "低く": "<",
+    "多く": ">",
+    "少なく": "<",
+    "大きく": ">",
+    "小さく": "<",
+    # Plain/dictionary forms
     "高い": ">",
     "低い": "<",
     "少ない": "<",

@@ -177,7 +177,7 @@ export const ChoiceView = {
                     const resolved = cardNo ? State.resolveCardData(cardNo) : null;
                     const cardData = cardNo ? (resolved || cardByNo[cardNo] || null) : null;
                     const name = cardData?.name || a.parameters?.card_name || a.description || '';
-                     const isTextAction = cardNo === '-1' || (cardNo && !resolved);
+                     const isTextAction = cardNo === '-1' || (cardNo && !cardData);
                     optItems.push({ card: cardData, name, action: a, isText: isTextAction });
                 });
             } else if (state.legal_actions && state.legal_actions.length > 0) {
@@ -188,7 +188,7 @@ export const ChoiceView = {
                     const resolved = cardNo ? State.resolveCardData(cardNo) : null;
                     const cardData = cardNo ? (resolved || { card_no: cardNo }) : null;
                     // Text-only action (yes/no/skip/digit) → render as text button, not empty card
-                     const isTextAction = cardNo === '-1' || (cardNo && !resolved);
+                     const isTextAction = cardNo === '-1' || (cardNo && !cardData);
                     let name = cardData?.name || a.parameters?.card_name || a.description || '';
                     if (!name || name.startsWith('ACT_') || name.startsWith('CHOOSE_')) {
                         const ACTION_LABELS = {

@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-19T18:13:48.249383",
+  "generated_at": "2026-06-19T19:02:51.871484",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -12900,7 +12900,6 @@
               "aggregate": "total",
               "cost_limit": 1,
               "type": "comparison_condition",
-              "location": "success_live_card_zone",
               "count": 1
             }
           ],
@@ -18690,10 +18689,10 @@
             {
               "text": "ライブの合計スコアが相手より高く、",
               "comparison_target": "opponent",
+              "operator": ">",
               "comparison_type": "score",
               "aggregate": "total",
-              "type": "comparison_condition",
-              "location": "stage"
+              "type": "comparison_condition"
             },
             {
               "text": "自分のステージに『蓮ノ空』のメンバーがいる場合",
