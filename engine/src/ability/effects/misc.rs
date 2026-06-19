@@ -568,7 +568,7 @@ impl AbilityResolver {
             } else {
                 std::collections::HashSet::new()
             };
-        let (blade_targets, heart_targets, heart_color_str, final_count) = {
+        let (blade_targets, mut heart_targets, heart_color_str, final_count) = {
             let player = gs.resolve_target_player_mut(&target);
 
             let mut filter = effect.filter_subset();
@@ -1032,6 +1032,21 @@ impl AbilityResolver {
             }
         }
 
+        // group_reference: "same_group_name" — filter heart targets to only
+        // include cards whose group (unit) matches the recently-moved card's group.
+        if effect.group_reference.as_deref() == Some("same_group_name") {
+            let ref_group: Option<String> = gs.recently_moved_cards.as_ref().and_then(|moved| {
+                moved
+                    .iter()
+                    .find_map(|&cid| gs.card_database.get_card(cid).and_then(|c| c.unit.clone()))
+            });
+            if let Some(ref group) = ref_group {
+                heart_targets.retain(|cid: &i16| {
+                    util::card_matches_group_str(&gs.card_database, *cid, Some(group.as_str()))
+                });
+            }
+        }
+
         if resource == "heart" || resource == "ハート" {
             if heart_targets.is_empty() {
                 if effect.position.is_some() {
@@ -1126,6 +1141,17 @@ impl AbilityResolver {
                         gs.activating_card.unwrap_or(-1),
                         &effect.text,
                     );
+                }
+                // Build effect_data for heart cleanup on expiry
+                if is_temporary && effect_data.is_none() && !targets.is_empty() {
+                    let color_name = heart_color_str.as_deref().unwrap_or("heart01");
+                    let cards_json: Vec<serde_json::Value> = targets
+                        .iter()
+                        .map(|&cid| {
+                            serde_json::json!({"card_id": cid, "amount": heart_to_add, "color": color_name})
+                        })
+                        .collect();
+                    effect_data = Some(serde_json::Value::Array(cards_json));
                 }
             }
         }

@@ -7560,9 +7560,9 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         # per-shape code paths in the engine.
         effect = _collapse_to_effect_steps(effect)
 
-        # Fill missing trigger_condition from text when neither condition nor trigger_condition exists
-        if not effect.get("condition") and not effect.get("trigger_condition"):
-            txt = effect.get("text", "") or triggerless_text
+        # Fill missing trigger_condition from text when trigger_condition doesn't exist
+        if not effect.get("trigger_condition"):
+            txt = triggerless_text
             for sep in ["とき、", "場合、", "たび、", "なら、"]:
                 idx = txt.find(sep)
                 if idx >= 0:
@@ -7583,7 +7583,10 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
                     tc = parse_condition(cond_text)
                     if tc and tc.get("type") not in (None, "custom"):
                         effect["trigger_condition"] = tc
-                        effect["condition"] = copy.deepcopy(tc)
+                        # Only overwrite condition if not already set
+                        # (e.g. _try_conditional may have set it first)
+                        if not effect.get("condition"):
+                            effect["condition"] = copy.deepcopy(tc)
                         break
             if not effect.get("trigger_condition"):
                 for key in ("actions", "primary_effect", "conditional_action"):
@@ -7994,10 +7997,35 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     ct = t[: idx + 2]
                     tc = parse_condition(ct)
                     if tc and tc.get("type") not in (None, "custom"):
-                        eff["trigger_condition"] = tc
                         eff["condition"] = copy.deepcopy(tc)
+                        # Only set trigger_condition for card_count/preceding_moved,
+                        # which can be evaluated at scan time using recently_moved_cards.
+                        # Other types (appearance, movement, state_change) need
+                        # execution-time context and would break if pre-filtered.
+                        if (
+                            tc.get("type") == "card_count_condition"
+                            and tc.get("source") == "preceding_moved"
+                        ):
+                            eff["trigger_condition"] = tc
                         fix_stats["auto_trigger"] += 1
                         break
+
+        # FIX 13b: Auto abilities with card_count_condition/preceding_moved condition
+        # but no trigger_condition — copy condition as trigger_condition.
+        # Only applicable to card_count_condition + preceding_moved (stage→discard pattern),
+        # because only this condition type can be evaluated at scan time using
+        # recently_moved_cards. Other types (state_change, movement, appearance) need
+        # execution-time context and would break if pre-filtered at scan time.
+        if (
+            ability.get("triggers") == "自動"
+            and isinstance(eff, dict)
+            and isinstance(eff.get("condition"), dict)
+            and not eff.get("trigger_condition")
+            and eff["condition"].get("type") == "card_count_condition"
+            and eff["condition"].get("source") == "preceding_moved"
+        ):
+            eff["trigger_condition"] = copy.deepcopy(eff["condition"])
+            fix_stats["auto_trigger"] += 1
 
     # ============== POST-PROCESSING ==============
 
@@ -8165,15 +8193,6 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     eff["result_condition"] = result_cond
                     eff["followup_action"] = followup
                     eff.pop("actions", None)
-
-        # D1: Remove optional_action from each_time with appearance trigger
-        if (
-            eff.get("action") == "conditional_on_optional"
-            and eff.get("trigger_type") == "each_time"
-        ):
-            tc = eff.get("trigger_condition", {})
-            if isinstance(tc, dict) and tc.get("type") == "appearance_condition":
-                eff.pop("optional_action", None)
 
         # E0: Fix DOLLCHESTRA-type primary_effect — split select+modify_cost into sequential
         if eff.get("action") in ("conditional_on_result", "conditional_alternative"):

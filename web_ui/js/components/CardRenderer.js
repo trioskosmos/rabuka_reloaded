@@ -624,7 +624,8 @@ export const CardRenderer = {
                 const existingUnder = Array.from(underContainer.children);
                 while (underContainer.children.length < under.length) {
                     const uc = document.createElement('div');
-                    uc.className = 'under-card';
+                    const cardType = (card.card_type || '').toLowerCase();
+                    uc.className = 'under-card' + (cardType === 'energy' ? ' energy-type' : cardType === 'member' ? ' member-type' : '');
                     underContainer.appendChild(uc);
                 }
                 while (underContainer.children.length > under.length) {
@@ -648,6 +649,8 @@ export const CardRenderer = {
                     underContainer.style.display = 'none';
                 }
             }
+
+            area.classList.toggle('has-under-cards', under.length > 0);
 
             // Rust backend format: slot is { card_no, name, card_type, orientation }
             const isTapped = slot && slot.orientation === 'Wait';

@@ -483,9 +483,12 @@
 }
 
 .member-slot {
-    height: 100%;
-    max-width: 100%;
+    flex: 1;
+    min-height: 0;
+    align-self: center;
     aspect-ratio: 512 / 720;
+    max-width: 100%;
+    max-height: 100%;
     border: 2px dashed var(--border);
     border-radius: var(--radius-sm);
     position: relative;
@@ -584,17 +587,18 @@
 /* --- Under Cards (Stacked Behind Member) --- */
 .under-cards {
     display: flex;
-    flex-direction: row;
-    gap: 2px;
-    margin-top: 2px;
+    flex-wrap: wrap;
+    gap: 1px;
     justify-content: center;
     width: 100%;
-    min-height: 0;
+    flex: 0 0 auto;
+    max-height: 60%;
+    overflow-y: auto;
 }
 
 .under-card {
-    width: calc(var(--card-w-mini) * 0.5);
-    height: calc(var(--card-h-mini) * 0.5);
+    width: calc(var(--card-w-mini) * 0.35);
+    height: calc(var(--card-h-mini) * 0.35);
     border: 1px solid var(--border);
     border-radius: 2px;
     overflow: hidden;

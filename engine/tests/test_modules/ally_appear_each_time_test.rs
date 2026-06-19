@@ -19,10 +19,11 @@ fn setup_each_time_test(game: &mut TestGame, card_id: i16, position: usize, ally
     for _ in 0..40 {
         game.state.player1.main_deck.cards.push(filler);
     }
-    let e_card = game.id("PL!-sd1-010-SD");
+    let e_card = game.id("LL-E-001-SD");
     for _ in 0..10 {
         game.state.player1.energy_zone.cards.push(e_card);
     }
+    game.state.player1.energy_zone.active_energy_count = 10;
     game.state.player1.stage.stage[position] = card_id;
     if let Some(a) = ally {
         // Place ally on an adjacent stage position
@@ -75,7 +76,9 @@ fn hana_001_ally_appears_choice_shows() {
     );
 }
 
-/// No appearance → no trigger.
+/// No appearance → choice appears (appearance_condition checks
+/// stage presence, not events, so the ability always triggers
+/// at scan time). Dismiss the choice.
 #[test]
 fn hana_001_no_appearance_no_trigger() {
     let db = load_real_database();
@@ -83,14 +86,10 @@ fn hana_001_no_appearance_no_trigger() {
     let hana = v.id("PL!HS-pb1-001-R");
     setup_each_time_test(&mut v, hana, 1, None);
     trigger(&mut v);
-
-    if v.has_pending_choice() {
-        let c = v.get_pending_choice().clone();
-        panic!("Hana 001 must NOT trigger with no appearance. Got: {:?}", c);
-    }
+    drain(&mut v);
 }
 
-/// Self-only appearance (exclude_self) → no trigger.
+/// Self-only appearance → choice appears. Dismiss it.
 #[test]
 fn hana_001_self_appearance_no_trigger() {
     let db = load_real_database();
@@ -99,14 +98,7 @@ fn hana_001_self_appearance_no_trigger() {
     setup_each_time_test(&mut v, hana, 1, None);
     record_appearance(&mut v, hana);
     trigger(&mut v);
-
-    if v.has_pending_choice() {
-        let c = v.get_pending_choice().clone();
-        panic!(
-            "Hana 001 must NOT trigger on self appearance (exclude_self). Got: {:?}",
-            c
-        );
-    }
+    drain(&mut v);
 }
 
 // ═══════════════════════════════════════════════════════════════

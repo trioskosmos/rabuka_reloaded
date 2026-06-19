@@ -1353,6 +1353,15 @@ impl<'a> ConditionContext<'a> {
             } else {
                 self.moved_cards.to_vec()
             };
+            // Determine destination zone for zone-transition filtering.
+            // When condition.location (source) and condition.locations are both set,
+            // find the destination zone (a zone in locations that is NOT the source).
+            let dest_zone: Option<String> = condition.location.as_ref().and_then(|src| {
+                condition
+                    .locations
+                    .as_ref()
+                    .and_then(|locs| locs.iter().find(|l| l.as_str() != src.as_str()).cloned())
+            });
             let actual = moved_source
                 .iter()
                 .filter(|&&cid| {
@@ -1377,6 +1386,53 @@ impl<'a> ConditionContext<'a> {
                     }
                     if !hc.is_empty() && !util::card_matches_heart_colors(card_db, cid, hc) {
                         return false;
+                    }
+                    // Zone-transition filter: if destination zone is specified,
+                    // only count cards that are currently in that zone.
+                    if let Some(ref dest) = dest_zone {
+                        let zone_match = match Zone::from_str(dest) {
+                            Some(Zone::Discard) | Some(Zone::Waitroom) => {
+                                self.game_state.player1.waitroom.cards.contains(&cid)
+                                    || self.game_state.player2.waitroom.cards.contains(&cid)
+                            }
+                            Some(Zone::Stage) => {
+                                self.game_state.player1.stage.stage.contains(&cid)
+                                    || self.game_state.player2.stage.stage.contains(&cid)
+                            }
+                            Some(Zone::Hand) => {
+                                self.game_state.player1.hand.cards.contains(&cid)
+                                    || self.game_state.player2.hand.cards.contains(&cid)
+                            }
+                            Some(Zone::EnergyZone) | Some(Zone::Energy) => {
+                                self.game_state.player1.energy_zone.cards.contains(&cid)
+                                    || self.game_state.player2.energy_zone.cards.contains(&cid)
+                            }
+                            Some(Zone::Deck) | Some(Zone::DeckTop) | Some(Zone::DeckBottom) => {
+                                self.game_state.player1.main_deck.cards.contains(&cid)
+                                    || self.game_state.player2.main_deck.cards.contains(&cid)
+                            }
+                            Some(Zone::LiveCardZone) => {
+                                self.game_state.player1.live_card_zone.cards.contains(&cid)
+                                    || self.game_state.player2.live_card_zone.cards.contains(&cid)
+                            }
+                            Some(Zone::SuccessLiveZone) => {
+                                self.game_state
+                                    .player1
+                                    .success_live_card_zone
+                                    .cards
+                                    .contains(&cid)
+                                    || self
+                                        .game_state
+                                        .player2
+                                        .success_live_card_zone
+                                        .cards
+                                        .contains(&cid)
+                            }
+                            _ => true, // Unknown zone — don't filter
+                        };
+                        if !zone_match {
+                            return false;
+                        }
                     }
 
                     true

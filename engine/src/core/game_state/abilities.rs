@@ -626,10 +626,24 @@ impl GameState {
                             .as_ref()
                             .and_then(|e| e.condition.as_ref())
                             .map(|c| {
-                                matches!(
+                                // Direct discard-location condition
+                                let direct_discard = matches!(
                                     Zone::from_str(c.location.as_deref().unwrap_or("")),
                                     Some(Zone::Discard | Zone::Waitroom)
-                                )
+                                );
+                                // Movement from stage to discard (preceding_moved + stage source + locations contains discard)
+                                let movement_to_discard = c.source.as_deref()
+                                    == Some("preceding_moved")
+                                    && c.location.as_deref() == Some("stage")
+                                    && c.locations.as_ref().is_some_and(|locs| {
+                                        locs.iter().any(|loc| {
+                                            matches!(
+                                                Zone::from_str(loc),
+                                                Some(Zone::Discard | Zone::Waitroom)
+                                            )
+                                        })
+                                    });
+                                direct_discard || movement_to_discard
                             })
                             .unwrap_or(false);
                         if is_auto && has_discard_condition {
@@ -828,11 +842,13 @@ impl GameState {
             if let Some(pid) = self.ability_master_id() {
                 self.process_pending_auto_abilities(&pid);
             }
-            self.clear_effect_tracking();
+            // Trigger discarded card abilities BEFORE clearing tracking data,
+            // so recently_moved_cards is still populated.
             let master_id = self.ability_master_id();
-            if let Some(pid) = master_id {
-                self.trigger_auto_for_discarded_cards(&pid);
+            if let Some(ref pid) = master_id {
+                self.trigger_auto_for_discarded_cards(pid);
             }
+            self.clear_effect_tracking();
         }
     }
 
