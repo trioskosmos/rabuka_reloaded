@@ -2079,23 +2079,46 @@ impl AbilityResolver {
         gs: &mut GameState,
         indices: &[usize],
     ) -> Result<(), String> {
-        let select_action = gs
-            .ability_queue
-            .current_entry()
-            .and_then(|e| e.ability.effect.as_ref())
-            .and_then(|ef| ef.compound.select_action.clone());
+        let target = self
+            .spawn_context
+            .target
+            .clone()
+            .or_else(|| gs.entry_effect().and_then(|e| e.target.clone()))
+            .unwrap_or_else(|| "self".to_string());
+        let select_action = self
+            .current_effect
+            .as_ref()
+            .and_then(|ef| ef.compound.select_action.clone())
+            .or_else(|| {
+                gs.ability_queue
+                    .current_entry()
+                    .and_then(|e| e.ability.effect.as_ref())
+                    .and_then(|ef| ef.compound.select_action.clone())
+            });
+        let current = self.current_effect.as_ref();
+        eprintln!("[HSC_LA] target={} cur_eff={:?} cur_dest={:?} cur_discard={:?} cur_place={:?} sel_act_dest={:?}",
+            target,
+            current.map(|c| &c.action),
+            current.and_then(|c| c.destination.as_deref()),
+            current.and_then(|c| c.discard_remaining),
+            current.and_then(|c| c.placement_order.as_deref()),
+            select_action.as_ref().and_then(|sa| sa.destination.as_deref()),
+        );
         let (destination, discard_remaining, placement_order) = (
             select_action
                 .as_ref()
                 .and_then(|sa| sa.destination.clone())
+                .or_else(|| current.and_then(|c| c.destination.clone()))
                 .unwrap_or_else(|| Zone::Hand.to_str().to_string()),
             select_action
                 .as_ref()
                 .and_then(|sa| sa.discard_remaining)
+                .or_else(|| current.and_then(|c| c.discard_remaining))
                 .unwrap_or(true),
             select_action
                 .as_ref()
-                .and_then(|sa| sa.placement_order.clone()),
+                .and_then(|sa| sa.placement_order.clone())
+                .or_else(|| current.and_then(|c| c.placement_order.clone())),
         );
 
         if gs.looked_at_cards.is_empty() && !self.selected_cards.is_empty() {
@@ -2174,7 +2197,7 @@ impl AbilityResolver {
 
         if needs_order {
             gs.looked_at_cards = selected_cards;
-            let player = gs.active_player_mut();
+            let player = gs.resolve_target_player_mut(&target);
             let dest_zone = if discard_remaining {
                 Zone::Discard.to_str()
             } else {
@@ -2199,7 +2222,7 @@ impl AbilityResolver {
             return Ok(());
         }
 
-        let player = gs.active_player_mut();
+        let player = gs.resolve_target_player_mut(&target);
         log::debug!("[PLACE] dest={} cards={:?}", destination, selected_cards);
         for card_id in selected_cards {
             util::place_card_in_zone(player, card_id, &destination, None, false, 1);
@@ -2260,7 +2283,7 @@ impl AbilityResolver {
             return Ok(());
         }
 
-        let player = gs.active_player_mut();
+        let player = gs.resolve_target_player_mut(&target);
         let dest_zone = if discard_remaining {
             Zone::Discard.to_str()
         } else {

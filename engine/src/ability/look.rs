@@ -40,7 +40,8 @@ impl AbilityResolver {
                             })
                         });
                     gs.looked_at_cards = matching;
-                    let player = gs.resolve_target_player_mut("self");
+                    let player_target = effect.target_name();
+                    let player = gs.resolve_target_player_mut(player_target);
                     for &card_id in &non_matching {
                         player.waitroom.add_card(card_id);
                     }
@@ -53,7 +54,8 @@ impl AbilityResolver {
                         .iter()
                         .partition(|&&card_id| filter.matches(card_db, card_id, false));
                     gs.looked_at_cards = matching;
-                    let player = gs.resolve_target_player_mut("self");
+                    let player_target = effect.target_name();
+                    let player = gs.resolve_target_player_mut(player_target);
                     for &card_id in &non_matching {
                         player.waitroom.add_card(card_id);
                     }
@@ -575,7 +577,8 @@ impl AbilityResolver {
                         })
                     });
                 gs.looked_at_cards = matching;
-                let player = gs.resolve_target_player_mut("self");
+                let player_target = effect.target_name();
+                let player = gs.resolve_target_player_mut(player_target);
                 for &card_id in &non_matching {
                     player.waitroom.add_card(card_id);
                 }
@@ -588,7 +591,8 @@ impl AbilityResolver {
                     .iter()
                     .partition(|&&card_id| filter.matches(card_db, card_id, false));
                 gs.looked_at_cards = matching;
-                let player = gs.resolve_target_player_mut("self");
+                let player_target = effect.target_name();
+                let player = gs.resolve_target_player_mut(player_target);
                 for &card_id in &non_matching {
                     player.waitroom.add_card(card_id);
                 }

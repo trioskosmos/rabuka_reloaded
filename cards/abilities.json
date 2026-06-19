@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-20T01:07:39.919919",
+  "generated_at": "2026-06-20T02:08:12.518741",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -10906,22 +10906,31 @@
       "cost": null,
       "effect": {
         "text": "自分か相手を選ぶ。自分は、そのプレイヤーのデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
-        "action": "look_and_select",
-        "look_action": {
-          "text": "自分か相手を選ぶ。自分は、そのプレイヤーのデッキの上からカードを2枚見る。",
-          "source": "deck_top",
-          "count": 2,
-          "action": "look_at"
-        },
-        "select_action": {
-          "action": "select_cards",
-          "discard_remaining": true,
-          "destination": "deck_top",
-          "placement_order": "any_order",
-          "any_number": true,
-          "reveal": false,
-          "text": "自分か相手を選ぶ。自分は、そのプレイヤーのデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く"
-        }
+        "action": "choose_target_player",
+        "choice_options": [
+          "自分",
+          "相手"
+        ],
+        "effect_steps": [
+          {
+            "text": "自分は、そのプレイヤーのデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
+            "action": "look_and_select",
+            "look_action": {
+              "text": "自分は、そのプレイヤーのデッキの上からカードを2枚見る。",
+              "source": "deck_top",
+              "count": 2,
+              "action": "look_at"
+            },
+            "select_action": {
+              "action": "select_cards",
+              "discard_remaining": true,
+              "destination": "deck_top",
+              "placement_order": "any_order",
+              "any_number": true,
+              "reveal": false
+            }
+          }
+        ]
       }
     },
     {
@@ -11370,8 +11379,12 @@
       },
       "effect": {
         "text": "自分か相手を選ぶ。自分は、そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く。そうした場合、自分はカードを1枚引く",
-        "action": "sequential",
-        "actions": [
+        "action": "choose_target_player",
+        "choice_options": [
+          "自分",
+          "相手"
+        ],
+        "effect_steps": [
           {
             "text": "自分は、そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く。そうした場合、自分はカードを1枚引く",
             "action": "sequential",
@@ -11382,23 +11395,19 @@
                 "destination": "deck_bottom",
                 "count": 1,
                 "card_type": "live_card",
-                "action": "move_cards",
-                "target": "self"
+                "action": "move_cards"
               },
               {
                 "text": "自分はカードを1枚引く",
                 "count": 1,
                 "action": "draw_card",
                 "source": "deck",
-                "destination": "hand",
-                "target": "self"
+                "destination": "hand"
               }
             ],
-            "conditional": true,
-            "target": "self"
+            "conditional": true
           }
-        ],
-        "conditional": true
+        ]
       }
     },
     {
@@ -11782,15 +11791,24 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分は、そのプレイヤーの控え室にあるメンバーカードを2枚まで、好きな順番でデッキの一番下に置く",
-        "source": "discard",
-        "destination": "deck_bottom",
-        "placement_order": "any_order",
-        "count": 2,
-        "card_type": "member_card",
-        "max": true,
-        "action": "move_cards",
-        "target": "self"
+        "text": "自分か相手を選ぶ。自分は、そのプレイヤーの控え室にあるメンバーカードを2枚まで、好きな順番でデッキの一番下に置く",
+        "action": "choose_target_player",
+        "choice_options": [
+          "自分",
+          "相手"
+        ],
+        "effect_steps": [
+          {
+            "text": "自分は、そのプレイヤーの控え室にあるメンバーカードを2枚まで、好きな順番でデッキの一番下に置く",
+            "source": "discard",
+            "destination": "deck_bottom",
+            "placement_order": "any_order",
+            "count": 2,
+            "card_type": "member_card",
+            "max": true,
+            "action": "move_cards"
+          }
+        ]
       }
     },
     {
@@ -13167,28 +13185,36 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分は、そのプレイヤーのデッキの一番上のカードを見る。自分はそのカードを控え室に置いてもよい",
-        "action": "sequential",
-        "actions": [
+        "text": "自分か相手を選ぶ。自分は、そのプレイヤーのデッキの一番上のカードを見る。自分はそのカードを控え室に置いてもよい",
+        "action": "choose_target_player",
+        "choice_options": [
+          "自分",
+          "相手"
+        ],
+        "effect_steps": [
           {
-            "text": "自分は、そのプレイヤーのデッキの一番上のカードを見る",
-            "source": "deck_top",
-            "count": 1,
-            "action": "look_at",
-            "target": "self"
-          },
-          {
-            "text": "自分はそのカードを控え室に置いてもよい",
-            "destination": "discard",
-            "optional": true,
-            "action": "move_cards",
-            "source": "hand",
-            "card_type": "card",
-            "count": 1,
-            "target": "self"
+            "text": "自分は、そのプレイヤーのデッキの一番上のカードを見る。自分はそのカードを控え室に置いてもよい",
+            "action": "sequential",
+            "actions": [
+              {
+                "text": "自分は、そのプレイヤーのデッキの一番上のカードを見る",
+                "source": "deck_top",
+                "count": 1,
+                "action": "look_at"
+              },
+              {
+                "text": "自分はそのカードを控え室に置いてもよい",
+                "destination": "discard",
+                "optional": true,
+                "action": "move_cards",
+                "source": "hand",
+                "card_type": "card",
+                "count": 1
+              }
+            ]
           }
         ],
-        "target": "self"
+        "optional": true
       }
     },
     {
@@ -17710,8 +17736,12 @@
       "cost": null,
       "effect": {
         "text": "自分か相手を選ぶ。自分は、そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く。そうした場合、自分はカードを1枚引く",
-        "action": "sequential",
-        "actions": [
+        "action": "choose_target_player",
+        "choice_options": [
+          "自分",
+          "相手"
+        ],
+        "effect_steps": [
           {
             "text": "自分は、そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く。そうした場合、自分はカードを1枚引く",
             "action": "sequential",
@@ -17722,23 +17752,19 @@
                 "destination": "deck_bottom",
                 "count": 1,
                 "card_type": "live_card",
-                "action": "move_cards",
-                "target": "self"
+                "action": "move_cards"
               },
               {
                 "text": "自分はカードを1枚引く",
                 "count": 1,
                 "action": "draw_card",
                 "source": "deck",
-                "destination": "hand",
-                "target": "self"
+                "destination": "hand"
               }
             ],
-            "conditional": true,
-            "target": "self"
+            "conditional": true
           }
-        ],
-        "conditional": true
+        ]
       }
     },
     {

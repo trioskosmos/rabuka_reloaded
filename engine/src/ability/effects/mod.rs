@@ -741,6 +741,7 @@ impl AbilityResolver {
                 self.execute_reveal_until_live_card(gs, effect.target_name())
             }
             ActionType::RevealUntilChosenCard => self.execute_reveal_until_chosen_card(gs, effect),
+            ActionType::ChooseTargetPlayer => self.execute_choose_target_player(gs, effect),
             ActionType::PerformYell => {
                 let count = if effect.per_unit.unwrap_or(false) {
                     // per_unit with per_unit_source = "previous_moved_cards":

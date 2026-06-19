@@ -28,11 +28,20 @@ impl super::resolver::AbilityResolver {
     /// If another choice interrupts execution, the remaining actions are safely parked back.
     pub fn resume_pending_commands(&mut self, gs: &mut GameState) -> Result<(), String> {
         let pending = gs.ability_queue.take_pending_commands();
+        eprintln!("[RPC] pending_commands_count={}", pending.len());
         for (idx, command) in pending.iter().enumerate() {
             match command {
                 Command::Effect(effect) => {
                     self.spawn_context.target = effect.target.clone();
+                    eprintln!(
+                        "[RPC] executing effect action={} target={:?}",
+                        effect.action, effect.target
+                    );
                     self.execute_effect(gs, effect)?;
+                    eprintln!(
+                        "[RPC] after execute: pending={}",
+                        self.pending_choice.is_some()
+                    );
                 }
                 Command::MoveCard {
                     card_id,
@@ -1865,6 +1874,59 @@ impl super::resolver::AbilityResolver {
             Some(super::enums::SelectTargetKind::Order) => {
                 return self.handle_order_selection(gs, selected);
             }
+            Some(super::enums::SelectTargetKind::SelfOrOpponent) => {
+                let chosen = match selected {
+                    "自分" => "self",
+                    "相手" => "opponent",
+                    _ => return Err("Invalid choice for SelfOrOpponent".to_string()),
+                };
+                eprintln!("[SELFOR] chosen={}", chosen);
+                self.spawn_context.target = Some(chosen.to_string());
+                if let Some(ref current) = self.current_effect {
+                    eprintln!(
+                        "[SELFOR] current.action={} steps={:?}",
+                        current.action,
+                        current.effect_steps.as_ref().map(|s| s.len())
+                    );
+                    if let Some(ref steps) = current.effect_steps {
+                        if let Some(inner) = steps.first() {
+                            let mut modified = inner.clone();
+                            eprintln!(
+                                "[SELFOR] inner.action={} steps_before={}",
+                                modified.action,
+                                modified.effect_steps.as_ref().map(|s| s.len()).unwrap_or(0)
+                            );
+                            Self::set_chosen_target(&mut modified, chosen);
+                            eprintln!(
+                                "[SELFOR] after_set: target={:?} has_la={} has_sa={}",
+                                modified.target,
+                                modified.compound.look_action.is_some(),
+                                modified.compound.select_action.is_some()
+                            );
+                            self.pending_choice = None;
+                            gs.ability_queue
+                                .set_pending_commands(vec![Command::Effect(modified)]);
+                            let res = self.resume_pending_commands(gs);
+                            eprintln!(
+                                "[SELFOR] after resume: pending={:?} res={:?}",
+                                self.pending_choice.is_some(),
+                                res
+                            );
+                            match res {
+                                Ok(()) => return Ok(()),
+                                Err(e) => {
+                                    eprintln!("[SELFOR] inner effect failed: {}", e);
+                                    self.clear_choice_state(gs);
+                                    return Ok(());
+                                }
+                            }
+                        }
+                    }
+                }
+                eprintln!("[SELFOR] no inner effect found");
+                self.clear_choice_state(gs);
+                return Ok(());
+            }
             None => {}
         }
 
@@ -1911,7 +1973,13 @@ impl super::resolver::AbilityResolver {
                         }
                     }
                     let card_ids: Vec<i16> = gs.looked_at_cards.iter().rev().copied().collect();
-                    let player = gs.active_player_mut();
+                    let target = self
+                        .spawn_context
+                        .target
+                        .clone()
+                        .or_else(|| gs.entry_effect().and_then(|e| e.target.clone()))
+                        .unwrap_or_else(|| "self".to_string());
+                    let player = gs.resolve_target_player_mut(&target);
                     for card_id in card_ids {
                         player.main_deck.cards.insert(0, card_id);
                     }
@@ -2403,5 +2471,49 @@ impl super::resolver::AbilityResolver {
     fn clear_choice_state_and_resume(&mut self, gs: &mut GameState) -> Result<(), String> {
         self.clear_choice_state(gs);
         self.resume_pending_commands(gs)
+    }
+
+    /// Recursively set target on all sub-effects that don't have an explicit target.
+    /// Excludes draw/draw_card actions (always target self) and select_cards (handled
+    /// via spawn_context.target fallback in handle_select_card_internal).
+    fn set_chosen_target(effect: &mut AbilityEffect, target: &str) {
+        let skip_actions = ["draw", "draw_card", "select_cards"];
+        if skip_actions.contains(&effect.action.as_str()) {
+            return;
+        }
+        if effect.target.is_none() || effect.target.as_deref() == Some("self") {
+            effect.target = Some(target.to_string());
+        }
+        if let Some(ref mut la) = effect.compound.look_action {
+            Self::set_chosen_target(la, target);
+        }
+        if let Some(ref mut sa) = effect.compound.select_action {
+            Self::set_chosen_target(sa, target);
+        }
+        if let Some(ref mut actions) = effect.compound.actions {
+            for a in actions.iter_mut() {
+                Self::set_chosen_target(a, target);
+            }
+        }
+        if let Some(ref mut steps) = effect.effect_steps {
+            for s in steps.iter_mut() {
+                Self::set_chosen_target(s, target);
+            }
+        }
+        if let Some(ref mut oa) = effect.opponent_action {
+            Self::set_chosen_target(oa, target);
+        }
+        if let Some(ref mut pri) = effect.compound.primary_effect {
+            Self::set_chosen_target(pri, target);
+        }
+        if let Some(ref mut oa2) = effect.compound.optional_action {
+            Self::set_chosen_target(oa2, target);
+        }
+        if let Some(ref mut ca) = effect.compound.conditional_action {
+            Self::set_chosen_target(ca, target);
+        }
+        if let Some(ref mut fu) = effect.compound.followup_action {
+            Self::set_chosen_target(fu, target);
+        }
     }
 }

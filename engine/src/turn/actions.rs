@@ -400,6 +400,31 @@ impl super::TurnEngine {
                                 }
                             }
                         }
+                        // For self_or_opponent, look up option text by index from card_indices
+                        if target == "self_or_opponent" {
+                            if let Some(ref opts) = options {
+                                if let Some(ref indices) = card_indices {
+                                    if let Some(&idx) = indices.first() {
+                                        if idx < opts.len() {
+                                            return Ok(
+                                                crate::ability::types::ChoiceResult::TargetSelected {
+                                                    target: opts[idx].clone(),
+                                                },
+                                            );
+                                        }
+                                    }
+                                }
+                                if let Some(id) = card_id {
+                                    if id >= 0 && (id as usize) < opts.len() {
+                                        return Ok(
+                                            crate::ability::types::ChoiceResult::TargetSelected {
+                                                target: opts[id as usize].clone(),
+                                            },
+                                        );
+                                    }
+                                }
+                            }
+                        }
                         match card_id {
                             Some(-1) => "skip".to_string(),
                             Some(id) => id.to_string(),

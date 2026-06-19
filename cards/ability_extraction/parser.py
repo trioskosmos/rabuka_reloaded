@@ -4690,21 +4690,17 @@ def _try_opponent_action(text):
 
 
 def _try_choose_self_opponent(text):
-    """自分か相手を選ぶ。— choose self or opponent."""
+    """自分か相手を選ぶ。— choose self or opponent, then execute effect on chosen player."""
     if not text.startswith("自分か相手を選ぶ。"):
         return None
     rest = text[len("自分か相手を選ぶ。") :].strip()
-    result = {"text": text, "action": "sequential"}
-    if rest:
-        re_eff = parse_effect(rest)
-        if "target" not in re_eff or not re_eff["target"]:
-            re_eff["target"] = "self"
-        result["actions"] = [re_eff]
-        if "そうした場合" in rest:
-            result["conditional"] = True
-    else:
-        result["actions"] = []
-    return result
+    inner = parse_effect(rest)
+    return {
+        "text": text,
+        "action": "choose_target_player",
+        "choice_options": ["自分", "相手"],
+        "effect_steps": [inner],
+    }
 
 
 def _try_opponent_after_conditional(text):
@@ -6572,12 +6568,12 @@ _EFFECT_HANDLERS = [
     _try_cost_modification,
     _try_kore_niyori_case,
     _try_heart_select_reveal,
+    _try_choose_self_opponent,
     _try_look_and_select,
     _try_answer_choice,
     _try_each_time,
     _try_unless_effect,
     _try_opponent_action,
-    _try_choose_self_opponent,
     _try_opponent_after_conditional,
     _try_reveal_until_chosen_card,
     _try_reveal_until_live,

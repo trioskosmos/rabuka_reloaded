@@ -205,6 +205,9 @@ pub enum ActionType {
     AllBladeTiming,
     SetCardIdentityAllRegions,
 
+    // Player target choice
+    ChooseTargetPlayer,
+
     // Missing variants from effects/mod.rs dispatch
     PlayBatonTouch,
     ModifyRequiredHeartsGlobal,
@@ -221,6 +224,7 @@ impl ActionType {
             "draw" => Some(ActionType::Draw),
             "draw_card" => Some(ActionType::DrawCard),
             "draw_until_count" => Some(ActionType::DrawUntilCount),
+            "choose_target_player" => Some(ActionType::ChooseTargetPlayer),
             "move_cards" => Some(ActionType::MoveCards),
             "discard_card" => Some(ActionType::DiscardCard),
             "select" => Some(ActionType::Select),
@@ -288,6 +292,7 @@ impl ActionType {
             ActionType::Draw => "draw",
             ActionType::DrawCard => "draw_card",
             ActionType::DrawUntilCount => "draw_until_count",
+            ActionType::ChooseTargetPlayer => "choose_target_player",
             ActionType::MoveCards => "move_cards",
             ActionType::DiscardCard => "discard_card",
             ActionType::Select => "select",
@@ -352,6 +357,7 @@ impl ActionType {
             ActionType::Draw => "Draw",
             ActionType::DrawCard => "Draw Card",
             ActionType::DrawUntilCount => "Draw Until Count",
+            ActionType::ChooseTargetPlayer => "Choose Target Player",
             ActionType::MoveCards => "Move Cards",
             ActionType::DiscardCard => "Discard Card",
             ActionType::Select => "Select",
@@ -548,6 +554,7 @@ pub enum SelectTargetKind {
     ConditionalOptional,
     DrawAnyNumber,
     Order,
+    SelfOrOpponent,
 }
 
 impl SelectTargetKind {
@@ -567,6 +574,7 @@ impl SelectTargetKind {
             "conditional_optional" => Some(Self::ConditionalOptional),
             "draw_any_number" => Some(Self::DrawAnyNumber),
             "order" => Some(Self::Order),
+            "self_or_opponent" => Some(Self::SelfOrOpponent),
             _ => None,
         }
     }
@@ -587,6 +595,7 @@ impl SelectTargetKind {
             Self::ConditionalOptional => "conditional_optional",
             Self::DrawAnyNumber => "draw_any_number",
             Self::Order => "order",
+            Self::SelfOrOpponent => "self_or_opponent",
         }
     }
 }

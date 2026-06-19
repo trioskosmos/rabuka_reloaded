@@ -2438,6 +2438,25 @@ impl AbilityResolver {
         });
     }
 
+    pub(crate) fn execute_choose_target_player(
+        &mut self,
+        _gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(), String> {
+        self.current_effect = Some(effect.clone());
+        let options = effect
+            .choice_options
+            .clone()
+            .unwrap_or_else(|| vec!["自分".to_string(), "相手".to_string()]);
+        self.pending_choice = Some(Choice::SelectTarget {
+            target: "self_or_opponent".to_string(),
+            description: "Choose self or opponent".to_string(),
+            allow_skip: false,
+            options: Some(options),
+        });
+        Ok(())
+    }
+
     pub(crate) fn execute_shuffle(&mut self, gs: &mut GameState, target: &str, source: &str) {
         let player = gs.resolve_target_player_mut(target);
         match Zone::from_str(source) {
