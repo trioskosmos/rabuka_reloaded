@@ -203,6 +203,7 @@ impl AbilityResolver {
         original_value: Option<bool>,
         original_count: Option<u32>,
         original_operator: Option<&str>,
+        exclude_self: bool,
     ) -> Result<(), String> {
         if per_unit {
             let card_db = &gs.card_database;
@@ -223,8 +224,14 @@ impl AbilityResolver {
                         .collect()
                 }
             };
+            let activating_id = gs.activating_card;
             let mut count = 0u32;
             for &card_id in &cards {
+                if exclude_self {
+                    if activating_id == Some(card_id) {
+                        continue;
+                    }
+                }
                 if let Some(g) = group_name {
                     if !util::card_matches_group_str(card_db, card_id, Some(g)) {
                         continue;
@@ -248,9 +255,16 @@ impl AbilityResolver {
             player.live_card_zone.cards.to_vec()
         };
         let db = &gs.card_database;
+        let activating_id = gs.activating_card;
         let card_ids: Vec<i16> = card_ids
             .into_iter()
             .filter(|&card_id| {
+                // Exclude the activating card when exclude_self is set
+                if exclude_self {
+                    if activating_id == Some(card_id) {
+                        return false;
+                    }
+                }
                 // Filter by group_name (e.g. "μ's")
                 if let Some(gn) = group_name {
                     if !util::card_matches_group_str(db, card_id, Some(gn)) {

@@ -312,6 +312,7 @@ impl AbilityResolver {
                 effect.original_value,
                 effect.original_count,
                 effect.original_operator.as_deref(),
+                effect.exclude_self.unwrap_or(false),
             ),
             ActionType::SetCost => {
                 self.execute_set_cost(
