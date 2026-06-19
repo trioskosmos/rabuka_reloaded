@@ -1589,6 +1589,34 @@ pub fn resolve_per_unit_count(
     if !per_unit {
         return 1;
     }
+    // heart_colors: count unique heart colors across matching stage cards
+    if per_unit_type == Some("heart_colors") {
+        let mut colors_found: std::collections::HashSet<crate::card::HeartColor> =
+            std::collections::HashSet::new();
+        let stage_cards = zone_cards(player, Zone::Stage.to_str());
+        for &cid in stage_cards {
+            if filter.matches(card_db, cid, true) {
+                if let Some(card) = card_db.get_card(cid) {
+                    for color_str in heart_colors {
+                        let hc = parse_heart_color(color_str);
+                        let has = card
+                            .base_heart
+                            .as_ref()
+                            .map_or(false, |bh| bh.hearts.contains_key(&hc))
+                            || card
+                                .need_heart
+                                .as_ref()
+                                .map_or(false, |nh| nh.hearts.contains_key(&hc));
+                        if has {
+                            colors_found.insert(hc);
+                        }
+                    }
+                }
+            }
+        }
+        return colors_found.len() as u32;
+    }
+
     let zone = match per_unit_type {
         Some("stage") | Some("member") | Some("人") | Some("members") => Zone::Stage.to_str(),
         Some("hand") | Some("card") => Zone::Hand.to_str(),

@@ -8221,6 +8221,29 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
 
     _add_cost_reference(data["unique_abilities"])
 
+    # FIX 16: per_unit_type for heart_colors — "色につき" pattern should count
+    # unique heart colors, not members
+    def _fix_heart_colors_per_unit(d):
+        if isinstance(d, dict):
+            if (
+                d.get("action") == "modify_score"
+                and d.get("per_unit_type") == "member"
+                and d.get("heart_colors")
+            ):
+                t = d.get("text", "")
+                if "色につき" in t:
+                    d["per_unit_type"] = "heart_colors"
+                    fix_stats["heart_colors_per_unit"] = (
+                        fix_stats.get("heart_colors_per_unit", 0) + 1
+                    )
+            for v in d.values():
+                _fix_heart_colors_per_unit(v)
+        elif isinstance(d, list):
+            for item in d:
+                _fix_heart_colors_per_unit(item)
+
+    _fix_heart_colors_per_unit(data["unique_abilities"])
+
     # ============== POST-PROCESSING ==============
 
     for ability in data["unique_abilities"]:

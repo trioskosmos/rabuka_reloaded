@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-20T05:11:42.188997",
+  "generated_at": "2026-06-20T05:21:03.940294",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -18482,7 +18482,7 @@
         "operation": "add",
         "self_target": true,
         "per_unit": true,
-        "per_unit_type": "member",
+        "per_unit_type": "heart_colors",
         "group_names": [
           "虹ヶ咲"
         ],
