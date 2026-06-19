@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-19T21:18:36.520248",
+  "generated_at": "2026-06-19T22:29:30.484146",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -5228,25 +5228,54 @@
       },
       "effect": {
         "text": "好きなハートの色を1つ指定する。その後、自分のデッキの上からカードを5枚公開する。公開されたカードの中に指定した色のハートを持つメンバーカードと必要ハートに指定した色を含むライブカードが合計5枚含まれる場合、その中から『μ's』のカードを1枚手札に加え、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。公開した残りのカードを控え室に置く",
-        "action": "look_and_select",
-        "condition": {
-          "type": "location_condition",
-          "card_type": "member_card",
-          "location": "stage",
-          "text": "好きなハートの色を1つ指定する。その後、自分のデッキの上からカードを5枚公開する。公開されたカードの中に指定した色のハートを持つメンバーカードと必要ハートに指定した色を含むライブカードが合計5枚含まれる場合",
-          "aggregate": "total"
-        },
-        "select_action": {
-          "action": "select_cards",
-          "discard_remaining": true,
-          "reveal": false,
-          "destination": "hand",
-          "count": 1,
-          "group_names": [
-            "μ's"
-          ],
-          "text": "好きなハートの色を1つ指定する。その後、自分のデッキの上からカードを5枚公開する。公開されたカードの中に指定した色のハートを持つメンバーカードと必要ハートに指定した色を含むライブカードが合計5枚含まれる場合、その中から『μ's』のカードを1枚手札に加え、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。公開した残りのカードを控え室に置く"
-        },
+        "action": "sequential",
+        "actions": [
+          {
+            "action": "specify_heart_color",
+            "choice": true,
+            "target": "self",
+            "text": "好きなハートの色を1つ指定する",
+            "group_names": [
+              "μ's"
+            ]
+          },
+          {
+            "action": "reveal",
+            "source": "deck_top",
+            "count": 5,
+            "target": "self",
+            "text": "自分のデッキの上からカードを5枚公開する",
+            "group_names": [
+              "μ's"
+            ]
+          },
+          {
+            "action": "select_cards",
+            "source": "revealed_cards",
+            "count": 1,
+            "destination": "hand",
+            "discard_remaining": true,
+            "group_names": [
+              "μ's"
+            ],
+            "text": "好きなハートの色を1つ指定する。その後、自分のデッキの上からカードを5枚公開する。公開されたカードの中に指定した色のハートを持つメンバーカードと必要ハートに指定した色を含むライブカードが合計5枚含まれる場合、その中から『μ's』のカードを1枚手札に加え、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。公開した残りのカードを控え室に置く"
+          },
+          {
+            "action": "gain_resource",
+            "resource": "blade",
+            "count": 3,
+            "duration": "live_end",
+            "text": "ブレードを得る"
+          },
+          {
+            "action": "move_cards",
+            "source": "revealed_cards",
+            "destination": "discard",
+            "count": 0,
+            "all": true,
+            "text": "公開した残りのカードを控え室に置く"
+          }
+        ],
         "group_names": [
           "μ's"
         ]

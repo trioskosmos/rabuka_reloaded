@@ -870,3 +870,223 @@ fn hs_bp5_021_no_score_bonus_with_one_mirakura_member() {
         score_mod
     );
 }
+
+/// 3 eligible members on stage: pick the middle (Center, index 1).
+/// Verifies exactly 1 member gets the multiplier — the selected one.
+#[test]
+fn hs_bp5_021_three_members_pick_middle() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let live_card = game.id("PL!HS-bp5-021-L");
+    let member = game.id("PL!HS-sd1-003-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.give_energy(30);
+    fill_decks(&mut game, filler);
+
+    let member_b = game.new_id("PL!HS-sd1-003-SD");
+    let member_c = game.new_id("PL!HS-sd1-003-SD");
+
+    game.state.player1.hand.cards.push(member);
+    game.state.player1.hand.cards.push(member_b);
+    game.state.player1.hand.cards.push(member_c);
+    game.play_to_stage(member, MemberArea::LeftSide);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    game.play_to_stage(member_b, MemberArea::Center);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    game.play_to_stage(member_c, MemberArea::RightSide);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    game.state.player1.hand.cards.push(live_card);
+    advance_to_live_card_set(&mut game);
+    game.set_live_card(live_card);
+    game.pass();
+    game.pass();
+
+    // Drain SelectAutoAbility and member debut choices until we hit SetHeartType
+    while game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectAutoAbility") => {
+                game.select_indices(&[0]);
+            }
+            Some("SelectCard") => {
+                // Only break on stage selection (SetHeartType); drain other SelectCard choices
+                use rabuka_engine::ability::types::Choice;
+                let is_stage = match game.get_pending_choice() {
+                    Choice::SelectCard { zone, .. } => zone == "stage",
+                    _ => false,
+                };
+                if is_stage {
+                    game.select_indices(&[1]);
+                    break;
+                }
+                game.select_indices(&[]);
+            }
+            _ => {
+                game.select_indices(&[]);
+            }
+        }
+    }
+
+    assert_eq!(
+        game.state.mods.heart_color_multiplier.len(),
+        1,
+        "Exactly 1 member has the multiplier"
+    );
+    assert!(
+        game.state
+            .mods
+            .heart_color_multiplier
+            .contains_key(&member_b),
+        "Center member (picked) should have the multiplier"
+    );
+    assert!(
+        !game.state.mods.heart_color_multiplier.contains_key(&member),
+        "LeftSide should NOT have multiplier"
+    );
+    assert!(
+        !game
+            .state
+            .mods
+            .heart_color_multiplier
+            .contains_key(&member_c),
+        "RightSide should NOT have multiplier"
+    );
+}
+
+/// 1 eligible + 1 non-eligible on stage: auto-selects the eligible member.
+#[test]
+fn hs_bp5_021_one_eligible_one_ineligible_auto_select() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let live_card = game.id("PL!HS-bp5-021-L");
+    let hasuno = game.id("PL!HS-sd1-003-SD"); // 蓮ノ空 member
+    let non_hasuno = game.id("PL!-sd1-010-SD"); // μ's, not 蓮ノ空
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.give_energy(20);
+    fill_decks(&mut game, filler);
+
+    game.state.player1.hand.cards.push(hasuno);
+    game.state.player1.hand.cards.push(non_hasuno);
+    game.play_to_stage(hasuno, MemberArea::Center);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    game.play_to_stage(non_hasuno, MemberArea::LeftSide);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    game.state.player1.hand.cards.push(live_card);
+    advance_to_live_card_set(&mut game);
+    game.set_live_card(live_card);
+    game.pass();
+    game.pass();
+
+    // Drain auto-ability and member choices; if SetHeartType creates a stage
+    // selection choice, there must be 0 (all drained) since auto-select should happen.
+    // Check that we never saw a stage SelectCard.
+    let mut saw_stage_choice = false;
+    while game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectAutoAbility") => {
+                game.select_indices(&[0]);
+            }
+            Some("SelectCard") => {
+                use rabuka_engine::ability::types::Choice;
+                let is_stage = match game.get_pending_choice() {
+                    Choice::SelectCard { zone, .. } => zone == "stage",
+                    _ => false,
+                };
+                if is_stage {
+                    saw_stage_choice = true;
+                    game.select_indices(&[0]);
+                } else {
+                    game.select_indices(&[]);
+                }
+            }
+            _ => {
+                game.select_indices(&[]);
+            }
+        }
+    }
+
+    assert!(
+        !saw_stage_choice,
+        "No stage choice expected (only 1 eligible \u{2192} auto-select)"
+    );
+    assert!(
+        game.state.mods.heart_color_multiplier.contains_key(&hasuno),
+        "Hasunosora member should have the multiplier"
+    );
+    assert!(
+        !game
+            .state
+            .mods
+            .heart_color_multiplier
+            .contains_key(&non_hasuno),
+        "Non-Hasunosora member should NOT have the multiplier"
+    );
+}
+
+/// Precise heart count after transform: all hearts shifted to heart01, total unchanged.
+#[test]
+fn hs_bp5_021_precise_heart_count_after_transform() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let live_card = game.id("PL!HS-bp5-021-L");
+    let member = game.id("PL!HS-sd1-001-SD"); // heart04:3 = 3 total
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.give_energy(10);
+    fill_decks(&mut game, filler);
+
+    game.state.player1.hand.cards.push(member);
+    game.play_to_stage(member, MemberArea::Center);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    game.state.player1.hand.cards.push(live_card);
+    advance_to_live_card_set(&mut game);
+    game.set_live_card(live_card);
+    game.pass();
+    game.pass();
+
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    let stage_hearts = game.state.player1.calculate_stage_hearts(
+        &game.state.card_database,
+        &game.state.mods.heart_color_multiplier,
+        &Default::default(),
+        &Default::default(),
+    );
+
+    assert_eq!(
+        stage_hearts.hearts.get(&HeartColor::Heart01),
+        Some(&3),
+        "All 3 hearts should be heart01 after transform"
+    );
+    assert_eq!(
+        stage_hearts.hearts.get(&HeartColor::Heart04),
+        None,
+        "Original heart04 should have 0 after transform"
+    );
+    assert_eq!(
+        stage_hearts.hearts.values().sum::<u32>(),
+        3,
+        "Total heart count unchanged at 3"
+    );
+}

@@ -527,7 +527,9 @@ impl<'a> ConditionContext<'a> {
                 }
                 if let Some(source_name) = condition.baton_touch_source.as_deref() {
                     if let Some(card) = self.game_state.card_database.get_card(replaced_id) {
-                        if !card.name.contains(source_name) {
+                        let norm_name = crate::card::CardDatabase::normalize_name(&card.name);
+                        let norm_source = crate::card::CardDatabase::normalize_name(source_name);
+                        if !norm_name.contains(&norm_source) {
                             return false;
                         }
                     } else {

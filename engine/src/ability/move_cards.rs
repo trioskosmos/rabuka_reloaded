@@ -390,6 +390,44 @@ impl AbilityResolver {
             }
             return Ok(cards);
         }
+        if source_str == "revealed_cards" {
+            let take_count = if is_all {
+                gs.revealed_cards.len()
+            } else {
+                count.min(gs.revealed_cards.len())
+            };
+            let can_skip = is_max || effect.optional.unwrap_or(false);
+            if take_count < gs.revealed_cards.len() && can_skip {
+                let filter = util::filter_from_parts_full(
+                    card_type_filter,
+                    group_name,
+                    cost_limit,
+                    None,
+                    character_filter,
+                    name_fragments,
+                    None,
+                    None,
+                    cost_total,
+                    cost_total_operator,
+                );
+                let matching: Vec<usize> = (0..gs.revealed_cards.len())
+                    .filter(|&i| filter.matches(card_db, gs.revealed_cards[i], false))
+                    .collect();
+                if take_count < matching.len() {
+                    self.prompt_card_selection(
+                        "revealed_cards",
+                        take_count,
+                        can_skip,
+                        effect,
+                        &filter,
+                        Some(matching),
+                    );
+                    return Ok(vec![]);
+                }
+            }
+            let cards: Vec<i16> = gs.revealed_cards.drain(..take_count).collect();
+            return Ok(cards);
+        }
 
         // Handle "those_cards" alias: resolve to the trigger_moved_cards stored
         // in the ability queue entry (the cards that triggered the each_time
@@ -1071,7 +1109,7 @@ impl AbilityResolver {
             taken.retain(|&id| {
                 card_db
                     .get_card(id)
-                    .map(|c| seen.insert(c.name.clone()))
+                    .map(|c| seen.insert(CardDatabase::normalize_name(&c.name)))
                     .unwrap_or(true)
             });
             if taken.len() < count {

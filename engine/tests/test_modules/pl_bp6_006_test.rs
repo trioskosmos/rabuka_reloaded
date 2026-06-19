@@ -1,28 +1,21 @@
 use crate::helpers::*;
 
 /// PL!-bp6-006-R+ 西木野真姫 (Nishikino Maki, μ's)
-/// 起動 turn1: discard 1 → reveal 5 from deck.
-///   If revealed has a μ's member AND a μ's live card, add 1 to hand.
-///
-/// Note: the "choose a heart color" step is not parsed in the JSON
-/// (parser limitation), so the look_and_select directly reveals 5.
-///
-/// Edge cases:
-///   - Deck < 5 cards → partial reveal
-///   - Matching μ's cards found → can pick
-///   - No matching μ's cards → no pick
+/// 起動 turn1: discard 1 → choose heart color → reveal 5 from deck →
+///   if all 5 match chosen heart, pick 1 μ's from revealed to hand,
+///   gain 3 blades until live_end, send rest to discard.
 
-fn fill_decks(game: &mut TestGame, filler: i16) {
-    game.state.player1.main_deck.cards.clear();
-    game.state.player2.main_deck.cards.clear();
-    for _ in 0..30 {
-        game.state.player1.main_deck.cards.push(filler);
-        game.state.player2.main_deck.cards.push(filler);
+fn drain_cost_and_color(game: &mut TestGame) {
+    if game.has_pending_choice() && game.pending_choice_type().as_deref() == Some("SelectCard") {
+        game.select_indices(&[0]);
+    }
+    if game.has_pending_choice() && game.pending_choice_type().as_deref() == Some("SelectTarget") {
+        game.select_option(1);
     }
 }
 
 #[test]
-fn maki_bp6_activate_cost_discard_works() {
+fn maki_bp6_cost_discard_works() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let maki = game.id("PL!-bp6-006-R+");
@@ -30,50 +23,40 @@ fn maki_bp6_activate_cost_discard_works() {
 
     game.state.player1.stage.stage = [-1, maki, -1];
     game.state.player1.hand.cards.push(filler);
-    fill_decks(&mut game, filler);
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..5 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     game.give_energy(10);
+    game.state.turn_number = 1;
 
     let hand_before = game.state.player1.hand.cards.len();
 
     game.activate_ability(maki);
+    drain_cost_and_color(&mut game);
 
-    // Cost: discard 1 card from hand
-    if game.has_pending_choice() && game.pending_choice_type().as_deref() == Some("SelectCard") {
-        game.select_indices(&[0]);
-    }
-
-    // After cost, engine goes to look_and_select → SelectCard
-    eprintln!("choice after cost: {:?}", game.pending_choice_type());
-
-    assert_eq!(
-        game.state.player1.hand.cards.len(),
-        hand_before - 1,
-        "1 card discarded as cost"
-    );
+    assert_eq!(game.state.player1.hand.cards.len(), hand_before - 1);
+    assert_eq!(game.state.player1.energy_zone.active_energy_count, 10);
 }
 
 #[test]
-fn maki_bp6_look_and_select_creates_choices() {
+fn maki_bp6_full_flow_pick_mus_card() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let maki = game.id("PL!-bp6-006-R+");
     let filler = game.id("PL!-sd1-010-SD");
-
-    // Setup deck with specific cards for a known outcome
-    // We'll use a member with heart01 and a live needing heart01
-    let member_heart01 = game.id("PL!-sd1-001-SD"); // has heart01
-    let live_need01 = game.id("PL!-sd1-019-SD"); // needs heart01
+    let mus_fodder = game.id("PL!-sd1-010-SD");
 
     game.state.player1.stage.stage = [-1, maki, -1];
     game.state.player1.hand.cards.push(filler);
-
-    // Clear deck and place known cards at top
     game.state.player1.main_deck.cards.clear();
-    game.state.player1.main_deck.cards.push(filler);
-    game.state.player1.main_deck.cards.push(filler);
-    game.state.player1.main_deck.cards.push(filler);
-    game.state.player1.main_deck.cards.push(member_heart01);
-    game.state.player1.main_deck.cards.push(live_need01);
+    for _ in 0..5 {
+        game.state.player1.main_deck.cards.push(mus_fodder);
+    }
     for _ in 0..25 {
         game.state.player1.main_deck.cards.push(filler);
     }
@@ -82,33 +65,30 @@ fn maki_bp6_look_and_select_creates_choices() {
         game.state.player2.main_deck.cards.push(filler);
     }
     game.give_energy(10);
+    game.state.turn_number = 1;
 
     game.activate_ability(maki);
+    drain_cost_and_color(&mut game);
 
-    // Cost: discard
-    if game.has_pending_choice() && game.pending_choice_type().as_deref() == Some("SelectCard") {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "SelectCard from revealed expected"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "revealed cards selection"
+    );
 
-    // Heart color: choose heart01
-    if game.has_pending_choice()
-        && game.pending_choice_type().as_deref() == Some("SelectHeartColor")
-    {
-        game.select_indices(&[0]); // heart01
-    }
+    let hand_before = game.state.player1.hand.cards.len();
+    game.select_indices(&[0]);
 
-    // After color selection, should have revealed cards + look_and_select choices
-    // The engine will either auto-resolve or create a SelectCard choice
-    if game.has_pending_choice() && game.pending_choice_type().as_deref() == Some("SelectCard") {
-        game.select_indices(&[0]);
-    }
-
-    // Verify the flow completed without errors
-    assert!(true, "activation flow completed");
+    assert_eq!(game.state.player1.hand.cards.len(), hand_before + 1);
+    assert!(!game.has_pending_choice(), "flow completed");
 }
 
 #[test]
-fn maki_bp6_deck_lt5_handles_gracefully() {
+fn maki_bp6_deck_lt5_reveals_partial() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let maki = game.id("PL!-bp6-006-R+");
@@ -116,32 +96,61 @@ fn maki_bp6_deck_lt5_handles_gracefully() {
 
     game.state.player1.stage.stage = [-1, maki, -1];
     game.state.player1.hand.cards.push(filler);
-
-    // Deck has only 3 cards
     game.state.player1.main_deck.cards.clear();
-    game.state.player1.main_deck.cards.push(filler);
-    game.state.player1.main_deck.cards.push(filler);
-    game.state.player1.main_deck.cards.push(filler);
+    for _ in 0..3 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
     game.state.player2.main_deck.cards.clear();
     for _ in 0..30 {
         game.state.player2.main_deck.cards.push(filler);
     }
     game.give_energy(10);
+    game.state.turn_number = 1;
 
     game.activate_ability(maki);
+    drain_cost_and_color(&mut game);
 
     if game.has_pending_choice() && game.pending_choice_type().as_deref() == Some("SelectCard") {
         game.select_indices(&[0]);
     }
-    if game.has_pending_choice()
-        && game.pending_choice_type().as_deref() == Some("SelectHeartColor")
-    {
-        game.select_indices(&[0]);
+
+    assert!(!game.has_pending_choice(), "partial deck flow completed");
+    assert_eq!(game.state.player1.main_deck.cards.len(), 0, "all 3 used");
+}
+
+#[test]
+fn maki_bp6_no_mus_in_revealed_skips_selection() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let maki = game.id("PL!-bp6-006-R+");
+    let non_mus = game.id("PL!S-bp2-009-R");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [-1, maki, -1];
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..5 {
+        game.state.player1.main_deck.cards.push(non_mus);
     }
+    for _ in 0..25 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.give_energy(10);
+    game.state.turn_number = 1;
+
+    game.activate_ability(maki);
+    drain_cost_and_color(&mut game);
+
+    // Non-μ's revealed cards filtered to empty → prompt with allow_skip
     if game.has_pending_choice() && game.pending_choice_type().as_deref() == Some("SelectCard") {
-        game.select_indices(&[0]);
+        game.select_indices(&[]);
     }
-    // Should not crash — engine handles <5 deck gracefully
+
+    assert!(!game.has_pending_choice(), "no remaining prompts");
 }
 
 #[test]
@@ -154,19 +163,23 @@ fn maki_bp6_use_limit_turn1_enforces() {
     game.state.player1.stage.stage = [-1, maki, -1];
     game.state.player1.hand.cards.push(filler);
     game.state.player1.hand.cards.push(filler);
-    fill_decks(&mut game, filler);
-    game.give_energy(10);
-
-    // First activation
-    game.activate_ability(maki);
-    if game.has_pending_choice() && game.pending_choice_type().as_deref() == Some("SelectCard") {
-        game.select_indices(&[0]);
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..5 {
+        game.state.player1.main_deck.cards.push(filler);
     }
-    // Drain color selection too
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.give_energy(10);
+    game.state.turn_number = 1;
+
+    // First activation — full drain
+    game.activate_ability(maki);
     while game.has_pending_choice() {
         match game.pending_choice_type().as_deref() {
-            Some("SelectHeartColor") | Some("SelectHeartType") => {
-                game.select_indices(&[0]);
+            Some("SelectTarget") => {
+                game.select_option(1);
             }
             Some("SelectCard") => {
                 game.select_indices(&[0]);
@@ -175,10 +188,7 @@ fn maki_bp6_use_limit_turn1_enforces() {
         }
     }
 
-    // Second activation should be blocked (use_limit=1 + turn1)
+    // Second activation fails
     let result = game.try_activate_ability(maki);
-    assert!(
-        result.is_err(),
-        "use_limit=1 + turn1 blocks second activation"
-    );
+    assert!(result.is_err(), "use_limit=1 blocks second activation");
 }

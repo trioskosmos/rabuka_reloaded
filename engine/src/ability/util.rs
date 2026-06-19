@@ -445,18 +445,8 @@ pub fn card_matches_characters(
         Some(names) if !names.is_empty() => {
             let card_names = card_db.get_card_names(card_id);
             names.iter().any(|name| {
-                let clean_name = name.replace([' ', '　'], "");
-                card_names.iter().any(|cn| {
-                    if cn.contains(&clean_name) {
-                        return true;
-                    }
-                    if cn.contains(' ') || cn.contains('　') {
-                        let clean_cn = cn.replace([' ', '　'], "");
-                        clean_cn.contains(&clean_name)
-                    } else {
-                        false
-                    }
-                })
+                let clean_name = CardDatabase::normalize_name(name);
+                card_names.iter().any(|cn| cn.contains(&clean_name))
             })
         }
         _ => true,
@@ -527,7 +517,7 @@ pub fn card_matches_name_constraint(
     match name_constraint {
         Some(name) => card_db
             .get_card(card_id)
-            .map(|c| c.name == name)
+            .map(|c| CardDatabase::normalize_name(&c.name) == CardDatabase::normalize_name(name))
             .unwrap_or(false),
         None => true,
     }
@@ -982,8 +972,12 @@ impl<'a> CardFilter<'a> {
 }
 
 fn card_matches_name_fragments(db: &CardDatabase, id: i16, fragments: &[String]) -> bool {
-    db.get_card(id)
-        .is_some_and(|card| fragments.iter().all(|f| card.name.contains(f.as_str())))
+    db.get_card(id).is_some_and(|card| {
+        let norm_name = CardDatabase::normalize_name(&card.name);
+        fragments
+            .iter()
+            .all(|f| norm_name.contains(&CardDatabase::normalize_name(f)))
+    })
 }
 
 // ============== FILTER CONSTRUCTION HELPERS ==============
@@ -1161,7 +1155,7 @@ pub fn filter_distinct(
     ids.into_iter()
         .filter(|&i| {
             db.get_card(cards[i])
-                .map(|c| seen.insert(c.name.clone()))
+                .map(|c| seen.insert(CardDatabase::normalize_name(&c.name)))
                 .unwrap_or(true)
         })
         .collect()
@@ -1680,7 +1674,7 @@ pub fn apply_distinct_filter(
         .filter(|&&id| {
             card_db
                 .get_card(id)
-                .map(|c| seen.insert(c.name.clone()))
+                .map(|c| seen.insert(CardDatabase::normalize_name(&c.name)))
                 .unwrap_or(true)
         })
         .copied()

@@ -171,6 +171,7 @@ impl AbilityResolver {
         let available = match Zone::from_str(source) {
             Some(Zone::Hand) => player.hand.cards.len(),
             Some(Zone::LookedAt) => looked_at_len,
+            Some(Zone::Deck) | Some(Zone::DeckTop) => player.main_deck.cards.len(),
             _ => 0,
         };
 
@@ -245,13 +246,11 @@ impl AbilityResolver {
         let card_ids: Vec<i16> = {
             match Zone::from_str(source) {
                 Some(Zone::Hand) => player.hand.cards.iter().copied().collect(),
-                Some(Zone::Deck) => player
-                    .main_deck
-                    .cards
-                    .iter()
-                    .take(count as usize)
-                    .copied()
-                    .collect(),
+                Some(Zone::Deck) | Some(Zone::DeckTop) => {
+                    let take_count = count.min(player.main_deck.cards.len() as u32) as usize;
+                    let ids: Vec<i16> = player.main_deck.cards.drain(..take_count).collect();
+                    ids
+                }
                 Some(Zone::LookedAt) => gs
                     .looked_at_cards
                     .iter()
@@ -532,6 +531,37 @@ impl AbilityResolver {
         let any_number = effect.any_number.unwrap_or(false);
         let count = effect.count.unwrap_or(1) as usize;
         let optional = effect.optional.unwrap_or(false);
+        let src = effect.source.as_deref().unwrap_or("");
+
+        // If source is revealed_cards, handle differently — no look_and_select pipeline
+        if src == "revealed_cards" {
+            let card_db = &gs.card_database;
+            let filter = util::CardFilter::from_effect(effect);
+            if filter.has_filter() {
+                // Filter revealed_cards in-place
+                gs.revealed_cards
+                    .retain(|&cid| filter.matches(card_db, cid, false));
+            }
+            let available = gs.revealed_cards.len();
+            let max_select = if optional || any_number {
+                available
+            } else {
+                count.min(available)
+            };
+            let choice = Choice::select_cards(
+                Zone::RevealedCards.to_str(),
+                max_select,
+                format!("Select card(s) from revealed cards"),
+                optional || any_number || available == 0,
+            )
+            .card_type(effect.card_type.clone())
+            .cost_limit(effect.cost_limit, effect.cost_limit_operator.clone())
+            .group(effect.group_names.as_ref().and_then(|v| v.first().cloned()))
+            .characters(effect.characters.clone())
+            .build();
+            self.pending_choice = Some(choice);
+            return Ok(());
+        }
 
         let card_db = &gs.card_database;
         // Support OR filter via options — card matches if ANY option matches

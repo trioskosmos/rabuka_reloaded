@@ -5032,6 +5032,99 @@ def _build_look_select_actions_inner(select_text):
     return result
 
 
+def _try_heart_select_reveal(text):
+    """好きなハートの色を指定 + 公開 + その中から — choose heart, reveal, select from revealed.
+
+    Handles the Maki bp6 pattern:
+      "好きなハートの色を1つ指定する。その後、デッキの上からカードをN枚公開する。
+       公開されたカードの中に...条件...合計N枚含まれる場合、その中から..."
+    → sequential [specify_heart_color, reveal, select_cards, gain_resource, cleanup]
+    """
+    if "好きなハートの色" not in text or "公開" not in text or "その中から" not in text:
+        return None
+    # Split on "その中から"
+    parts = text.split("その中から", 1)
+    before = parts[0].strip()
+    after = parts[1].strip() if len(parts) > 1 else ""
+    # Extract heart color selection and reveal from before-text
+    # "好きなハートの色を1つ指定する。その後、..."
+    if "その後、" in before:
+        _, rest = before.split("その後、", 1)
+    else:
+        rest = before
+    # Extract reveal instruction: "自分のデッキの上からカードを5枚公開する"
+    reveal_m = re.search(r"デッキの上からカードを(\d+)枚公開", rest)
+    if not reveal_m:
+        return None
+    reveal_count = int(reveal_m.group(1))
+    # Parse the after-text for the followup actions
+    # after = "『μ's』のカードを1枚手札に加え、...公開した残りのカードを控え室に置く"
+    select_actions = _build_look_select_actions(after) or {}
+    # Check if gain_resource is already nested in select_actions or needs standalone handling
+    has_blade = "{{icon_blade.png|ブレード}}" in after or "ブレード" in after
+    blade_count = after.count("{{icon_blade.png|ブレード}}")
+    if blade_count == 0 and has_blade:
+        m = re.search(r"ブレード", after)
+        blade_count = len(re.findall(r"ブレード", after))
+    seq = []
+    # Step 1: specify heart color
+    seq.append(
+        {
+            "action": "specify_heart_color",
+            "choice": True,
+            "target": "self",
+            "text": "好きなハートの色を1つ指定する",
+        }
+    )
+    # Step 2: reveal from deck_top
+    seq.append(
+        {
+            "action": "reveal",
+            "source": "deck_top",
+            "count": reveal_count,
+            "target": "self",
+            "text": f"自分のデッキの上からカードを{reveal_count}枚公開する",
+        }
+    )
+    # Step 3: select_cards from revealed_cards (if we had a select_action from _build)
+    if select_actions.get("action") == "select_cards":
+        sel = {
+            "action": "select_cards",
+            "source": "revealed_cards",
+            "count": select_actions.get("count", 1),
+            "destination": select_actions.get("destination", "hand"),
+            "discard_remaining": select_actions.get("discard_remaining", False),
+        }
+        if select_actions.get("group_names"):
+            sel["group_names"] = select_actions["group_names"]
+        if select_actions.get("card_type"):
+            sel["card_type"] = select_actions["card_type"]
+        seq.append(sel)
+    # Step 4: gain_resource blade if present
+    if blade_count > 0:
+        seq.append(
+            {
+                "action": "gain_resource",
+                "resource": "blade",
+                "count": blade_count,
+                "duration": "live_end",
+                "text": "ブレードを得る",
+            }
+        )
+    # Step 5: discard remaining revealed cards
+    seq.append(
+        {
+            "action": "move_cards",
+            "source": "revealed_cards",
+            "destination": "discard",
+            "count": 0,
+            "all": True,
+            "text": "公開した残りのカードを控え室に置く",
+        }
+    )
+    return {"text": text, "action": "sequential", "actions": seq}
+
+
 def _try_look_and_select(text):
     """その中から — look_at + select + action."""
     if "その中から" not in text:
@@ -6466,6 +6559,7 @@ _EFFECT_HANDLERS = [
     _try_activation_suffix,
     _try_cost_modification,
     _try_kore_niyori_case,
+    _try_heart_select_reveal,
     _try_look_and_select,
     _try_answer_choice,
     _try_each_time,

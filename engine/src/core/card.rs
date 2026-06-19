@@ -261,11 +261,17 @@ impl CardDatabase {
             .replace('＃', "#")
     }
 
+    /// Strip all whitespace from a card name so that inconsistent spacing
+    /// (e.g. "南 ことり" vs "南ことり") does not break ability conditions.
+    pub fn normalize_name(name: &str) -> String {
+        name.chars().filter(|c| !c.is_whitespace()).collect()
+    }
+
     /// Check if a card's name contains the given name fragment
     /// Used for cost payment and ability targeting (Q90, Q81, Q74)
     pub fn card_name_contains(&self, card_id: i16, name_fragment: &str) -> bool {
         if let Some(card) = self.cards.get(&card_id) {
-            card.name.contains(name_fragment)
+            Self::normalize_name(&card.name).contains(&Self::normalize_name(name_fragment))
         } else {
             false
         }
@@ -276,7 +282,7 @@ impl CardDatabase {
     pub fn get_card_names(&self, card_id: i16) -> Vec<String> {
         if let Some(card) = self.cards.get(&card_id) {
             // Handle both regular '&' and full-width '＆' separators
-            card.name
+            Self::normalize_name(&card.name)
                 .replace('＆', "&")
                 .split('&')
                 .map(|s| s.to_string())
@@ -289,9 +295,10 @@ impl CardDatabase {
     /// Check if card has any of the given names (for multi-name cards)
     pub fn card_has_any_name(&self, card_id: i16, names: &[&str]) -> bool {
         let card_names = self.get_card_names(card_id);
-        names
-            .iter()
-            .any(|&name| card_names.iter().any(|cn| cn.contains(name)))
+        names.iter().any(|&name| {
+            let norm = Self::normalize_name(name);
+            card_names.iter().any(|cn| cn.contains(&norm))
+        })
     }
 }
 

@@ -968,7 +968,24 @@ impl super::resolver::AbilityResolver {
                 Some(Zone::RevealedCards) => {
                     let dst = gs.entry_destination().map(|s| s.to_string());
                     let dst_str = dst.as_deref().unwrap_or(Zone::Hand.to_str());
-                    self.move_from_revealed(gs, indices, &mut validate_card, dst_str);
+                    let moved = self.move_from_revealed(gs, indices, &mut validate_card, dst_str);
+                    // If discard_remaining is set, move non-selected revealed cards to discard
+                    if gs
+                        .entry_effect()
+                        .is_some_and(|e| e.discard_remaining.unwrap_or(false))
+                    {
+                        let remaining: Vec<i16> = gs
+                            .revealed_cards
+                            .iter()
+                            .filter(|&&cid| !moved.contains(&cid))
+                            .copied()
+                            .collect();
+                        let player = gs.resolve_target_player_mut("self");
+                        for &cid in &remaining {
+                            player.waitroom.add_card(cid);
+                        }
+                        gs.revealed_cards.clear();
+                    }
                     return self.finalize_choice(gs, &context);
                 }
                 Some(Zone::UnderMember) => {
@@ -2288,11 +2305,15 @@ impl super::resolver::AbilityResolver {
         ];
         let idx: usize = selected.parse().unwrap_or(0);
         if idx < HEART_VALS.len() {
+            let color = HEART_VALS[idx];
             gs.prohibition_effects
-                .push(format!("selected_heart_color:{}", HEART_VALS[idx]));
+                .push(format!("selected_heart_color:{}", color));
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.conditional_choice = Some(color.to_string());
+            }
         }
         self.clear_choice_state(gs);
-        Ok(())
+        self.resume_pending_commands(gs)
     }
 
     fn handle_choice_condition(

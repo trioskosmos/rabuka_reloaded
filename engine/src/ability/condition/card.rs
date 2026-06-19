@@ -489,7 +489,12 @@ impl<'a> ConditionContext<'a> {
                 .cards
                 .iter()
                 .chain(self.game_state.player2.waitroom.cards.iter())
-                .any(|&id| card_db.get_card(id).is_some_and(|c| c.name.contains(src)))
+                .any(|&id| {
+                    card_db.get_card(id).is_some_and(|c| {
+                        crate::card::CardDatabase::normalize_name(&c.name)
+                            .contains(&crate::card::CardDatabase::normalize_name(src))
+                    })
+                })
             {
                 return false;
             }
@@ -887,14 +892,16 @@ impl<'a> ConditionContext<'a> {
                 let selected: &[i16] = self.selected_card_ids;
                 if let Some(&selected_id) = selected.last() {
                     if let Some(selected_card) = card_db.get_card(selected_id) {
-                        let selected_name = &selected_card.name;
+                        let selected_name =
+                            crate::card::CardDatabase::normalize_name(&selected_card.name);
                         let target_cards: Vec<i16> = util::zone_cards(player, location).to_vec();
                         let matching = target_cards
                             .iter()
                             .filter(|&&cid| {
-                                card_db
-                                    .get_card(cid)
-                                    .is_some_and(|c| c.name == *selected_name)
+                                card_db.get_card(cid).is_some_and(|c| {
+                                    crate::card::CardDatabase::normalize_name(&c.name)
+                                        == selected_name
+                                })
                             })
                             .count() as u32;
                         let required = condition.count.unwrap_or(1);
@@ -1922,14 +1929,13 @@ impl<'a> ConditionContext<'a> {
                                 self.game_state
                                     .card_database
                                     .get_card(cid)
-                                    .map(|c| c.name.clone())
+                                    .map(|c| crate::card::CardDatabase::normalize_name(&c.name))
                             })
                             .collect();
                         log::debug!("[APPEARANCE] stage card names: {:?}", stage_card_names);
                         let result = chars.iter().all(|name| {
-                            stage_card_names
-                                .iter()
-                                .any(|cname| cname.contains(name.as_str()))
+                            let norm = crate::card::CardDatabase::normalize_name(name);
+                            stage_card_names.iter().any(|cname| cname.contains(&norm))
                         });
                         log::debug!("[APPEARANCE] result={}", result);
                         if !result {
@@ -1937,22 +1943,28 @@ impl<'a> ConditionContext<'a> {
                         }
                         if let Some(ref ref_char) = condition.cost_reference_character {
                             let subject = chars[0].as_str();
+                            let norm_subject = crate::card::CardDatabase::normalize_name(subject);
                             let subject_cost = stage_ids
                                 .iter()
                                 .filter_map(|&cid| {
                                     let card = self.game_state.card_database.get_card(cid)?;
-                                    if card.name.contains(subject) {
+                                    let norm_name =
+                                        crate::card::CardDatabase::normalize_name(&card.name);
+                                    if norm_name.contains(&norm_subject) {
                                         card.cost
                                     } else {
                                         None
                                     }
                                 })
                                 .next();
+                            let norm_ref = crate::card::CardDatabase::normalize_name(ref_char);
                             let ref_cost = stage_ids
                                 .iter()
                                 .filter_map(|&cid| {
                                     let card = self.game_state.card_database.get_card(cid)?;
-                                    if card.name.contains(ref_char.as_str()) {
+                                    let norm_name =
+                                        crate::card::CardDatabase::normalize_name(&card.name);
+                                    if norm_name.contains(&norm_ref) {
                                         card.cost
                                     } else {
                                         None
@@ -2393,7 +2405,9 @@ impl<'a> ConditionContext<'a> {
                 if let Some(exc) = exclude_characters {
                     if let Some(card) = card_db.get_card(card_id) {
                         if exc.iter().any(|e| {
-                            card.name.contains(e.as_str()) || card.card_no.contains(e.as_str())
+                            crate::card::CardDatabase::normalize_name(&card.name)
+                                .contains(&crate::card::CardDatabase::normalize_name(e.as_str()))
+                                || card.card_no.contains(e.as_str())
                         }) {
                             log::debug!(
                                 "[COUNT_EXCLUDE] excluding card {} (name={})",
