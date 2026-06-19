@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-19T20:07:05.885732",
+  "generated_at": "2026-06-19T20:17:19.270017",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -15627,12 +15627,12 @@
             "source": "stage",
             "card_type": "member_card",
             "target": "self",
+            "exclude_self": true,
             "group_names": [
               "みらくらぱーく！"
             ],
             "optional": true,
-            "action": "position_change",
-            "exclude_self": true
+            "action": "position_change"
           },
           {
             "text": "{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る",
@@ -18839,6 +18839,7 @@
         "duration": "live_end",
         "card_type": "member_card",
         "target": "self",
+        "exclude_self": true,
         "group_names": [
           "虹ヶ咲"
         ],

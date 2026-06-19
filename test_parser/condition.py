@@ -476,7 +476,7 @@ def _try_card_count(text, f):
     if (
         "このメンバー以外" in text
         or "このカード以外" in text
-        or "ほかのメンバー" in text
+        or bool(re.search(r"ほかの.*メンバー", text))
     ):
         result["exclude_self"] = True
         result["card_type"] = "member_card"

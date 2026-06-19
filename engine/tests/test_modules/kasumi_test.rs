@@ -280,6 +280,97 @@ fn kasumi_q76_cannot_target_locked_area() {
 }
 
 #[test]
+fn kasumi_q76_appear_when_stage_full_all_occupied() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let kasumi = game.id("PL!N-bp1-002-R\u{ff0b}");
+    let filler1 = game.new_id("PL!-sd1-010-SD");
+    let filler2 = game.new_id("PL!-sd1-010-SD");
+    let filler3 = game.new_id("PL!-sd1-010-SD");
+    let discard_fodder = game.id("PL!-sd1-010-SD");
+
+    // Setup: all 3 stage positions occupied, Kasumi in discard
+    game.state.player1.stage.stage[0] = filler1;
+    game.state.player1.stage.stage[1] = filler2;
+    game.state.player1.stage.stage[2] = filler3;
+    game.state.player1.waitroom.cards.push(kasumi);
+    game.state.player1.hand.cards.push(discard_fodder);
+    game.give_energy(2);
+
+    // Activate ability
+    game.activate_ability(kasumi);
+
+    // Resolve: discard fodder from hand
+    assert!(game.has_pending_choice(), "Discard prompt expected");
+    game.select_indices(&[0]);
+
+    // Position prompt should appear even though stage is "full"
+    assert!(
+        game.has_pending_choice(),
+        "Position prompt should appear when stage is full (allow_occupied_stage)"
+    );
+
+    // Choose LeftSide (occupied by filler1) — should replace
+    TurnEngine::resume_with_choice(&mut game.state, Some(0), None).expect("select left");
+
+    // Kasumi replaces filler1 on LeftSide
+    game.assert_stage_pos(
+        MemberArea::LeftSide,
+        kasumi,
+        "Kasumi replaced filler1 on left",
+    );
+
+    // filler1 moved to waitroom
+    assert!(
+        game.state.player1.waitroom.cards.contains(&filler1),
+        "filler1 was moved to waitroom"
+    );
+
+    // LeftSide should be locked
+    assert!(
+        game.state
+            .player1
+            .areas_locked_this_turn
+            .contains(&MemberArea::LeftSide),
+        "LeftSide locked after ability appearance"
+    );
+
+    // Other areas NOT locked
+    assert!(
+        !game
+            .state
+            .player1
+            .areas_locked_this_turn
+            .contains(&MemberArea::Center),
+        "Center should not be locked"
+    );
+    assert!(
+        !game
+            .state
+            .player1
+            .areas_locked_this_turn
+            .contains(&MemberArea::RightSide),
+        "RightSide should not be locked"
+    );
+
+    // filler2 and filler3 remain in place
+    assert_eq!(
+        game.state.player1.stage.stage[1], filler2,
+        "filler2 still on center"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[2], filler3,
+        "filler3 still on right"
+    );
+
+    // Kasumi no longer in discard
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&kasumi),
+        "Kasumi moved from discard"
+    );
+}
+
+#[test]
 fn kasumi_q122_look_top3_no_refresh_with_exactly_3() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

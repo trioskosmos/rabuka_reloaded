@@ -89,6 +89,45 @@ t = "ブレードの数が相手より小さく、"
 r = parse_condition(t)
 check("小さく → <", r.get("operator"), "<")
 
+# ── 10. exclude_self with ほかの (group name between ほかの and メンバー) ──
+print("\n[10] exclude_self with ほかの separated by group name")
+t = "自分のステージにいるほかの『虹ヶ咲』のメンバーは{{icon_blade.png|ブレード}}を得る"
+r = parse_effect(t)
+check("exclude_self for ほかの『虹ヶ咲』のメンバー", r.get("exclude_self"), True)
+check("group_names should include 虹ヶ咲", r.get("group_names"), ["虹ヶ咲"])
+check("action should be gain_resource", r.get("action"), "gain_resource")
+check("resource should be blade", r.get("resource"), "blade")
+
+# ── 11. exclude_self with contiguous ほかのメンバー (regression) ──
+print("\n[11] exclude_self with contiguous ほかのメンバー")
+t = "自分のステージにほかのメンバーがいる場合、好きなハートの色を1つ指定する"
+r = parse_condition(t)
+check("exclude_self for contiguous ほかのメンバー", r.get("exclude_self"), True)
+check("card_type should be member_card", r.get("card_type"), "member_card")
+
+# ── 12. exclude_self with このメンバー以外 (baseline) ──
+print("\n[12] exclude_self with このメンバー以外")
+t = "自分のステージにこのメンバー以外のコスト11のメンバーが登場したとき"
+r = parse_condition(t)
+check("exclude_self for このメンバー以外", r.get("exclude_self"), True)
+
+# ── 13. exclude_self with kanji 他の separated by group name (baseline) ──
+print("\n[13] exclude_self with 他の separated by group name")
+t = "自分のステージにいる他の『みらくらぱーく！』のメンバー1人につき"
+r = parse_effect(t)
+check(
+    "exclude_self for 他の『みらくらぱーく！』のメンバー", r.get("exclude_self"), True
+)
+
+# ── 14. self_cost should NOT be set when ほかのメンバー is present ──
+print("\n[14] self_cost not set when ほかのメンバー present")
+t = "このメンバーと自分のステージにいるほかの『Liella!』のメンバー1人は、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る"
+r = parse_effect(t)
+# self_cost should not be set because ほかの is present (the card itself is excluded)
+if "self_cost" in r:
+    # If self_cost is set, it must be False - the card should NOT be the only target
+    check("self_cost should not be set for ほかの pattern", r.get("self_cost"), None)
+
 # ── Summary ──
 print()
 if ok:

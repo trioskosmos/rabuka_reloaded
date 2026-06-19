@@ -1094,6 +1094,7 @@ impl AbilityResolver {
         let stage_full = {
             let player = if use_p2 { &gs.player2 } else { &gs.player1 };
             Zone::from_str(&destination) == Some(Zone::Stage)
+                && !effect.allow_occupied_stage.unwrap_or(false)
                 && player.stage.stage.iter().all(|&id| id != -1)
         };
 

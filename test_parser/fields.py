@@ -229,7 +229,7 @@ class ExtractedFields:
         # Exclude self
         self.exclude_self = (
             "このメンバー以外" in raw
-            or "ほかのメンバー" in raw
+            or bool(re.search(r"ほかの.*メンバー", raw))
             or bool(re.search(r"他の.*メンバー", raw))
         )
 
@@ -237,7 +237,7 @@ class ExtractedFields:
         self.self_cost = (
             "このメンバー" in raw
             and "このメンバー以外" not in raw
-            and "ほかのメンバー" not in raw
+            and not bool(re.search(r"ほかの.*メンバー", raw))
             and bool(re.search(r"このメンバー[をが]", raw))
         )
         self.self_target = "このカード" in raw or (

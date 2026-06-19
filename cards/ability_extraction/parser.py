@@ -712,7 +712,7 @@ def _try_card_count(text):
             if (
                 "このメンバー以外" in text
                 or "このカード以外" in text
-                or "ほかのメンバー" in text
+                or bool(re.search(r"ほかの.*?メンバー", text))
             ):
                 result["exclude_self"] = True
                 result["card_type"] = "member_card"
@@ -2832,9 +2832,9 @@ def parse_action(text: str) -> Dict[str, Any]:
 
     # Extract exclude_self for actions (e.g., "このメンバー以外の" or "「character name」以外")
     # Only for filtering actions, NOT for gain_resource/select (self-buffs)
-    if ("このメンバー以外" in text or "ほかのメンバー" in text) and action.get(
-        "action"
-    ) not in ("gain_resource", "select", "heart_selection"):
+    if (
+        "このメンバー以外" in text or bool(re.search(r"ほかの.*?メンバー", text))
+    ) and action.get("action") not in ("gain_resource", "select", "heart_selection"):
         action["exclude_self"] = True
     # Also check for specific character name exclusions like "「鬼塚冬毬」以外"
     if re.search(r"「.+」以外", text):
@@ -3745,7 +3745,7 @@ def _extract_basic_cost_fields(cost, text):
                 cost["cost_limit_operator"] = op
                 break
     # Exclude self / self cost
-    if "このメンバー以外" in text or "ほかのメンバー" in text:
+    if "このメンバー以外" in text or bool(re.search(r"ほかの.*?メンバー", text)):
         cost["exclude_self"] = True
     # Same unit name
     if "同じユニット名" in text:
@@ -3755,7 +3755,7 @@ def _extract_basic_cost_fields(cost, text):
     if (
         "このメンバー" in text
         and "このメンバー以外" not in text
-        and "ほかのメンバー" not in text
+        and not bool(re.search(r"ほかの.*?メンバー", text))
     ):
         if re.search(r"このメンバー[をが]", text):
             cost["self_cost"] = True
