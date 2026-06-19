@@ -48,6 +48,7 @@ pub mod fuyumari_test;
 pub mod gameplay_test;
 pub mod hanamaru_test;
 
+pub mod hanamusubi_exclude_self_test;
 pub mod hanamusubi_test;
 pub mod hanano_test;
 pub mod hanayo_bp6_test;

@@ -941,6 +941,7 @@ impl GameState {
                         effect.original_count,
                         effect.original_operator.as_deref(),
                         effect.exclude_self.unwrap_or(false),
+                        effect.self_target.unwrap_or(false),
                     );
                     self.activating_card = prev_activating;
                 }

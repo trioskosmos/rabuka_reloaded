@@ -204,6 +204,7 @@ impl AbilityResolver {
         original_count: Option<u32>,
         original_operator: Option<&str>,
         exclude_self: bool,
+        self_target: bool,
     ) -> Result<(), String> {
         if per_unit {
             let card_db = &gs.card_database;
@@ -212,6 +213,9 @@ impl AbilityResolver {
             let cards: Vec<i16> = match location {
                 Some("success_live_zone") | Some("success_live_card_zone") => {
                     player.success_live_card_zone.cards.to_vec()
+                }
+                Some("live_card_zone") | Some("live_zone") => {
+                    player.live_card_zone.cards.to_vec()
                 }
                 _ => {
                     // Default: count stage members
@@ -248,21 +252,25 @@ impl AbilityResolver {
                 }
                 count += 1;
             }
-            value = count * per_unit_count;
+            // Mirror execute_modify_cost: divide the matched count by per_unit_count
+            // (every N cards) then multiply by the per-unit heart amount (value).
+            value = value * (count / per_unit_count.max(1));
         }
         let card_ids: Vec<i16> = {
             let player = gs.resolve_target_player_mut(target);
             player.live_card_zone.cards.to_vec()
         };
         let db = &gs.card_database;
-        let activating_id = gs.activating_card;
         let card_ids: Vec<i16> = card_ids
             .into_iter()
             .filter(|&card_id| {
-                // Exclude the activating card when exclude_self is set
-                if exclude_self {
-                    if activating_id == Some(card_id) {
-                        return false;
+                // When self_target is set, only the activating card receives the
+                // modifier (e.g. ハナムスビ reduces only its own heart requirement).
+                if self_target {
+                    if let Some(act) = gs.activating_card {
+                        if card_id != act {
+                            return false;
+                        }
                     }
                 }
                 // Filter by group_name (e.g. "μ's")
