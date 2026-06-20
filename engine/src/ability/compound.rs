@@ -221,6 +221,14 @@ impl AbilityResolver {
                                 }
                                 save_remaining(gs, remaining);
                                 return Ok(());
+                            } else if self.cancel_remaining_commands {
+                                // An optional sub-action (e.g. pay_energy with insufficient
+                                // energy) requested cancellation of subsequent actions.
+                                self.cancel_remaining_commands = false;
+                                if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                                    eprintln!("[SEQ_TRACE] cancel_remaining_commands set — aborting sequential loop");
+                                }
+                                return Ok(());
                             } else if action.optional.unwrap_or(false)
                                 && action.action == "change_state"
                             {

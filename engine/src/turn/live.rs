@@ -628,7 +628,7 @@ impl super::TurnEngine {
         for &idx in cards_to_remove.iter().rev() {
             if idx < player.live_card_zone.cards.len() {
                 let card_id = player.live_card_zone.cards.remove(idx);
-                player.waitroom.add_card(card_id);
+                player.waitroom.cards.push(card_id);
             }
         }
     }
@@ -649,9 +649,8 @@ impl super::TurnEngine {
             }
         }
         while !player.live_card_zone.cards.is_empty() {
-            player
-                .waitroom
-                .add_card(player.live_card_zone.cards.remove(0));
+            let card_id = player.live_card_zone.cards.remove(0);
+            player.waitroom.cards.push(card_id);
         }
     }
 
@@ -772,6 +771,12 @@ impl super::TurnEngine {
             }
         }
 
+        // Record what cards actually move to the waitroom (discard)
+        let mut moved_to_waitroom = Vec::new();
+        
+        let p1_live_before = game_state.player1.live_card_zone.cards.clone();
+        let p2_live_before = game_state.player2.live_card_zone.cards.clone();
+
         Self::process_player_live_result(
             &mut game_state.player1,
             player1_won,
@@ -784,6 +789,32 @@ impl super::TurnEngine {
             p2_must_skip,
             p2_can_place,
         );
+
+        // Find which cards ended up in waitroom
+        for cid in p1_live_before {
+            if game_state.player1.waitroom.cards.contains(&cid) {
+                moved_to_waitroom.push(cid);
+            }
+        }
+        for cid in p2_live_before {
+            if game_state.player2.waitroom.cards.contains(&cid) {
+                moved_to_waitroom.push(cid);
+            }
+        }
+
+        if !moved_to_waitroom.is_empty() {
+            game_state.recently_moved_cards = Some(moved_to_waitroom);
+            game_state.recently_moved_from_zone = Some("live_card_zone".to_string());
+            
+            // Scan and queue triggers for both players
+            game_state.trigger_auto_for_discarded_cards(&p1_id);
+            game_state.trigger_auto_for_discarded_cards(&p2_id);
+            Self::trigger_auto_abilities_for_player(game_state, &p1_id);
+            Self::trigger_auto_abilities_for_player(game_state, &p2_id);
+            
+            game_state.process_pending_auto_abilities(&p1_id);
+            game_state.process_pending_auto_abilities(&p2_id);
+        }
     }
 
     /// Check if a card has a success zone replacement ability (常時 + conditional_alternative).

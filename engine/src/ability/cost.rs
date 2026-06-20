@@ -144,8 +144,8 @@ impl AbilityResolver {
             }
             "move_cards" => {
                 let source = cost.source.as_deref().unwrap_or("");
-                // None means "any number" (player chooses 0..N)
-                let is_any_number = cost.count.is_none();
+                // any_number means player chooses 0..N
+                let is_any_number = cost.any_number.unwrap_or(false);
                 let count = cost.count.unwrap_or(1) as usize;
                 let card_type = cost.card_type.clone();
                 let optional = cost.optional.unwrap_or(false);
@@ -204,13 +204,33 @@ impl AbilityResolver {
                         match_names.join(", ")
                     );
 
-                    if is_optional && matching_indices.is_empty() {
-                        log::debug!("  └─ skip (optional/any_number, no eligible cards in hand)");
-                        if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                            entry.cost_paid = true;
-                            entry.optional_cost_result = Some(false);
+                    let has_restrictions = cost.characters.is_some() || cost.group_names.is_some() || cost.card_type.is_some() || cost.cost_limit.is_some();
+                    if !is_any_number && matching_indices.len() < count {
+                        if is_optional {
+                            // If optional cost, we should auto-skip if the hand is completely empty or doesn't have enough matching cards for name-restricted costs.
+                            // But if we just don't have enough cards in hand for a general optional cost (like having 0 cards when needing 1), we should auto-skip it.
+                            log::debug!("  └─ skip (optional, not enough eligible cards in hand)");
+                            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                                entry.cost_paid = true;
+                                entry.optional_cost_result = Some(false);
+                            }
+                            return Ok(());
+                        } else {
+                            // Non-optional and not enough matching cards -> cannot pay the cost
+                            return Err(format!("Not enough matching cards in hand to pay cost. Needs {}, has {}", count, matching_indices.len()));
                         }
-                        return Ok(());
+                    } else if is_any_number && matching_indices.is_empty() {
+                        if is_optional {
+                            log::debug!("  └─ skip (optional any_number, no eligible cards in hand)");
+                            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                                entry.cost_paid = true;
+                                entry.optional_cost_result = Some(false);
+                            }
+                            return Ok(());
+                        } else {
+                            // Non-optional, any_number requires at least 0? Wait, standard any_number normally allows 0. But if matching_indices is empty we just skip.
+                            return Ok(());
+                        }
                     } else if !matching_indices.is_empty() {
                         let desc = if is_any_number {
                             format!(

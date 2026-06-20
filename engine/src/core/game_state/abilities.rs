@@ -643,7 +643,20 @@ impl GameState {
                                             )
                                         })
                                     });
-                                direct_discard || movement_to_discard
+                                // Movement from live_card_zone to discard
+                                let movement_from_live = c.source.as_deref()
+                                    == Some("preceding_moved")
+                                    && c.location.as_deref() == Some("live_card_zone")
+                                    && c.locations.as_ref().is_some_and(|locs| {
+                                        locs.iter().any(|loc| {
+                                            matches!(
+                                                Zone::from_str(loc),
+                                                Some(Zone::Discard | Zone::Waitroom)
+                                            )
+                                        })
+                                    });
+                                direct_discard || movement_to_discard || movement_from_live
+
                             })
                             .unwrap_or(false);
                         if is_auto && has_discard_condition {
@@ -1675,6 +1688,32 @@ impl GameState {
                                     );
                                 }
                             }
+                        }
+                    }
+                }
+                s if s.starts_with("gain_ability:") => {
+                    let ability_text = s.trim_start_matches("gain_ability:");
+                    // Revert gained score modifier if any
+                    if let Some(val) = ability_text.split('+').nth(1).and_then(|s| {
+                        s.chars()
+                            .take_while(|c| c.is_ascii_digit())
+                            .collect::<String>()
+                            .parse::<i32>()
+                            .ok()
+                    }) {
+                        // Scan for card modifications to remove this score bonus
+                        // Since temporary effects might not store card_id in some paths, check the gained_abilities keys
+                        let mut card_to_revert = None;
+                        for (&cid, abilities) in &self.gained_abilities {
+                            if abilities.contains(&ability_text.to_string()) {
+                                card_to_revert = Some(cid);
+                                break;
+                            }
+                        }
+                        if let Some(card_id) = card_to_revert {
+                            self.mods.remove_score_modifier(card_id, val);
+                            self.clear_gained_abilities_for_card(card_id);
+                            log::debug!("Reverted gained ability score modifier +{} for card {}", val, card_id);
                         }
                     }
                 }

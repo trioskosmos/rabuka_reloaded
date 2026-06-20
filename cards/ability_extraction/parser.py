@@ -7731,19 +7731,25 @@ def _normalize_effect_tree(effect, original_text=None):
             if gained and gained.get("action") and gained.get("action") != "custom":
                 node["gained_effect"] = gained
 
-    # Fallback: extract character names from 「X」のメンバーカード/ライブカード patterns
+    # Fallback: extract character names from 「X」か「Y」か「Z」のメンバーカード patterns
     # and card names from カード名が「X」/カード名に「X」 patterns
     # in any sub-dict that lacks the appropriate field.
     def _enrich_characters(d):
         if isinstance(d, dict):
-            if "text" in d:
+            # Skip look_and_select — select_action child already handles character filtering
+            if d.get("action") == "look_and_select":
+                pass  # still recurse into children
+            elif "text" in d:
                 text = d["text"]
                 if not d.get("characters"):
                     cm = re.search(
-                        r"「([^」]+)」の(?:メンバーカード|ライブカード)", text
+                        r"((?:「[^」]+」[か、]? ?)+)の(?:メンバーカード|ライブカード)",
+                        text,
                     )
                     if cm:
-                        d["characters"] = [cm.group(1)]
+                        names = re.findall(r"「([^」]+)」", cm.group(1))
+                        if names:
+                            d["characters"] = names
                 if not d.get("card_names"):
                     cn = re.search(r"カード名(?:に|が)「([^」]+)」", text)
                     if cn:

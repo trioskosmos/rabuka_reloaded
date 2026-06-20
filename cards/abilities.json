@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-21T04:06:26.728424",
+  "generated_at": "2026-06-21T05:25:57.112610",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -14704,10 +14704,7 @@
           ],
           "text": "自分のデッキの上からカードを2枚見る。その中から「朝香果林」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "optional": true,
-        "characters": [
-          "朝香果林"
-        ]
+        "optional": true
       }
     },
     {
@@ -14782,10 +14779,7 @@
           ],
           "text": "自分のデッキの上からカードを2枚見る。その中から「近江彼方」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "optional": true,
-        "characters": [
-          "近江彼方"
-        ]
+        "optional": true
       }
     },
     {
@@ -14915,10 +14909,7 @@
           ],
           "text": "自分のデッキの上からカードを2枚見る。その中から「天王寺璃奈」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "optional": true,
-        "characters": [
-          "天王寺璃奈"
-        ]
+        "optional": true
       }
     },
     {
@@ -15039,10 +15030,7 @@
           ],
           "text": "自分のデッキの上からカードを2枚見る。その中から「鐘嵐珠」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "optional": true,
-        "characters": [
-          "鐘嵐珠"
-        ]
+        "optional": true
       }
     },
     {
@@ -23875,10 +23863,7 @@
           "cost_limit_operator": "<="
         },
         "optional": true,
-        "original_value": true,
-        "characters": [
-          "葉月恋"
-        ]
+        "original_value": true
       }
     },
     {

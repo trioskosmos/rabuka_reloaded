@@ -210,3 +210,63 @@ fn test_q252_pick_second_card() {
         "live1 stays in waitroom"
     );
 }
+
+/// End-to-end test simulating the live phase and victory determination.
+/// Riko is on stage, player sets an Aqours live card, resolves the live victory determination,
+/// which moves the live card to waitroom and should trigger Riko's auto ability automatically.
+#[test]
+fn test_q252_stage_trigger_simulation() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    // Setup stage with Riko
+    let riko = game.id("PL!S-bp6-002-R\u{ff0b}");
+    game.state.player1.stage.stage[1] = riko;
+
+    // Add filler cards to deck
+    let filler = game.new_id("PL!-sd1-010-SD");
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+
+    // Set an Aqours live card in P1's live_card_zone
+    let live = game.id(AQOURS_LIVE);
+    game.state.player1.live_card_zone.cards.push(live);
+
+    // Give P2 a member card so P2 "has cards" — P2's card has no need_heart
+    // so it passes heart check with score 0.
+    // Set cheer_blade_heart_count = 1 so P2's score = 1.
+    let p2_member = game.new_id("PL!-sd1-010-SD");
+    game.state.player2.live_card_zone.cards.push(p2_member);
+    game.state.player2_cheer_blade_heart_count = 1;
+
+    // P1's Next SPARKLING!! needs 21 hearts but Riko provides only 6 → heart check fails → score = 0.
+    // P2's score (1) > P1's (0) → P2 wins, P1 loses → P1's live card goes to waitroom.
+
+    // Go to LiveVictoryDetermination phase and advance
+    game.state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
+    game.state.current_phase = rabuka_engine::game_state::Phase::LiveVictoryDetermination;
+
+    // Execute advancement, which calls execute_live_victory_determination
+    assert!(!game.has_pending_choice());
+    rabuka_engine::turn::TurnEngine::advance_phase(&mut game.state);
+
+    // Riko's auto ability should trigger automatically, giving us a pending choice.
+    // With a single trigger card, the "pick which card" step is auto-resolved,
+    // leaving only the "deck top or bottom" SelectTarget choice.
+    assert!(
+        game.has_pending_choice(),
+        "Riko's auto ability should be triggered"
+    );
+    game.select_option(0); // place on top of deck
+
+    assert!(
+        !game.has_pending_choice(),
+        "Choice should be fully resolved"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.first(),
+        Some(&live),
+        "Live card should be put on top of deck"
+    );
+}

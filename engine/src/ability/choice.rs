@@ -77,6 +77,13 @@ impl super::resolver::AbilityResolver {
                 }
                 return Ok(());
             }
+            if self.cancel_remaining_commands {
+                // An optional sub-action (e.g. insufficient pay_energy) has flagged
+                // that remaining commands should be dropped.
+                self.cancel_remaining_commands = false;
+                eprintln!("[RPC] cancel_remaining_commands set — aborting pending commands");
+                return Ok(());
+            }
         }
         Ok(())
     }
@@ -777,6 +784,11 @@ impl super::resolver::AbilityResolver {
                             }
                         }
                         self.clear_choice_state(gs);
+                        // If no valid targets were selected, don't execute the
+                        // pending command — the effect is effectively cancelled.
+                        if stage_indices.is_empty() {
+                            return Ok(());
+                        }
                         return self.resume_pending_commands(gs);
                     }
                     // Non-is_select_action: actually move the card(s) to destination.
@@ -1649,12 +1661,13 @@ impl super::resolver::AbilityResolver {
                 if is_select_action {
                     // Select card(s) for a state change or similar effect
                     // without moving them off stage.
-                    // When the user skips a max/optional selection, discard pending
-                    // re-apply commands to avoid re-prompting in an infinite loop.
-                    if indices.is_empty() && allow_skip {
+                    // When the user makes no selection (skip or no valid targets),
+                    // discard pending re-apply commands to avoid re-prompting
+                    // in an infinite loop and to prevent the effect from firing.
+                    if indices.is_empty() {
                         gs.ability_queue.take_pending_commands();
                         self.selected_cards = vec![];
-                        log::debug!("[SELECT_STAGE] skip: cleared pending commands");
+                        log::debug!("[SELECT_STAGE] no selection: cleared pending commands");
                     }
                     let stage_indices: Vec<usize> = if let Some(ref fidx) = filtered_indices {
                         indices
