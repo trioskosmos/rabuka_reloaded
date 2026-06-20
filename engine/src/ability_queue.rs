@@ -77,6 +77,10 @@ pub struct AbilityQueueEntry {
     /// Persistent ability resolver — stays alive across choice round-trips
     /// instead of being destroyed and recreated. Eliminates manual save/restore.
     pub resolver: Option<AbilityResolver>,
+    /// For each_time triggers: the stage member card ID whose resolution
+    /// caused this each_time ability to fire. Used by effects like
+    /// "gain all-heart" to target the correct member.
+    pub triggering_member_id: Option<i16>,
 }
 
 /// Unified ability queue with proper state management
@@ -264,6 +268,7 @@ impl AbilityQueue {
                     pending_commands: Vec::new(),
                     resolver: None,
                     trigger_moved_cards: None,
+                    triggering_member_id: None,
                     snapshot_last_energy_placed_by_effect: false,
                     snapshot_last_energy_placed_by_player: None,
                     snapshot_last_area_move_card_id: None,

@@ -60,22 +60,8 @@ impl AbilityResolver {
                     | "conditional_on_optional"
             )
         {
-            let pp = gs.player_prefix();
-            let act_name = gs
-                .activating_card
-                .and_then(|id| gs.card_database.get_card(id))
-                .map(|c| c.name.clone());
-            gs.log_entry(
-                format!(
-                    "{pp} {}: [effect] {}",
-                    act_name.as_deref().unwrap_or(""),
-                    effect.text
-                ),
-                &pp,
-                gs.activating_card,
-                act_name,
-                "effect",
-            );
+            // Effect details are captured in the structured ability_resolution entry
+            // — no separate [effect] text entry needed.
         }
 
         // Legacy opponent_action wrapper (pre-parser-flatten). Flat effects

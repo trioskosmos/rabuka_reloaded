@@ -125,7 +125,7 @@ fn keke_discard_1_no_blade_heart_member() {
 fn keke_discard_2_no_blade_heart_members() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
-    let keke = game.id("PL!SP-bp5-002-R＋");
+    let keke = game.id("PL!SP-bp5-002-R\u{ff0b}");
     let no_bh_member1 = game.id("PL!-bp6-001-R\u{ff0b}");
     let no_bh_member2 = game.new_id("PL!-bp6-001-R\u{ff0b}");
     let filler_deck = game.new_id("PL!-sd1-010-SD");
@@ -170,4 +170,64 @@ fn keke_discard_2_no_blade_heart_members() {
         .get(&keke)
         .map_or(0, ModifierEntry::total);
     assert_eq!(blades, 2, "Should gain 2 blades");
+}
+
+/// Discard 2 PL!SP-sd1-011-P (鬼塚冬毬, has blade:1 but no blade_heart).
+/// According to the ability text, only cards that "do not have blade heart"
+/// count toward the condition. PL!SP-sd1-011-P has blade_heart=None, so
+/// it should be counted as a member without blade heart.
+#[test]
+fn keke_discard_2_tomari_no_blade_heart() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let keke = game.id("PL!SP-bp5-002-R\u{ff0b}");
+    let tomari1 = game.id("PL!SP-sd1-011-P");
+    let tomari2 = game.new_id("PL!SP-sd1-011-P");
+    let filler_deck = game.new_id("PL!-sd1-010-SD");
+
+    game.add_to_stage(MemberArea::LeftSide, keke);
+
+    game.add_to_hand(tomari1);
+    game.add_to_hand(tomari2);
+
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler_deck);
+    }
+
+    game.activate_ability(keke);
+
+    assert_eq!(
+        game.state
+            .mods
+            .orientation_modifiers
+            .get(&keke)
+            .map(|s| s.as_str()),
+        Some("wait"),
+        "Keke should be wait after paying cost"
+    );
+
+    game.select_indices(&[0, 1]);
+
+    assert_ne!(
+        game.state
+            .mods
+            .orientation_modifiers
+            .get(&keke)
+            .map(|s| s.as_str()),
+        Some("wait"),
+        "Keke should become active after discarding 2 no-blade-heart members"
+    );
+
+    let blades = game
+        .state
+        .mods
+        .blade_modifiers
+        .get(&keke)
+        .map_or(0, ModifierEntry::total);
+    // PL!SP-sd1-011-P has blade=1 but blade_heart=None → has_blade_heart()=false
+    // So both count as "member cards without blade heart" → blade bonus should trigger
+    assert_eq!(
+        blades, 2,
+        "PL!SP-sd1-011-P has no blade_heart → both count toward the condition → blade+2"
+    );
 }

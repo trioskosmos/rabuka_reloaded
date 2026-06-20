@@ -2113,6 +2113,7 @@ fn test_ability_live_success_draw_then_discard() {
         Some(member_card.card_no.clone()),
         Some(member_id),
         None,
+        None,
     );
 
     println!(

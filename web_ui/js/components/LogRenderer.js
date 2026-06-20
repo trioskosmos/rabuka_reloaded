@@ -484,7 +484,7 @@ export const LogRenderer = {
         const resultIcon = meta.result === 'success' ? '✓' : '✗';
         const triggerText = meta.trigger || '?';
         headerDiv.innerHTML = `
-            <div class="log-entry-icon">⚡</div>
+            <div class="log-entry-icon"> </div>
             <div class="log-entry-content">
                 <span class="${resultClass}">${resultIcon}</span>
                 <strong>${meta.card_name || ''}</strong>: ${triggerText}
@@ -522,10 +522,10 @@ export const LogRenderer = {
 
         switch (item.kind || 'Condition') {
             case 'Condition': {
-                const icon = item.passed ? '✅' : '❌';
                 const sub = item.children && item.children.length > 0;
+                const iconChar = item.passed ? '✓' : '✗';
                 let html = `<div class="ability-cond-row">
-                    <span class="ability-cond-icon">${icon}</span>
+                    <span class="ability-cond-icon">${iconChar}</span>
                     <span class="ability-cond-text">${item.text || ''}</span>
                     <span class="ability-cond-type">[${item.type || ''}]</span>
                 </div>`;
@@ -536,7 +536,7 @@ export const LogRenderer = {
                         <span class="ability-label">実際:</span>
                         <span class="ability-value">${item.actual || '—'}</span>
                         <span class="ability-result ${item.passed ? 'pass' : 'fail'}">
-                            ${item.passed ? '✓' : '✗'}
+                            ${iconChar}
                         </span>
                     </div>`;
                 }
@@ -556,32 +556,32 @@ export const LogRenderer = {
                 break;
             }
             case 'Cost': {
-                const icon = item.passed ? '✅' : '❌';
+                const iconChar = item.passed ? '✓' : '✗';
                 div.innerHTML = `<div class="ability-cost-row">
-                    <span class="ability-cond-icon">💰</span>
+                    <span class="ability-cond-icon"> </span>
                     <span class="ability-cond-text">${item.text || ''}</span>
                     <span class="ability-label">期待:</span>
                     <span class="ability-value">${item.expectation || '—'}</span>
                     <span class="ability-label">実際:</span>
                     <span class="ability-value">${item.actual || '—'}</span>
-                    <span class="ability-result ${item.passed ? 'pass' : 'fail'}">${icon}</span>
+                    <span class="ability-result ${item.passed ? 'pass' : 'fail'}">${iconChar}</span>
                 </div>`;
                 break;
             }
             case 'Effect': {
                 div.innerHTML = `<div class="ability-effect-row">
-                    <span class="ability-cond-icon">⚡</span>
+                    <span class="ability-cond-icon"> </span>
                     <span class="ability-cond-text">${item.text || ''}</span>
                     <span class="ability-effect-detail">${item.details || item.action || ''}</span>
                 </div>`;
                 break;
             }
             case 'KeyValue': {
-                const icon = item.passed ? '✅' : '❌';
+                const iconChar = item.passed ? '✓' : '✗';
                 div.innerHTML = `<div class="ability-kv-row">
-                    <span class="ability-cond-icon">🔑</span>
+                    <span class="ability-cond-icon"> </span>
                     <span class="ability-cond-text">${item.key}: ${item.value}</span>
-                    <span class="ability-result ${item.passed ? 'pass' : 'fail'}">${icon}</span>
+                    <span class="ability-result ${item.passed ? 'pass' : 'fail'}">${iconChar}</span>
                 </div>`;
                 break;
             }

@@ -155,15 +155,8 @@ impl super::TurnEngine {
                 if game_state.has_pending_choice() {
                     return;
                 }
-                Self::trigger_each_time_abilities(
-                    game_state,
-                    &player1_id,
-                    crate::triggers::LIVE_SUCCESS,
-                );
-                game_state.process_pending_auto_abilities(&player1_id);
-                if game_state.has_pending_choice() {
-                    return;
-                }
+                // each_time LIVE_SUCCESS triggers fire post-resolution
+                // in process_current_ability (abilities.rs)
                 let score_cur: HashMap<i16, i32> = game_state
                     .mods
                     .score_modifiers
@@ -189,15 +182,8 @@ impl super::TurnEngine {
             if game_state.has_pending_choice() {
                 return;
             }
-            Self::trigger_each_time_abilities(
-                game_state,
-                &player2_id,
-                crate::triggers::LIVE_SUCCESS,
-            );
-            game_state.process_pending_auto_abilities(&player2_id);
-            if game_state.has_pending_choice() {
-                return;
-            }
+            // each_time LIVE_SUCCESS triggers fire post-resolution
+            // in process_current_ability (abilities.rs)
             let score_cur2: HashMap<i16, i32> = game_state
                 .mods
                 .score_modifiers
@@ -773,7 +759,7 @@ impl super::TurnEngine {
 
         // Record what cards actually move to the waitroom (discard)
         let mut moved_to_waitroom = Vec::new();
-        
+
         let p1_live_before = game_state.player1.live_card_zone.cards.clone();
         let p2_live_before = game_state.player2.live_card_zone.cards.clone();
 
@@ -805,13 +791,13 @@ impl super::TurnEngine {
         if !moved_to_waitroom.is_empty() {
             game_state.recently_moved_cards = Some(moved_to_waitroom);
             game_state.recently_moved_from_zone = Some("live_card_zone".to_string());
-            
+
             // Scan and queue triggers for both players
             game_state.trigger_auto_for_discarded_cards(&p1_id);
             game_state.trigger_auto_for_discarded_cards(&p2_id);
             Self::trigger_auto_abilities_for_player(game_state, &p1_id);
             Self::trigger_auto_abilities_for_player(game_state, &p2_id);
-            
+
             game_state.process_pending_auto_abilities(&p1_id);
             game_state.process_pending_auto_abilities(&p2_id);
         }

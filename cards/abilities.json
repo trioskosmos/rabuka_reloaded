@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-21T06:51:21.922061",
+  "generated_at": "2026-06-21T08:52:39.978929",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -3020,7 +3020,8 @@
         "count": 2,
         "heart_colors": [
           "heart02"
-        ]
+        ],
+        "target": "self"
       }
     },
     {
@@ -3681,7 +3682,8 @@
         "count": 1,
         "heart_colors": [
           "heart03"
-        ]
+        ],
+        "target": "self"
       }
     },
     {
@@ -3846,7 +3848,8 @@
         "resource": "heart",
         "count": 1,
         "duration": "live_end",
-        "heart_type": "all"
+        "heart_type": "all",
+        "target": "self"
       }
     },
     {
@@ -4228,7 +4231,8 @@
         "heart_colors": [
           "heart02"
         ],
-        "duration": "live_end"
+        "duration": "live_end",
+        "target": "self"
       }
     },
     {
@@ -5538,7 +5542,8 @@
         "resource": "heart",
         "count": 2,
         "duration": "live_end",
-        "heart_type": "all"
+        "heart_type": "all",
+        "target": "self"
       }
     },
     {
@@ -6865,7 +6870,8 @@
         "count": 2,
         "heart_colors": [
           "heart03"
-        ]
+        ],
+        "target": "self"
       }
     },
     {
@@ -8542,7 +8548,8 @@
         ],
         "duration": "live_end",
         "filter_targets_by_heart_colors": true,
-        "group_reference": "same_group_name"
+        "group_reference": "same_group_name",
+        "target": "self"
       }
     },
     {
@@ -9959,7 +9966,8 @@
         "duration": "live_end",
         "heart_colors": [
           "heart03"
-        ]
+        ],
+        "target": "self"
       }
     },
     {
@@ -10169,7 +10177,8 @@
           "heart03"
         ],
         "filter_targets_by_heart_colors": true,
-        "position": "center"
+        "position": "center",
+        "target": "self"
       }
     },
     {
@@ -10595,7 +10604,8 @@
         "heart_colors": [
           "heart01"
         ],
-        "duration": "live_end"
+        "duration": "live_end",
+        "target": "self"
       }
     },
     {
@@ -14276,7 +14286,8 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "heart_type": "all"
+        "heart_type": "all",
+        "target": "self"
       }
     },
     {
@@ -16070,7 +16081,8 @@
         "count": 1,
         "heart_colors": [
           "heart06"
-        ]
+        ],
+        "target": "self"
       }
     },
     {
@@ -16411,7 +16423,8 @@
         "count": 1,
         "heart_colors": [
           "heart01"
-        ]
+        ],
+        "target": "opponent"
       }
     },
     {
@@ -18056,7 +18069,8 @@
         "heart_colors": [
           "heart02",
           "heart04"
-        ]
+        ],
+        "target": "self"
       }
     },
     {
@@ -18220,7 +18234,8 @@
         "heart_colors": [
           "heart02",
           "heart05"
-        ]
+        ],
+        "target": "self"
       }
     },
     {
@@ -18327,7 +18342,8 @@
         "heart_colors": [
           "heart02",
           "heart03"
-        ]
+        ],
+        "target": "self"
       }
     },
     {
@@ -19930,7 +19946,8 @@
           "heart06"
         ],
         "duration": "live_end",
-        "filter_targets_by_heart_colors": true
+        "filter_targets_by_heart_colors": true,
+        "target": "self"
       }
     },
     {
@@ -19964,7 +19981,8 @@
           "heart02"
         ],
         "duration": "live_end",
-        "filter_targets_by_heart_colors": true
+        "filter_targets_by_heart_colors": true,
+        "target": "self"
       }
     },
     {
@@ -19998,7 +20016,8 @@
           "heart03"
         ],
         "duration": "live_end",
-        "filter_targets_by_heart_colors": true
+        "filter_targets_by_heart_colors": true,
+        "target": "self"
       }
     },
     {
@@ -23435,7 +23454,8 @@
         "count": 1,
         "heart_colors": [
           "heart06"
-        ]
+        ],
+        "target": "self"
       }
     },
     {
@@ -24646,7 +24666,8 @@
         "heart_colors": [
           "heart04"
         ],
-        "duration": "live_end"
+        "duration": "live_end",
+        "target": "self"
       }
     },
     {
@@ -24733,7 +24754,8 @@
         "heart_colors": [
           "heart05"
         ],
-        "duration": "live_end"
+        "duration": "live_end",
+        "target": "self"
       }
     },
     {
@@ -24823,7 +24845,8 @@
         "heart_colors": [
           "heart01"
         ],
-        "duration": "live_end"
+        "duration": "live_end",
+        "target": "self"
       }
     },
     {
@@ -25185,7 +25208,8 @@
           "card_type": "member_card",
           "type": "location_condition"
         },
-        "heart_type": "all"
+        "heart_type": "all",
+        "target": "self"
       }
     },
     {
@@ -25248,7 +25272,8 @@
         "count": 1,
         "heart_colors": [
           "heart03"
-        ]
+        ],
+        "target": "self"
       }
     },
     {
@@ -25397,7 +25422,8 @@
         "count": 2,
         "heart_colors": [
           "heart06"
-        ]
+        ],
+        "target": "self"
       }
     },
     {
@@ -25804,7 +25830,8 @@
         "count": 1,
         "heart_colors": [
           "heart06"
-        ]
+        ],
+        "target": "opponent"
       }
     },
     {
@@ -26623,7 +26650,8 @@
         "count": 1,
         "heart_colors": [
           "heart04"
-        ]
+        ],
+        "target": "self"
       }
     },
     {
@@ -27574,7 +27602,8 @@
         "count": 2,
         "heart_colors": [
           "heart01"
-        ]
+        ],
+        "target": "self"
       }
     },
     {
@@ -27995,7 +28024,8 @@
         "count": 1,
         "heart_colors": [
           "heart03"
-        ]
+        ],
+        "target": "self"
       }
     },
     {
@@ -28063,7 +28093,8 @@
         "count": 1,
         "heart_colors": [
           "heart01"
-        ]
+        ],
+        "target": "self"
       }
     },
     {
@@ -28096,7 +28127,8 @@
         "count": 1,
         "heart_colors": [
           "heart06"
-        ]
+        ],
+        "target": "self"
       }
     },
     {
@@ -28469,7 +28501,8 @@
         "heart_colors": [
           "heart02"
         ],
-        "duration": "live_end"
+        "duration": "live_end",
+        "target": "self"
       }
     },
     {
@@ -30376,7 +30409,8 @@
         "count": 1,
         "heart_colors": [
           "heart03"
-        ]
+        ],
+        "target": "self"
       }
     },
     {

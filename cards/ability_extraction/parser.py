@@ -8654,7 +8654,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     if not nc.get("card_type") and ctx.get("card_type"):
                         nc["card_type"] = ctx["card_type"]
 
-            # Inherit duration into action-type dicts
+            # Inherit duration and target into action-type dicts
             if action in (
                 "gain_resource",
                 "change_state",
@@ -8663,6 +8663,8 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             ):
                 if not node.get("duration") and ctx.get("duration"):
                     node["duration"] = ctx["duration"]
+                if not node.get("target") and ctx.get("target"):
+                    node["target"] = ctx["target"]
             # draw_card: only inherit duration if context has it and action type
             # is not a setup step (drawing itself is instantaneous)
             if (
@@ -8801,6 +8803,23 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                         hc = nc.get("heart_colors") or []
                         if len(hc) >= 6 or "{{icon_all.png" in ct:
                             nc["location"] = "live_card_zone"
+
+            # Inherit target from condition into gain_resource effect (each_time
+            # abilities: the condition's target identifies the member that triggered
+            # the each_time, and the gain_resource effect needs it to know which card
+            # receives the modifier).
+            # NOTE: "both" is NOT inherited — a condition's "both" means checking
+            # both sides (e.g. "self and opponent's success zones"), NOT applying
+            # the effect to both players.
+            if isinstance(eff, dict) and eff.get("action") == "gain_resource":
+                if not eff.get("target") and eff.get("resource") == "heart":
+                    nc = eff.get("condition")
+                    if isinstance(nc, dict) and nc.get("target"):
+                        ct = nc["target"]
+                        if ct == "both":
+                            eff["target"] = "self"
+                        else:
+                            eff["target"] = ct
 
         _propagate_context(eff)
 

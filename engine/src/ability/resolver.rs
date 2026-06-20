@@ -487,12 +487,18 @@ impl AbilityResolver {
             .current_entry()
             .is_some_and(|e| e.cost_paid);
 
-        // Log ability activation on first entry (not re-entry from pending choice)
+        // Log ability activation on first entry — skip for auto abilities
+        // (auto abilities log via the structured ability_resolution entry instead,
+        //  avoiding repeated "能力起動" lines when conditions aren't met).
         if !cost_already_paid {
             let pp = gs.player_prefix();
             let trigger = ability.triggers.as_deref().unwrap_or("?");
-            gs.rule_log
-                .push(format!("{pp} {card_name}: 能力起動 [{trigger}]",));
+            let is_auto =
+                trigger != crate::triggers::ACTIVATION && trigger != crate::triggers::DEBUT;
+            if !is_auto {
+                gs.rule_log
+                    .push(format!("{pp} {card_name}: 能力起動 [{trigger}]",));
+            }
         }
 
         if !cost_already_paid {
@@ -623,53 +629,6 @@ impl AbilityResolver {
             let pp = gs.player_prefix();
             if effect.condition.is_some() || effect.activation_condition_parsed.is_some() {
                 let passed = self.can_activate_effect(gs, effect);
-                let cond = effect
-                    .condition
-                    .as_ref()
-                    .or_else(|| effect.activation_condition_parsed.as_ref());
-                if let Some(c) = cond {
-                    let cond_type = c
-                        .condition_type
-                        .as_ref()
-                        .map(|t| format!("{:?}", t))
-                        .unwrap_or_default();
-                    let detail = match (c.operator.as_deref(), c.count) {
-                        (Some(op), Some(th)) => format!(" {}{} {}", c.text, op, th),
-                        _ => format!(" {}", c.text),
-                    };
-                    // Suppress condition failures for auto abilities to
-                    // avoid log noise (they fire on every phase transition).
-                    let is_auto = ability.triggers.as_deref() != Some(crate::triggers::ACTIVATION)
-                        && ability.triggers.as_deref() != Some(crate::triggers::DEBUT);
-                    let icon = if passed { "✓" } else { "✗" };
-                    if passed || !is_auto {
-                        let detail_text = format!(
-                            "[条件]{}{} {}",
-                            detail,
-                            if !cond_type.is_empty() && cond_type != "OtherwiseCondition" {
-                                format!(" ({})", cond_type)
-                            } else {
-                                String::new()
-                            },
-                            icon,
-                        );
-                        let act_name = gs
-                            .activating_card
-                            .and_then(|id| gs.card_database.get_card(id))
-                            .map(|c| c.name.clone());
-                        gs.log_entry(
-                            format!(
-                                "{pp} {}: {}",
-                                act_name.as_deref().unwrap_or(""),
-                                detail_text
-                            ),
-                            &pp,
-                            gs.activating_card,
-                            act_name,
-                            "condition",
-                        );
-                    }
-                }
                 if !passed {
                     // For 起動 (activation) abilities, the player deliberately paid the
                     // cost, so the attempt counts toward the turn limit even when the
@@ -684,6 +643,26 @@ impl AbilityResolver {
                         }
                     }
                     dbg.p("RESULT", "effect condition not met — skipped");
+                    // Flush structured log for condition failure
+                    let fail_items = drain_verdicts();
+                    if !fail_items.is_empty() {
+                        let act_name = gs
+                            .activating_card
+                            .and_then(|id| gs.card_database.get_card(id))
+                            .map(|c| c.name.clone());
+                        gs.structured_log.push(LogEntry {
+                            text: format!("{pp} {card_name}: 能力発動 [{trigger_str}] — failure"),
+                            turn: gs.turn_number,
+                            player_label: pp.clone(),
+                            source_card_id: gs.activating_card,
+                            source_card_name: act_name,
+                            category: "ability_resolution".to_string(),
+                            metadata: Some(serde_json::json!({
+                                "result": "failure",
+                                "items": fail_items,
+                            })),
+                        });
+                    }
                     return Ok(());
                 }
             }

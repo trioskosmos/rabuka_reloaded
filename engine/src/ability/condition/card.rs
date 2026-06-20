@@ -361,6 +361,49 @@ impl<'a> ConditionContext<'a> {
         }
         let card_db = &self.game_state.card_database;
         let mods = &self.game_state.mods;
+        if condition.negation.unwrap_or(false) {
+            // Negated: check whether the specific triggering member lacks all-heart.
+            // When triggered via each_time, use the triggering_member_id from the
+            // queue entry to check only "そのメンバー" (that specific member).
+            // Falls back to ALL stage cards if no specific member is targeted.
+            let target_ids: Vec<i16> = self
+                .game_state
+                .ability_queue
+                .current_entry()
+                .and_then(|e| e.triggering_member_id)
+                .map(|id| vec![id])
+                .unwrap_or_else(|| {
+                    player
+                        .stage
+                        .stage
+                        .iter()
+                        .filter(|&&id| id != -1)
+                        .copied()
+                        .collect()
+                });
+            return target_ids.iter().any(|&id| {
+                if id == -1 {
+                    return false;
+                }
+                let has_all = card_db.get_card(id).is_some_and(|c| {
+                    c.base_heart
+                        .as_ref()
+                        .is_some_and(|bh| bh.hearts.contains_key(&crate::card::HeartColor::Heart00))
+                }) || mods
+                    .heart_modifiers
+                    .get(&id)
+                    .and_then(|m| m.get(&crate::card::HeartColor::All))
+                    .map_or(false, |e| e.total() > 0)
+                    || mods
+                        .constant_heart_bonuses
+                        .get(&id)
+                        .and_then(|cols| cols.get("all"))
+                        .copied()
+                        .unwrap_or(0)
+                        > 0;
+                !has_all
+            });
+        }
         player.stage.stage.iter().any(|&id| {
             if id == -1 {
                 return false;
@@ -395,6 +438,43 @@ impl<'a> ConditionContext<'a> {
             }
             false
         })
+    }
+
+    /// Per-card check: does this card match the `heart_type: "all"` filter?
+    /// Returns true if heart_type is not "all" (skip filter).
+    /// When negated, returns true for cards WITHOUT all-heart.
+    pub(crate) fn check_heart_type_all_per_card(
+        &self,
+        condition: &Condition,
+        card_db: &crate::card::CardDatabase,
+        card_id: i16,
+    ) -> bool {
+        if condition.heart_type.as_deref() != Some("all") {
+            return true;
+        }
+        let negate = condition.negation.unwrap_or(false);
+        let mods = &self.game_state.mods;
+        let has_all = card_db.get_card(card_id).is_some_and(|c| {
+            c.base_heart
+                .as_ref()
+                .is_some_and(|bh| bh.hearts.contains_key(&crate::card::HeartColor::Heart00))
+        }) || mods
+            .heart_modifiers
+            .get(&card_id)
+            .and_then(|m| m.get(&crate::card::HeartColor::All))
+            .map_or(false, |e| e.total() > 0)
+            || mods
+                .constant_heart_bonuses
+                .get(&card_id)
+                .and_then(|cols| cols.get("all"))
+                .copied()
+                .unwrap_or(0)
+                > 0;
+        if negate {
+            !has_all
+        } else {
+            has_all
+        }
     }
 
     pub(crate) fn check_heart_colors(
@@ -953,6 +1033,7 @@ impl<'a> ConditionContext<'a> {
                         && util::card_matches_cost_limit_op(card_db, id, condition.cost_limit, op)
                         && self.check_original_blade_filter(condition, id)
                         && self.check_original_heart_filter(condition, id)
+                        && self.check_heart_type_all_per_card(condition, card_db, id)
                 })
                 .count() as u32
         } else {
@@ -966,6 +1047,7 @@ impl<'a> ConditionContext<'a> {
                 |cid| {
                     self.check_original_blade_filter(condition, cid)
                         && self.check_original_heart_filter(condition, cid)
+                        && self.check_heart_type_all_per_card(condition, card_db, cid)
                 },
             )
         };

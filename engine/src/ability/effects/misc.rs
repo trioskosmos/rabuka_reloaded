@@ -240,7 +240,23 @@ impl AbilityResolver {
         if effect.resource.as_deref() == Some("heart")
             && effect.heart_type.as_deref() == Some("all")
         {
-            if let Some(card_id) = gs.activating_card {
+            let target_str = effect.target_name().to_string();
+            // Capture values before mutable borrow of gs
+            let triggering_member = gs
+                .ability_queue
+                .current_entry()
+                .and_then(|e| e.triggering_member_id);
+            let activating = gs.activating_card;
+            let has_explicit_target = effect.target.is_some();
+            let player = gs.resolve_target_player_mut(&target_str);
+            let card_id = triggering_member.or_else(|| {
+                if has_explicit_target {
+                    player.stage.stage.iter().find(|&&id| id != -1).copied()
+                } else {
+                    activating
+                }
+            });
+            if let Some(card_id) = card_id {
                 let amount = effect.count_or(1) as i32;
                 gs.mods.add_heart_modifier_with_trace(
                     card_id,

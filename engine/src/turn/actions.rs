@@ -226,6 +226,7 @@ impl super::TurnEngine {
             Some(card.card_no.clone()),
             Some(card_id),
             None,
+            None,
         );
         game_state.process_pending_auto_abilities(&player_id);
         game_state.rule_log.push(format!(
@@ -630,6 +631,19 @@ impl super::TurnEngine {
                 .ability_queue
                 .current_entry()
                 .map(|e| e.player_id.clone());
+            // Capture each_time trigger info before entry is lost
+            let cost_entry_trigger = game_state
+                .ability_queue
+                .current_entry()
+                .map(|e| e.trigger_type.clone());
+            let cost_entry_card_id = game_state
+                .ability_queue
+                .current_entry()
+                .and_then(|e| e.card_id);
+            let cost_entry_opt_result = game_state
+                .ability_queue
+                .current_entry()
+                .and_then(|e| e.optional_cost_result);
             log::debug!(
                 "[RWC] cost_was_paid={}, effect_started={}, had_pending_sequential={}",
                 cost_was_paid,
@@ -718,6 +732,29 @@ impl super::TurnEngine {
                                 }
                                 break;
                             }
+                        }
+                    }
+                }
+                // Post-resolution each_time for LiveStart/LiveSuccess
+                if cost_entry_opt_result != Some(false) {
+                    let pid = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
+                    if let Some(crate::game_state::AbilityTrigger::LiveStart) = cost_entry_trigger {
+                        if let Some(cid) = cost_entry_card_id {
+                            game_state.trigger_each_time_for_member(
+                                &pid,
+                                crate::triggers::LIVE_START,
+                                cid,
+                            );
+                        }
+                    } else if let Some(crate::game_state::AbilityTrigger::LiveSuccess) =
+                        cost_entry_trigger
+                    {
+                        if let Some(cid) = cost_entry_card_id {
+                            game_state.trigger_each_time_for_member(
+                                &pid,
+                                crate::triggers::LIVE_SUCCESS,
+                                cid,
+                            );
                         }
                     }
                 }

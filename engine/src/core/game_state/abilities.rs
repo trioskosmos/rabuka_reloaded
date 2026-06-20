@@ -60,6 +60,7 @@ impl GameState {
         player_id: String,
         trigger_type: AbilityTrigger,
         trigger_moved_cards: Option<Vec<i16>>,
+        triggering_member_id: Option<i16>,
     ) -> crate::ability_queue::AbilityQueueEntry {
         use crate::ability_queue::{AbilityId, AbilityQueueEntry};
 
@@ -87,6 +88,7 @@ impl GameState {
             pending_commands: Vec::new(),
             resolver: None,
             trigger_moved_cards,
+            triggering_member_id,
             snapshot_last_energy_placed_by_effect: false,
             snapshot_last_energy_placed_by_player: None,
             snapshot_last_area_move_card_id: None,
@@ -313,6 +315,7 @@ impl GameState {
                 Some(card_no),
                 Some(stage_card_id),
                 moved.clone(),
+                None,
             );
         }
         // Consume the energy flag after every TAS scan — each event should
@@ -331,6 +334,7 @@ impl GameState {
         source_card_id: Option<String>,
         explicit_card_id: Option<i16>,
         trigger_moved_cards: Option<Vec<i16>>,
+        triggering_member_id: Option<i16>,
     ) {
         if let Some(ref card_no) = source_card_id {
             let (card, card_id) = if let Some(cid) = explicit_card_id {
@@ -351,6 +355,7 @@ impl GameState {
                             player_id.clone(),
                             trigger_type,
                             trigger_moved_cards.clone(),
+                            triggering_member_id,
                         );
                         // Snapshot tracking flags at enqueue time so the
                         // "moves" condition can check what triggered it even
@@ -449,6 +454,60 @@ impl GameState {
 
     /// Internal: Process all standby abilities for a single player.
     /// Stops early if an ability creates a pending choice.
+    /// Trigger each_time abilities on live cards for a specific stage member's resolution.
+    /// Called after a LiveStart/LiveSuccess ability resolves successfully.
+    /// Enqueues each matching each_time ability with `triggering_member_id` set to `member_card_id`.
+    pub fn trigger_each_time_for_member(
+        &mut self,
+        player_id: &str,
+        trigger_substring: &str,
+        member_card_id: i16,
+    ) {
+        let player = if player_id == self.player1.id || player_id == "p1" {
+            &self.player1
+        } else {
+            &self.player2
+        };
+        let player_id_clone = player_id.to_string();
+        let mut abilities: Vec<(String, String, i16)> = Vec::new();
+        for &card_id in &player.live_card_zone.cards {
+            if let Some(card) = self.card_database.get_card(card_id) {
+                for ability in &card.abilities {
+                    if ability.triggers.as_deref() != Some(crate::triggers::AUTO) {
+                        continue;
+                    }
+                    let effect = match &ability.effect {
+                        Some(e) => e,
+                        None => continue,
+                    };
+                    if effect.trigger_type.as_deref() != Some("each_time") {
+                        continue;
+                    }
+                    let watch_text = match &effect.trigger_condition {
+                        Some(c) => &c.text,
+                        None => &effect.text,
+                    };
+                    if !watch_text.contains(trigger_substring) {
+                        continue;
+                    }
+                    let aid = format!("{}_{}", card.card_no, ability.full_text);
+                    abilities.push((aid, card.card_no.clone(), card_id));
+                }
+            }
+        }
+        for (aid, card_no, cid) in abilities {
+            self.trigger_auto_ability(
+                aid,
+                crate::game_state::AbilityTrigger::Auto,
+                player_id_clone.clone(),
+                Some(card_no),
+                Some(cid),
+                None,
+                Some(member_card_id),
+            );
+        }
+    }
+
     fn process_player_abilities(&mut self, raw_player_id: &str) {
         let player_id = match raw_player_id {
             "player1" => "p1",
@@ -656,7 +715,6 @@ impl GameState {
                                         })
                                     });
                                 direct_discard || movement_to_discard || movement_from_live
-
                             })
                             .unwrap_or(false);
                         if is_auto && has_discard_condition {
@@ -681,6 +739,7 @@ impl GameState {
                 player_id.to_string(),
                 Some(card_no),
                 Some(moved_id),
+                None,
                 None,
             );
         }
@@ -824,6 +883,17 @@ impl GameState {
                 .map(|e| e.player_id.clone())
                 .unwrap_or_default();
 
+            // Capture info for post-resolution each_time trigger
+            let resolved_trigger_type = self
+                .ability_queue
+                .current_entry()
+                .map(|e| e.trigger_type.clone());
+            let resolved_card_id = self.ability_queue.current_entry().and_then(|e| e.card_id);
+            let resolved_optional_cost = self
+                .ability_queue
+                .current_entry()
+                .and_then(|e| e.optional_cost_result);
+
             // Build the ability key for the just-completed ability so the
             // re-scan can skip re-enqueueing this SPECIFIC ability while
             // still allowing OTHER abilities (e.g. each_time) on the same
@@ -861,6 +931,30 @@ impl GameState {
             // ability_master_id which returns None after state becomes Idle.
             if self.recently_moved_cards.is_some() {
                 self.trigger_auto_for_discarded_cards(&current_pid);
+            }
+            // Post-resolution each_time trigger for LiveStart/LiveSuccess.
+            // Only fires if the effect was actually executed (cost was paid
+            // or no optional cost was declined).
+            if resolved_optional_cost != Some(false) {
+                if let Some(crate::game_state::AbilityTrigger::LiveStart) = resolved_trigger_type {
+                    if let Some(cid) = resolved_card_id {
+                        self.trigger_each_time_for_member(
+                            &current_pid,
+                            crate::triggers::LIVE_START,
+                            cid,
+                        );
+                    }
+                } else if let Some(crate::game_state::AbilityTrigger::LiveSuccess) =
+                    resolved_trigger_type
+                {
+                    if let Some(cid) = resolved_card_id {
+                        self.trigger_each_time_for_member(
+                            &current_pid,
+                            crate::triggers::LIVE_SUCCESS,
+                            cid,
+                        );
+                    }
+                }
             }
             self.clear_effect_tracking();
         }
@@ -1713,7 +1807,11 @@ impl GameState {
                         if let Some(card_id) = card_to_revert {
                             self.mods.remove_score_modifier(card_id, val);
                             self.clear_gained_abilities_for_card(card_id);
-                            log::debug!("Reverted gained ability score modifier +{} for card {}", val, card_id);
+                            log::debug!(
+                                "Reverted gained ability score modifier +{} for card {}",
+                                val,
+                                card_id
+                            );
                         }
                     }
                 }

@@ -104,6 +104,7 @@ impl super::TurnEngine {
                 Some(card_no),
                 Some(stage_card_id),
                 None,
+                None,
             );
         }
     }
@@ -150,18 +151,47 @@ impl super::TurnEngine {
     ///   Future: DEBUT, AREA_MOVE, STATE_CHANGE, DISCARD, ENERGY, YELL
     ///
     /// Called from phase and performance transitions in phases.rs and live.rs.
+    /// When `specific_member_id` is Some, enqueues once for that specific member.
+    /// When None, counts all stage members with matching triggers and enqueues once per member.
     pub fn trigger_each_time_abilities(
         game_state: &mut GameState,
         player_id: &str,
         trigger_substring: &str,
+        specific_member_id: Option<i16>,
     ) {
         let player_id_clone = player_id.to_string();
-        let member_count =
-            Self::count_stage_members_with_trigger(game_state, player_id, trigger_substring);
-        if member_count == 0 {
+        let member_ids: Vec<i16> = if let Some(mid) = specific_member_id {
+            vec![mid]
+        } else {
+            let mut ids = Vec::new();
+            let player = if player_id_clone == game_state.player1.id {
+                &game_state.player1
+            } else {
+                &game_state.player2
+            };
+            for &cid in &player.stage.stage {
+                if cid == -1 {
+                    continue;
+                }
+                if let Some(card) = game_state.card_database.get_card(cid) {
+                    for ability in &card.abilities {
+                        if ability
+                            .triggers
+                            .as_ref()
+                            .is_some_and(|t| t.contains(trigger_substring))
+                        {
+                            ids.push(cid);
+                            break;
+                        }
+                    }
+                }
+            }
+            ids
+        };
+        if member_ids.is_empty() {
             return;
         }
-        let mut abilities: Vec<(String, String, i16)> = Vec::new();
+        let mut abilities: Vec<(String, String, i16, Option<i16>)> = Vec::new();
         {
             let player = if player_id_clone == game_state.player1.id {
                 &game_state.player1
@@ -199,16 +229,16 @@ impl super::TurnEngine {
                                 continue;
                             }
                         }
-                        for _ in 0..member_count {
+                        for &member_id in &member_ids {
                             let aid = format!("{}_{}", card.card_no, ability.full_text);
-                            abilities.push((aid, card.card_no.clone(), card_id));
+                            abilities.push((aid, card.card_no.clone(), card_id, Some(member_id)));
                         }
                     }
                 }
             }
         }
         let label = crate::game_state::AbilityTrigger::Auto;
-        for (aid, card_no, cid) in abilities {
+        for (aid, card_no, cid, member_id) in abilities {
             game_state.trigger_auto_ability(
                 aid,
                 label.clone(),
@@ -216,6 +246,7 @@ impl super::TurnEngine {
                 Some(card_no),
                 Some(cid),
                 None,
+                member_id,
             );
         }
     }
@@ -305,6 +336,7 @@ impl super::TurnEngine {
                 player_id_clone.clone(),
                 Some(card_no),
                 explicit_card_id,
+                None,
                 None,
             );
         }
@@ -431,6 +463,7 @@ impl super::TurnEngine {
                 player_id_clone.clone(),
                 Some(card_no),
                 Some(source_card_id),
+                None,
                 None,
             );
         }

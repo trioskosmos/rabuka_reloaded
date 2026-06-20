@@ -21,6 +21,7 @@ fn trigger_riko_auto(game: &mut TestGame) {
         Some("PL!S-bp6-002-R\u{ff0b}".to_string()),
         None,
         None,
+        None,
     );
     game.state.process_pending_auto_abilities("player1");
 }

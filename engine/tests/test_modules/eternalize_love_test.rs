@@ -29,6 +29,7 @@ fn trigger_ability(game: &mut TestGame, card_id: i16, trigger_str: &str) {
         Some(card.card_no.clone()),
         Some(card_id),
         None,
+        None,
     );
     game.state
         .process_pending_auto_abilities(&game.state.player1.id.clone());

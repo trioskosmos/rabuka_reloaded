@@ -138,6 +138,7 @@ fn trigger_live_start(game: &mut TestGame, card_id: i16) {
         Some(card.card_no.clone()),
         Some(card_id),
         None,
+        None,
     );
     game.state.activating_card = Some(card_id);
     game.state.process_pending_auto_abilities(&pid);

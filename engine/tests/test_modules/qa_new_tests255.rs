@@ -48,6 +48,7 @@ fn q255_dancing_stars_live_success_after_position_change() {
         &mut game.state,
         &player_id,
         rabuka_engine::triggers::LIVE_START,
+        None,
     );
     game.state.process_pending_auto_abilities(&player_id);
     // Drain the position change choice if there is one
@@ -103,6 +104,7 @@ fn q255_dancing_stars_live_success_after_position_change() {
         &mut game.state,
         &player_id,
         rabuka_engine::triggers::LIVE_SUCCESS,
+        None,
     );
     game.state.process_pending_auto_abilities(&player_id);
     if game.has_pending_choice() {

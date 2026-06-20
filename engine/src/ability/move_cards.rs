@@ -1692,6 +1692,7 @@ impl AbilityResolver {
                         Some(card_no.clone()),
                         Some(card_id),
                         None,
+                        None,
                     );
                 }
             }

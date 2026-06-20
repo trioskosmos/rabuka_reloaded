@@ -113,16 +113,8 @@ impl super::TurnEngine {
                     // and will be processed when the choice resolves.
                     Self::trigger_live_start_abilities(game_state, &first_attacker_id);
                     Self::trigger_live_start_abilities(game_state, &second_attacker_id);
-                    Self::trigger_each_time_abilities(
-                        game_state,
-                        &first_attacker_id,
-                        crate::triggers::LIVE_START,
-                    );
-                    Self::trigger_each_time_abilities(
-                        game_state,
-                        &second_attacker_id,
-                        crate::triggers::LIVE_START,
-                    );
+                    // each_time LIVE_START triggers fire post-resolution
+                    // in process_current_ability (abilities.rs)
                     // Now process both players' abilities
                     game_state.process_pending_auto_abilities(&first_attacker_id);
                     if game_state.has_pending_choice() {
@@ -744,6 +736,7 @@ impl super::TurnEngine {
                         player_id.clone(),
                         Some(card_no),
                         Some(bt_card_id),
+                        None,
                         None,
                     );
                 }

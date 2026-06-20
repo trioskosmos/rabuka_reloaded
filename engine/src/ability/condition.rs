@@ -316,6 +316,8 @@ impl<'a> ConditionContext<'a> {
 
         let final_result = if condition.negation.unwrap_or(false)
             && !(ct == Some(ConditionType::CardCountCondition) && condition.card_property.is_some())
+            && !(ct == Some(ConditionType::LocationCondition)
+                && condition.heart_type.as_deref() == Some("all"))
         {
             !result
         } else {
