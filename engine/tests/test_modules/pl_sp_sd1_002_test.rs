@@ -36,16 +36,16 @@ fn keke_place_in_empty_slot() {
     // Process debut auto ability (Keke's debut fires)
     if v.has_pending_choice() {
         match v.pending_choice_type().as_deref() {
-            Some("SelectAutoAbility") => v.select_indices(&[0]),
-            _ => v.select_indices(&[]),
+            Some("SelectAutoAbility") => {
+                v.select_indices(&[0]);
+            }
+            _ => {}
         }
     }
 
-    // The optional effect should now prompt: "do you want to place a card?"
-    // This might be a choose-yes/no choice or a select-card-from-hand choice
+    // The optional effect should now prompt: select a card from hand
     if v.has_pending_choice() {
         match v.pending_choice_type().as_deref() {
-            // If it asks to select a card from hand, select the Liella! card
             Some("SelectCard") => {
                 let idx = v
                     .state
@@ -65,7 +65,7 @@ fn keke_place_in_empty_slot() {
     if v.has_pending_choice() {
         match v.pending_choice_type().as_deref() {
             Some("SelectPosition") => {
-                v.select_indices(&[]); // default
+                v.select_option(0); // left
             }
             _ => v.select_indices(&[]),
         }
@@ -104,8 +104,10 @@ fn keke_place_in_occupied_slot() {
     // Process debut auto ability
     if v.has_pending_choice() {
         match v.pending_choice_type().as_deref() {
-            Some("SelectAutoAbility") => v.select_indices(&[0]),
-            _ => v.select_indices(&[]),
+            Some("SelectAutoAbility") => {
+                v.select_indices(&[0]);
+            }
+            _ => {}
         }
     }
 
@@ -131,8 +133,7 @@ fn keke_place_in_occupied_slot() {
     if v.has_pending_choice() {
         match v.pending_choice_type().as_deref() {
             Some("SelectPosition") => {
-                // 0 = left, 1 = center, 2 = right
-                v.select_indices(&[0]);
+                v.select_option(0); // left
             }
             _ => v.select_indices(&[]),
         }
@@ -197,8 +198,10 @@ fn keke_blocked_from_locked_area() {
     // Process Keke's debut ability
     if v.has_pending_choice() {
         match v.pending_choice_type().as_deref() {
-            Some("SelectAutoAbility") => v.select_indices(&[0]),
-            _ => v.select_indices(&[]),
+            Some("SelectAutoAbility") => {
+                v.select_indices(&[0]);
+            }
+            _ => {}
         }
     }
 

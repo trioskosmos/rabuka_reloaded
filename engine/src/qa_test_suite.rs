@@ -2281,8 +2281,8 @@ fn test_baton_touch_discard_ability_triggers() {
     println!("Initial active energy count: {}", initial_energy_active);
 
     // Trigger discard auto abilities for the replaced card
-    crate::turn::TurnEngine::trigger_discard_auto_abilities(&mut game_state, "player1", target_id);
-    game_state.process_pending_auto_abilities("player1");
+    game_state.trigger_auto_for_discarded_cards("p1");
+    game_state.process_pending_auto_abilities("p1");
 
     let final_energy_active = game_state.player1.energy_zone.active_count();
     println!("Final active energy count: {}", final_energy_active);
@@ -2355,8 +2355,8 @@ fn test_baton_touch_discard_ability_skipped_low_cost() {
 
     let initial_energy_active = game_state.player1.energy_zone.active_count();
 
-    crate::turn::TurnEngine::trigger_discard_auto_abilities(&mut game_state, "player1", target_id);
-    game_state.process_pending_auto_abilities("player1");
+    game_state.trigger_auto_for_discarded_cards("p1");
+    game_state.process_pending_auto_abilities("p1");
 
     let final_energy_active = game_state.player1.energy_zone.active_count();
     println!(

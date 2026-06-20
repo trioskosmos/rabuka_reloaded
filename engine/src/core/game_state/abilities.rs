@@ -610,7 +610,7 @@ impl GameState {
         }
     }
 
-    fn trigger_auto_for_discarded_cards(&mut self, player_id: &str) {
+    pub(crate) fn trigger_auto_for_discarded_cards(&mut self, player_id: &str) {
         let trigger_data: Vec<(String, String, i16)> = if let Some(ref moved_cards) =
             self.recently_moved_cards.clone()
         {
@@ -844,9 +844,10 @@ impl GameState {
             }
             // Trigger discarded card abilities BEFORE clearing tracking data,
             // so recently_moved_cards is still populated.
-            let master_id = self.ability_master_id();
-            if let Some(ref pid) = master_id {
-                self.trigger_auto_for_discarded_cards(pid);
+            // Use current_pid (captured before complete_current) instead of
+            // ability_master_id which returns None after state becomes Idle.
+            if self.recently_moved_cards.is_some() {
+                self.trigger_auto_for_discarded_cards(&current_pid);
             }
             self.clear_effect_tracking();
         }

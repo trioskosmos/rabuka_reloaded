@@ -1,4 +1,3 @@
-use crate::ability::enums::Zone;
 use crate::constants::MAX_LIVE_CARDS;
 use crate::game_state::{GameState, Phase};
 
@@ -595,6 +594,8 @@ impl super::TurnEngine {
                 }
                 replaced
             };
+            game_state.recently_moved_cards = Some(double_replaced_ids);
+            game_state.recently_moved_from_zone = Some("stage".to_string());
             // Track the non-placement vacated area for empty_area deployment
             let other_vacated = if db_areas[0] != area {
                 Some(db_areas[0] as usize)
@@ -633,9 +634,7 @@ impl super::TurnEngine {
                 game_state.player1.id.clone()
             };
             Self::trigger_auto_abilities_for_player(game_state, &db_opponent_id);
-            for &replaced_id in &double_replaced_ids {
-                Self::trigger_discard_auto_abilities(game_state, &player_id, replaced_id);
-            }
+            game_state.trigger_auto_for_discarded_cards(&player_id);
             game_state.process_pending_auto_abilities(&player_id);
             game_state.recalculate_constants();
 
@@ -746,74 +745,14 @@ impl super::TurnEngine {
             }
         }
 
-        // Check the replaced member's auto abilities for movement triggers.
-        if let Some(replaced_id) = replaced_member_id {
-            Self::trigger_discard_auto_abilities(game_state, &player_id, replaced_id);
+        // Discard triggers are handled inside process_current_ability
+        // via trigger_auto_for_discarded_cards (uses recently_moved_cards
+        // which was set during baton touch above).
+        if replaced_member_id.is_some() {
             game_state.process_pending_auto_abilities(&player_id);
         }
 
         Ok(())
-    }
-
-    /// Trigger auto abilities for a card that was placed in discard/waitroom from stage.
-    /// Checks the card's auto abilities for discard/waitroom location conditions.
-    pub fn trigger_discard_auto_abilities(
-        game_state: &mut GameState,
-        player_id: &str,
-        card_id: i16,
-    ) {
-        let abilities: Vec<(String, String)> = game_state
-            .card_database
-            .get_card(card_id)
-            .map(|card| {
-                card.abilities
-                    .iter()
-                    .filter(|ability| {
-                        ability.triggers.as_deref() == Some(crate::triggers::AUTO)
-                            && ability
-                                .effect
-                                .as_ref()
-                                .and_then(|e| e.condition.as_ref())
-                                .is_some_and(|c| {
-                                    // Direct discard-location condition
-                                    let direct_discard = matches!(
-                                        Zone::from_str(c.location.as_deref().unwrap_or("")),
-                                        Some(Zone::Discard | Zone::Waitroom)
-                                    );
-                                    // Movement from stage to discard (preceding_moved + stage source + locations contains discard)
-                                    let movement_to_discard = c.source.as_deref()
-                                        == Some("preceding_moved")
-                                        && c.location.as_deref() == Some("stage")
-                                        && c.locations.as_ref().is_some_and(|locs| {
-                                            locs.iter().any(|loc| {
-                                                matches!(
-                                                    Zone::from_str(loc),
-                                                    Some(Zone::Discard | Zone::Waitroom)
-                                                )
-                                            })
-                                        });
-                                    direct_discard || movement_to_discard
-                                })
-                    })
-                    .map(|ability| {
-                        (
-                            format!("{}_{}", card.card_no, ability.full_text),
-                            card.card_no.clone(),
-                        )
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-        for (ability_id, card_no) in abilities {
-            game_state.trigger_auto_ability(
-                ability_id,
-                crate::game_state::AbilityTrigger::Auto,
-                player_id.to_string(),
-                Some(card_no),
-                Some(card_id),
-                None,
-            );
-        }
     }
 
     pub fn setup_initial_energy(game_state: &mut GameState) {

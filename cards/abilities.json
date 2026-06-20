@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-20T05:27:38.493796",
+  "generated_at": "2026-06-20T23:17:07.863600",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -4494,7 +4494,8 @@
               "state_change": "active",
               "card_type": "member_card",
               "action": "change_state",
-              "count": 1
+              "count": 1,
+              "activation_position": "left_side"
             },
             {
               "text": "2枚ある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -4511,7 +4512,8 @@
               "action": "gain_resource",
               "resource": "blade",
               "count": 2,
-              "duration": "live_end"
+              "duration": "live_end",
+              "activation_position": "left_side"
             }
           ],
           "activation_position": "left_side"
