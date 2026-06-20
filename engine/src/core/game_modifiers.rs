@@ -43,6 +43,10 @@ pub struct GameModifiers {
     /// Track need_heart modifiers applied by constant ModifyRequiredHeartsGlobal effects.
     /// Key: (target_card_id, heart_color_str) → total delta applied.
     pub constant_global_need_heart: Vec<(i16, String, i32)>,
+    /// Per-player global constant score bonus from GainAbility (modify_score) effects.
+    /// Accumulated in recalculate_constants, added directly to each player's total live score.
+    pub p1_constant_total_score_bonus: i32,
+    pub p2_constant_total_score_bonus: i32,
     /// Source info for constant score bonuses: (card_id, ability_text, value)
     /// Populated by recalculate_constants for display in breakdown.scores.
     pub constant_score_sources: Vec<(i16, String, i32)>,
@@ -81,6 +85,8 @@ impl GameModifiers {
             constant_score_bonuses: HashMap::new(),
             constant_heart_bonuses: HashMap::new(),
             constant_global_need_heart: Vec::new(),
+            p1_constant_total_score_bonus: 0,
+            p2_constant_total_score_bonus: 0,
             constant_score_sources: Vec::new(),
             heart_color_multiplier: HashMap::new(),
             last_cost_discard_count: 0,

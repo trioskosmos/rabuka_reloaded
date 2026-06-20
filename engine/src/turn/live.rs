@@ -239,6 +239,7 @@ impl super::TurnEngine {
             game_state.player1.stage_hearts.as_ref(),
             Some(&need_heart_flat),
             Some(&pre_score_flat),
+            game_state.mods.p1_constant_total_score_bonus,
         ) + p1_extra;
         let player2_score = game_state.player2.live_card_zone.calculate_live_score(
             &game_state.card_database,
@@ -246,6 +247,7 @@ impl super::TurnEngine {
             game_state.player2.stage_hearts.as_ref(),
             Some(&need_heart_flat),
             Some(&pre_score_flat),
+            game_state.mods.p2_constant_total_score_bonus,
         ) + p2_extra;
         let player1_has_cards = !game_state.player1.live_card_zone.cards.is_empty();
         let player2_has_cards = !game_state.player2.live_card_zone.cards.is_empty();

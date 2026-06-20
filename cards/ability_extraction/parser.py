@@ -7622,6 +7622,27 @@ def _normalize_effect_tree(effect, original_text=None):
         return node
 
     effect = _collapse_position_changes(effect)
+
+    # Enrich gain_ability nodes with parsed gained_effect (one level deep only)
+    def _collect_gain(d, nodes):
+        if isinstance(d, dict):
+            if d.get("action") == "gain_ability" and d.get("ability_gain"):
+                nodes.append(d)
+            for v in d.values():
+                if isinstance(v, dict):
+                    _collect_gain(v, nodes)
+                elif isinstance(v, list):
+                    for item in v:
+                        _collect_gain(item, nodes)
+
+    gain_nodes = []
+    _collect_gain(effect, gain_nodes)
+    for node in gain_nodes:
+        if "gained_effect" not in node:
+            gained = parse_effect(node["ability_gain"])
+            if gained and gained.get("action") and gained.get("action") != "custom":
+                node["gained_effect"] = gained
+
     return effect
 
 
@@ -7807,28 +7828,6 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         if extra_pos_from_cost and "activation_position" not in effect:
             effect["activation_position"] = extra_pos_from_cost
 
-        # Enrich gain_ability nodes with parsed gained_effect (one level deep only)
-        def _collect_gain(d, nodes):
-            if isinstance(d, dict):
-                if d.get("action") == "gain_ability" and d.get("ability_gain"):
-                    nodes.append(d)
-                for v in d.values():
-                    if isinstance(v, dict):
-                        _collect_gain(v, nodes)
-                    elif isinstance(v, list):
-                        for item in v:
-                            _collect_gain(item, nodes)
-
-        gain_nodes = []
-        _collect_gain(effect, gain_nodes)
-        for node in gain_nodes:
-            if "gained_effect" not in node:
-                gained = parse_effect(node["ability_gain"])
-                if gained and gained.get("action") and gained.get("action") != "custom":
-                    node["gained_effect"] = gained
-                    # Pure gain_ability: the gained constant ability provides the effect.
-                    # Do NOT add a separate direct action — the constant ability handles it.
-                    # Just preserve the gain_ability action as-is.
         effect = _clean(effect)
         _validate_effect(effect, triggerless_text[:40])
         ability["effect"] = effect

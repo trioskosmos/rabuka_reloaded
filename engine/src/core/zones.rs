@@ -510,6 +510,7 @@ impl LiveCardZone {
             >,
         >,
         score_modifiers: Option<&std::collections::HashMap<i16, i32>>,
+        constant_total_score_bonus: i32,
     ) -> u32 {
         let mut total_score = 0;
 
@@ -566,7 +567,7 @@ impl LiveCardZone {
             }
         }
 
-        total_score + cheer_blade_heart_count
+        total_score + cheer_blade_heart_count + constant_total_score_bonus.max(0) as u32
     }
 
     pub fn get_top_card(&self) -> Option<i16> {

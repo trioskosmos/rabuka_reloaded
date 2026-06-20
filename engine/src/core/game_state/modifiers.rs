@@ -13,6 +13,8 @@ impl GameState {
             std::collections::HashMap::new();
         let mut exp_prohibition: Vec<String> = Vec::new();
         let mut exp_global_need_heart: Vec<(i16, String, i32)> = Vec::new();
+        let mut p1_constant_score_bonus: i32 = 0;
+        let mut p2_constant_score_bonus: i32 = 0;
 
         // Compute stage positions for all entries before creating resolver
         let mut entry_positions: std::collections::HashMap<i16, Option<usize>> =
@@ -216,19 +218,55 @@ impl GameState {
                                         .entry("all".to_string())
                                         .or_insert(0) += 1i32;
                                 } else if let Some(gain_text) = effect.ability_gain.as_deref() {
-                                    if let Some(val) = gain_text.split('+').nth(1).and_then(|s| {
-                                        s.chars()
-                                            .take_while(|c| c.is_ascii_digit())
-                                            .collect::<String>()
-                                            .parse::<i32>()
-                                            .ok()
-                                    }) {
-                                        *exp_score.entry(*card_id).or_insert(0) += val;
-                                        self.mods.constant_score_sources.push((
-                                            *card_id,
-                                            gain_text.to_string(),
-                                            val,
-                                        ));
+                                    // Determine which player this card belongs to
+                                    let belongs_to_p1 = self.player1.stage.stage.contains(card_id);
+                                    let bonus_target = if belongs_to_p1 {
+                                        &mut p1_constant_score_bonus
+                                    } else {
+                                        &mut p2_constant_score_bonus
+                                    };
+
+                                    // Record the gained ability for tracking
+                                    self.add_gained_ability(*card_id, gain_text.to_string());
+
+                                    // Use gained_effect if available (structured data from parser)
+                                    if let Some(ref gained) = effect.gained_effect {
+                                        let action = crate::ability::enums::ActionType::from_str(
+                                            &gained.action,
+                                        );
+                                        if action
+                                            == Some(crate::ability::enums::ActionType::ModifyScore)
+                                        {
+                                            let val = gained.value.unwrap_or(0) as i32;
+                                            *bonus_target += val;
+                                            if val != 0 {
+                                                self.mods.constant_score_sources.push((
+                                                    *card_id,
+                                                    gain_text.to_string(),
+                                                    val,
+                                                ));
+                                            }
+                                        }
+                                    } else {
+                                        // Fallback: parse value from text (legacy path)
+                                        if let Some(val) =
+                                            gain_text.split('+').nth(1).and_then(|s| {
+                                                s.chars()
+                                                    .take_while(|c| c.is_ascii_digit())
+                                                    .collect::<String>()
+                                                    .parse::<i32>()
+                                                    .ok()
+                                            })
+                                        {
+                                            *bonus_target += val;
+                                            if val != 0 {
+                                                self.mods.constant_score_sources.push((
+                                                    *card_id,
+                                                    gain_text.to_string(),
+                                                    val,
+                                                ));
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -337,6 +375,10 @@ impl GameState {
             self.mods.add_score_modifier(cid, val);
         }
         self.mods.constant_score_bonuses = exp_score;
+
+        // Per-player global score bonus (from GainAbility modify_score)
+        self.mods.p1_constant_total_score_bonus = p1_constant_score_bonus;
+        self.mods.p2_constant_total_score_bonus = p2_constant_score_bonus;
 
         // Heart — clear old constant heart modifiers first, then re-apply new ones.
         // Must drain the OLD map so bonuses from cards that left the stage are removed.
