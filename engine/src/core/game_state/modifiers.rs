@@ -194,12 +194,18 @@ impl GameState {
                             Some(crate::ability::enums::ActionType::Restriction) => {
                                 if let Some(ref rt) = effect.restriction_type {
                                     exp_prohibition.push(format!("const_restriction:{}:", rt));
+                                    let tgt = effect.target.as_deref().unwrap_or("self");
                                     if rt == "cannot_activate" || rt == "cannot_activate_by_effect"
                                     {
-                                        let tgt = effect.target.as_deref().unwrap_or("self");
                                         let resolved = self.resolve_target_player(tgt).id.clone();
                                         if !self.cannot_activate_members.contains(&resolved) {
                                             self.cannot_activate_members.push(resolved);
+                                        }
+                                    }
+                                    if rt == "cannot_live" {
+                                        let resolved = self.resolve_target_player(tgt).id.clone();
+                                        if !self.cannot_live_players.contains(&resolved) {
+                                            self.cannot_live_players.push(resolved);
                                         }
                                     }
                                 }

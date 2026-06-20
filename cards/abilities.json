@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-21T00:54:09.884745",
+  "generated_at": "2026-06-21T01:13:54.137521",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -9009,8 +9009,8 @@
         },
         "action": "restriction",
         "restriction_type": "cannot_live",
-        "count": 1,
-        "exclude_self": true
+        "target": "self",
+        "count": 1
       }
     },
     {
@@ -20158,6 +20158,7 @@
             "duration": "live_end",
             "action": "restriction",
             "restriction_type": "cannot_live",
+            "target": "self",
             "count": 1
           }
         ]

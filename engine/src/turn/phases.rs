@@ -202,7 +202,12 @@ impl super::TurnEngine {
             })
             .collect();
         let hcm = game_state.mods.heart_color_multiplier.clone();
-        let cannot_live = game_state.is_action_prohibited("cannot_live");
+        let player_id = if is_first {
+            game_state.first_attacker().id.clone()
+        } else {
+            game_state.second_attacker().id.clone()
+        };
+        let cannot_live = game_state.cannot_live_players.contains(&player_id);
         let player = if is_first {
             game_state.first_attacker_mut()
         } else {

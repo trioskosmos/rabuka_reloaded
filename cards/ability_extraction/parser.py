@@ -3197,12 +3197,34 @@ def parse_action(text: str) -> Dict[str, Any]:
     R(
         "ライブできない",
         "restriction",
-        lambda t, a: a.update({"restriction_type": "cannot_live"}),
+        lambda t, a: a.update(
+            {
+                "restriction_type": "cannot_live",
+                "target": "self"
+                if "自分" in t
+                else "both"
+                if "自分と相手" in t or "お互い" in t
+                else "opponent"
+                if "相手" in t
+                else None,
+            }
+        ),
     )
     R(
         "アクティブにしない",
         "restriction",
-        lambda t, a: a.update({"restriction_type": "cannot_activate"}),
+        lambda t, a: a.update(
+            {
+                "restriction_type": "cannot_activate",
+                "target": "opponent"
+                if "相手" in t
+                else "both"
+                if "自分と相手" in t or "お互い" in t
+                else "self"
+                if "自分" in t
+                else None,
+            }
+        ),
     )
     R(
         lambda t: "アクティブしない" in t and "アクティブにしない" not in t,

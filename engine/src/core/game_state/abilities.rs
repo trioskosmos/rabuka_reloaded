@@ -1688,6 +1688,9 @@ impl GameState {
         if self.current_turn_phase != TurnPhase::Live && !self.prohibition_effects.is_empty() {
             self.prohibition_effects.clear();
         }
+        if self.current_turn_phase != TurnPhase::Live && !self.cannot_live_players.is_empty() {
+            self.cannot_live_players.clear();
+        }
     }
 
     pub fn add_replacement_effect(

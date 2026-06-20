@@ -2399,6 +2399,13 @@ impl AbilityResolver {
                 }
             }
         }
+        // Handle cannot_live restrictions — store per-player
+        if restriction_type == Some("cannot_live") {
+            let resolved = gs.resolve_target_player(target).id.clone();
+            if !gs.cannot_live_players.contains(&resolved) {
+                gs.cannot_live_players.push(resolved);
+            }
+        }
         Ok(())
     }
 
