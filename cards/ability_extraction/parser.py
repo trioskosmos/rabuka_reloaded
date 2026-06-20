@@ -7221,16 +7221,30 @@ def _normalize_effect_tree(effect, original_text=None):
                         # If so, skip — the group belongs to the condition, not the
                         # action (e.g. "『Liella!』のメンバーからバトンタッチ" in the
                         # condition should not make the action filter by Liella!).
+                        # Only propagate to sub-conditions with `distinct` (name
+                        # distinctness checks) since they need the group context to
+                        # know which cards to compare. Avoid blind propagation to
+                        # all sub-conditions (e.g. card_count_condition) which would
+                        # incorrectly filter counts by group.
                         own_has_group = any(g in (d.get("text", "") or "") for g in gms)
-                        if (own_has_group or d.get("type")) and d.get(
-                            "action"
-                        ) != "gain_resource":
+                        needs_group = own_has_group or d.get("distinct")
+                        if (
+                            needs_group
+                            and d.get("action") != "gain_resource"
+                            and d.get("type") != "card_count_condition"
+                        ):
                             d["group_names"] = gms
                     else:
                         # Don't propagate group_names to gain_resource actions.
                         # Leaked group_names cause the engine to distribute resources
                         # to ALL matching group members instead of the activating card.
-                        if d.get("action") != "gain_resource":
+                        # Also skip card_count_condition — the parser already handles
+                        # pure group-filtered counts; _walk would incorrectly add
+                        # group_names to inclusion-pattern counts ("1人を含む").
+                        if (
+                            d.get("action") != "gain_resource"
+                            and d.get("type") != "card_count_condition"
+                        ):
                             d["group_names"] = gms
 
         # Propagate shuffle from text context
@@ -7532,6 +7546,7 @@ def _normalize_effect_tree(effect, original_text=None):
             "actions",
             "options",
             "conditions",
+            "condition",
             "primary_effect",
             "alternative_effect",
             "select_action",

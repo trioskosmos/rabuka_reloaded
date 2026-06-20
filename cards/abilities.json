@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-20T23:17:07.863600",
+  "generated_at": "2026-06-21T00:18:28.337499",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -921,7 +921,10 @@
           ],
           "text": "自分のライブ中のカードが3枚以上あり、その中に『虹ヶ咲』のライブカードを1枚以上含む場合",
           "target": "self",
-          "card_type": "live_card"
+          "card_type": "live_card",
+          "group_names": [
+            "虹ヶ咲"
+          ]
         },
         "action": "sequential",
         "actions": [
@@ -1115,14 +1118,20 @@
               "target": "self",
               "distinct": "card_name",
               "text": "名前が異なる場合",
-              "location": "stage"
+              "location": "stage",
+              "group_names": [
+                "蓮ノ空"
+              ]
             }
           ],
           "text": "自分のステージのエリアすべてに『蓮ノ空』のメンバーが登場しており、かつ名前が異なる場合",
           "target": "self",
           "location": "stage",
           "card_type": "member_card",
-          "distinct": "card_name"
+          "distinct": "card_name",
+          "group_names": [
+            "蓮ノ空"
+          ]
         },
         "action": "gain_ability",
         "ability_gain": "ライブの合計スコアを+1する。",
@@ -1510,14 +1519,20 @@
               "target": "self",
               "distinct": "card_name",
               "text": "名前が異なる場合",
-              "location": "stage"
+              "location": "stage",
+              "group_names": [
+                "Aqours"
+              ]
             }
           ],
           "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合",
           "target": "self",
           "location": "stage",
           "card_type": "member_card",
-          "distinct": "card_name"
+          "distinct": "card_name",
+          "group_names": [
+            "Aqours"
+          ]
         },
         "alternative_condition": {
           "type": "card_count_condition",
@@ -1967,6 +1982,7 @@
           "location": "discard",
           "card_type": "member_card",
           "type": "location_condition",
+          "target": "self",
           "heart_colors": [
             "heart04"
           ]
@@ -3257,14 +3273,15 @@
         "condition": {
           "type": "appearance_condition",
           "appearance": true,
-          "text": "{{center.png|センター}}『Liella!』のメンバー2人からバトンタッチして登場している場合",
+          "text": "『Liella!』のメンバー2人からバトンタッチして登場している場合",
           "location": "stage",
           "group_names": [
             "Liella!"
           ],
           "baton_touch_trigger": true,
           "min_baton_touch_count": 2,
-          "position": "center"
+          "position": "center",
+          "activation_position": "center"
         },
         "action": "sequential",
         "actions": [
@@ -3346,7 +3363,10 @@
           ],
           "text": "『Liella!』のメンバーからバトンタッチして登場しており、かつ自分のエネルギーが7枚以上ある場合",
           "target": "self",
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "group_names": [
+            "Liella!"
+          ]
         },
         "source": "energy_deck",
         "destination": "energy_zone",
@@ -3879,7 +3899,7 @@
       "effect": {
         "text": "自分のステージの右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のすべてのメンバーをウェイトにする",
         "condition": {
-          "text": "{{center.png|センター}}自分のステージの右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合",
+          "text": "自分のステージの右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合",
           "target": "self",
           "location": "stage",
           "card_type": "member_card",
@@ -3887,7 +3907,8 @@
           "operator": "=",
           "type": "location_condition",
           "position": "left_side",
-          "position_compare": "right_side"
+          "position_compare": "right_side",
+          "activation_position": "center"
         },
         "source": "stage",
         "state_change": "wait",
@@ -4074,7 +4095,11 @@
               "card_type": "member_card",
               "location": "stage",
               "text": "このメンバーがステージから控え室に置かれたとき、このメンバーがコスト10以上のブレードハートを持たない『虹ヶ咲』のメンバーとバトンタッチしていた場合",
-              "negation": true
+              "negation": true,
+              "group_names": [
+                "虹ヶ咲"
+              ],
+              "target": "self"
             },
             "state_change": "active",
             "count": 2,
@@ -4088,7 +4113,11 @@
               "card_type": "member_card",
               "location": "stage",
               "text": "コスト15以上のブレードハートを持たない『虹ヶ咲』のメンバーの場合",
-              "negation": true
+              "negation": true,
+              "group_names": [
+                "虹ヶ咲"
+              ],
+              "target": "self"
             },
             "count": 1,
             "action": "draw_card",
@@ -4483,6 +4512,7 @@
           "negation": true,
           "card_type": "member_card",
           "source": "preceding_moved",
+          "activation_position": "left_side",
           "card_property": "has_blade_heart"
         },
         "followup_action": {
@@ -4507,6 +4537,7 @@
                 "source": "preceding_moved",
                 "card_type": "member_card",
                 "negation": true,
+                "activation_position": "left_side",
                 "card_property": "has_blade_heart"
               },
               "action": "gain_resource",
@@ -5055,7 +5086,7 @@
       "effect": {
         "text": "自分のライブカード置き場に『µ's』のカードがある場合、ライブ終了時まで、自分のステージにいるすべての『μ's』のメンバーは{{icon_blade.png|ブレード}}を得る",
         "condition": {
-          "text": "{{center.png|センター}}自分のライブカード置き場に『µ's』のカードがある場合",
+          "text": "自分のライブカード置き場に『µ's』のカードがある場合",
           "group_names": [
             "µ's"
           ],
@@ -5063,7 +5094,8 @@
           "location": "live_card_zone",
           "card_type": "live_card",
           "position": "center",
-          "type": "group_condition"
+          "type": "group_condition",
+          "activation_position": "center"
         },
         "card_type": "member_card",
         "target": "self",
@@ -5100,7 +5132,10 @@
           "target": "self",
           "text": "エールにより公開された自分のカードの中に、ブレードハートを持たない『μ's』のメンバーカードがある場合",
           "negation": true,
-          "card_property": "has_blade_heart"
+          "card_property": "has_blade_heart",
+          "group_names": [
+            "μ's"
+          ]
         },
         "action": "sequential",
         "actions": [
@@ -5341,7 +5376,8 @@
               "card_type": "member_card",
               "location": "stage",
               "text": "それがブレードハートを持たないメンバーカードの場合",
-              "negation": true
+              "negation": true,
+              "target": "self"
             },
             "action": "modify_score",
             "value": 1,
@@ -5461,7 +5497,10 @@
           "target": "self",
           "location": "live_card_zone",
           "card_type": "live_card",
-          "aggregate": "total"
+          "aggregate": "total",
+          "group_names": [
+            "Aqours"
+          ]
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -5603,8 +5642,12 @@
           "type": "location_condition",
           "location": "revealed_cards",
           "target": "self",
-          "text": "{{center.png|センター}}エールにより公開された自分のカードの中に、{{icon_score.png|スコア}}を持つ『Aqours』のライブカードがある場合",
-          "position": "center"
+          "text": "エールにより公開された自分のカードの中に、{{icon_score.png|スコア}}を持つ『Aqours』のライブカードがある場合",
+          "position": "center",
+          "activation_position": "center",
+          "group_names": [
+            "Aqours"
+          ]
         },
         "action": "modify_score",
         "value": 1,
@@ -6084,7 +6127,8 @@
               "location": "revealed_cards",
               "card_type": "live_card",
               "negation": true,
-              "type": "location_condition"
+              "type": "location_condition",
+              "target": "self"
             }
           ],
           "text": "自分のステージにほかのメンバーがおり、かつこれにより公開した手札の中にライブカードがない場合",
@@ -6280,6 +6324,7 @@
           "text": "これによりライブカードを控え室に置いた場合",
           "card_type": "live_card",
           "type": "card_count_condition",
+          "target": "self",
           "source": "preceding_moved"
         },
         "followup_action": {
@@ -7168,7 +7213,9 @@
           "location": "stage",
           "text": "自分と相手のステージの中で、このメンバーがほかのすべてのメンバーより多くのハートを持つかぎり",
           "exclude_self": true,
-          "scope": "both"
+          "scope": "both",
+          "all": true,
+          "target": "self"
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -7509,7 +7556,8 @@
               "text": "自分の控え室にグループ名が異なるライブカードが3枚以上ある場合",
               "card_type": "live_card",
               "location": "discard",
-              "target": "self"
+              "target": "self",
+              "group_reference": "different_group_names"
             },
             "group_reference": "different_group_names"
           }
@@ -8448,7 +8496,8 @@
           "location": "revealed_cards",
           "card_type": "member_card",
           "target": "self",
-          "comparison_target": "self"
+          "comparison_target": "self",
+          "group_reference": "same_group_name"
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -12256,13 +12305,14 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "text": "{{center.png|センター}}自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』のカードが1枚ある場合",
+          "text": "自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』のカードが1枚ある場合",
           "location": "success_live_card_zone",
           "target": "self",
           "group_names": [
             "μ's"
           ],
-          "position": "center"
+          "position": "center",
+          "activation_position": "center"
         },
         "alternative_condition": {
           "type": "card_count_condition",
@@ -13510,7 +13560,10 @@
           "text": "自分のステージにいるメンバーが『Liella!』のみで、かつ自分のエネルギーが7枚以上ある場合",
           "target": "self",
           "location": "stage",
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "group_names": [
+            "Liella!"
+          ]
         },
         "source": "energy_deck",
         "destination": "energy_zone",
@@ -13996,7 +14049,8 @@
           "type": "temporal_condition",
           "temporal": "this_turn",
           "condition": {
-            "type": "not_moved"
+            "type": "not_moved",
+            "text": "このターンにこのメンバーが移動していないかぎり"
           },
           "text": "このターンにこのメンバーが移動していないかぎり",
           "card_type": "member_card"
@@ -15297,7 +15351,10 @@
           "text": "自分のステージに『蓮ノ空』のメンバーが3人以上いて、かつ自分の控え室にカード名に「DreamBelievers」を含むライブカードがある場合",
           "target": "self",
           "location": "discard",
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "group_names": [
+            "蓮ノ空"
+          ]
         },
         "action": "modify_score",
         "value": 1,
@@ -15696,7 +15753,8 @@
                   "text": "公開したカードがメンバーカードで、",
                   "location": "revealed_cards",
                   "card_type": "member_card",
-                  "type": "location_condition"
+                  "type": "location_condition",
+                  "target": "self"
                 },
                 {
                   "text": "コストが選んだ数以上の場合",
@@ -16515,7 +16573,7 @@
       "effect": {
         "text": "ライブの合計スコアを+1する",
         "condition": {
-          "text": "{{center.png|センター}}自分のステージの右サイドエリアと左サイドエリアに、元々持つ{{icon_blade.png|ブレード}}の数が2つのメンバーがいるかぎり",
+          "text": "自分のステージの右サイドエリアと左サイドエリアに、元々持つ{{icon_blade.png|ブレード}}の数が2つのメンバーがいるかぎり",
           "target": "self",
           "location": "stage",
           "card_type": "member_card",
@@ -16524,7 +16582,9 @@
           "blade_limit_operator": "==",
           "position": "left_side",
           "position_compare": "right_side",
-          "type": "location_condition"
+          "type": "location_condition",
+          "activation_position": "center",
+          "original_value": true
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -17019,6 +17079,7 @@
           "text": "これにより「百生吟子」のメンバーカードを控え室に置いた場合",
           "card_type": "member_card",
           "type": "card_count_condition",
+          "target": "self",
           "source": "preceding_moved"
         },
         "followup_action": {
@@ -18260,7 +18321,8 @@
           "text": "自分のステージに、元々持つハートの数より多い数のハートを持つメンバーがいる場合",
           "original_value": true,
           "operator": ">",
-          "count": 1
+          "count": 1,
+          "target": "self"
         },
         "count": 1,
         "action": "draw_card",
@@ -18894,7 +18956,10 @@
           "target": "self",
           "location": "stage",
           "card_type": "member_card",
-          "aggregate": "total"
+          "aggregate": "total",
+          "group_names": [
+            "蓮ノ空"
+          ]
         },
         "source": "energy_deck",
         "destination": "energy_zone",
@@ -20787,7 +20852,8 @@
               "temporal": "this_turn",
               "condition": {
                 "type": "opponent_live_success",
-                "no_excess_heart": true
+                "no_excess_heart": true,
+                "text": "このターン、相手が余剰のハートを持たずにライブを成功させていた場合"
               },
               "text": "このターン、相手が余剰のハートを持たずにライブを成功させていた場合"
             }
@@ -20796,7 +20862,10 @@
           "target": "self",
           "location": "stage",
           "card_type": "member_card",
-          "aggregate": "total"
+          "aggregate": "total",
+          "group_names": [
+            "Aqours"
+          ]
         },
         "action": "modify_score",
         "value": 2,
@@ -21055,7 +21124,8 @@
           "temporal": "this_turn",
           "condition": {
             "type": "no_excess_heart",
-            "no_excess_heart": true
+            "no_excess_heart": true,
+            "text": "このターン、自分が余剰ハートを持たない場合"
           },
           "text": "このターン、自分が余剰ハートを持たない場合"
         },
@@ -21633,7 +21703,10 @@
           "text": "このターン、自分が余剰ハートに{{heart_04.png|heart04}}を1つ以上持っており、かつ自分のステージに『虹ヶ咲』のメンバーがいる場合",
           "target": "self",
           "location": "stage",
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "group_names": [
+            "虹ヶ咲"
+          ]
         },
         "source": "energy_deck",
         "destination": "energy_zone",
@@ -21850,7 +21923,10 @@
           "text": "自分の成功ライブカード置き場のカードが0枚で、かつ自分のステージにいるメンバーが『lilywhite』のみの場合",
           "target": "self",
           "location": "success_live_card_zone",
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "group_names": [
+            "lilywhite"
+          ]
         },
         "action": "modify_score",
         "value": 1,
@@ -22236,7 +22312,10 @@
           "text": "このカードが自分の成功ライブカード置き場にあり、かつ自分のステージに『μ's』のメンバーがいるかぎり",
           "target": "self",
           "location": "success_live_card_zone",
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "group_names": [
+            "μ's"
+          ]
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -22575,6 +22654,9 @@
           "location": "revealed_cards",
           "target": "self",
           "text": "エールにより公開された自分の『虹ヶ咲』のメンバーカードが持つハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がある場合",
+          "group_names": [
+            "虹ヶ咲"
+          ],
           "heart_colors": [
             "heart01",
             "heart02",
@@ -22672,7 +22754,8 @@
           "location": "live_card_zone",
           "card_type": "live_card",
           "self_target": true,
-          "type": "location_condition"
+          "type": "location_condition",
+          "target": "self"
         },
         "count": 2,
         "card_type": "member_card",
@@ -22947,7 +23030,10 @@
           "target": "self",
           "location": "stage",
           "card_type": "member_card",
-          "aggregate": "total"
+          "aggregate": "total",
+          "group_names": [
+            "虹ヶ咲"
+          ]
         },
         "action": "sequential",
         "actions": [
@@ -23057,11 +23143,15 @@
           "type": "temporal_condition",
           "temporal": "this_turn",
           "condition": {
-            "type": "has_moved"
+            "type": "has_moved",
+            "text": "{{leftside.png|左サイド}}このターン、このメンバーがエリアを移動している場合",
+            "activation_position": "left_side",
+            "position": "left_side"
           },
-          "text": "{{leftside.png|左サイド}}このターン、このメンバーがエリアを移動している場合",
+          "text": "このターン、このメンバーがエリアを移動している場合",
           "card_type": "member_card",
-          "position": "left_side"
+          "position": "left_side",
+          "activation_position": "left_side"
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -23129,11 +23219,15 @@
           "type": "temporal_condition",
           "temporal": "this_turn",
           "condition": {
-            "type": "has_moved"
+            "type": "has_moved",
+            "text": "{{rightside.png|右サイド}}このターン、このメンバーがエリアを移動している場合",
+            "activation_position": "right_side",
+            "position": "right_side"
           },
-          "text": "{{rightside.png|右サイド}}このターン、このメンバーがエリアを移動している場合",
+          "text": "このターン、このメンバーがエリアを移動している場合",
           "card_type": "member_card",
-          "position": "right_side"
+          "position": "right_side",
+          "activation_position": "right_side"
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -23402,7 +23496,12 @@
           "type": "temporal_condition",
           "temporal": "this_turn",
           "condition": {
-            "type": "has_moved"
+            "type": "has_moved",
+            "text": "自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合",
+            "group_names": [
+              "Liella!"
+            ],
+            "position": "center"
           },
           "text": "自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合",
           "card_type": "member_card",
@@ -24426,7 +24525,8 @@
           "operator": ">",
           "location": "ステージ",
           "card_type": "member_card",
-          "text": "相手のステージにいるすべてのメンバーのそれぞれのコストよりコストが高いメンバーが自分のステージにいる場合"
+          "text": "相手のステージにいるすべてのメンバーのそれぞれのコストよりコストが高いメンバーが自分のステージにいる場合",
+          "all": true
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -24903,7 +25003,8 @@
           "location": "stage",
           "text": "そのメンバーが{{icon_all.png|ハート}}を持たない場合",
           "negation": true,
-          "heart_type": "all"
+          "heart_type": "all",
+          "target": "self"
         },
         "card_type": "member_card",
         "action": "gain_resource",
@@ -25066,10 +25167,13 @@
           "type": "temporal_condition",
           "temporal": "this_turn",
           "condition": {
-            "type": "has_moved"
+            "type": "has_moved",
+            "text": "このターン、自分のステージにいるほかのメンバーがエリアを移動している場合",
+            "exclude_self": true
           },
           "text": "このターン、自分のステージにいるほかのメンバーがエリアを移動している場合",
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "exclude_self": true
         },
         "count": 1,
         "action": "draw_card",
@@ -25147,7 +25251,11 @@
           "type": "temporal_condition",
           "temporal": "this_turn",
           "condition": {
-            "type": "has_moved"
+            "type": "has_moved",
+            "text": "自分のステージにいる『Liella!』のメンバーがこのターンにエリアを移動しているかぎり",
+            "group_names": [
+              "Liella!"
+            ]
           },
           "text": "自分のステージにいる『Liella!』のメンバーがこのターンにエリアを移動しているかぎり",
           "card_type": "member_card",
@@ -25572,14 +25680,20 @@
               "target": "self",
               "distinct": "group_name",
               "text": "それらのメンバーのユニット名がそれぞれ異なる場合",
-              "location": "stage"
+              "location": "stage",
+              "group_names": [
+                "蓮ノ空"
+              ]
             }
           ],
           "text": "自分のステージに『蓮ノ空』のメンバー1人を含むメンバーが2人以上おり、かつそれらのメンバーのユニット名がそれぞれ異なる場合",
           "target": "self",
           "location": "stage",
           "card_type": "member_card",
-          "distinct": "group_name"
+          "distinct": "group_name",
+          "group_names": [
+            "蓮ノ空"
+          ]
         },
         "action": "modify_score",
         "value": 1,
@@ -25873,7 +25987,8 @@
               "type": "temporal_condition",
               "temporal": "this_turn",
               "condition": {
-                "type": "has_moved"
+                "type": "has_moved",
+                "text": "このターンに自分のステージにいるメンバーがエリアを移動している場合"
               },
               "text": "このターンに自分のステージにいるメンバーがエリアを移動している場合",
               "card_type": "member_card"
@@ -25917,7 +26032,8 @@
           "location": "stage",
           "count": 3,
           "operator": ">=",
-          "unit": "人"
+          "unit": "人",
+          "group_reference": "different_group_names"
         },
         "card_type": "member_card",
         "target": "self",
@@ -26096,7 +26212,11 @@
           "target": "self",
           "location": "stage",
           "card_type": "member_card",
-          "aggregate": "total"
+          "aggregate": "total",
+          "group_names": [
+            "Aqours",
+            "SaintSnow"
+          ]
         },
         "source": "discard",
         "destination": "deck_top",
@@ -27542,7 +27662,8 @@
               "comparison_target": "self",
               "group_names": [
                 "みらくらぱーく！"
-              ]
+              ],
+              "original_value": true
             },
             "count": 1,
             "action": "draw_card",
@@ -27935,7 +28056,12 @@
           "type": "temporal_condition",
           "temporal": "this_turn",
           "condition": {
-            "type": "has_moved"
+            "type": "has_moved",
+            "text": "自分のステージのセンターエリアにいる『μ's』のメンバーの{{live_success.png|ライブ成功時}}能力が解決したとき、そのメンバーがこのターン中に移動している場合",
+            "group_names": [
+              "μ's"
+            ],
+            "position": "center"
           },
           "text": "自分のステージのセンターエリアにいる『μ's』のメンバーの{{live_success.png|ライブ成功時}}能力が解決したとき、そのメンバーがこのターン中に移動している場合",
           "card_type": "member_card",
@@ -28134,7 +28260,8 @@
           "location": "success_live_card_zone",
           "card_type": "live_card",
           "target_event": "placing_in_success_zone",
-          "text": "このカードを成功ライブカード置き場に置く場合"
+          "text": "このカードを成功ライブカード置き場に置く場合",
+          "target": "self"
         },
         "group_names": [
           "μ's"
@@ -29962,7 +30089,8 @@
               "type": "temporal_condition",
               "temporal": "this_turn",
               "condition": {
-                "type": "has_moved"
+                "type": "has_moved",
+                "text": "このターン、このメンバーがエリアを移動している場合"
               },
               "text": "このターン、このメンバーがエリアを移動している場合",
               "card_type": "member_card"

@@ -738,16 +738,19 @@ impl<'a> ConditionContext<'a> {
             _ => {
                 let mut seen_names: std::collections::HashSet<String> =
                     std::collections::HashSet::new();
+                let mut name_collision = false;
                 for &cid in cards.iter() {
                     let names = card_db.get_card_names(cid);
                     for name in names {
-                        seen_names.insert(name);
+                        if !seen_names.insert(name) {
+                            name_collision = true;
+                        }
                     }
                 }
                 if let Some(n) = distinct_only {
                     seen_names.len() >= n
                 } else {
-                    seen_names.len() == cards.len()
+                    !name_collision
                 }
             }
         };
@@ -1837,7 +1840,8 @@ impl<'a> ConditionContext<'a> {
                     if let Some(ref groups) = condition.group_names {
                         if !groups.is_empty() {
                             let card_db = &self.game_state.card_database;
-                            let any_match = stage_ids.iter().any(|&cid| {
+                            let all_areas = condition.all_areas.unwrap_or(false);
+                            let match_fn = |cid: i16| -> bool {
                                 groups.iter().any(|g| {
                                     crate::ability::util::card_matches_group_str(
                                         card_db,
@@ -1845,14 +1849,22 @@ impl<'a> ConditionContext<'a> {
                                         Some(g),
                                     )
                                 })
-                            });
-                            if !any_match {
+                            };
+                            let ok = if all_areas {
+                                stage_ids.iter().all(|&cid| match_fn(cid))
+                            } else {
+                                stage_ids.iter().any(|&cid| match_fn(cid))
+                            };
+                            if !ok {
                                 return false;
                             }
                             // Prevent self-trigger on own appearance when NOT
                             // arriving via baton touch (baton_touch appearances
                             // legitimately trigger on the activating card itself).
-                            if !baton_touch_trigger {
+                            // Skip during constant evaluation (no cards "appeared").
+                            if !baton_touch_trigger
+                                && !self.game_state.cards_appeared_this_turn.is_empty()
+                            {
                                 let has_other_matching = stage_ids.iter().any(|&cid| {
                                     let matches_group = groups.iter().any(|g| {
                                         crate::ability::util::card_matches_group_str(

@@ -5,7 +5,7 @@ use super::types::{
     ZoneSnapshot,
 };
 use super::util;
-use crate::card::{Ability, AbilityEffect, CardDatabase, Keyword};
+use crate::card::{Ability, AbilityEffect, CardDatabase, Condition, Keyword};
 use crate::game_state::{GameState, Phase};
 use crate::zones::MemberArea;
 use std::sync::Arc;
@@ -147,19 +147,32 @@ impl AbilityResolver {
                         cond.activation_position = Some(act_pos.clone());
                     }
                 }
-                // For appearance conditions, merge group_names from the effect
-                // level so the condition evaluates which group appeared.
-                if cond.condition_type
-                    == Some(crate::ability::enums::ConditionType::AppearanceCondition)
-                    && (cond.group_names.is_none()
-                        || cond.group_names.as_ref().is_some_and(|v| v.is_empty()))
-                {
-                    if let Some(ref gns) = effect.group_names {
-                        if !gns.is_empty() {
-                            cond.group_names = Some(gns.clone());
+                // Merge effect-level group_names into conditions that need
+                // group filtering: AppearanceCondition (group appeared check)
+                // and conditions with distinct (name distinctness within group).
+                // Recurse into compound sub-conditions with the same logic.
+                fn merge_group_names(cond: &mut Condition, group_names: Option<&Vec<String>>) {
+                    let needs_group = cond.condition_type
+                        == Some(crate::ability::enums::ConditionType::AppearanceCondition)
+                        || cond.distinct.as_ref().is_some_and(|d| d.is_distinct());
+                    if needs_group
+                        && (cond.group_names.is_none()
+                            || cond.group_names.as_ref().is_some_and(|v| v.is_empty()))
+                    {
+                        if let Some(gns) = group_names {
+                            if !gns.is_empty() {
+                                cond.group_names = Some(gns.clone());
+                            }
+                        }
+                    }
+                    if let Some(ref mut sub_conds) = cond.conditions {
+                        for sub in sub_conds.iter_mut() {
+                            merge_group_names(sub, group_names);
                         }
                     }
                 }
+                let gns = effect.group_names.as_ref();
+                merge_group_names(&mut cond, gns);
                 if !ctx.evaluate_condition(&cond) {
                     log::debug!("[CAN_ACTIVATE] condition FAILED for {}: type={:?} location={:?} group={:?} exclude={:?}",
                         effect.action, condition.condition_type, condition.location, condition.group_names, condition.exclude_characters);

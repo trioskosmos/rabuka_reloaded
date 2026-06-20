@@ -219,6 +219,7 @@ pub mod stellar_phoenix_test;
 pub mod target_selection_test;
 
 // New test files for parser/engine fix coverage
+pub mod pl_hs_bp1_003_test;
 pub mod ability_trigger_fix_test;
 pub mod ally_appear_each_time_test;
 pub mod card_filter_test;
