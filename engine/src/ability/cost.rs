@@ -663,6 +663,7 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         if selected == "skip_optional_cost" || selected == "0" {
             self.pending_choice = None;
+            self.pending_energy_payment = None;
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.cost_paid = true;
                 // If the cost has an alternative_effect ("unless you pay"),
@@ -687,6 +688,20 @@ impl AbilityResolver {
         }
         // "pay_optional_cost" or "1" from select_option(1)
         self.pending_choice = None;
+        if let Some(count) = self.pending_energy_payment {
+            self.pending_energy_payment = None;
+            let player = gs.resolve_target_player_mut("self");
+            if player.energy_zone.active_energy_count >= count as usize {
+                player.energy_zone.pay_energy(count as usize)?;
+            } else {
+                // Insufficient energy: clear remaining commands and return
+                self.cancel_remaining_commands = true;
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.pending_commands.clear();
+                }
+                return self.resume_pending_commands(gs);
+            }
+        }
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
             entry.cost_paid = true;
             entry.optional_cost_result = Some(true);
@@ -780,7 +795,8 @@ impl AbilityResolver {
                 "[HANDLE_OPT_COST2] entering if: entry_cost.is_some={}",
                 gs.entry_cost().is_some()
             );
-            if gs.entry_cost().is_some() {
+            let effect_started = gs.ability_queue.current_entry().is_some_and(|e| e.effect_started);
+            if gs.entry_cost().is_some() && !effect_started {
                 log::debug!(
                     "[HANDLE_OPT_COST2] inside if: entry_effect.is_some={}",
                     gs.entry_effect().is_some()

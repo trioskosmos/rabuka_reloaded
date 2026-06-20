@@ -537,20 +537,24 @@ def _validate_output(result):
     _validate_group_filters(abilities)
 
 
-BRACKET_RE = re.compile(r"『([^』]+)』")
+BRACKET_RE = re.compile(r"[『「]([^』」]+)[』」]")
 FILTER_FIELDS = {
     "group_names",
     "exclude_group_names",
     "characters",
     "exclude_characters",
+    "card_names",
 }
 
 
 def _walk_filters(obj):
-    """Recursively walk JSON and return all (value, field_name) pairs from filter fields."""
+    """Recursively walk JSON and return all (value, field_name) pairs from filter fields.
+    Excludes 'text' keys since those are raw descriptions, not structured filters."""
     filters = set()
     if isinstance(obj, dict):
         for key, value in obj.items():
+            if key == "text":
+                continue
             if key in FILTER_FIELDS and isinstance(value, list):
                 for item in value:
                     if isinstance(item, str):
@@ -590,6 +594,8 @@ def _validate_group_filters(abilities):
         filter_values = {fv for fv, _ in _walk_filters(a)}
 
         for name in bracketed:
+            if "{{" in name:
+                continue  # skip template/ability text, not a card/group name
             if not (variants(name) & filter_values):
                 card_list = a.get("cards", [])
                 text_preview = a.get("full_text", "")[:80]

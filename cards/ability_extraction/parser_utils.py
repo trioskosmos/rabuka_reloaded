@@ -166,6 +166,8 @@ def extract_dynamic_count(text):
         count_match = re.search(r"(.+?)に等しい(?:枚数|数)", text)
         if count_match:
             source = count_match.group(1).strip()
+            if source == "そのカードのスコア":
+                source = "selected_card_score"
             result = {"type": "dynamic_count", "reference": source, "mode": "equals"}
             # Check for calculation pattern like "スコアに2を足した数"
             calc_match = re.search(r"(.+?)に(\d+)を足した", source)

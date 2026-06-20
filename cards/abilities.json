@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-21T01:13:54.137521",
+  "generated_at": "2026-06-21T04:06:26.728424",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -7290,7 +7290,7 @@
             "text": "そのカードのスコアに等しい数の{{icon_energy.png|E}}を支払ってもよい。",
             "dynamic_count": {
               "type": "dynamic_count",
-              "reference": "そのカードのスコア",
+              "reference": "selected_card_score",
               "mode": "equals"
             },
             "optional": true,
@@ -10734,6 +10734,8 @@
           "text": "自分のステージの右サイドエリアに「大沢瑠璃乃」が、左サイドエリアに「安養寺姫芽」が、センターエリアに「藤島慈」がそれぞれ登場している場合",
           "location": "stage",
           "characters": [
+            "大沢瑠璃乃",
+            "安養寺姫芽",
             "藤島慈"
           ],
           "target": "self",
@@ -11883,6 +11885,9 @@
         ],
         "parenthetical": [
           "メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。"
+        ],
+        "characters": [
+          "優木せつ菜"
         ]
       }
     },
@@ -14602,7 +14607,10 @@
           "baton_touch_trigger": true,
           "text": "「中須かすみ」からバトンタッチして登場した場合",
           "location": "stage",
-          "baton_touch_source": "中須かすみ"
+          "baton_touch_source": "中須かすみ",
+          "characters": [
+            "中須かすみ"
+          ]
         },
         "action": "sequential",
         "actions": [
@@ -14691,9 +14699,15 @@
           "count": 1,
           "card_type": "member_card",
           "optional": true,
+          "characters": [
+            "朝香果林"
+          ],
           "text": "自分のデッキの上からカードを2枚見る。その中から「朝香果林」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "optional": true
+        "optional": true,
+        "characters": [
+          "朝香果林"
+        ]
       }
     },
     {
@@ -14763,9 +14777,15 @@
           "count": 1,
           "card_type": "member_card",
           "optional": true,
+          "characters": [
+            "近江彼方"
+          ],
           "text": "自分のデッキの上からカードを2枚見る。その中から「近江彼方」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "optional": true
+        "optional": true,
+        "characters": [
+          "近江彼方"
+        ]
       }
     },
     {
@@ -14789,7 +14809,10 @@
           "baton_touch_trigger": true,
           "text": "「優木せつ菜」からバトンタッチして登場した場合",
           "location": "stage",
-          "baton_touch_source": "優木せつ菜"
+          "baton_touch_source": "優木せつ菜",
+          "characters": [
+            "優木せつ菜"
+          ]
         },
         "action": "sequential",
         "actions": [
@@ -14832,7 +14855,10 @@
           "baton_touch_trigger": true,
           "text": "「エマ・ヴェルデ」からバトンタッチして登場した場合",
           "location": "stage",
-          "baton_touch_source": "エマ・ヴェルデ"
+          "baton_touch_source": "エマ・ヴェルデ",
+          "characters": [
+            "エマ・ヴェルデ"
+          ]
         },
         "action": "sequential",
         "actions": [
@@ -14884,9 +14910,15 @@
           "count": 1,
           "card_type": "member_card",
           "optional": true,
+          "characters": [
+            "天王寺璃奈"
+          ],
           "text": "自分のデッキの上からカードを2枚見る。その中から「天王寺璃奈」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "optional": true
+        "optional": true,
+        "characters": [
+          "天王寺璃奈"
+        ]
       }
     },
     {
@@ -14910,7 +14942,10 @@
           "baton_touch_trigger": true,
           "text": "「三船栞子」からバトンタッチして登場した場合",
           "location": "stage",
-          "baton_touch_source": "三船栞子"
+          "baton_touch_source": "三船栞子",
+          "characters": [
+            "三船栞子"
+          ]
         },
         "action": "sequential",
         "actions": [
@@ -14999,9 +15034,15 @@
           "count": 1,
           "card_type": "member_card",
           "optional": true,
+          "characters": [
+            "鐘嵐珠"
+          ],
           "text": "自分のデッキの上からカードを2枚見る。その中から「鐘嵐珠」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "optional": true
+        "optional": true,
+        "characters": [
+          "鐘嵐珠"
+        ]
       }
     },
     {
@@ -15402,6 +15443,9 @@
             },
             {
               "text": "自分の控え室にカード名に「DreamBelievers」を含むライブカードがある場合",
+              "card_names": [
+                "DreamBelievers"
+              ],
               "target": "self",
               "location": "discard",
               "card_type": "live_card",
@@ -15414,6 +15458,9 @@
           "card_type": "member_card",
           "group_names": [
             "蓮ノ空"
+          ],
+          "card_names": [
+            "DreamBelievers"
           ]
         },
         "action": "modify_score",
@@ -15422,6 +15469,9 @@
         "self_target": true,
         "group_names": [
           "蓮ノ空"
+        ],
+        "card_names": [
+          "DreamBelievers"
         ]
       }
     },
@@ -17134,6 +17184,9 @@
         "text": "{{icon_blade.png|ブレード}}を得る。これにより「百生吟子」のメンバーカードを控え室に置いた場合、さらに{{icon_blade.png|ブレード}}を得る",
         "action": "conditional_on_result",
         "duration": "live_end",
+        "characters": [
+          "百生吟子"
+        ],
         "primary_effect": {
           "text": "{{icon_blade.png|ブレード}}を得る",
           "action": "gain_resource",
@@ -17146,6 +17199,9 @@
           "card_type": "member_card",
           "type": "card_count_condition",
           "target": "self",
+          "characters": [
+            "百生吟子"
+          ],
           "source": "preceding_moved"
         },
         "followup_action": {
@@ -17153,7 +17209,10 @@
           "action": "gain_resource",
           "resource": "blade",
           "count": 1,
-          "duration": "live_end"
+          "duration": "live_end",
+          "characters": [
+            "百生吟子"
+          ]
         }
       }
     },
@@ -18827,6 +18886,7 @@
         "condition": {
           "text": "自分のステージに「澁谷かのん」と「唐可可」がいる場合",
           "characters": [
+            "澁谷かのん",
             "唐可可"
           ],
           "target": "self",
@@ -19994,7 +20054,12 @@
           "location": "stage",
           "count": 2,
           "operator": ">=",
-          "unit": "人"
+          "unit": "人",
+          "characters": [
+            "澁谷かのん",
+            "ウィーン・マルガレーテ",
+            "鬼塚冬毬"
+          ]
         },
         "source": "revealed_cards",
         "dynamic_count": {
@@ -22678,6 +22743,9 @@
         "state_change": "wait",
         "count": 1,
         "card_type": "member_card",
+        "group_names": [
+          "虹ヶ咲"
+        ],
         "optional": true,
         "type": "change_state"
       },
@@ -22798,7 +22866,10 @@
               "quoted_type": "character"
             },
             "optional": true,
-            "action": "move_cards"
+            "action": "move_cards",
+            "card_names": [
+              "DIVE!"
+            ]
           },
           {
             "text": "次のライブカードセットフェイズで自分がライブカード置き場に置けるカード枚数の上限が1枚減る",
@@ -22818,7 +22889,13 @@
           ],
           "self_target": true,
           "type": "location_condition"
-        }
+        },
+        "characters": [
+          "DIVE!"
+        ],
+        "card_names": [
+          "DIVE!"
+        ]
       }
     },
     {
@@ -22895,6 +22972,9 @@
             "target": "self",
             "value": 3
           }
+        ],
+        "card_names": [
+          "EMOTION"
         ],
         "heart_colors": [
           "heart00"
@@ -23772,6 +23852,11 @@
           "count": 1,
           "card_type": "member_card",
           "optional": true,
+          "characters": [
+            "絢瀬絵里",
+            "朝香果林",
+            "葉月恋"
+          ],
           "text": "自分のデッキの上からカードを5枚見る。その中から「絢瀬絵里」か「朝香果林」か「葉月恋」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。その後、相手のステージにいる、これにより公開したカードのコスト以下で、かつ元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバーをすべてウェイトにする",
           "original_value": true
         },
@@ -23790,7 +23875,10 @@
           "cost_limit_operator": "<="
         },
         "optional": true,
-        "original_value": true
+        "original_value": true,
+        "characters": [
+          "葉月恋"
+        ]
       }
     },
     {
@@ -26565,6 +26653,9 @@
           "baton_touch_trigger": true,
           "text": "「徒町小鈴」以外の『蓮ノ空』のメンバーからバトンタッチして登場した場合",
           "location": "stage",
+          "exclude_characters": [
+            "徒町小鈴"
+          ],
           "group_names": [
             "蓮ノ空"
           ]

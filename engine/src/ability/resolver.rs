@@ -36,6 +36,8 @@ pub struct AbilityResolver {
     /// Cross-step data flow machinery — see `StepState` for the per-step
     /// output map, last-draw-count, and looked-at-total-count fields.
     pub step_state: StepState,
+    pub pending_energy_payment: Option<u32>,
+    pub cancel_remaining_commands: bool,
 }
 
 impl AbilityResolver {
@@ -59,6 +61,8 @@ impl AbilityResolver {
             debug_trace: false,
             pipeline: { EffectPipeline::new() },
             step_state: StepState::new(),
+            pending_energy_payment: None,
+            cancel_remaining_commands: false,
         }
     }
 

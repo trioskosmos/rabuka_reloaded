@@ -89,6 +89,17 @@ impl AbilityResolver {
         let reference_text = dc.reference.as_deref().or(dc.base_reference.as_deref());
 
         let mut count = match reference_text {
+            Some("selected_card_score") => {
+                if let Some(&card_id) = self.selected_cards.first() {
+                    if let Some(card) = gs.card_database.get_card(card_id) {
+                        card.score.unwrap_or(0)
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                }
+            }
             Some("previous_moved_cards") | Some("previous_move") => {
                 if !self.moved_cards.is_empty() {
                     self.moved_cards.len() as u32

@@ -67,6 +67,9 @@ impl super::resolver::AbilityResolver {
             }
 
             if self.pending_choice.is_some() {
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.effect_started = true;
+                }
                 if idx + 1 < pending.len() {
                     let mut existing = gs.ability_queue.take_pending_commands();
                     existing.extend(pending[idx + 1..].to_vec());

@@ -32,12 +32,17 @@ impl super::TurnEngine {
 
         // Restore performance-time need_heart_modifiers that were cleared by
         // evaluate_success_zone_heart_reductions. This preserves modifications
-        // from live_start triggers and other non-constant sources. The merge is
-        // safe to call on re-entry because evaluate_success_zone_heart_reductions
-        // is deterministic given the same success zone state.
+        // from live_start triggers and other non-constant sources.
+        // Deduplicate (cid,color) pairs to avoid double-counting when the same
+        // global modifier is captured in multiple players' snapshots.
+        let mut restored: std::collections::HashSet<(i16, crate::card::HeartColor)> =
+            std::collections::HashSet::new();
         for snap in &game_state.performance_snapshots {
             for (cid, colors) in &snap.performance_need_heart_modifiers {
                 for (color, entry) in colors {
+                    if !restored.insert((*cid, *color)) {
+                        continue;
+                    }
                     let target = game_state
                         .mods
                         .need_heart_modifiers

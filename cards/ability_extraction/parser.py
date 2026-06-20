@@ -344,14 +344,19 @@ def extract_optional(text: str) -> bool:
 
 
 def extract_group_names(text: str) -> List[str]:
-    """Extract all group names within 『』 brackets."""
-    return re.findall(r"『([^』]+)』", text)
+    """Extract all group names within 『』 or mixed 『」 brackets."""
+    names = re.findall(r"『([^』」]+)』", text)
+    # Also handle mixed brackets: 『虹ヶ咲」 (opening 『, closing 」)
+    names += re.findall(r"『([^』」]+)」", text)
+    return names
 
 
 def extract_exclude_group_names(text: str) -> List[str]:
     """Extract group names that are excluded (以外 pattern).
     e.g. 『Aqours』以外 → returns ['Aqours']"""
-    return re.findall(r"『([^』]+)』以外", text)
+    names = re.findall(r"『([^』」]+)』以外", text)
+    names += re.findall(r"『([^』」]+)」以外", text)
+    return names
 
 
 def extract_heart_types(text: str) -> List[str]:
@@ -657,6 +662,12 @@ def _try_distinct(text):
     gns = extract_group_names(text)
     if gns:
         result["group_names"] = gns
+    # Extract 「』-bracketed character names from のうち patterns
+    cm = re.search(r"((?:「[^」]+」[とか、]? ?)+)(?:」?がいる|」?のうち)", text)
+    if cm:
+        names = re.findall(r"「([^」]+)」", cm.group(1))
+        if names:
+            result["characters"] = names
     return result
 
 
@@ -722,6 +733,16 @@ def _try_card_count(text):
             # Detect distinct card name constraint (カード名の異なる)
             if "カード名の異なる" in text:
                 result["distinct"] = "card_name"
+            # Extract character names from 「X」のメンバーカード / ライブカード patterns
+            char_m = re.search(r"「([^」]+)」の(?:メンバーカード|ライブカード)", text)
+            if char_m:
+                result["characters"] = [char_m.group(1)]
+            # Also fallback: extract any 「」-bracketed names not matched above
+            if "characters" not in result:
+                bracketed = re.findall(r"「([^」]+)」", text)
+                if bracketed:
+                    # Only add names that look like character names (contain Japanese or are short)
+                    result["characters"] = bracketed
             # Detect same name constraint (同じ名前)
             if "同じ名前" in text:
                 result["same_name"] = True
@@ -975,9 +996,17 @@ def _try_baton_touch(text):
     m = re.search(r"「([^」]+)」からバトンタッチ", text)
     if m:
         result["baton_touch_source"] = m.group(1)
-    m = re.search(r"『([^』]+)』からバトンタッチ", text)
+        result["characters"] = [m.group(1)]
+    # 「名」以外の...からバトンタッチ — exclude this character
+    m = re.search(r"「([^」]+)」以外の.*からバトンタッチ", text)
+    if m:
+        result["exclude_characters"] = [m.group(1)]
+    m = re.search(r"『([^』」]+)』からバトンタッチ", text)
     if m:
         result["baton_touch_group"] = m.group(1)
+        # Also add to characters if not yet set
+        if "characters" not in result:
+            result["characters"] = [m.group(1)]
     count_m = re.search(r"(\d+)人からバトンタッチ", text)
     if count_m:
         result["min_baton_touch_count"] = int(count_m.group(1))
@@ -1212,7 +1241,15 @@ def _try_appearance(text):
         )
         result["cost_reference_type"] = "cost"
     if subject:
-        result["characters"] = [subject]
+        all_quoted = re.findall(r"「([^」]+)」", text)
+        if all_quoted:
+            result["characters"] = list(dict.fromkeys(all_quoted))
+        else:
+            result["characters"] = [subject]
+        # Remove cost reference character from characters — it's not the one appearing
+        if "cost_reference_character" in result:
+            ref = result["cost_reference_character"]
+            result["characters"] = [c for c in result["characters"] if c != ref]
     if "エリアすべて" in text:
         result["all_areas"] = True
     # Exclude self for "このメンバー以外" / "このカード以外" patterns
@@ -1230,6 +1267,10 @@ def _try_appearance(text):
         bts = re.search(r"「([^」]+)」からバトンタッチ", text)
         if bts:
             result["baton_touch_source"] = bts.group(1)
+        # 「名」以外の...からバトンタッチ — exclude this character
+        bte = re.search(r"「([^」]+)」以外の.*からバトンタッチ", text)
+        if bte:
+            result["exclude_characters"] = [bte.group(1)]
         count_m = re.search(r"(\d+)人からバトンタッチ", text)
         if count_m:
             result["min_baton_touch_count"] = int(count_m.group(1))
@@ -1266,6 +1307,7 @@ def _try_energy_state(text):
 
 
 def _try_state(text):
+    result = None
     for patterns, state in [
         (["ウェイト状態である", "ウェイト状態にある", "ウェイト状態の"], "wait"),
         (
@@ -1279,11 +1321,12 @@ def _try_state(text):
                 result["resource_type"] = "energy"
             if "すべて" in text:
                 result["all"] = True
-            gns = extract_group_names(text)
-            if gns:
-                result["group_names"] = gns
-            return result
-    return None
+    if result is None:
+        return None
+    gns = extract_group_names(text)
+    if gns:
+        result["group_names"] = gns
+    return result
 
 
 def _try_revealed(text):
@@ -1539,12 +1582,23 @@ def _try_live_mid(text):
 
 def _extract_generic_fields(condition, text):
     """Extract all generic fields from text into condition dict (no early return)."""
-    # Character names: 「A」か「B」か「C」がいる (any number of names OR-ed)
-    cm = re.search(r"((?:「[^」]+」か? ?)+)がいる", text)
+    # Character names: 「A」か「B」か「C」がいる, 「A」と「B」がいる,
+    # 「A」、「B」、「C」のうち (any number of names with か/と/、 separators)
+    cm = re.search(r"((?:「[^」]+」[とか、]? ?)+)(?:」?がいる|」?のうち)", text)
     if cm:
         names = re.findall(r"「([^」]+)」", cm.group(1))
         if names:
             condition["characters"] = names
+
+    # Card name filter: カード名に「DreamBelievers」を含む
+    cn = re.search(r"カード名に「([^」]+)」を含む", text)
+    if cn:
+        condition["card_names"] = [cn.group(1)]
+
+    # Card name exact: カード名が「EMOTION」のカード
+    cn_exact = re.search(r"カード名が「([^」]+)」のカード", text)
+    if cn_exact:
+        condition["card_names"] = [cn_exact.group(1)]
 
     # Group/unit names: 『虹ヶ咲』 etc.
     gns = extract_group_names(text)
@@ -4841,6 +4895,9 @@ def _build_reveal_add_discard(fp, sa_text, select_text):
     gns = extract_group_names(select_text)
     if gns:
         result["group_names"] = gns
+    char_names = re.findall(r"「([^」]+)」", select_text)
+    if char_names:
+        result["characters"] = list(dict.fromkeys(char_names))
     cl = extract_cost_limit(select_text)
     if cl:
         result["cost_limit"] = cl
@@ -4893,6 +4950,10 @@ def _enrich_from_text(d, text):
     gns = extract_group_names(text)
     if gns:
         d["group_names"] = gns
+    # Extract 「」-bracketed character names (e.g. 「朝香果林」のメンバーカード)
+    char_names = re.findall(r"「([^」]+)」", text)
+    if char_names:
+        d["characters"] = list(dict.fromkeys(char_names))
     cl = extract_cost_limit(text)
     if cl:
         d["cost_limit"] = cl
@@ -6115,6 +6176,11 @@ def _try_kore_niyori_result(text):
         cond.pop("location", None)
         if cond.get("type") in ("location_condition",):
             cond["type"] = "card_count_condition"
+    # Extract character names from 「X」のメンバーカード/ライブカード patterns
+    if cond and isinstance(cond, dict) and not cond.get("characters"):
+        char_m = re.search(r"「([^」]+)」の(?:メンバーカード|ライブカード)", cond_raw)
+        if char_m:
+            cond["characters"] = [char_m.group(1)]
     # "custom" type conditions can't be evaluated by the engine — skip them.
     # However, detect known action result patterns and convert them.
     if cond and cond.get("type") == "custom":
@@ -7664,6 +7730,33 @@ def _normalize_effect_tree(effect, original_text=None):
             gained = parse_effect(node["ability_gain"])
             if gained and gained.get("action") and gained.get("action") != "custom":
                 node["gained_effect"] = gained
+
+    # Fallback: extract character names from 「X」のメンバーカード/ライブカード patterns
+    # and card names from カード名が「X」/カード名に「X」 patterns
+    # in any sub-dict that lacks the appropriate field.
+    def _enrich_characters(d):
+        if isinstance(d, dict):
+            if "text" in d:
+                text = d["text"]
+                if not d.get("characters"):
+                    cm = re.search(
+                        r"「([^」]+)」の(?:メンバーカード|ライブカード)", text
+                    )
+                    if cm:
+                        d["characters"] = [cm.group(1)]
+                if not d.get("card_names"):
+                    cn = re.search(r"カード名(?:に|が)「([^」]+)」", text)
+                    if cn:
+                        d["card_names"] = [cn.group(1)]
+            for v in d.values():
+                if isinstance(v, (dict, list)):
+                    _enrich_characters(v)
+        elif isinstance(d, list):
+            for item in d:
+                if isinstance(item, (dict, list)):
+                    _enrich_characters(item)
+
+    _enrich_characters(effect)
 
     return effect
 

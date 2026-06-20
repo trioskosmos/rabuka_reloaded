@@ -587,7 +587,30 @@ impl AbilityResolver {
 
             ActionType::Choice => self.execute_choice(gs, effect),
             ActionType::PayEnergy => {
-                self.execute_pay_energy(gs, effect.count_or(0), effect.target_name())
+                let count = if let Some(ref dc) = effect.dynamic_count {
+                    self.resolve_dynamic_count(gs, dc)
+                } else {
+                    effect.energy_count.unwrap_or_else(|| effect.count_or(0))
+                };
+                if effect.optional.unwrap_or(false) {
+                    let player = gs.resolve_target_player(effect.target_name());
+                    if player.energy_zone.active_energy_count < count as usize {
+                        // Insufficient energy: skip payment and clear remaining actions
+                        self.cancel_remaining_commands = true;
+                        if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                            entry.pending_commands.clear();
+                        }
+                        return Ok(());
+                    }
+                    self.pending_energy_payment = Some(count);
+                    self.pending_choice = Some(crate::ability::types::Choice::select_target(
+                        "pay_optional_cost:skip_optional_cost",
+                        format!("Pay {} energy?", count),
+                        false,
+                    ));
+                    return Ok(());
+                }
+                self.execute_pay_energy(gs, count, effect.target_name())
             }
             ActionType::SetCardIdentity => self.execute_set_card_identity_effect(gs, effect),
             ActionType::RepeatProcedure => {
