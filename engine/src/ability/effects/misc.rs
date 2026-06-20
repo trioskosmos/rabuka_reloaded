@@ -241,14 +241,30 @@ impl AbilityResolver {
             && effect.heart_type.as_deref() == Some("all")
         {
             if let Some(card_id) = gs.activating_card {
+                let amount = effect.count_or(1) as i32;
                 gs.mods.add_heart_modifier_with_trace(
                     card_id,
                     crate::card::HeartColor::All,
-                    effect.count_or(1) as i32,
+                    amount,
                     &mut gs.ability_applications,
-                    gs.activating_card.unwrap_or(-1),
+                    card_id,
                     &effect.text,
                 );
+                if effect.duration.as_deref() == Some("live_end") {
+                    let effect_data = serde_json::json!({
+                        "card_id": card_id,
+                        "amount": amount,
+                        "color": "all",
+                    });
+                    crate::ability::util::push_temporary_effect(
+                        gs,
+                        "gain_heart",
+                        Some("live_end"),
+                        "self",
+                        &format!("Gain {} all-heart", amount),
+                        Some(effect_data),
+                    );
+                }
             }
             return Ok(());
         }

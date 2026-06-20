@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-20T05:21:03.940294",
+  "generated_at": "2026-06-20T05:27:38.493796",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -4494,8 +4494,7 @@
               "state_change": "active",
               "card_type": "member_card",
               "action": "change_state",
-              "count": 1,
-              "activation_position": "left_side"
+              "count": 1
             },
             {
               "text": "2枚ある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -4512,8 +4511,7 @@
               "action": "gain_resource",
               "resource": "blade",
               "count": 2,
-              "duration": "live_end",
-              "activation_position": "left_side"
+              "duration": "live_end"
             }
           ],
           "activation_position": "left_side"
@@ -5467,11 +5465,6 @@
         "resource": "heart",
         "count": 2,
         "duration": "live_end",
-        "heart_colors": [
-          "heart02",
-          "heart04",
-          "heart05"
-        ],
         "heart_type": "all"
       }
     },
@@ -14154,14 +14147,6 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "heart_colors": [
-          "heart01",
-          "heart02",
-          "heart03",
-          "heart04",
-          "heart05",
-          "heart06"
-        ],
         "heart_type": "all"
       }
     },
@@ -19165,7 +19150,8 @@
         "destination": "stage",
         "parenthetical": [
           "この効果で既にメンバーがいるエリアにも登場できる。ただし、このターンにステージに登場したメンバーがいるエリアには登場できない。"
-        ]
+        ],
+        "allow_occupied_stage": true
       }
     },
     {

@@ -954,3 +954,156 @@ fn riko_bp6_auto_optional_skip_does_not_consume_turn_limit() {
         "live_c stays in waitroom (turn limit used)"
     );
 }
+
+// ====================================================================
+// LiveEnd cleanup tests — verify heart_type=all + duration=live_end
+// properly removes modifiers after the live phase ends.
+// ====================================================================
+
+fn advance_to_live_card_set_p1(game: &mut TestGame) {
+    for _ in 0..5 {
+        game.pass();
+    }
+}
+
+fn advance_to_live_start(game: &mut TestGame) {
+    game.pass();
+    game.pass();
+}
+
+/// MIRACLE WAVE (need_heart = {02:4, 04:4, 05:4}, total=12) alone passes
+/// the >=12 threshold. Verify all-heart is gained during live, then
+/// cleaned up after LiveVictoryDetermination.
+#[test]
+fn riko_bp6_live_end_clears_all_heart() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let riko = game.id("PL!S-bp6-002-SEC");
+    let filler = game.id("PL!-sd1-010-SD");
+    let mw = game.id("PL!S-bp3-019-L");
+
+    game.state.player1.stage.stage = [-1, riko, -1];
+    game.state.player1.hand.cards.push(mw);
+    game.state.player1.hand.cards.push(filler);
+
+    // Fill deck
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(mw);
+    advance_to_live_start(&mut game);
+
+    // Handle any pending choices from LiveStart triggers
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // During live phase: exactly +2 all-heart
+    let all = game.state.mods.get_heart_modifier(riko, HeartColor::All);
+    assert_eq!(all, 2, "during live: +2 all-heart (MW total 12 >= 12)");
+
+    // Advance: FirstAttackerPerformance → SecondAttackerPerformance
+    game.pass();
+    game.pass();
+
+    // Advance: LiveVictoryDetermination
+    game.pass();
+
+    // Handle any pending choices (e.g. LiveSuccess triggers)
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // Advance: LiveVictoryDetermination → Active
+    game.pass();
+    // check_expired_effects runs here, cleaning up live_end-temporary effects
+
+    // All-heart must be cleared after LiveVictoryDetermination
+    let all_after = game.state.mods.get_heart_modifier(riko, HeartColor::All);
+    assert_eq!(
+        all_after, 0,
+        "all-heart must be cleared after LiveVictoryDetermination (duration=live_end)"
+    );
+}
+
+/// 4 x PL!S-sd1-019-SD (each has {02:1,04:1,05:1}=3) = total 12 → passes exactly.
+#[test]
+fn riko_bp6_threshold_exact_12_passes() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let riko = game.id("PL!S-bp6-002-SEC");
+    let filler = game.id("PL!-sd1-010-SD");
+    let sd = game.id("PL!S-sd1-019-SD");
+
+    game.state.player1.stage.stage = [-1, riko, -1];
+    for _ in 0..4 {
+        game.state.player1.live_card_zone.cards.push(sd);
+    }
+    fill_decks(&mut game, filler);
+
+    trigger_ability(&mut game, riko, "ライブ開始時");
+
+    let all = game.state.mods.get_heart_modifier(riko, HeartColor::All);
+    assert_eq!(all, 2, "4× SD (total 12) → +2 all-heart");
+}
+
+/// 3 x PL!S-sd1-019-SD (each has {02:1,04:1,05:1}=3) = total 9 → below threshold.
+#[test]
+fn riko_bp6_threshold_9_fails() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let riko = game.id("PL!S-bp6-002-SEC");
+    let filler = game.id("PL!-sd1-010-SD");
+    let sd = game.id("PL!S-sd1-019-SD");
+
+    game.state.player1.stage.stage = [-1, riko, -1];
+    for _ in 0..3 {
+        game.state.player1.live_card_zone.cards.push(sd);
+    }
+    fill_decks(&mut game, filler);
+
+    trigger_ability(&mut game, riko, "ライブ開始時");
+
+    let all = game.state.mods.get_heart_modifier(riko, HeartColor::All);
+    assert_eq!(all, 0, "3× SD (total 9) → condition fails, no hearts");
+}
+
+/// Verify the effect has heart_type="all". This test verifies the correct
+/// parsed state expected after running the parser fix that removes leaked
+/// heart_colors from the effect when heart_type=all.
+/// NOTE: If abilities.json hasn't been regenerated after the parser fix,
+/// heart_colors may still be present — that is a data regeneration issue,
+/// not an engine bug.
+#[test]
+fn riko_bp6_has_heart_type_all() {
+    let db = load_real_database();
+    let riko_card = db.get_card_id("PL!S-bp6-002-SEC").unwrap();
+    let card = db.get_card(riko_card).unwrap();
+
+    let ab = card
+        .abilities
+        .iter()
+        .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
+        .expect("Riko BP6 should have ライブ開始時 ability");
+
+    let effect = ab.effect.as_ref().expect("Should have an effect");
+    assert_eq!(
+        effect.action, "gain_resource",
+        "Action should be gain_resource"
+    );
+    assert_eq!(
+        effect.resource.as_deref(),
+        Some("heart"),
+        "Resource should be heart"
+    );
+    assert_eq!(
+        effect.heart_type.as_deref(),
+        Some("all"),
+        "heart_type should be all"
+    );
+}

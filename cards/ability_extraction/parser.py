@@ -7916,6 +7916,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             if "{{icon_all.png|ハート}}" in (eff.get("text", "") or t or ""):
                 if not eff.get("heart_type"):
                     eff["heart_type"] = "all"
+                    eff.pop("heart_colors", None)
                     fix_stats["heart_type"] += 1
 
         # FIX 2: each_time sequential → conditional_on_optional
@@ -8665,7 +8666,8 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
 
         _propagate_context(eff)
 
-    # ============== Q76: allow_occupied_stage for self-targeting discard-to-stage ==============
+    # ============== allow_occupied_stage ==============
+    # Q76 rule: self-revival from discard to stage can place on occupied areas
     for ability in data["unique_abilities"]:
         eff = ability.get("effect")
         if not isinstance(eff, dict):
@@ -8677,6 +8679,12 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             and eff.get("self_target") is True
         ):
             eff["allow_occupied_stage"] = True
+        # Text-based detection for "既にメンバーがいるエリアにも登場できる"
+        if eff.get("action") == "move_cards" and eff.get("destination") == "stage":
+            text = eff.get("text", "")
+            parenthetical = " ".join(eff.get("parenthetical", []) or [])
+            if "既にメンバーがいるエリア" in text + parenthetical:
+                eff["allow_occupied_stage"] = True
 
     # Group/unit filter fields are validated in extract_card_abilities.py
     return data
