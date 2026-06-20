@@ -15,7 +15,6 @@ use crate::helpers::*;
 
 /// Advance to MainPhase.
 
-
 #[test]
 fn position_change_swap_triggers_jidou_energy_draw() {
     let db = load_real_database();
@@ -34,7 +33,11 @@ fn position_change_swap_triggers_jidou_energy_draw() {
     }
     // Populate energy deck so 千砂都's energy draw can succeed
     for _ in 0..10 {
-        game.state.player1.energy_deck.cards.push(game.id("LL-E-001-SD"));
+        game.state
+            .player1
+            .energy_deck
+            .cards
+            .push(game.id("LL-E-001-SD"));
     }
     game.give_energy(20);
 
@@ -63,10 +66,7 @@ fn position_change_swap_triggers_jidou_energy_draw() {
     // Find the "left" position option (where 千砂都 currently is) among the
     // generated ChoicePosition actions and select it.
     let actions = game.generated_actions();
-    let descriptions: Vec<&str> = actions
-        .iter()
-        .map(|a| a.description.as_str())
-        .collect();
+    let descriptions: Vec<&str> = actions.iter().map(|a| a.description.as_str()).collect();
     eprintln!("[POSITION_OPTIONS] {:?}", descriptions);
 
     let left_idx = actions

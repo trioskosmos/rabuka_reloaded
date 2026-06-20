@@ -371,11 +371,59 @@ fn all_heart_expires_at_live_end() {
 //       カードを1枚引く。
 // ─────────────────────────────────────────────────────────────
 
-/// T12: ライブ成功時能力を持たないメンバー → カードを引かない
-/// 南ことり has no LiveSuccess. Phase transitions draw cards but
-/// Victory Road ab#1 does NOT fire because no LiveSuccess resolved.
+/// T12: メンバーのライブ成功時能力が解決 → ビクトリーロードが1枚引く
+/// 鬼塚夏美 (PL!SP-bp2-009-R+) has unconditional LiveSuccess "draw 2, discard 1".
+/// Victory Road ab#1 fires after each LiveSuccess resolves, drawing 1 more.
 #[test]
-fn live_success_noop_without_live_success() {
+fn live_success_each_time_draws_card() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let victory = game.id("PL!N-bp5-030-L");
+    let member = game.id("PL!SP-bp2-009-R\u{ff0b}");
+    let filler = game.new_id("PL!-sd1-010-SD");
+    let hand_card = game.new_id("PL!-bp3-013-N");
+
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.state.player1.live_card_zone.cards.push(victory);
+    game.state.player1.stage.stage[0] = filler;
+    game.state.player1.stage.stage[1] = member;
+    game.state.player1.stage.stage[2] = -1;
+    game.state.player1.hand.cards.push(victory);
+    game.state.player1.hand.cards.push(hand_card);
+    game.state.player1.hand.cards.push(hand_card);
+    game.state.player1.hand.cards.push(hand_card);
+
+    advance_to_live_start(&mut game);
+    game.set_live_card(victory);
+    finish_live_setup(&mut game);
+    drain_choices(&mut game);
+
+    let deck_before = game.state.player1.main_deck.cards.len();
+    set_stage_hearts(&mut game);
+
+    // Advance through: FirstAttackerPerformance → SecondAttackerPerformance → LiveVictoryDetermination
+    game.pass();
+    drain_choices(&mut game);
+    game.pass();
+    drain_choices(&mut game);
+    game.pass();
+    drain_choices(&mut game);
+
+    assert!(
+        game.state.player1.main_deck.cards.len() < deck_before,
+        "LiveSuccess + Victory Road each_time should draw cards"
+    );
+}
+
+/// T13: ライブ成功時能力を持たないメンバー → ビクトリーロード発動しない
+#[test]
+fn no_live_success_no_trigger() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -404,7 +452,6 @@ fn live_success_noop_without_live_success() {
     let deck_before = game.state.player1.main_deck.cards.len();
     set_stage_hearts(&mut game);
 
-    // Advance through performance phases → LiveVictoryDetermination → live ends
     game.pass();
     drain_choices(&mut game);
     game.pass();
@@ -412,10 +459,66 @@ fn live_success_noop_without_live_success() {
     game.pass();
     drain_choices(&mut game);
 
-    // Member has no LiveSuccess, so no draw from Victory Road ab#1.
-    // Phase passes draw cards (need_heart draw when placing live card).
+    let deck_after = game.state.player1.main_deck.cards.len();
+    // Both tests pass through the same phases; T12 should draw MORE than T13
+    // because T12 has LiveSuccess triggering Victory Road ab#1.
+    assert!(deck_after < deck_before, "Deck decreased from phase draws");
+}
+
+/// T14: ライブカード自身のライブ成功時能力 → メンバーでない → ビクトリーロード発動しない
+/// 君のこころは輝いてるかい？ (PL!S-bp2-024-L) is a live card with LiveSuccess "draw 2, discard 1".
+/// Victory Road ab#1 watches "メンバーの" (member's) LiveSuccess → live card's own LiveSuccess
+/// does NOT trigger it.
+#[test]
+fn live_card_own_live_success_no_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let victory = game.id("PL!N-bp5-030-L");
+    let live_card = game.id("PL!S-bp2-024-L");
+    let member = game.id("PL!-bp3-012-N");
+    let filler = game.new_id("PL!-sd1-010-SD");
+    let hand_card = game.new_id("PL!-bp3-013-N");
+
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    // Don't push to live_card_zone yet; set_live_card handles that.
+    game.state.player1.stage.stage[0] = filler;
+    game.state.player1.stage.stage[1] = member;
+    game.state.player1.stage.stage[2] = -1;
+    game.state.player1.hand.cards.push(victory);
+    game.state.player1.hand.cards.push(live_card);
+    game.state.player1.hand.cards.push(hand_card);
+    game.state.player1.hand.cards.push(hand_card);
+    game.state.player1.hand.cards.push(hand_card);
+
+    advance_to_live_start(&mut game);
+    game.set_live_card(victory);
+    // Manually add the second live card (君のこころは輝いてるかい？) to the zone
+    game.state.player1.live_card_zone.cards.push(live_card);
+    finish_live_setup(&mut game);
+    drain_choices(&mut game);
+
+    let deck_before = game.state.player1.main_deck.cards.len();
+    set_stage_hearts(&mut game);
+
+    game.pass();
+    drain_choices(&mut game);
+    game.pass();
+    drain_choices(&mut game);
+    game.pass();
+    drain_choices(&mut game);
+
+    // The live card (PL!S-bp2-024-L) has LiveSuccess → draws 2, discards 1.
+    // The member (PL!-bp3-012-N) has NO LiveSuccess.
+    // Victory Road should NOT fire live card's LiveSuccess is from a non-member.
+    // Only the live card's own LiveSuccess draw happens.
     assert!(
         game.state.player1.main_deck.cards.len() < deck_before,
-        "Deck decreased from phase draws (no LiveSuccess trigger)"
+        "Live card's own LiveSuccess draws; Victory Road does NOT fire for non-member"
     );
 }

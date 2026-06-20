@@ -249,6 +249,42 @@ impl GameState {
                                         }
                                     }
                                 }
+                                // Pre-filter: evaluate past-tense movement conditions
+                                // ("moved") during scanning to prevent queuing auto
+                                // abilities whose trigger event hasn't occurred.
+                                // E.g. "このメンバーがエリアを移動したとき" should NOT
+                                // queue if the card hasn't moved yet.
+                                // We do NOT pre-filter "moves" (present tense) because
+                                // those fire DURING position change — the card hasn't
+                                // moved yet at TAS scan time.
+                                if let Some(ref condition) = effect.condition {
+                                    let movement = condition.movement.as_deref();
+                                    let is_past_movement = movement == Some("moved");
+                                    let is_appearance = matches!(
+                                    condition.condition_type,
+                                    Some(crate::ability::enums::ConditionType::AppearanceCondition)
+                                );
+                                    if is_past_movement || is_appearance {
+                                        let moved: &[i16] =
+                                            self.recently_moved_cards.as_deref().unwrap_or(&[]);
+                                        let saved_activating = self.activating_card;
+                                        self.activating_card = Some(card_id);
+                                        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, moved);
+                                        let passes = ctx.evaluate_condition(condition);
+                                        self.activating_card = saved_activating;
+                                        if crate::ability::debug::ABILITY_DEBUG
+                                            .load(std::sync::atomic::Ordering::Relaxed)
+                                        {
+                                            eprintln!(
+                                                "[TAS_COND] card={} cond_type={:?} passes={}",
+                                                card.name, condition.condition_type, passes
+                                            );
+                                        }
+                                        if !passes {
+                                            continue;
+                                        }
+                                    }
+                                }
                             }
                             // During in-execution scans (e.g. state.rs state-change),
                             // skip the exact same ability on the same card to prevent
@@ -293,6 +329,27 @@ impl GameState {
                                     let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, moved);
                                     if !ctx.evaluate_condition(trigger_cond) {
                                         continue;
+                                    }
+                                }
+                                // Same pre-filter for live cards: only past-tense "moved"
+                                if let Some(ref condition) = effect.condition {
+                                    let movement = condition.movement.as_deref();
+                                    let is_past_movement = movement == Some("moved");
+                                    let is_appearance = matches!(
+                                        condition.condition_type,
+                                        Some(crate::ability::enums::ConditionType::AppearanceCondition)
+                                    );
+                                    if is_past_movement || is_appearance {
+                                        let moved: &[i16] =
+                                            self.recently_moved_cards.as_deref().unwrap_or(&[]);
+                                        let saved_activating = self.activating_card;
+                                        self.activating_card = Some(card_id);
+                                        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, moved);
+                                        let passes = ctx.evaluate_condition(condition);
+                                        self.activating_card = saved_activating;
+                                        if !passes {
+                                            continue;
+                                        }
                                     }
                                 }
                             }
@@ -454,8 +511,10 @@ impl GameState {
 
     /// Internal: Process all standby abilities for a single player.
     /// Stops early if an ability creates a pending choice.
-    /// Trigger each_time abilities on live cards for a specific stage member's resolution.
+    /// Trigger each_time abilities on live cards for a specific member's resolution.
     /// Called after a LiveStart/LiveSuccess ability resolves successfully.
+    /// Only fires when the resolved card is a STAGE MEMBER (not a live card in the
+    /// live_card_zone), matching the "メンバーの" (member's) condition in each_time text.
     /// Enqueues each matching each_time ability with `triggering_member_id` set to `member_card_id`.
     pub fn trigger_each_time_for_member(
         &mut self,
@@ -463,11 +522,17 @@ impl GameState {
         trigger_substring: &str,
         member_card_id: i16,
     ) {
+        // Only fire for stage member cards — live cards' own LiveStart/LiveSuccess
+        // must NOT trigger each_time (each_time watches "メンバーの" = member's abilities).
         let player = if player_id == self.player1.id || player_id == "p1" {
             &self.player1
         } else {
             &self.player2
         };
+        let is_on_stage = player.stage.stage.contains(&member_card_id);
+        if !is_on_stage {
+            return;
+        }
         let player_id_clone = player_id.to_string();
         let mut abilities: Vec<(String, String, i16)> = Vec::new();
         for &card_id in &player.live_card_zone.cards {
