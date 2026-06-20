@@ -253,11 +253,19 @@ impl<'a> ConditionContext<'a> {
         }
 
         let result = compare_counts(condition.operator.as_deref(), count, target_count);
-        if condition.negation.unwrap_or(false) {
+        let final_result = if condition.negation.unwrap_or(false) {
             !result
         } else {
             result
-        }
+        };
+        let op_str = condition.operator.as_deref().unwrap_or(">=");
+        super::push_cond_verdict(
+            condition,
+            &format!("実際={}, 期待={}{}", count, op_str, target_count),
+            final_result,
+            vec![],
+        );
+        final_result
     }
 
     pub(crate) fn evaluate_front_comparison(&self, condition: &Condition) -> bool {
@@ -1742,6 +1750,7 @@ impl<'a> ConditionContext<'a> {
         }
         let mut dbg = AbDebug::new();
         dbg.condition(condition, actual, count, passed);
+        super::push_cond_verdict(condition, &format!("{}枚", actual), passed, vec![]);
         passed
     }
 
@@ -1800,22 +1809,37 @@ impl<'a> ConditionContext<'a> {
         let baton_touch_trigger = condition.baton_touch_trigger.unwrap_or(false);
         let player = self.resolve_condition_player(target);
 
+        // Helper to push enriched verdict with character/cost data
+        let push_rich = |actual: &str, ok: bool| {
+            super::push_cond_verdict(condition, actual, ok, vec![]);
+        };
+
         if baton_touch_trigger {
             if let Some(ref _activating_card) = self.game_state.activating_card {
                 if self.game_state.baton_touch_count == 0 {
+                    push_rich("バトンタッチ未実行", false);
                     return false;
                 }
                 if let Some(min_count) = condition.min_baton_touch_count {
                     if self.game_state.baton_touch_count < min_count {
+                        push_rich(
+                            &format!(
+                                "バトンタッチ回数不足({})",
+                                self.game_state.baton_touch_count
+                            ),
+                            false,
+                        );
                         return false;
                     }
                 }
             } else {
+                push_rich("起動カードなし", false);
                 return false;
             }
         }
 
         if !baton_touch_trigger && !appearance {
+            push_rich("不在条件", false);
             return false;
         }
 
@@ -1830,11 +1854,12 @@ impl<'a> ConditionContext<'a> {
                         .copied()
                         .collect();
                     if stage_ids.is_empty() {
+                        push_rich("ステージ空", false);
                         return false;
                     }
-                    if condition.all_areas.unwrap_or(false)
-                        && player.stage.stage.iter().filter(|&&id| id != -1).count() != 3
-                    {
+                    let filled_count = player.stage.stage.iter().filter(|&&id| id != -1).count();
+                    if condition.all_areas.unwrap_or(false) && filled_count != 3 {
+                        push_rich(&format!("全エリア未充足({}/3)", filled_count), false);
                         return false;
                     }
                     if let Some(ref groups) = condition.group_names {
@@ -1856,6 +1881,7 @@ impl<'a> ConditionContext<'a> {
                                 stage_ids.iter().any(|&cid| match_fn(cid))
                             };
                             if !ok {
+                                push_rich(&format!("グループ不一致: {:?}", groups), false);
                                 return false;
                             }
                             // Prevent self-trigger on own appearance when NOT
@@ -1880,6 +1906,7 @@ impl<'a> ConditionContext<'a> {
                                         && self.game_state.has_card_appeared_this_turn(cid)
                                 });
                                 if !has_other_matching {
+                                    push_rich("自カードのみ登場", false);
                                     return false;
                                 }
                             }
@@ -1901,6 +1928,7 @@ impl<'a> ConditionContext<'a> {
                                     && player.stage.stage[idx] == card_id.unwrap()
                             });
                             if !passes {
+                                push_rich(&format!("位置不一致: {}", act_pos), false);
                                 return false;
                             }
                         }
@@ -1914,6 +1942,7 @@ impl<'a> ConditionContext<'a> {
                             Some("right") | Some("rightside") | Some("right_side") => 2,
                             _ => {
                                 log::debug!("[APPEARANCE] unknown position: {:?}", pos_str);
+                                push_rich(&format!("不明な位置: {:?}", pos_str), false);
                                 return false;
                             }
                         };
@@ -1923,6 +1952,7 @@ impl<'a> ConditionContext<'a> {
                             || expected.is_none()
                             || player.stage.stage[pos_idx] != expected.unwrap()
                         {
+                            push_rich(&format!("位置不一致(idx={})", pos_idx), false);
                             return false;
                         }
                     }
@@ -1933,7 +1963,9 @@ impl<'a> ConditionContext<'a> {
                             stage_ids
                         );
                         if chars.is_empty() {
-                            return !stage_ids.is_empty();
+                            let r = !stage_ids.is_empty();
+                            push_rich(&format!("ステージ在籍={}", stage_ids.len()), r);
+                            return r;
                         }
                         let stage_card_names: Vec<String> = stage_ids
                             .iter()
@@ -1951,6 +1983,11 @@ impl<'a> ConditionContext<'a> {
                         });
                         log::debug!("[APPEARANCE] result={}", result);
                         if !result {
+                            let names = stage_card_names.join(", ");
+                            push_rich(
+                                &format!("キャラ不在: 期待={:?}, 在籍=[{}]", chars, names),
+                                false,
+                            );
                             return false;
                         }
                         if let Some(ref ref_char) = condition.cost_reference_character {
@@ -1993,12 +2030,30 @@ impl<'a> ConditionContext<'a> {
                             };
                             log::debug!("[APPEARANCE] cost_compare: subject={} cost={:?} ref={} cost={:?} op={} ok={}",
                                 subject, subject_cost, ref_char, ref_cost, op, ok);
+                            let _cost_actual = match (subject_cost, ref_cost) {
+                                (Some(sc), Some(rc)) => format!("{} {} {}", sc, op, rc),
+                                (Some(sc), None) => format!("{} {} ?", sc, op),
+                                (None, Some(rc)) => format!("? {} {}", op, rc),
+                                (None, None) => format!("コスト未取得"),
+                            };
+                            push_rich(
+                                &format!(
+                                    "{}({}) {} {}({}) → {}",
+                                    subject,
+                                    subject_cost.unwrap_or(0),
+                                    if ok { "<" } else { "not<" },
+                                    ref_char,
+                                    ref_cost.unwrap_or(0),
+                                    if ok { "成立" } else { "不成立" }
+                                ),
+                                ok,
+                            );
                             ok
                         } else {
+                            push_rich(&format!("全キャラ在籍: {:?}", chars), true);
                             true
                         }
                     } else {
-                        // Check appearance_source if specified
                         if let Some(ref expected_source) = condition.appearance_source {
                             let card_to_check = self.activating_card_id;
                             let ok = card_to_check.map_or(false, |cid| {
@@ -2006,30 +2061,72 @@ impl<'a> ConditionContext<'a> {
                                     == Some(expected_source.as_str())
                             });
                             if !ok {
+                                push_rich(
+                                    &format!("登場元不一致: 期待={}", expected_source),
+                                    false,
+                                );
                                 return false;
                             }
                         }
-                        log::debug!(
-                            "[APPEARANCE] no characters filter, stage_ids={:?}",
-                            stage_ids
-                        );
+                        let names = stage_ids
+                            .iter()
+                            .filter_map(|&cid| {
+                                self.game_state
+                                    .card_database
+                                    .get_card(cid)
+                                    .map(|c| c.name.clone())
+                            })
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        push_rich(&format!("在籍キャラ: [{}]", names), true);
                         !stage_ids.is_empty()
                     }
                 }
-                Some(Zone::Hand) => !player.hand.cards.is_empty(),
-                Some(Zone::Discard) => !player.waitroom.cards.is_empty(),
-                _ => true,
+                Some(Zone::Hand) => {
+                    let r = !player.hand.cards.is_empty();
+                    push_rich(&format!("手札枚数={}", player.hand.cards.len()), r);
+                    r
+                }
+                Some(Zone::Discard) => {
+                    let r = !player.waitroom.cards.is_empty();
+                    push_rich(&format!("控え室枚数={}", player.waitroom.cards.len()), r);
+                    r
+                }
+                _ => {
+                    push_rich("他ゾーン", true);
+                    true
+                }
             }
         } else {
             match Zone::from_str(location) {
                 Some(Zone::Stage) => {
-                    player.stage.stage[0] == -1
+                    let r = player.stage.stage[0] == -1
                         && player.stage.stage[1] == -1
-                        && player.stage.stage[2] == -1
+                        && player.stage.stage[2] == -1;
+                    push_rich(
+                        if r {
+                            "不在=全エリア空"
+                        } else {
+                            "不在≠全エリア空"
+                        },
+                        r,
+                    );
+                    r
                 }
-                Some(Zone::Hand) => player.hand.cards.is_empty(),
-                Some(Zone::Discard) => player.waitroom.cards.is_empty(),
-                _ => true,
+                Some(Zone::Hand) => {
+                    let r = player.hand.cards.is_empty();
+                    push_rich(&format!("手札={}", player.hand.cards.len()), r);
+                    r
+                }
+                Some(Zone::Discard) => {
+                    let r = player.waitroom.cards.is_empty();
+                    push_rich(&format!("控え室={}", player.waitroom.cards.len()), r);
+                    r
+                }
+                _ => {
+                    push_rich("他ゾーン不在", true);
+                    true
+                }
             }
         }
     }

@@ -1,5 +1,6 @@
 use super::debug::AbDebug;
 use super::enums::Zone;
+use super::log::{drain_verdicts, AbilityLogItem};
 use super::types::{
     AbilityTraceNode, Choice, EffectPipeline, EffectSpawnContext, ExecutionContext, StepState,
     ZoneSnapshot,
@@ -7,6 +8,7 @@ use super::types::{
 use super::util;
 use crate::card::{Ability, AbilityEffect, CardDatabase, Condition, Keyword};
 use crate::game_state::{GameState, Phase};
+use crate::types::LogEntry;
 use crate::zones::MemberArea;
 use std::sync::Arc;
 
@@ -38,6 +40,10 @@ pub struct AbilityResolver {
     pub step_state: StepState,
     pub pending_energy_payment: Option<u32>,
     pub cancel_remaining_commands: bool,
+    /// Buffer for structured ability resolution log items.
+    /// Items are pushed during resolution and flushed as a single LogEntry
+    /// with metadata at the end of `resolve_ability()`.
+    pub log_items: Vec<AbilityLogItem>,
 }
 
 impl AbilityResolver {
@@ -63,8 +69,13 @@ impl AbilityResolver {
             step_state: StepState::new(),
             pending_energy_payment: None,
             cancel_remaining_commands: false,
+            log_items: Vec::new(),
         }
     }
+
+    /// Buffer a log text entry (goes to `rule_log` at flush time).
+    #[allow(unused)]
+    pub fn buffer_log<E: AsRef<str>>(&mut self, _gs: &GameState, _text: E) {}
 
     /// Find matching card indices in a zone, prompt if too many.
     /// Takes &[i16] (read-only — works with Vec, SmallVec, any container).
@@ -421,6 +432,8 @@ impl AbilityResolver {
         ability_index: usize,
     ) -> Result<(), String> {
         let mut dbg = AbDebug::new();
+        // Clear structured verdict buffer from any previous ability
+        crate::ability::log::clear_verdicts();
 
         // Card info for debug (owned Strings to avoid borrowing gs across mutation)
         let card_data = activating_card.and_then(|id| gs.card_database.get_card(id));
@@ -440,6 +453,7 @@ impl AbilityResolver {
         }
 
         dbg.ability(&card_name, &card_no, &card_id_str, ability);
+        let trigger_str = ability.triggers.as_deref().unwrap_or("?").to_string();
 
         // Check use_limit before cost, but don't insert until after effect runs
         let ability_key = activating_card
@@ -735,6 +749,26 @@ impl AbilityResolver {
             }
             gs.rule_log.push(format!("{pp} {card_name}: 効果適用 ✓"));
             dbg.p("RESULT", "effect applied ✓");
+            // Flush structured ability log
+            let items = drain_verdicts();
+            if !items.is_empty() {
+                let act_name = gs
+                    .activating_card
+                    .and_then(|id| gs.card_database.get_card(id))
+                    .map(|c| c.name.clone());
+                gs.structured_log.push(LogEntry {
+                    text: format!("{pp} {card_name}: 能力発動 [{trigger_str}] — success"),
+                    turn: gs.turn_number,
+                    player_label: pp.clone(),
+                    source_card_id: gs.activating_card,
+                    source_card_name: act_name,
+                    category: "ability_resolution".to_string(),
+                    metadata: Some(serde_json::json!({
+                        "result": "success",
+                        "items": items,
+                    })),
+                });
+            }
         }
 
         if !cost_already_paid {

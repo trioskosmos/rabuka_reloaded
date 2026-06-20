@@ -1274,3 +1274,127 @@
         break-inside: avoid;
     }
 }
+
+/* ── Structured ability resolution blocks ── */
+.ability-resolution-block {
+    margin: 4px 0;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.ability-resolution-block .log-group-details {
+    padding: 2px 8px 8px 8px;
+    background: var(--bg-alt, #f8f8f8);
+}
+
+.ability-log-item {
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border-dim, #eee);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.ability-log-item:last-child {
+    border-bottom: none;
+}
+
+.ability-cond-row,
+.ability-cost-row,
+.ability-effect-row,
+.ability-kv-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.ability-cond-icon {
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    width: 18px;
+    text-align: center;
+}
+
+.ability-cond-text {
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+}
+
+.ability-cond-type {
+    font-size: 0.7rem;
+    color: var(--text-dim, #999);
+    font-style: italic;
+}
+
+.ability-cond-detail {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+    padding-left: 22px;
+    font-size: 0.78rem;
+    flex-wrap: wrap;
+}
+
+.ability-label {
+    color: var(--text-dim, #888);
+    font-size: 0.75rem;
+}
+
+.ability-value {
+    font-weight: 500;
+    margin-right: 6px;
+}
+
+.ability-result {
+    font-weight: bold;
+    margin-left: auto;
+}
+
+.ability-result.pass {
+    color: #2e7d32;
+}
+
+.ability-result.fail {
+    color: #c62828;
+}
+
+.ability-sub-items {
+    padding-left: 22px;
+    margin-top: 4px;
+    border-left: 2px solid var(--border, #ddd);
+}
+
+.ability-sub-close {
+    height: 4px;
+}
+
+.ability-effect-detail {
+    color: var(--text-dim, #666);
+    font-size: 0.78rem;
+}
+
+.ability-pass {
+    color: #2e7d32;
+}
+
+.ability-fail {
+    color: #c62828;
+}
+
+@media (prefers-color-scheme: dark) {
+    .ability-resolution-block {
+        border-color: #444;
+    }
+    .ability-resolution-block .log-group-details {
+        background: #1a1a2e;
+    }
+    .ability-log-item {
+        border-bottom-color: #333;
+    }
+    .ability-cond-type {
+        color: #777;
+    }
+}

@@ -474,6 +474,7 @@ impl GameState {
             source_card_id,
             source_card_name,
             category: category.to_string(),
+            metadata: None,
         });
     }
 

@@ -288,4 +288,6 @@ pub struct LogEntry {
     pub source_card_id: Option<i16>,
     pub source_card_name: Option<String>,
     pub category: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
 }

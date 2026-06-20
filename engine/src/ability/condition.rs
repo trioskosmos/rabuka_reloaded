@@ -92,6 +92,134 @@ impl<'a> ConditionContext<'a> {
     }
 }
 
+/// Push a condition verdict to the structured log buffer.
+/// `actual_label` overrides the auto-generated actual string; use "" to auto-generate.
+pub fn push_cond_verdict(
+    condition: &Condition,
+    extra_actual: &str,
+    passed: bool,
+    children: Vec<crate::ability::log::AbilityLogItem>,
+) {
+    use crate::ability::log::{push_verdict, AbilityLogItem};
+    let ct = condition.condition_type;
+    let condition_type = ct.map(|t| t.to_str().to_string()).unwrap_or_default();
+    let op = condition.operator.as_deref().unwrap_or(">=");
+    let threshold = condition.count.map(|c| c.to_string()).unwrap_or_default();
+    let resource = condition.resource_type.as_deref().unwrap_or("");
+    let location = condition.location.as_deref().unwrap_or("");
+
+    let expectation = match ct {
+        Some(ConditionType::AppearanceCondition) => {
+            if let Some(ref chars) = condition.characters {
+                if !chars.is_empty() {
+                    if condition.cost_reference_character.is_some() {
+                        format!(
+                            "{} {} {}",
+                            chars[0],
+                            condition.cost_reference_operator.as_deref().unwrap_or(">"),
+                            condition.cost_reference_character.as_deref().unwrap_or("")
+                        )
+                    } else {
+                        format!("{} = true", chars[0])
+                    }
+                } else {
+                    "登場=true".into()
+                }
+            } else {
+                "登場=true".into()
+            }
+        }
+        Some(ConditionType::ComparisonCondition) => {
+            if !resource.is_empty() {
+                format!("{}{} {}{}", op, threshold, resource, location)
+            } else if !location.is_empty() {
+                format!("{}{} {}", op, threshold, location)
+            } else {
+                format!("{}{}", op, threshold)
+            }
+        }
+        Some(ConditionType::CardCountCondition) => {
+            let ct_field = condition.card_type.as_deref().unwrap_or("");
+            if !ct_field.is_empty() {
+                format!("{}{} {} {}", op, threshold, ct_field, location)
+            } else if !location.is_empty() {
+                format!("{}{} {}", op, threshold, location)
+            } else {
+                format!("{}{}", op, threshold)
+            }
+        }
+        Some(ConditionType::LocationCondition) => {
+            format!("位置={}", location)
+        }
+        Some(ConditionType::GroupCondition) => {
+            if let Some(ref gns) = condition.group_names {
+                format!("所属={}", gns.join(","))
+            } else {
+                "所属条件".into()
+            }
+        }
+        Some(ConditionType::PositionCondition) => {
+            if let Some(ref pos) = condition.position {
+                format!("位置={}", pos.get_position().unwrap_or("?"))
+            } else {
+                "位置条件".into()
+            }
+        }
+        Some(ConditionType::CardBladeCondition) => {
+            format!("ブレード{}{}", op, threshold)
+        }
+        Some(ConditionType::ScoreThresholdCondition) => {
+            format!("スコア{}{}", op, threshold)
+        }
+        Some(ConditionType::ResourceCondition) => {
+            format!("資源{}{}", op, threshold)
+        }
+        Some(ConditionType::StateCondition) => {
+            condition.state.as_deref().unwrap_or("状態").to_string()
+        }
+        Some(ConditionType::MovementCondition) => {
+            format!("移動={}", condition.movement.as_deref().unwrap_or("?"))
+        }
+        Some(ConditionType::TemporalCondition) => condition
+            .temporal
+            .as_deref()
+            .unwrap_or("タイミング")
+            .to_string(),
+        Some(ConditionType::EnergyStateCondition) => condition
+            .energy_state
+            .as_deref()
+            .unwrap_or("エネルギー状態")
+            .to_string(),
+        Some(ConditionType::AbilityFilterCondition) => condition
+            .ability_filter
+            .as_deref()
+            .unwrap_or("フィルター")
+            .to_string(),
+        Some(ConditionType::NoExcessHeart) => "余剰ハートなし".into(),
+        Some(ConditionType::AllCostComparisonCondition) => {
+            format!("全コスト合計{}{}", op, threshold)
+        }
+        _ => String::new(),
+    };
+
+    let actual = if !extra_actual.is_empty() {
+        extra_actual.to_string()
+    } else if passed {
+        "条件満たす".into()
+    } else {
+        "条件満たさない".into()
+    };
+
+    push_verdict(AbilityLogItem::Condition {
+        text: condition.text.clone(),
+        condition_type,
+        expectation,
+        actual,
+        passed,
+        children,
+    });
+}
+
 impl<'a> ConditionContext<'a> {
     pub fn evaluate_condition(&self, condition: &Condition) -> bool {
         // Handle aggregate total with heart_colors — runs before type dispatch
@@ -112,33 +240,46 @@ impl<'a> ConditionContext<'a> {
 
         let mut dbg = AbDebug::new();
         let ct = condition.condition_type;
-        let result = match ct {
-            Some(ConditionType::Compound) => self.evaluate_compound_condition(condition),
+        // Snapshot buffer before compound/or so children can be collected
+        let _before = crate::ability::log::buffer_len();
+        // Handle compound/or first — they push their own verdicts with children
+        match ct {
+            Some(ConditionType::Compound) => {
+                let r = self.evaluate_compound_condition(condition);
+                return r;
+            }
+            Some(ConditionType::OrCondition) => {
+                let r = self.evaluate_or_condition(condition);
+                return r;
+            }
+            _ => {}
+        }
+        // For all other types: run evaluator, then push generic verdict
+        let result: bool = match ct {
+            Some(ConditionType::AppearanceCondition) => {
+                self.evaluate_appearance_condition(condition)
+            }
             Some(ConditionType::ComparisonCondition) => {
                 self.evaluate_comparison_condition(condition)
             }
-            Some(ConditionType::LocationCondition) => self.evaluate_location_condition(condition),
             Some(ConditionType::CardCountCondition) => {
                 self.evaluate_card_count_condition(condition)
             }
+            Some(ConditionType::LocationCondition) => self.evaluate_location_condition(condition),
             Some(ConditionType::CardBladeCondition) => {
                 self.evaluate_card_blade_condition(condition)
             }
             Some(ConditionType::GroupCondition) => self.evaluate_group_condition(condition),
             Some(ConditionType::PositionCondition) => self.evaluate_position_condition(condition),
-            Some(ConditionType::AppearanceCondition) => {
-                self.evaluate_appearance_condition(condition)
-            }
             Some(ConditionType::TemporalCondition) => self.evaluate_temporal_condition(condition),
+            Some(ConditionType::MovementCondition) => self.evaluate_movement_condition(condition),
             Some(ConditionType::StateCondition) => self.evaluate_state_condition(condition),
             Some(ConditionType::EnergyStateCondition) => {
                 self.evaluate_energy_state_condition(condition)
             }
-            Some(ConditionType::MovementCondition) => self.evaluate_movement_condition(condition),
             Some(ConditionType::AbilityFilterCondition) => {
                 self.evaluate_ability_filter_condition(condition)
             }
-            Some(ConditionType::OrCondition) => self.evaluate_or_condition(condition),
             Some(ConditionType::AnyOfCondition) => self.evaluate_any_of_condition(condition),
             Some(ConditionType::ScoreThresholdCondition) => {
                 self.evaluate_score_threshold_condition(condition)
@@ -160,27 +301,16 @@ impl<'a> ConditionContext<'a> {
             Some(ConditionType::NoExcessHeart) => {
                 self.evaluate_no_excess_heart_condition(condition)
             }
-            Some(ConditionType::OtherwiseCondition) => true, // "otherwise" = catch-all, always true when reached
-            Some(ConditionType::NotMoved) | Some(ConditionType::HasMoved) => {
-                // These are only meaningful as nested conditions within movement_condition.
-                // At top level they are handled by evaluate_movement_condition's nested path.
-                false
-            }
             Some(ConditionType::ResourceCondition) => self.evaluate_resource_condition(condition),
-            Some(ConditionType::ActionSuccessCondition) => {
-                // Action success conditions are placed by the parser to gate followup
-                // actions on the success of a previous action. When reached here, the
-                // previous action already succeeded (otherwise this followup wouldn't
-                // be executing). Always passes.
-                true
-            }
             Some(ConditionType::AllCostComparisonCondition) => {
                 self.evaluate_all_cost_comparison_condition(condition)
             }
-            Some(ConditionType::Custom) => {
-                // Custom conditions are parser-only markers; always true when reached.
-                true
-            }
+            Some(ConditionType::OtherwiseCondition) => true,
+            Some(ConditionType::ActionSuccessCondition) => true,
+            Some(ConditionType::Custom) => true,
+            Some(ConditionType::NotMoved) | Some(ConditionType::HasMoved) => false,
+            // Compound & OrCondition handled above via early return — never reachable here
+            Some(ConditionType::Compound) | Some(ConditionType::OrCondition) => unreachable!(),
             None => false,
         };
 
@@ -193,6 +323,9 @@ impl<'a> ConditionContext<'a> {
         } else {
             result
         };
+        // Push generic verdict for this condition (enriched verdicts from evaluators
+        // go to the buffer first and are deduplicated by the resolver).
+        push_cond_verdict(condition, "", final_result, vec![]);
         let thresh = if ct == Some(ConditionType::ComparisonCondition) {
             condition.count.unwrap_or(0)
         } else {

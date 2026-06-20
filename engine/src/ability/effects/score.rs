@@ -214,9 +214,7 @@ impl AbilityResolver {
                 Some("success_live_zone") | Some("success_live_card_zone") => {
                     player.success_live_card_zone.cards.to_vec()
                 }
-                Some("live_card_zone") | Some("live_zone") => {
-                    player.live_card_zone.cards.to_vec()
-                }
+                Some("live_card_zone") | Some("live_zone") => player.live_card_zone.cards.to_vec(),
                 _ => {
                     // Default: count stage members
                     player

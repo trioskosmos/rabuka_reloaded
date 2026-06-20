@@ -204,7 +204,10 @@ impl AbilityResolver {
                         match_names.join(", ")
                     );
 
-                    let has_restrictions = cost.characters.is_some() || cost.group_names.is_some() || cost.card_type.is_some() || cost.cost_limit.is_some();
+                    let _has_restrictions = cost.characters.is_some()
+                        || cost.group_names.is_some()
+                        || cost.card_type.is_some()
+                        || cost.cost_limit.is_some();
                     if !is_any_number && matching_indices.len() < count {
                         if is_optional {
                             // If optional cost, we should auto-skip if the hand is completely empty or doesn't have enough matching cards for name-restricted costs.
@@ -217,11 +220,17 @@ impl AbilityResolver {
                             return Ok(());
                         } else {
                             // Non-optional and not enough matching cards -> cannot pay the cost
-                            return Err(format!("Not enough matching cards in hand to pay cost. Needs {}, has {}", count, matching_indices.len()));
+                            return Err(format!(
+                                "Not enough matching cards in hand to pay cost. Needs {}, has {}",
+                                count,
+                                matching_indices.len()
+                            ));
                         }
                     } else if is_any_number && matching_indices.is_empty() {
                         if is_optional {
-                            log::debug!("  └─ skip (optional any_number, no eligible cards in hand)");
+                            log::debug!(
+                                "  └─ skip (optional any_number, no eligible cards in hand)"
+                            );
                             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                                 entry.cost_paid = true;
                                 entry.optional_cost_result = Some(false);
@@ -815,7 +824,10 @@ impl AbilityResolver {
                 "[HANDLE_OPT_COST2] entering if: entry_cost.is_some={}",
                 gs.entry_cost().is_some()
             );
-            let effect_started = gs.ability_queue.current_entry().is_some_and(|e| e.effect_started);
+            let effect_started = gs
+                .ability_queue
+                .current_entry()
+                .is_some_and(|e| e.effect_started);
             if gs.entry_cost().is_some() && !effect_started {
                 log::debug!(
                     "[HANDLE_OPT_COST2] inside if: entry_effect.is_some={}",

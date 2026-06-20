@@ -52,6 +52,7 @@ impl AbDebug {
                     source_card_id: None,
                     source_card_name: None,
                     category: "debug".to_string(),
+                    metadata: None,
                 });
             }
         }

@@ -72,26 +72,44 @@ impl<'a> ConditionContext<'a> {
                 ),
             );
             let op = condition.operator.as_deref().unwrap_or("and");
-            let (passed_count, all_pass) = self.evaluate_condition_list(conditions, op);
+            let before = crate::ability::log::buffer_len();
+            let (passed_count, result) = self.evaluate_condition_list(conditions, op);
+            let children = crate::ability::log::drain_verdicts_since(before);
             dbg.p(
                 "COMPOUND",
                 format_args!(
                     "→ {}/{} passed = {}",
                     passed_count,
                     conditions.len(),
-                    if all_pass { "PASS" } else { "FAIL" }
+                    if result { "PASS" } else { "FAIL" }
                 ),
             );
-            all_pass
+            super::push_cond_verdict(
+                condition,
+                &format!("{}/{}", passed_count, conditions.len()),
+                result,
+                children,
+            );
+            result
         } else {
             log::debug!("[COMPOUND] no conditions array!");
+            super::push_cond_verdict(condition, "no conditions", true, vec![]);
             true
         }
     }
 
     pub(crate) fn evaluate_or_condition(&self, condition: &Condition) -> bool {
         if let Some(ref conditions) = condition.conditions {
-            self.evaluate_condition_list(conditions, "or").1
+            let before = crate::ability::log::buffer_len();
+            let (passed_count, result) = self.evaluate_condition_list(conditions, "or");
+            let children = crate::ability::log::drain_verdicts_since(before);
+            super::push_cond_verdict(
+                condition,
+                &format!("{}/{} any", passed_count, conditions.len()),
+                result,
+                children,
+            );
+            result
         } else {
             true
         }

@@ -457,8 +457,139 @@ export const LogRenderer = {
             }
         });
 
-        PerformanceMonitor.recordEntryCount(groupedLogs.length);
+        // Render structured ability resolution entries (from structured_log, category=ability_resolution)
+        const abilityResolutions = (state.structured_log || []).filter(
+            e => e.category === 'ability_resolution' && e.metadata
+        );
+        abilityResolutions.forEach(entry => {
+            const block = LogRenderer.createAbilityResolutionBlock(entry, currentLang, showFriendlyAbilities);
+            if (block) section.appendChild(block);
+        });
+
+        PerformanceMonitor.recordEntryCount(groupedLogs.length + abilityResolutions.length);
         return section;
+    },
+
+    createAbilityResolutionBlock: (entry, currentLang, showFriendlyAbilities) => {
+        const meta = entry.metadata;
+        if (!meta || !meta.items) return null;
+
+        const blockDiv = document.createElement('div');
+        blockDiv.className = 'log-group-block ability-resolution-block';
+
+        // Header
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'log-entry ability group-header';
+        const resultClass = meta.result === 'success' ? 'ability-pass' : 'ability-fail';
+        const resultIcon = meta.result === 'success' ? '✓' : '✗';
+        const triggerText = meta.trigger || '?';
+        headerDiv.innerHTML = `
+            <div class="log-entry-icon">⚡</div>
+            <div class="log-entry-content">
+                <span class="${resultClass}">${resultIcon}</span>
+                <strong>${meta.card_name || ''}</strong>: ${triggerText}
+            </div>
+            <div class="log-group-toggle">▼</div>
+        `;
+        blockDiv.appendChild(headerDiv);
+
+        // Details
+        const detailsContainer = document.createElement('div');
+        detailsContainer.className = 'log-group-details';
+        detailsContainer.style.display = 'block';
+
+        meta.items.forEach(item => {
+            LogRenderer._renderAbilityLogItem(item, detailsContainer);
+        });
+
+        blockDiv.appendChild(detailsContainer);
+
+        // Toggle on click
+        headerDiv.style.cursor = 'pointer';
+        headerDiv.onclick = () => {
+            const isHidden = detailsContainer.style.display === 'none';
+            detailsContainer.style.display = isHidden ? 'block' : 'none';
+            headerDiv.querySelector('.log-group-toggle').textContent = isHidden ? '▼' : '▶';
+        };
+
+        return blockDiv;
+    },
+
+    _renderAbilityLogItem: (item, container) => {
+        if (!item) return;
+        const div = document.createElement('div');
+        div.className = 'log-entry effect detail ability-log-item';
+
+        switch (item.kind || 'Condition') {
+            case 'Condition': {
+                const icon = item.passed ? '✅' : '❌';
+                const sub = item.children && item.children.length > 0;
+                let html = `<div class="ability-cond-row">
+                    <span class="ability-cond-icon">${icon}</span>
+                    <span class="ability-cond-text">${item.text || ''}</span>
+                    <span class="ability-cond-type">[${item.type || ''}]</span>
+                </div>`;
+                if (item.expectation || item.actual) {
+                    html += `<div class="ability-cond-detail">
+                        <span class="ability-label">期待:</span>
+                        <span class="ability-value">${item.expectation || '—'}</span>
+                        <span class="ability-label">実際:</span>
+                        <span class="ability-value">${item.actual || '—'}</span>
+                        <span class="ability-result ${item.passed ? 'pass' : 'fail'}">
+                            ${item.passed ? '✓' : '✗'}
+                        </span>
+                    </div>`;
+                }
+                if (sub) {
+                    html += `<div class="ability-sub-items">`;
+                    div.innerHTML = html;
+                    container.appendChild(div);
+                    item.children.forEach(child => {
+                        LogRenderer._renderAbilityLogItem(child, container.lastChild || container);
+                    });
+                    const closeDiv = document.createElement('div');
+                    closeDiv.className = 'ability-sub-close';
+                    container.appendChild(closeDiv);
+                    return;
+                }
+                div.innerHTML = html;
+                break;
+            }
+            case 'Cost': {
+                const icon = item.passed ? '✅' : '❌';
+                div.innerHTML = `<div class="ability-cost-row">
+                    <span class="ability-cond-icon">💰</span>
+                    <span class="ability-cond-text">${item.text || ''}</span>
+                    <span class="ability-label">期待:</span>
+                    <span class="ability-value">${item.expectation || '—'}</span>
+                    <span class="ability-label">実際:</span>
+                    <span class="ability-value">${item.actual || '—'}</span>
+                    <span class="ability-result ${item.passed ? 'pass' : 'fail'}">${icon}</span>
+                </div>`;
+                break;
+            }
+            case 'Effect': {
+                div.innerHTML = `<div class="ability-effect-row">
+                    <span class="ability-cond-icon">⚡</span>
+                    <span class="ability-cond-text">${item.text || ''}</span>
+                    <span class="ability-effect-detail">${item.details || item.action || ''}</span>
+                </div>`;
+                break;
+            }
+            case 'KeyValue': {
+                const icon = item.passed ? '✅' : '❌';
+                div.innerHTML = `<div class="ability-kv-row">
+                    <span class="ability-cond-icon">🔑</span>
+                    <span class="ability-cond-text">${item.key}: ${item.value}</span>
+                    <span class="ability-result ${item.passed ? 'pass' : 'fail'}">${icon}</span>
+                </div>`;
+                break;
+            }
+            default: {
+                div.textContent = JSON.stringify(item);
+            }
+        }
+        container.appendChild(div);
     },
 
     createGroupedLogBlock: (group, currentLang, showFriendlyAbilities) => {
