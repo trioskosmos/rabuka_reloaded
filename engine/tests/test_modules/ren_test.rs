@@ -463,6 +463,8 @@ fn ren_ab1_triggers_once_from_look_and_select_discard() {
     game.state.player1.stage.stage = [ren, -1, -1];
     game.state.player1.hand.cards.clear();
     game.state.player1.hand.cards.push(scry);
+    // Add a filler so the scry's optional discard cost can be paid
+    game.state.player1.hand.cards.push(filler);
 
     game.state.player1.main_deck.cards.clear();
     for _ in 0..3 {

@@ -4059,6 +4059,9 @@ def parse_cost(text: str) -> Dict[str, Any]:
     cnt = extract_count(text)
     if cnt:
         cost["count"] = cnt
+    if extract_max(text):
+        cost["max"] = True
+        cost["any_number"] = True
     if (
         "好きな枚数" in text
         or "好きな枚数まで" in text

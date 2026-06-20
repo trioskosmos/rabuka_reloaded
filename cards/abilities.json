@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-21T05:45:45.570206",
+  "generated_at": "2026-06-21T06:51:21.922061",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -2354,6 +2354,8 @@
         "destination": "discard",
         "count": 2,
         "optional": true,
+        "max": true,
+        "any_number": true,
         "type": "move_cards"
       },
       "effect": {
@@ -6922,6 +6924,8 @@
         "count": 2,
         "card_type": "member_card",
         "optional": true,
+        "max": true,
+        "any_number": true,
         "type": "move_cards"
       },
       "effect": {
@@ -9296,6 +9300,8 @@
         "destination": "discard",
         "count": 3,
         "optional": true,
+        "max": true,
+        "any_number": true,
         "type": "move_cards"
       },
       "effect": {
@@ -12572,6 +12578,8 @@
         "count": 3,
         "card_type": "member_card",
         "optional": true,
+        "max": true,
+        "any_number": true,
         "type": "change_state"
       },
       "effect": {
@@ -26953,6 +26961,8 @@
           "蓮ノ空"
         ],
         "optional": true,
+        "max": true,
+        "any_number": true,
         "type": "move_cards"
       },
       "effect": {

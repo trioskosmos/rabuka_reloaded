@@ -598,19 +598,14 @@ impl AbilityResolver {
             }
         }
 
-        // When an optional cost with a character filter was skipped (no eligible cards),
-        // the primary effect should not run. This handles "may discard X named cards: gain Y"
-        // patterns (e.g. LL-bp1-001-R+) where the colon gates the effect.
+        // When an optional cost was skipped (no eligible cards or player declined),
+        // the primary effect should not run. Handles colon-gated patterns like
+        // "may discard X: gain Y" where the colon gates the effect.
         let cost_was_skipped = gs
             .ability_queue
             .current_entry()
             .is_some_and(|e| e.optional_cost_result == Some(false));
-        let cost_has_characters = ability
-            .cost
-            .as_ref()
-            .and_then(|c| c.characters.as_ref())
-            .is_some_and(|v| !v.is_empty());
-        if cost_was_skipped && cost_has_characters {
+        if cost_was_skipped {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.effect_started = true;
             }

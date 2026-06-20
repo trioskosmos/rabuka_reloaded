@@ -317,15 +317,13 @@ impl<'a> ConditionContext<'a> {
         let final_result = if condition.negation.unwrap_or(false)
             && !(ct == Some(ConditionType::CardCountCondition) && condition.card_property.is_some())
         {
-            // CardCountCondition with card_property handles negation internally
-            // (per-card filter already inverts via negate flag) — do NOT double-negate.
             !result
         } else {
             result
         };
-        // Push generic verdict for this condition (enriched verdicts from evaluators
-        // go to the buffer first and are deduplicated by the resolver).
-        push_cond_verdict(condition, "", final_result, vec![]);
+        // Push ONE verdict per condition with actual game state value
+        let actual = self.describe_condition_actual(condition);
+        push_cond_verdict(condition, &actual, final_result, vec![]);
         let thresh = if ct == Some(ConditionType::ComparisonCondition) {
             condition.count.unwrap_or(0)
         } else {
@@ -338,7 +336,6 @@ impl<'a> ConditionContext<'a> {
         };
         dbg.condition(condition, dbg_actual, thresh, final_result);
 
-        // Check ability_filter field on any condition type
         if let Some(ref filter) = condition.ability_filter {
             let filtered =
                 self.evaluate_ability_filter_condition_with_card_check(condition, filter);
@@ -348,6 +345,234 @@ impl<'a> ConditionContext<'a> {
         }
 
         final_result
+    }
+
+    /// Query game state to produce a human-readable "actual" string for this condition.
+    /// This runs immediately after evaluation (game state is fresh).
+    fn describe_condition_actual(&self, condition: &Condition) -> String {
+        let ct = condition.condition_type;
+        match ct {
+            Some(ConditionType::AppearanceCondition) => self.describe_appearance_actual(condition),
+            Some(ConditionType::ComparisonCondition) => {
+                let count = self.get_count_for_condition(condition);
+                format!("{}", count)
+            }
+            Some(ConditionType::CardCountCondition) => {
+                let count = self.get_count_for_condition(condition);
+                format!("{}", count)
+            }
+            Some(ConditionType::CardBladeCondition) => String::new(),
+            Some(ConditionType::GroupCondition) => {
+                let player =
+                    self.resolve_condition_player(condition.target.as_deref().unwrap_or("self"));
+                let loc = condition.location.as_deref().unwrap_or("stage");
+                let ids: Vec<i16> = match Zone::from_str(loc) {
+                    Some(Zone::Stage) => player
+                        .stage
+                        .stage
+                        .iter()
+                        .filter(|&&id| id != -1)
+                        .copied()
+                        .collect(),
+                    _ => vec![],
+                };
+                let names: Vec<String> = ids
+                    .iter()
+                    .filter_map(|&cid| {
+                        self.game_state
+                            .card_database
+                            .get_card(cid)
+                            .map(|c| c.name.clone())
+                    })
+                    .collect();
+                if names.is_empty() {
+                    "不在".into()
+                } else {
+                    format!("在籍=[{}]", names.join(","))
+                }
+            }
+            Some(ConditionType::PositionCondition) => {
+                let player =
+                    self.resolve_condition_player(condition.target.as_deref().unwrap_or("self"));
+                let ids: Vec<(usize, &i16)> = player
+                    .stage
+                    .stage
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, &id)| id != -1)
+                    .collect();
+                if ids.is_empty() {
+                    "不在".into()
+                } else {
+                    let pos_names = ["左", "中", "右"];
+                    let desc: Vec<String> = ids
+                        .iter()
+                        .map(|(i, &id)| {
+                            let name = self
+                                .game_state
+                                .card_database
+                                .get_card(id)
+                                .map(|c| c.name.clone())
+                                .unwrap_or_default();
+                            format!("{}:{}", pos_names[*i], name)
+                        })
+                        .collect();
+                    desc.join(", ")
+                }
+            }
+            Some(ConditionType::LocationCondition) => {
+                let loc = condition.location.as_deref().unwrap_or("");
+                if let Some(ref pos) = condition.position {
+                    let pos_str = pos.get_position().unwrap_or("?");
+                    format!("位置={}", pos_str)
+                } else {
+                    format!("{}", loc)
+                }
+            }
+            Some(ConditionType::StateCondition) => {
+                condition.state.as_deref().unwrap_or("状態").to_string()
+            }
+            Some(ConditionType::MovementCondition) => {
+                let mov = condition.movement.as_deref().unwrap_or("?");
+                let count = self
+                    .game_state
+                    .recently_moved_cards
+                    .as_ref()
+                    .map(|v| v.len())
+                    .unwrap_or(0);
+                format!("移動={}, 移動枚数={}", mov, count)
+            }
+            Some(ConditionType::TemporalCondition) => {
+                let appeared = self.game_state.cards_appeared_this_turn.len();
+                let moved = self.game_state.cards_moved_this_turn.len();
+                format!("登場={}, 移動={}", appeared, moved)
+            }
+            Some(ConditionType::ScoreThresholdCondition) => String::new(),
+            Some(ConditionType::ResourceCondition) => String::new(),
+            Some(ConditionType::NoExcessHeart) => {
+                if self.no_excess_heart_flag(condition.target.as_deref().unwrap_or("self")) {
+                    "余剰ハートなし".into()
+                } else {
+                    "余剰ハートあり".into()
+                }
+            }
+            Some(ConditionType::AnyOfCondition) => {
+                if let Some(ref any_of) = condition.any_of {
+                    format!("条件={:?}", any_of)
+                } else {
+                    String::new()
+                }
+            }
+            _ => String::new(),
+        }
+    }
+
+    fn describe_appearance_actual(&self, condition: &Condition) -> String {
+        let target = condition.target.as_deref().unwrap_or("self");
+        let player = self.resolve_condition_player(target);
+        let location = condition.location.as_deref().unwrap_or("");
+        match Zone::from_str(location) {
+            Some(Zone::Stage) => {
+                let stage_ids: Vec<i16> = player
+                    .stage
+                    .stage
+                    .iter()
+                    .filter(|&&id| id != -1)
+                    .copied()
+                    .collect();
+                if stage_ids.is_empty() {
+                    return "不在".into();
+                }
+                let stage_names: Vec<String> = stage_ids
+                    .iter()
+                    .filter_map(|&cid| {
+                        self.game_state
+                            .card_database
+                            .get_card(cid)
+                            .map(|c| crate::card::CardDatabase::normalize_name(&c.name))
+                    })
+                    .collect();
+                // Check character match
+                if let Some(ref chars) = condition.characters {
+                    for ch in chars {
+                        let norm = crate::card::CardDatabase::normalize_name(ch);
+                        let found = stage_names.iter().any(|n| n.contains(&norm));
+                        if !found {
+                            return format!("{}不在", ch);
+                        }
+                    }
+                    // All matched — check cost_reference
+                    if let Some(ref ref_char) = condition.cost_reference_character {
+                        let subject = &chars[0];
+                        let norm_sub = crate::card::CardDatabase::normalize_name(subject);
+                        let norm_ref = crate::card::CardDatabase::normalize_name(ref_char);
+                        let sub_cost = stage_ids
+                            .iter()
+                            .filter_map(|&cid| {
+                                let card = self.game_state.card_database.get_card(cid)?;
+                                let n = crate::card::CardDatabase::normalize_name(&card.name);
+                                if n.contains(&norm_sub) {
+                                    card.cost
+                                } else {
+                                    None
+                                }
+                            })
+                            .next();
+                        let ref_cost = stage_ids
+                            .iter()
+                            .filter_map(|&cid| {
+                                let card = self.game_state.card_database.get_card(cid)?;
+                                let n = crate::card::CardDatabase::normalize_name(&card.name);
+                                if n.contains(&norm_ref) {
+                                    card.cost
+                                } else {
+                                    None
+                                }
+                            })
+                            .next();
+                        let op = condition.cost_reference_operator.as_deref().unwrap_or(">");
+                        match (sub_cost, ref_cost) {
+                            (Some(sc), Some(rc)) => format!(
+                                "{}コスト({}) {} {}コスト({})",
+                                subject, sc, op, ref_char, rc
+                            ),
+                            (Some(sc), None) => {
+                                format!("{}コスト({}) {} {} (不在)", subject, sc, op, ref_char)
+                            }
+                            (None, Some(rc)) => {
+                                format!("{}(不在) {} {}コスト({})", subject, op, ref_char, rc)
+                            }
+                            (None, None) => format!("{}も{}も不在", subject, ref_char),
+                        }
+                    } else {
+                        let names: Vec<String> = stage_ids
+                            .iter()
+                            .filter_map(|&cid| {
+                                self.game_state
+                                    .card_database
+                                    .get_card(cid)
+                                    .map(|c| c.name.clone())
+                            })
+                            .collect();
+                        format!("在籍=[{}]", names.join(", "))
+                    }
+                } else {
+                    let names: Vec<String> = stage_ids
+                        .iter()
+                        .filter_map(|&cid| {
+                            self.game_state
+                                .card_database
+                                .get_card(cid)
+                                .map(|c| c.name.clone())
+                        })
+                        .collect();
+                    format!("在籍=[{}]", names.join(", "))
+                }
+            }
+            Some(Zone::Hand) => format!("手札={}枚", player.hand.cards.len()),
+            Some(Zone::Discard) => format!("控え室={}枚", player.waitroom.cards.len()),
+            _ => String::new(),
+        }
     }
 }
 

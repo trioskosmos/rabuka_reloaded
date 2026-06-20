@@ -160,8 +160,7 @@ fn rurino_ozora_only_selects_mirakura_cards() {
     );
 }
 
-/// Test that the ability handles the case where the cost is paid with
-/// the only hand card (Rurino's additional cost card) and mirakura is retrieved.
+/// Optional cost declined: player explicitly declines the discard → no recovery.
 #[test]
 fn rurino_ozora_optional_cost_no_payment() {
     let db = load_real_database();
@@ -169,8 +168,10 @@ fn rurino_ozora_optional_cost_no_payment() {
 
     let rurino = game.id("PL!HS-bp2-005-R＋");
     let other_member = game.id("PL!-sd1-010-SD");
+    let filler = game.id("PL!-sd1-010-SD");
 
     game.add_to_hand(rurino);
+    game.add_to_hand(filler);
     game.give_energy(10);
     game.state.player1.stage.stage = [-1, -1, -1];
     game.add_to_stage(rabuka_engine::zones::MemberArea::RightSide, other_member);
@@ -178,24 +179,27 @@ fn rurino_ozora_optional_cost_no_payment() {
     let mirakura_card = game.id("PL!HS-pb1-003-R");
     game.add_to_discard(mirakura_card);
 
-    let hand_before = game.state.player1.hand.cards.len(); // 1 (rurino)
-
     game.play_to_stage(rurino, rabuka_engine::zones::MemberArea::Center);
 
-    // Rurino played to stage. The cost auto-resolves (no cards to discard
-    // after playing Rurino → cost succeeds with 0 discarded).
-    // The effect retrieves mirakura from discard.
-    // Net hand: -1 (Rurino played) +1 (mirakura recovered) = 0 net change
-    assert_eq!(
-        game.state.player1.hand.cards.len(),
-        hand_before,
-        "Hand: Rurino played + mirakura recovered = net 0"
-    );
-    // Discard: +1 (mirakura recovered) → net -1
+    // Handle auto-ability + cost choice: decline the optional cost
+    while game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectAutoAbility") => game.select_indices(&[0]),
+            Some("SelectCard") => game.select_indices(&[]), // decline cost
+            _ => break,
+        }
+    }
+
+    // Cost was explicitly declined → colon-gated effect does NOT fire
     assert_eq!(
         game.state.player1.waitroom.cards.len(),
-        0,
-        "Mirakura was recovered from discard"
+        1,
+        "Mirakura stays in waitroom (cost declined)"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        1,
+        "Hand: only the filler remains (Rurino played, nothing recovered)"
     );
 }
 

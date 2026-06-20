@@ -68,7 +68,7 @@ fn pr_energy_place_pay_cost_energy_in_wait() {
     );
 }
 
-/// Optional cost declined: no discard → still get energy in wait
+/// Optional cost declined: no discard → no energy placed
 #[test]
 fn pr_energy_place_decline_cost_no_discard() {
     let db = load_real_database();
@@ -112,9 +112,14 @@ fn pr_energy_place_decline_cost_no_discard() {
     }
 
     let energy_after = game.player().energy_zone.cards.len();
+    assert_eq!(
+        energy_after, energy_before,
+        "Energy should NOT be placed when optional discard cost is declined"
+    );
+    // Verify the energy card is still in the energy deck (not moved)
     assert!(
-        energy_after > energy_before,
-        "Energy card should still be placed even without discard cost"
+        game.state.player1.energy_deck.cards.contains(&energy_card),
+        "Energy card should remain in energy deck when cost was skipped"
     );
 }
 

@@ -45,18 +45,17 @@ fn setup_pr_ai(
     (ai, hand_before, deck_before, discard_before)
 }
 
-/// POSITIVE: With 1 card in hand (just Ai itself) when played, paying the
-/// cost is impossible (only 1 card in hand), so the player skips the cost
-/// and draw-until-5 draws 5 cards from the deck.
+/// With 3 cards in hand (Ai + 2 filler), the player pays the cost
+/// (discards 2), then draw-until-5 draws enough to reach 5.
 ///
-/// Expected: hand = 5 (0 - 0 + 5), deck = deck - 5, discard = 0, Ai on stage.
+/// Expected: hand = 5, deck = deck - 3, discard = 2, Ai on stage.
 #[test]
-fn pr_ai_played_from_solo_hand_draws_to_five() {
+fn pr_ai_pays_cost_discards_2_draws_to_five() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    // Hand has just Ai. Cost requires discarding 2, so player must skip.
-    let (ai, _hand_before, deck_before, discard_before) = setup_pr_ai(&mut game, 0, 10);
+    // Hand has Ai + 2 filler. Cost requires discarding 2 — player can pay.
+    let (ai, _hand_before, deck_before, discard_before) = setup_pr_ai(&mut game, 2, 10);
 
     game.play_to_stage(ai, MemberArea::Center);
 
@@ -66,28 +65,32 @@ fn pr_ai_played_from_solo_hand_draws_to_five() {
         "Ai should be on Center stage"
     );
 
-    // Cost was skipped (only 1 card in hand at the time of cost, < 2)
-    // OR was offered and player chose to skip. Either way, no discard.
-    assert_eq!(
-        game.state.player1.waitroom.cards.len(),
-        discard_before,
-        "No cards should be in waitroom"
+    // Cost choice should be pending: select 2 cards to discard.
+    assert!(
+        game.has_pending_choice(),
+        "Optional cost should produce a choice with eligible cards"
     );
 
-    // Hand should now have 5 cards (0 from play - 0 discarded + 5 drawn).
+    // Pay cost: discard the 2 filler cards
+    game.try_select_indices(&[0, 1]).unwrap();
+
+    // Two cards were discarded as cost
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        discard_before + 2,
+        "Waitroom should have +2 from cost"
+    );
+
+    // After discard: hand = 0, draw-until-5 → draws 5
     assert_eq!(
         game.state.player1.hand.cards.len(),
         5,
-        "Hand should be exactly 5 cards after draw-until-5"
+        "Hand should be exactly 5 (0 after cost + 5 drawn)"
     );
-
-    // Deck lost exactly 5 cards.
     assert_eq!(
         game.state.player1.main_deck.cards.len(),
         deck_before - 5,
-        "Deck should lose exactly 5 cards ({} - 5 = {})",
-        deck_before,
-        deck_before - 5
+        "Deck should lose 5 cards"
     );
 }
 
