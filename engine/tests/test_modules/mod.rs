@@ -123,6 +123,7 @@ pub mod position_change_triggers_jidou_move_test;
 pub mod q38_live_card_zone_test;
 pub mod qa_new_tests;
 pub mod qa_new_tests246;
+pub mod qa_new_tests251;
 pub mod qa_new_tests252;
 pub mod qa_new_tests253;
 pub mod qa_new_tests254;

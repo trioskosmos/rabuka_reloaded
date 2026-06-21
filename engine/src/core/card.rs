@@ -714,6 +714,8 @@ pub struct AbilityEffect {
     pub position: Option<PositionInfo>,
     pub state_change: Option<String>,
     pub optional: Option<bool>,
+    #[serde(default)]
+    pub negation: Option<bool>,
     pub max: Option<bool>,
     pub effect_constraint: Option<String>,
     pub resource_icon_count: Option<u32>,
@@ -1455,6 +1457,10 @@ impl Card {
 
     pub fn has_blade_heart(&self) -> bool {
         self.blade_heart.is_some()
+            || self
+                .special_heart
+                .as_ref()
+                .is_some_and(|sh| !sh.hearts.is_empty())
     }
 
     pub fn has_score_icon(&self) -> bool {

@@ -397,36 +397,70 @@ impl AbilityResolver {
                 count.min(gs.revealed_cards.len())
             };
             let can_skip = is_max || effect.optional.unwrap_or(false);
-            if take_count < gs.revealed_cards.len() && can_skip {
-                let filter = util::filter_from_parts_full(
-                    card_type_filter,
-                    group_name,
-                    cost_limit,
-                    None,
-                    character_filter,
-                    name_fragments,
-                    None,
-                    None,
-                    cost_total,
-                    cost_total_operator,
-                );
-                let matching: Vec<usize> = (0..gs.revealed_cards.len())
-                    .filter(|&i| filter.matches(card_db, gs.revealed_cards[i], false))
-                    .collect();
-                if take_count < matching.len() {
-                    self.prompt_card_selection(
-                        "revealed_cards",
-                        take_count,
-                        can_skip,
-                        effect,
-                        &filter,
-                        Some(matching),
-                    );
-                    return Ok(vec![]);
-                }
+            let filter = util::filter_from_parts_full(
+                card_type_filter,
+                group_name,
+                cost_limit,
+                None,
+                character_filter,
+                name_fragments,
+                None,
+                None,
+                cost_total,
+                cost_total_operator,
+            );
+            let neg = effect.negation.unwrap_or(false);
+            let matching: Vec<usize> = (0..gs.revealed_cards.len())
+                .filter(|&i| {
+                    let id = gs.revealed_cards[i];
+                    if !filter.matches(card_db, id, false) {
+                        return false;
+                    }
+                    if let Some(prop) = effect.card_property.as_deref() {
+                        let has_prop = match prop {
+                            "has_blade_heart" => {
+                                card_db.get_card(id).is_some_and(|c| c.has_blade_heart())
+                            }
+                            _ => false,
+                        };
+                        if neg {
+                            if has_prop {
+                                return false;
+                            }
+                        } else {
+                            if !has_prop {
+                                return false;
+                            }
+                        }
+                    }
+                    true
+                })
+                .collect();
+            if matching.is_empty() {
+                return Ok(vec![]);
             }
-            let cards: Vec<i16> = gs.revealed_cards.drain(..take_count).collect();
-            return Ok(cards);
+            if take_count < matching.len() && can_skip {
+                self.prompt_card_selection(
+                    "revealed_cards",
+                    take_count,
+                    can_skip,
+                    effect,
+                    &filter,
+                    Some(matching),
+                );
+                return Ok(vec![]);
+            }
+            let actual_take = take_count.min(matching.len());
+            let taken: Vec<i16> = matching[..actual_take]
+                .iter()
+                .rev()
+                .map(|&i| {
+                    let id = gs.revealed_cards[i];
+                    gs.revealed_cards.remove(i);
+                    id
+                })
+                .collect();
+            return Ok(taken);
         }
 
         // Handle "those_cards" alias: resolve to the trigger_moved_cards stored
