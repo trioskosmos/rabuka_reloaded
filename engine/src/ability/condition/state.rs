@@ -140,6 +140,20 @@ impl<'a> ConditionContext<'a> {
                 if has_success_or_live_zone {
                     let target = condition.target.as_deref().unwrap_or("self");
                     let player = self.resolve_condition_player(target);
+
+                    // Aggregate total with heart_colors: sum need_heart across all live cards
+                    if condition.aggregate.as_deref() == Some("total")
+                        && condition
+                            .heart_colors
+                            .as_ref()
+                            .is_some_and(|c| !c.is_empty())
+                    {
+                        let location = condition.location.as_deref().unwrap_or("live_card_zone");
+                        return self
+                            .check_aggregate_total(condition, player, location)
+                            .unwrap_or(false);
+                    }
+
                     let mut found_match = false;
                     'zone_loop: for zone_name in &zones_to_check {
                         let cards: Vec<i16> = match *zone_name {

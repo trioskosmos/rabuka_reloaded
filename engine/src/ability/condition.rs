@@ -222,8 +222,10 @@ pub fn push_cond_verdict(
 
 impl<'a> ConditionContext<'a> {
     pub fn evaluate_condition(&self, condition: &Condition) -> bool {
-        // Handle aggregate total with heart_colors — runs before type dispatch
-        if condition.aggregate.as_deref() == Some("total")
+        // Handle aggregate total with heart_colors — runs before type dispatch.
+        // Skip early return for TemporalCondition so the phase gate is checked too.
+        if condition.condition_type != Some(ConditionType::TemporalCondition)
+            && condition.aggregate.as_deref() == Some("total")
             && condition
                 .heart_colors
                 .as_ref()

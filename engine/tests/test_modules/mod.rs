@@ -29,7 +29,6 @@ pub mod condition_negative_test;
 pub mod constant_edge_case_test;
 pub mod daisuki_test;
 pub mod dazzling_test;
-pub mod debug_play_test;
 pub mod draw_phase_fix;
 pub mod dream_believers_test;
 pub mod dream_with_you_test;
