@@ -369,6 +369,7 @@ impl super::TurnEngine {
                                     } else {
                                         "sub"
                                     };
+                                    let card_name = card.name.clone();
                                     adjustments.push(crate::types::Adjustment {
                                         adjustment_type: "requirement".to_string(),
                                         desc: format!(
@@ -385,7 +386,7 @@ impl super::TurnEngine {
                                         ),
                                         value: total,
                                         color: color.index(),
-                                        source: format!("Heart req modifier ({})", label),
+                                        source: format!("{} req modifier ({})", card_name, label),
                                     });
                                 }
                             }

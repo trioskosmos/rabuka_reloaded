@@ -280,6 +280,7 @@ impl AbilityResolver {
                 effect.per_unit.unwrap_or(false),
                 effect.per_unit_count.unwrap_or(1),
                 effect.per_unit_type.as_deref(),
+                effect.location.as_deref(),
                 effect.effect_constraint.as_deref(),
                 effect.self_target.unwrap_or(false),
                 &effect.heart_colors,

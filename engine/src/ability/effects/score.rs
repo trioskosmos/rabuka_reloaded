@@ -18,6 +18,7 @@ impl AbilityResolver {
         per_unit: bool,
         per_unit_count: u32,
         per_unit_type: Option<&str>,
+        location: Option<&str>,
         effect_constraint: Option<&str>,
         self_target: bool,
         heart_colors: &[String],
@@ -61,7 +62,17 @@ impl AbilityResolver {
             filter.exclude_self = exclude_self_id;
 
             let final_value = if per_unit {
-                let matching_count = if per_unit_type_str.as_deref() == Some("つ") {
+                // Determine the effective zone for per-unit counting.
+                // - Special pseudo-zones like "heart_colors" come from per_unit_type
+                //   and must take priority (they trigger unique counting logic).
+                // - Otherwise, use location as the zone override (e.g. EMOTION
+                //   has per_unit_type="枚" but location="success_live_zone").
+                let pt = per_unit_type_str.as_deref();
+                let effective_per_unit_zone = match pt {
+                    Some("heart_colors") => pt,
+                    _ => location.or(pt),
+                };
+                let matching_count = if effective_per_unit_zone == Some("つ") {
                     // "つ" = counter for units; for energy costs this is the
                     // number of energy paid in the current cost step.
                     log::debug!("[PER_UNIT_つ] last_cost_energy_count={}", last_energy);
@@ -69,7 +80,7 @@ impl AbilityResolver {
                 } else {
                     util::resolve_per_unit_count(
                         true,
-                        per_unit_type_str.as_deref(),
+                        effective_per_unit_zone,
                         player,
                         &card_db,
                         &filter,
@@ -255,8 +266,29 @@ impl AbilityResolver {
             value = value * (count / per_unit_count.max(1));
         }
         let card_ids: Vec<i16> = {
+            // Include success_live_card_zone only when the activating card
+            // is in that zone AND has self_target.  This handles LiveStart
+            // triggers from a previously successful card (e.g. EMOTION),
+            // while constant-ability evaluation
+            // (evaluate_success_zone_heart_reductions) only targets
+            // live_card_zone.
+            let activating_in_success = self_target
+                && gs.activating_card.is_some_and(|cid| {
+                    let player_ref = gs.resolve_target_player(target);
+                    player_ref.success_live_card_zone.cards.contains(&cid)
+                });
             let player = gs.resolve_target_player_mut(target);
-            player.live_card_zone.cards.to_vec()
+            if activating_in_success {
+                player
+                    .live_card_zone
+                    .cards
+                    .iter()
+                    .chain(player.success_live_card_zone.cards.iter())
+                    .copied()
+                    .collect()
+            } else {
+                player.live_card_zone.cards.to_vec()
+            }
         };
         let db = &gs.card_database;
         let card_ids: Vec<i16> = card_ids

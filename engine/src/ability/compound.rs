@@ -125,6 +125,19 @@ impl AbilityResolver {
                             action_to_execute.per_unit_type = effect.per_unit_type.clone();
                         }
                     }
+                    // Inherit self_target from the parent effect or the first
+                    // sub-action when this action doesn't have it set.
+                    // Japanese grammar attaches "このカード" (this card) to the
+                    // first verb only, but the intent applies to all verbs in
+                    // a compound sentence (e.g. EMOTION: "card's score+2 AND
+                    // required hearts+3" — both target the card itself).
+                    if action_to_execute.self_target.is_none() {
+                        if effect.self_target.is_some() {
+                            action_to_execute.self_target = effect.self_target;
+                        } else if i > 0 {
+                            action_to_execute.self_target = repeat_actions[0].self_target;
+                        }
+                    }
 
                     log::debug!(
                         "[SEQ_LOOP] executing action[{}] action={} pending_before={:?}",
