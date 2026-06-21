@@ -457,8 +457,6 @@ impl<'a> ConditionContext<'a> {
                 let moved = self.game_state.cards_moved_this_turn.len();
                 format!("登場={}, 移動={}", appeared, moved)
             }
-            Some(ConditionType::ScoreThresholdCondition) => String::new(),
-            Some(ConditionType::ResourceCondition) => String::new(),
             Some(ConditionType::NoExcessHeart) => {
                 if self.no_excess_heart_flag(condition.target.as_deref().unwrap_or("self")) {
                     "余剰ハートなし".into()

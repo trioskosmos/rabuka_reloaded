@@ -146,6 +146,7 @@ pub mod setsuna_bp5_test;
 pub mod setsuna_pb1_heart_constant_test;
 pub mod setsuna_pb1_test;
 pub mod setsuna_test;
+pub mod shioriko_bp4_swap_test;
 pub mod shizuku_bp5_test;
 pub mod shizuku_pb1_test;
 pub mod shodo_rin_energy_test;

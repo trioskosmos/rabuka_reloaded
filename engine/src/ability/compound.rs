@@ -235,6 +235,14 @@ impl AbilityResolver {
                                 // Optional change_state completed without creating a choice
                                 // (no valid targets). Skip remaining actions (そうした場合).
                                 return Ok(());
+                            } else if conditional
+                                && self.moved_cards.is_empty()
+                                && !self.pending_choice.is_some()
+                            {
+                                // Conditional sequential: if the current step moved nothing
+                                // and there's no pending choice, skip remaining actions
+                                // (そうした場合 / このカードを控え室に置く).
+                                return Ok(());
                             }
                         }
                         Err(e) if e.contains("Pending choice required") => {

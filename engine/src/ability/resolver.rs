@@ -549,6 +549,8 @@ impl AbilityResolver {
                 let cost = self.apply_modify_cost_to_ability_cost(gs, cost, ability);
                 if let Err(e) = self.pay_cost(gs, &cost) {
                     dbg.p("RESULT", format_args!("COST FAILED: {}", e));
+                    let items = drain_verdicts();
+                    self.push_ability_result(gs, "cost_fail", items, Some(&e));
                     return Err(e);
                 }
                 dbg.p("RESULT", "cost paid ✓");
@@ -665,10 +667,9 @@ impl AbilityResolver {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.effect_started = true;
             }
-            let pp = gs.player_prefix();
-            gs.rule_log
-                .push(format!("{pp} {card_name}: 任意コスト不成立 - 効果スキップ"));
             dbg.p("RESULT", "optional cost skipped — effect not executed");
+            let items = drain_verdicts();
+            self.push_ability_result(gs, "skipped", items, Some("optional cost not paid"));
             return Ok(());
         }
 

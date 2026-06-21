@@ -1743,6 +1743,55 @@ impl super::resolver::AbilityResolver {
                     .to_string();
                 self.move_from_under_member(gs, indices, &mut validate_card, &dst_str)?;
             }
+            Some(Zone::SuccessLiveZone) => {
+                let mapped: Vec<usize> = if let Some(ref fidx) = filtered_indices {
+                    indices
+                        .iter()
+                        .filter_map(|&i| fidx.get(i).copied())
+                        .collect()
+                } else {
+                    indices.to_vec()
+                };
+                let dst = gs.entry_destination().map(|s| s.to_string());
+                let dst_str = dst.as_deref().unwrap_or(Zone::Discard.to_str()).to_string();
+                let target = target_player_id.as_deref().unwrap_or("self");
+                let player = gs.resolve_target_player_mut(target);
+                let card_ids =
+                    util::resolve_indices_to_ids(player, Zone::SuccessLiveZone.to_str(), &mapped);
+                if !card_ids.is_empty() {
+                    let valid_ids: Vec<i16> = card_ids
+                        .into_iter()
+                        .filter(|&cid| validate_card(cid))
+                        .collect();
+                    if !valid_ids.is_empty() {
+                        let mc = util::move_cards(
+                            player,
+                            &valid_ids,
+                            Zone::SuccessLiveZone.to_str(),
+                            &dst_str,
+                            None,
+                            &card_db,
+                        );
+                        if mc > 0 {
+                            self.moved_cards = valid_ids.clone();
+                            gs.recently_moved_cards = Some(valid_ids);
+                            gs.recently_moved_from_zone =
+                                Some(Zone::SuccessLiveZone.to_str().to_string());
+                        }
+                    }
+                }
+                self.clear_choice_state(gs);
+                let pending = gs.ability_queue.take_pending_commands();
+                let filtered: Vec<Command> = pending
+                    .into_iter()
+                    .filter(|cmd| match cmd {
+                        Command::Effect(e) => e.source.as_deref() != Some("success_live_zone"),
+                        _ => true,
+                    })
+                    .collect();
+                gs.ability_queue.set_pending_commands(filtered);
+                return self.resume_pending_commands(gs);
+            }
             _ => log::debug!("Card selection from zone '{}' not yet implemented", zone),
         }
         log::debug!(

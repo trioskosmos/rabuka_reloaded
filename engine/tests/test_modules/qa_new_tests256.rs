@@ -13,7 +13,7 @@ fn q256_maki_reveal_crossroads_replacement() {
     let maki = game.id("PL!-sd1-006-SD");
     let crossroads = game.id("PL!-bp6-024-L");
     let muse_live = game.id("PL!-bp3-019-L"); // 僕らのLIVE 君とのLIFE
-    let filler_card = game.id("PL!-sd1-010-SD");
+    let filler_live = game.new_id("PL!SP-sd1-023-SD"); // WE WILL!! (live card)
 
     // Put Maki in hand, 錯覚CROSSROADS in hand (to reveal), a μ's live in waitroom
     game.add_to_hand(maki);
@@ -25,7 +25,9 @@ fn q256_maki_reveal_crossroads_replacement() {
         .player1
         .success_live_card_zone
         .cards
-        .push(filler_card);
+        .push(filler_live);
+    // ... add filler_live to hand for the "returned to hand" check
+    game.add_to_hand(filler_live);
 
     // Give energy to play Maki (cost 9)
     game.give_energy(9);
@@ -67,9 +69,9 @@ fn q256_maki_reveal_crossroads_replacement() {
         "μ's live card should be in success zone (replacement target)"
     );
 
-    // 3. The filler card that was in success zone should now be in hand
+    // 3. The filler live card that was in success zone should now be in hand
     assert!(
-        game.state.player1.hand.cards.contains(&filler_card),
+        game.state.player1.hand.cards.contains(&filler_live),
         "Original success zone card should be in hand"
     );
 

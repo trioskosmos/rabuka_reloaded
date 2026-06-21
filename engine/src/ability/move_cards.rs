@@ -709,9 +709,7 @@ impl AbilityResolver {
                     Some(Zone::LiveCardZone) => util::InsufficientBehavior::Error(
                         "Not enough cards in live card zone".to_string(),
                     ),
-                    Some(Zone::SuccessLiveZone) => util::InsufficientBehavior::Error(
-                        "Not enough cards in success live zone".to_string(),
-                    ),
+                    Some(Zone::SuccessLiveZone) => util::InsufficientBehavior::Silent,
                     _ => util::InsufficientBehavior::Silent,
                 };
 
@@ -720,6 +718,7 @@ impl AbilityResolver {
                     Some(Zone::Hand) => {
                         effect.optional.unwrap_or(false) || effect.any_number.unwrap_or(false)
                     }
+                    Some(Zone::SuccessLiveZone) => effect.optional.unwrap_or(false),
                     _ => false,
                 };
 
@@ -729,19 +728,21 @@ impl AbilityResolver {
                 };
 
                 let mut filter = util::filter_from_parts_full(
-                    if src_zone == Some(Zone::LiveCardZone) {
+                    if src_zone == Some(Zone::LiveCardZone)
+                        || (src_zone == Some(Zone::SuccessLiveZone) && card_type_filter.is_some())
+                    {
                         Some("live_card")
                     } else if src_zone == Some(Zone::SuccessLiveZone) {
                         None
                     } else {
                         card_type_filter
                     },
-                    if matches!(src_zone, Some(Zone::Energy) | Some(Zone::SuccessLiveZone)) {
+                    if src_zone == Some(Zone::Energy) {
                         None
                     } else {
                         group_name
                     },
-                    if matches!(src_zone, Some(Zone::Energy) | Some(Zone::SuccessLiveZone)) {
+                    if src_zone == Some(Zone::Energy) {
                         None
                     } else {
                         cost_limit
@@ -1519,14 +1520,12 @@ impl AbilityResolver {
         }
 
         let is_energy = Zone::from_str(destination) == Some(Zone::Energy);
+        self.moved_cards.extend(moved_cards);
         if Zone::from_str(destination) == Some(Zone::Discard)
             || Zone::from_str(destination) == Some(Zone::Waitroom)
             || Zone::from_str(destination) == Some(Zone::DeckBottom)
             || is_energy
         {
-            self.moved_cards.extend(moved_cards);
-            // Accumulate: each movement batch extends, not replaces, so
-            // cost and effect movements persist together for each_time watchers.
             let acc = gs.recently_moved_cards.get_or_insert_with(Vec::new);
             acc.extend(moved_cards.iter().copied());
             gs.recently_moved_from_zone = Some(source.to_string());
@@ -1877,7 +1876,11 @@ impl AbilityResolver {
         }
         let mut moved = Vec::new();
         match zone_enum {
-            Some(Zone::Hand) | Some(Zone::Discard) | Some(Zone::Deck) => {
+            Some(Zone::Hand)
+            | Some(Zone::Discard)
+            | Some(Zone::Deck)
+            | Some(Zone::SuccessLiveZone)
+            | Some(Zone::LiveCardZone) => {
                 if Zone::from_str(dest) == Some(Zone::Stage) {
                     let player = gs.resolve_target_player(&target);
                     if player.stage.stage.iter().all(|&id| id != -1) {
@@ -2036,7 +2039,9 @@ impl AbilityResolver {
                             }
                         }
                         let player = gs.resolve_target_player_mut(&target);
-                        util::move_cards(player, &card_ids, zone, dest, None, &card_db);
+                        eprintln!("[MOVE_BEFORE] target={} zone={} dest={} success_before={:?} discard_before={:?}", target, zone, dest, player.success_live_card_zone.cards, player.waitroom.cards);
+                        let mc = util::move_cards(player, &card_ids, zone, dest, None, &card_db);
+                        eprintln!("[MOVE_DEBUG] zone={} dest={} card_ids={:?} moved_count={} zone_after={:?}", zone, dest, card_ids, mc, player.success_live_card_zone.cards);
                         moved = card_ids;
                     }
                 }
