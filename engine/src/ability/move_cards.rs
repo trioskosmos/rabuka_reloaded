@@ -595,6 +595,22 @@ impl AbilityResolver {
 
         match Zone::from_str(effective_source) {
             Some(Zone::Deck) | Some(Zone::DeckTop) => {
+                if effect.optional.unwrap_or(false) {
+                    let entry = gs.ability_queue.current_entry();
+                    let decided = entry
+                        .as_ref()
+                        .and_then(|e| e.conditional_choice.as_ref())
+                        .is_some();
+                    if !decided {
+                        self.pending_choice = Some(Choice::SelectTarget {
+                            target: "pay_optional_cost:skip_optional_cost".to_string(),
+                            description: "Place top card of deck to waiting room?".to_string(),
+                            allow_skip: true,
+                            options: Some(vec!["No".to_string(), "Yes".to_string()]),
+                        });
+                        return Ok(vec![]);
+                    }
+                }
                 let mut drawn = Vec::new();
                 let mut attempts = 0u32;
                 while drawn.len() < count

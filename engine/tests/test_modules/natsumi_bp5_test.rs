@@ -63,11 +63,23 @@ fn natsumi_bp5_q222_repeat_continues_after_wait() {
 
     // LiveStart fires Natsumi's ability.
     // Sequential with repeat_procedure(4):
-    //   1. move_cards (deck_top→discard, count=1)
+    //   1. move_cards (deck_top→discard, count=1, optional)
     //   2. conditional: gain_resource(blade, 1)
     //   3. conditional if disc was live: change_state(wait)
-    //   4. repeat_procedure (loops 1-3 up to 4 times)
+    //   4. repeat_procedure (loops 1-3 up to 4 times, optional)
     //
+    // Handle all choices for 4 iterations:
+    //   4× deck_top optional ("Yes" = option 1)
+    //   3× repeat optional ("Continue" = option 1)
+    //   7 total, interleaved.
+    for _ in 0..20 {
+        if !game.has_pending_choice() {
+            break;
+        }
+        game.select_option(1);
+        game.drain_auto_ability_choices();
+    }
+
     // Q222: wait state does NOT prevent remaining iterations.
     // Verify all 4 iterations ran by checking discard count.
     let deck_after = game.state.player1.main_deck.cards.len();

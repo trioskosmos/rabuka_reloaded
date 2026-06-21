@@ -1,138 +1,183 @@
 use crate::helpers::*;
-use rabuka_engine::core::types::Phase;
-use rabuka_engine::turn::TurnEngine;
+use rabuka_engine::card::HeartColor;
 
-fn drain_auto(v: &mut TestGame) {
-    while v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectAutoAbility") => v.select_indices(&[0]),
-            _ => v.select_indices(&[]),
+fn advance_to_live_card_set(game: &mut TestGame) {
+    // From Phase::Main, TurnPhase::FirstAttackerNormal:
+    //   5 passes cycles through Active→Energy→Draw→Main→LiveCardSetFirstAttacker
+    for _ in 0..5 {
+        game.pass();
+    }
+}
+
+fn run_live_full(game: &mut TestGame, live_id: i16) {
+    advance_to_live_card_set(game);
+    game.set_live_card(live_id);
+    game.pass(); // LiveCardSetFirstAttacker → LiveCardSetSecondAttacker
+    game.pass(); // LiveCardSetSecondAttacker → FirstAttackerPerformance (fires LiveStart)
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+    game.pass(); // FirstAttackerPerformance → SecondAttackerPerformance (executes performance)
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+    game.pass(); // SecondAttackerPerformance → LiveVictoryDetermination
+    game.pass(); // LiveVictoryDetermination → Active (finalizes snapshot)
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+}
+
+fn setup_game() -> TestGame {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let filler = game.id("PL!-sd1-010-SD");
+    game.state.player1.hand.cards.push(filler);
+    for _ in 0..60 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.give_energy(15);
+    game
+}
+
+fn snapshot_adjustments<'a>(game: &'a TestGame) -> Vec<(&'a str, i32, usize)> {
+    let mut items = Vec::new();
+    for snap in &game.state.performance_snapshots {
+        for live in &snap.lives {
+            for adj in &live.adjustments {
+                items.push((adj.source.as_str(), adj.value, adj.color));
+            }
         }
     }
+    items
 }
 
-fn score_bonus(v: &TestGame, cid: i16) -> i32 {
-    v.state.mods.get_score_modifier(cid)
-}
-
-fn setup_live_start(v: &mut TestGame, emotion: i16, success_zone_emotions: &[i16]) {
-    v.state.player1.live_card_zone.cards.push(emotion);
-    for &eid in success_zone_emotions {
-        v.state.player1.success_live_card_zone.cards.push(eid);
+fn snapshot_score_bonuses<'a>(game: &'a TestGame) -> Vec<(&'a str, u32)> {
+    let mut items = Vec::new();
+    for snap in &game.state.performance_snapshots {
+        for sline in &snap.breakdown.scores {
+            items.push((sline.source.as_str(), sline.value));
+        }
     }
-    v.state.current_phase = Phase::FirstAttackerPerformance;
-    TurnEngine::trigger_live_start_abilities(&mut v.state, "p1");
-    v.state.process_pending_auto_abilities("p1");
-    drain_auto(v);
+    items
 }
 
-/// 0 EMOTION in success zone → +0 score, +0 heart00
+fn score_bonus(game: &TestGame, cid: i16) -> i32 {
+    game.state.mods.get_score_modifier(cid)
+}
+
+fn heart_modifier(game: &TestGame, cid: i16, color: HeartColor) -> i32 {
+    game.state.mods.get_need_heart_modifier(cid, color)
+}
+
+/// 0 EMOTION in success zone → +0 score, no adjustments
 #[test]
 fn emotion_zero_in_success_zone() {
-    let db = load_real_database();
-    let mut v = TestGame::new(db);
-    let emo = v.id("PL!N-bp4-027-L");
-    for _ in 0..40 {
-        v.state.player1.main_deck.cards.push(v.id("PL!-sd1-010-SD"));
-    }
-    setup_live_start(&mut v, emo, &[]);
+    let mut game = setup_game();
+    let emo = game.id("PL!N-bp4-027-L");
+    game.state.player1.hand.cards.push(emo);
+    run_live_full(&mut game, emo);
+
     assert_eq!(
-        score_bonus(&v, emo),
+        score_bonus(&game, emo),
         0,
         "No EMOTION in success zone → +0 score"
     );
+    assert_eq!(
+        heart_modifier(&game, emo, HeartColor::Heart00),
+        0,
+        "No EMOTION → +0 heart00"
+    );
+    assert!(
+        snapshot_adjustments(&game).is_empty(),
+        "No adjustments expected"
+    );
 }
 
-/// 1 EMOTION in success zone → +2 score, +3 heart00
+/// 1 EMOTION in success zone → +2 score, +3 heart00, snapshot has adjustment
 #[test]
 fn emotion_one_in_success_zone() {
-    let db = load_real_database();
-    let mut v = TestGame::new(db);
-    let emo = v.id("PL!N-bp4-027-L");
-    let in_success = v.new_id("PL!N-bp4-027-L");
-    for _ in 0..40 {
-        v.state.player1.main_deck.cards.push(v.id("PL!-sd1-010-SD"));
-    }
-    setup_live_start(&mut v, emo, &[in_success]);
+    let mut game = setup_game();
+    let emo = game.id("PL!N-bp4-027-L");
+    let emo_in_success = game.id("PL!N-bp4-027-L");
+    game.state.player1.hand.cards.push(emo);
+    game.state
+        .player1
+        .success_live_card_zone
+        .cards
+        .push(emo_in_success);
+    run_live_full(&mut game, emo);
+
     assert_eq!(
-        score_bonus(&v, emo),
+        score_bonus(&game, emo),
         2,
-        "1 EMOTION in success zone → +2 score"
+        "1 EMOTION in success → +2 score mod"
     );
-    let heart_mods = v.state.mods.need_heart_modifiers.get(&emo);
+    let h00 = heart_modifier(&game, emo, HeartColor::Heart00);
+    assert_eq!(h00, 3, "1 EMOTION in success → +3 heart00 mod");
+
+    let adjustments = snapshot_adjustments(&game);
+    eprintln!("[TEST ADJ] {:?}", adjustments);
+    let heart_adj = adjustments.iter().find(|(_, _, c)| *c == 0);
     assert!(
-        heart_mods.is_some(),
-        "need_heart_modifiers should exist for the card"
+        heart_adj.is_some(),
+        "Heart00 adjustment pill should exist in snapshot"
     );
-    if let Some(mods) = heart_mods {
-        let h00 = mods
-            .get(&rabuka_engine::card::HeartColor::Heart00)
-            .map(|e| e.total())
-            .unwrap_or(0);
-        assert_eq!(h00, 3, "1 EMOTION in success zone → +3 heart00");
-    }
+    let (_, val, _) = heart_adj.unwrap();
+    assert_eq!(*val, 3, "Heart00 adjustment should be +3");
 }
 
 /// 2 EMOTION cards in success zone → +4 score, +6 heart00
 #[test]
 fn emotion_two_in_success_zone() {
-    let db = load_real_database();
-    let mut v = TestGame::new(db);
-    let emo = v.id("PL!N-bp4-027-L");
-    let in_success1 = v.new_id("PL!N-bp4-027-L");
-    let in_success2 = v.new_id("PL!N-bp4-027-L");
-    for _ in 0..40 {
-        v.state.player1.main_deck.cards.push(v.id("PL!-sd1-010-SD"));
-    }
-    setup_live_start(&mut v, emo, &[in_success1, in_success2]);
+    let mut game = setup_game();
+    let emo = game.id("PL!N-bp4-027-L");
+    let emo1 = game.id("PL!N-bp4-027-L");
+    let emo2 = game.id("PL!N-bp4-027-L");
+    game.state.player1.hand.cards.push(emo);
+    game.state.player1.success_live_card_zone.cards.push(emo1);
+    game.state.player1.success_live_card_zone.cards.push(emo2);
+    run_live_full(&mut game, emo);
+
     assert_eq!(
-        score_bonus(&v, emo),
+        score_bonus(&game, emo),
         4,
-        "2 EMOTION in success zone → +4 score"
+        "2 EMOTION in success → +4 score mod"
     );
-    let heart_mods = v.state.mods.need_heart_modifiers.get(&emo);
-    assert!(
-        heart_mods.is_some(),
-        "need_heart_modifiers should exist for the card"
-    );
-    if let Some(mods) = heart_mods {
-        let h00 = mods
-            .get(&rabuka_engine::card::HeartColor::Heart00)
-            .map(|e| e.total())
-            .unwrap_or(0);
-        assert_eq!(h00, 6, "2 EMOTION in success zone → +6 heart00");
-    }
+    let h00 = heart_modifier(&game, emo, HeartColor::Heart00);
+    assert_eq!(h00, 6, "2 EMOTION in success → +6 heart00 mod");
+
+    let adjustments = snapshot_adjustments(&game);
+    let heart_adj = adjustments.iter().find(|(_, _, c)| *c == 0);
+    assert!(heart_adj.is_some(), "Heart00 adjustment pill should exist");
+    let (_, val, _) = heart_adj.unwrap();
+    assert_eq!(*val, 6, "Heart00 adjustment should be +6");
 }
 
-/// Each EMOTION card only modifies itself via self_target inheritance.
+/// The score breakdown should have exactly ONE entry per bonus source
+/// (not duplicate entries from success-zone card activations).
 #[test]
-fn emotion_modifier_only_on_self() {
-    let db = load_real_database();
-    let mut v = TestGame::new(db);
-    let emo1 = v.id("PL!N-bp4-027-L");
-    let emo2 = v.id("PL!N-bp4-027-L");
-    let in_success = v.id("PL!N-bp4-027-L");
-    for _ in 0..40 {
-        v.state.player1.main_deck.cards.push(v.id("PL!-sd1-010-SD"));
-    }
-    // emo1 → live_card_zone triggers; in_success → success_zone triggers
-    v.state.player1.live_card_zone.cards.push(emo1);
-    v.state
+fn emotion_score_breakdown_no_duplicates() {
+    let mut game = setup_game();
+    let emo = game.id("PL!N-bp4-027-L");
+    let emo_in_success = game.id("PL!N-bp4-027-L");
+    game.state.player1.hand.cards.push(emo);
+    game.state
         .player1
         .success_live_card_zone
         .cards
-        .push(in_success);
-    v.state.current_phase = Phase::FirstAttackerPerformance;
-    TurnEngine::trigger_live_start_abilities(&mut v.state, "p1");
-    v.state.process_pending_auto_abilities("p1");
-    drain_auto(&mut v);
-    // Both live_zone and success_zone cards trigger and modify themselves
-    assert_eq!(score_bonus(&v, emo1), 2, "live_zone EMOTION gets +2");
+        .push(emo_in_success);
+    run_live_full(&mut game, emo);
+
+    let scores = snapshot_score_bonuses(&game);
+    let total_bonus: u32 = scores.iter().map(|(_, v)| v).sum();
     assert_eq!(
-        score_bonus(&v, in_success),
-        2,
-        "success_zone EMOTION gets +2"
+        scores.len(),
+        1,
+        "Expected exactly 1 ScoreLine (only live_zone card's activation). Got {}: {:?}",
+        scores.len(),
+        scores
     );
-    // emo2 was never placed in a trigger zone → no modifier
-    assert_eq!(score_bonus(&v, emo2), 0, "Unplaced EMOTION not modified");
+    assert_eq!(total_bonus, 2, "Total score bonus should be +2");
 }

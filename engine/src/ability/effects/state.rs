@@ -241,7 +241,16 @@ impl AbilityResolver {
 
             // Prompt when: there are candidates to choose from AND we haven't already selected,
             // AND either max allows subset selection or more candidates than count need narrowing.
-            let needs_prompt = self.selected_cards.is_empty()
+            // Exception: if the effect targets "this member" (activating card is among candidates)
+            // and it's a single-target self-member effect, auto-select instead of prompting.
+            let is_self_target = count == 1
+                && target.as_str() != "opponent"
+                && card_type_filter.as_deref() == Some("member_card")
+                && gs
+                    .activating_card
+                    .is_some_and(|act_id| candidates.iter().any(|(_, cid)| *cid == act_id));
+            let needs_prompt = !is_self_target
+                && self.selected_cards.is_empty()
                 && ((max && !candidates.is_empty())
                     || (!is_change_all && candidates.len() > count as usize));
 

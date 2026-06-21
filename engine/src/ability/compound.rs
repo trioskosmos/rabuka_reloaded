@@ -284,6 +284,32 @@ impl AbilityResolver {
                         Err(e) => return Err(e),
                     }
                 }
+                // After all actions in this iteration, check if repeat_procedure is optional
+                // and we have remaining repeats — ask player whether to continue.
+                if repeats_remaining > 0 {
+                    if let Some(ref repeat_action) = actions.last() {
+                        if repeat_action.action == "repeat_procedure"
+                            && repeat_action.optional.unwrap_or(false)
+                        {
+                            self.pending_choice = Some(Choice::SelectTarget {
+                                target: "pay_optional_cost:skip_optional_cost".to_string(),
+                                description: "Repeat effect?".to_string(),
+                                allow_skip: true,
+                                options: Some(vec!["Stop".to_string(), "Continue".to_string()]),
+                            });
+                            let mut remaining: Vec<AbilityEffect> = Vec::new();
+                            for _ in 0..repeats_remaining {
+                                remaining.extend_from_slice(repeat_actions);
+                            }
+                            if !remaining.is_empty() {
+                                let mut existing = gs.ability_queue.take_pending_commands();
+                                existing.extend(remaining.into_iter().map(Command::Effect));
+                                gs.ability_queue.set_pending_commands(existing);
+                            }
+                            return Ok(());
+                        }
+                    }
+                }
             }
         }
         // Clear context so resume_with_choice doesn't re-process the ability.
