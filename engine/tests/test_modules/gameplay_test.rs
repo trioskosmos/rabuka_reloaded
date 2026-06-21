@@ -3383,3 +3383,72 @@ fn hanamaru_score_icon_filter() {
         "member card should remain in discard"
     );
 }
+
+#[test]
+fn ai_screeam_soreigai_all_members_on_both_sides_gain_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let screeam = game.id("LL-PR-004-PR");
+    let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    let p1_a = game.id("PL!-sd1-013-SD");
+    let p1_b = game.id("PL!-sd1-014-SD");
+    let p1_c = game.id("PL!-sd1-015-SD");
+    let p2_a = game.id("PL!-sd1-016-SD");
+    let p2_b = game.id("PL!-sd1-017-SD");
+    let p2_c = game.id("PL!-sd1-018-SD");
+
+    // Full stage: 3 members each
+    game.state.player1.stage.stage = [p1_a, p1_b, p1_c];
+    game.state.player2.stage.stage = [p2_a, p2_b, p2_c];
+
+    game.state.player1.hand.cards.push(screeam);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player2.hand.cards.push(filler);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(screeam);
+    advance_to_live_start(&mut game);
+    assert!(game.has_pending_choice());
+
+    // Option 2: それ以外 → all members on both sides gain blade
+    game.select_option(2);
+
+    assert!(
+        !game.has_pending_choice(),
+        "No more pending choices after blade gain"
+    );
+
+    // All 3 P1 members should have blade
+    assert!(
+        game.state.mods.get_blade_modifier(p1_a) > 0,
+        "P1 left member should have blade"
+    );
+    assert!(
+        game.state.mods.get_blade_modifier(p1_b) > 0,
+        "P1 center member should have blade"
+    );
+    assert!(
+        game.state.mods.get_blade_modifier(p1_c) > 0,
+        "P1 right member should have blade"
+    );
+
+    // All 3 P2 members should have blade
+    assert!(
+        game.state.mods.get_blade_modifier(p2_a) > 0,
+        "P2 left member should have blade"
+    );
+    assert!(
+        game.state.mods.get_blade_modifier(p2_b) > 0,
+        "P2 center member should have blade"
+    );
+    assert!(
+        game.state.mods.get_blade_modifier(p2_c) > 0,
+        "P2 right member should have blade"
+    );
+}

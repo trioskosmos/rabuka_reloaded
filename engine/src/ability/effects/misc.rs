@@ -379,13 +379,13 @@ impl AbilityResolver {
         let is_all = effect.all.unwrap_or(false)
             || (effect.source.is_none()
                 && effect.card_type.as_deref() == Some("member_card")
-                && target == "self"
+                && (target == "self" || target == "opponent")
                 && !is_self_target
                 && effect.exclude_self.is_none())
             // Also detect "all members" when the effect has no target_count limit
-            // and targets "self" members (e.g. "自分のステージにいるメンバーは")
+            // and targets "self"/"opponent" members (e.g. "自分のステージにいるメンバーは")
             || (effect.card_type.as_deref() == Some("member_card")
-                && target == "self"
+                && (target == "self" || target == "opponent")
                 && effect.target_count.is_none()
                 && effect.distinct.is_none());
 
