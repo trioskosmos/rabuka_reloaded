@@ -184,12 +184,11 @@ impl GameState {
         ) {
             return true;
         }
-        // card_count with preceding_moved (tracks recently_moved_cards)
+        // card_count (all variants — zone counts are stable state checks)
         if matches!(
             condition.condition_type,
             Some(crate::ability::enums::ConditionType::CardCountCondition)
-        ) && condition.source.as_deref() == Some("preceding_moved")
-        {
+        ) {
             return true;
         }
         // Recurse into compound conditions — if any child is event-based,
@@ -279,14 +278,13 @@ impl GameState {
                                 // to prevent queuing auto abilities whose trigger
                                 // event hasn't occurred.  Only pre-filter event-
                                 // based condition types:
-                                //   - past-tense movement ("moved")
+                                //   - movement ("moved" / "moves")
                                 //   - appearance
-                                //   - card_count with source=preceding_moved
-                                // Present-tense "moves" is excluded because those
-                                // fire DURING position change — the card hasn't
-                                // moved yet at TAS scan time.
-                                // Other types (state, position, group, comparison)
-                                // are safe to defer to resolution time.
+                                //   - card_count (all variants)
+                                // Other types (state, position, group, comparison,
+                                // state_change) depend on game state or events
+                                // that may change between TAS and ability
+                                // resolution, so they are deferred.
                                 if let Some(ref condition) = effect.condition {
                                     let can_prefilter = Self::condition_is_event_based(condition);
                                     if can_prefilter {

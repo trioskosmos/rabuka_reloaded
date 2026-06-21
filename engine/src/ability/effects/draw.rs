@@ -592,6 +592,13 @@ impl AbilityResolver {
         }
         if unique_colors.len() == 1 && !heart_selection {
             Ok(Some(unique_colors[0].clone()))
+        } else if !heart_selection
+            && unique_colors.len() > 1
+            && count as usize >= unique_colors.len()
+        {
+            // Multiple fixed heart colors with matching or exceeding count.
+            // Don't create a choice — caller will distribute the count across all colors.
+            Ok(None)
         } else {
             self.pending_choice = Some(Choice::SelectHeartColor {
                 count: count as usize,

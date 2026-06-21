@@ -890,6 +890,23 @@ impl AbilityResolver {
         let heart_color_val =
             crate::zones::parse_heart_color(heart_color_str.as_deref().unwrap_or("heart00"));
 
+        // Build heart distribution: for fixed multi-color grants, distribute count
+        // across all specified colors instead of using a single color.
+        let heart_distribution: Vec<(crate::card::HeartColor, u32)> = if resource == "heart"
+            && !heart_selection
+            && effect.heart_colors.len() > 1
+            && final_count >= effect.heart_colors.len() as u32
+        {
+            let per_color = final_count / effect.heart_colors.len() as u32;
+            effect
+                .heart_colors
+                .iter()
+                .map(|c| (crate::zones::parse_heart_color(c), per_color))
+                .collect()
+        } else {
+            vec![(heart_color_val, final_count)]
+        };
+
         if is_self_target {
             if let Some(card_id) = activating_card_id {
                 if !gs
@@ -1093,22 +1110,41 @@ impl AbilityResolver {
                                 let player = gs.resolve_target_player_mut(&target);
                                 let card_id = player.stage.stage[stage_idx];
                                 if card_id != -1 {
-                                    gs.mods.add_heart_modifier_with_trace(
-                                        card_id,
-                                        heart_color_val,
-                                        heart_to_add,
-                                        &mut gs.ability_applications,
-                                        gs.activating_card.unwrap_or(-1),
-                                        &effect.text,
-                                    );
-                                    if is_temporary && effect_data.is_none() {
-                                        let color_name =
-                                            heart_color_str.as_deref().unwrap_or("heart01");
-                                        effect_data = Some(Self::make_card_effect_data(
+                                    for &(color, dist_count) in &heart_distribution {
+                                        let dist_amount = if is_negative {
+                                            -(dist_count as i32)
+                                        } else {
+                                            dist_count as i32
+                                        };
+                                        gs.mods.add_heart_modifier_with_trace(
                                             card_id,
-                                            heart_to_add,
-                                            Some(color_name),
-                                        ));
+                                            color,
+                                            dist_amount,
+                                            &mut gs.ability_applications,
+                                            gs.activating_card.unwrap_or(-1),
+                                            &effect.text,
+                                        );
+                                    }
+                                    if is_temporary && effect_data.is_none() {
+                                        if heart_distribution.len() > 1 {
+                                            let cards_json: Vec<serde_json::Value> = heart_distribution
+                                                .iter()
+                                                .map(|&(c, dc)| {
+                                                    let amount = if is_negative { -(dc as i32) } else { dc as i32 };
+                                                    serde_json::json!({"card_id": card_id, "amount": amount, "color": format!("{:?}", c)})
+                                                })
+                                                .collect();
+                                            effect_data =
+                                                Some(serde_json::Value::Array(cards_json));
+                                        } else {
+                                            let color_name =
+                                                heart_color_str.as_deref().unwrap_or("heart01");
+                                            effect_data = Some(Self::make_card_effect_data(
+                                                card_id,
+                                                heart_to_add,
+                                                Some(color_name),
+                                            ));
+                                        }
                                     }
                                 }
                             }
@@ -1118,21 +1154,39 @@ impl AbilityResolver {
                     && (effect.exclude_self.is_none() || effect.target.as_deref() == Some("self"))
                 {
                     if let Some(card_id) = activating_card_id {
-                        gs.mods.add_heart_modifier_with_trace(
-                            card_id,
-                            heart_color_val,
-                            heart_to_add,
-                            &mut gs.ability_applications,
-                            gs.activating_card.unwrap_or(-1),
-                            &effect.text,
-                        );
-                        if is_temporary && effect_data.is_none() {
-                            let color_name = heart_color_str.as_deref().unwrap_or("heart01");
-                            effect_data = Some(Self::make_card_effect_data(
+                        for &(color, dist_count) in &heart_distribution {
+                            let dist_amount = if is_negative {
+                                -(dist_count as i32)
+                            } else {
+                                dist_count as i32
+                            };
+                            gs.mods.add_heart_modifier_with_trace(
                                 card_id,
-                                heart_to_add,
-                                Some(color_name),
-                            ));
+                                color,
+                                dist_amount,
+                                &mut gs.ability_applications,
+                                gs.activating_card.unwrap_or(-1),
+                                &effect.text,
+                            );
+                        }
+                        if is_temporary && effect_data.is_none() {
+                            if heart_distribution.len() > 1 {
+                                let cards_json: Vec<serde_json::Value> = heart_distribution
+                                    .iter()
+                                    .map(|&(c, dc)| {
+                                        let amount = if is_negative { -(dc as i32) } else { dc as i32 };
+                                        serde_json::json!({"card_id": card_id, "amount": amount, "color": format!("{:?}", c)})
+                                    })
+                                    .collect();
+                                effect_data = Some(serde_json::Value::Array(cards_json));
+                            } else {
+                                let color_name = heart_color_str.as_deref().unwrap_or("heart01");
+                                effect_data = Some(Self::make_card_effect_data(
+                                    card_id,
+                                    heart_to_add,
+                                    Some(color_name),
+                                ));
+                            }
                         }
                     }
                 }
@@ -1143,21 +1197,39 @@ impl AbilityResolver {
                     && effect.card_type.is_none())
             {
                 if let Some(card_id) = activating_card_id {
-                    gs.mods.add_heart_modifier_with_trace(
-                        card_id,
-                        heart_color_val,
-                        heart_to_add,
-                        &mut gs.ability_applications,
-                        gs.activating_card.unwrap_or(-1),
-                        &effect.text,
-                    );
-                    if is_temporary && effect_data.is_none() {
-                        let color_name = heart_color_str.as_deref().unwrap_or("heart01");
-                        effect_data = Some(Self::make_card_effect_data(
+                    for &(color, dist_count) in &heart_distribution {
+                        let dist_amount = if is_negative {
+                            -(dist_count as i32)
+                        } else {
+                            dist_count as i32
+                        };
+                        gs.mods.add_heart_modifier_with_trace(
                             card_id,
-                            heart_to_add,
-                            Some(color_name),
-                        ));
+                            color,
+                            dist_amount,
+                            &mut gs.ability_applications,
+                            gs.activating_card.unwrap_or(-1),
+                            &effect.text,
+                        );
+                    }
+                    if is_temporary && effect_data.is_none() {
+                        if heart_distribution.len() > 1 {
+                            let cards_json: Vec<serde_json::Value> = heart_distribution
+                                .iter()
+                                .map(|&(c, dc)| {
+                                    let amount = if is_negative { -(dc as i32) } else { dc as i32 };
+                                    serde_json::json!({"card_id": card_id, "amount": amount, "color": format!("{:?}", c)})
+                                })
+                                .collect();
+                            effect_data = Some(serde_json::Value::Array(cards_json));
+                        } else {
+                            let color_name = heart_color_str.as_deref().unwrap_or("heart01");
+                            effect_data = Some(Self::make_card_effect_data(
+                                card_id,
+                                heart_to_add,
+                                Some(color_name),
+                            ));
+                        }
                     }
                 }
             } else {
@@ -1170,25 +1242,45 @@ impl AbilityResolver {
                         .collect()
                 };
                 for &card_id in &targets {
-                    gs.mods.add_heart_modifier_with_trace(
-                        card_id,
-                        heart_color_val,
-                        heart_to_add,
-                        &mut gs.ability_applications,
-                        gs.activating_card.unwrap_or(-1),
-                        &effect.text,
-                    );
+                    for &(color, dist_count) in &heart_distribution {
+                        let dist_amount = if is_negative {
+                            -(dist_count as i32)
+                        } else {
+                            dist_count as i32
+                        };
+                        gs.mods.add_heart_modifier_with_trace(
+                            card_id,
+                            color,
+                            dist_amount,
+                            &mut gs.ability_applications,
+                            gs.activating_card.unwrap_or(-1),
+                            &effect.text,
+                        );
+                    }
                 }
                 // Build effect_data for heart cleanup on expiry
                 if is_temporary && effect_data.is_none() && !targets.is_empty() {
-                    let color_name = heart_color_str.as_deref().unwrap_or("heart01");
-                    let cards_json: Vec<serde_json::Value> = targets
-                        .iter()
-                        .map(|&cid| {
-                            serde_json::json!({"card_id": cid, "amount": heart_to_add, "color": color_name})
-                        })
-                        .collect();
-                    effect_data = Some(serde_json::Value::Array(cards_json));
+                    if heart_distribution.len() > 1 {
+                        let cards_json: Vec<serde_json::Value> = targets
+                            .iter()
+                            .flat_map(|&cid| {
+                                heart_distribution.iter().map(move |&(c, dc)| {
+                                    let amount = if is_negative { -(dc as i32) } else { dc as i32 };
+                                    serde_json::json!({"card_id": cid, "amount": amount, "color": format!("{:?}", c)})
+                                })
+                            })
+                            .collect();
+                        effect_data = Some(serde_json::Value::Array(cards_json));
+                    } else {
+                        let color_name = heart_color_str.as_deref().unwrap_or("heart01");
+                        let cards_json: Vec<serde_json::Value> = targets
+                            .iter()
+                            .map(|&cid| {
+                                serde_json::json!({"card_id": cid, "amount": heart_to_add, "color": color_name})
+                            })
+                            .collect();
+                        effect_data = Some(serde_json::Value::Array(cards_json));
+                    }
                 }
             }
         }

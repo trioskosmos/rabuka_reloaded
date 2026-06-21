@@ -244,3 +244,6 @@ pub mod on_hand_to_discard_test;
 pub mod pl_hs_bp1_003_test;
 pub mod trigger_card_integration_test;
 pub mod upper_batch_on_yell_test;
+
+// Multi-color heart gain (PL!S-PR-040-PR / PL!N-PR-023-PR)
+pub mod multi_color_heart_test;
