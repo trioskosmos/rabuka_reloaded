@@ -542,6 +542,8 @@ export const CardRenderer = {
                         }
                         const cardEl = document.getElementById(`${containerId}-card-${handIdx}`);
                         if (cardEl) cardEl.classList.toggle('mulligan-selected');
+                        const actionThumb = document.querySelector(`.action-btn[data-card-index="${handIdx}"] .action-card-thumb`);
+                        if (actionThumb) actionThumb.classList.toggle('mulligan-selected');
                     }
                     return;
                 }

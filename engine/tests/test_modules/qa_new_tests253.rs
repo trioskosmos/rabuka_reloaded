@@ -22,102 +22,118 @@ fn setup_p1_deck(game: &mut TestGame, live_ids: &[i16]) {
     }
 }
 
-fn dbg_revealed(game: &TestGame) {
-    eprintln!(
-        "  revealed_cards: {:?}",
-        game.state
-            .revealed_cards
-            .iter()
-            .map(|&id| (game.name(id), id))
-            .collect::<Vec<_>>()
-    );
-}
-
-/// Debug test to trace revealed_cards state throughout the flow.
+/// GALAXY with no Kanan — live card in yell → +1.
 #[test]
-fn q253_debug_revealed_cards() {
+fn q253_galaxy_gets_plus_one() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
+    let galaxy = game.id("PL!S-bp6-023-L");
+    let yell_live = game.id("PL!-sd1-020-SD");
 
+    game.add_to_stage(MemberArea::LeftSide, game.id("PL!S-bp2-017-N"));
+    game.add_to_stage(MemberArea::Center, game.id("PL!S-bp3-015-N"));
+    game.add_to_stage(MemberArea::RightSide, game.id("PL!S-PR-014-PR"));
+    setup_p1_deck(&mut game, &[yell_live]);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.state.player1.hand.cards.push(galaxy);
+    game.set_live_card(galaxy);
+    advance_to_live_start(&mut game);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    game.pass();
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    game.pass();
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    game.pass();
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert_eq!(game.state.mods.get_score_modifier(galaxy), 1);
+}
+
+/// Kanan takes the only live card from yell → GALAXY gets nothing (Q253 ruling).
+#[test]
+fn q253_kanan_first_galaxy_gets_nothing() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
     let galaxy = game.id("PL!S-bp6-023-L");
     let yell_live = game.id("PL!-sd1-020-SD");
 
     game.add_to_stage(MemberArea::LeftSide, game.id("PL!S-pb1-003-R"));
     game.add_to_stage(MemberArea::Center, game.id("PL!S-bp2-017-N"));
     game.add_to_stage(MemberArea::RightSide, game.id("PL!S-bp3-015-N"));
-
     setup_p1_deck(&mut game, &[yell_live]);
-
-    eprintln!("=== Before live card set ===");
-    eprintln!("  phase: {}", game.state.current_phase);
-    eprintln!(
-        "  deck top 4: {:?}",
-        game.state.player1.main_deck.peek_top(4)
-    );
-    eprintln!("  deck len: {}", game.state.player1.main_deck.len());
 
     advance_to_live_card_set_p1(&mut game);
     game.state.player1.hand.cards.push(galaxy);
     game.set_live_card(galaxy);
     advance_to_live_start(&mut game);
-
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
 
-    eprintln!("\n=== After live start ===");
-    eprintln!("  phase: {}", game.state.current_phase);
-    dbg_revealed(&game);
-    eprintln!("  deck len: {}", game.state.player1.main_deck.len());
-    eprintln!(
-        "  hand: {:?}",
-        game.state
-            .player1
-            .hand
-            .cards
-            .iter()
-            .map(|&id| game.name(id))
-            .collect::<Vec<_>>()
+    game.pass();
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    game.pass();
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    game.pass();
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(galaxy),
+        0,
+        "Q253: Kanan took the live card from yell, GALAXY should get +0"
     );
+}
 
-    // First performance (P1 yell)
+/// Two live cards in yell — Kanan takes one, GALAXY still has one → +1.
+#[test]
+fn q253_both_succeed_two_live_cards() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let galaxy = game.id("PL!S-bp6-023-L");
+    let yell_live_1 = game.id("PL!-sd1-020-SD");
+    let yell_live_2 = game.id("PL!-sd1-021-SD");
+
+    game.add_to_stage(MemberArea::LeftSide, game.id("PL!S-pb1-003-R"));
+    game.add_to_stage(MemberArea::Center, game.id("PL!S-bp2-017-N"));
+    game.add_to_stage(MemberArea::RightSide, game.id("PL!S-bp3-015-N"));
+    setup_p1_deck(&mut game, &[yell_live_1, yell_live_2]);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.state.player1.hand.cards.push(galaxy);
+    game.set_live_card(galaxy);
+    advance_to_live_start(&mut game);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    game.pass();
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    game.pass();
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
     game.pass();
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
 
-    eprintln!("\n=== After P1 performance ===");
-    eprintln!("  phase: {}", game.state.current_phase);
-    dbg_revealed(&game);
-    eprintln!("  deck len: {}", game.state.player1.main_deck.len());
-
-    // Second performance (P2 yell)
-    game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
-
-    eprintln!("\n=== After P2 performance ===");
-    eprintln!("  phase: {}", game.state.current_phase);
-    dbg_revealed(&game);
-
-    // Live Victory Determination (Live Success triggers here)
-    game.pass();
-    eprintln!("\n=== After LVD pass ===");
-    eprintln!("  phase: {}", game.state.current_phase);
-    dbg_revealed(&game);
-
-    while game.has_pending_choice() {
-        eprintln!("  pending: {:?}", game.pending_choice_type());
-        dbg_revealed(&game);
-        game.select_indices(&[]);
-    }
-
-    eprintln!("\n=== After all choices ===");
-    eprintln!("  phase: {}", game.state.current_phase);
-    dbg_revealed(&game);
-
-    eprintln!("\n=== Results ===");
-    let sm = game.state.mods.get_score_modifier(galaxy);
-    eprintln!("  GALAXY score_modifier: {}", sm);
+    assert_eq!(game.state.mods.get_score_modifier(galaxy), 1);
 }

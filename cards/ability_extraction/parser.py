@@ -1349,6 +1349,11 @@ def _try_revealed(text):
     if "0枚" in text:
         result["count"] = 1
         result["operator"] = ">="
+    ct = extract_card_type(text)
+    if ct:
+        zone_keywords = ["置き場", "ゾーン"]
+        if not any(kw in text for kw in zone_keywords):
+            result["card_type"] = ct
     return result
 
 

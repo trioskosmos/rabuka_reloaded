@@ -365,7 +365,13 @@ impl<'a> ConditionContext<'a> {
                 let count = self.get_count_for_condition(condition);
                 format!("{}", count)
             }
-            Some(ConditionType::CardBladeCondition) => String::new(),
+            Some(ConditionType::CardBladeCondition) => {
+                if let Some(op) = condition.operator.as_deref() {
+                    format!("{} {} {}", "ブレード", op, condition.count.unwrap_or(1))
+                } else {
+                    String::new()
+                }
+            }
             Some(ConditionType::GroupCondition) => {
                 let player =
                     self.resolve_condition_player(condition.target.as_deref().unwrap_or("self"));
@@ -467,6 +473,34 @@ impl<'a> ConditionContext<'a> {
                     String::new()
                 }
             }
+            Some(ConditionType::ChoiceCondition) => {
+                if let Some(ref opts) = condition.options {
+                    format!("選択肢={}個", opts.len())
+                } else {
+                    "選択肢なし".into()
+                }
+            }
+            Some(ConditionType::EnergyStateCondition) => condition
+                .state
+                .as_deref()
+                .map(|s| format!("エネルギー状態={}", s))
+                .unwrap_or_default(),
+            Some(ConditionType::StateChangeCondition) => {
+                let from = condition.from_state.as_deref().unwrap_or("?");
+                let to = condition.to_state.as_deref().unwrap_or("?");
+                format!("状態変化: {}→{}", from, to)
+            }
+            Some(ConditionType::AllCostComparisonCondition) => {
+                let op = condition.operator.as_deref().unwrap_or(">");
+                format!("全コスト比較{}?", op)
+            }
+            Some(ConditionType::ScoreThresholdCondition) => {
+                let op = condition.operator.as_deref().unwrap_or(">=");
+                format!("スコア{} {}?", op, condition.count.unwrap_or(1))
+            }
+            Some(ConditionType::ResourceCondition) => {
+                format!("資源={}", condition.resource_type.as_deref().unwrap_or("?"))
+            }
             _ => String::new(),
         }
     }
@@ -475,6 +509,42 @@ impl<'a> ConditionContext<'a> {
         let target = condition.target.as_deref().unwrap_or("self");
         let player = self.resolve_condition_player(target);
         let location = condition.location.as_deref().unwrap_or("");
+
+        // Check position constraints first
+        let mut position_str = String::new();
+        if let Some(ref pos) = condition.position {
+            position_str = format!("位置={}", pos.get_position().unwrap_or("?"));
+        } else if let Some(ref act_pos) = condition.activation_position {
+            let card_id = self.activating_card_id;
+            let ok = act_pos.split(',').any(|p| {
+                let trimmed = p.trim();
+                let idx = match trimmed {
+                    "left" | "left_side" => 0,
+                    "center" => 1,
+                    "right" | "right_side" => 2,
+                    _ => return true,
+                };
+                idx < player.stage.stage.len()
+                    && card_id.is_some()
+                    && player.stage.stage[idx] == card_id.unwrap()
+            });
+            if ok {
+                position_str = format!("位置=OK({})", act_pos);
+            } else {
+                let actual_pos = card_id
+                    .and_then(|id| {
+                        player
+                            .stage
+                            .stage
+                            .iter()
+                            .position(|&c| c == id)
+                            .map(|i| ["左", "中", "右"][i])
+                    })
+                    .unwrap_or("?");
+                position_str = format!("位置=不適合(現在{}、期待{})", actual_pos, act_pos);
+            }
+        }
+
         match Zone::from_str(location) {
             Some(Zone::Stage) => {
                 let stage_ids: Vec<i16> = player
@@ -485,7 +555,7 @@ impl<'a> ConditionContext<'a> {
                     .copied()
                     .collect();
                 if stage_ids.is_empty() {
-                    return "不在".into();
+                    return format!("不在 {}", position_str).trim().to_string();
                 }
                 let stage_names: Vec<String> = stage_ids
                     .iter()
@@ -502,7 +572,7 @@ impl<'a> ConditionContext<'a> {
                         let norm = crate::card::CardDatabase::normalize_name(ch);
                         let found = stage_names.iter().any(|n| n.contains(&norm));
                         if !found {
-                            return format!("{}不在", ch);
+                            return format!("{}不在 {}", ch, position_str).trim().to_string();
                         }
                     }
                     // All matched — check cost_reference
@@ -535,7 +605,7 @@ impl<'a> ConditionContext<'a> {
                             })
                             .next();
                         let op = condition.cost_reference_operator.as_deref().unwrap_or(">");
-                        match (sub_cost, ref_cost) {
+                        let cost_part = match (sub_cost, ref_cost) {
                             (Some(sc), Some(rc)) => format!(
                                 "{}コスト({}) {} {}コスト({})",
                                 subject, sc, op, ref_char, rc
@@ -547,6 +617,11 @@ impl<'a> ConditionContext<'a> {
                                 format!("{}(不在) {} {}コスト({})", subject, op, ref_char, rc)
                             }
                             (None, None) => format!("{}も{}も不在", subject, ref_char),
+                        };
+                        if position_str.is_empty() {
+                            cost_part
+                        } else {
+                            format!("{} {}", cost_part, position_str)
                         }
                     } else {
                         let names: Vec<String> = stage_ids
@@ -558,7 +633,12 @@ impl<'a> ConditionContext<'a> {
                                     .map(|c| c.name.clone())
                             })
                             .collect();
-                        format!("在籍=[{}]", names.join(", "))
+                        let base = format!("在籍=[{}]", names.join(", "));
+                        if position_str.is_empty() {
+                            base
+                        } else {
+                            format!("{} {}", base, position_str)
+                        }
                     }
                 } else {
                     let names: Vec<String> = stage_ids
@@ -570,7 +650,12 @@ impl<'a> ConditionContext<'a> {
                                 .map(|c| c.name.clone())
                         })
                         .collect();
-                    format!("在籍=[{}]", names.join(", "))
+                    let base = format!("在籍=[{}]", names.join(", "));
+                    if position_str.is_empty() {
+                        base
+                    } else {
+                        format!("{} {}", base, position_str)
+                    }
                 }
             }
             Some(Zone::Hand) => format!("手札={}枚", player.hand.cards.len()),

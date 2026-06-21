@@ -174,8 +174,8 @@ export const ActionButtons = {
         if (a.action_type === 'select_mulligan') {
             const ci = (a.parameters || a.params || {}).card_index;
             if (ci !== undefined) {
-                const isSelected = State.localMulliganSelection.has(ci);
-                if (isSelected) {
+                btn.dataset.cardIndex = ci;
+                if (State.localMulliganSelection.has(ci)) {
                     const thumb = btn.querySelector('.action-card-thumb');
                     if (thumb) {
                         thumb.classList.add('mulligan-selected');

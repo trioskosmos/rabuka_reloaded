@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-21T20:17:15.188153",
+  "generated_at": "2026-06-21T21:04:04.191035",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -5141,6 +5141,7 @@
           "text": "エールにより公開された自分のカードの中に、ブレードハートを持たない『μ's』のメンバーカードがある場合",
           "negation": true,
           "card_property": "has_blade_heart",
+          "card_type": "member_card",
           "group_names": [
             "μ's"
           ]
@@ -5635,6 +5636,7 @@
           "location": "revealed_cards",
           "target": "self",
           "text": "エールにより公開された自分のカードの中に、{{icon_score.png|スコア}}を持つ『Aqours』のライブカードがある場合",
+          "card_type": "live_card",
           "position": "center",
           "activation_position": "center",
           "group_names": [
@@ -9950,7 +9952,8 @@
           "location": "revealed_cards",
           "target": "self",
           "text": "エールにより公開された自分のカードの中にライブカードがないとき",
-          "negation": true
+          "negation": true,
+          "card_type": "live_card"
         }
       }
     },
@@ -22708,6 +22711,7 @@
           "location": "revealed_cards",
           "target": "self",
           "text": "エールにより公開された自分の『虹ヶ咲』のメンバーカードが持つハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がある場合",
+          "card_type": "member_card",
           "group_names": [
             "虹ヶ咲"
           ],
@@ -28760,7 +28764,8 @@
           "type": "location_condition",
           "location": "revealed_cards",
           "target": "self",
-          "text": "エールにより公開された自分のカードの中にライブカードがある場合"
+          "text": "エールにより公開された自分のカードの中にライブカードがある場合",
+          "card_type": "live_card"
         },
         "action": "modify_score",
         "value": 1,

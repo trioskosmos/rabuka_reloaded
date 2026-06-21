@@ -1203,62 +1203,7 @@ impl AbilityResolver {
             effect_data = Some(serde_json::Value::Array(cards_json.clone()));
         }
 
-        let pp = self.player_prefix(gs);
-        let act_name = gs
-            .activating_card
-            .map(|c| self.card_name(c))
-            .unwrap_or_default();
-        let resource_jp = if resource == "blade" || resource == "ブレード" {
-            "ブレード"
-        } else {
-            "ハート"
-        };
-        let color_tag = heart_color_str.as_deref().unwrap_or("heart00");
-        // Collect target card names for the log entry so it's clear which
-        // cards received the bonus (avoids sounding like a global buff).
-        let target_names: Vec<String> = {
-            let mut names = Vec::new();
-            for &cid in &blade_targets_save {
-                if let Some(card) = gs.card_database.get_card(cid) {
-                    names.push(card.name.clone());
-                }
-            }
-            // is_all path: blade_targets_save is empty but all stage cards got the bonus
-            if names.is_empty() && is_all && (resource == "blade" || resource == "ブレード") {
-                let p = gs.resolve_target_player(&target);
-                for &cid in p.stage.stage.iter().filter(|&&c| c != -1) {
-                    if let Some(card) = gs.card_database.get_card(cid) {
-                        names.push(card.name.clone());
-                    }
-                }
-            }
-            // activating_card fallback (no blade_targets but single card got bonus)
-            if names.is_empty() {
-                if let Some(cid) = gs.activating_card {
-                    if let Some(card) = gs.card_database.get_card(cid) {
-                        names.push(card.name.clone());
-                    }
-                }
-            }
-            names
-        };
-        let target_suffix = if target_names.is_empty() {
-            String::new()
-        } else {
-            format!(" (→ {})", target_names.join(", "))
-        };
-        if resource == "heart" || resource == "ハート" {
-            gs.rule_log.push(format!(
-                "{} {}: [effect] {} {}獲得 ({}){}",
-                pp, act_name, final_count, resource_jp, color_tag, target_suffix
-            ));
-        } else {
-            gs.rule_log.push(format!(
-                "{} {}: [effect] {} {}獲得{}",
-                pp, act_name, final_count, resource_jp, target_suffix
-            ));
-        }
-
+        // Resource gain details captured in structured ability_resolution entry
         if is_temporary {
             util::push_temporary_effect(
                 gs,

@@ -1554,21 +1554,25 @@ fn parse_deck_text(content: &str) -> Vec<String> {
         .filter(|l| !l.trim().is_empty())
         .flat_map(|l| {
             let parts: Vec<&str> = l.split(" x ").collect();
-            if parts.len() != 2 {
+            if parts.len() == 2 {
+                let (card_no, quantity) = if let Ok(q) = parts[0].trim().parse::<u32>() {
+                    (parts[1].trim().to_string(), q)
+                } else if let Ok(q) = parts[1].trim().parse::<u32>() {
+                    (parts[0].trim().to_string(), q)
+                } else {
+                    return Vec::new();
+                };
+                if card_no.contains('-') {
+                    return std::iter::repeat_n(card_no, quantity as usize).collect();
+                }
                 return Vec::new();
             }
-            let (card_no, quantity) = if let Ok(q) = parts[0].trim().parse::<u32>() {
-                (parts[1].trim().to_string(), q)
-            } else if let Ok(q) = parts[1].trim().parse::<u32>() {
-                (parts[0].trim().to_string(), q)
-            } else {
-                return Vec::new();
-            };
+            // Single card per line (quantity = 1)
+            let card_no = l.trim();
             if card_no.contains('-') {
-                std::iter::repeat_n(card_no, quantity as usize).collect()
-            } else {
-                Vec::new()
+                return vec![card_no.to_string()];
             }
+            Vec::new()
         })
         .collect()
 }

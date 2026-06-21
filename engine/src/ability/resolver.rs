@@ -425,6 +425,49 @@ impl AbilityResolver {
         }
     }
 
+    /// Push a structured ability_resolution log entry with the given result and items.
+    fn push_ability_result(
+        &self,
+        gs: &mut GameState,
+        result: &str,
+        items: Vec<AbilityLogItem>,
+        error: Option<&str>,
+    ) {
+        let pp = gs.player_prefix();
+        let card_id = gs.activating_card;
+        let card_name = card_id
+            .and_then(|id| gs.card_database.get_card(id))
+            .map(|c| c.name.clone())
+            .unwrap_or_default();
+        let trigger_str = self
+            .current_ability
+            .as_ref()
+            .and_then(|a| a.triggers.as_deref())
+            .unwrap_or("?");
+        let ability_text = self
+            .current_ability
+            .as_ref()
+            .map(|a| a.full_text.clone())
+            .unwrap_or_default();
+        let mut meta = serde_json::json!({
+            "result": result,
+            "items": items,
+            "ability_text": ability_text,
+        });
+        if let Some(e) = error {
+            meta["error"] = serde_json::json!(e);
+        }
+        gs.structured_log.push(LogEntry {
+            text: format!("{pp} {card_name}: 能力発動 [{trigger_str}] — {}", result),
+            turn: gs.turn_number,
+            player_label: pp.clone(),
+            source_card_id: card_id,
+            source_card_name: Some(card_name),
+            category: "ability_resolution".to_string(),
+            metadata: Some(meta),
+        });
+    }
+
     pub fn resolve_ability(
         &mut self,
         gs: &mut GameState,
@@ -454,7 +497,6 @@ impl AbilityResolver {
         }
 
         dbg.ability(&card_name, &card_no, &card_id_str, ability);
-        let trigger_str = ability.triggers.as_deref().unwrap_or("?").to_string();
 
         // Check use_limit before cost, but don't insert until after effect runs
         let ability_key = activating_card
@@ -586,12 +628,19 @@ impl AbilityResolver {
                         if ability.triggers.as_deref() != Some(crate::triggers::ACTIVATION)
                             && ability.triggers.as_deref() != Some(crate::triggers::DEBUT)
                         {
-                            let pp = gs.player_prefix();
+                            let pp2 = gs.player_prefix();
                             gs.rule_log.push(format!(
-                                "{pp} {card_name}: 位置条件不成立 ({kw:?}) - スキップ"
+                                "{pp2} {card_name}: 位置条件不成立 ({kw:?}) - スキップ"
                             ));
                         }
                         dbg.p("RESULT", "position requirement not met — effect skipped");
+                        // Flush structured log for non-auto position failures
+                        if ability.triggers.as_deref() == Some(crate::triggers::ACTIVATION)
+                            || ability.triggers.as_deref() == Some(crate::triggers::DEBUT)
+                        {
+                            let items = drain_verdicts();
+                            self.push_ability_result(gs, "position_fail", items, None);
+                        }
                         return Ok(());
                     }
                 }
@@ -627,7 +676,6 @@ impl AbilityResolver {
             // Check the effect's condition BEFORE executing. The condition must
             // be met in the current game state (after cost payment). This prevents
             // effects like "choice" from being shown when the condition fails.
-            let pp = gs.player_prefix();
             if effect.condition.is_some() || effect.activation_condition_parsed.is_some() {
                 let passed = self.can_activate_effect(gs, effect);
                 if !passed {
@@ -644,33 +692,15 @@ impl AbilityResolver {
                         }
                     }
                     dbg.p("RESULT", "effect condition not met — skipped");
-                    // Flush structured log for condition failure
-                    let fail_items = drain_verdicts();
-                    if !fail_items.is_empty() {
-                        let act_name = gs
-                            .activating_card
-                            .and_then(|id| gs.card_database.get_card(id))
-                            .map(|c| c.name.clone());
-                        gs.structured_log.push(LogEntry {
-                            text: format!("{pp} {card_name}: 能力発動 [{trigger_str}] — failure"),
-                            turn: gs.turn_number,
-                            player_label: pp.clone(),
-                            source_card_id: gs.activating_card,
-                            source_card_name: act_name,
-                            category: "ability_resolution".to_string(),
-                            metadata: Some(serde_json::json!({
-                                "result": "failure",
-                                "items": fail_items,
-                            })),
-                        });
-                    }
+                    let items = drain_verdicts();
+                    self.push_ability_result(gs, "failure", items, None);
                     return Ok(());
                 }
             }
             if let Err(e) = self.execute_effect(gs, effect) {
-                gs.rule_log
-                    .push(format!("{pp} {card_name}: 効果失敗 ✗ ({e})"));
                 dbg.p("RESULT", format_args!("EFFECT FAILED: {}", e));
+                let items = drain_verdicts();
+                self.push_ability_result(gs, "failure", items, Some(&e));
                 return Err(e);
             }
             log::debug!(
@@ -722,28 +752,9 @@ impl AbilityResolver {
                 self.store_pending_choice(gs);
                 return Ok(());
             }
-            gs.rule_log.push(format!("{pp} {card_name}: 効果適用 ✓"));
             dbg.p("RESULT", "effect applied ✓");
-            // Flush structured ability log
             let items = drain_verdicts();
-            if !items.is_empty() {
-                let act_name = gs
-                    .activating_card
-                    .and_then(|id| gs.card_database.get_card(id))
-                    .map(|c| c.name.clone());
-                gs.structured_log.push(LogEntry {
-                    text: format!("{pp} {card_name}: 能力発動 [{trigger_str}] — success"),
-                    turn: gs.turn_number,
-                    player_label: pp.clone(),
-                    source_card_id: gs.activating_card,
-                    source_card_name: act_name,
-                    category: "ability_resolution".to_string(),
-                    metadata: Some(serde_json::json!({
-                        "result": "success",
-                        "items": items,
-                    })),
-                });
-            }
+            self.push_ability_result(gs, "success", items, None);
         }
 
         if !cost_already_paid {
