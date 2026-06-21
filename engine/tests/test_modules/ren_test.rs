@@ -241,6 +241,72 @@ fn ren_ab1_triggers_after_mill_pay_cost_recover_card() {
     );
 }
 
+/// Ab#1: Mill 3 different cards, verify the selection offers all 3 positions,
+/// then recover a specific card and confirm it's the right one.
+#[test]
+fn ren_ab1_mill_3_recover_specific_card() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let ren = game.id("PL!SP-bp5-005-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD");
+    // A named card we can identify after recovery
+    let chisato = game.id("PL!SP-bp2-003-R");
+
+    game.state.player1.stage.stage[1] = ren;
+    game.give_energy(5);
+
+    // Deck top: [chisato, filler, filler, ...]
+    game.state.player1.main_deck.cards.insert(0, filler);
+    game.state.player1.main_deck.cards.insert(0, filler);
+    game.state.player1.main_deck.cards.insert(0, chisato);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+
+    TurnEngine::execute_main_phase_action(
+        &mut game.state,
+        &ActionType::UseAbility,
+        Some(ren),
+        None,
+        None,
+        None,
+    )
+    .expect("Activate ab#0");
+
+    // Ab#1 should trigger → optional cost prompt → pay
+    if game.has_pending_choice() {
+        let ct = game.pending_choice_type().unwrap_or_default();
+        if ct == "SelectTarget" {
+            game.select_option(1);
+        }
+    }
+    // SelectCard: pick chisato (the milled card we want)
+    let hand_before = game.state.player1.hand.cards.len();
+    while game.has_pending_choice() {
+        let ct = game.pending_choice_type().unwrap_or_default();
+        match ct.as_str() {
+            "SelectCard" => {
+                game.select_indices(&[0]);
+            }
+            "SelectTarget" => game.select_option(0),
+            _ => break,
+        }
+    }
+
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before + 1,
+        "1 card recovered"
+    );
+    // Verify it's chisato — the first card milled (deck top = last discard)
+    assert_eq!(
+        game.state.player1.hand.cards.last(),
+        Some(&chisato),
+        "Should have recovered chisato (the first-milled card, index 0 in choice)"
+    );
+}
+
 /// Ab#1: Decline the optional cost, no card recovered (per Q233).
 #[test]
 fn ren_ab1_decline_cost_no_recovery() {
@@ -373,10 +439,12 @@ fn ren_ab1_card_type_catch_all_matches_any_card() {
     game.state.trigger_auto_abilities_for_player("p1");
     game.state.process_pending_auto_abilities("p1");
 
+    // Ab#1 triggers: pay optional cost → choose 1 of 3 cards to recover
     while game.has_pending_choice() {
         match game.pending_choice_type().as_deref() {
             Some("SelectAutoAbility") => game.select_indices(&[0]),
-            Some("SelectTarget") => game.select_option(1),
+            Some("SelectTarget") => game.select_option(1), // pay 1 energy
+            Some("SelectCard") => game.select_indices(&[0]), // pick first card
             _ => break,
         }
     }
@@ -385,6 +453,12 @@ fn ren_ab1_card_type_catch_all_matches_any_card() {
         game.state.player1.hand.cards.len(),
         1,
         "card_type='card' catch-all → 1 recovered"
+    );
+    // Verify the choice included all 3 discard positions, not just 1
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        2,
+        "2 of the 3 energy cards should remain in waitroom"
     );
 }
 

@@ -482,17 +482,22 @@ impl AbilityResolver {
                         // Q252: more matching cards than count, player chooses which one.
                         // Directly create a SelectCard choice restricted to the
                         // trigger_moved_cards' positions in the waitroom.
-                        // For all other destinations, take the first `count` directly.
-                        // This keeps Ren (hand destination) working with the old behavior:
                         let player = if use_p2 {
                             &mut gs.player2
                         } else {
                             &mut gs.player1
                         };
-                        let filtered_indices: Vec<usize> = all_matching
-                            .iter()
-                            .filter_map(|&cid| player.waitroom.cards.iter().position(|&c| c == cid))
-                            .collect();
+                        let filtered_indices: Vec<usize> = {
+                            let mut indices = Vec::new();
+                            for &cid in &all_matching {
+                                for (i, &wc) in player.waitroom.cards.iter().enumerate() {
+                                    if wc == cid && !indices.contains(&i) {
+                                        indices.push(i);
+                                    }
+                                }
+                            }
+                            indices
+                        };
                         let description = card_type_filter
                             .and_then(|_| group_name)
                             .map(|g| format!("Select 1 {g} card to place on deck"))
@@ -507,24 +512,43 @@ impl AbilityResolver {
                         );
                         return Ok(vec![]);
                     } else {
-                        // More matching than count for a non-Q252 destination.
-                        // Take the first `count` directly (pre-existing behavior).
-                        let found = all_matching[..count as usize].to_vec();
-                        if !effect.optional.unwrap_or(false) {
-                            let player = if use_p2 {
-                                &mut gs.player2
-                            } else {
-                                &mut gs.player1
-                            };
-                            for &cid in &found {
-                                if let Some(pos) =
-                                    player.waitroom.cards.iter().position(|&c| c == cid)
-                                {
-                                    player.waitroom.cards.remove(pos);
+                        // More matching than count — player must choose which cards.
+                        // Show a SelectCard choice restricted to the trigger_moved_cards'
+                        // positions in the waitroom, regardless of destination.
+                        let player = if use_p2 {
+                            &mut gs.player2
+                        } else {
+                            &mut gs.player1
+                        };
+                        let filtered_indices: Vec<usize> = {
+                            let mut indices = Vec::new();
+                            for &cid in &all_matching {
+                                for (i, &wc) in player.waitroom.cards.iter().enumerate() {
+                                    if wc == cid && !indices.contains(&i) {
+                                        indices.push(i);
+                                    }
                                 }
                             }
-                        }
-                        return Ok(found);
+                            indices
+                        };
+                        let description = card_type_filter
+                            .and_then(|_| group_name)
+                            .map(|g| format!("Select {count} {g} card(s)"))
+                            .unwrap_or_else(|| "Select card(s)".to_string());
+                        self.pending_choice = Some(
+                            Choice::select_cards(
+                                Zone::Discard.to_str(),
+                                count,
+                                description,
+                                effect.optional.unwrap_or(false),
+                            )
+                            .card_type(card_type_filter.map(|s| s.to_string()))
+                            .group(group_name.map(|s| s.to_string()))
+                            .filtered_indices(Some(filtered_indices))
+                            .target_player_id(Some("self".to_string()))
+                            .build(),
+                        );
+                        return Ok(vec![]);
                     }
                 }
             }
