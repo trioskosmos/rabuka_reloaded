@@ -726,7 +726,17 @@ fn filter_display_for_player(
         }
     }
 
-    // 3. If the pending choice is routed to a player different from the requester,
+    // 3. Hide opponent's RPS choice until resolution is complete
+    //    (prevents P2 from seeing P1's choice before submitting their own).
+    if game_state.rps_winner.is_none() {
+        if requester_player_id == 0 {
+            display.player2_rps_choice = None;
+        } else {
+            display.player1_rps_choice = None;
+        }
+    }
+
+    // 4. If the pending choice is routed to a player different from the requester,
     //    remove the entire pending_choice so the opponent's card data doesn't leak.
     if let Some(ref pending) = display.pending_choice {
         let cpid = pending.get("choice_player_id").and_then(|v| v.as_str());

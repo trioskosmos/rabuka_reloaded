@@ -1879,7 +1879,6 @@ impl AbilityResolver {
             Some(Zone::Hand)
             | Some(Zone::Discard)
             | Some(Zone::Deck)
-            | Some(Zone::SuccessLiveZone)
             | Some(Zone::LiveCardZone) => {
                 if Zone::from_str(dest) == Some(Zone::Stage) {
                     let player = gs.resolve_target_player(&target);
@@ -2039,9 +2038,7 @@ impl AbilityResolver {
                             }
                         }
                         let player = gs.resolve_target_player_mut(&target);
-                        eprintln!("[MOVE_BEFORE] target={} zone={} dest={} success_before={:?} discard_before={:?}", target, zone, dest, player.success_live_card_zone.cards, player.waitroom.cards);
-                        let mc = util::move_cards(player, &card_ids, zone, dest, None, &card_db);
-                        eprintln!("[MOVE_DEBUG] zone={} dest={} card_ids={:?} moved_count={} zone_after={:?}", zone, dest, card_ids, mc, player.success_live_card_zone.cards);
+                        util::move_cards(player, &card_ids, zone, dest, None, &card_db);
                         moved = card_ids;
                     }
                 }

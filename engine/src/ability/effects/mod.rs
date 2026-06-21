@@ -192,7 +192,7 @@ impl AbilityResolver {
             }
         }
 
-        match action_type {
+        let result = match action_type {
             ActionType::Sequential => self.execute_sequential_effect(
                 gs,
                 effect,
@@ -777,6 +777,33 @@ impl AbilityResolver {
                 self.execute_perform_yell(gs, count, effect.target_name());
                 Ok(())
             }
+        };
+        // Push effect verdict for non-structural action types
+        const SKIP: &[&str] = &[
+            "compound_action",
+            "sequential",
+            "choice",
+            "conditional_alternative",
+            "conditional_on_result",
+            "conditional_on_optional",
+        ];
+        if !SKIP.contains(&effect.action.as_str()) {
+            let val = effect
+                .count
+                .or(effect.value)
+                .map(|v| v.to_string())
+                .unwrap_or_default();
+            let details = if !val.is_empty() {
+                format!("{} {}", effect.action, val)
+            } else {
+                effect.action.clone()
+            };
+            crate::ability::log::push_verdict(crate::ability::log::AbilityLogItem::Effect {
+                text: effect.text.clone(),
+                action: effect.action.clone(),
+                details,
+            });
         }
+        result
     }
 }

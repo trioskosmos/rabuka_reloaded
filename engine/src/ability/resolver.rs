@@ -1,6 +1,6 @@
 use super::debug::AbDebug;
 use super::enums::Zone;
-use super::log::{drain_verdicts, AbilityLogItem};
+use super::log::{drain_verdicts, push_verdict, AbilityLogItem};
 use super::types::{
     AbilityTraceNode, Choice, EffectPipeline, EffectSpawnContext, ExecutionContext, StepState,
     ZoneSnapshot,
@@ -554,6 +554,20 @@ impl AbilityResolver {
                     return Err(e);
                 }
                 dbg.p("RESULT", "cost paid ✓");
+                let cost_desc = format!(
+                    "{}: {}→{} {}",
+                    cost.action,
+                    cost.source.as_deref().unwrap_or("?"),
+                    cost.destination.as_deref().unwrap_or("?"),
+                    cost.count.unwrap_or(cost.energy_count.unwrap_or(1))
+                );
+                push_verdict(AbilityLogItem::Cost {
+                    text: cost.text.clone(),
+                    expectation: cost_desc,
+                    actual: "支払済".into(),
+                    passed: true,
+                    optional: cost.optional.unwrap_or(false),
+                });
             }
         }
 

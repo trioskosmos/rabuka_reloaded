@@ -121,10 +121,10 @@ export const GameService = {
 
             if (data.frame_counter !== undefined) {
                 GameService._lastKnownVersion = data.frame_counter;
+                State._frameCounter = data.frame_counter;
             }
             updateStateData(data);
             State.gameHasStarted = true;
-            State.fetchFrameCounter();
             GameService.startGameplayPolling();
 
         } catch (e) {
@@ -178,6 +178,7 @@ export const GameService = {
             }
         }
 
+        const actionStart = performance.now();
         try {
             const headers = networkFacade?.getHeaders ? networkFacade.getHeaders() : { 'Content-Type': 'application/json' };
             const res = await fetch('api/execute-action', {
@@ -201,8 +202,11 @@ export const GameService = {
             }
 
             const data = await res.json();
+            if (data.frame_counter !== undefined) {
+                State._frameCounter = data.frame_counter;
+            }
+            State._actionLatency = Math.round(performance.now() - actionStart);
             updateStateData(data);
-            State.fetchFrameCounter();
             log('Action completed');
 
         } catch (e) {
@@ -252,7 +256,7 @@ export const GameService = {
 
             updateStateData(data);
             window.lastShownPerformanceHash = "";
-            State.fetchFrameCounter();
+            if (data.frame_counter !== undefined) State._frameCounter = data.frame_counter;
             log('New game started');
             if (networkFacade?.fetchState) await networkFacade.fetchState();
         } catch (e) {

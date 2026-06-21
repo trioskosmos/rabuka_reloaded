@@ -19,18 +19,6 @@
     <!-- Floating Tooltip -->
     <div id="floating-tooltip" class="floating-tooltip" style="display: none;"></div>
 
-    <!-- Permanent Debug Overlay (Phase 4) -->
-    <div id="debug-overlay" class="debug-overlay">
-        <div>ROOM: <span id="debug-room">---</span></div>
-        <div>SESS: <span id="debug-session">---</span></div>
-        <div>VIEW: <span id="debug-view">---</span></div>
-        <div>POLL: <span id="debug-poll">0</span></div>
-        <div>DLAY: <span id="debug-delay">---</span></div>
-        <div>SYNC: <span id="debug-sync" style="font-weight:bold;">???</span></div>
-        <div id="debug-error-panel" class="debug-error-panel" style="display: none;">ERR:
-            <span id="debug-error-msg"></span>
-        </div>
-    </div>
 
     <button id="mobile-toggle-log" data-action="toggle-log-sidebar" class="mobile-toggle-btn">
         <span class="icon">📋</span>
@@ -57,7 +45,9 @@
                 <span class="stat" title="System Status" style="display: none;"><span class="stat-icon"></span> <strong
                         id="system-status-badge" class="debug-badge" data-i18n="checking">Checking...</strong></span>
                 <span class="stat"><span class="stat-icon">#</span> <strong
-                        id="frame-counter">0</strong></span>
+                        id="frame-counter" title="Frame">0</strong>
+                    <span class="stat-separator"></span>
+                    <span class="stat-icon">⏱</span> <strong id="action-latency" title="Last action latency">---</strong></span>
             </div>
 
             <!-- Group: Turn & Phase -->

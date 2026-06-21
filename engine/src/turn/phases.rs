@@ -1,5 +1,6 @@
 use crate::constants::MAX_LIVE_CARDS;
 use crate::game_state::{GameState, Phase};
+use crate::types::LogEntry;
 
 impl super::TurnEngine {
     pub fn advance_phase(game_state: &mut GameState) {
@@ -785,6 +786,37 @@ impl super::TurnEngine {
         Self::resolve_rps_if_both_chosen(game_state)
     }
 
+    fn rps_choice_name(choice: i32) -> &'static str {
+        match choice {
+            0 => "グー",
+            1 => "チョキ",
+            2 => "パー",
+            _ => "?",
+        }
+    }
+
+    fn push_rps_log(game_state: &mut GameState, p1: i32, p2: i32, winner_str: &str) {
+        let p1_name = Self::rps_choice_name(p1);
+        let p2_name = Self::rps_choice_name(p2);
+        let text = format!("P1: {} vs P2: {} → {}", p1_name, p2_name, winner_str);
+        game_state.rule_log.push(text.clone());
+        game_state.structured_log.push(LogEntry {
+            text,
+            turn: game_state.turn_number,
+            player_label: "SYSTEM".into(),
+            source_card_id: None,
+            source_card_name: None,
+            category: "rps".into(),
+            metadata: Some(serde_json::json!({
+                "p1_choice": Self::rps_choice_name(p1),
+                "p2_choice": Self::rps_choice_name(p2),
+                "p1_value": p1,
+                "p2_value": p2,
+                "winner": winner_str,
+            })),
+        });
+    }
+
     fn resolve_rps_if_both_chosen(game_state: &mut GameState) -> Result<(), String> {
         let p1_choice = match game_state.player1_rps_choice {
             Some(c) => c,
@@ -796,9 +828,16 @@ impl super::TurnEngine {
         };
 
         let rps_winner = match (p1_choice, p2_choice) {
-            (0, 2) | (1, 0) | (2, 1) => 1,
-            (2, 0) | (0, 1) | (1, 2) => 2,
+            (0, 2) | (1, 0) | (2, 1) => {
+                Self::push_rps_log(game_state, p1_choice, p2_choice, "P1の勝利");
+                1
+            }
+            (2, 0) | (0, 1) | (1, 2) => {
+                Self::push_rps_log(game_state, p1_choice, p2_choice, "P2の勝利");
+                2
+            }
             _ => {
+                Self::push_rps_log(game_state, p1_choice, p2_choice, "引き分け　再選択");
                 game_state.player1_rps_choice = None;
                 game_state.player2_rps_choice = None;
                 return Ok(());

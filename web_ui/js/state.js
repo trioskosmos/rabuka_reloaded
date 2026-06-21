@@ -69,21 +69,7 @@ const stateInternal = {
     showMulliganReturn: false,
 
     _frameCounter: 0,
-
-    fetchFrameCounter: async () => {
-        try {
-            const res = await fetch('api/debug/frames');
-            if (!res.ok) return;
-            const data = await res.json();
-            if (data.success) {
-                State._frameCounter = data.current_frame ?? 0;
-                if (State.data) {
-                    State.data._frameCounter = State._frameCounter;
-                }
-                State.emit('frame-counter-updated');
-            }
-        } catch (e) { /* silent */ }
-    },
+    _actionLatency: -1,
 
     updateUiConfig: async (changes) => {
         if (!State.data) State.data = {};
