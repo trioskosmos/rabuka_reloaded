@@ -4,7 +4,7 @@
 /// Ability activation trigger: "起動" — player-initiated, once per turn
 pub const ACTIVATION: &str = "起動";
 /// Auto trigger: "自動" — fires automatically when its condition is met.
-/// Sub-types are distinguished by trigger_condition.text keywords and
+/// Sub-types are distinguished by condition.text keywords and
 /// evaluated via the each_time watcher system or the main auto scan.
 pub const AUTO: &str = "自動";
 /// Constant trigger: "常時" — always-active passive modifier
@@ -23,7 +23,7 @@ pub const DEBUT_EN: &str = "Debut";
 pub const LIVE_SUCCESS_EN: &str = "live_success";
 
 // Each_time watcher trigger substrings — these are matched against
-// trigger_condition.text in each_time abilities on live cards.
+// condition.text in each_time abilities on live cards.
 // The text must CONTAIN the substring for the watcher to fire.
 //
 // Jidou auto trigger types parsed from abilities.json (17 sub-types):

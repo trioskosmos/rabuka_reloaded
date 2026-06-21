@@ -211,21 +211,21 @@ impl super::TurnEngine {
                         if effect.trigger_type.as_deref() != Some("each_time") {
                             continue;
                         }
-                        let watch_text = match &effect.trigger_condition {
+                        let watch_text = match &effect.condition {
                             Some(c) => &c.text,
                             None => &effect.text,
                         };
                         if !watch_text.contains(trigger_substring) {
                             continue;
                         }
-                        // Evaluate trigger_condition before enqueuing.
+                        // Evaluate condition before enqueuing.
                         // For example, an each_time:discard ability with
                         // "このメンバーがステージから控え室に置かれたとき" must
                         // verify via recently_moved_cards that a card actually
                         // moved to discard before this each_time fires.
-                        if let Some(ref trigger_cond) = effect.trigger_condition {
+                        if let Some(ref cond) = effect.condition {
                             let ctx = crate::ability::condition::ConditionContext::new(game_state);
-                            if !ctx.evaluate_condition(trigger_cond) {
+                            if !ctx.evaluate_condition(cond) {
                                 continue;
                             }
                         }

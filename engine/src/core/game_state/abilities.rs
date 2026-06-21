@@ -148,9 +148,10 @@ impl GameState {
     /// Guards against triggering discard-location abilities when the card isn't in discard.
     ///
     /// Trigger types scanned:
-    ///   Stage cards: all 17 jidou sub-types that have trigger_condition set.
-    ///     Includes each_time triggers on stage cards (e.g. Ren:discard, Natsumi:area_move).
-    ///     trigger_condition evaluated with recently_moved_cards context (P1 fix).
+    ///   Stage cards: all auto abilities.  The `condition` field is evaluated
+    ///     during scanning for movement/appearance sub-types to ensure the
+    ///     triggering event has actually occurred ("このメンバーがエリアを移動したとき"
+    ///     should not queue if the card hasn't moved).
     ///   Live cards: non-each_time auto abilities only.
     ///     each_time live card abilities handled by trigger_each_time_abilities().
     ///
@@ -160,6 +161,47 @@ impl GameState {
     ///   - execute_performance_phase() for yell/performance triggers (line ~350)
     ///   - debut placement in phases.rs
     ///   - state change effects in effects/state.rs
+    /// Check if a condition describes an event that can be evaluated at
+    /// scanning time.  Event-based conditions depend on tracking flags
+    /// (recently_moved_cards, cards_moved_this_turn, cards_appeared_this_turn)
+    /// that are set before TAS runs.  Other types (state, position, group,
+    /// comparison) depend on game state that may change between TAS and
+    /// ability resolution, so they are deferred.
+    fn condition_is_event_based(condition: &crate::card::Condition) -> bool {
+        let movement = condition.movement.as_deref();
+        // All movement types ("moved" and "moves") are event-based.
+        // "moved" → card has already moved (can be checked now).
+        // "moves" → card is / was moving (checkable because we set
+        //   activating_card to the scanned card, and cards_moved_this_turn
+        //   is persistent across the turn).
+        if movement == Some("moved") || movement == Some("moves") {
+            return true;
+        }
+        // Appearance
+        if matches!(
+            condition.condition_type,
+            Some(crate::ability::enums::ConditionType::AppearanceCondition)
+        ) {
+            return true;
+        }
+        // card_count with preceding_moved (tracks recently_moved_cards)
+        if matches!(
+            condition.condition_type,
+            Some(crate::ability::enums::ConditionType::CardCountCondition)
+        ) && condition.source.as_deref() == Some("preceding_moved")
+        {
+            return true;
+        }
+        // Recurse into compound conditions — if any child is event-based,
+        // the whole compound is pre-filtered.
+        if let Some(ref children) = condition.conditions {
+            if children.iter().any(Self::condition_is_event_based) {
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn trigger_auto_abilities_for_player(&mut self, player_id: &str) {
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();
@@ -189,15 +231,22 @@ impl GameState {
                                     .load(std::sync::atomic::Ordering::Relaxed)
                                 {
                                     eprintln!(
-                                        "[TAS] scanning trigger={:?} has_trigger_cond={} cond={}",
+                                        "[TAS] scanning trigger={:?} cond={}",
                                         ability.triggers,
-                                        effect.trigger_condition.is_some(),
-                                        effect.condition.is_some()
+                                        effect.condition.is_some(),
                                     );
                                 }
                                 if let Some(ref condition) = effect.condition {
-                                    if Zone::from_str(condition.location.as_deref().unwrap_or(""))
-                                        == Some(Zone::Discard)
+                                    // Guard: skip discard-location abilities when the
+                                    // card is on stage (prevents premature triggering
+                                    // of "this card is in discard" abilities).
+                                    // BUT: skip this guard for "preceding_moved"
+                                    // watchers — those track OTHER cards moving to
+                                    // discard, not the card itself being in discard.
+                                    if condition.source.as_deref() != Some("preceding_moved")
+                                        && Zone::from_str(
+                                            condition.location.as_deref().unwrap_or(""),
+                                        ) == Some(Zone::Discard)
                                         && (condition.card_type.as_deref() == Some("member_card")
                                             || condition.target.as_deref() == Some("self"))
                                     {
@@ -209,62 +258,21 @@ impl GameState {
                                         }
                                     }
                                 }
-                                // Evaluate trigger_condition (e.g. "このメンバーがエリアを移動する"
-                                // for each-time triggers). If not met, skip.
-                                if let Some(ref trigger_cond) = effect.trigger_condition {
-                                    let moved: &[i16] =
-                                        self.recently_moved_cards.as_deref().unwrap_or(&[]);
-                                    // Temporarily set activating_card so position-based
-                                    // checks (center, left, right) in appearance_condition
-                                    // can match the current card during scanning.
-                                    let saved_activating = self.activating_card;
-                                    self.activating_card = Some(card_id);
-                                    let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, moved);
-                                    let passes = ctx.evaluate_condition(trigger_cond);
-                                    if crate::ability::debug::ABILITY_DEBUG
-                                        .load(std::sync::atomic::Ordering::Relaxed)
-                                    {
-                                        eprintln!(
-                                            "[TRIGGER_COND] card={} cond_type={:?} source={:?} passes={}",
-                                            card.name, trigger_cond.condition_type, trigger_cond.source, passes
-                                        );
-                                    }
-                                    self.activating_card = saved_activating;
-                                    if !passes {
-                                        continue;
-                                    }
-                                    // Heuristic guard: each_time abilities whose
-                                    // trigger_condition is a comparison on energy_zone
-                                    // should also require that energy was actually
-                                    // placed by an effect (the flag is consumed after
-                                    // every TAS scan to prevent re-triggering on stale
-                                    // comparisons like "energy_zone >= 0").
-                                    if effect.trigger_type.as_deref() == Some("each_time") {
-                                        if trigger_cond.condition_type
-                                            == Some(crate::ability::enums::ConditionType::ComparisonCondition)
-                                            && trigger_cond.location.as_deref() == Some("energy_zone")
-                                            && !self.last_energy_placed_by_effect
-                                        {
-                                            continue;
-                                        }
-                                    }
-                                }
-                                // Pre-filter: evaluate past-tense movement conditions
-                                // ("moved") during scanning to prevent queuing auto
-                                // abilities whose trigger event hasn't occurred.
-                                // E.g. "このメンバーがエリアを移動したとき" should NOT
-                                // queue if the card hasn't moved yet.
-                                // We do NOT pre-filter "moves" (present tense) because
-                                // those fire DURING position change — the card hasn't
+                                // Pre-filter: evaluate conditions during scanning
+                                // to prevent queuing auto abilities whose trigger
+                                // event hasn't occurred.  Only pre-filter event-
+                                // based condition types:
+                                //   - past-tense movement ("moved")
+                                //   - appearance
+                                //   - card_count with source=preceding_moved
+                                // Present-tense "moves" is excluded because those
+                                // fire DURING position change — the card hasn't
                                 // moved yet at TAS scan time.
+                                // Other types (state, position, group, comparison)
+                                // are safe to defer to resolution time.
                                 if let Some(ref condition) = effect.condition {
-                                    let movement = condition.movement.as_deref();
-                                    let is_past_movement = movement == Some("moved");
-                                    let is_appearance = matches!(
-                                    condition.condition_type,
-                                    Some(crate::ability::enums::ConditionType::AppearanceCondition)
-                                );
-                                    if is_past_movement || is_appearance {
+                                    let can_prefilter = Self::condition_is_event_based(condition);
+                                    if can_prefilter {
                                         let moved: &[i16] =
                                             self.recently_moved_cards.as_deref().unwrap_or(&[]);
                                         let saved_activating = self.activating_card;
@@ -281,6 +289,22 @@ impl GameState {
                                             );
                                         }
                                         if !passes {
+                                            continue;
+                                        }
+                                    }
+                                    // Heuristic guard: each_time abilities whose
+                                    // condition is a comparison on energy_zone must
+                                    // also require energy was placed by a card effect
+                                    // (the flag is consumed after every TAS scan to
+                                    // prevent re-triggering on stale comparisons
+                                    // like "energy_zone >= 0" during phase-based
+                                    // energy placement).
+                                    if effect.trigger_type.as_deref() == Some("each_time") {
+                                        if condition.condition_type
+                                            == Some(crate::ability::enums::ConditionType::ComparisonCondition)
+                                            && condition.location.as_deref() == Some("energy_zone")
+                                            && !self.last_energy_placed_by_effect
+                                        {
                                             continue;
                                         }
                                     }
@@ -316,30 +340,16 @@ impl GameState {
                             .is_some_and(|t| t == crate::triggers::AUTO)
                         {
                             if let Some(ref effect) = ability.effect {
-                                // For each_time abilities, skip the trigger_condition
-                                // pre-filter here — they are handled by dedicated
-                                // trigger functions (trigger_live_start_abilities etc.)
-                                // that fire them per matching member.
+                                // For each_time abilities on live cards, skip the
+                                // condition pre-filter — they are handled by
+                                // dedicated trigger functions that fire per event.
                                 if effect.trigger_type.as_deref() == Some("each_time") {
                                     continue;
                                 }
-                                if let Some(ref trigger_cond) = effect.trigger_condition {
-                                    let moved: &[i16] =
-                                        self.recently_moved_cards.as_deref().unwrap_or(&[]);
-                                    let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, moved);
-                                    if !ctx.evaluate_condition(trigger_cond) {
-                                        continue;
-                                    }
-                                }
-                                // Same pre-filter for live cards: only past-tense "moved"
+                                // Same pre-filter for live cards — uses the same
+                                // event-based condition check.
                                 if let Some(ref condition) = effect.condition {
-                                    let movement = condition.movement.as_deref();
-                                    let is_past_movement = movement == Some("moved");
-                                    let is_appearance = matches!(
-                                        condition.condition_type,
-                                        Some(crate::ability::enums::ConditionType::AppearanceCondition)
-                                    );
-                                    if is_past_movement || is_appearance {
+                                    if Self::condition_is_event_based(condition) {
                                         let moved: &[i16] =
                                             self.recently_moved_cards.as_deref().unwrap_or(&[]);
                                         let saved_activating = self.activating_card;
@@ -548,7 +558,7 @@ impl GameState {
                     if effect.trigger_type.as_deref() != Some("each_time") {
                         continue;
                     }
-                    let watch_text = match &effect.trigger_condition {
+                    let watch_text = match &effect.condition {
                         Some(c) => &c.text,
                         None => &effect.text,
                     };

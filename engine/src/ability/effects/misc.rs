@@ -1891,12 +1891,19 @@ impl AbilityResolver {
                 player.stage.stage[current_idx],
             );
             if player.stage.position_change(from_area, to_area).is_ok() {
-                let moved = gs.recently_moved_cards.get_or_insert_with(Vec::new);
-                if target_id != -1 {
-                    moved.push(target_id);
+                let moved_ids = [target_id, source_id];
+                {
+                    let moved = gs.recently_moved_cards.get_or_insert_with(Vec::new);
+                    for &cid in &moved_ids {
+                        if cid != -1 {
+                            moved.push(cid);
+                        }
+                    }
                 }
-                if source_id != -1 {
-                    moved.push(source_id);
+                for &cid in &moved_ids {
+                    if cid != -1 {
+                        gs.record_card_movement(cid);
+                    }
                 }
             } else {
                 return Err(format!(

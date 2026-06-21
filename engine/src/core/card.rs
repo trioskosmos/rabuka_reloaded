@@ -946,9 +946,6 @@ pub struct AbilityEffect {
     /// Dynamic group reference (same_group_name, different_group_names)
     #[serde(default)]
     pub group_reference: Option<String>,
-    /// Conditional trigger for each_time / たび patterns (e.g. OR conditions)
-    #[serde(default)]
-    pub trigger_condition: Option<Box<Condition>>,
     /// Original blade limit filter (元々持つブレードの数)
     #[serde(default)]
     pub blade_limit: Option<u32>,

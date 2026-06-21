@@ -4760,7 +4760,20 @@ def _try_each_time(text):
             and "source" not in trigger_cond
         ):
             trigger_cond["source"] = "preceding_moved"
-        sub["trigger_condition"] = trigger_cond
+        # Merge into condition (previously trigger_condition — unified).
+        # If condition already exists (from the action part), combine via compound AND.
+        existing = sub.get("condition")
+        if existing and isinstance(existing, dict):
+            sub["condition"] = {
+                "type": "compound",
+                "operator": "and",
+                "conditions": [existing, trigger_cond],
+                "text": existing.get("text", "")
+                + "、かつ、"
+                + trigger_cond.get("text", ""),
+            }
+        else:
+            sub["condition"] = trigger_cond
     return sub
 
 
@@ -7871,8 +7884,8 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         # per-shape code paths in the engine.
         effect = _collapse_to_effect_steps(effect)
 
-        # Fill missing trigger_condition from text when trigger_condition doesn't exist
-        if not effect.get("trigger_condition"):
+        # Fill missing condition from text — unified single field
+        if not effect.get("condition"):
             txt = triggerless_text
             for sep in ["とき、", "場合、", "たび、", "なら、"]:
                 idx = txt.find(sep)
@@ -7893,59 +7906,24 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
                         continue
                     tc = parse_condition(cond_text)
                     if tc and tc.get("type") not in (None, "custom"):
-                        effect["trigger_condition"] = tc
-                        # Only overwrite condition if not already set
-                        # (e.g. _try_conditional may have set it first)
-                        if not effect.get("condition"):
-                            effect["condition"] = copy.deepcopy(tc)
+                        effect["condition"] = tc
                         break
-            if not effect.get("trigger_condition"):
-                for key in ("actions", "primary_effect", "conditional_action"):
-                    sub = effect.get(key)
-                    if isinstance(sub, dict):
-                        for ck in ("condition", "trigger_condition"):
-                            sv = sub.get(ck)
-                            if sv and isinstance(sv, dict):
-                                effect[ck] = copy.deepcopy(sv)
-                                break
-                        if effect.get("trigger_condition"):
-                            break
-                    elif isinstance(sub, list):
-                        for item in sub:
-                            if isinstance(item, dict):
-                                for ck in ("condition", "trigger_condition"):
-                                    sv = item.get(ck)
-                                    if sv and isinstance(sv, dict):
-                                        effect[ck] = copy.deepcopy(sv)
-                                        break
-                                if effect.get("trigger_condition"):
-                                    break
-                        if effect.get("trigger_condition"):
-                            break
             if not effect.get("condition"):
                 for key in ("actions", "primary_effect", "conditional_action"):
                     sub = effect.get(key)
                     if isinstance(sub, dict):
-                        for ck in ("condition", "trigger_condition"):
-                            sv = sub.get(ck)
-                            if sv and isinstance(sv, dict):
-                                effect[ck] = copy.deepcopy(sv)
-                                break
-                        if effect.get("condition") or effect.get("trigger_condition"):
+                        sv = sub.get("condition")
+                        if sv and isinstance(sv, dict):
+                            effect["condition"] = copy.deepcopy(sv)
                             break
                     elif isinstance(sub, list):
                         for item in sub:
                             if isinstance(item, dict):
-                                for ck in ("condition", "trigger_condition"):
-                                    sv = item.get(ck)
-                                    if sv and isinstance(sv, dict):
-                                        effect[ck] = copy.deepcopy(sv)
-                                        break
-                                if effect.get("condition") or effect.get(
-                                    "trigger_condition"
-                                ):
+                                sv = item.get("condition")
+                                if sv and isinstance(sv, dict):
+                                    effect["condition"] = copy.deepcopy(sv)
                                     break
-                        if effect.get("condition") or effect.get("trigger_condition"):
+                        if effect.get("condition"):
                             break
 
         # Apply activation_position from cost text to the effect
@@ -8274,12 +8252,11 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                             eff["group_names"] = gns
                     fix_stats["compound_split"] += 1
 
-        # FIX 13: Auto abilities with no condition/trigger_condition — extract from text
+        # FIX 13: Auto abilities with no condition — extract from text
         if (
             ability.get("triggers") == "自動"
             and isinstance(eff, dict)
             and not eff.get("condition")
-            and not eff.get("trigger_condition")
         ):
             for sep in ["とき、", "場合、", "たび、", "なら、"]:
                 idx = t.find(sep)
@@ -8288,34 +8265,8 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     tc = parse_condition(ct)
                     if tc and tc.get("type") not in (None, "custom"):
                         eff["condition"] = copy.deepcopy(tc)
-                        # Only set trigger_condition for card_count/preceding_moved,
-                        # which can be evaluated at scan time using recently_moved_cards.
-                        # Other types (appearance, movement, state_change) need
-                        # execution-time context and would break if pre-filtered.
-                        if (
-                            tc.get("type") == "card_count_condition"
-                            and tc.get("source") == "preceding_moved"
-                        ):
-                            eff["trigger_condition"] = tc
                         fix_stats["auto_trigger"] += 1
                         break
-
-        # FIX 13b: Auto abilities with card_count_condition/preceding_moved condition
-        # but no trigger_condition — copy condition as trigger_condition.
-        # Only applicable to card_count_condition + preceding_moved (stage→discard pattern),
-        # because only this condition type can be evaluated at scan time using
-        # recently_moved_cards. Other types (state_change, movement, appearance) need
-        # execution-time context and would break if pre-filtered at scan time.
-        if (
-            ability.get("triggers") == "自動"
-            and isinstance(eff, dict)
-            and isinstance(eff.get("condition"), dict)
-            and not eff.get("trigger_condition")
-            and eff["condition"].get("type") == "card_count_condition"
-            and eff["condition"].get("source") == "preceding_moved"
-        ):
-            eff["trigger_condition"] = copy.deepcopy(eff["condition"])
-            fix_stats["auto_trigger"] += 1
 
     # FIX 14: appearance_source — add "discard" for 控え室から登場 conditions
     def _add_appearance_source(d):

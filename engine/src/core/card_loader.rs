@@ -60,8 +60,33 @@ impl CardLoader {
         {
             // println!("Loading {} unique abilities from abilities.json", unique_abilities.len());
             for ability_entry in unique_abilities {
-                // Try to deserialize the ability directly - #[serde(default)] will handle missing fields
-                if let Ok(mut ability) = serde_json::from_value::<Ability>(ability_entry.clone()) {
+                // Merge trigger_condition into condition BEFORE deserialization,
+                // so the Rust struct only ever sees `condition`.  This avoids
+                // serde alias-vs-flatten conflicts and unifies the two fields.
+                let mut entry = ability_entry.clone();
+                if let Some(obj) = entry.as_object_mut() {
+                    if let Some(tc_val) = obj.remove("trigger_condition") {
+                        match obj.get_mut("condition") {
+                            Some(cond_val) => {
+                                // Both exist → wrap in compound AND
+                                let mut merged = serde_json::Map::new();
+                                merged.insert("type".into(), "compound".into());
+                                merged.insert("operator".into(), "and".into());
+                                merged.insert(
+                                    "conditions".into(),
+                                    serde_json::Value::Array(vec![cond_val.take(), tc_val]),
+                                );
+                                obj.insert("condition".into(), serde_json::Value::Object(merged));
+                            }
+                            None => {
+                                // Only trigger_condition exists → use as condition
+                                obj.insert("condition".into(), tc_val);
+                            }
+                        }
+                    }
+                }
+                // Try to deserialize the ability - #[serde(default)] handles missing fields
+                if let Ok(mut ability) = serde_json::from_value::<Ability>(entry) {
                     // Fix nested actions - rebuild the actions array with count set
                     if let Some(ref mut effect) = ability.effect {
                         if let Some(ref actions) = effect.compound.actions.clone() {

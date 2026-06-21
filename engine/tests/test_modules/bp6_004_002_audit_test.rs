@@ -12,12 +12,36 @@ fn fill_decks(game: &mut TestGame, filler: i16) {
 
 fn trigger_ability(game: &mut TestGame, card_id: i16, trigger_str: &str) {
     let card = game.db.get_card(card_id).unwrap();
+    eprintln!(
+        "[TRIGGER_DEBUG] card={} abilities={}",
+        card.card_no,
+        card.abilities.len()
+    );
+    for (i, a) in card.abilities.iter().enumerate() {
+        eprintln!(
+            "  ab#{}: triggers={:?} trigger_type={:?} effect={}",
+            i,
+            a.triggers,
+            a.effect.as_ref().and_then(|e| e.trigger_type.as_deref()),
+            a.effect.is_some()
+        );
+    }
     let ab = card
         .abilities
         .iter()
         .find(|a| a.triggers.as_deref() == Some(trigger_str))
         .cloned()
-        .unwrap();
+        .unwrap_or_else(|| {
+            panic!(
+                "Card {} has no ability with triggers={:?}. Available: {:?}",
+                card.card_no,
+                trigger_str,
+                card.abilities
+                    .iter()
+                    .map(|a| a.triggers.clone())
+                    .collect::<Vec<_>>()
+            )
+        });
     let pid = game.state.player1.id.clone();
     let trigger = match trigger_str {
         "登場" => rabuka_engine::core::types::AbilityTrigger::Debut,
