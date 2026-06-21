@@ -88,6 +88,52 @@ fn jellyfish_one_member_both_flags_counts_once() {
 }
 
 #[test]
+fn jellyfish_position_change_swap_creates_countable_movement() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let jellyfish = game.id("PL!SP-pb1-025-L");
+    let wakana = game.id("PL!SP-pb1-008-R");
+    let chisato = game.id("PL!SP-pb1-014-N");
+
+    fill_decks(&mut game);
+    game.add_to_hand(jellyfish);
+    game.add_to_hand(wakana);
+    game.give_energy(20);
+
+    game.state.player1.stage.stage = [chisato, -1, -1];
+
+    advance_to_live_card_set_p1(&mut game);
+
+    game.play_to_stage(wakana, MemberArea::Center);
+
+    let choice = game
+        .state
+        .ability_queue
+        .is_waiting_for_choice()
+        .cloned()
+        .expect("Area select choice should be pending after Wakana debut");
+    match &choice {
+        rabuka_engine::ability::types::Choice::SelectTarget {
+            target, options, ..
+        } => {
+            assert_eq!(target, "area_select");
+            assert!(options
+                .as_ref()
+                .map_or(false, |o| o.contains(&"left".to_string())));
+        }
+        _ => panic!("Expected SelectTarget for area_select"),
+    }
+
+    game.select_option(0);
+
+    game.set_live_card(jellyfish);
+    advance_to_live_start(&mut game);
+
+    check_heart_reduction(&game, jellyfish, -2);
+}
+
+#[test]
 fn jellyfish_mixed_qualifying_and_non_qualifying() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
@@ -169,26 +215,32 @@ fn jellyfish_three_members_all_qualify_reduce_by_3() {
 }
 
 #[test]
-fn jellyfish_member_only_moved_still_counts() {
+fn jellyfish_member_moved_by_position_change_without_appearing_this_turn_counts() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
     let jellyfish = game.id("PL!SP-pb1-025-L");
+    let wakana = game.id("PL!SP-pb1-008-R");
     let chisato = game.id("PL!SP-pb1-014-N");
+    let honoka = game.id("PL!-sd1-010-SD");
 
     fill_decks(&mut game);
     game.add_to_hand(jellyfish);
-    game.add_to_hand(chisato);
-    game.give_energy(10);
+    game.add_to_hand(wakana);
+    game.give_energy(20);
 
-    game.play_to_stage(chisato, MemberArea::Center);
+    game.state.player1.stage.stage = [chisato, -1, honoka];
 
     advance_to_live_card_set_p1(&mut game);
+
+    game.play_to_stage(wakana, MemberArea::Center);
+
+    game.select_option(0);
 
     game.set_live_card(jellyfish);
     advance_to_live_start(&mut game);
 
-    check_heart_reduction(&game, jellyfish, -1);
+    check_heart_reduction(&game, jellyfish, -2);
 }
 
 #[test]
