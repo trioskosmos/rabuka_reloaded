@@ -2118,6 +2118,13 @@ impl super::resolver::AbilityResolver {
                 // Clear old choice metadata so the destination choice can set fresh routing.
                 self.clear_choice_meta(gs);
                 modified.target_member = Some("this_member".to_string());
+                // Source was already filtered by group_names during source selection;
+                // clear it so destinations aren't restricted to the same group.
+                // Also clear exclude_self since entry_effect() returns the choice-level
+                // effect which may have exclude_self set — that constraint only applies
+                // to member targeting, not destination selection.
+                modified.group_names = None;
+                modified.exclude_self = None;
                 if let Err(e) =
                     self.execute_position_change(gs, &modified, None, &target_str, "this_member")
                 {

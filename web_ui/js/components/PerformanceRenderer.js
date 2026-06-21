@@ -346,7 +346,7 @@ function renderPerfSteps(result) {
     const fmtHShortReq = (arr) => arr ? arr.map((v,i) => v > 0 ? `<img src="${i === 0 ? 'img/texticon/heart_00.png' : `img/texticon/heart_0${i}.png`}" class="heart-mini-icon">${v}` : '').join('') : '';
     const fmtHShortSrc = (arr) => arr ? arr.map((v,i) => v > 0 ? `<img src="img/texticon/heart_0${i}.png" class="heart-mini-icon">${v}` : '').join('') : '';
 
-    const totalBlades = (result.member_contributions || []).reduce((s, m) => s + m.base_blades + m.bonus_blades, 0);
+    const totalBlades = (result.member_contributions || []).reduce((s, m) => m.is_wait ? s : s + m.base_blades + m.bonus_blades, 0);
     const passedLives = (result.lives || []).filter(l => l.passed).length;
     const baseLiveScore = (result.lives || []).reduce((s, l) => l.passed ? s + l.score : s, 0);
     const baseRawScore = (result.lives || []).reduce((s, l) => l.passed ? s + (l.base_score || 0) : s, 0);
@@ -400,10 +400,11 @@ function renderPerfSteps(result) {
                         ${(result.member_contributions || []).map(m => {
                             const cd = m.card_no ? State.resolveCardData(m.card_no) : null;
                             const imgSrc = cd ? fixImg(cd.img || '') : '';
+                            const isWait = m.is_wait;
                             return `
-                                <div class="perf-step-member">
+                                <div class="perf-step-member${isWait ? ' perf-dimmed' : ''}">
                                     ${imgSrc ? `<img src="${imgSrc}" class="perf-step-member-img">` : ''}
-                                    <div>Blade: ${m.base_blades}${m.bonus_blades > 0 ? '+' + m.bonus_blades : ''}</div>
+                                    <div>Blade: ${isWait ? '0 (negated)' : `${m.base_blades}${m.bonus_blades > 0 ? '+' + m.bonus_blades : ''}`} ${isWait ? '<span class="perf-wait-badge">(wait)</span>' : ''}</div>
                                     <div>${fmtHShortSrc(m.base_hearts)}</div>
                                 </div>
                             `;
@@ -710,7 +711,8 @@ function renderContributionSection(result) {
                     const base = member.base_hearts || [0,0,0,0,0,0,0,0];
                     const bonus = member.bonus_hearts || [0,0,0,0,0,0,0,0];
                     const total = base.map((v, i) => v + (bonus[i] || 0));
-                    const totalBlade = (member.base_blades || 0) + (member.bonus_blades || 0);
+                    const isWait = member.is_wait;
+                    const totalBlade = isWait ? 0 : (member.base_blades || 0) + (member.bonus_blades || 0);
                     const heartBonuses = member.ability_heart_bonuses || [];
                     const bladeBonuses = member.ability_blade_bonuses || [];
                     const slot = member.slot !== undefined && member.slot >= 0 && member.slot < 3
@@ -718,11 +720,11 @@ function renderContributionSection(result) {
                     const memberImg = member.card_no ? (() => { const cd = State.resolveCardData(member.card_no); return cd?.img ? fixImg(cd.img) : ''; })() : '';
                     const memberName = member.card_no ? (() => { const cd = State.resolveCardData(member.card_no); return cd?.name || member?.source || 'Member'; })() : (member?.source || 'Member');
                     return `
-                        <article class="perf-contrib-card" data-member-id="${member?.source_id ?? ''}" data-member-slot="${member?.slot ?? ''}">
+                        <article class="perf-contrib-card${isWait ? ' perf-contrib-wait' : ''}" data-member-id="${member?.source_id ?? ''}" data-member-slot="${member?.slot ?? ''}">
                             <div class="perf-contrib-header">
                                 ${memberImg ? `<img src="${memberImg}" class="perf-contrib-art" alt="${escapeHtml(memberName)}">` : ''}
                                 <div>
-                                    <h4>${escapeHtml(memberName)}</h4>
+                                    <h4>${escapeHtml(memberName)}${isWait ? ' <span class="perf-wait-badge">(wait)</span>' : ''}</h4>
                                     <div class="perf-breakdown-row total">
                                         <span class="perf-mini-heading">Total hearts</span>
                                         ${renderHeartsCompact(total)}
@@ -753,11 +755,12 @@ function renderContributionSection(result) {
                                     </div>
                                     ` : ''}
                                 </div>
-                                <div class="perf-breakdown-row">
+                                <div class="perf-breakdown-row${isWait ? ' perf-dimmed' : ''}">
                                     <span class="perf-mini-heading">Blades</span>
                                     ${renderBladesCompact(totalBlade)}
-                                    ${(member.bonus_blades || 0) > 0 ? `<span class="perf-breakdown-detail">(+${member.bonus_blades} from abilities)</span>` : ''}
-                                    ${bladeBonuses.length > 0 ? `
+                                    ${!isWait && (member.bonus_blades || 0) > 0 ? `<span class="perf-breakdown-detail">(+${member.bonus_blades} from abilities)</span>` : ''}
+                                    ${isWait ? `<span class="perf-breakdown-detail">(negated — card is in wait)</span>` : ''}
+                                    ${!isWait && bladeBonuses.length > 0 ? `
                                     <div class="perf-breakdown-bonuses">
                                         ${bladeBonuses.map((bonus) => `
                                             <div class="perf-bonus-item compact">
@@ -982,7 +985,7 @@ function renderPlayerPanel(playerId, result) {
     }
 
     const members = result?.member_contributions || [];
-    const totalBlades = members.reduce((s, m) => s + (m.base_blades || 0) + (m.bonus_blades || 0), 0);
+    const totalBlades = members.reduce((s, m) => m.is_wait ? s : s + (m.base_blades || 0) + (m.bonus_blades || 0), 0);
 
     return `
         <article class="perf-panel ${isSuccess ? 'success' : 'failure'}">

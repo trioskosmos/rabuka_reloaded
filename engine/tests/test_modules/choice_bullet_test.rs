@@ -182,3 +182,222 @@ fn kotori_discard_non_muse_retrieve_live() {
         "Retrieved card no longer in waitroom"
     );
 }
+
+/// Dia (PL!S-bp5-004-R): Choose position_change → source must be SaintSnow,
+/// destination can be any position (not restricted to SaintSnow).
+#[test]
+fn dia_position_change_saintsnow_source_any_destination() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let dia = game.id("PL!S-bp5-004-R");
+    let seira = game.id("PL!S-bp5-222-R"); // 理亞 (SaintSnow, auto: activate 2 energy on move)
+    let filler = game.id("PL!-sd1-010-SD"); // Honoka (Printemps, non-SaintSnow)
+
+    // Stage: left=理亞(SaintSnow), center=filler(non-SS), right=empty
+    game.state.player1.stage.stage = [seira, filler, -1];
+    debut_play(&mut game, dia, 10, MemberArea::RightSide);
+
+    // Dia's 登場 → choice between blade (0) and position_change (1)
+    assert!(game.has_pending_choice(), "Dia's 登場 choice expected");
+    game.select_option(1);
+
+    // Source selection: only left (理亞/SaintSnow) must be valid
+    assert!(game.has_pending_choice(), "Source selection expected");
+    let src_actions = game.generated_actions();
+    assert_eq!(
+        src_actions.len(),
+        1,
+        "Only SaintSnow member should be valid source, got: {:?}",
+        src_actions
+            .iter()
+            .map(|a| a
+                .parameters
+                .as_ref()
+                .and_then(|p| p.stage_area.as_deref())
+                .unwrap_or("?"))
+            .collect::<Vec<_>>()
+    );
+    let src_area = src_actions[0]
+        .parameters
+        .as_ref()
+        .and_then(|p| p.stage_area.as_deref());
+    assert_eq!(
+        src_area,
+        Some("left"),
+        "Only left (理亞/SaintSnow) should be selectable"
+    );
+
+    // Select left (理亞) as source
+    game.select_generated(0);
+
+    // Destination selection: must include center (non-SaintSnow filler)
+    assert!(game.has_pending_choice(), "Destination selection expected");
+    let dst_actions = game.generated_actions();
+    let dst_areas: Vec<&str> = dst_actions
+        .iter()
+        .filter_map(|a| a.parameters.as_ref()?.stage_area.as_deref())
+        .collect();
+    assert!(
+        dst_areas.contains(&"center"),
+        "Center (non-SaintSnow) must be a valid destination, got: {:?}",
+        dst_areas
+    );
+    assert!(
+        dst_areas.contains(&"right"),
+        "Right (Dia) must be a valid destination (any position), got: {:?}",
+        dst_areas
+    );
+
+    // Select center as destination
+    let center_idx = dst_actions
+        .iter()
+        .position(|a| a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("center"))
+        .unwrap();
+    game.select_generated(center_idx);
+
+    // Drain any auto-ability choices triggered by the position change
+    game.drain_auto_ability_choices();
+
+    // Verify swap: 理亞 at center, filler at left
+    assert_eq!(
+        game.state.player1.stage.stage[0], filler,
+        "Left should have filler (was at center)"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[1], seira,
+        "Center should have 理亞 (moved from left)"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[2], dia,
+        "Right should still have Dia"
+    );
+}
+
+/// Dia (PL!S-bp5-004-R): Choose position_change — no SaintSnow on stage,
+/// source options should be empty and the effect should skip gracefully.
+#[test]
+fn dia_position_change_no_saintsnow_skips_gracefully() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let dia = game.id("PL!S-bp5-004-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    let filler2 = game.id("PL!-sd1-013-SD");
+
+    // Stage: [filler, filler2, -] — no SaintSnow at all
+    game.state.player1.stage.stage = [filler, filler2, -1];
+    debut_play(&mut game, dia, 10, MemberArea::RightSide);
+
+    // Dia's 登場 → choose position_change (option 1)
+    assert!(game.has_pending_choice(), "Dia's 登場 choice expected");
+    game.select_option(1);
+
+    // No SaintSnow on stage → source selection should not appear
+    // (valid_sources is empty → execute_position_change returns Ok(()) immediately)
+    if game.has_pending_choice() {
+        let actions = game.generated_actions();
+        assert!(
+            actions.is_empty(),
+            "No source options expected with zero SaintSnow, got: {:?}",
+            actions
+                .iter()
+                .map(|a| a
+                    .parameters
+                    .as_ref()
+                    .and_then(|p| p.stage_area.as_deref())
+                    .unwrap_or("?"))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    // Verify stage unchanged
+    assert_eq!(game.state.player1.stage.stage[0], filler);
+    assert_eq!(game.state.player1.stage.stage[1], filler2);
+    assert_eq!(game.state.player1.stage.stage[2], dia);
+}
+
+/// Dia (PL!S-bp5-004-R): Choose position_change — two SaintSnow members,
+/// both should be selectable as source.
+#[test]
+fn dia_position_change_two_saintsnow_both_selectable() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let dia = game.id("PL!S-bp5-004-R");
+    let seira1 = game.id("PL!S-bp5-222-R"); // 理亞 (SaintSnow)
+    let seira2 = game.id("PL!S-bp5-222-R"); // second copy
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // Stage: [理亞1(SaintSnow), 理亞2(SaintSnow), -]
+    game.state.player1.stage.stage = [seira1, seira2, -1];
+    debut_play(&mut game, dia, 10, MemberArea::RightSide);
+
+    // Choose position_change (option 1)
+    assert!(game.has_pending_choice(), "Dia's 登場 choice expected");
+    game.select_option(1);
+
+    // Source selection: both left and center should be valid
+    assert!(game.has_pending_choice(), "Source selection expected");
+    let src_actions = game.generated_actions();
+    assert_eq!(
+        src_actions.len(),
+        2,
+        "Both SaintSnow members should be valid sources, got: {:?}",
+        src_actions
+            .iter()
+            .map(|a| a
+                .parameters
+                .as_ref()
+                .and_then(|p| p.stage_area.as_deref())
+                .unwrap_or("?"))
+            .collect::<Vec<_>>()
+    );
+    let src_areas: Vec<&str> = src_actions
+        .iter()
+        .filter_map(|a| a.parameters.as_ref()?.stage_area.as_deref())
+        .collect();
+    assert!(src_areas.contains(&"left"), "Left should be selectable");
+    assert!(src_areas.contains(&"center"), "Center should be selectable");
+
+    // Select left (理亞1) as source
+    game.select_generated(0);
+
+    // Destination selection: must include center (理亞2), right (Dia)
+    assert!(game.has_pending_choice(), "Destination selection expected");
+    let dst_actions = game.generated_actions();
+    let dst_areas: Vec<&str> = dst_actions
+        .iter()
+        .filter_map(|a| a.parameters.as_ref()?.stage_area.as_deref())
+        .collect();
+    assert!(
+        dst_areas.contains(&"center"),
+        "Center (理亞2) must be valid destination, got: {:?}",
+        dst_areas
+    );
+    assert!(
+        dst_areas.contains(&"right"),
+        "Right (Dia) must be valid destination, got: {:?}",
+        dst_areas
+    );
+
+    // Select center as destination
+    let center_idx = dst_actions
+        .iter()
+        .position(|a| a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("center"))
+        .unwrap();
+    game.select_generated(center_idx);
+
+    game.drain_auto_ability_choices();
+
+    // Verify swap: 理亞1 at center, 理亞2 at left
+    assert_eq!(
+        game.state.player1.stage.stage[0], seira2,
+        "Left should have 理亞2 (was at center)"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[1], seira1,
+        "Center should have 理亞1 (moved from left)"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[2], dia,
+        "Right should still have Dia"
+    );
+}

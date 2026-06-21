@@ -97,6 +97,17 @@ export const ActionListView = {
             addHeader(i18n.t('mulligan').toUpperCase(), 'var(--accent-pink)');
             allMulliganActions.forEach(a => listDiv.appendChild(ActionButtons.createActionButton(a, false, '', state)));
 
+            // Post-render: apply mulligan-selected class to thumbnails based on
+            // local selection state. This guarantees the grayscale appears even
+            // if createActionButton's check ran on stale localMulliganSelection.
+            listDiv.querySelectorAll('.action-btn[data-card-index]').forEach(btn => {
+                const ci = parseInt(btn.dataset.cardIndex, 10);
+                if (!isNaN(ci) && State.localMulliganSelection.has(ci)) {
+                    const thumb = btn.querySelector('.action-card-thumb');
+                    if (thumb) thumb.classList.add('mulligan-selected');
+                }
+            });
+
             // Select All button — dispatches all unselected select_mulligan actions
             const selectAllBtn = document.createElement('button');
             selectAllBtn.className = 'btn action-btn system';

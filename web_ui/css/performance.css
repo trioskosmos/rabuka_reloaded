@@ -925,6 +925,25 @@
     background: rgba(241, 186, 76, 0.03);
 }
 
+/* ── Wait-state contributor card ── */
+.perf-contrib-card.perf-contrib-wait {
+    opacity: 0.6;
+}
+
+.perf-contrib-wait .perf-contrib-art {
+    filter: grayscale(0.8);
+}
+
+.perf-wait-badge {
+    font-size: 0.7rem;
+    color: #a0a0a0;
+    font-weight: 400;
+}
+
+.perf-dimmed {
+    opacity: 0.45;
+}
+
 /* ── Yell summary ── */
 .perf-yell-summary {
     padding: 4px 8px 2px;

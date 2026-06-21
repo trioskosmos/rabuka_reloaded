@@ -82,6 +82,17 @@ export const ChoiceView = {
             });
         }
 
+        // Render prompt/instruction between ability text and options
+        const prompt = State.currentLang === 'en'
+            ? (choice.prompt_en || choice.title || '')
+            : (choice.prompt_ja || choice.title || '');
+        if (prompt) {
+            const displayPrompt = State.currentLang === 'en' && window.translateAbility
+                ? window.translateAbility(prompt, 'en')
+                : prompt;
+            content += `<div class="choice-prompt">${Tooltips.enrichAbilityText(displayPrompt)}</div>`;
+        }
+
         choiceDiv.innerHTML = content;
         let hasContent = false;
 

@@ -3,6 +3,7 @@ pub mod compound;
 pub mod condition;
 pub mod cost;
 pub mod debug;
+pub mod describe;
 pub mod effects;
 pub mod enums;
 pub mod log;

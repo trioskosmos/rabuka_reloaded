@@ -551,7 +551,7 @@ impl AbilityResolver {
             }
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "conditional_optional".to_string(),
-                description: String::new(),
+                description: "Pay optional cost or skip".to_string(),
                 allow_skip: true,
                 options: Some(vec!["Skip".to_string(), "Pay".to_string()]),
             });

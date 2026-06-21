@@ -541,6 +541,19 @@
     max-height: none;
 }
 
+.choice-prompt {
+    padding: 8px 12px;
+    margin: 4px 0 8px 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--accent-gold, #d4a843);
+    background: rgba(212, 168, 67, 0.08);
+    border-left: 3px solid var(--accent-gold, #d4a843);
+    border-radius: 4px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+
 .choice-options-container {
     overflow: visible;
     max-height: none;

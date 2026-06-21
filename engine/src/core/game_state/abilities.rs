@@ -93,6 +93,7 @@ impl GameState {
             snapshot_last_energy_placed_by_player: None,
             snapshot_last_area_move_card_id: None,
             snapshot_last_area_move_by_player: None,
+            choice_effect_text: None,
         }
     }
 
@@ -1165,6 +1166,11 @@ impl GameState {
     pub fn inject_choice_ability_context(&self, json: &mut serde_json::Value) {
         let entry = self.ability_queue.current_entry();
         let entry_ref = entry.as_ref();
+        let existing_title = json
+            .get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
         if let Some(obj) = json.as_object_mut() {
             if let Some(entry) = entry_ref {
                 obj.insert(
@@ -1175,6 +1181,21 @@ impl GameState {
                     "ability_text".into(),
                     serde_json::Value::String(entry.ability.full_text.clone()),
                 );
+                let prompt_ja = entry
+                    .choice_effect_text
+                    .clone()
+                    .unwrap_or_else(|| entry.ability.triggerless_text.clone());
+                obj.insert("prompt_ja".into(), serde_json::Value::String(prompt_ja));
+                let prompt_en = if entry.choice_effect_text.is_some() {
+                    if let Some(ref effect) = entry.ability.effect {
+                        crate::ability::describe::describe_effect_en(effect)
+                    } else {
+                        existing_title
+                    }
+                } else {
+                    existing_title
+                };
+                obj.insert("prompt_en".into(), serde_json::Value::String(prompt_en));
                 obj.insert(
                     "trigger_type".into(),
                     serde_json::Value::String(format!("{:?}", entry.trigger_type)),

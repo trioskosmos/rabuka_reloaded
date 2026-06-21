@@ -1594,9 +1594,28 @@ impl AbilityResolver {
         // "target_member: select" from parser — player must pick which member to move
         if target_member == "select" {
             let valid_sources: Vec<String> = {
+                let card_db = self.card_db();
                 let player = gs.resolve_target_player(target);
+                let group_names = effect.group_names.as_ref();
+                let exclude_self = effect.exclude_self.unwrap_or(false);
+                let activating_card_id = gs.activating_card;
                 (0..3)
-                    .filter(|&i| player.stage.stage[i] != -1)
+                    .filter(|&i| {
+                        let card_id = player.stage.stage[i];
+                        if card_id == -1 {
+                            return false;
+                        }
+                        if exclude_self && Some(card_id) == activating_card_id {
+                            return false;
+                        }
+                        if let Some(gn) = group_names {
+                            gn.iter().any(|g| {
+                                util::card_matches_group_str(&card_db, card_id, Some(g.as_str()))
+                            })
+                        } else {
+                            true
+                        }
+                    })
                     .map(|i| {
                         match i {
                             0 => "left",
@@ -2356,6 +2375,9 @@ impl AbilityResolver {
                 allow_skip: effect.optional.unwrap_or(false),
                 options: None,
             });
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.choice_effect_text = Some(effect.text.clone());
+            }
         } else if let Some(string_options) = choice_options {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "choice_string".to_string(),

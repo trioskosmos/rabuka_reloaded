@@ -81,6 +81,9 @@ pub struct AbilityQueueEntry {
     /// caused this each_time ability to fire. Used by effects like
     /// "gain all-heart" to target the correct member.
     pub triggering_member_id: Option<i16>,
+    /// The original effect text of a choice-type ability, stored so the frontend
+    /// can use it as the choice prompt (separate from the option labels).
+    pub choice_effect_text: Option<String>,
 }
 
 /// Unified ability queue with proper state management
@@ -278,6 +281,7 @@ impl AbilityQueue {
                     snapshot_last_energy_placed_by_player: None,
                     snapshot_last_area_move_card_id: None,
                     snapshot_last_area_move_by_player: None,
+                    choice_effect_text: None,
                 };
                 self.entries.push(dummy_entry);
                 self.state = QueueState::WaitingForChoice {

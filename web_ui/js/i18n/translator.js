@@ -333,7 +333,14 @@ export function translateAbility(rawText, lang = 'jp') {
     const lines = rawText.split('\n');
     const translatedLines = [];
 
-    for (const rawLine of lines) {
+    for (let rawLine of lines) {
+        rawLine = rawLine.trim();
+        // Try line-by-line ability_translations lookup before pseudocode parsing
+        // (handles cards whose ability field contains multiple abilities separated by \n)
+        if (lang === 'en' && abilityTranslations[rawLine]) {
+            translatedLines.push(abilityTranslations[rawLine]);
+            continue;
+        }
         const parsed = OpcodeParser.parse(rawLine);
 
         if (parsed.type === 'comment') {
