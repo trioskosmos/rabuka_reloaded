@@ -124,6 +124,8 @@ pub mod q38_live_card_zone_test;
 pub mod qa_new_tests;
 pub mod qa_new_tests246;
 pub mod qa_new_tests252;
+pub mod qa_new_tests253;
+pub mod qa_new_tests254;
 pub mod qa_new_tests255;
 pub mod qa_new_tests256;
 pub mod qa_remaining_tests2;

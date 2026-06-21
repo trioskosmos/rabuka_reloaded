@@ -32,30 +32,31 @@ impl DeckParser {
 
         for line in content.lines() {
             let line = line.trim();
-            if line.is_empty() {
+            if line.is_empty() || line.starts_with("//") {
                 continue;
             }
 
-            // Parse format: "card_no x quantity" or "quantity x card_no"
+            // Parse format: "card_no x quantity", "quantity x card_no", or single card per line
             let parts: Vec<&str> = line.split(" x ").collect();
-            if parts.len() != 2 {
-                return Err(format!("Invalid line format: {}", line));
+            if parts.len() == 2 {
+                // Try to parse first part as quantity (for "quantity x card_no" format)
+                let (card_no, quantity) = if let Ok(q) = parts[0].trim().parse::<u32>() {
+                    (Self::clean_card_no(parts[1].trim()), q)
+                } else {
+                    let q = parts[1]
+                        .trim()
+                        .parse::<u32>()
+                        .map_err(|e| format!("Invalid quantity: {}", e))?;
+                    (Self::clean_card_no(parts[0].trim()), q)
+                };
+                entries.push(DeckEntry { card_no, quantity });
+            } else if line.contains('-') && !line.contains(' ') {
+                // Single card per line (quantity defaults to 1)
+                entries.push(DeckEntry {
+                    card_no: Self::clean_card_no(line),
+                    quantity: 1,
+                });
             }
-
-            // Try to parse first part as quantity (for "quantity x card_no" format)
-            let (card_no, quantity) = if let Ok(q) = parts[0].trim().parse::<u32>() {
-                // Format: "quantity x card_no"
-                (parts[1].trim().to_string(), q)
-            } else {
-                // Format: "card_no x quantity"
-                let q = parts[1]
-                    .trim()
-                    .parse::<u32>()
-                    .map_err(|e| format!("Invalid quantity: {}", e))?;
-                (parts[0].trim().to_string(), q)
-            };
-
-            entries.push(DeckEntry { card_no, quantity });
         }
 
         Ok(DeckList { name, entries })
@@ -81,7 +82,7 @@ impl DeckParser {
     }
 
     pub fn parse_all_decks() -> Result<Vec<DeckList>, String> {
-        let decks_path = Path::new("../game/decks");
+        let decks_path = Path::new("../web_ui/decks");
         Self::parse_all_decks_from_directory(decks_path)
     }
 
@@ -127,6 +128,14 @@ impl DeckParser {
         card_numbers
     }
 
+    pub fn normalize_card_no(raw: &str) -> String {
+        raw.replace('+', "＋").replace('!', "！")
+    }
+
+    fn clean_card_no(raw: &str) -> String {
+        Self::normalize_card_no(raw)
+    }
+
     fn parse_line(line: &str) -> Option<String> {
         let line = line.trim();
         let parts: Vec<&str> = line.split(" x ").collect();
@@ -140,12 +149,12 @@ impl DeckParser {
             };
             // Validate card_no looks like a card identifier (has a dash)
             if card_no.contains('-') {
-                return Some(card_no.to_string());
+                return Some(Self::clean_card_no(card_no));
             }
         }
         // Single identifier per line
         if line.contains('-') && !line.contains(' ') {
-            return Some(line.to_string());
+            return Some(Self::clean_card_no(line));
         }
         None
     }

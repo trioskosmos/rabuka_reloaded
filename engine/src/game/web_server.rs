@@ -1635,7 +1635,7 @@ pub async fn set_deck(
 
     let card_numbers: Vec<String> = if let Some(arr) = req.get("deck").and_then(|v| v.as_array()) {
         arr.iter()
-            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .filter_map(|v| v.as_str().map(|s| deck_parser::DeckParser::normalize_card_no(s)))
             .collect()
     } else {
         let deck_content = req.get("deck").and_then(|v| v.as_str()).unwrap_or("");
@@ -1664,7 +1664,7 @@ pub async fn set_deck(
             if let Some(energy_arr) = req.get("energy_deck").and_then(|v| v.as_array()) {
                 deck_entry.energy = energy_arr
                     .iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .filter_map(|v| v.as_str().map(|s| deck_parser::DeckParser::normalize_card_no(s)))
                     .collect();
             }
             // Check if both players have submitted
@@ -2329,9 +2329,17 @@ async fn init_game(
                 let e0 = custom_energy.remove(&0).unwrap_or_default();
                 let e1 = custom_energy.remove(&1).unwrap_or_else(|| e0.clone());
                 (p0, p1, e0, e1)
+            } else if deck_lists.is_empty() {
+                return HttpResponse::InternalServerError().json(
+                    "No decks available. Ensure deck files are present in web_ui/decks/."
+                );
             } else {
                 let deck = if let Some(idx) = deck_index {
-                    &deck_lists[idx]
+                    if idx >= deck_lists.len() {
+                        &deck_lists[0]
+                    } else {
+                        &deck_lists[idx]
+                    }
                 } else {
                     &deck_lists[0]
                 };

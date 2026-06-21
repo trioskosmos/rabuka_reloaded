@@ -318,24 +318,23 @@
 .card-area.stage {
     overflow-x: auto;
     overflow-y: hidden;
-    scrollbar-width: thin;
     flex: 1;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
 
 .card-area.stage::-webkit-scrollbar {
-    height: 6px;
+    height: 4px;
 }
 .card-area.stage::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.02);
-    border-radius: 10px;
+    background: transparent;
 }
 .card-area.stage::-webkit-scrollbar-thumb {
-    background: linear-gradient(to right, var(--accent-blue), var(--accent-purple));
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
 }
 .card-area.stage::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(to right, var(--accent-blue-bright), var(--accent-pink));
+    background: rgba(255, 255, 255, 0.25);
 }
 
 .card-area.energy {
@@ -482,7 +481,7 @@
     position: relative;
     height: 100%;
     aspect-ratio: 512 / 720;
-    flex: 1 0 auto;
+    flex: none;
 }
 
 .member-slot {

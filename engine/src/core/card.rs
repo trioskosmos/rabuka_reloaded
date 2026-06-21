@@ -256,6 +256,7 @@ impl CardDatabase {
         card_no
             .to_uppercase()
             .replace('＋', "+")
+            .replace('！', "!")
             .replace('－', "-")
             .replace('＊', "*")
             .replace('＃', "#")
