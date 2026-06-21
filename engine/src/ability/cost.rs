@@ -187,7 +187,12 @@ impl AbilityResolver {
                         })
                         .collect();
                     // For "any number" costs, the effective count is 0 (any number)
-                    let effective_count = if is_any_number { 0 } else { count };
+                    // unless `max` is also set, in which case count caps the max.
+                    let effective_count = if is_any_number && !cost.max.unwrap_or(false) {
+                        0
+                    } else {
+                        count
+                    };
                     log::debug!(
                         "▶ cost(move_cards, {}=>discard, effective_count={}, any_number={}, optional={})",
                         source, effective_count, is_any_number, is_optional
@@ -242,9 +247,14 @@ impl AbilityResolver {
                         }
                     } else if !matching_indices.is_empty() {
                         let desc = if is_any_number {
+                            let max_str = if cost.max.unwrap_or(false) {
+                                count.min(matching_indices.len())
+                            } else {
+                                matching_indices.len()
+                            };
                             format!(
                                 "Select any number of card(s) from hand (0-{}) (or skip)",
-                                matching_indices.len()
+                                max_str
                             )
                         } else {
                             format!(

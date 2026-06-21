@@ -550,13 +550,62 @@ fn rurino_bp1_discard_3_draw_3() {
         }
     }
 
-    // count=0 → draw = last_cost_discard_count = 3
+    // count=3 → draw = last_cost_discard_count = 3
     assert_eq!(game.state.player1.waitroom.cards.len(), 3);
     assert_eq!(game.state.player1.main_deck.cards.len(), deck_before - 3);
     assert_eq!(
         game.state.player1.hand.cards.len(),
         hand_before,
         "3 - 3 discarded + 3 drawn = 3, got {}",
+        game.state.player1.hand.cards.len()
+    );
+}
+
+#[test]
+fn rurino_bp1_limited_to_3_with_more_in_hand() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let rurino = game.id("PL!HS-bp1-005-R");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.add_to_hand(rurino);
+    game.give_energy(9);
+    // Put 7 filler cards in hand — more than the 3-card cap
+    for _ in 0..7 {
+        game.state.player1.hand.cards.push(filler);
+    }
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    let deck_before = game.state.player1.main_deck.cards.len();
+    let hand_before = game.state.player1.hand.cards.len();
+    game.play_to_stage(rurino, rabuka_engine::zones::MemberArea::Center);
+
+    // Try to discard 5 cards — the cap should stop at 3
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+    // After 3 selections, should NOT have another re-prompt (cap met)
+    assert!(
+        !game.has_pending_choice(),
+        "Should not have another choice after 3 selections (max=3 cap)"
+    );
+
+    // Verify: 3 discarded, 3 drawn
+    assert_eq!(game.state.player1.waitroom.cards.len(), 3);
+    assert_eq!(game.state.player1.main_deck.cards.len(), deck_before - 3);
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before - 1,
+        "{} - 1(Rurino) - 3 discarded + 3 drawn = {}, got {}",
+        hand_before,
+        hand_before - 1,
         game.state.player1.hand.cards.len()
     );
 }

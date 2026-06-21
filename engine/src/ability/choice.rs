@@ -1260,7 +1260,11 @@ impl super::resolver::AbilityResolver {
                     // EXCEPTION: opponent actions — when opponent skips, the conditional_on_optional
                     // MUST fire (it has the "if you didn't do so" effect like blade gain).
                     let is_opponent_action = target_player_id.as_deref() == Some("opponent");
-                    if indices.is_empty() && count > 0 && !is_opponent_action {
+                    if indices.is_empty()
+                        && count > 0
+                        && !is_opponent_action
+                        && self.moved_cards.is_empty()
+                    {
                         gs.ability_queue.take_pending_commands();
                     }
                 }

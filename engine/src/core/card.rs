@@ -596,6 +596,7 @@ impl<'de> serde::Deserialize<'de> for AbilityCost {
                         "same_unit_name" => effect.same_unit_name = map.next_value()?,
                         "shuffle" => effect.shuffle = map.next_value()?,
                         "any_number" => effect.any_number = map.next_value()?,
+                        "max" => effect.max = map.next_value()?,
                         "cost_limit" => effect.cost_limit = map.next_value()?,
                         "cost_limit_operator" => effect.cost_limit_operator = map.next_value()?,
                         "characters" => effect.characters = map.next_value()?,
