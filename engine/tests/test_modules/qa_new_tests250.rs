@@ -17,14 +17,16 @@ fn trigger_ceras_auto(game: &mut TestGame) {
     game.state.process_pending_auto_abilities("player1");
 }
 
-fn setup_ceras_appearance(game: &mut TestGame, p2_active_count: usize) -> i16 {
+fn setup_ceras_appearance(game: &mut TestGame, p2_active_count: usize) -> (i16, Vec<i16>) {
     let ceras = game.new_id("PL!HS-bp6-007-R");
     game.state.player1.stage.stage[0] = ceras;
     game.state.recently_moved_cards = Some(vec![ceras]);
 
+    let mut p2_members = Vec::new();
     for i in 0..p2_active_count {
         let p2_member = game.new_id("PL!-sd1-010-SD");
         game.state.player2.stage.stage[i] = p2_member;
+        p2_members.push(p2_member);
     }
 
     let filler = game.new_id("PL!-sd1-010-SD");
@@ -32,26 +34,32 @@ fn setup_ceras_appearance(game: &mut TestGame, p2_active_count: usize) -> i16 {
         game.state.player1.main_deck.cards.push(filler);
     }
     game.state.current_phase = rabuka_engine::game_state::Phase::Main;
-    ceras
+    (ceras, p2_members)
 }
 
-/// Q250 core: when the EdelNote member itself appears on stage,
-/// its own auto ability triggers (opponent selects an active member to wait).
+fn is_wait(game: &TestGame, id: i16) -> bool {
+    game.state
+        .mods
+        .get_orientation_modifier(id)
+        .is_some_and(|o| o == "wait")
+}
+
+/// Q250 core: when the EdelNote member appears on stage,
+/// its auto ability triggers and puts 1 opponent active member into wait.
 #[test]
 fn q250_self_appearance_triggers() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    setup_ceras_appearance(&mut game, 1);
+    let (_, p2_members) = setup_ceras_appearance(&mut game, 1);
+    let p2_member = p2_members[0];
 
+    assert!(!is_wait(&game, p2_member), "Member starts active");
     trigger_ceras_auto(&mut game);
-
-    assert!(
-        game.has_pending_choice(),
-        "Auto ability triggers when Ceras herself appears — opponent picks a member to wait"
-    );
+    assert!(!game.has_pending_choice(), "1 target → auto-resolved");
+    assert!(is_wait(&game, p2_member), "Opponent member put into wait");
 }
 
-/// No appearance (card already on stage, no recently_moved) → no trigger.
+/// No appearance (card on stage, no recently_moved) → no trigger.
 #[test]
 fn q250_no_appearance_no_trigger() {
     let db = load_real_database();
@@ -63,64 +71,48 @@ fn q250_no_appearance_no_trigger() {
 
     trigger_ceras_auto(&mut game);
 
-    assert!(
-        !game.has_pending_choice(),
-        "No trigger when no recent appearance"
-    );
+    assert!(!game.has_pending_choice());
 }
 
-/// Opponent has 2 active members → selects which one to put into wait.
-/// The selected member should become wait, the other stays active.
+/// 2 active members → opponent selects which one to put into wait.
 #[test]
 fn q250_opponent_selects_which_member() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    setup_ceras_appearance(&mut game, 2);
+    let (_, p2_members) = setup_ceras_appearance(&mut game, 2);
+    let m0 = p2_members[0];
+    let m1 = p2_members[1];
+
+    assert!(!is_wait(&game, m0), "m0 active");
+    assert!(!is_wait(&game, m1), "m1 active");
 
     trigger_ceras_auto(&mut game);
 
-    assert!(
-        game.has_pending_choice(),
-        "Opponent chooses which member to wait"
-    );
-    game.select_indices(&[1]); // pick the second active member (index 1)
+    assert!(game.has_pending_choice(), "Opponent picks which to wait");
+    game.select_indices(&[1]);
+    assert!(!game.has_pending_choice());
 
-    assert!(!game.has_pending_choice(), "Choice resolved");
-
-    // Opponent's selected member should be in wait
-    let p2_stage_1 = game.state.player2.stage.stage[1];
-    assert!(
-        game.state.player2.waitroom.cards.contains(&p2_stage_1),
-        "Selected member moved to waitroom"
-    );
-    // The other member should remain active on stage
-    assert_ne!(
-        game.state.player2.stage.stage[0], -1,
-        "Unselected member stays on stage"
-    );
+    assert!(!is_wait(&game, m0), "m0 stays active");
+    assert!(is_wait(&game, m1), "m1 put into wait");
 }
 
-/// Use limit (1/turn): second trigger in the same turn is blocked.
+/// Use limit (1/turn): same copy cannot trigger twice in one turn.
 #[test]
 fn q250_use_limit() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    // First trigger
-    setup_ceras_appearance(&mut game, 1);
+    let (ceras, first) = setup_ceras_appearance(&mut game, 2);
     trigger_ceras_auto(&mut game);
     assert!(game.has_pending_choice(), "First trigger works");
-    game.select_indices(&[0]); // pick the active member
-    assert!(!game.has_pending_choice(), "First trigger resolved");
+    game.select_indices(&[0]);
+    assert!(!game.has_pending_choice());
 
-    // Second trigger — same turn, blocked by 1/turn
-    let ceras2 = game.new_id("PL!HS-bp6-007-R");
-    game.state.player1.stage.stage[1] = ceras2;
-    game.state.recently_moved_cards = Some(vec![ceras2]);
-
+    // Re-trigger with SAME copy ID — use_limit (1/turn) blocks it
+    game.state.recently_moved_cards = Some(vec![ceras]);
     trigger_ceras_auto(&mut game);
     assert!(
         !game.has_pending_choice(),
-        "Second auto trigger blocked by use_limit (1/turn)"
+        "Second trigger blocked — same copy used 1/turn"
     );
 }
