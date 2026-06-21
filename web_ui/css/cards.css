@@ -477,9 +477,12 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 4px;
     padding: var(--space-xxs);
     position: relative;
     height: 100%;
+    aspect-ratio: 512 / 720;
+    flex: 1 0 auto;
 }
 
 .member-slot {
@@ -632,14 +635,7 @@
 }
 
 .board-slot-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    flex: 1 0 var(--card-w);
-    width: 100%;
-    height: 100%;
+    /* class kept for JS selector compatibility — sizing handled by .member-area */
 }
 
 .deck-discard-group.simplified {

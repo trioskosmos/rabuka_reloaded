@@ -89,6 +89,10 @@ pub struct AbilityQueue {
     entries: Vec<AbilityQueueEntry>,
     state: QueueState,
     current_index: usize,
+    /// Set by the resolver when a new pending choice is about to be stored.
+    /// The web handler checks this after execute_main_phase_action to decide
+    /// whether to push an additional history snapshot at the choice boundary.
+    pub snapshot_requested: bool,
 }
 
 impl AbilityQueue {
@@ -97,6 +101,7 @@ impl AbilityQueue {
             entries: Vec::new(),
             state: QueueState::Idle,
             current_index: 0,
+            snapshot_requested: false,
         }
     }
 

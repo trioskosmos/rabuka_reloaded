@@ -278,6 +278,7 @@ impl AbilityResolver {
     }
 
     pub(crate) fn store_pending_choice(&mut self, gs: &mut GameState) {
+        gs.ability_queue.snapshot_requested = true;
         if let Some(ref choice) = self.pending_choice {
             let mut json = choice.to_frontend_json();
             if let Some(ref mut j) = json {

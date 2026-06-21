@@ -769,6 +769,9 @@ pub async fn execute_action(
         drop(gs);
     }
 
+    // Check if there was already a pending choice before this action
+    // (i.e. this is a resume, not a fresh action)
+    let had_choice_before = lock_state!(gs_arc, read).has_pending_choice();
     let snapshot = lock_state!(gs_arc, read).clone();
     let mut game_state = lock_state!(gs_arc, write);
 
@@ -807,7 +810,20 @@ pub async fn execute_action(
             if let Some(ref rid) = exec_room_id_str {
                 if let Ok(mut rooms) = data.rooms.lock() {
                     if let Some(room) = rooms.get_mut(rid) {
-                        room.history.push(snapshot);
+                        // Fresh action: push before-state as undo point.
+                        // Resume: the before-state is already in history (was pushed
+                        // as the choice-boundary snapshot from the previous call), so
+                        // skip it to avoid duplicates.
+                        if !had_choice_before {
+                            room.history.push(snapshot);
+                        }
+                        // If the ability engine created a new pending choice at a
+                        // choice boundary, push the current state so undo can step
+                        // back to just before this choice.
+                        if game_state.ability_queue.snapshot_requested {
+                            game_state.ability_queue.snapshot_requested = false;
+                            room.history.push(game_state.clone());
+                        }
                         room.future.clear();
                         room.actions_dirty = true;
                         room.frame_counter += 1;
@@ -825,7 +841,15 @@ pub async fn execute_action(
                     }
                 }
             } else {
-                data.history.lock().unwrap().push(snapshot);
+                let mut history = data.history.lock().unwrap();
+                if !had_choice_before {
+                    history.push(snapshot);
+                }
+                if game_state.ability_queue.snapshot_requested {
+                    game_state.ability_queue.snapshot_requested = false;
+                    history.push(game_state.clone());
+                }
+                drop(history);
                 data.future.lock().unwrap().clear();
                 invalidate_actions(&data, None);
                 let mut fc = data.frame_counter.lock().unwrap();
@@ -931,6 +955,16 @@ async fn set_ai(_data: web::Data<AppState>, _req: web::Json<serde_json::Value>) 
     }))
 }
 
+fn pvp_mode_for_room(data: &AppState, room_id: Option<&str>) -> bool {
+    room_id.is_some_and(|rid| {
+        data.rooms
+            .lock()
+            .ok()
+            .and_then(|rooms| rooms.get(rid).map(|r| r.mode == "pvp"))
+            .unwrap_or(false)
+    })
+}
+
 async fn undo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Responder {
     let undo_room_id = get_room_id_from_req(&req);
     let snapshot = if let Some(ref rid) = undo_room_id {
@@ -955,6 +989,7 @@ async fn undo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
     };
     let gs_arc = resolve_game_state_arc(&data, &req);
     let mut game_state = lock_state!(gs_arc, write);
+    let is_pvp = pvp_mode_for_room(&data, undo_room_id.as_deref());
     if let Some(ref rid) = undo_room_id {
         if let Ok(mut rooms) = data.rooms.lock() {
             if let Some(room) = rooms.get_mut(rid) {
@@ -966,10 +1001,25 @@ async fn undo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
     }
     *game_state = snapshot;
 
-    if let Err(e) = settle_single_player_state(&mut game_state) {
-        log::debug!("Single-player settle error after undo: {}", e);
+    if !is_pvp {
+        if let Err(e) = settle_single_player_state(&mut game_state) {
+            log::debug!("Single-player settle error after undo: {}", e);
+        }
     }
     invalidate_actions(&data, undo_room_id.as_deref());
+    if let Some(ref rid) = undo_room_id {
+        notify_room_clients(&data, rid);
+    }
+    // Update frame counter so polling clients detect the change
+    if let Some(ref rid) = undo_room_id {
+        if let Ok(mut rooms) = data.rooms.lock() {
+            if let Some(room) = rooms.get_mut(rid) {
+                room.frame_counter += 1;
+            }
+        }
+    } else if let Ok(mut fc) = data.frame_counter.lock() {
+        *fc += 1;
+    }
     let display = crate::display::game_state_to_display(&game_state);
     drop(game_state);
     let ui_config = data.ui_config.lock().unwrap().clone();
@@ -1004,6 +1054,7 @@ async fn redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
     };
     let gs_arc = resolve_game_state_arc(&data, &req);
     let mut game_state = lock_state!(gs_arc, write);
+    let is_pvp = pvp_mode_for_room(&data, redo_room_id.as_deref());
     if let Some(ref rid) = redo_room_id {
         if let Ok(mut rooms) = data.rooms.lock() {
             if let Some(room) = rooms.get_mut(rid) {
@@ -1015,10 +1066,25 @@ async fn redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
     }
     *game_state = snapshot;
 
-    if let Err(e) = settle_single_player_state(&mut game_state) {
-        log::debug!("Single-player settle error after redo: {}", e);
+    if !is_pvp {
+        if let Err(e) = settle_single_player_state(&mut game_state) {
+            log::debug!("Single-player settle error after redo: {}", e);
+        }
     }
     invalidate_actions(&data, redo_room_id.as_deref());
+    if let Some(ref rid) = redo_room_id {
+        notify_room_clients(&data, rid);
+    }
+    // Update frame counter so polling clients detect the change
+    if let Some(ref rid) = redo_room_id {
+        if let Ok(mut rooms) = data.rooms.lock() {
+            if let Some(room) = rooms.get_mut(rid) {
+                room.frame_counter += 1;
+            }
+        }
+    } else if let Ok(mut fc) = data.frame_counter.lock() {
+        *fc += 1;
+    }
     let display = crate::display::game_state_to_display(&game_state);
     drop(game_state);
     let ui_config = data.ui_config.lock().unwrap().clone();
@@ -1188,6 +1254,26 @@ async fn exec_code(
     }
 
     let exec_room_id = get_room_id_from_req(&http_req);
+    // Push snapshot to history so exec_code can be undone like any other action
+    if let Some(ref rid) = exec_room_id {
+        if let Ok(mut rooms) = data.rooms.lock() {
+            if let Some(room) = rooms.get_mut(rid) {
+                room.history.push(game_state.clone());
+                room.future.clear();
+                room.actions_dirty = true;
+                room.frame_counter += 1;
+            }
+        }
+    } else {
+        data.history.lock().unwrap().push(game_state.clone());
+        data.future.lock().unwrap().clear();
+        if let Ok(mut fc) = data.frame_counter.lock() {
+            *fc += 1;
+        }
+    }
+    if let Some(rid) = exec_room_id.as_ref() {
+        notify_room_clients(&data, rid);
+    }
     ensure_actions(&data, &game_state, exec_room_id.as_deref());
     let display = crate::display::game_state_to_display(&game_state);
     let actions = read_actions(&data, exec_room_id.as_deref());
@@ -1218,6 +1304,15 @@ async fn debug_rewind(data: web::Data<AppState>, req: actix_web::HttpRequest) ->
     };
     let gs_arc = resolve_game_state_arc(&data, &req);
     let mut game_state = lock_state!(gs_arc, write);
+    if let Some(ref rid) = rewind_room_id {
+        if let Ok(mut rooms) = data.rooms.lock() {
+            if let Some(room) = rooms.get_mut(rid) {
+                room.future.push(game_state.clone());
+            }
+        }
+    } else {
+        data.future.lock().unwrap().push(game_state.clone());
+    }
     *game_state = snapshot;
     invalidate_actions(&data, rewind_room_id.as_deref());
     HttpResponse::Ok().json(serde_json::json!({"success": true}))
@@ -1240,6 +1335,15 @@ async fn debug_redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
     };
     let gs_arc = resolve_game_state_arc(&data, &req);
     let mut game_state = lock_state!(gs_arc, write);
+    if let Some(ref rid) = redo_room_id {
+        if let Ok(mut rooms) = data.rooms.lock() {
+            if let Some(room) = rooms.get_mut(rid) {
+                room.history.push(game_state.clone());
+            }
+        }
+    } else {
+        data.history.lock().unwrap().push(game_state.clone());
+    }
     *game_state = snapshot;
     HttpResponse::Ok().json(serde_json::json!({"success": true}))
 }

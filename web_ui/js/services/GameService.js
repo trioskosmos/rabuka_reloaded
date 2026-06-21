@@ -112,6 +112,7 @@ export const GameService = {
 
             updateStateData(data);
             State.gameHasStarted = true;
+            State.fetchFrameCounter();
 
             // Start gameplay polling as fallback for unreliable SSE (Cloudflared, proxies)
             GameService.startGameplayPolling();
@@ -162,6 +163,7 @@ export const GameService = {
             console.log('DEBUG: Frontend received new state after action:', data.phase, data.legal_actions?.length || 0, 'actions');
             console.log('DEBUG: Full response data:', JSON.stringify(data, null, 2));
             updateStateData(data);
+            State.fetchFrameCounter();
             log('Action completed');
 
         } catch (e) {
