@@ -83,7 +83,7 @@ export const DeckSetupModal = {
 
         const playerIds = (playerVal === 'both') ? [0, 1] : [parseInt(playerVal)];
 
-        for (const pid of playerIds) {
+        const results = await Promise.all(playerIds.map(async (pid) => {
             try {
                 const resp = await fetch('api/set_deck', {
                     method: 'POST',
@@ -94,14 +94,17 @@ export const DeckSetupModal = {
                     })
                 });
                 const result = await resp.json();
-
-                if (result.success) {
-                    console.log(`Deck set for Player ${pid + 1}`);
-                } else {
-                    alert(`Failed for P${pid + 1}: ` + (result.error || 'Unknown error'));
-                }
+                return { pid, success: result.success, error: result.error };
             } catch (e) {
-                alert(`Error for P${pid + 1}: ` + e.message);
+                return { pid, success: false, error: e.message };
+            }
+        }));
+
+        for (const { pid, success, error } of results) {
+            if (success) {
+                console.log(`Deck set for Player ${pid + 1}`);
+            } else {
+                alert(`Failed for P${pid + 1}: ` + (error || 'Unknown error'));
             }
         }
         DeckSetupModal.closeDeckModal();
@@ -125,7 +128,7 @@ export const DeckSetupModal = {
             }
 
             const cards = data.content;
-            for (const pid of playerIds) {
+            const results = await Promise.all(playerIds.map(async (pid) => {
                 const resp = await fetch('api/set_deck', {
                     method: 'POST',
                     headers: Network.getHeaders(),
@@ -136,9 +139,10 @@ export const DeckSetupModal = {
                     })
                 });
                 const result = await resp.json();
-                if (result.success) {
-                    console.log(`Test Deck loaded for P${pid + 1}`);
-                }
+                return { pid, success: result.success };
+            }));
+            for (const { pid, success } of results) {
+                if (success) console.log(`Test Deck loaded for P${pid + 1}`);
             }
             DeckSetupModal.closeDeckModal();
             if (State.roomCode || State.offlineMode || State.gameHasStarted) {
@@ -165,7 +169,7 @@ export const DeckSetupModal = {
             }
 
             const cards = data.content;
-            for (const pid of playerIds) {
+            const results = await Promise.all(playerIds.map(async (pid) => {
                 const resp = await fetch('api/set_deck', {
                     method: 'POST',
                     headers: Network.getHeaders(),
@@ -176,9 +180,10 @@ export const DeckSetupModal = {
                     })
                 });
                 const result = await resp.json();
-                if (result.success) {
-                    console.log(`Random Deck Loaded for P${pid + 1}`);
-                }
+                return { pid, success: result.success };
+            }));
+            for (const { pid, success } of results) {
+                if (success) console.log(`Random Deck Loaded for P${pid + 1}`);
             }
             DeckSetupModal.closeDeckModal();
             if (State.roomCode || State.offlineMode || State.gameHasStarted) {

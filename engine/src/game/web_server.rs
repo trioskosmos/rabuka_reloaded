@@ -770,9 +770,12 @@ pub async fn execute_action(
     }
 
     // Check if there was already a pending choice before this action
-    // (i.e. this is a resume, not a fresh action)
-    let had_choice_before = lock_state!(gs_arc, read).has_pending_choice();
-    let snapshot = lock_state!(gs_arc, read).clone();
+    // (i.e. this is a resume, not a fresh action).
+    // Hold the read lock for both checks atomically to avoid TOCTOU races.
+    let (had_choice_before, snapshot) = {
+        let gs = lock_state!(gs_arc, read);
+        (gs.has_pending_choice(), gs.clone())
+    };
     let mut game_state = lock_state!(gs_arc, write);
 
     let action_type = req

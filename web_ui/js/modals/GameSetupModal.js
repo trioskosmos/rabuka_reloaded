@@ -268,14 +268,16 @@ export const GameSetupModal = {
 
             const headers = Network?.getHeaders ? Network.getHeaders() : { 'Content-Type': 'application/json' };
 
-            await fetch('api/set_deck', {
-                method: 'POST', headers,
-                body: JSON.stringify({ player: 0, deck: p0Deck.main, room_id: State.roomCode })
-            });
-            await fetch('api/set_deck', {
-                method: 'POST', headers,
-                body: JSON.stringify({ player: 1, deck: p1Deck.main, room_id: State.roomCode })
-            });
+            await Promise.all([
+                fetch('api/set_deck', {
+                    method: 'POST', headers,
+                    body: JSON.stringify({ player: 0, deck: p0Deck.main, room_id: State.roomCode })
+                }),
+                fetch('api/set_deck', {
+                    method: 'POST', headers,
+                    body: JSON.stringify({ player: 1, deck: p1Deck.main, room_id: State.roomCode })
+                })
+            ]);
 
             const initRes = await fetch('api/init', {
                 method: 'POST', headers,

@@ -56,8 +56,6 @@ export const BoardRenderer = {
             }
         };
 
-        console.log('[BoardRenderer] renderDeckCounts - p0.hand:', p0?.hand, 'p0.energy:', p0?.energy);
-
         updateCount('my-deck-count', p0.main_deck_count);
         updateCount('opp-deck-count', p1.main_deck_count);
         updateCount('my-energy-deck-count', p0.energy_deck_count);

@@ -7,7 +7,6 @@ export const SSEClient = {
         }
         eventSource = new EventSource(`/api/events?room_id=${roomCode}`);
         eventSource.onmessage = (e) => {
-            console.log('[SSE] message:', e.data);
             if (e.data === 'update' && onUpdate) {
                 onUpdate();
             } else if (e.data === 'closed' && onUpdate) {

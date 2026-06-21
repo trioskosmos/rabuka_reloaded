@@ -291,6 +291,7 @@ impl AbilityQueue {
     }
 
     pub fn pause_for_auto_ability_choice(&mut self, choice: Choice) {
+        self.snapshot_requested = true;
         self.state = QueueState::WaitingForAutoAbilityChoice { choice };
     }
 

@@ -11,7 +11,6 @@ import { DebugService } from './services/DebugService.js';
 export const Network = {
     // Shared State & Utils
     getHeaders: () => {
-        console.log(`[Network] getHeaders called. roomCode: ${State.roomCode}`);
         return {
             'Content-Type': 'application/json',
             'X-Session-Token': State.sessionToken || '',

@@ -240,8 +240,10 @@ export const AppController = {
             Modals.openLobby();
         }
 
-        await loadTranslations(State.currentLang);
-        await State.loadStaticCardDatabase();
+        await Promise.all([
+            loadTranslations(State.currentLang),
+            State.loadStaticCardDatabase()
+        ]);
         await loadTranslations(State.currentLang);
         
         const syncRoomState = () => syncRoomDisplay();
@@ -305,15 +307,6 @@ export const AppController = {
                 }
             });
         }
-
-        // PVP state polling — fallback when SSE is delayed or drops
-        const existingPoll = window._pvpPollInterval;
-        if (existingPoll) clearInterval(existingPoll);
-        window._pvpPollInterval = window.setInterval(() => {
-            if (isTabActive && State.roomCode && State.sessionToken && !State.replayMode) {
-                Network.fetchState();
-            }
-        }, 3000);
 
         // Global handler for when the other player leaves the room
         window._roomClosedHandled = false;

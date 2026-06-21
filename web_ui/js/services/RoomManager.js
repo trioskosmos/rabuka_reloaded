@@ -4,6 +4,7 @@ import { ModalManager } from '../utils/ModalManager.js';
 import { DOMUtils } from '../utils/DOMUtils.js';
 import { DOM_IDS } from '../constants_dom.js';
 import { SSEClient } from './SSEClient.js';
+import { GameService } from './GameService.js';
 
 export const RoomManager = {
     // Session Management
@@ -160,14 +161,14 @@ export const RoomManager = {
         if (networkFacade?.triggerRoomUpdate) networkFacade.triggerRoomUpdate();
         if (networkFacade?.fetchState) await networkFacade.fetchState();
 
+        GameService.startGameplayPolling();
         RoomManager.connectSSE();
     },
 
     connectSSE: () => {
         if (!State.roomCode) return;
         SSEClient.connect(State.roomCode, () => {
-            const network = window.Network || null;
-            if (network?.fetchState) network.fetchState();
+            GameService.triggerVersionCheck();
         });
     },
 

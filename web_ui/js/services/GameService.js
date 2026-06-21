@@ -40,27 +40,36 @@ export const GameService = {
         return null;
     },
 
+    _lastKnownVersion: -1,
+
     startGameplayPolling: () => {
         if (window._gameplayPollInterval) return;
-        let lastVersion = -1;
         window._gameplayPollInterval = setInterval(async () => {
             if (!State.gameHasStarted || !State.roomCode) {
                 clearInterval(window._gameplayPollInterval);
                 window._gameplayPollInterval = null;
                 return;
             }
-            try {
-                const network = window.Network || null;
-                const headers = network?.getHeaders ? network.getHeaders() : {};
-                const res = await fetch('api/game-state/version', { headers });
-                if (!res.ok) return;
-                const data = await res.json();
-                if (data.version !== undefined && data.version !== lastVersion) {
-                    lastVersion = data.version;
-                    await GameService.fetchState(network);
-                }
-            } catch (_) {}
+            await GameService.checkVersionAndFetch();
         }, 500);
+    },
+
+    checkVersionAndFetch: async () => {
+        try {
+            const network = window.Network || null;
+            const headers = network?.getHeaders ? network.getHeaders() : {};
+            const res = await fetch('api/game-state/version', { headers });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.version !== undefined && data.version !== GameService._lastKnownVersion) {
+                GameService._lastKnownVersion = data.version;
+                await GameService.fetchState(network);
+            }
+        } catch (_) {}
+    },
+
+    triggerVersionCheck: () => {
+        GameService.checkVersionAndFetch();
     },
 
     stopGameplayPolling: () => {
@@ -110,11 +119,12 @@ export const GameService = {
                 setupModal.style.display = 'none';
             }
 
+            if (data.frame_counter !== undefined) {
+                GameService._lastKnownVersion = data.frame_counter;
+            }
             updateStateData(data);
             State.gameHasStarted = true;
             State.fetchFrameCounter();
-
-            // Start gameplay polling as fallback for unreliable SSE (Cloudflared, proxies)
             GameService.startGameplayPolling();
 
         } catch (e) {
@@ -128,16 +138,47 @@ export const GameService = {
         const state = State.data;
         if (!state) return;
 
-        console.log('DEBUG: Frontend sending action:', action.action_type);
-
         // For mulligan confirm, inject the locally-selected indices into card_indices
         let extraCardIndices = action.parameters?.card_indices;
         if (action.action_type === 'confirm_mulligan' || action.action_type === 'ConfirmMulligan') {
             extraCardIndices = Array.from(State.localMulliganSelection);
         }
 
+        // Optimistic local prediction — apply deterministic state changes immediately
+        // so the UI feels instant even over the tunnel. Server response overwrites.
+        let predicted = false;
+        const actionType = action.action_type;
+        const playerKey = State.perspectivePlayer === 0 ? 'player1' : 'player2';
+        const player = state[playerKey];
+
+        if (actionType === 'play_member_to_stage' && player?.hand?.cards && action.parameters?.card_index !== undefined && action.parameters?.stage_area) {
+            const cardIndex = action.parameters.card_index;
+            const stageArea = action.parameters.stage_area;
+            const card = player.hand.cards[cardIndex];
+            if (card && player.stage?.[stageArea] !== undefined) {
+                const predictedState = JSON.parse(JSON.stringify(state));
+                const p = predictedState[playerKey];
+                const removed = p.hand.cards.splice(cardIndex, 1);
+                p.hand.count = p.hand.cards.length;
+
+                if (!p.stage[stageArea]) {
+                    p.stage[stageArea] = [];
+                }
+                if (Array.isArray(p.stage[stageArea])) {
+                    p.stage[stageArea].push(removed[0]);
+                } else {
+                    p.stage[stageArea] = [removed[0]];
+                }
+                if (predictedState.state_id !== undefined) {
+                    predictedState._predictedStateId = predictedState.state_id;
+                    predictedState.state_id = `predicted-${predictedState.state_id}`;
+                }
+                updateStateData(predictedState);
+                predicted = true;
+            }
+        }
+
         try {
-            // Simple state machine: send action, get new state and actions
             const headers = networkFacade?.getHeaders ? networkFacade.getHeaders() : { 'Content-Type': 'application/json' };
             const res = await fetch('api/execute-action', {
                 method: 'POST',
@@ -160,14 +201,16 @@ export const GameService = {
             }
 
             const data = await res.json();
-            console.log('DEBUG: Frontend received new state after action:', data.phase, data.legal_actions?.length || 0, 'actions');
-            console.log('DEBUG: Full response data:', JSON.stringify(data, null, 2));
             updateStateData(data);
             State.fetchFrameCounter();
             log('Action completed');
 
         } catch (e) {
             console.error("Action error:", e);
+            // Revert predicted state by re-fetching authoritative state
+            if (predicted && networkFacade) {
+                await GameService.fetchState(networkFacade);
+            }
             alert(e.message);
         }
     },
