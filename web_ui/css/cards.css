@@ -459,6 +459,7 @@
     width: 100%;
     flex: 1;
     min-height: 0;
+    min-width: 0;
 }
 
 .stage-group {
@@ -467,6 +468,7 @@
     flex-direction: column;
     height: 100%;
     min-height: 0;
+    min-width: 0;
 }
 
 .member-area {
@@ -477,9 +479,10 @@
     gap: 4px;
     padding: var(--space-xxs);
     position: relative;
+    flex: 0 0 var(--card-w);
     width: var(--card-w);
     min-width: var(--card-w);
-    flex: 1 0 auto;
+    max-width: var(--card-w);
     height: 100%;
 }
 

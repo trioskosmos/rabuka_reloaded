@@ -202,7 +202,24 @@ impl GameState {
         false
     }
 
+    /// Legacy wrapper: calls with default event (reads flags from self).
     pub fn trigger_auto_abilities_for_player(&mut self, player_id: &str) {
+        let event = crate::ability::types::TriggerEvent {
+            moved_cards: self.recently_moved_cards.clone().unwrap_or_default(),
+            moved_from_zone: self.recently_moved_from_zone.clone(),
+            ..Default::default()
+        };
+        self.trigger_auto_abilities_for_player_with_event(player_id, &event);
+    }
+
+    /// Core TAS implementation that takes an explicit TriggerEvent.
+    /// Callers should construct and pass the event so the scan has
+    /// accurate context about what triggered it.
+    pub fn trigger_auto_abilities_for_player_with_event(
+        &mut self,
+        player_id: &str,
+        event: &crate::ability::types::TriggerEvent,
+    ) {
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();
         let skip_this_card_auto_key = self.just_completed_ability_key.clone();
@@ -273,11 +290,9 @@ impl GameState {
                                 if let Some(ref condition) = effect.condition {
                                     let can_prefilter = Self::condition_is_event_based(condition);
                                     if can_prefilter {
-                                        let moved: &[i16] =
-                                            self.recently_moved_cards.as_deref().unwrap_or(&[]);
                                         let saved_activating = self.activating_card;
                                         self.activating_card = Some(card_id);
-                                        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, moved);
+                                        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, &event.moved_cards);
                                         let passes = ctx.evaluate_condition(condition);
                                         self.activating_card = saved_activating;
                                         if crate::ability::debug::ABILITY_DEBUG
@@ -350,11 +365,9 @@ impl GameState {
                                 // event-based condition check.
                                 if let Some(ref condition) = effect.condition {
                                     if Self::condition_is_event_based(condition) {
-                                        let moved: &[i16] =
-                                            self.recently_moved_cards.as_deref().unwrap_or(&[]);
                                         let saved_activating = self.activating_card;
                                         self.activating_card = Some(card_id);
-                                        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, moved);
+                                        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, &event.moved_cards);
                                         let passes = ctx.evaluate_condition(condition);
                                         self.activating_card = saved_activating;
                                         if !passes {
@@ -373,7 +386,7 @@ impl GameState {
                 }
             }
         }
-        let moved = self.recently_moved_cards.clone();
+        let moved = Some(event.moved_cards.clone());
         for (ability_id, card_no, stage_card_id) in abilities_to_trigger {
             self.trigger_auto_ability(
                 ability_id,
@@ -389,8 +402,10 @@ impl GameState {
         // trigger at most one batch of each_time abilities.  The snapshot
         // captured in trigger_auto_ability (above) preserves the flag value
         // for abilities that need it during execution (e.g. Sumire's "moves").
-        self.last_energy_placed_by_effect = false;
-        self.last_energy_placed_by_player = None;
+        if !event.energy_placed_by_effect {
+            self.last_energy_placed_by_effect = false;
+            self.last_energy_placed_by_player = None;
+        }
     }
 
     pub fn trigger_auto_ability(
@@ -703,10 +718,16 @@ impl GameState {
         // after the loop already exited, via moved_snapshot in actions.rs).
         // Trigger types: each_time:discard, each_time:hand_to_discard, each_time:any_to_discard,
         // each_time:energy_placed
-        if (self.recently_moved_cards.is_some() || self.last_energy_placed_by_effect)
+        let moved_marker = self.recently_moved_cards.is_some();
+        if (moved_marker || self.last_energy_placed_by_effect)
             && self.current_phase == crate::types::Phase::Main
         {
-            self.trigger_auto_abilities_for_player(player_id);
+            let event = crate::ability::types::TriggerEvent {
+                moved_cards: Vec::new(),
+                energy_placed_by_effect: self.last_energy_placed_by_effect,
+                ..Default::default()
+            };
+            self.trigger_auto_abilities_for_player_with_event(player_id, &event);
             self.recently_moved_cards = None;
             self.recently_moved_from_zone = None;
             // Re-enter the loop to process any abilities just enqueued
@@ -993,8 +1014,15 @@ impl GameState {
                         current_pid, self.recently_moved_cards
                     );
                 }
+                let event = crate::ability::types::TriggerEvent {
+                    moved_cards: self.recently_moved_cards.clone().unwrap_or_default(),
+                    moved_from_zone: self.recently_moved_from_zone.clone(),
+                    energy_placed_by_effect: self.last_energy_placed_by_effect,
+                    energy_placed_by_player: self.last_energy_placed_by_player.clone(),
+                    ..Default::default()
+                };
                 self.just_completed_ability_key = just_completed_key;
-                self.trigger_auto_abilities_for_player(&current_pid);
+                self.trigger_auto_abilities_for_player_with_event(&current_pid, &event);
                 self.just_completed_ability_key = None;
             }
             if let Some(pid) = self.ability_master_id() {

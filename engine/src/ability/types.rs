@@ -4,6 +4,25 @@ use serde_json::Value;
 
 use crate::card::AbilityEffect;
 
+/// Contextual event data passed into `trigger_auto_abilities_for_player`.
+/// Replaces the fragmented per-scan tracking flags with a single explicit
+/// value, making it clear what triggered the scan.
+#[derive(Clone, Debug, Default)]
+pub struct TriggerEvent {
+    /// Cards that moved in this batch (replaces recently_moved_cards).
+    pub moved_cards: Vec<i16>,
+    /// Zone the cards moved from (if tracked).
+    pub moved_from_zone: Option<String>,
+    /// Whether a position change occurred.
+    pub position_change_occurred: bool,
+    /// Cards that appeared on stage recently, with their source zone.
+    pub appeared_cards: Vec<(i16, String)>,
+    /// Whether energy was placed by a card effect.
+    pub energy_placed_by_effect: bool,
+    /// Which player's effect placed the energy.
+    pub energy_placed_by_player: Option<String>,
+}
+
 /// Discriminator for routing choice results to the correct handler.
 /// Statically known routes are enum variants; dynamic routes (e.g. position_change
 /// with card_no) use `Raw`.
