@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-23T00:56:18.673058",
+  "generated_at": "2026-06-23T01:22:52.584069",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1619,6 +1619,35 @@
         ],
         "action": "gain_ability",
         "ability_gain": "エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを＋１する。ライブカードが3枚以上ある場合、代わりに合計スコアを＋２する。",
+        "condition": {
+          "type": "compound",
+          "operator": "and",
+          "conditions": [
+            {
+              "type": "appearance_condition",
+              "appearance": true,
+              "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、",
+              "location": "stage",
+              "all_areas": true,
+              "group_names": [
+                "Aqours"
+              ],
+              "target": "self"
+            },
+            {
+              "type": "location_condition",
+              "target": "self",
+              "distinct": "card_name",
+              "text": "名前が異なる場合",
+              "location": "stage"
+            }
+          ],
+          "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合",
+          "target": "self",
+          "location": "stage",
+          "card_type": "member_card",
+          "distinct": "card_name"
+        },
         "gained_effect": {
           "text": "エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを+1する。ライブカードが3枚以上ある場合、代わりに合計スコアを+2する",
           "action": "conditional_alternative",

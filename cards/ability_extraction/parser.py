@@ -9084,6 +9084,17 @@ def _fix_mari_gain_ability(data: Dict[str, Any], fix_stats: Dict[str, int]) -> N
         fixed = parse_action(tt)
         if fixed.get("action") != "gain_ability":
             continue
+        # parse_action's gain_ability early return skips condition extraction.
+        # Re-extract condition from the triggerless text (scan for 場合、 etc.)
+        if not fixed.get("condition"):
+            for sep in ["とき、", "場合、", "たび、", "なら、"]:
+                idx = tt.find(sep)
+                if idx >= 0:
+                    ct = tt[: idx + 2]
+                    tc = parse_condition(ct)
+                    if tc and tc.get("type") not in (None, "custom"):
+                        fixed["condition"] = tc
+                        break
         ability["effect"] = fixed
         fix_stats["leak"] = fix_stats.get("leak", 0) + 1
         # Re-run enrichment: gained_effect from ability_gain text
