@@ -91,6 +91,7 @@ pub mod look_and_select_test;
 pub mod love_u_test;
 pub mod maki_appear_test;
 pub mod maki_test;
+pub mod mari_bp2_test;
 pub mod mari_test;
 pub mod mebius_loop_test;
 pub mod mei_bp5_test;

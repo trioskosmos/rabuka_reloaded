@@ -9051,8 +9051,46 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             if "既にメンバーがいるエリア" in text + parenthetical:
                 eff["allow_occupied_stage"] = True
 
+    # FIX: 小原鞠莉 (PL!S-bp2-008) ab#1 — constant conditional_alternative is
+    # actually a gain_ability.  _try_sequential splices the text before
+    # parse_action's gain_ability fallback runs, so we fix it post-hoc.
+    _fix_mari_gain_ability(data, fix_stats)
+
     # Group/unit filter fields are validated in extract_card_abilities.py
     return data
+
+
+def _fix_mari_gain_ability(data: Dict[str, Any], fix_stats: Dict[str, int]) -> None:
+    """Post-hoc fix: PL!S-bp2-008 ab#1 effect is sequential/conditional_alternative
+    but should be gain_ability.  Re-parses via parse_action + enriches gained_effect."""
+    for ability in data.get("unique_abilities", []):
+        cards = ability.get("cards", [])
+        if not any("S-bp2-008" in c and "(ab#1)" in c for c in cards):
+            continue
+        eff = ability.get("effect")
+        if not isinstance(eff, dict):
+            continue
+        if eff.get("action") not in ("sequential", "conditional_alternative"):
+            continue
+        tt = ability.get("triggerless_text", "")
+        if "得る" not in tt:
+            continue
+        q = extract_quoted_text(tt)
+        if not q:
+            continue
+        cat = categorize_quoted_text(q)
+        if not cat["abilities"]:
+            continue
+        fixed = parse_action(tt)
+        if fixed.get("action") != "gain_ability":
+            continue
+        ability["effect"] = fixed
+        fix_stats["leak"] = fix_stats.get("leak", 0) + 1
+        # Re-run enrichment: gained_effect from ability_gain text
+        if "gained_effect" not in fixed and fixed.get("ability_gain"):
+            gained = parse_effect(fixed["ability_gain"])
+            if gained and gained.get("action") and gained.get("action") != "custom":
+                fixed["gained_effect"] = gained
 
 
 def _validate_semantic(abilities):
