@@ -42,7 +42,7 @@ fn nagisa_one_card_gets_plus_one() {
     game.state.player1.stage.stage = [-1, -1, -1];
     game.give_energy(15);
 
-    add_live_to_success_zone(&mut game, "PL!-sd1-020-SD");
+    add_live_to_success_zone(&mut game, "PL!-sd1-019-SD");
 
     game.play_to_stage(nagisa, MemberArea::Center);
     game.drain_auto_ability_choices();
@@ -85,8 +85,8 @@ fn nagisa_two_cards_gets_plus_two() {
     game.state.player1.stage.stage = [-1, -1, -1];
     game.give_energy(15);
 
-    add_live_to_success_zone(&mut game, "PL!-sd1-020-SD");
-    add_live_to_success_zone(&mut game, "PL!-sd1-021-SD");
+    add_live_to_success_zone(&mut game, "PL!-sd1-019-SD");
+    add_live_to_success_zone(&mut game, "PL!-bp4-022-SECL");
 
     game.play_to_stage(nagisa, MemberArea::Center);
     game.drain_auto_ability_choices();
@@ -108,7 +108,7 @@ fn nagisa_not_at_center_does_not_fire() {
     game.state.player1.stage.stage = [-1, -1, -1];
     game.give_energy(15);
 
-    add_live_to_success_zone(&mut game, "PL!-sd1-020-SD");
+    add_live_to_success_zone(&mut game, "PL!-sd1-019-SD");
 
     game.play_to_stage(nagisa, MemberArea::LeftSide);
     game.drain_auto_ability_choices();
@@ -130,8 +130,8 @@ fn nagisa_effect_expires_on_clear() {
     game.state.player1.stage.stage = [-1, -1, -1];
     game.give_energy(15);
 
-    add_live_to_success_zone(&mut game, "PL!-sd1-020-SD");
-    add_live_to_success_zone(&mut game, "PL!-sd1-021-SD");
+    add_live_to_success_zone(&mut game, "PL!-sd1-019-SD");
+    add_live_to_success_zone(&mut game, "PL!-bp4-022-SECL");
 
     game.play_to_stage(nagisa, MemberArea::Center);
     game.drain_auto_ability_choices();

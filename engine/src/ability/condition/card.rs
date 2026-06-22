@@ -578,15 +578,17 @@ impl<'a> ConditionContext<'a> {
         })
     }
 
-    pub(crate) fn check_has_blade_heart(
+    pub(crate) fn check_card_property(
         &self,
         condition: &Condition,
         player: &crate::player::Player,
         location: &str,
     ) -> bool {
-        if condition.card_property.as_deref() != Some("has_blade_heart") {
-            return true;
-        }
+        let prop = match condition.card_property.as_deref() {
+            Some("has_blade_heart") => "has_blade_heart",
+            Some("has_score_icon") => "has_score_icon",
+            _ => return true,
+        };
         let card_db = &self.game_state.card_database;
         let check_cards: Vec<i16> = match Zone::from_str(location) {
             Some(Zone::RevealedCards) => self.game_state.revealed_cards.to_vec(),
@@ -602,9 +604,15 @@ impl<'a> ConditionContext<'a> {
         if check_cards.is_empty() {
             return true;
         }
-        check_cards
-            .iter()
-            .any(|&id| card_db.get_card(id).is_some_and(|c| c.has_blade_heart()))
+        let has_prop = |id: i16| -> bool {
+            let c = card_db.get_card(id);
+            match prop {
+                "has_blade_heart" => c.is_some_and(|c| c.has_blade_heart()),
+                "has_score_icon" => c.is_some_and(|c| c.has_score_icon()),
+                _ => false,
+            }
+        };
+        check_cards.iter().any(|&id| has_prop(id))
     }
 
     pub(crate) fn check_baton_touch(&self, condition: &Condition) -> bool {
@@ -1003,7 +1011,7 @@ impl<'a> ConditionContext<'a> {
         if !self.check_heart_colors(condition, player, location) {
             return false;
         }
-        if !self.check_has_blade_heart(condition, player, location) {
+        if !self.check_card_property(condition, player, location) {
             return false;
         }
         if !self.check_baton_touch(condition) {

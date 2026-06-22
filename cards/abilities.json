@@ -1,19 +1,19 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-22T19:54:44.478177",
+  "generated_at": "2026-06-22T20:34:16.543106",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
-    "total_cards": 2130,
-    "cards_with_abilities": 1279,
-    "total_abilities": 1615,
-    "unique_abilities": 752
+    "total_cards": 2280,
+    "cards_with_abilities": 1373,
+    "total_abilities": 1727,
+    "unique_abilities": 800
   },
   "unique_abilities": [
     {
       "full_text": "{{kidou.png|起動}}このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。",
       "triggerless_text": "このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。",
-      "card_count": 28,
+      "card_count": 32,
       "cards": [
         "PL!-sd1-005-SD | 星空 凛 (ab#0)",
         "PL!S-PR-026-PR | 桜内梨子 (ab#0)",
@@ -42,7 +42,11 @@
         "PL!N-PR-014-RM | 鐘 嵐珠 (ab#0)",
         "PL!HS-sd1-009-SD | 日野下花帆 (ab#0)",
         "PL!S-sd1-015-SD | 津島善子 (ab#0)",
-        "PL!SP-sd2-010-SD2 | ウィーン・マルガレーテ (ab#0)"
+        "PL!SP-sd2-010-SD2 | ウィーン・マルガレーテ (ab#0)",
+        "PL!SP-pb2-012-R | 澁谷かのん (ab#0)",
+        "PL!SP-pb2-012-P＋ | 澁谷かのん (ab#0)",
+        "PL!SP-pb2-016-R | 葉月 恋 (ab#0)",
+        "PL!SP-pb2-016-P＋ | 葉月 恋 (ab#0)"
       ],
       "triggers": "起動",
       "use_limit": null,
@@ -62,6 +66,58 @@
         "destination": "hand",
         "count": 1,
         "card_type": "live_card",
+        "target": "self",
+        "action": "move_cards"
+      }
+    },
+    {
+      "full_text": "{{kidou.png|起動}}このメンバーをステージから控え室に置く：自分の控え室からメンバーカードを1枚手札に加える。",
+      "triggerless_text": "このメンバーをステージから控え室に置く：自分の控え室からメンバーカードを1枚手札に加える。",
+      "card_count": 24,
+      "cards": [
+        "PL!-sd1-002-SD | 絢瀬 絵里 (ab#0)",
+        "PL!-pb1-019-PR | 高坂穂乃果 (ab#0)",
+        "PL!S-PR-025-PR | 高海千歌 (ab#0)",
+        "PL!S-PR-027-PR | 松浦果南 (ab#0)",
+        "PL!HS-PR-014-PR | 日野下花帆 (ab#0)",
+        "PL!N-sd1-006-SD | 近江彼方 (ab#0)",
+        "PL!SP-pb1-021-N | ウィーン・マルガレーテ (ab#0)",
+        "PL!S-bp2-016-N | 国木田花丸 (ab#0)",
+        "PL!-pb1-019-N | 高坂穂乃果 (ab#0)",
+        "PL!-pb1-025-N | 東條 希 (ab#0)",
+        "PL!N-bp4-017-N | 宮下 愛 (ab#0)",
+        "PL!N-bp4-020-N | エマ・ヴェルデ (ab#0)",
+        "PL!SP-bp4-015-N | 平安名すみれ (ab#0)",
+        "PL!SP-bp4-019-N | 若菜四季 (ab#0)",
+        "PL!S-PR-025-RM | 高海千歌 (ab#0)",
+        "PL!S-PR-027-RM | 松浦果南 (ab#0)",
+        "PL!HS-PR-014-RM | 日野下花帆 (ab#0)",
+        "PL!HS-sd1-015-SD | セラス 柳田 リリエンフェルト (ab#0)",
+        "PL!S-sd1-008-SD | 小原鞠莉 (ab#0)",
+        "PL!HS-pb1-019-N | 大沢瑠璃乃 (ab#0)",
+        "PL!S-bp6-014-N | 渡辺 曜 (ab#0)",
+        "PL!SP-sd2-014-SD2 | 嵐 千砂都 (ab#0)",
+        "PL!SP-pb2-031-N | 鬼塚夏美 (ab#0)",
+        "PL!SP-pb2-033-N | 鬼塚冬毬 (ab#0)"
+      ],
+      "triggers": "起動",
+      "use_limit": null,
+      "is_null": false,
+      "cost": {
+        "text": "このメンバーをステージから控え室に置く",
+        "source": "stage",
+        "zone": "stage",
+        "destination": "discard",
+        "card_type": "member_card",
+        "self_cost": true,
+        "type": "move_cards"
+      },
+      "effect": {
+        "text": "自分の控え室からメンバーカードを1枚手札に加える",
+        "source": "discard",
+        "destination": "hand",
+        "count": 1,
+        "card_type": "member_card",
         "target": "self",
         "action": "move_cards"
       }
@@ -126,55 +182,6 @@
       }
     },
     {
-      "full_text": "{{kidou.png|起動}}このメンバーをステージから控え室に置く：自分の控え室からメンバーカードを1枚手札に加える。",
-      "triggerless_text": "このメンバーをステージから控え室に置く：自分の控え室からメンバーカードを1枚手札に加える。",
-      "card_count": 21,
-      "cards": [
-        "PL!-sd1-002-SD | 絢瀬 絵里 (ab#0)",
-        "PL!S-PR-025-PR | 高海千歌 (ab#0)",
-        "PL!S-PR-027-PR | 松浦果南 (ab#0)",
-        "PL!HS-PR-014-PR | 日野下花帆 (ab#0)",
-        "PL!N-sd1-006-SD | 近江彼方 (ab#0)",
-        "PL!SP-pb1-021-N | ウィーン・マルガレーテ (ab#0)",
-        "PL!S-bp2-016-N | 国木田花丸 (ab#0)",
-        "PL!-pb1-019-N | 高坂穂乃果 (ab#0)",
-        "PL!-pb1-025-N | 東條 希 (ab#0)",
-        "PL!N-bp4-017-N | 宮下 愛 (ab#0)",
-        "PL!N-bp4-020-N | エマ・ヴェルデ (ab#0)",
-        "PL!SP-bp4-015-N | 平安名すみれ (ab#0)",
-        "PL!SP-bp4-019-N | 若菜四季 (ab#0)",
-        "PL!S-PR-025-RM | 高海千歌 (ab#0)",
-        "PL!S-PR-027-RM | 松浦果南 (ab#0)",
-        "PL!HS-PR-014-RM | 日野下花帆 (ab#0)",
-        "PL!HS-sd1-015-SD | セラス 柳田 リリエンフェルト (ab#0)",
-        "PL!S-sd1-008-SD | 小原鞠莉 (ab#0)",
-        "PL!HS-pb1-019-N | 大沢瑠璃乃 (ab#0)",
-        "PL!S-bp6-014-N | 渡辺 曜 (ab#0)",
-        "PL!SP-sd2-014-SD2 | 嵐 千砂都 (ab#0)"
-      ],
-      "triggers": "起動",
-      "use_limit": null,
-      "is_null": false,
-      "cost": {
-        "text": "このメンバーをステージから控え室に置く",
-        "source": "stage",
-        "zone": "stage",
-        "destination": "discard",
-        "card_type": "member_card",
-        "self_cost": true,
-        "type": "move_cards"
-      },
-      "effect": {
-        "text": "自分の控え室からメンバーカードを1枚手札に加える",
-        "source": "discard",
-        "destination": "hand",
-        "count": 1,
-        "card_type": "member_card",
-        "target": "self",
-        "action": "move_cards"
-      }
-    },
-    {
       "full_text": "{{toujyou.png|登場}}カードを1枚引き、手札を1枚控え室に置く。",
       "triggerless_text": "カードを1枚引き、手札を1枚控え室に置く。",
       "card_count": 16,
@@ -225,7 +232,7 @@
     {
       "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggerless_text": "{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
-      "card_count": 14,
+      "card_count": 15,
       "cards": [
         "PL!HS-PR-018-PR | 大沢瑠璃乃 (ab#0)",
         "PL!HS-PR-022-PR | セラス 柳田 リリエンフェルト (ab#0)",
@@ -240,7 +247,8 @@
         "PL!N-bp4-013-N | 上原歩夢 (ab#0)",
         "PL!HS-PR-018-RM | 大沢瑠璃乃 (ab#0)",
         "PL!HS-sd1-006-SD | 安養寺 姫芽 (ab#1)",
-        "PL!HS-cl1-005-CL | 徒町 小鈴 (ab#0)"
+        "PL!HS-cl1-005-CL | 徒町 小鈴 (ab#0)",
+        "PL!SP-pb2-040-N | 米女メイ (ab#0)"
       ],
       "triggers": "ライブ開始時",
       "use_limit": null,
@@ -587,6 +595,29 @@
       }
     },
     {
+      "full_text": "{{jyouji.png|常時}}このカードのプレイに際し、2人のメンバーとバトンタッチしてもよい。",
+      "triggerless_text": "このカードのプレイに際し、2人のメンバーとバトンタッチしてもよい。",
+      "card_count": 6,
+      "cards": [
+        "PL!SP-bp4-004-R＋ | 平安名すみれ (ab#0)",
+        "PL!SP-bp4-004-P | 平安名すみれ (ab#0)",
+        "PL!SP-bp4-004-P＋ | 平安名すみれ (ab#0)",
+        "PL!SP-bp4-004-SEC | 平安名すみれ (ab#0)",
+        "PL!SP-pb2-000-R | 嵐 千砂都＆鬼塚夏美 (ab#0)",
+        "PL!SP-pb2-000-DUO | 嵐 千砂都＆鬼塚夏美 (ab#0)"
+      ],
+      "triggers": "常時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "このカードのプレイに際し、2人のメンバーとバトンタッチしてもよい",
+        "action": "play_baton_touch",
+        "count": 2,
+        "optional": true
+      }
+    },
+    {
       "full_text": "{{live_start.png|ライブ開始時}}{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、自分の成功ライブカード置き場にあるカード1枚につき、選んだハートを1つ得る。",
       "triggerless_text": "{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、自分の成功ライブカード置き場にあるカード1枚につき、選んだハートを1つ得る。",
       "card_count": 5,
@@ -740,6 +771,77 @@
         "parenthetical": [
           "ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。"
         ]
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}このメンバーをポジションチェンジしてもよい。(このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。)",
+      "triggerless_text": "このメンバーをポジションチェンジしてもよい。(このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。)",
+      "card_count": 5,
+      "cards": [
+        "PL!SP-bp4-013-N | 唐 可可 (ab#0)",
+        "PL!SP-sd2-005-SD2 | 葉月 恋 (ab#0)",
+        "PL!SP-sd2-007-SD2 | 米女メイ (ab#0)",
+        "PL!SP-sd2-016-SD2 | 葉月 恋 (ab#0)",
+        "PL!SP-pb2-025-N | 嵐 千砂都 (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "このメンバーをポジションチェンジしてもよい",
+        "card_type": "member_card",
+        "optional": true,
+        "action": "position_change",
+        "target": null,
+        "parenthetical": [
+          "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
+        ]
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
+      "triggerless_text": "手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
+      "card_count": 4,
+      "cards": [
+        "PL!HS-bp1-011-PR | 村野さやか (ab#0)",
+        "PL!HS-bp1-011-N | 村野さやか (ab#0)",
+        "PL!-bp3-010-N | 高坂穂乃果 (ab#0)",
+        "PL!HS-bp6-022-N | 安養寺 姫芽 (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": {
+        "text": "手札を1枚控え室に置いてもよい",
+        "source": "hand",
+        "zone": "hand",
+        "destination": "discard",
+        "count": 1,
+        "optional": true,
+        "type": "move_cards"
+      },
+      "effect": {
+        "text": "自分のデッキの上からカードを5枚見る。その中からライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く",
+        "action": "look_and_select",
+        "look_action": {
+          "text": "自分のデッキの上からカードを5枚見る。",
+          "source": "deck_top",
+          "count": 5,
+          "target": "self",
+          "action": "look_at"
+        },
+        "select_action": {
+          "action": "select_cards",
+          "destination": "hand",
+          "discard_remaining": true,
+          "reveal": true,
+          "count": 1,
+          "card_type": "live_card",
+          "optional": true,
+          "text": "自分のデッキの上からカードを5枚見る。その中からライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
+        },
+        "optional": true
       }
     },
     {
@@ -1362,7 +1464,7 @@
       }
     },
     {
-      "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、自分の手札が7枚以下の場合、カードを1枚引く。",
+      "full_text": "{{jidou.png|自動}}［ターン1回］エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、自分の手札が7枚以下の場合、カードを1枚引く。",
       "triggerless_text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、自分の手札が7枚以下の場合、カードを1枚引く。",
       "card_count": 4,
       "cards": [
@@ -1698,6 +1800,57 @@
         "count": 1,
         "parenthetical": [
           "{{toujyou.png|登場}}能力がコストを持つ場合、支払って発動させる。"
+        ]
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
+      "triggerless_text": "手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
+      "card_count": 4,
+      "cards": [
+        "PL!SP-bp2-007-R | 米女メイ (ab#0)",
+        "PL!SP-bp2-007-P | 米女メイ (ab#0)",
+        "PL!SP-pb2-017-R | 桜小路きな子 (ab#0)",
+        "PL!SP-pb2-017-P＋ | 桜小路きな子 (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": {
+        "text": "手札を1枚控え室に置いてもよい",
+        "source": "hand",
+        "zone": "hand",
+        "destination": "discard",
+        "count": 1,
+        "optional": true,
+        "type": "move_cards"
+      },
+      "effect": {
+        "text": "自分のデッキの上からカードを5枚見る。その中から『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く",
+        "action": "look_and_select",
+        "look_action": {
+          "text": "自分のデッキの上からカードを5枚見る。",
+          "source": "deck_top",
+          "count": 5,
+          "target": "self",
+          "action": "look_at"
+        },
+        "select_action": {
+          "action": "select_cards",
+          "destination": "hand",
+          "discard_remaining": true,
+          "reveal": true,
+          "count": 1,
+          "card_type": "member_card",
+          "optional": true,
+          "group_names": [
+            "Liella!"
+          ],
+          "text": "自分のデッキの上からカードを5枚見る。その中から『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
+        },
+        "optional": true,
+        "group_names": [
+          "Liella!"
         ]
       }
     },
@@ -3260,27 +3413,6 @@
       }
     },
     {
-      "full_text": "{{jyouji.png|常時}}このカードのプレイに際し、2人のメンバーとバトンタッチしてもよい。",
-      "triggerless_text": "このカードのプレイに際し、2人のメンバーとバトンタッチしてもよい。",
-      "card_count": 4,
-      "cards": [
-        "PL!SP-bp4-004-R＋ | 平安名すみれ (ab#0)",
-        "PL!SP-bp4-004-P | 平安名すみれ (ab#0)",
-        "PL!SP-bp4-004-P＋ | 平安名すみれ (ab#0)",
-        "PL!SP-bp4-004-SEC | 平安名すみれ (ab#0)"
-      ],
-      "triggers": "常時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "このカードのプレイに際し、2人のメンバーとバトンタッチしてもよい",
-        "action": "play_baton_touch",
-        "count": 2,
-        "optional": true
-      }
-    },
-    {
       "full_text": "{{toujyou.png|登場}}{{center.png|センター}}『Liella!』のメンバー2人からバトンタッチして登場している場合、カードを2枚引き、自分の控え室にあるコスト4以下の『Liella!』のメンバーカード1枚を自分のステージのメンバーのいないエリアに登場させる。",
       "triggerless_text": "{{center.png|センター}}『Liella!』のメンバー2人からバトンタッチして登場している場合、カードを2枚引き、自分の控え室にあるコスト4以下の『Liella!』のメンバーカード1枚を自分のステージのメンバーのいないエリアに登場させる。",
       "card_count": 4,
@@ -3570,31 +3702,6 @@
         "original_value": true,
         "blade_limit": 3,
         "blade_limit_operator": "<="
-      }
-    },
-    {
-      "full_text": "{{toujyou.png|登場}}このメンバーをポジションチェンジしてもよい。(このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。)",
-      "triggerless_text": "このメンバーをポジションチェンジしてもよい。(このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。)",
-      "card_count": 4,
-      "cards": [
-        "PL!SP-bp4-013-N | 唐 可可 (ab#0)",
-        "PL!SP-sd2-005-SD2 | 葉月 恋 (ab#0)",
-        "PL!SP-sd2-007-SD2 | 米女メイ (ab#0)",
-        "PL!SP-sd2-016-SD2 | 葉月 恋 (ab#0)"
-      ],
-      "triggers": "登場",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "このメンバーをポジションチェンジしてもよい",
-        "card_type": "member_card",
-        "optional": true,
-        "action": "position_change",
-        "target": null,
-        "parenthetical": [
-          "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
-        ]
       }
     },
     {
@@ -5635,6 +5742,7 @@
           "location": "revealed_cards",
           "target": "self",
           "text": "エールにより公開された自分のカードの中に、{{icon_score.png|スコア}}を持つ『Aqours』のライブカードがある場合",
+          "card_property": "has_score_icon",
           "card_type": "live_card",
           "position": "center",
           "activation_position": "center",
@@ -5939,6 +6047,50 @@
       }
     },
     {
+      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
+      "triggerless_text": "手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
+      "card_count": 3,
+      "cards": [
+        "PL!-sd1-015-SD | 西木野 真姫 (ab#0)",
+        "PL!HS-bp2-010-PR | 日野下花帆 (ab#0)",
+        "PL!HS-bp2-010-N | 日野下花帆 (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": {
+        "text": "手札を1枚控え室に置いてもよい",
+        "source": "hand",
+        "zone": "hand",
+        "destination": "discard",
+        "count": 1,
+        "optional": true,
+        "type": "move_cards"
+      },
+      "effect": {
+        "text": "自分のデッキの上からカードを5枚見る。その中からメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く",
+        "action": "look_and_select",
+        "look_action": {
+          "text": "自分のデッキの上からカードを5枚見る。",
+          "source": "deck_top",
+          "count": 5,
+          "target": "self",
+          "action": "look_at"
+        },
+        "select_action": {
+          "action": "select_cards",
+          "destination": "hand",
+          "discard_remaining": true,
+          "reveal": true,
+          "count": 1,
+          "card_type": "member_card",
+          "optional": true,
+          "text": "自分のデッキの上からカードを5枚見る。その中からメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
+        },
+        "optional": true
+      }
+    },
+    {
       "full_text": "{{toujyou.png|登場}}以下から1つを選ぶ。\n・カードを1枚引き、手札を1枚控え室に置く。\n・相手のステージにいるすべてのコスト2以下のメンバーをウェイトにする。",
       "triggerless_text": "以下から1つを選ぶ。\n・カードを1枚引き、手札を1枚控え室に置く。\n・相手のステージにいるすべてのコスト2以下のメンバーをウェイトにする。",
       "card_count": 3,
@@ -6034,6 +6186,34 @@
       }
     },
     {
+      "full_text": "{{jyouji.png|常時}}相手のエネルギーが自分より多い場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "相手のエネルギーが自分より多い場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "card_count": 3,
+      "cards": [
+        "PL!S-pb1-005-PR | 渡辺 曜 (ab#0)",
+        "PL!S-pb1-005-R | 渡辺 曜 (ab#0)",
+        "PL!S-pb1-005-P＋ | 渡辺 曜 (ab#0)"
+      ],
+      "triggers": "常時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "相手のエネルギーが自分より多い場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+        "condition": {
+          "text": "相手のエネルギーが自分より多い場合",
+          "target": "opponent",
+          "resource_type": "energy",
+          "operator": ">",
+          "comparison_target": "self",
+          "type": "comparison_condition"
+        },
+        "action": "gain_resource",
+        "resource": "blade",
+        "count": 3
+      }
+    },
+    {
       "full_text": "{{toujyou.png|登場}}ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
       "triggerless_text": "ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
       "card_count": 3,
@@ -6080,6 +6260,80 @@
         "action": "gain_resource",
         "resource": "blade",
         "count": 2
+      }
+    },
+    {
+      "full_text": "{{kidou.png|起動}}{{icon_energy.png|E}}{{icon_energy.png|E}}このメンバーをステージから控え室に置く：自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる。その後、自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く。（メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。）",
+      "triggerless_text": "{{icon_energy.png|E}}{{icon_energy.png|E}}このメンバーをステージから控え室に置く：自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる。その後、自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く。（メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。）",
+      "card_count": 3,
+      "cards": [
+        "PL!N-bp3-007-PR | 優木せつ菜 (ab#0)",
+        "PL!N-bp3-007-R | 優木せつ菜 (ab#0)",
+        "PL!N-bp3-007-P | 優木せつ菜 (ab#0)"
+      ],
+      "triggers": "起動",
+      "use_limit": null,
+      "is_null": false,
+      "cost": {
+        "text": "{{icon_energy.png|E}}{{icon_energy.png|E}}このメンバーをステージから控え室に置く",
+        "type": "sequential_cost",
+        "costs": [
+          {
+            "text": "{{icon_energy.png|E}}{{icon_energy.png|E}}",
+            "type": "pay_energy",
+            "energy": 2,
+            "zone": "energy_zone",
+            "count": 2
+          },
+          {
+            "text": "このメンバーをステージから控え室に置く",
+            "source": "stage",
+            "zone": "stage",
+            "destination": "discard",
+            "card_type": "member_card",
+            "self_cost": true,
+            "type": "move_cards"
+          }
+        ]
+      },
+      "effect": {
+        "text": "自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる。その後、自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる",
+            "source": "hand",
+            "destination": "same_area",
+            "cost_limit": 13,
+            "cost_limit_operator": "<=",
+            "count": 1,
+            "card_type": "member_card",
+            "target": "self",
+            "characters": [
+              "優木せつ菜"
+            ],
+            "quoted_text": {
+              "text": "優木せつ菜",
+              "quoted_type": "character"
+            },
+            "action": "move_cards"
+          },
+          {
+            "text": "自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く",
+            "destination": "under_member",
+            "count": 1,
+            "card_type": "member_card",
+            "target": "self",
+            "action": "place_energy_under_member",
+            "energy_count": 1
+          }
+        ],
+        "parenthetical": [
+          "メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。"
+        ],
+        "characters": [
+          "優木せつ菜"
+        ]
       }
     },
     {
@@ -6188,6 +6442,33 @@
           "live_card",
           "member_card"
         ]
+      }
+    },
+    {
+      "full_text": "{{jyouji.png|常時}}ステージのセンターエリアにいる場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "ステージのセンターエリアにいる場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "card_count": 3,
+      "cards": [
+        "PL!SP-bp1-004-PR | 平安名すみれ (ab#0)",
+        "PL!SP-bp1-004-R | 平安名すみれ (ab#0)",
+        "PL!SP-bp1-004-P | 平安名すみれ (ab#0)"
+      ],
+      "triggers": "常時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "ステージのセンターエリアにいる場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+        "condition": {
+          "text": "ステージのセンターエリアにいる場合",
+          "location": "stage",
+          "position": "center",
+          "type": "position_condition"
+        },
+        "action": "gain_resource",
+        "resource": "blade",
+        "count": 5,
+        "position": "center"
       }
     },
     {
@@ -6331,6 +6612,40 @@
       }
     },
     {
+      "full_text": "{{toujyou.png|登場}}手札を3枚まで控え室に置いてもよい：これにより置いた枚数分カードを引く。",
+      "triggerless_text": "手札を3枚まで控え室に置いてもよい：これにより置いた枚数分カードを引く。",
+      "card_count": 3,
+      "cards": [
+        "PL!HS-bp1-005-PR | 大沢瑠璃乃 (ab#0)",
+        "PL!HS-bp1-005-R | 大沢瑠璃乃 (ab#0)",
+        "PL!HS-bp1-005-P | 大沢瑠璃乃 (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": {
+        "text": "手札を3枚まで控え室に置いてもよい",
+        "source": "hand",
+        "zone": "hand",
+        "destination": "discard",
+        "count": 3,
+        "optional": true,
+        "max": true,
+        "any_number": true,
+        "type": "move_cards"
+      },
+      "effect": {
+        "text": "これにより置いた枚数分カードを引く",
+        "action": "draw_card",
+        "source": "deck",
+        "destination": "hand",
+        "dynamic_count": {
+          "type": "drawn_cards",
+          "reference": "previous_draw"
+        }
+      }
+    },
+    {
       "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
       "triggerless_text": "{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
       "card_count": 3,
@@ -6395,50 +6710,6 @@
           "count": 1,
           "text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く"
         }
-      }
-    },
-    {
-      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
-      "triggerless_text": "手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
-      "card_count": 3,
-      "cards": [
-        "PL!HS-bp1-011-N | 村野さやか (ab#0)",
-        "PL!-bp3-010-N | 高坂穂乃果 (ab#0)",
-        "PL!HS-bp6-022-N | 安養寺 姫芽 (ab#0)"
-      ],
-      "triggers": "登場",
-      "use_limit": null,
-      "is_null": false,
-      "cost": {
-        "text": "手札を1枚控え室に置いてもよい",
-        "source": "hand",
-        "zone": "hand",
-        "destination": "discard",
-        "count": 1,
-        "optional": true,
-        "type": "move_cards"
-      },
-      "effect": {
-        "text": "自分のデッキの上からカードを5枚見る。その中からライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く",
-        "action": "look_and_select",
-        "look_action": {
-          "text": "自分のデッキの上からカードを5枚見る。",
-          "source": "deck_top",
-          "count": 5,
-          "target": "self",
-          "action": "look_at"
-        },
-        "select_action": {
-          "action": "select_cards",
-          "destination": "hand",
-          "discard_remaining": true,
-          "reveal": true,
-          "count": 1,
-          "card_type": "live_card",
-          "optional": true,
-          "text": "自分のデッキの上からカードを5枚見る。その中からライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
-        },
-        "optional": true
       }
     },
     {
@@ -6540,6 +6811,35 @@
       }
     },
     {
+      "full_text": "{{live_success.png|ライブ成功時}}自分の手札の枚数が相手より多い場合、このカードのスコアを＋１する。",
+      "triggerless_text": "自分の手札の枚数が相手より多い場合、このカードのスコアを＋１する。",
+      "card_count": 3,
+      "cards": [
+        "PL!SP-bp2-024-L | ビタミンSUMMER！ (ab#0)",
+        "PL!SP-bp2-024-SECL | ビタミンSUMMER! (ab#0)",
+        "PL!SP-bp2-024-SRL | ビタミンSUMMER! (ab#0)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分の手札の枚数が相手より多い場合、このカードのスコアを+1する",
+        "condition": {
+          "text": "自分の手札の枚数が相手より多い場合",
+          "target": "self",
+          "location": "hand",
+          "operator": ">",
+          "comparison_target": "opponent",
+          "type": "comparison_condition"
+        },
+        "action": "modify_score",
+        "value": 1,
+        "operation": "add",
+        "self_target": true
+      }
+    },
+    {
       "full_text": "{{jyouji.png|常時}}すべての領域にあるこのカードは『スリーズブーケ』、『DOLLCHESTRA』、『みらくらぱーく！』として扱う。",
       "triggerless_text": "すべての領域にあるこのカードは『スリーズブーケ』、『DOLLCHESTRA』、『みらくらぱーく！』として扱う。",
       "card_count": 3,
@@ -6612,6 +6912,84 @@
           "aggregate": "total",
           "type": "comparison_condition"
         }
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}自分のセンターエリアにいる『Liella!』のメンバーのコストが、相手のセンターエリアにいるメンバーより高い場合、このカードのスコアを＋１する。",
+      "triggerless_text": "自分のセンターエリアにいる『Liella!』のメンバーのコストが、相手のセンターエリアにいるメンバーより高い場合、このカードのスコアを＋１する。",
+      "card_count": 3,
+      "cards": [
+        "PL!SP-bp4-024-L | ノンフィクション!! (ab#0)",
+        "PL!SP-bp4-024-SECL | ノンフィクション!! (ab#0)",
+        "PL!SP-bp4-024-SRL | ノンフィクション!! (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のセンターエリアにいる『Liella!』のメンバーのコストが、相手のセンターエリアにいるメンバーより高い場合、このカードのスコアを+1する",
+        "condition": {
+          "text": "自分のセンターエリアにいる『Liella!』のメンバーのコストが、相手のセンターエリアにいるメンバーより高い場合",
+          "group_names": [
+            "Liella!"
+          ],
+          "target": "both",
+          "card_type": "member_card",
+          "comparison_target": "opponent",
+          "operator": ">",
+          "comparison_type": "cost",
+          "position": "center",
+          "type": "comparison_condition"
+        },
+        "action": "modify_score",
+        "value": 1,
+        "operation": "add",
+        "self_target": true,
+        "group_names": [
+          "Liella!"
+        ],
+        "position": "center"
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合、そのメンバーは、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合、そのメンバーは、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "card_count": 3,
+      "cards": [
+        "PL!SP-bp4-024-L | ノンフィクション!! (ab#1)",
+        "PL!SP-bp4-024-SECL | ノンフィクション!! (ab#1)",
+        "PL!SP-bp4-024-SRL | ノンフィクション!! (ab#1)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合、そのメンバーは、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+        "condition": {
+          "text": "自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合",
+          "group_names": [
+            "Liella!"
+          ],
+          "target": "self",
+          "location": "stage",
+          "count": 3,
+          "resource_type": "heart_02",
+          "heart_colors": [
+            "heart02"
+          ],
+          "card_type": "member_card",
+          "operator": ">=",
+          "position": "left_side",
+          "type": "comparison_condition"
+        },
+        "duration": "live_end",
+        "card_type": "member_card",
+        "action": "gain_resource",
+        "resource": "blade",
+        "count": 2,
+        "position": "left_side"
       }
     },
     {
@@ -8210,49 +8588,6 @@
       }
     },
     {
-      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
-      "triggerless_text": "手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
-      "card_count": 2,
-      "cards": [
-        "PL!-sd1-015-SD | 西木野 真姫 (ab#0)",
-        "PL!HS-bp2-010-N | 日野下花帆 (ab#0)"
-      ],
-      "triggers": "登場",
-      "use_limit": null,
-      "is_null": false,
-      "cost": {
-        "text": "手札を1枚控え室に置いてもよい",
-        "source": "hand",
-        "zone": "hand",
-        "destination": "discard",
-        "count": 1,
-        "optional": true,
-        "type": "move_cards"
-      },
-      "effect": {
-        "text": "自分のデッキの上からカードを5枚見る。その中からメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く",
-        "action": "look_and_select",
-        "look_action": {
-          "text": "自分のデッキの上からカードを5枚見る。",
-          "source": "deck_top",
-          "count": 5,
-          "target": "self",
-          "action": "look_at"
-        },
-        "select_action": {
-          "action": "select_cards",
-          "destination": "hand",
-          "discard_remaining": true,
-          "reveal": true,
-          "count": 1,
-          "card_type": "member_card",
-          "optional": true,
-          "text": "自分のデッキの上からカードを5枚見る。その中からメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
-        },
-        "optional": true
-      }
-    },
-    {
       "full_text": "{{jidou.png|自動}}このメンバーがステージから控え室に置かれたとき、メンバー1人をアクティブにしてもよい。",
       "triggerless_text": "このメンバーがステージから控え室に置かれたとき、メンバー1人をアクティブにしてもよい。",
       "card_count": 2,
@@ -8967,32 +9302,6 @@
       }
     },
     {
-      "full_text": "{{jyouji.png|常時}}ステージのセンターエリアにいる場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
-      "triggerless_text": "ステージのセンターエリアにいる場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
-      "card_count": 2,
-      "cards": [
-        "PL!SP-bp1-004-R | 平安名すみれ (ab#0)",
-        "PL!SP-bp1-004-P | 平安名すみれ (ab#0)"
-      ],
-      "triggers": "常時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "ステージのセンターエリアにいる場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
-        "condition": {
-          "text": "ステージのセンターエリアにいる場合",
-          "location": "stage",
-          "position": "center",
-          "type": "position_condition"
-        },
-        "action": "gain_resource",
-        "resource": "blade",
-        "count": 5,
-        "position": "center"
-      }
-    },
-    {
       "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『Liella!』のカードを1枚まで公開して手札に加えてもよい。残りを控え室に置く。",
       "triggerless_text": "手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『Liella!』のカードを1枚まで公開して手札に加えてもよい。残りを控え室に置く。",
       "card_count": 2,
@@ -9184,6 +9493,84 @@
       }
     },
     {
+      "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-bp1-024-L | Tiny Stars (ab#0)",
+        "PL!SP-bp1-024-SRL | Tiny Stars (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "action": "sequential",
+        "actions": [
+          {
+            "action": "gain_resource",
+            "resource": "blade",
+            "count": 1,
+            "characters": [
+              "澁谷かのん"
+            ],
+            "card_type": "member_card",
+            "target": "self",
+            "target_count": 1,
+            "duration": "live_end",
+            "text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。"
+          },
+          {
+            "action": "gain_resource",
+            "resource": "heart",
+            "heart_color": "heart05",
+            "count": 1,
+            "characters": [
+              "澁谷かのん"
+            ],
+            "card_type": "member_card",
+            "target": "self",
+            "target_count": 1,
+            "duration": "live_end",
+            "text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。"
+          },
+          {
+            "action": "gain_resource",
+            "resource": "blade",
+            "count": 1,
+            "characters": [
+              "唐可可"
+            ],
+            "card_type": "member_card",
+            "target": "self",
+            "target_count": 1,
+            "duration": "live_end",
+            "text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。"
+          },
+          {
+            "action": "gain_resource",
+            "resource": "heart",
+            "heart_color": "heart01",
+            "count": 1,
+            "characters": [
+              "唐可可"
+            ],
+            "card_type": "member_card",
+            "target": "self",
+            "target_count": 1,
+            "duration": "live_end",
+            "text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。"
+          }
+        ],
+        "duration": "live_end",
+        "text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。",
+        "heart_colors": [
+          "heart05",
+          "heart01"
+        ]
+      }
+    },
+    {
       "full_text": "{{kidou.png|起動}}{{icon_energy.png|E}}{{icon_energy.png|E}}、このメンバーをステージから控え室に置く：自分の控え室からコスト15以下の『蓮ノ空』のメンバーカードを1枚、このメンバーがいたエリアに登場させる。",
       "triggerless_text": "{{icon_energy.png|E}}{{icon_energy.png|E}}、このメンバーをステージから控え室に置く：自分の控え室からコスト15以下の『蓮ノ空』のメンバーカードを1枚、このメンバーがいたエリアに登場させる。",
       "card_count": 2,
@@ -9229,39 +9616,6 @@
           "蓮ノ空"
         ],
         "action": "move_cards"
-      }
-    },
-    {
-      "full_text": "{{toujyou.png|登場}}手札を3枚まで控え室に置いてもよい：これにより置いた枚数分カードを引く。",
-      "triggerless_text": "手札を3枚まで控え室に置いてもよい：これにより置いた枚数分カードを引く。",
-      "card_count": 2,
-      "cards": [
-        "PL!HS-bp1-005-R | 大沢瑠璃乃 (ab#0)",
-        "PL!HS-bp1-005-P | 大沢瑠璃乃 (ab#0)"
-      ],
-      "triggers": "登場",
-      "use_limit": null,
-      "is_null": false,
-      "cost": {
-        "text": "手札を3枚まで控え室に置いてもよい",
-        "source": "hand",
-        "zone": "hand",
-        "destination": "discard",
-        "count": 3,
-        "optional": true,
-        "max": true,
-        "any_number": true,
-        "type": "move_cards"
-      },
-      "effect": {
-        "text": "これにより置いた枚数分カードを引く",
-        "action": "draw_card",
-        "source": "deck",
-        "destination": "hand",
-        "dynamic_count": {
-          "type": "drawn_cards",
-          "reference": "previous_draw"
-        }
       }
     },
     {
@@ -9763,6 +10117,137 @@
       }
     },
     {
+      "full_text": "{{live_start.png|ライブ開始時}}自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする。その後、自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを＋１する。",
+      "triggerless_text": "自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする。その後、自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを＋１する。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb1-023-L | ディストーション (ab#0)",
+        "PL!SP-pb1-023-SRL | ディストーション (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする。その後、自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを+1する",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする",
+            "condition": {
+              "type": "location_condition",
+              "target": "self",
+              "distinct": "card_name",
+              "text": "自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合",
+              "location": "stage",
+              "count": 2,
+              "operator": ">=",
+              "unit": "人",
+              "group_names": [
+                "CatChu!"
+              ]
+            },
+            "state_change": "active",
+            "count": 6,
+            "max": true,
+            "action": "change_state",
+            "card_type": "energy_card",
+            "distinct": "card_name"
+          },
+          {
+            "text": "自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを+1する",
+            "condition": {
+              "type": "state_condition",
+              "state": "active",
+              "text": "自分のエネルギーがすべてアクティブ状態の場合",
+              "resource_type": "energy",
+              "all": true
+            },
+            "action": "modify_score",
+            "value": 1,
+            "operation": "add",
+            "self_target": true,
+            "group_names": [
+              "CatChu!"
+            ]
+          }
+        ],
+        "distinct": "card_name",
+        "group_names": [
+          "CatChu!"
+        ]
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}自分のステージに名前の異なる『KALEIDOSCORE』のメンバーが2人以上いる場合、このカードのスコアを＋１する。",
+      "triggerless_text": "自分のステージに名前の異なる『KALEIDOSCORE』のメンバーが2人以上いる場合、このカードのスコアを＋１する。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb1-024-L | ニュートラル (ab#0)",
+        "PL!SP-pb1-024-SRL | ニュートラル (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージに名前の異なる『KALEIDOSCORE』のメンバーが2人以上いる場合、このカードのスコアを+1する",
+        "condition": {
+          "type": "location_condition",
+          "target": "self",
+          "distinct": "card_name",
+          "text": "自分のステージに名前の異なる『KALEIDOSCORE』のメンバーが2人以上いる場合",
+          "location": "stage",
+          "count": 2,
+          "operator": ">=",
+          "unit": "人",
+          "group_names": [
+            "KALEIDOSCORE"
+          ]
+        },
+        "action": "modify_score",
+        "value": 1,
+        "operation": "add",
+        "self_target": true,
+        "distinct": "card_name",
+        "group_names": [
+          "KALEIDOSCORE"
+        ]
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいる、このターン中に登場、またはエリアを移動した『5yncri5e!』のメンバー1人につき、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}減らす。",
+      "triggerless_text": "自分のステージにいる、このターン中に登場、またはエリアを移動した『5yncri5e!』のメンバー1人につき、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}減らす。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb1-025-L | Jellyfish (ab#0)",
+        "PL!SP-pb1-025-SRL | Jellyfish (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージにいる、このターン中に登場、またはエリアを移動した『5yncri5e!』のメンバー1人につき、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}減らす",
+        "action": "modify_required_hearts",
+        "heart_colors": [
+          "heart00"
+        ],
+        "operation": "decrease",
+        "self_target": true,
+        "per_unit": true,
+        "per_unit_count": 1,
+        "per_unit_type": "人",
+        "group_names": [
+          "5yncri5e!"
+        ],
+        "timing_condition": "appeared_or_moved_this_turn",
+        "location": "stage",
+        "target": "self",
+        "value": 1
+      }
+    },
+    {
       "full_text": "{{jyouji.png|常時}}自分の成功ライブカード置き場のカードが0枚で、かつ相手の成功ライブカード置き場にカードが1枚以上ある場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggerless_text": "自分の成功ライブカード置き場のカードが0枚で、かつ相手の成功ライブカード置き場にカードが1枚以上ある場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "card_count": 2,
@@ -9866,8 +10351,8 @@
       }
     },
     {
-      "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、ライブ終了時まで、{{heart_03.png|緑ハート}}を得る。",
-      "triggerless_text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、ライブ終了時まで、{{heart_03.png|緑ハート}}を得る。",
+      "full_text": "{{jidou.png|自動}}［ターン1回］エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、ライブ終了時まで、［緑ハート］を得る。",
+      "triggerless_text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、ライブ終了時まで、［緑ハート］を得る。",
       "card_count": 2,
       "cards": [
         "PL!S-bp2-003-R | 松浦果南 (ab#0)",
@@ -9878,7 +10363,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、ライブ終了時まで、{{heart_03.png|緑ハート}}を得る",
+        "text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、ライブ終了時まで、［緑ハート］を得る",
         "condition": {
           "type": "card_count_condition",
           "count": 1,
@@ -9892,14 +10377,11 @@
         "resource": "heart",
         "count": 1,
         "duration": "live_end",
-        "heart_colors": [
-          "heart03"
-        ],
         "target": "self"
       }
     },
     {
-      "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}エールにより公開された自分のカードの中にライブカードがないとき、それらのカードをすべて控え室に置いてもよい。これにより1枚以上のカードが控え室に置かれた場合、そのエールで得たブレードハートを失い、もう一度エールを行う。",
+      "full_text": "{{jidou.png|自動}}［ターン1回］エールにより公開された自分のカードの中にライブカードがないとき、それらのカードをすべて控え室に置いてもよい。これにより1枚以上のカードが控え室に置かれた場合、そのエールで得たブレードハートを失い、もう一度エールを行う。",
       "triggerless_text": "エールにより公開された自分のカードの中にライブカードがないとき、それらのカードをすべて控え室に置いてもよい。これにより1枚以上のカードが控え室に置かれた場合、そのエールで得たブレードハートを失い、もう一度エールを行う。",
       "card_count": 2,
       "cards": [
@@ -10158,55 +10640,6 @@
       }
     },
     {
-      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
-      "triggerless_text": "手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。",
-      "card_count": 2,
-      "cards": [
-        "PL!SP-bp2-007-R | 米女メイ (ab#0)",
-        "PL!SP-bp2-007-P | 米女メイ (ab#0)"
-      ],
-      "triggers": "登場",
-      "use_limit": null,
-      "is_null": false,
-      "cost": {
-        "text": "手札を1枚控え室に置いてもよい",
-        "source": "hand",
-        "zone": "hand",
-        "destination": "discard",
-        "count": 1,
-        "optional": true,
-        "type": "move_cards"
-      },
-      "effect": {
-        "text": "自分のデッキの上からカードを5枚見る。その中から『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く",
-        "action": "look_and_select",
-        "look_action": {
-          "text": "自分のデッキの上からカードを5枚見る。",
-          "source": "deck_top",
-          "count": 5,
-          "target": "self",
-          "action": "look_at"
-        },
-        "select_action": {
-          "action": "select_cards",
-          "destination": "hand",
-          "discard_remaining": true,
-          "reveal": true,
-          "count": 1,
-          "card_type": "member_card",
-          "optional": true,
-          "group_names": [
-            "Liella!"
-          ],
-          "text": "自分のデッキの上からカードを5枚見る。その中から『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
-        },
-        "optional": true,
-        "group_names": [
-          "Liella!"
-        ]
-      }
-    },
-    {
       "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}{{icon_energy.png|E}}：このメンバーがいるエリアとは別の自分のエリア1つを選ぶ。このメンバーをそのエリアに移動する。選んだエリアにメンバーがいる場合、そのメンバーは、このメンバーがいたエリアに移動させる。",
       "triggerless_text": "{{icon_energy.png|E}}：このメンバーがいるエリアとは別の自分のエリア1つを選ぶ。このメンバーをそのエリアに移動する。選んだエリアにメンバーがいる場合、そのメンバーは、このメンバーがいたエリアに移動させる。",
       "card_count": 2,
@@ -10309,24 +10742,25 @@
       }
     },
     {
-      "full_text": "{{live_success.png|ライブ成功時}}自分の手札の枚数が相手より多い場合、このカードのスコアを＋１する。",
-      "triggerless_text": "自分の手札の枚数が相手より多い場合、このカードのスコアを＋１する。",
+      "full_text": "{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場のカード枚数が相手より少ない場合、このカードのスコアを＋１する。",
+      "triggerless_text": "自分の成功ライブカード置き場のカード枚数が相手より少ない場合、このカードのスコアを＋１する。",
       "card_count": 2,
       "cards": [
-        "PL!SP-bp2-024-L | ビタミンSUMMER！ (ab#0)",
-        "PL!SP-bp2-024-SECL | ビタミンSUMMER! (ab#0)"
+        "PL!SP-bp2-023-L | Go!! リスタート (ab#0)",
+        "PL!SP-bp2-023-SRL | Go!! リスタート (ab#0)"
       ],
-      "triggers": "ライブ成功時",
+      "triggers": "ライブ開始時",
       "use_limit": null,
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分の手札の枚数が相手より多い場合、このカードのスコアを+1する",
+        "text": "自分の成功ライブカード置き場のカード枚数が相手より少ない場合、このカードのスコアを+1する",
         "condition": {
-          "text": "自分の手札の枚数が相手より多い場合",
+          "text": "自分の成功ライブカード置き場のカード枚数が相手より少ない場合",
           "target": "self",
-          "location": "hand",
-          "operator": ">",
+          "location": "success_live_card_zone",
+          "card_type": "live_card",
+          "operator": "<",
           "comparison_target": "opponent",
           "type": "comparison_condition"
         },
@@ -10334,6 +10768,48 @@
         "value": 1,
         "operation": "add",
         "self_target": true
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}自分のステージに「澁谷かのん」、「ウィーン・マルガレーテ」、「鬼塚冬毬」のうち、名前の異なるメンバーが2人以上いる場合、エールにより公開された自分のカードの中から、カードを1枚手札に加える。",
+      "triggerless_text": "自分のステージに「澁谷かのん」、「ウィーン・マルガレーテ」、「鬼塚冬毬」のうち、名前の異なるメンバーが2人以上いる場合、エールにより公開された自分のカードの中から、カードを1枚手札に加える。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-bp2-025-L | Bubble Rise (ab#0)",
+        "PL!SP-bp2-025-SRL | Bubble Rise (ab#0)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージに「澁谷かのん」、「ウィーン・マルガレーテ」、「鬼塚冬毬」のうち、名前の異なるメンバーが2人以上いる場合、エールにより公開された自分のカードの中から、カードを1枚手札に加える",
+        "condition": {
+          "type": "location_condition",
+          "target": "self",
+          "distinct": "card_name",
+          "text": "自分のステージに「澁谷かのん」、「ウィーン・マルガレーテ」、「鬼塚冬毬」のうち、名前の異なるメンバーが2人以上いる場合",
+          "location": "stage",
+          "count": 2,
+          "operator": ">=",
+          "unit": "人",
+          "characters": [
+            "澁谷かのん",
+            "ウィーン・マルガレーテ",
+            "鬼塚冬毬"
+          ]
+        },
+        "source": "revealed_cards",
+        "dynamic_count": {
+          "type": "revealed_cards",
+          "reference": "previous_reveal"
+        },
+        "destination": "hand",
+        "count": 1,
+        "target": "self",
+        "action": "move_cards",
+        "card_type": "card",
+        "distinct": "card_name"
       }
     },
     {
@@ -10833,33 +11309,6 @@
         "card_type": "live_card",
         "target": "self",
         "action": "move_cards"
-      }
-    },
-    {
-      "full_text": "{{jyouji.png|常時}}相手のエネルギーが自分より多い場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
-      "triggerless_text": "相手のエネルギーが自分より多い場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
-      "card_count": 2,
-      "cards": [
-        "PL!S-pb1-005-R | 渡辺 曜 (ab#0)",
-        "PL!S-pb1-005-P＋ | 渡辺 曜 (ab#0)"
-      ],
-      "triggers": "常時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "相手のエネルギーが自分より多い場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
-        "condition": {
-          "text": "相手のエネルギーが自分より多い場合",
-          "target": "opponent",
-          "resource_type": "energy",
-          "operator": ">",
-          "comparison_target": "self",
-          "type": "comparison_condition"
-        },
-        "action": "gain_resource",
-        "resource": "blade",
-        "count": 3
       }
     },
     {
@@ -11764,79 +12213,6 @@
       }
     },
     {
-      "full_text": "{{kidou.png|起動}}{{icon_energy.png|E}}{{icon_energy.png|E}}このメンバーをステージから控え室に置く：自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる。その後、自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く。（メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。）",
-      "triggerless_text": "{{icon_energy.png|E}}{{icon_energy.png|E}}このメンバーをステージから控え室に置く：自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる。その後、自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く。（メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。）",
-      "card_count": 2,
-      "cards": [
-        "PL!N-bp3-007-R | 優木せつ菜 (ab#0)",
-        "PL!N-bp3-007-P | 優木せつ菜 (ab#0)"
-      ],
-      "triggers": "起動",
-      "use_limit": null,
-      "is_null": false,
-      "cost": {
-        "text": "{{icon_energy.png|E}}{{icon_energy.png|E}}このメンバーをステージから控え室に置く",
-        "type": "sequential_cost",
-        "costs": [
-          {
-            "text": "{{icon_energy.png|E}}{{icon_energy.png|E}}",
-            "type": "pay_energy",
-            "energy": 2,
-            "zone": "energy_zone",
-            "count": 2
-          },
-          {
-            "text": "このメンバーをステージから控え室に置く",
-            "source": "stage",
-            "zone": "stage",
-            "destination": "discard",
-            "card_type": "member_card",
-            "self_cost": true,
-            "type": "move_cards"
-          }
-        ]
-      },
-      "effect": {
-        "text": "自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる。その後、自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く",
-        "action": "sequential",
-        "actions": [
-          {
-            "text": "自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる",
-            "source": "hand",
-            "destination": "same_area",
-            "cost_limit": 13,
-            "cost_limit_operator": "<=",
-            "count": 1,
-            "card_type": "member_card",
-            "target": "self",
-            "characters": [
-              "優木せつ菜"
-            ],
-            "quoted_text": {
-              "text": "優木せつ菜",
-              "quoted_type": "character"
-            },
-            "action": "move_cards"
-          },
-          {
-            "text": "自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く",
-            "destination": "under_member",
-            "count": 1,
-            "card_type": "member_card",
-            "target": "self",
-            "action": "place_energy_under_member",
-            "energy_count": 1
-          }
-        ],
-        "parenthetical": [
-          "メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。"
-        ],
-        "characters": [
-          "優木せつ菜"
-        ]
-      }
-    },
-    {
       "full_text": "{{live_start.png|ライブ開始時}}自分か相手を選ぶ。自分は、そのプレイヤーの控え室にあるメンバーカードを2枚まで、好きな順番でデッキの一番下に置く。",
       "triggerless_text": "自分か相手を選ぶ。自分は、そのプレイヤーの控え室にあるメンバーカードを2枚まで、好きな順番でデッキの一番下に置く。",
       "card_count": 2,
@@ -12304,7 +12680,8 @@
             "μ's"
           ],
           "position": "center",
-          "activation_position": "center"
+          "activation_position": "center",
+          "card_property": "has_score_icon"
         },
         "alternative_condition": {
           "type": "card_count_condition",
@@ -13858,6 +14235,293 @@
         "card_type": "energy_card",
         "target": "self",
         "action": "move_cards"
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "ライブ終了時まで、自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-bp4-023-L | Dazzling Game (ab#0)",
+        "PL!SP-bp4-023-SRL | Dazzling Game (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る",
+        "action": "sequential",
+        "actions": [
+          {
+            "action": "select",
+            "count": 1,
+            "card_type": "member_card",
+            "characters": [
+              "澁谷かのん",
+              "ウィーン・マルガレーテ",
+              "鬼塚冬毬"
+            ],
+            "group_names": [
+              "Liella!"
+            ],
+            "duration": "live_end",
+            "text": "自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る"
+          },
+          {
+            "action": "select",
+            "count": 1,
+            "card_type": "member_card",
+            "exclude_selected": true,
+            "group_names": [
+              "Liella!"
+            ],
+            "duration": "live_end",
+            "text": "自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る"
+          },
+          {
+            "text": "{{icon_blade.png|ブレード}}を得る",
+            "action": "gain_resource",
+            "resource": "blade",
+            "count": 1,
+            "duration": "live_end"
+          }
+        ],
+        "duration": "live_end",
+        "group_names": [
+          "Liella!"
+        ]
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる。",
+      "triggerless_text": "ライブ終了時まで、エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-bp4-023-L | Dazzling Game (ab#1)",
+        "PL!SP-bp4-023-SRL | Dazzling Game (ab#1)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる",
+        "action": "set_blade_type",
+        "blade_type": "紫ブレード",
+        "duration": "live_end"
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージのセンターエリアにいる『Liella!』のメンバーが元々持つ{{icon_blade.png|ブレード}}の数は3つになる。",
+      "triggerless_text": "ライブ終了時まで、自分のステージのセンターエリアにいる『Liella!』のメンバーが元々持つ{{icon_blade.png|ブレード}}の数は3つになる。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-bp4-025-L | Special Color (ab#0)",
+        "PL!SP-bp4-025-SRL | Special Color (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージのセンターエリアにいる『Liella!』のメンバーが元々持つ{{icon_blade.png|ブレード}}の数は3つになる",
+        "duration": "live_end",
+        "count": 3,
+        "card_type": "member_card",
+        "target": "self",
+        "position": "center",
+        "group_names": [
+          "Liella!"
+        ],
+        "action": "set_blade_count",
+        "original_value": true,
+        "blade_limit": 3,
+        "blade_limit_operator": "=="
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合、このカードのスコアを＋１する。",
+      "triggerless_text": "自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合、このカードのスコアを＋１する。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-bp4-025-L | Special Color (ab#1)",
+        "PL!SP-bp4-025-SRL | Special Color (ab#1)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合、このカードのスコアを+1する",
+        "condition": {
+          "type": "temporal_condition",
+          "temporal": "this_turn",
+          "condition": {
+            "type": "has_moved",
+            "text": "自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合",
+            "group_names": [
+              "Liella!"
+            ],
+            "position": "center"
+          },
+          "text": "自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合",
+          "card_type": "member_card",
+          "group_names": [
+            "Liella!"
+          ],
+          "position": "center"
+        },
+        "action": "modify_score",
+        "value": 1,
+        "operation": "add",
+        "self_target": true,
+        "group_names": [
+          "Liella!"
+        ],
+        "position": "center"
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に名前が異なる『Liella!』のメンバーカードが5枚以上ある場合、このカードのスコアを＋１する。",
+      "triggerless_text": "エールにより公開された自分のカードの中に名前が異なる『Liella!』のメンバーカードが5枚以上ある場合、このカードのスコアを＋１する。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-bp4-026-L | Wish Song (ab#0)",
+        "PL!SP-bp4-026-SRL | Wish Song (ab#0)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "エールにより公開された自分のカードの中に名前が異なる『Liella!』のメンバーカードが5枚以上ある場合、このカードのスコアを+1する",
+        "condition": {
+          "type": "location_condition",
+          "target": "self",
+          "distinct": "card_name",
+          "text": "エールにより公開された自分のカードの中に名前が異なる『Liella!』のメンバーカードが5枚以上ある場合",
+          "location": "revealed_cards",
+          "count": 5,
+          "operator": ">=",
+          "unit": "枚",
+          "group_names": [
+            "Liella!"
+          ]
+        },
+        "action": "modify_score",
+        "value": 1,
+        "operation": "add",
+        "self_target": true,
+        "group_names": [
+          "Liella!"
+        ]
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}自分のエネルギーが11枚以上ある場合、カードを2枚引き、手札を1枚控え室に置く。",
+      "triggerless_text": "自分のエネルギーが11枚以上ある場合、カードを2枚引き、手札を1枚控え室に置く。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-bp4-026-L | Wish Song (ab#1)",
+        "PL!SP-bp4-026-SRL | Wish Song (ab#1)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のエネルギーが11枚以上ある場合、カードを2枚引き、手札を1枚控え室に置く",
+        "condition": {
+          "type": "card_count_condition",
+          "count": 11,
+          "operator": ">=",
+          "text": "自分のエネルギーが11枚以上ある場合",
+          "target": "self",
+          "location": "energy_zone"
+        },
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "カードを2枚引き",
+            "count": 2,
+            "action": "draw_card",
+            "source": "deck",
+            "destination": "hand"
+          },
+          {
+            "text": "手札を1枚控え室に置く",
+            "source": "hand",
+            "destination": "discard",
+            "count": 1,
+            "action": "move_cards",
+            "card_type": "card"
+          }
+        ]
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}自分のステージにいるメンバーが『Liella!』のみの場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい。(メンバーをそれぞれ好きなエリアに移動させる。この効果で1つのエリアに2人以上のメンバーを移動させることはできない。)",
+      "triggerless_text": "自分のステージにいるメンバーが『Liella!』のみの場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい。(メンバーをそれぞれ好きなエリアに移動させる。この効果で1つのエリアに2人以上のメンバーを移動させることはできない。)",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-bp4-027-L | Chance Day, Chance Way! (ab#0)",
+        "PL!SP-bp4-027-SRL | Chance Day, Chance Way! (ab#0)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージにいるメンバーが『Liella!』のみの場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい",
+        "condition": {
+          "text": "自分のステージにいるメンバーが『Liella!』のみの場合",
+          "group_names": [
+            "Liella!"
+          ],
+          "target": "self",
+          "location": "stage",
+          "card_type": "member_card",
+          "all_members": true,
+          "type": "group_condition"
+        },
+        "source": "stage",
+        "card_type": "member_card",
+        "target": "self",
+        "optional": true,
+        "action": "position_change",
+        "multiple_targets": true,
+        "parenthetical": [
+          "メンバーをそれぞれ好きなエリアに移動させる。この効果で1つのエリアに2人以上のメンバーを移動させることはできない。"
+        ],
+        "group_names": [
+          "Liella!"
+        ]
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}アクティブ状態の自分のエネルギーがある場合、このカードのスコアを＋１する。",
+      "triggerless_text": "アクティブ状態の自分のエネルギーがある場合、このカードのスコアを＋１する。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-bp4-028-L | DAISUKI FULL POWER (ab#0)",
+        "PL!SP-bp4-028-SRL | DAISUKI FULL POWER (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "アクティブ状態の自分のエネルギーがある場合、このカードのスコアを+1する",
+        "condition": {
+          "type": "energy_state_condition",
+          "text": "アクティブ状態の自分のエネルギーがある場合",
+          "state": "active"
+        },
+        "action": "modify_score",
+        "value": 1,
+        "operation": "add",
+        "self_target": true
       }
     },
     {
@@ -16991,6 +17655,30 @@
       }
     },
     {
+      "full_text": "{{toujyou.png|登場}}相手のステージにいるコスト2以下のメンバー1人をウェイトにする。",
+      "triggerless_text": "相手のステージにいるコスト2以下のメンバー1人をウェイトにする。",
+      "card_count": 2,
+      "cards": [
+        "PL!S-bp6-015-N | 津島善子 (ab#0)",
+        "PL!SP-pb2-024-N | 唐 可可 (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "相手のステージにいるコスト2以下のメンバー1人をウェイトにする",
+        "source": "stage",
+        "cost_limit": 2,
+        "cost_limit_operator": "<=",
+        "state_change": "wait",
+        "count": 1,
+        "card_type": "member_card",
+        "target": "opponent",
+        "action": "change_state"
+      }
+    },
+    {
       "full_text": "{{jyouji.png|常時}}自分のステージにほかのメンバーがいないかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "triggerless_text": "自分のステージにほかのメンバーがいないかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "card_count": 2,
@@ -17397,6 +18085,965 @@
         "timing_condition": "moved_this_turn",
         "target": "self",
         "duration": "live_end"
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}自分の、ステージと控え室に名前の異なる『Liella!』のメンバーが5人以上いる場合、このカードを使用するためのコストは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_03.png|heart03}}{{heart_03.png|heart03}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}になる。",
+      "triggerless_text": "自分の、ステージと控え室に名前の異なる『Liella!』のメンバーが5人以上いる場合、このカードを使用するためのコストは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_03.png|heart03}}{{heart_03.png|heart03}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}になる。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-bp1-026-SECL | 未来予報ハレルヤ！ (ab#0)",
+        "PL!SP-bp1-026-SRL | 未来予報ハレルヤ！ (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分の、ステージと控え室に名前の異なる『Liella!』のメンバーが5人以上いる場合、このカードを使用するためのコストは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_03.png|heart03}}{{heart_03.png|heart03}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}になる",
+        "condition": {
+          "type": "location_condition",
+          "target": "self",
+          "distinct": "card_name",
+          "text": "自分の、ステージと控え室に名前の異なる『Liella!』のメンバーが5人以上いる場合",
+          "locations": [
+            "discard",
+            "stage"
+          ],
+          "count": 5,
+          "operator": ">=",
+          "unit": "人",
+          "group_names": [
+            "Liella!"
+          ],
+          "heart_colors": [
+            "heart02",
+            "heart03",
+            "heart06"
+          ]
+        },
+        "action": "modify_required_hearts",
+        "operation": "set",
+        "heart_colors": [
+          "heart02",
+          "heart03",
+          "heart06"
+        ],
+        "count": 2,
+        "value": 2,
+        "self_target": true,
+        "replace_all": true,
+        "distinct": "card_name",
+        "group_names": [
+          "Liella!"
+        ]
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}バトンタッチして登場した場合、このバトンタッチによって控え室に置かれた『Liella!』のメンバーカード1枚につき、カードを1枚引く。ブレードハートを持たない『Liella!』のメンバーカード1枚につき、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "バトンタッチして登場した場合、このバトンタッチによって控え室に置かれた『Liella!』のメンバーカード1枚につき、カードを1枚引く。ブレードハートを持たない『Liella!』のメンバーカード1枚につき、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-000-R | 嵐 千砂都＆鬼塚夏美 (ab#1)",
+        "PL!SP-pb2-000-DUO | 嵐 千砂都＆鬼塚夏美 (ab#1)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "バトンタッチして登場した場合、このバトンタッチによって控え室に置かれた『Liella!』のメンバーカード1枚につき、カードを1枚引く。ブレードハートを持たない『Liella!』のメンバーカード1枚につき、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+        "duration": "live_end",
+        "per_unit": true,
+        "per_unit_count": 1,
+        "per_unit_type": "枚",
+        "card_type": "member_card",
+        "action": "gain_resource",
+        "resource": "blade",
+        "count": 2,
+        "dynamic_count": {
+          "type": "per_unit",
+          "reference": "unit_count"
+        },
+        "group_names": [
+          "Liella!"
+        ],
+        "condition": {
+          "type": "movement_condition",
+          "movement": "baton_touch",
+          "target": "self",
+          "baton_touch_trigger": true,
+          "text": "バトンタッチして登場した場合",
+          "location": "stage"
+        }
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からコスト4以下の『Liella!』のメンバーカードを1枚まで公開する。そのカードを自分のステージのメンバーのいないエリアに登場させるか、手札に加える。残りを控え室に置く。",
+      "triggerless_text": "手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中からコスト4以下の『Liella!』のメンバーカードを1枚まで公開する。そのカードを自分のステージのメンバーのいないエリアに登場させるか、手札に加える。残りを控え室に置く。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-001-R | 澁谷かのん (ab#0)",
+        "PL!SP-pb2-001-PP | 澁谷かのん (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": {
+        "text": "手札を1枚控え室に置いてもよい",
+        "source": "hand",
+        "zone": "hand",
+        "destination": "discard",
+        "count": 1,
+        "optional": true,
+        "type": "move_cards"
+      },
+      "effect": {
+        "text": "自分のデッキの上からカードを5枚見る。その中からコスト4以下の『Liella!』のメンバーカードを1枚まで公開する。そのカードを自分のステージのメンバーのいないエリアに登場させるか、手札に加える。残りを控え室に置く",
+        "action": "look_and_select",
+        "look_action": {
+          "text": "自分のデッキの上からカードを5枚見る。",
+          "source": "deck_top",
+          "count": 5,
+          "target": "self",
+          "action": "look_at"
+        },
+        "select_action": {
+          "action": "select_cards",
+          "discard_remaining": true,
+          "destination": "hand",
+          "count": 1,
+          "card_type": "member_card",
+          "text": "自分のデッキの上からカードを5枚見る。その中からコスト4以下の『Liella!』のメンバーカードを1枚まで公開する。そのカードを自分のステージのメンバーのいないエリアに登場させるか、手札に加える。残りを控え室に置く",
+          "group_names": [
+            "Liella!"
+          ]
+        },
+        "group_names": [
+          "Liella!"
+        ]
+      }
+    },
+    {
+      "full_text": "{{kidou.png|起動}}{{turn1.png|ターン1回}}手札の『Liella!』のカードを1枚控え室に置く：以下から1つを選ぶ。これにより控え室に置いたカードがブレードハートを持たないメンバーカードの場合、代わりに1つ以上を選ぶ。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n・ライブ終了時まで、自分のステージにいるこのメンバー以外の『Liella!』のメンバー1人は、{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る。",
+      "triggerless_text": "手札の『Liella!』のカードを1枚控え室に置く：以下から1つを選ぶ。これにより控え室に置いたカードがブレードハートを持たないメンバーカードの場合、代わりに1つ以上を選ぶ。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n・ライブ終了時まで、自分のステージにいるこのメンバー以外の『Liella!』のメンバー1人は、{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-002-R | 唐 可可 (ab#0)",
+        "PL!SP-pb2-002-PP | 唐 可可 (ab#0)"
+      ],
+      "triggers": "起動",
+      "use_limit": 1,
+      "is_null": false,
+      "cost": {
+        "text": "手札の『Liella!』のカードを1枚控え室に置く",
+        "source": "hand",
+        "zone": "hand",
+        "destination": "discard",
+        "count": 1,
+        "group_names": [
+          "Liella!"
+        ],
+        "type": "move_cards"
+      },
+      "effect": {
+        "text": "以下から1つを選ぶ。これにより控え室に置いたカードがブレードハートを持たないメンバーカードの場合、代わりに1つ以上を選ぶ。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n・ライブ終了時まで、自分のステージにいるこのメンバー以外の『Liella!』のメンバー1人は、{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る",
+        "action": "conditional_on_result",
+        "primary_effect": {
+          "text": "以下から1つを選ぶ",
+          "count": 1,
+          "action": "select"
+        },
+        "result_condition": {
+          "type": "card_count_condition",
+          "card_type": "member_card",
+          "text": "これにより控え室に置いたカードがブレードハートを持たないメンバーカードの場合",
+          "negation": true,
+          "source": "preceding_moved",
+          "card_property": "has_blade_heart"
+        },
+        "followup_action": {
+          "text": "代わりに1つ以上を選ぶ。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n・ライブ終了時まで、自分のステージにいるこのメンバー以外の『Liella!』のメンバー1人は、{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る",
+          "duration": "live_end",
+          "source": "stage",
+          "destination": "energy_zone",
+          "state_change": "wait",
+          "count": 1,
+          "card_type": "member_card",
+          "target": "self",
+          "exclude_self": true,
+          "group_names": [
+            "Liella!"
+          ],
+          "target_count": 1,
+          "action": "move_cards",
+          "heart_colors": [
+            "heart06"
+          ]
+        },
+        "exclude_self": true,
+        "group_names": [
+          "Liella!"
+        ],
+        "heart_colors": [
+          "heart06"
+        ]
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}このターン、自分の『Liella!』のカードの効果によってこのメンバーがエリアを移動していた場合、ライブの合計スコアを＋１する。",
+      "triggerless_text": "このターン、自分の『Liella!』のカードの効果によってこのメンバーがエリアを移動していた場合、ライブの合計スコアを＋１する。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-003-R | 嵐 千砂都 (ab#0)",
+        "PL!SP-pb2-003-PP | 嵐 千砂都 (ab#0)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "このターン、自分の『Liella!』のカードの効果によってこのメンバーがエリアを移動していた場合、ライブの合計スコアを+1する",
+        "condition": {
+          "text": "このターン、自分の『Liella!』のカードの効果によってこのメンバーがエリアを移動していた場合",
+          "group_names": [
+            "Liella!"
+          ],
+          "target": "self",
+          "card_type": "member_card",
+          "self_target": true,
+          "temporal": "this_turn",
+          "temporal_scope": "this_turn",
+          "type": "group_condition"
+        },
+        "action": "modify_score",
+        "value": 1,
+        "operation": "add",
+        "group_names": [
+          "Liella!"
+        ]
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}自分のライブカード置き場の中に元々のスコアより高いスコアのライブカードがあるか、エールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードがある場合、カードを1枚引く。",
+      "triggerless_text": "自分のライブカード置き場の中に元々のスコアより高いスコアのライブカードがあるか、エールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードがある場合、カードを1枚引く。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-004-R | 平安名すみれ (ab#0)",
+        "PL!SP-pb2-004-PP | 平安名すみれ (ab#0)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のライブカード置き場の中に元々のスコアより高いスコアのライブカードがあるか、エールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードがある場合、カードを1枚引く",
+        "condition": {
+          "type": "or_condition",
+          "conditions": [
+            {
+              "text": "自分のライブカード置き場の中に元々のスコアより高いスコアのライブカードがある",
+              "target": "self",
+              "location": "live_card_zone",
+              "card_type": "live_card",
+              "comparison_target": "self",
+              "operator": ">",
+              "comparison_type": "score",
+              "type": "comparison_condition",
+              "original_value": true
+            },
+            {
+              "type": "location_condition",
+              "location": "revealed_cards",
+              "target": "self",
+              "text": "エールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードがある場合",
+              "card_property": "has_score_icon",
+              "card_type": "live_card"
+            }
+          ],
+          "text": "自分のライブカード置き場の中に元々のスコアより高いスコアのライブカードがあるか、エールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードがある場合",
+          "original_value": true,
+          "card_property": "has_score_icon"
+        },
+        "count": 1,
+        "action": "draw_card",
+        "source": "deck",
+        "destination": "hand",
+        "original_value": true
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}バトンタッチして登場した場合、このバトンタッチで控え室に置かれた『Liella!』のメンバーカードを1枚、このメンバーの下に置く。",
+      "triggerless_text": "バトンタッチして登場した場合、このバトンタッチで控え室に置かれた『Liella!』のメンバーカードを1枚、このメンバーの下に置く。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-005-R | 葉月 恋 (ab#0)",
+        "PL!SP-pb2-005-PP | 葉月 恋 (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "バトンタッチして登場した場合、このバトンタッチで控え室に置かれた『Liella!』のメンバーカードを1枚、このメンバーの下に置く",
+        "condition": {
+          "type": "movement_condition",
+          "movement": "baton_touch",
+          "target": "self",
+          "baton_touch_trigger": true,
+          "text": "バトンタッチして登場した場合",
+          "location": "stage"
+        },
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "このバトンタッチで控え室に置かれた『Liella!』のメンバーカードを1枚",
+            "source": "discard",
+            "count": 1,
+            "card_type": "member_card",
+            "group_names": [
+              "Liella!"
+            ],
+            "action": "play_baton_touch"
+          },
+          {
+            "text": "このメンバーの下に置く",
+            "destination": "under_member",
+            "card_type": "member_card",
+            "action": "move_cards",
+            "count": 1
+          }
+        ],
+        "group_names": [
+          "Liella!"
+        ]
+      }
+    },
+    {
+      "full_text": "{{jyouji.png|常時}}このメンバーは、このメンバーの下に置かれている『Liella!』のメンバーカードが持つ{{kidou.png|起動}}能力をすべて得る。",
+      "triggerless_text": "このメンバーは、このメンバーの下に置かれている『Liella!』のメンバーカードが持つ{{kidou.png|起動}}能力をすべて得る。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-005-R | 葉月 恋 (ab#1)",
+        "PL!SP-pb2-005-PP | 葉月 恋 (ab#1)"
+      ],
+      "triggers": "常時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "このメンバーは、このメンバーの下に置かれている『Liella!』のメンバーカードが持つ{{kidou.png|起動}}能力をすべて得る",
+        "card_type": "member_card",
+        "group_names": [
+          "Liella!"
+        ],
+        "action": "gain_ability_from_source",
+        "source_location": "under_member",
+        "trigger_filter": [
+          "起動"
+        ],
+        "all": true
+      }
+    },
+    {
+      "full_text": "{{jyouji.png|常時}}このメンバーの下にある『Liella!』のメンバーカード1枚につき、このメンバーのコストを＋１する。",
+      "triggerless_text": "このメンバーの下にある『Liella!』のメンバーカード1枚につき、このメンバーのコストを＋１する。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-006-R | 桜小路きな子 (ab#0)",
+        "PL!SP-pb2-006-PP | 桜小路きな子 (ab#0)"
+      ],
+      "triggers": "常時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "このメンバーの下にある『Liella!』のメンバーカード1枚につき、このメンバーのコストを+1する",
+        "card_type": "member_card",
+        "action": "modify_cost",
+        "operation": "add",
+        "value": 1,
+        "per_unit": true,
+        "per_unit_count": 1,
+        "per_unit_type": "枚",
+        "group_names": [
+          "Liella!"
+        ],
+        "location": "under_member"
+      }
+    },
+    {
+      "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のライブが成功するか、このメンバーがエリアを移動したとき、自分の控え室にある『Liella!』のメンバーカードを1枚、このメンバーの下に置く。",
+      "triggerless_text": "自分のライブが成功するか、このメンバーがエリアを移動したとき、自分の控え室にある『Liella!』のメンバーカードを1枚、このメンバーの下に置く。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-006-R | 桜小路きな子 (ab#1)",
+        "PL!SP-pb2-006-PP | 桜小路きな子 (ab#1)"
+      ],
+      "triggers": "自動",
+      "use_limit": 1,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のライブが成功するか、このメンバーがエリアを移動したとき、自分の控え室にある『Liella!』のメンバーカードを1枚、このメンバーの下に置く",
+        "condition": {
+          "type": "movement_condition",
+          "text": "自分のライブが成功するか、このメンバーがエリアを移動したとき",
+          "movement": "moved",
+          "movement_state": "has_moved"
+        },
+        "source": "discard",
+        "destination": "under_member",
+        "count": 1,
+        "card_type": "member_card",
+        "target": "self",
+        "group_names": [
+          "Liella!"
+        ],
+        "action": "move_cards"
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分の控え室から『Liella!』のライブカードを1枚手札に加える。",
+      "triggerless_text": "{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分の控え室から『Liella!』のライブカードを1枚手札に加える。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-007-R | 米女メイ (ab#0)",
+        "PL!SP-pb2-007-PP | 米女メイ (ab#0)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": {
+        "text": "{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい",
+        "optional": true,
+        "type": "pay_energy",
+        "energy": 3,
+        "zone": "energy_zone",
+        "count": 3
+      },
+      "effect": {
+        "text": "自分の控え室から『Liella!』のライブカードを1枚手札に加える",
+        "source": "discard",
+        "destination": "hand",
+        "count": 1,
+        "card_type": "live_card",
+        "target": "self",
+        "group_names": [
+          "Liella!"
+        ],
+        "action": "move_cards"
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にあるブレードハートを持たない『Liella!』のメンバーカード2枚につき、ライブの合計スコアを＋１する。この能力では合計スコアは２までしか増えない。",
+      "triggerless_text": "エールにより公開された自分のカードの中にあるブレードハートを持たない『Liella!』のメンバーカード2枚につき、ライブの合計スコアを＋１する。この能力では合計スコアは２までしか増えない。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-008-R | 若菜四季 (ab#0)",
+        "PL!SP-pb2-008-PP | 若菜四季 (ab#0)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "エールにより公開された自分のカードの中にあるブレードハートを持たない『Liella!』のメンバーカード2枚につき、ライブの合計スコアを+1する。この能力では合計スコアは2までしか増えない",
+        "action": "modify_score",
+        "value": 1,
+        "operation": "add",
+        "per_unit": true,
+        "per_unit_count": 2,
+        "per_unit_type": "枚",
+        "card_type": "member_card",
+        "group_names": [
+          "Liella!"
+        ],
+        "target": "self"
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}/{{live_start.png|ライブ開始時}}『Liella!』のメンバー1人をウェイトにしてもよい：相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数がこれによりウェイトにしたメンバーが元々持つ{{icon_blade.png|ブレード}}の数より2つ以上少ないメンバー1人をウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）",
+      "triggerless_text": "『Liella!』のメンバー1人をウェイトにしてもよい：相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数がこれによりウェイトにしたメンバーが元々持つ{{icon_blade.png|ブレード}}の数より2つ以上少ないメンバー1人をウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-009-R | 鬼塚夏美 (ab#0)",
+        "PL!SP-pb2-009-PP | 鬼塚夏美 (ab#0)"
+      ],
+      "triggers": "ライブ開始時, 登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": {
+        "text": "『Liella!』のメンバー1人をウェイトにしてもよい",
+        "state_change": "wait",
+        "count": 1,
+        "card_type": "member_card",
+        "group_names": [
+          "Liella!"
+        ],
+        "optional": true,
+        "type": "change_state"
+      },
+      "effect": {
+        "text": "相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数がこれによりウェイトにしたメンバーが元々持つ{{icon_blade.png|ブレード}}の数より2つ以上少ないメンバー1人をウェイトにする",
+        "source": "stage",
+        "state_change": "wait",
+        "count": 1,
+        "card_type": "member_card",
+        "target": "opponent",
+        "action": "change_state",
+        "original_value": true,
+        "parenthetical": [
+          "ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。"
+        ]
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置かないかぎり、自分のエネルギー1枚をエネルギーデッキに置く。",
+      "triggerless_text": "手札を1枚控え室に置かないかぎり、自分のエネルギー1枚をエネルギーデッキに置く。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-010-R | ウィーン・マルガレーテ (ab#0)",
+        "PL!SP-pb2-010-PP | ウィーン・マルガレーテ (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のエネルギー1枚をエネルギーデッキに置く",
+        "condition": {
+          "text": "手札を1枚控え室に置かないかぎり",
+          "location": "discard",
+          "locations": [
+            "discard",
+            "hand"
+          ],
+          "count": 1,
+          "operator": ">=",
+          "target": "self",
+          "type": "comparison_condition"
+        },
+        "duration": "as_long_as",
+        "conditional": true,
+        "destination": "deck",
+        "count": 1,
+        "target": "self",
+        "action": "move_cards",
+        "source": "hand",
+        "card_type": "energy_card"
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}以下から1つを選ぶ。\n・カードを2枚引く。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
+      "triggerless_text": "以下から1つを選ぶ。\n・カードを2枚引く。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-010-R | ウィーン・マルガレーテ (ab#1)",
+        "PL!SP-pb2-010-PP | ウィーン・マルガレーテ (ab#1)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "以下から1つを選ぶ。\n・カードを2枚引く。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
+        "action": "choice",
+        "options": [
+          {
+            "text": "カードを2枚引く。",
+            "count": 2,
+            "action": "draw_card",
+            "source": "deck",
+            "destination": "hand"
+          },
+          {
+            "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
+            "source": "energy_deck",
+            "destination": "energy_zone",
+            "state_change": "wait",
+            "count": 1,
+            "card_type": "energy_card",
+            "target": "self",
+            "action": "move_cards"
+          }
+        ],
+        "count": 1
+      }
+    },
+    {
+      "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のステージのセンターエリアにいるメンバーがエリアを移動したとき、以下から1つを選ぶ。\n・ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。\n・相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。\n・カードを1枚引く。",
+      "triggerless_text": "自分のステージのセンターエリアにいるメンバーがエリアを移動したとき、以下から1つを選ぶ。\n・ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。\n・相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。\n・カードを1枚引く。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-011-R | 鬼塚冬毬 (ab#0)",
+        "PL!SP-pb2-011-PP | 鬼塚冬毬 (ab#0)"
+      ],
+      "triggers": "自動",
+      "use_limit": 1,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージのセンターエリアにいるメンバーがエリアを移動したとき、以下から1つを選ぶ。\n・ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。\n・相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。\n・カードを1枚引く",
+        "condition": {
+          "type": "movement_condition",
+          "text": "自分のステージのセンターエリアにいるメンバーがエリアを移動したとき",
+          "movement": "moved",
+          "movement_state": "has_moved",
+          "position": "center"
+        },
+        "action": "choice",
+        "options": [
+          {
+            "text": "ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+            "duration": "live_end",
+            "action": "gain_resource",
+            "resource": "blade",
+            "count": 2
+          },
+          {
+            "text": "相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。",
+            "source": "stage",
+            "state_change": "wait",
+            "count": 1,
+            "card_type": "member_card",
+            "target": "opponent",
+            "action": "change_state",
+            "original_value": true,
+            "blade_limit": 2,
+            "blade_limit_operator": "<="
+          },
+          {
+            "text": "カードを1枚引く",
+            "count": 1,
+            "action": "draw_card",
+            "source": "deck",
+            "destination": "hand"
+          }
+        ],
+        "count": 1,
+        "original_value": true,
+        "position": "center"
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}このメンバーをポジションチェンジしてもよい。",
+      "triggerless_text": "このメンバーをポジションチェンジしてもよい。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-011-R | 鬼塚冬毬 (ab#4)",
+        "PL!SP-pb2-011-PP | 鬼塚冬毬 (ab#4)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "このメンバーをポジションチェンジしてもよい",
+        "card_type": "member_card",
+        "optional": true,
+        "action": "position_change",
+        "target": null
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}手札の『KALEIDOSCORE』のカードを1枚控え室に置いてもよい：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。これにより控え室に置いたカードがブレードハートを持たない場合、カードを1枚引く。",
+      "triggerless_text": "手札の『KALEIDOSCORE』のカードを1枚控え室に置いてもよい：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。これにより控え室に置いたカードがブレードハートを持たない場合、カードを1枚引く。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-013-R | 唐 可可 (ab#0)",
+        "PL!SP-pb2-013-P＋ | 唐 可可 (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": {
+        "text": "手札の『KALEIDOSCORE』のカードを1枚控え室に置いてもよい",
+        "source": "hand",
+        "zone": "hand",
+        "destination": "discard",
+        "count": 1,
+        "group_names": [
+          "KALEIDOSCORE"
+        ],
+        "optional": true,
+        "type": "move_cards"
+      },
+      "effect": {
+        "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。これにより控え室に置いたカードがブレードハートを持たない場合、カードを1枚引く",
+        "action": "conditional_on_result",
+        "primary_effect": {
+          "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
+          "source": "energy_deck",
+          "destination": "energy_zone",
+          "state_change": "wait",
+          "count": 1,
+          "card_type": "energy_card",
+          "target": "self",
+          "action": "move_cards"
+        },
+        "result_condition": {
+          "type": "card_count_condition",
+          "card_type": "member_card",
+          "text": "これにより控え室に置いたカードがブレードハートを持たない場合",
+          "negation": true,
+          "source": "preceding_moved",
+          "card_property": "has_blade_heart"
+        },
+        "followup_action": {
+          "text": "カードを1枚引く",
+          "count": 1,
+          "action": "draw_card",
+          "source": "deck",
+          "destination": "hand"
+        }
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}自分のステージにいるメンバーが『5yncri5e!』のみの場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい。(メンバーをそれぞれ好きなエリアに移動させてもよい。)",
+      "triggerless_text": "自分のステージにいるメンバーが『5yncri5e!』のみの場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい。(メンバーをそれぞれ好きなエリアに移動させてもよい。)",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-014-R | 嵐 千砂都 (ab#0)",
+        "PL!SP-pb2-014-P＋ | 嵐 千砂都 (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージにいるメンバーが『5yncri5e!』のみの場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい",
+        "condition": {
+          "text": "自分のステージにいるメンバーが『5yncri5e!』のみの場合",
+          "group_names": [
+            "5yncri5e!"
+          ],
+          "target": "self",
+          "location": "stage",
+          "card_type": "member_card",
+          "all_members": true,
+          "type": "group_condition"
+        },
+        "source": "stage",
+        "card_type": "member_card",
+        "target": "self",
+        "optional": true,
+        "action": "position_change",
+        "multiple_targets": true,
+        "parenthetical": [
+          "メンバーをそれぞれ好きなエリアに移動させてもよい。"
+        ],
+        "group_names": [
+          "5yncri5e!"
+        ]
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分の控え室から『CatChu!』のカードを1枚手札に加える。",
+      "triggerless_text": "手札を1枚控え室に置いてもよい：自分の控え室から『CatChu!』のカードを1枚手札に加える。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-015-R | 平安名すみれ (ab#0)",
+        "PL!SP-pb2-015-P＋ | 平安名すみれ (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": {
+        "text": "手札を1枚控え室に置いてもよい",
+        "source": "hand",
+        "zone": "hand",
+        "destination": "discard",
+        "count": 1,
+        "optional": true,
+        "type": "move_cards"
+      },
+      "effect": {
+        "text": "自分の控え室から『CatChu!』のカードを1枚手札に加える",
+        "source": "discard",
+        "destination": "hand",
+        "count": 1,
+        "target": "self",
+        "group_names": [
+          "CatChu!"
+        ],
+        "action": "move_cards",
+        "card_type": "card"
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいるこのメンバーと名前の異なる『CatChu!』のメンバー1人につき、エネルギーを1枚アクティブにする。",
+      "triggerless_text": "自分のステージにいるこのメンバーと名前の異なる『CatChu!』のメンバー1人につき、エネルギーを1枚アクティブにする。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-018-R | 米女メイ (ab#0)",
+        "PL!SP-pb2-018-P＋ | 米女メイ (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージにいるこのメンバーと名前の異なる『CatChu!』のメンバー1人につき、エネルギーを1枚アクティブにする",
+        "state_change": "active",
+        "count": 1,
+        "action": "change_state",
+        "card_type": "energy_card",
+        "per_unit": true,
+        "per_unit_count": 1,
+        "per_unit_type": "人",
+        "group_names": [
+          "CatChu!"
+        ],
+        "distinct": "card_name",
+        "location": "stage",
+        "target": "self"
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分の控え室から『5yncri5e!』のカードを1枚手札に加える。",
+      "triggerless_text": "手札を1枚控え室に置いてもよい：自分の控え室から『5yncri5e!』のカードを1枚手札に加える。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-019-R | 若菜四季 (ab#0)",
+        "PL!SP-pb2-019-P＋ | 若菜四季 (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": {
+        "text": "手札を1枚控え室に置いてもよい",
+        "source": "hand",
+        "zone": "hand",
+        "destination": "discard",
+        "count": 1,
+        "optional": true,
+        "type": "move_cards"
+      },
+      "effect": {
+        "text": "自分の控え室から『5yncri5e!』のカードを1枚手札に加える",
+        "source": "discard",
+        "destination": "hand",
+        "count": 1,
+        "target": "self",
+        "group_names": [
+          "5yncri5e!"
+        ],
+        "action": "move_cards",
+        "card_type": "card"
+      }
+    },
+    {
+      "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分がエールしたとき、手札にある『Liella!』のライブカードを1枚控え室に置いてもよい。そうした場合、追加で2枚エールを行う。",
+      "triggerless_text": "自分がエールしたとき、手札にある『Liella!』のライブカードを1枚控え室に置いてもよい。そうした場合、追加で2枚エールを行う。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-020-R | 鬼塚夏美 (ab#0)",
+        "PL!SP-pb2-020-P＋ | 鬼塚夏美 (ab#0)"
+      ],
+      "triggers": "自動",
+      "use_limit": 1,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分がエールしたとき、手札にある『Liella!』のライブカードを1枚控え室に置いてもよい。そうした場合、追加で2枚エールを行う",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "手札にある『Liella!』のライブカードを1枚控え室に置いてもよい。",
+            "source": "hand",
+            "destination": "discard",
+            "count": 1,
+            "card_type": "live_card",
+            "group_names": [
+              "Liella!"
+            ],
+            "optional": true,
+            "action": "move_cards"
+          },
+          {
+            "text": "追加で2枚エールを行う",
+            "count": 2,
+            "action": "perform_yell",
+            "group_names": [
+              "Liella!"
+            ]
+          }
+        ],
+        "conditional": true,
+        "condition": {
+          "type": "location_condition",
+          "location": "revealed_cards",
+          "target": "self",
+          "text": "自分がエールしたとき"
+        },
+        "group_names": [
+          "Liella!"
+        ]
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分の控え室から『KALEIDOSCORE』のカードを1枚手札に加える。",
+      "triggerless_text": "手札を1枚控え室に置いてもよい：自分の控え室から『KALEIDOSCORE』のカードを1枚手札に加える。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-021-R | ウィーン・マルガレーテ (ab#0)",
+        "PL!SP-pb2-021-P＋ | ウィーン・マルガレーテ (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": {
+        "text": "手札を1枚控え室に置いてもよい",
+        "source": "hand",
+        "zone": "hand",
+        "destination": "discard",
+        "count": 1,
+        "optional": true,
+        "type": "move_cards"
+      },
+      "effect": {
+        "text": "自分の控え室から『KALEIDOSCORE』のカードを1枚手札に加える",
+        "source": "discard",
+        "destination": "hand",
+        "count": 1,
+        "target": "self",
+        "group_names": [
+          "KALEIDOSCORE"
+        ],
+        "action": "move_cards",
+        "card_type": "card"
+      }
+    },
+    {
+      "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のステージにいる『5yncri5e!』のメンバーがセンターエリアに移動したとき、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "自分のステージにいる『5yncri5e!』のメンバーがセンターエリアに移動したとき、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "card_count": 2,
+      "cards": [
+        "PL!SP-pb2-022-R | 鬼塚冬毬 (ab#0)",
+        "PL!SP-pb2-022-P＋ | 鬼塚冬毬 (ab#0)"
+      ],
+      "triggers": "自動",
+      "use_limit": 1,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージにいる『5yncri5e!』のメンバーがセンターエリアに移動したとき、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+        "condition": {
+          "type": "movement_condition",
+          "text": "自分のステージにいる『5yncri5e!』のメンバーがセンターエリアに移動したとき",
+          "movement": "moved",
+          "movement_state": "has_moved",
+          "position": "center",
+          "group_names": [
+            "5yncri5e!"
+          ]
+        },
+        "action": "gain_resource",
+        "resource": "blade",
+        "count": 4,
+        "duration": "live_end",
+        "position": "center"
       }
     },
     {
@@ -18766,83 +20413,6 @@
       }
     },
     {
-      "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。",
-      "triggerless_text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。",
-      "card_count": 1,
-      "cards": [
-        "PL!SP-bp1-024-L | Tiny Stars (ab#0)"
-      ],
-      "triggers": "ライブ開始時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "action": "sequential",
-        "actions": [
-          {
-            "action": "gain_resource",
-            "resource": "blade",
-            "count": 1,
-            "characters": [
-              "澁谷かのん"
-            ],
-            "card_type": "member_card",
-            "target": "self",
-            "target_count": 1,
-            "duration": "live_end",
-            "text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。"
-          },
-          {
-            "action": "gain_resource",
-            "resource": "heart",
-            "heart_color": "heart05",
-            "count": 1,
-            "characters": [
-              "澁谷かのん"
-            ],
-            "card_type": "member_card",
-            "target": "self",
-            "target_count": 1,
-            "duration": "live_end",
-            "text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。"
-          },
-          {
-            "action": "gain_resource",
-            "resource": "blade",
-            "count": 1,
-            "characters": [
-              "唐可可"
-            ],
-            "card_type": "member_card",
-            "target": "self",
-            "target_count": 1,
-            "duration": "live_end",
-            "text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。"
-          },
-          {
-            "action": "gain_resource",
-            "resource": "heart",
-            "heart_color": "heart01",
-            "count": 1,
-            "characters": [
-              "唐可可"
-            ],
-            "card_type": "member_card",
-            "target": "self",
-            "target_count": 1,
-            "duration": "live_end",
-            "text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。"
-          }
-        ],
-        "duration": "live_end",
-        "text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。",
-        "heart_colors": [
-          "heart05",
-          "heart01"
-        ]
-      }
-    },
-    {
       "full_text": "{{live_success.png|ライブ成功時}}自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
       "triggerless_text": "自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
       "card_count": 1,
@@ -19631,134 +21201,6 @@
       }
     },
     {
-      "full_text": "{{live_start.png|ライブ開始時}}自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする。その後、自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを＋１する。",
-      "triggerless_text": "自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする。その後、自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを＋１する。",
-      "card_count": 1,
-      "cards": [
-        "PL!SP-pb1-023-L | ディストーション (ab#0)"
-      ],
-      "triggers": "ライブ開始時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする。その後、自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを+1する",
-        "action": "sequential",
-        "actions": [
-          {
-            "text": "自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする",
-            "condition": {
-              "type": "location_condition",
-              "target": "self",
-              "distinct": "card_name",
-              "text": "自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合",
-              "location": "stage",
-              "count": 2,
-              "operator": ">=",
-              "unit": "人",
-              "group_names": [
-                "CatChu!"
-              ]
-            },
-            "state_change": "active",
-            "count": 6,
-            "max": true,
-            "action": "change_state",
-            "card_type": "energy_card",
-            "distinct": "card_name"
-          },
-          {
-            "text": "自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを+1する",
-            "condition": {
-              "type": "state_condition",
-              "state": "active",
-              "text": "自分のエネルギーがすべてアクティブ状態の場合",
-              "resource_type": "energy",
-              "all": true
-            },
-            "action": "modify_score",
-            "value": 1,
-            "operation": "add",
-            "self_target": true,
-            "group_names": [
-              "CatChu!"
-            ]
-          }
-        ],
-        "distinct": "card_name",
-        "group_names": [
-          "CatChu!"
-        ]
-      }
-    },
-    {
-      "full_text": "{{live_start.png|ライブ開始時}}自分のステージに名前の異なる『KALEIDOSCORE』のメンバーが2人以上いる場合、このカードのスコアを＋１する。",
-      "triggerless_text": "自分のステージに名前の異なる『KALEIDOSCORE』のメンバーが2人以上いる場合、このカードのスコアを＋１する。",
-      "card_count": 1,
-      "cards": [
-        "PL!SP-pb1-024-L | ニュートラル (ab#0)"
-      ],
-      "triggers": "ライブ開始時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "自分のステージに名前の異なる『KALEIDOSCORE』のメンバーが2人以上いる場合、このカードのスコアを+1する",
-        "condition": {
-          "type": "location_condition",
-          "target": "self",
-          "distinct": "card_name",
-          "text": "自分のステージに名前の異なる『KALEIDOSCORE』のメンバーが2人以上いる場合",
-          "location": "stage",
-          "count": 2,
-          "operator": ">=",
-          "unit": "人",
-          "group_names": [
-            "KALEIDOSCORE"
-          ]
-        },
-        "action": "modify_score",
-        "value": 1,
-        "operation": "add",
-        "self_target": true,
-        "distinct": "card_name",
-        "group_names": [
-          "KALEIDOSCORE"
-        ]
-      }
-    },
-    {
-      "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいる、このターン中に登場、またはエリアを移動した『5yncri5e!』のメンバー1人につき、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}減らす。",
-      "triggerless_text": "自分のステージにいる、このターン中に登場、またはエリアを移動した『5yncri5e!』のメンバー1人につき、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}減らす。",
-      "card_count": 1,
-      "cards": [
-        "PL!SP-pb1-025-L | Jellyfish (ab#0)"
-      ],
-      "triggers": "ライブ開始時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "自分のステージにいる、このターン中に登場、またはエリアを移動した『5yncri5e!』のメンバー1人につき、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}減らす",
-        "action": "modify_required_hearts",
-        "heart_colors": [
-          "heart00"
-        ],
-        "operation": "decrease",
-        "self_target": true,
-        "per_unit": true,
-        "per_unit_count": 1,
-        "per_unit_type": "人",
-        "group_names": [
-          "5yncri5e!"
-        ],
-        "timing_condition": "appeared_or_moved_this_turn",
-        "location": "stage",
-        "target": "self",
-        "value": 1
-      }
-    },
-    {
       "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、ライブカードを1枚までデッキの一番下に置く。",
       "triggerless_text": "エールにより公開された自分のカードの中から、ライブカードを1枚までデッキの一番下に置く。",
       "card_count": 1,
@@ -19978,75 +21420,6 @@
         "duration": "live_end",
         "filter_targets_by_heart_colors": true,
         "target": "self"
-      }
-    },
-    {
-      "full_text": "{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場のカード枚数が相手より少ない場合、このカードのスコアを＋１する。",
-      "triggerless_text": "自分の成功ライブカード置き場のカード枚数が相手より少ない場合、このカードのスコアを＋１する。",
-      "card_count": 1,
-      "cards": [
-        "PL!SP-bp2-023-L | Go!! リスタート (ab#0)"
-      ],
-      "triggers": "ライブ開始時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "自分の成功ライブカード置き場のカード枚数が相手より少ない場合、このカードのスコアを+1する",
-        "condition": {
-          "text": "自分の成功ライブカード置き場のカード枚数が相手より少ない場合",
-          "target": "self",
-          "location": "success_live_card_zone",
-          "card_type": "live_card",
-          "operator": "<",
-          "comparison_target": "opponent",
-          "type": "comparison_condition"
-        },
-        "action": "modify_score",
-        "value": 1,
-        "operation": "add",
-        "self_target": true
-      }
-    },
-    {
-      "full_text": "{{live_success.png|ライブ成功時}}自分のステージに「澁谷かのん」、「ウィーン・マルガレーテ」、「鬼塚冬毬」のうち、名前の異なるメンバーが2人以上いる場合、エールにより公開された自分のカードの中から、カードを1枚手札に加える。",
-      "triggerless_text": "自分のステージに「澁谷かのん」、「ウィーン・マルガレーテ」、「鬼塚冬毬」のうち、名前の異なるメンバーが2人以上いる場合、エールにより公開された自分のカードの中から、カードを1枚手札に加える。",
-      "card_count": 1,
-      "cards": [
-        "PL!SP-bp2-025-L | Bubble Rise (ab#0)"
-      ],
-      "triggers": "ライブ成功時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "自分のステージに「澁谷かのん」、「ウィーン・マルガレーテ」、「鬼塚冬毬」のうち、名前の異なるメンバーが2人以上いる場合、エールにより公開された自分のカードの中から、カードを1枚手札に加える",
-        "condition": {
-          "type": "location_condition",
-          "target": "self",
-          "distinct": "card_name",
-          "text": "自分のステージに「澁谷かのん」、「ウィーン・マルガレーテ」、「鬼塚冬毬」のうち、名前の異なるメンバーが2人以上いる場合",
-          "location": "stage",
-          "count": 2,
-          "operator": ">=",
-          "unit": "人",
-          "characters": [
-            "澁谷かのん",
-            "ウィーン・マルガレーテ",
-            "鬼塚冬毬"
-          ]
-        },
-        "source": "revealed_cards",
-        "dynamic_count": {
-          "type": "revealed_cards",
-          "reference": "previous_reveal"
-        },
-        "destination": "hand",
-        "count": 1,
-        "target": "self",
-        "action": "move_cards",
-        "card_type": "card",
-        "distinct": "card_name"
       }
     },
     {
@@ -21344,7 +22717,7 @@
       }
     },
     {
-      "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}エールにより自分のカードを1枚以上公開したとき、それらのカードの中にブレードハートを持つカードが2枚以下の場合、それらのカードをすべて控え室に置いてもよい。そのエールで得たブレードハートを失い、もう一度エールを行う。",
+      "full_text": "{{jidou.png|自動}}［ターン1回］エールにより自分のカードを1枚以上公開したとき、それらのカードの中にブレードハートを持つカードが2枚以下の場合、それらのカードをすべて控え室に置いてもよい。そのエールで得たブレードハートを失い、もう一度エールを行う。",
       "triggerless_text": "エールにより自分のカードを1枚以上公開したとき、それらのカードの中にブレードハートを持つカードが2枚以下の場合、それらのカードをすべて控え室に置いてもよい。そのエールで得たブレードハートを失い、もう一度エールを行う。",
       "card_count": 1,
       "cards": [
@@ -21661,8 +23034,8 @@
       }
     },
     {
-      "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数エネルギーデッキに置いてもよい。そうした場合、ライブ終了時まで、そのメンバーは、これによって置いたエネルギーカード1枚につき、{{heart_01.png|赤ハート}}{{heart_01.png|赤ハート}}{{heart_01.png|赤ハート}}を得る。",
-      "triggerless_text": "自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数エネルギーデッキに置いてもよい。そうした場合、ライブ終了時まで、そのメンバーは、これによって置いたエネルギーカード1枚につき、{{heart_01.png|赤ハート}}{{heart_01.png|赤ハート}}{{heart_01.png|赤ハート}}を得る。",
+      "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数エネルギーデッキに置いてもよい。そうした場合、ライブ終了時まで、そのメンバーは、これによって置いたエネルギーカード1枚につき、［赤ハート］［赤ハート］［赤ハート］を得る。",
+      "triggerless_text": "自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数エネルギーデッキに置いてもよい。そうした場合、ライブ終了時まで、そのメンバーは、これによって置いたエネルギーカード1枚につき、［赤ハート］［赤ハート］［赤ハート］を得る。",
       "card_count": 1,
       "cards": [
         "PL!N-bp3-025-L | Awakening Promise (ab#0)"
@@ -21672,7 +23045,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数エネルギーデッキに置いてもよい。そうした場合、ライブ終了時まで、そのメンバーは、これによって置いたエネルギーカード1枚につき、{{heart_01.png|赤ハート}}{{heart_01.png|赤ハート}}{{heart_01.png|赤ハート}}を得る",
+        "text": "自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数エネルギーデッキに置いてもよい。そうした場合、ライブ終了時まで、そのメンバーは、これによって置いたエネルギーカード1枚につき、［赤ハート］［赤ハート］［赤ハート］を得る",
         "action": "sequential",
         "actions": [
           {
@@ -21683,13 +23056,10 @@
             "optional": true,
             "action": "move_cards",
             "destination": null,
-            "any_number": true,
-            "heart_colors": [
-              "heart01"
-            ]
+            "any_number": true
           },
           {
-            "text": "そのメンバーは、これによって置いたエネルギーカード1枚につき、{{heart_01.png|赤ハート}}{{heart_01.png|赤ハート}}{{heart_01.png|赤ハート}}を得る",
+            "text": "そのメンバーは、これによって置いたエネルギーカード1枚につき、［赤ハート］［赤ハート］［赤ハート］を得る",
             "action": "gain_resource",
             "resource": "heart",
             "count": 1,
@@ -21697,10 +23067,7 @@
             "per_unit_count": 1,
             "per_unit_type": "枚",
             "card_type": "energy_card",
-            "duration": "live_end",
-            "heart_colors": [
-              "heart01"
-            ]
+            "duration": "live_end"
           }
         ],
         "conditional": true
@@ -23419,359 +24786,6 @@
         "per_unit": true,
         "duration": "live_end",
         "per_unit_count": 1
-      }
-    },
-    {
-      "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。",
-      "triggerless_text": "ライブ終了時まで、自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。",
-      "card_count": 1,
-      "cards": [
-        "PL!SP-bp4-023-L | Dazzling Game (ab#0)"
-      ],
-      "triggers": "ライブ開始時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る",
-        "action": "sequential",
-        "actions": [
-          {
-            "action": "select",
-            "count": 1,
-            "card_type": "member_card",
-            "characters": [
-              "澁谷かのん",
-              "ウィーン・マルガレーテ",
-              "鬼塚冬毬"
-            ],
-            "group_names": [
-              "Liella!"
-            ],
-            "duration": "live_end",
-            "text": "自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る"
-          },
-          {
-            "action": "select",
-            "count": 1,
-            "card_type": "member_card",
-            "exclude_selected": true,
-            "group_names": [
-              "Liella!"
-            ],
-            "duration": "live_end",
-            "text": "自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る"
-          },
-          {
-            "text": "{{icon_blade.png|ブレード}}を得る",
-            "action": "gain_resource",
-            "resource": "blade",
-            "count": 1,
-            "duration": "live_end"
-          }
-        ],
-        "duration": "live_end",
-        "group_names": [
-          "Liella!"
-        ]
-      }
-    },
-    {
-      "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる。",
-      "triggerless_text": "ライブ終了時まで、エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる。",
-      "card_count": 1,
-      "cards": [
-        "PL!SP-bp4-023-L | Dazzling Game (ab#1)"
-      ],
-      "triggers": "ライブ開始時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる",
-        "action": "set_blade_type",
-        "blade_type": "紫ブレード",
-        "duration": "live_end"
-      }
-    },
-    {
-      "full_text": "{{live_start.png|ライブ開始時}}自分のセンターエリアにいる『Liella!』のメンバーのコストが、相手のセンターエリアにいるメンバーより高い場合、このカードのスコアを＋１する。",
-      "triggerless_text": "自分のセンターエリアにいる『Liella!』のメンバーのコストが、相手のセンターエリアにいるメンバーより高い場合、このカードのスコアを＋１する。",
-      "card_count": 1,
-      "cards": [
-        "PL!SP-bp4-024-L | ノンフィクション!! (ab#0)"
-      ],
-      "triggers": "ライブ開始時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "自分のセンターエリアにいる『Liella!』のメンバーのコストが、相手のセンターエリアにいるメンバーより高い場合、このカードのスコアを+1する",
-        "condition": {
-          "text": "自分のセンターエリアにいる『Liella!』のメンバーのコストが、相手のセンターエリアにいるメンバーより高い場合",
-          "group_names": [
-            "Liella!"
-          ],
-          "target": "both",
-          "card_type": "member_card",
-          "comparison_target": "opponent",
-          "operator": ">",
-          "comparison_type": "cost",
-          "position": "center",
-          "type": "comparison_condition"
-        },
-        "action": "modify_score",
-        "value": 1,
-        "operation": "add",
-        "self_target": true,
-        "group_names": [
-          "Liella!"
-        ],
-        "position": "center"
-      }
-    },
-    {
-      "full_text": "{{live_start.png|ライブ開始時}}自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合、そのメンバーは、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
-      "triggerless_text": "自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合、そのメンバーは、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
-      "card_count": 1,
-      "cards": [
-        "PL!SP-bp4-024-L | ノンフィクション!! (ab#1)"
-      ],
-      "triggers": "ライブ開始時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合、そのメンバーは、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
-        "condition": {
-          "text": "自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合",
-          "group_names": [
-            "Liella!"
-          ],
-          "target": "self",
-          "location": "stage",
-          "count": 3,
-          "resource_type": "heart_02",
-          "heart_colors": [
-            "heart02"
-          ],
-          "card_type": "member_card",
-          "operator": ">=",
-          "position": "left_side",
-          "type": "comparison_condition"
-        },
-        "duration": "live_end",
-        "card_type": "member_card",
-        "action": "gain_resource",
-        "resource": "blade",
-        "count": 2,
-        "position": "left_side"
-      }
-    },
-    {
-      "full_text": "{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージのセンターエリアにいる『Liella!』のメンバーが元々持つ{{icon_blade.png|ブレード}}の数は3つになる。",
-      "triggerless_text": "ライブ終了時まで、自分のステージのセンターエリアにいる『Liella!』のメンバーが元々持つ{{icon_blade.png|ブレード}}の数は3つになる。",
-      "card_count": 1,
-      "cards": [
-        "PL!SP-bp4-025-L | Special Color (ab#0)"
-      ],
-      "triggers": "ライブ開始時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "自分のステージのセンターエリアにいる『Liella!』のメンバーが元々持つ{{icon_blade.png|ブレード}}の数は3つになる",
-        "duration": "live_end",
-        "count": 3,
-        "card_type": "member_card",
-        "target": "self",
-        "position": "center",
-        "group_names": [
-          "Liella!"
-        ],
-        "action": "set_blade_count",
-        "original_value": true,
-        "blade_limit": 3,
-        "blade_limit_operator": "=="
-      }
-    },
-    {
-      "full_text": "{{live_success.png|ライブ成功時}}自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合、このカードのスコアを＋１する。",
-      "triggerless_text": "自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合、このカードのスコアを＋１する。",
-      "card_count": 1,
-      "cards": [
-        "PL!SP-bp4-025-L | Special Color (ab#1)"
-      ],
-      "triggers": "ライブ成功時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合、このカードのスコアを+1する",
-        "condition": {
-          "type": "temporal_condition",
-          "temporal": "this_turn",
-          "condition": {
-            "type": "has_moved",
-            "text": "自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合",
-            "group_names": [
-              "Liella!"
-            ],
-            "position": "center"
-          },
-          "text": "自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合",
-          "card_type": "member_card",
-          "group_names": [
-            "Liella!"
-          ],
-          "position": "center"
-        },
-        "action": "modify_score",
-        "value": 1,
-        "operation": "add",
-        "self_target": true,
-        "group_names": [
-          "Liella!"
-        ],
-        "position": "center"
-      }
-    },
-    {
-      "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に名前が異なる『Liella!』のメンバーカードが5枚以上ある場合、このカードのスコアを＋１する。",
-      "triggerless_text": "エールにより公開された自分のカードの中に名前が異なる『Liella!』のメンバーカードが5枚以上ある場合、このカードのスコアを＋１する。",
-      "card_count": 1,
-      "cards": [
-        "PL!SP-bp4-026-L | Wish Song (ab#0)"
-      ],
-      "triggers": "ライブ成功時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "エールにより公開された自分のカードの中に名前が異なる『Liella!』のメンバーカードが5枚以上ある場合、このカードのスコアを+1する",
-        "condition": {
-          "type": "location_condition",
-          "target": "self",
-          "distinct": "card_name",
-          "text": "エールにより公開された自分のカードの中に名前が異なる『Liella!』のメンバーカードが5枚以上ある場合",
-          "location": "revealed_cards",
-          "count": 5,
-          "operator": ">=",
-          "unit": "枚",
-          "group_names": [
-            "Liella!"
-          ]
-        },
-        "action": "modify_score",
-        "value": 1,
-        "operation": "add",
-        "self_target": true,
-        "group_names": [
-          "Liella!"
-        ]
-      }
-    },
-    {
-      "full_text": "{{live_success.png|ライブ成功時}}自分のエネルギーが11枚以上ある場合、カードを2枚引き、手札を1枚控え室に置く。",
-      "triggerless_text": "自分のエネルギーが11枚以上ある場合、カードを2枚引き、手札を1枚控え室に置く。",
-      "card_count": 1,
-      "cards": [
-        "PL!SP-bp4-026-L | Wish Song (ab#1)"
-      ],
-      "triggers": "ライブ成功時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "自分のエネルギーが11枚以上ある場合、カードを2枚引き、手札を1枚控え室に置く",
-        "condition": {
-          "type": "card_count_condition",
-          "count": 11,
-          "operator": ">=",
-          "text": "自分のエネルギーが11枚以上ある場合",
-          "target": "self",
-          "location": "energy_zone"
-        },
-        "action": "sequential",
-        "actions": [
-          {
-            "text": "カードを2枚引き",
-            "count": 2,
-            "action": "draw_card",
-            "source": "deck",
-            "destination": "hand"
-          },
-          {
-            "text": "手札を1枚控え室に置く",
-            "source": "hand",
-            "destination": "discard",
-            "count": 1,
-            "action": "move_cards",
-            "card_type": "card"
-          }
-        ]
-      }
-    },
-    {
-      "full_text": "{{live_success.png|ライブ成功時}}自分のステージにいるメンバーが『Liella!』のみの場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい。(メンバーをそれぞれ好きなエリアに移動させる。この効果で1つのエリアに2人以上のメンバーを移動させることはできない。)",
-      "triggerless_text": "自分のステージにいるメンバーが『Liella!』のみの場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい。(メンバーをそれぞれ好きなエリアに移動させる。この効果で1つのエリアに2人以上のメンバーを移動させることはできない。)",
-      "card_count": 1,
-      "cards": [
-        "PL!SP-bp4-027-L | Chance Day, Chance Way! (ab#0)"
-      ],
-      "triggers": "ライブ成功時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "自分のステージにいるメンバーが『Liella!』のみの場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい",
-        "condition": {
-          "text": "自分のステージにいるメンバーが『Liella!』のみの場合",
-          "group_names": [
-            "Liella!"
-          ],
-          "target": "self",
-          "location": "stage",
-          "card_type": "member_card",
-          "all_members": true,
-          "type": "group_condition"
-        },
-        "source": "stage",
-        "card_type": "member_card",
-        "target": "self",
-        "optional": true,
-        "action": "position_change",
-        "multiple_targets": true,
-        "parenthetical": [
-          "メンバーをそれぞれ好きなエリアに移動させる。この効果で1つのエリアに2人以上のメンバーを移動させることはできない。"
-        ],
-        "group_names": [
-          "Liella!"
-        ]
-      }
-    },
-    {
-      "full_text": "{{live_start.png|ライブ開始時}}アクティブ状態の自分のエネルギーがある場合、このカードのスコアを＋１する。",
-      "triggerless_text": "アクティブ状態の自分のエネルギーがある場合、このカードのスコアを＋１する。",
-      "card_count": 1,
-      "cards": [
-        "PL!SP-bp4-028-L | DAISUKI FULL POWER (ab#0)"
-      ],
-      "triggers": "ライブ開始時",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "アクティブ状態の自分のエネルギーがある場合、このカードのスコアを+1する",
-        "condition": {
-          "type": "energy_state_condition",
-          "text": "アクティブ状態の自分のエネルギーがある場合",
-          "state": "active"
-        },
-        "action": "modify_score",
-        "value": 1,
-        "operation": "add",
-        "self_target": true
       }
     },
     {
@@ -25502,13 +26516,15 @@
               "text": "エールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードが1枚以上ある場合",
               "location": "revealed_cards",
               "card_type": "live_card",
-              "target": "self"
+              "target": "self",
+              "card_property": "has_score_icon"
             }
           ],
           "text": "自分か相手の成功ライブカード置き場にカードが2枚以上あり、かつエールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードが1枚以上ある場合",
           "target": "both",
           "location": "success_live_card_zone",
-          "card_type": "live_card"
+          "card_type": "live_card",
+          "card_property": "has_score_icon"
         },
         "action": "modify_score",
         "value": 2,
@@ -28506,29 +29522,6 @@
       }
     },
     {
-      "full_text": "{{toujyou.png|登場}}相手のステージにいるコスト2以下のメンバー1人をウェイトにする。",
-      "triggerless_text": "相手のステージにいるコスト2以下のメンバー1人をウェイトにする。",
-      "card_count": 1,
-      "cards": [
-        "PL!S-bp6-015-N | 津島善子 (ab#0)"
-      ],
-      "triggers": "登場",
-      "use_limit": null,
-      "is_null": false,
-      "cost": null,
-      "effect": {
-        "text": "相手のステージにいるコスト2以下のメンバー1人をウェイトにする",
-        "source": "stage",
-        "cost_limit": 2,
-        "cost_limit_operator": "<=",
-        "state_change": "wait",
-        "count": 1,
-        "card_type": "member_card",
-        "target": "opponent",
-        "action": "change_state"
-      }
-    },
-    {
       "full_text": "{{toujyou.png|登場}}控え室から登場している場合、自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。",
       "triggerless_text": "控え室から登場している場合、自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。",
       "card_count": 1,
@@ -30452,6 +31445,828 @@
         "parenthetical": [
           "対戦相手のカードの効果でも発動する。"
         ]
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
+      "triggerless_text": "ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-bp1-023-SRL | START!! True dreams (ab#0)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
+        "condition": {
+          "text": "ライブの合計スコアが相手より高い場合",
+          "comparison_target": "opponent",
+          "operator": ">",
+          "comparison_type": "score",
+          "aggregate": "total",
+          "type": "comparison_condition"
+        },
+        "source": "energy_deck",
+        "destination": "energy_zone",
+        "state_change": "wait",
+        "count": 1,
+        "card_type": "energy_card",
+        "target": "self",
+        "action": "move_cards"
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。",
+      "triggerless_text": "自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-bp1-024-SRL | Tiny Stars (ab#1)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く",
+        "condition": {
+          "text": "自分のステージに「澁谷かのん」と「唐可可」がいる場合",
+          "characters": [
+            "澁谷かのん",
+            "唐可可"
+          ],
+          "target": "self",
+          "location": "stage",
+          "type": "location_condition"
+        },
+        "count": 1,
+        "action": "draw_card",
+        "source": "deck",
+        "destination": "hand"
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}自分のエネルギーが12枚以上ある場合、このカードのスコアを＋１する。",
+      "triggerless_text": "自分のエネルギーが12枚以上ある場合、このカードのスコアを＋１する。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-bp1-027-SRL | Sing！Shine！Smile！ (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のエネルギーが12枚以上ある場合、このカードのスコアを+1する",
+        "condition": {
+          "type": "card_count_condition",
+          "count": 12,
+          "operator": ">=",
+          "text": "自分のエネルギーが12枚以上ある場合",
+          "target": "self",
+          "location": "energy_zone"
+        },
+        "action": "modify_score",
+        "value": 1,
+        "operation": "add",
+        "self_target": true
+      }
+    },
+    {
+      "full_text": "{{jyouji.png|常時}}自分のエネルギーが6枚以上あるかぎり、{{heart_02.png|heart02}}を得る。8枚以上あるかぎり、さらに{{heart_02.png|heart02}}を得る。",
+      "triggerless_text": "自分のエネルギーが6枚以上あるかぎり、{{heart_02.png|heart02}}を得る。8枚以上あるかぎり、さらに{{heart_02.png|heart02}}を得る。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-023-N | 澁谷かのん (ab#0)"
+      ],
+      "triggers": "常時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のエネルギーが6枚以上あるかぎり、{{heart_02.png|heart02}}を得る。8枚以上あるかぎり、さらに{{heart_02.png|heart02}}を得る",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "{{heart_02.png|heart02}}を得る",
+            "condition": {
+              "type": "card_count_condition",
+              "count": 6,
+              "operator": ">=",
+              "text": "自分のエネルギーが6枚以上あるかぎり",
+              "target": "self",
+              "location": "energy_zone"
+            },
+            "duration": "as_long_as",
+            "conditional": true,
+            "action": "gain_resource",
+            "resource": "heart",
+            "count": 1,
+            "heart_colors": [
+              "heart02"
+            ]
+          },
+          {
+            "text": "{{heart_02.png|heart02}}を得る",
+            "condition": {
+              "type": "card_count_condition",
+              "count": 8,
+              "operator": ">=",
+              "text": "8枚以上あるかぎり"
+            },
+            "duration": "as_long_as",
+            "conditional": true,
+            "action": "gain_resource",
+            "resource": "heart",
+            "count": 1,
+            "heart_colors": [
+              "heart02"
+            ]
+          }
+        ],
+        "heart_colors": [
+          "heart02"
+        ]
+      }
+    },
+    {
+      "full_text": "{{jyouji.png|常時}}自分のアクティブ状態のエネルギーがあるかぎり、{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る。",
+      "triggerless_text": "自分のアクティブ状態のエネルギーがあるかぎり、{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-026-N | 平安名すみれ (ab#0)"
+      ],
+      "triggers": "常時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る",
+        "condition": {
+          "type": "energy_state_condition",
+          "text": "自分のアクティブ状態のエネルギーがあるかぎり",
+          "state": "active"
+        },
+        "duration": "as_long_as",
+        "conditional": true,
+        "action": "gain_resource",
+        "resource": "heart",
+        "count": 2,
+        "heart_colors": [
+          "heart02"
+        ]
+      }
+    },
+    {
+      "full_text": "{{jyouji.png|常時}}自分のエネルギーが6枚以上あるかぎり、{{heart_03.png|heart03}}を得る。8枚以上あるかぎり、さらに{{heart_03.png|heart03}}を得る。",
+      "triggerless_text": "自分のエネルギーが6枚以上あるかぎり、{{heart_03.png|heart03}}を得る。8枚以上あるかぎり、さらに{{heart_03.png|heart03}}を得る。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-027-N | 葉月 恋 (ab#0)"
+      ],
+      "triggers": "常時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のエネルギーが6枚以上あるかぎり、{{heart_03.png|heart03}}を得る。8枚以上あるかぎり、さらに{{heart_03.png|heart03}}を得る",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "{{heart_03.png|heart03}}を得る",
+            "condition": {
+              "type": "card_count_condition",
+              "count": 6,
+              "operator": ">=",
+              "text": "自分のエネルギーが6枚以上あるかぎり",
+              "target": "self",
+              "location": "energy_zone"
+            },
+            "duration": "as_long_as",
+            "conditional": true,
+            "action": "gain_resource",
+            "resource": "heart",
+            "count": 1,
+            "heart_colors": [
+              "heart03"
+            ]
+          },
+          {
+            "text": "{{heart_03.png|heart03}}を得る",
+            "condition": {
+              "type": "card_count_condition",
+              "count": 8,
+              "operator": ">=",
+              "text": "8枚以上あるかぎり"
+            },
+            "duration": "as_long_as",
+            "conditional": true,
+            "action": "gain_resource",
+            "resource": "heart",
+            "count": 1,
+            "heart_colors": [
+              "heart03"
+            ]
+          }
+        ],
+        "heart_colors": [
+          "heart03"
+        ]
+      }
+    },
+    {
+      "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のメインフェイズの間、このメンバーがエリアを移動したとき、エネルギーを2枚アクティブにする。",
+      "triggerless_text": "自分のメインフェイズの間、このメンバーがエリアを移動したとき、エネルギーを2枚アクティブにする。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-028-N | 桜小路きな子 (ab#0)"
+      ],
+      "triggers": "自動",
+      "use_limit": 1,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のメインフェイズの間、このメンバーがエリアを移動したとき、エネルギーを2枚アクティブにする",
+        "condition": {
+          "type": "movement_condition",
+          "text": "自分のメインフェイズの間、このメンバーがエリアを移動したとき",
+          "movement": "moved",
+          "movement_state": "has_moved"
+        },
+        "state_change": "active",
+        "count": 2,
+        "action": "change_state",
+        "card_type": "energy_card"
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}/{{live_start.png|ライブ開始時}}相手のステージにいるコスト2以下のメンバー1人をウェイトにする。",
+      "triggerless_text": "相手のステージにいるコスト2以下のメンバー1人をウェイトにする。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-029-N | 米女メイ (ab#0)"
+      ],
+      "triggers": "ライブ開始時, 登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "相手のステージにいるコスト2以下のメンバー1人をウェイトにする",
+        "source": "stage",
+        "cost_limit": 2,
+        "cost_limit_operator": "<=",
+        "state_change": "wait",
+        "count": 1,
+        "card_type": "member_card",
+        "target": "opponent",
+        "action": "change_state"
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}{{heart_02.png|heart02}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち1つを選ぶ。ライブ終了時まで、このメンバーが元々持つハートは選んだハートになる。",
+      "triggerless_text": "{{heart_02.png|heart02}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち1つを選ぶ。ライブ終了時まで、このメンバーが元々持つハートは選んだハートになる。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-030-N | 若菜四季 (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "{{heart_02.png|heart02}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち1つを選ぶ。ライブ終了時まで、このメンバーが元々持つハートは選んだハートになる",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "{{heart_02.png|heart02}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち1つを選ぶ",
+            "count": 1,
+            "action": "select",
+            "heart_colors": [
+              "heart02",
+              "heart03",
+              "heart06"
+            ]
+          },
+          {
+            "text": "このメンバーが元々持つハートは選んだハートになる",
+            "duration": "live_end",
+            "card_type": "member_card",
+            "action": "set_heart_type",
+            "heart_type": "selected",
+            "original_value": true,
+            "self_target": true
+          }
+        ],
+        "original_value": true,
+        "heart_colors": [
+          "heart02",
+          "heart03",
+          "heart06"
+        ]
+      }
+    },
+    {
+      "full_text": "{{jyouji.png|常時}}自分のエネルギーが6枚以上あるかぎり、{{heart_06.png|heart06}}を得る。8枚以上あるかぎり、さらに{{heart_06.png|heart06}}を得る。",
+      "triggerless_text": "自分のエネルギーが6枚以上あるかぎり、{{heart_06.png|heart06}}を得る。8枚以上あるかぎり、さらに{{heart_06.png|heart06}}を得る。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-032-N | ウィーン・マルガレーテ (ab#0)"
+      ],
+      "triggers": "常時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のエネルギーが6枚以上あるかぎり、{{heart_06.png|heart06}}を得る。8枚以上あるかぎり、さらに{{heart_06.png|heart06}}を得る",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "{{heart_06.png|heart06}}を得る",
+            "condition": {
+              "type": "card_count_condition",
+              "count": 6,
+              "operator": ">=",
+              "text": "自分のエネルギーが6枚以上あるかぎり",
+              "target": "self",
+              "location": "energy_zone"
+            },
+            "duration": "as_long_as",
+            "conditional": true,
+            "action": "gain_resource",
+            "resource": "heart",
+            "count": 1,
+            "heart_colors": [
+              "heart06"
+            ]
+          },
+          {
+            "text": "{{heart_06.png|heart06}}を得る",
+            "condition": {
+              "type": "card_count_condition",
+              "count": 8,
+              "operator": ">=",
+              "text": "8枚以上あるかぎり"
+            },
+            "duration": "as_long_as",
+            "conditional": true,
+            "action": "gain_resource",
+            "resource": "heart",
+            "count": 1,
+            "heart_colors": [
+              "heart06"
+            ]
+          }
+        ],
+        "heart_colors": [
+          "heart06"
+        ]
+      }
+    },
+    {
+      "full_text": "{{jyouji.png|常時}}{{leftside.png|左サイド}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "{{leftside.png|左サイド}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-035-N | 唐 可可 (ab#0)"
+      ],
+      "triggers": "常時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+        "position": "left_side",
+        "action": "gain_resource",
+        "resource": "blade",
+        "count": 2,
+        "activation_position": "left_side"
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}{{rightside.png|右サイド}}カードを2枚引き、手札を2枚控え室に置く。",
+      "triggerless_text": "{{rightside.png|右サイド}}カードを2枚引き、手札を2枚控え室に置く。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-036-N | 嵐 千砂都 (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "カードを2枚引き、手札を2枚控え室に置く",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "カードを2枚引き",
+            "count": 2,
+            "position": "right_side",
+            "action": "draw_card",
+            "source": "deck",
+            "destination": "hand",
+            "activation_position": "right_side"
+          },
+          {
+            "text": "手札を2枚控え室に置く",
+            "source": "hand",
+            "destination": "discard",
+            "count": 2,
+            "action": "move_cards",
+            "card_type": "card",
+            "position": "right_side",
+            "activation_position": "right_side"
+          }
+        ],
+        "activation_position": "right_side",
+        "position": "right_side"
+      }
+    },
+    {
+      "full_text": "{{toujyou.png|登場}}{{leftside.png|左サイド}}カードを2枚引き、手札を2枚控え室に置く。",
+      "triggerless_text": "{{leftside.png|左サイド}}カードを2枚引き、手札を2枚控え室に置く。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-037-N | 平安名すみれ (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "カードを2枚引き、手札を2枚控え室に置く",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "カードを2枚引き",
+            "count": 2,
+            "position": "left_side",
+            "action": "draw_card",
+            "source": "deck",
+            "destination": "hand",
+            "activation_position": "left_side"
+          },
+          {
+            "text": "手札を2枚控え室に置く",
+            "source": "hand",
+            "destination": "discard",
+            "count": 2,
+            "action": "move_cards",
+            "card_type": "card",
+            "position": "left_side",
+            "activation_position": "left_side"
+          }
+        ],
+        "activation_position": "left_side",
+        "position": "left_side"
+      }
+    },
+    {
+      "full_text": "{{jyouji.png|常時}}{{rightside.png|右サイド}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "{{rightside.png|右サイド}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-041-N | 若菜四季 (ab#0)"
+      ],
+      "triggers": "常時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+        "position": "right_side",
+        "action": "gain_resource",
+        "resource": "blade",
+        "count": 2,
+        "activation_position": "right_side"
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいるハートを4つ以上持つ『Liella!』のメンバー1人につき、このカードのスコアを＋１する。",
+      "triggerless_text": "自分のステージにいるハートを4つ以上持つ『Liella!』のメンバー1人につき、このカードのスコアを＋１する。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-045-L | 絶対的LOVER (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージにいるハートを4つ以上持つ『Liella!』のメンバー1人につき、このカードのスコアを+1する",
+        "action": "modify_score",
+        "value": 1,
+        "operation": "add",
+        "self_target": true,
+        "per_unit": true,
+        "per_unit_count": 1,
+        "per_unit_type": "人",
+        "group_names": [
+          "Liella!"
+        ],
+        "location": "stage",
+        "target": "self"
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：自分のステージにいるメンバーが『Liella!』のみの場合、相手のステージにいるコスト2以下のメンバー1人をウェイトにする。",
+      "triggerless_text": "手札を1枚控え室に置いてもよい：自分のステージにいるメンバーが『Liella!』のみの場合、相手のステージにいるコスト2以下のメンバー1人をウェイトにする。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-047-L | Welcome to 僕らのセカイ (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": {
+        "text": "手札を1枚控え室に置いてもよい",
+        "source": "hand",
+        "zone": "hand",
+        "destination": "discard",
+        "count": 1,
+        "optional": true,
+        "type": "move_cards"
+      },
+      "effect": {
+        "text": "自分のステージにいるメンバーが『Liella!』のみの場合、相手のステージにいるコスト2以下のメンバー1人をウェイトにする",
+        "condition": {
+          "text": "自分のステージにいるメンバーが『Liella!』のみの場合",
+          "group_names": [
+            "Liella!"
+          ],
+          "target": "self",
+          "location": "stage",
+          "card_type": "member_card",
+          "all_members": true,
+          "type": "group_condition"
+        },
+        "source": "stage",
+        "cost_limit": 2,
+        "cost_limit_operator": "<=",
+        "state_change": "wait",
+        "count": 1,
+        "card_type": "member_card",
+        "target": "opponent",
+        "action": "change_state",
+        "group_names": [
+          "Liella!"
+        ]
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいる名前の異なる『CatChu!』のメンバー1人につき、このカードの必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らし、{{heart_02.png|heart02}}増やす。その後、このカードの必要ハートに含まれる{{heart_02.png|heart02}}が9以上の場合、このカードのスコアを＋１する。",
+      "triggerless_text": "自分のステージにいる名前の異なる『CatChu!』のメンバー1人につき、このカードの必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らし、{{heart_02.png|heart02}}増やす。その後、このカードの必要ハートに含まれる{{heart_02.png|heart02}}が9以上の場合、このカードのスコアを＋１する。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-048-L | ディストーション (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージにいる名前の異なる『CatChu!』のメンバー1人につき、このカードの必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らし、{{heart_02.png|heart02}}増やす。その後、このカードの必要ハートに含まれる{{heart_02.png|heart02}}が9以上の場合、このカードのスコアを+1する",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "このカードの必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らし",
+            "action": "modify_required_hearts",
+            "heart_colors": [
+              "heart00"
+            ],
+            "operation": "decrease",
+            "self_target": true,
+            "per_unit": true,
+            "per_unit_count": 1,
+            "per_unit_type": "人",
+            "group_names": [
+              "CatChu!"
+            ],
+            "distinct": "card_name",
+            "location": "stage",
+            "target": "self",
+            "value": 2
+          },
+          {
+            "text": "このカードの必要ハートに含まれる{{heart_02.png|heart02}}が9以上の場合",
+            "count": 9,
+            "action": "modify_required_hearts",
+            "heart_colors": [
+              "heart02"
+            ],
+            "operation": "decrease",
+            "self_target": true,
+            "per_unit": true,
+            "per_unit_count": 1,
+            "per_unit_type": "人",
+            "group_names": [
+              "CatChu!"
+            ],
+            "distinct": "card_name",
+            "location": "stage",
+            "target": "self",
+            "value": 1
+          },
+          {
+            "text": "このカードのスコアを+1する",
+            "action": "modify_score",
+            "value": 1,
+            "operation": "add",
+            "self_target": true,
+            "per_unit": true,
+            "per_unit_count": 1,
+            "per_unit_type": "人",
+            "group_names": [
+              "CatChu!"
+            ],
+            "distinct": "card_name",
+            "location": "stage",
+            "target": "self"
+          }
+        ],
+        "distinct": "card_name",
+        "group_names": [
+          "CatChu!"
+        ],
+        "heart_colors": [
+          "heart00",
+          "heart02"
+        ]
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に『KALEIDOSCORE』のカードが5枚以上ある場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
+      "triggerless_text": "エールにより公開された自分のカードの中に『KALEIDOSCORE』のカードが5枚以上ある場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-049-L | ニュートラル (ab#0)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "エールにより公開された自分のカードの中に『KALEIDOSCORE』のカードが5枚以上ある場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
+        "condition": {
+          "type": "card_count_condition",
+          "count": 5,
+          "operator": ">=",
+          "text": "エールにより公開された自分のカードの中に『KALEIDOSCORE』のカードが5枚以上ある場合",
+          "location": "revealed_cards",
+          "target": "self",
+          "group_names": [
+            "KALEIDOSCORE"
+          ]
+        },
+        "source": "energy_deck",
+        "destination": "energy_zone",
+        "state_change": "wait",
+        "count": 1,
+        "card_type": "energy_card",
+        "target": "self",
+        "action": "move_cards",
+        "group_names": [
+          "KALEIDOSCORE"
+        ]
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}自分のエネルギーが11枚以上ある場合、このカードのスコアを＋１する。",
+      "triggerless_text": "自分のエネルギーが11枚以上ある場合、このカードのスコアを＋１する。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-049-L | ニュートラル (ab#1)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のエネルギーが11枚以上ある場合、このカードのスコアを+1する",
+        "condition": {
+          "type": "card_count_condition",
+          "count": 11,
+          "operator": ">=",
+          "text": "自分のエネルギーが11枚以上ある場合",
+          "target": "self",
+          "location": "energy_zone"
+        },
+        "action": "modify_score",
+        "value": 1,
+        "operation": "add",
+        "self_target": true
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}自分のステージに『5yncri5e!』のメンバーが2人以上いる場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい。(メンバーをそれぞれ好きなエリアに移動させてもよい。)",
+      "triggerless_text": "自分のステージに『5yncri5e!』のメンバーが2人以上いる場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい。(メンバーをそれぞれ好きなエリアに移動させてもよい。)",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-050-L | Jellyfish (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージに『5yncri5e!』のメンバーが2人以上いる場合、自分のステージにいるメンバーをフォーメーションチェンジしてもよい",
+        "condition": {
+          "type": "card_count_condition",
+          "count": 2,
+          "operator": ">=",
+          "text": "自分のステージに『5yncri5e!』のメンバーが2人以上いる場合",
+          "unit": "人",
+          "card_type": "member_card",
+          "location": "stage",
+          "target": "self",
+          "group_names": [
+            "5yncri5e!"
+          ]
+        },
+        "source": "stage",
+        "card_type": "member_card",
+        "target": "self",
+        "optional": true,
+        "action": "position_change",
+        "multiple_targets": true,
+        "parenthetical": [
+          "メンバーをそれぞれ好きなエリアに移動させてもよい。"
+        ],
+        "group_names": [
+          "5yncri5e!"
+        ]
+      }
+    },
+    {
+      "full_text": "{{live_start.png|ライブ開始時}}自分のエネルギーが9枚以上ある場合、このカードのスコアを＋１する。",
+      "triggerless_text": "自分のエネルギーが9枚以上ある場合、このカードのスコアを＋１する。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-sd1-026-SRL | 私のSymphony 〜澁谷かのんVer.〜 (ab#0)"
+      ],
+      "triggers": "ライブ開始時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のエネルギーが9枚以上ある場合、このカードのスコアを+1する",
+        "condition": {
+          "type": "card_count_condition",
+          "count": 9,
+          "operator": ">=",
+          "text": "自分のエネルギーが9枚以上ある場合",
+          "target": "self",
+          "location": "energy_zone"
+        },
+        "action": "modify_score",
+        "value": 1,
+        "operation": "add",
+        "self_target": true
+      }
+    },
+    {
+      "full_text": "{{jyouji.png|常時}}自分のステージにいるメンバーが持つ{{live_start.png|ライブ開始時}}能力は発動しない。",
+      "triggerless_text": "自分のステージにいるメンバーが持つ{{live_start.png|ライブ開始時}}能力は発動しない。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-046-L | Butterfly Wing (ab#0)"
+      ],
+      "triggers": "常時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージにいるメンバーが持つ{{live_start.png|ライブ開始時}}能力は発動しない",
+        "source": "stage",
+        "card_type": "member_card",
+        "target": "self",
+        "action": "custom"
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}自分のステージに{{live_start.png|ライブ開始時}}能力を持つメンバーがいる場合、このカードのスコアを＋１する。",
+      "triggerless_text": "自分のステージに{{live_start.png|ライブ開始時}}能力を持つメンバーがいる場合、このカードのスコアを＋１する。",
+      "card_count": 1,
+      "cards": [
+        "PL!SP-pb2-046-L | Butterfly Wing (ab#1)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "自分のステージに{{live_start.png|ライブ開始時}}能力を持つメンバーがいる場合、このカードのスコアを+1する",
+        "condition": {
+          "text": "自分のステージに{{live_start.png|ライブ開始時}}能力を持つメンバーがいる場合",
+          "target": "self",
+          "location": "stage",
+          "card_type": "member_card",
+          "type": "location_condition"
+        },
+        "action": "modify_score",
+        "value": 1,
+        "operation": "add",
+        "self_target": true
       }
     }
   ]

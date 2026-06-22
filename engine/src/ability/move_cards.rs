@@ -421,6 +421,9 @@ impl AbilityResolver {
                             "has_blade_heart" => {
                                 card_db.get_card(id).is_some_and(|c| c.has_blade_heart())
                             }
+                            "has_score_icon" => {
+                                card_db.get_card(id).is_some_and(|c| c.has_score_icon())
+                            }
                             _ => false,
                         };
                         if neg {

@@ -463,6 +463,19 @@ def validate(abilities):
 
         walk_tree(combined, cb)
 
+        # C8: {{icon_score.png|スコア}}を持つ requires card_property: has_score_icon
+        if "{{icon_score.png|スコア}}を持つ" in t:
+            props = find_in_tree(combined, "card_property") or set()
+            if "has_score_icon" not in props:
+                fail(
+                    "ERROR",
+                    "score_icon_missing_card_property",
+                    idx,
+                    t,
+                    "card_property=has_score_icon expected when text contains {{icon_score.png|スコア}}を持つ",
+                    f"card_property values found: {props}",
+                )
+
         # ==================== STRUCTURE CHECKS ====================
 
         # S1: 代わりに → conditional_alternative

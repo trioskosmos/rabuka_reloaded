@@ -1343,6 +1343,8 @@ def _try_revealed(text):
         result["negation"] = True
     if "ブレードハートを持つ" in text or "ブレードハートを持たない" in text:
         result["card_property"] = "has_blade_heart"
+    if "{{icon_score.png|スコア}}を持つ" in text:
+        result["card_property"] = "has_score_icon"
     # "持たないカードが0枚" = cards WITHOUT property = 0.
     # This means NOT(at least 1 card has the property).
     # Set count:1 with operator >= so negation → false only when ≥1 match.
@@ -2427,6 +2429,8 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
                 action["negation"] = True
             elif "ブレードハートを持つ" in text:
                 action["card_property"] = "has_blade_heart"
+            elif "{{icon_score.png|スコア}}を持つ" in text:
+                action["card_property"] = "has_score_icon"
         if "state_change" not in action and "ウェイト状態" in text:
             action["state_change"] = "wait"
         # If after inference source and destination are both missing/None,
@@ -8160,11 +8164,16 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(cond, dict):
             ct = cond.get("text", "") or t
 
-            # 8b: card_property: has_blade_heart
+            # 8b: card_property enrichment for card_count_condition
             if cond.get("type") == "card_count_condition":
                 if "ブレードハートを持たない" in ct or "ブレードハートがない" in ct:
                     cond["card_property"] = "has_blade_heart"
                     cond["negation"] = True
+                    fix_stats["card_property"] += 1
+                if "{{icon_score.png|スコア}}を持つ" in ct and not cond.get(
+                    "card_property"
+                ):
+                    cond["card_property"] = "has_score_icon"
                     fix_stats["card_property"] += 1
 
             # 8d: Enrich temporal_condition with aggregate
@@ -8197,13 +8206,18 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
 
             # Remove check_self (reference doesn't have it)
 
-        # FIX 8e: card_property: has_score_icon for effects selecting cards with score icon
-        if "{{icon_score.png|スコア}}を持つ" in t and eff.get("action") in (
-            "move_cards",
-            "select",
-        ):
-            if not eff.get("card_property"):
+        # FIX 8e: card_property: has_score_icon for effects/conditions with score icon
+        if "{{icon_score.png|スコア}}を持つ" in t:
+            # Set on the effect for move_cards/select actions
+            if eff.get("action") in ("move_cards", "select") and not eff.get(
+                "card_property"
+            ):
                 eff["card_property"] = "has_score_icon"
+                fix_stats["card_property"] += 1
+            # Also set on the condition (any action type including modify_score)
+            cond = eff.get("condition")
+            if isinstance(cond, dict) and not cond.get("card_property"):
+                cond["card_property"] = "has_score_icon"
                 fix_stats["card_property"] += 1
 
         # FIX 9: Result condition enrichment in conditional_on_result
@@ -8213,6 +8227,9 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             if "ブレードハートを持たない" in rct or "ブレードハートがない" in rct:
                 rc["card_property"] = "has_blade_heart"
                 rc["negation"] = True
+                fix_stats["result_cond"] += 1
+            if "{{icon_score.png|スコア}}を持つ" in rct and not rc.get("card_property"):
+                rc["card_property"] = "has_score_icon"
                 fix_stats["result_cond"] += 1
 
         # FIX 10: Primary effect fixes — negation condition
@@ -8769,13 +8786,18 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     if not node.get("heart_type") and not node.get("heart_colors"):
                         node["heart_type"] = "all"
 
-            # blade_heart card_property and heart_colors cleanup for card_count_conditions
+            # card_property enrichment and heart_colors cleanup for card_count_conditions
+            # Check node.get("condition") — works for effect/action nodes
             nc = node.get("condition")
             if isinstance(nc, dict) and nc.get("type") == "card_count_condition":
                 nct = nc.get("text", "")
                 if "ブレードハートを持たない" in nct or "ブレードハートがない" in nct:
                     if not nc.get("card_property"):
                         nc["card_property"] = "has_blade_heart"
+                if "{{icon_score.png|スコア}}を持つ" in nct and not nc.get(
+                    "card_property"
+                ):
+                    nc["card_property"] = "has_score_icon"
                 # Strip heart_colors from preceding_moved conditions that have a
                 # specific location — the move already filtered by heart color.
                 if (
@@ -8784,6 +8806,17 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     and nc.get("heart_colors")
                 ):
                     nc.pop("heart_colors", None)
+            # Also check if node itself IS a card_count_condition (sub-condition
+            # of a compound — no "condition" child, it IS the condition).
+            if node.get("type") == "card_count_condition" and node is not nc:
+                nct = node.get("text", "")
+                if "ブレードハートを持たない" in nct or "ブレードハートがない" in nct:
+                    if not node.get("card_property"):
+                        node["card_property"] = "has_blade_heart"
+                if "{{icon_score.png|スコア}}を持つ" in nct and not node.get(
+                    "card_property"
+                ):
+                    node["card_property"] = "has_score_icon"
 
             # Strip parenthetical from sub-conditions of compound conditions
             if node.get("type") == "compound" and "conditions" in node:
