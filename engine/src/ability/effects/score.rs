@@ -52,6 +52,13 @@ impl AbilityResolver {
         let (live_card_ids, final_value) = {
             let player = gs.resolve_target_player_mut(&target);
 
+            // Use CardFilter::from_effect (not filter_subset) so that
+            // need_heart_total, need_heart_operator, and other condition
+            // fields are included in the filter.  filter_subset() drops
+            // these fields intentionally — it's a minimal set for simple
+            // lookups — but modify_score + per_unit needs the full filter
+            // for accurate per-unit counting (e.g. 絶対的LOVER counts only
+            // Liella! members with ≥4 hearts per Q149 rules).
             let mut filter = util::CardFilter::from_effect(effect);
             if let Some(ref ct) = card_type_filter {
                 filter.card_type = Some(ct.as_str());

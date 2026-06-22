@@ -1631,6 +1631,25 @@ def _extract_generic_fields(condition, text):
     if "公開した" in text or "公開された" in text or "公開する" in text:
         condition["location"] = "revealed_cards"
 
+    # Ability filter: has ability / no ability
+    if "能力を持つ" in text and "能力を持たない" not in text:
+        condition["ability_filter"] = "has_ability"
+        trig_match = re.search(r"\{\{(\w+)\.png\|([^}]+?)\}\}", text)
+        if trig_match:
+            condition["ability_filter_triggers"] = [trig_match.group(2)]
+    elif "能力を持たない" in text or "能力も持たない" in text:
+        trig_match = re.search(r"\{\{([^}]+?)\.png\|([^}]+?)\}\}能力", text)
+        if trig_match:
+            condition["ability_filter"] = "no_ability_type"
+            condition["ability_filter_triggers"] = [trig_match.group(2)]
+        elif "能力も" in text:
+            condition["ability_filter"] = "no_ability_type"
+            triggers = re.findall(r"\{\{([^}]+?)\.png\|([^}]+?)\}\}能力も", text)
+            if triggers:
+                condition["ability_filter_triggers"] = [t[1] for t in triggers]
+        else:
+            condition["ability_filter"] = "no_ability"
+
     # Delta tracking for surplus heart loss ("これにより失っている場合")
     if "失っている" in text and "これにより" in text:
         condition["delta"] = True
@@ -5057,8 +5076,13 @@ def _enrich_from_text(d, text):
         if "以下" in text and "cost_limit_operator" not in d:
             d["cost_limit_operator"] = "<="
 
-    # Extract ability filters (e.g. "{{live_start.png|ライブ開始時}}能力を持たない")
-    if "能力を持たない" in text or "能力も持たない" in text:
+    # Extract ability filters (e.g. "{{live_start.png|ライブ開始時}}能力を持つ")
+    if "能力を持つ" in text and "能力を持たない" not in text:
+        d["ability_filter"] = "has_ability"
+        trig_match = re.search(r"\{\{(\w+)\.png\|", text)
+        if trig_match:
+            d["ability_filter_triggers"] = [trig_match.group(1)]
+    elif "能力を持たない" in text or "能力も持たない" in text:
         trig_match = re.search(r"\{\{([^}]+?)\.png\|([^}]+?)\}\}能力", text)
         if trig_match:
             d["ability_filter"] = "no_ability_type"

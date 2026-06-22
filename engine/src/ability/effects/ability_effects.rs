@@ -124,10 +124,22 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        // Check if there are valid targets on stage matching the effect's filters,
-        // excluding the activating card itself (you can't invalidate your own abilities
-        // as part of playing yourself).
         let db = &gs.card_database;
+        let is_self = effect.self_target.unwrap_or(false);
+
+        if is_self {
+            // Self-targeting: invalidate the activating card itself (works for any zone)
+            if let Some(card_id) = gs.activating_card {
+                let pp = self.player_prefix(gs);
+                let cn = self.card_name(card_id);
+                gs.rule_log.push(format!("{} {}: 能力無効化(自身)", pp, cn));
+                gs.negated_abilities.insert(card_id);
+                return Ok(());
+            }
+            return Err("no activating card for self-targeted invalidation".to_string());
+        }
+
+        // Other-targeting: find valid target on stage
         let player = gs.resolve_target_player(effect.target.as_deref().unwrap_or("self"));
         let stage_ids: Vec<i16> = player
             .stage
@@ -147,11 +159,13 @@ impl AbilityResolver {
             return Err("no valid targets for invalidation".to_string());
         }
 
-        if let Some(card_id) = gs.activating_card {
+        if let Some(activating) = gs.activating_card {
             let pp = self.player_prefix(gs);
-            let cn = self.card_name(card_id);
+            let cn = self.card_name(activating);
             gs.rule_log.push(format!("{} {}: 能力無効化", pp, cn));
-            gs.negated_abilities.insert(card_id);
+            if let Some(&target_id) = valid.first() {
+                gs.negated_abilities.insert(target_id);
+            }
         }
         Ok(())
     }

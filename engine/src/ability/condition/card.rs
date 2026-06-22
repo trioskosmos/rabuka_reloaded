@@ -191,6 +191,12 @@ impl<'a> ConditionContext<'a> {
                                         .and_then(|c| c.score)
                                 })
                                 .unwrap_or(0);
+                            // Per Q129 (qa_data.json:2199-2200): cost conditions use
+                            // the CURRENT/MODIFIED cost (NOT base/printed).  Hand-based
+                            // cost reductions ("手札にあるこのメンバーカードのコストは
+                            // ...少なくなる") lower the cost used for condition checks.
+                            // This is distinct from "元々のコスト" which checks the
+                            // printed cost directly via cost_threshold_met().
                             if ctype == "cost" {
                                 base.saturating_sub(
                                     self.game_state.mods.get_cost_modifier(act_id).max(0) as u32,
@@ -676,6 +682,61 @@ impl<'a> ConditionContext<'a> {
         true
     }
 
+    pub(crate) fn check_ability_filter(
+        &self,
+        condition: &Condition,
+        player: &crate::player::Player,
+        location: &str,
+    ) -> bool {
+        let filter = match condition.ability_filter.as_deref() {
+            Some(f) => f,
+            None => return true,
+        };
+        let card_db = &self.game_state.card_database;
+        let card_ids: Vec<i16> = match Zone::from_str(location) {
+            Some(Zone::Stage) => player
+                .stage
+                .stage
+                .iter()
+                .filter(|&&id| id != -1)
+                .copied()
+                .collect(),
+            Some(Zone::Hand) => player.hand.cards.to_vec(),
+            Some(Zone::Discard) | Some(Zone::Waitroom) => player.waitroom.cards.to_vec(),
+            _ => return true,
+        };
+        let triggers: Vec<&str> = condition
+            .ability_filter_triggers
+            .as_ref()
+            .map(|t| t.iter().map(|s| s.as_str()).collect())
+            .unwrap_or_default();
+        match filter {
+            "has_ability" => {
+                if triggers.is_empty() {
+                    card_ids.iter().any(|&id| {
+                        card_db
+                            .get_card(id)
+                            .is_some_and(|c| !c.abilities.is_empty())
+                    })
+                } else {
+                    card_ids.iter().any(|&id| {
+                        card_db.get_card(id).is_some_and(|c| {
+                            c.abilities.iter().any(|a| {
+                                a.triggers
+                                    .as_ref()
+                                    .is_some_and(|t| triggers.iter().any(|et| t.contains(et)))
+                            })
+                        })
+                    })
+                }
+            }
+            "no_ability" => card_ids
+                .iter()
+                .any(|&id| card_db.get_card(id).is_some_and(|c| c.abilities.is_empty())),
+            _ => true,
+        }
+    }
+
     pub(crate) fn check_aggregate_total(
         &self,
         condition: &Condition,
@@ -708,9 +769,11 @@ impl<'a> ConditionContext<'a> {
                             group_name.is_none()
                                 || util::card_matches_group_str(card_db, cid, group_name)
                         })
-                        .filter_map(|&cid| card_db.get_card(cid))
-                        .map(|card| {
-                            card.base_heart
+                        .map(|&cid| (cid, card_db.get_card(cid)))
+                        .filter_map(|(cid, card)| card.map(|c| (cid, c)))
+                        .map(|(cid, card)| {
+                            let base: u32 = card
+                                .base_heart
                                 .as_ref()
                                 .map(|bh| {
                                     hc.iter()
@@ -720,7 +783,21 @@ impl<'a> ConditionContext<'a> {
                                         })
                                         .sum::<u32>()
                                 })
-                                .unwrap_or(0)
+                                .unwrap_or(0);
+                            let modifier: i32 = hc
+                                .iter()
+                                .map(|color_str| {
+                                    let color = crate::zones::parse_heart_color(color_str);
+                                    self.game_state
+                                        .mods
+                                        .heart_modifiers
+                                        .get(&cid)
+                                        .and_then(|hm| hm.get(&color))
+                                        .map(|e| e.set + e.additive)
+                                        .unwrap_or(0)
+                                })
+                                .sum();
+                            (base as i32 + modifier).max(0) as u32
                         })
                         .sum();
                     Some(compare_counts(
@@ -1020,6 +1097,9 @@ impl<'a> ConditionContext<'a> {
         if let Some(res) = self.check_aggregate_total(condition, player, location) {
             return res;
         }
+        if !self.check_ability_filter(condition, player, location) {
+            return false;
+        }
         if !self.check_distinct_names(condition, player, location) {
             return false;
         }
@@ -1146,6 +1226,13 @@ impl<'a> ConditionContext<'a> {
         compare_counts(effective_op, count, thresh)
     }
 
+    /// "元々持つブレード" — checks base/printed blade (card.blade from DB).
+    ///
+    /// Per Q195 (qa_data.json:1071-1074): "元々持つブレードの数を変更した後、
+    /// ブレードを得る効果が適用される" — setting the original blade changes
+    /// the base (Rules 9.9.1.4), then +blade effects stack on top (9.9.1.5).
+    /// For current blade totals (e.g. "ブレードの合計"), Q116 (lines 2487-2488)
+    /// confirms modified/current values are used instead.
     pub(crate) fn check_original_blade_filter(&self, condition: &Condition, card_id: i16) -> bool {
         if !condition.original_value.unwrap_or(false) {
             return true;
@@ -1172,7 +1259,16 @@ impl<'a> ConditionContext<'a> {
 
     /// "元々持つハートの数より多い/少ない" — compare a member's current total hearts
     /// (base + heart modifiers from constant abilities) against its original base.
-    /// Uses the condition's operator (">", "<", ">=", etc.) and count (threshold).
+    ///
+    /// Per Q172 (qa_data.json:1405-1406): "能力によって得たハートも含みます。
+    /// ただし、エールによって得たブレードハートは含みません。" — ability-granted
+    /// hearts ARE counted, but yell blade hearts are NOT.  The base comparison is
+    /// against the card's printed hearts (total_hearts() = base_heart for members).
+    /// Per Q149 (lines 1957-1958): "ハートの総数" = 基本ハート (basic hearts).
+    /// This function sums heart_modifiers (ability-granted hearts) on top of
+    /// base_hearts, then compares against base_hearts using the condition's operator.
+    /// Rules 9.9.1.4→9.9.1.5 (rules.txt:1196-1212) defines the application order:
+    /// printed base → set-to-value → add/subtract.
     pub(crate) fn check_original_heart_filter(&self, condition: &Condition, card_id: i16) -> bool {
         if !condition.original_value.unwrap_or(false) {
             return true;
@@ -1383,6 +1479,15 @@ impl<'a> ConditionContext<'a> {
                 _ => return false,
             }
         }
+        let g_target = condition.target.as_deref().unwrap_or("self");
+        let g_player = self.resolve_condition_player(g_target);
+        let g_location = condition.location.as_deref().unwrap_or("");
+
+        // Aggregate total check (sum of heart values, e.g. heart02 >= 6)
+        if let Some(res) = self.check_aggregate_total(condition, &g_player, g_location) {
+            return res;
+        }
+
         // When heart_colors are specified, check that the collective cards in the
         // target zone cover ALL required heart colors (e.g. yell-revealed cards).
         let hc: &[String] = condition.heart_colors.as_deref().unwrap_or(&[]);

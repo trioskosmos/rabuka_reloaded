@@ -858,6 +858,18 @@ impl GameState {
             )
         };
 
+        // Skip resolution if this card's abilities are negated
+        if card_id.is_some() && self.negated_abilities.contains(&card_id.unwrap()) {
+            log::debug!(
+                "[NEGATED] card_id={:?} is negated — skipping ability resolution",
+                card_id
+            );
+            self.ability_queue.complete_current();
+            self.activating_card = None;
+            self.activating_ability_index = None;
+            return;
+        }
+
         self.activating_card = card_id;
         self.activating_ability_index = Some(ability_index);
 

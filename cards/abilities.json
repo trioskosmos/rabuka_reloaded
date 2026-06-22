@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-22T21:45:21.243648",
+  "generated_at": "2026-06-22T22:35:21.842047",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -32293,6 +32293,10 @@
           "text": "自分のステージに{{live_start.png|ライブ開始時}}能力を持つメンバーがいる場合",
           "target": "self",
           "location": "stage",
+          "ability_filter": "has_ability",
+          "ability_filter_triggers": [
+            "ライブ開始時"
+          ],
           "card_type": "member_card",
           "type": "location_condition"
         },

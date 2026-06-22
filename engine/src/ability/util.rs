@@ -700,9 +700,20 @@ impl<'a> CardFilter<'a> {
         if !self.heart_colors.is_empty() && !card_matches_heart_colors(db, id, self.heart_colors) {
             return false;
         }
+        // Heart threshold check.
+        // Per Q149 (qa_data.json:1957-1958): "ハートの総数" = 基本ハート
+        // (basic hearts counted regardless of color). Per Q172 (lines 1405-1406):
+        // ability-granted hearts ARE included but blade hearts from yell are NOT.
+        // total_hearts() returns base_heart (printed) for member cards, which
+        // matches "基本ハート". Note: this does NOT include ability-granted
+        // heart modifiers (heart_modifiers in GameModifiers) — those require
+        // game-state access which CardFilter::matches() doesn't have.
+        // Rules 9.9.1.4→9.9.1.5 (rules.txt:1196-1212) defines the application
+        // order: printed base → set-to-value → add/subtract.
         if let Some(need_total) = self.need_heart_total {
             if let Some(color_str) = self.need_heart_color {
-                // Per-color check (e.g. heart06 >= 3)
+                // Per-color check (e.g. heart06 >= 3 for specific-color
+                // live-card require conditions, not member base hearts).
                 let color = crate::zones::parse_heart_color(color_str);
                 let card_amount = db
                     .get_card(id)
@@ -717,7 +728,8 @@ impl<'a> CardFilter<'a> {
                 // Total sum check — use total_hearts() which returns base_heart
                 // for member cards (the card's printed hearts) and falls back to
                 // need_heart for live cards. need_heart_total() only checks the
-                // live card cost field which is always 0 for members.
+                // live card cost field which is always 0 for members, so we use
+                // total_hearts() instead. Per Q149 + Q172.
                 let card_total = db.get_card(id).map(|c| c.total_hearts()).unwrap_or(0);
                 let op = self.need_heart_operator.unwrap_or(">=");
                 if !compare_counts(Some(op), card_total, need_total) {
@@ -735,6 +747,16 @@ impl<'a> CardFilter<'a> {
                 return false;
             }
         }
+        // "元々持つブレード" — checks the card's base/printed blade value
+        // (card.blade from DB, no modifiers applied). Per Q195 (qa_data.json:1071-1074):
+        // "元々持つブレードの数を変更した後、ブレードを得る効果が適用される" —
+        // setting the original blade changes the base, then +blade effects stack
+        // on top. Rules 9.9.1.4→9.9.1.5 (rules.txt:1196-1212) defines this order:
+        // printed base → set-to-value → add/subtract.
+        // For current/modified blade checks (e.g. "ブレードの合計"), use
+        // evaluate_card_blade_condition() which sums base + blade_modifiers.
+        // Per Q116 (lines 2487-2488): current total blade ≥ 10 condition uses
+        // modified values.
         if let Some(bl) = self.original_blade_limit {
             let card_blade = db.get_card(id).map(|c| c.blade).unwrap_or(0);
             if !compare_counts(self.original_blade_operator, card_blade, bl) {
@@ -889,7 +911,14 @@ impl<'a> CardFilter<'a> {
             .count() as u32
     }
 
-    /// Build from an AbilityEffect — single source of filter field extraction.
+    /// Build a full CardFilter from all AbilityEffect fields.
+    ///
+    /// This is the complete filter including heart thresholds (Q149/Q172:
+    /// need_heart_total uses total_hearts() for member base_heart checks),
+    /// blade limits (Q195: original_blade_limit checks card.blade from DB),
+    /// cost totals (Q129: modified/current cost is used for cost conditions),
+    /// ability filters, card properties, distinct, etc.
+    /// Use filter_subset() only for minimal zone lookups.
     pub fn from_effect(effect: &'a crate::card::AbilityEffect) -> Self {
         CardFilter {
             card_type: effect.card_type.as_deref(),

@@ -1034,11 +1034,21 @@ impl AbilityEffect {
     /// group, cost_limit, cost_operator, characters, exclude_characters,
     /// exclude_self) that effect handlers most commonly need. This is the
     /// subset of `CardFilter::from_effect` that matches the field set
-    /// `filter_from_parts` exposes — handlers that need the full filter
-    /// (heart_colors, distinct, exclude_cards, etc.) should call
-    /// `CardFilter::from_effect` instead. Handlers that need to override
-    /// individual fields can mutate the returned `CardFilter` directly or
-    /// use the builder methods (`.card_type_opt`, `.group_opt`, etc.).
+    /// Returns a minimal CardFilter suitable for zone lookups and simple
+    /// conditions.  Handlers that need the full filter (heart thresholds,
+    /// blade limits, cost totals, distinct, ability filters, card properties,
+    /// etc.) should call `CardFilter::from_effect` instead.
+    ///
+    /// Missing fields compared to `from_effect`:
+    ///   need_heart_total, need_heart_operator, need_heart_color (Q149/Q172)
+    ///   original_blade_limit, original_blade_operator (Q195, Rules 9.9.1)
+    ///   cost_total, cost_total_operator (Q129 — cost uses modified values)
+    ///   distinct, heart_colors, exclude_cards
+    ///   ability_filter, ability_filter_triggers, or_ability_filters
+    ///   card_property, original_value, negation
+    ///
+    /// Handlers that need to override individual fields can mutate the
+    /// returned `CardFilter` directly or use the builder methods.
     pub fn filter_subset(&self) -> crate::ability::util::CardFilter<'_> {
         crate::ability::util::CardFilter {
             card_type: self.card_type.as_deref(),
@@ -1450,6 +1460,19 @@ impl Card {
         matches!(self.card_type, CardType::Energy)
     }
 
+    /// Total hearts this card has (printed hearts for member cards).
+    ///
+    /// Returns base_heart (printed hearts) for member cards, falling back to
+    /// need_heart (live-card cost hearts) for live cards.
+    ///
+    /// Per QA Q149 (qa_data.json:1957-1958): when conditions check "ハートの総数",
+    /// they count "メンバーが持つ基本ハート" (members' basic hearts), which is
+    /// base_heart.  Per Q172 (lines 1405-1406): ability-granted hearts ARE
+    /// included but blade hearts from yell are NOT ("基本ハートとエールで獲得した
+    /// ブレードハート").  Note: this method returns only the printed value and
+    /// does NOT include runtime heart_modifiers from GameModifiers.
+    /// Rules 9.9.1.4→9.9.1.5 (rules.txt:1196-1212) defines the application order:
+    /// printed base → set-to-value → add/subtract.
     pub fn total_hearts(&self) -> u32 {
         if let Some(ref base_heart) = self.base_heart {
             base_heart.hearts.values().sum()
@@ -1461,6 +1484,11 @@ impl Card {
     }
 
     /// Total required hearts (sum of all need_heart values).
+    ///
+    /// This is the live card's cost hearts (not member base_heart).
+    /// For member cards this always returns 0 since members don't have
+    /// need_heart.  For condition checks involving members' printed hearts,
+    /// use total_hearts() instead (per Q149: 基本ハート).
     pub fn need_heart_total(&self) -> u32 {
         self.need_heart
             .as_ref()

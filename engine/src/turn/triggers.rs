@@ -251,7 +251,7 @@ impl super::TurnEngine {
         }
     }
 
-    fn has_live_start_suppression(game_state: &GameState, player_id: &str) -> bool {
+    fn is_trigger_suppressed(game_state: &GameState, player_id: &str, trigger_name: &str) -> bool {
         let player = if player_id == game_state.player1.id {
             &game_state.player1
         } else {
@@ -265,7 +265,7 @@ impl super::TurnEngine {
                 for ability in &card.abilities {
                     if let Some(ref effect) = ability.effect {
                         if effect.action == "suppress_ability_trigger" {
-                            if effect.suppressed_trigger.as_deref() == Some("live_start") {
+                            if effect.suppressed_trigger.as_deref() == Some(trigger_name) {
                                 return true;
                             }
                         }
@@ -288,7 +288,7 @@ impl super::TurnEngine {
     }
 
     pub fn trigger_live_start_abilities(game_state: &mut GameState, player_id: &str) {
-        if Self::has_live_start_suppression(game_state, player_id) {
+        if Self::is_trigger_suppressed(game_state, player_id, "live_start") {
             log::debug!(
                 "[LIVE_START_SUPPRESSED] live_start abilities suppressed for player {}",
                 player_id
@@ -306,6 +306,9 @@ impl super::TurnEngine {
                 &game_state.player2
             };
             for card_id in &player.live_card_zone.cards {
+                if game_state.negated_abilities.contains(card_id) {
+                    continue;
+                }
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
                     for ability in &card.abilities {
                         if ability
@@ -324,7 +327,7 @@ impl super::TurnEngine {
                 }
             }
             for &card_id in &player.stage.stage {
-                if card_id != -1 {
+                if card_id != -1 && !game_state.negated_abilities.contains(&card_id) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
                         for ability in &card.abilities {
                             if ability
@@ -344,6 +347,9 @@ impl super::TurnEngine {
                 }
             }
             for &card_id in &player.success_live_card_zone.cards {
+                if game_state.negated_abilities.contains(&card_id) {
+                    continue;
+                }
                 if let Some(card) = game_state.card_database.get_card(card_id) {
                     for ability in &card.abilities {
                         if ability
@@ -448,13 +454,15 @@ impl super::TurnEngine {
             } else {
                 &game_state.player2
             };
+            let skip_negated =
+                |gs: &GameState, id: i16| -> bool { gs.negated_abilities.contains(&id) };
             for (_area, index) in [
                 (crate::zones::MemberArea::LeftSide, 0),
                 (crate::zones::MemberArea::Center, 1),
                 (crate::zones::MemberArea::RightSide, 2),
             ] {
                 let card_id = player.stage.stage[index];
-                if card_id != -1 {
+                if card_id != -1 && !skip_negated(game_state, card_id) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
                         for ability in &card.abilities {
                             if ability
