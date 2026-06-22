@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-23T01:52:15.120819",
+  "generated_at": "2026-06-23T03:41:29.533165",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -27001,7 +27001,9 @@
           "target": "self",
           "group_names": [
             "蓮ノ空"
-          ]
+          ],
+          "cost_limit": 10,
+          "cost_limit_operator": ">="
         },
         "action": "modify_score",
         "value": 1,
@@ -32344,5 +32346,6 @@
         "self_target": true
       }
     }
-  ]
+  ],
+  "_warning": "DO NOT EDIT THIS MANUALLY. Run cards/ability_extraction/parser.py to regenerate."
 }

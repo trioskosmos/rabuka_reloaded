@@ -369,10 +369,6 @@ export const Highlighter = {
                 // Support both card_index and hand_idx
                 const cardIndexOrIndices = params.card_index ?? a.hand_idx;
                 const cardIndices = params.card_indices ?? a.card_indices;
-                if ((cardIndexOrIndices === handIdx || cardIndices?.includes(handIdx)) &&
-                    (actionType === 'SelectHand' || a.description?.includes('Discard'))) {
-                    validTargets.add('my-discard-visual');
-                }
             } else if (source === 'stage') {
                 const sourceSlot = index;
                 if (params.stage_area) {

@@ -820,6 +820,19 @@ def _try_card_count(text):
             if gns and "を含む" not in text:
                 result["group_names"] = gns
 
+            # Extract cost limit (e.g. "コスト10以上" → cost_limit=10, operator=">=")
+            cm = re.search(r"コスト(\d+)(以上|以下|より大きい|より小さい|未満)", text)
+            if cm:
+                result["cost_limit"] = int(cm.group(1))
+                op_map = {
+                    "以上": ">=",
+                    "以下": "<=",
+                    "より大きい": ">",
+                    "より小さい": "<",
+                    "未満": "<",
+                }
+                result["cost_limit_operator"] = op_map.get(cm.group(2), ">=")
+
             # Extract heart_colors from text for heart icon patterns (e.g. 5種類以上)
             # Only if the condition text actually contains heart icons (not the effect part)
             # to avoid leaking effect heart icons into the condition filter.
@@ -8152,6 +8165,28 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
 
 def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
     """Post-process already-parsed abilities: infer actions, apply targeted fixes."""
+
+    # Add a DO NOT EDIT warning
+    data["_warning"] = (
+        "DO NOT EDIT THIS MANUALLY. Run cards/ability_extraction/parser.py to regenerate."
+    )
+
+    # Re-parse condition texts to pick up fields that newer parser versions extract
+    # (e.g. cost_limit, cost_limit_operator) from card_count_condition and other types.
+    for ability in data["unique_abilities"]:
+        eff = ability.get("effect")
+        if not isinstance(eff, dict):
+            continue
+        cond = eff.get("condition")
+        if isinstance(cond, dict) and cond.get("text"):
+            cond_text = cond["text"]
+            reparse = parse_condition(cond_text)
+            if reparse:
+                # Merge missing fields from the fresh parse into the existing condition.
+                # Never overwrite existing values — only fill in None/missing fields.
+                for key in ("cost_limit", "cost_limit_operator"):
+                    if key in reparse and key not in cond:
+                        cond[key] = reparse[key]
 
     # Post-processing: infer action for any effect with empty action,
     # plus apply sequential action chaining fixes for ALL abilities

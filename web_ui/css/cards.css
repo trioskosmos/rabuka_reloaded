@@ -55,8 +55,12 @@
 
 
 .card.card-back {
-    background: linear-gradient(135deg, #4a3a2a, #2a1a1a);
+    background: #2a1a1a;
     border: 1px solid #666;
+}
+
+.card.card-back img {
+    object-fit: cover;
 }
 
 /* --- Unified Orientation & Rotation --- */
@@ -304,10 +308,10 @@
 .energy-area-container {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
     justify-content: flex-start;
     align-items: center;
-    min-height: 40px;
+    min-height: calc(var(--card-h-mini) + 8px);
 }
 
 .energy-area-container.horizontal {
@@ -316,6 +320,10 @@
 }
 
 .card-area.stage {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+    align-items: center;
     overflow-x: auto;
     overflow-y: hidden;
     flex: 1;
@@ -342,28 +350,29 @@
 }
 
 .energy-pip {
-    width: 28px;
-    height: 28px;
-    border-radius: var(--radius-full);
+    width: var(--card-w-compact);
+    height: var(--card-h-compact);
+    border-radius: var(--radius-sm);
     border: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.05);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden; /* Ensure image doesn't bleed out */
+    background: var(--bg-tertiary);
+    overflow: hidden;
+    flex-shrink: 0;
+    position: relative;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s;
 }
 
 .energy-pip img {
     width: 100%;
     height: 100%;
-    object-fit: contain;
-    border-radius: 50%;
+    object-fit: cover;
+    display: block;
 }
 
 .energy-pip.tapped {
-    opacity: 0.4;
-    filter: grayscale(1);
-    transform: rotate(-15deg); /* Subtle tilt for tapped energy */
+    transform: rotate(-90deg) scale(0.9);
+    opacity: 0.85;
+    z-index: 5;
+    overflow: visible;
 }
 
 .discard-pile-visual {
@@ -450,18 +459,6 @@
 }
 
 /* --- Member Stage Layout --- */
-.stage {
-    display: flex;
-    flex-direction: row;
-    gap: var(--space-md);
-    justify-content: flex-start;
-    align-items: stretch;
-    width: 100%;
-    flex: 1;
-    min-height: 0;
-    min-width: 0;
-}
-
 .stage-group {
     flex: 1;
     display: flex;
@@ -694,7 +691,7 @@
 }
 
 .utility-column-right {
-    width: 90px;
+    width: 120px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;

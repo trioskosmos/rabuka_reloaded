@@ -1161,6 +1161,7 @@ impl<'a> ConditionContext<'a> {
             .as_ref()
             .and_then(|g| g.first().map(|s| s.as_str()));
         let op = condition.operator.as_deref();
+        let cost_op = condition.cost_limit_operator.as_deref();
 
         let cards: Vec<i16> = if Zone::from_str(location) == Some(Zone::RevealedCards) {
             self.game_state.revealed_cards.clone()
@@ -1183,7 +1184,12 @@ impl<'a> ConditionContext<'a> {
                         && Some(id) != ex_id
                         && util::card_matches_type(card_db, id, condition.card_type.as_deref())
                         && util::card_matches_group_str(card_db, id, group)
-                        && util::card_matches_cost_limit_op(card_db, id, condition.cost_limit, op)
+                        && util::card_matches_cost_limit_op(
+                            card_db,
+                            id,
+                            condition.cost_limit,
+                            cost_op,
+                        )
                         && self.check_original_blade_filter(condition, id)
                         && self.check_original_heart_filter(condition, id)
                         && self.check_heart_type_all_per_card(condition, card_db, id)
@@ -1196,7 +1202,7 @@ impl<'a> ConditionContext<'a> {
                 condition.card_type.as_deref(),
                 group,
                 condition.cost_limit,
-                op,
+                cost_op,
                 |cid| {
                     self.check_original_blade_filter(condition, cid)
                         && self.check_original_heart_filter(condition, cid)

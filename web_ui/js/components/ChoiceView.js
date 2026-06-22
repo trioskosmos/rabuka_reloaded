@@ -1,4 +1,5 @@
 import { State } from '../state.js';
+import { fixImg } from '../constants.js';
 import { Tooltips } from '../ui_tooltips.js';
 import { CardRenderer } from './CardRenderer.js';
 import * as i18n from '../i18n/index.js';
@@ -293,6 +294,7 @@ export const ChoiceView = {
                     if (cardData && cardData.card_no) {
                         const vm = CardRenderer.getCardViewModel(cardData, { compact: true });
                         const cardPortion = CardRenderer.createCardDOM(vm, cardData);
+                        cardPortion.classList.remove('rotate-img-90');
                         choiceEl.appendChild(cardPortion);
                     }
                     const textWrap = document.createElement('div');
@@ -348,24 +350,19 @@ export const ChoiceView = {
                 } else if (cardData && cardData.card_no) {
                     if (choice.blind) {
                         choiceEl = document.createElement('div');
-                        choiceEl.className = 'compact-choice-card has-image blind-card card card-compact card-back';
-                        choiceEl.style.cssText = `
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            border-radius: 4px;
-                            border: 2px solid var(--accent-gold, #d4a843);
-                            background: linear-gradient(135deg, #2a2a3a 0%, #1a1a2e 50%, #2a2a3a 100%);
-                            cursor: pointer;
-                            font-size: 1.6rem;
-                            color: var(--accent-gold, #d4a843);
-                            flex-shrink: 0;
-                        `;
-                        choiceEl.textContent = '?';
+                        choiceEl.className = 'compact-choice-card has-image card card-compact';
+                        const backImg = document.createElement('img');
+                        backImg.src = fixImg('img/texticon/lltcg-back.png');
+                        backImg.style.width = '100%';
+                        backImg.style.height = '100%';
+                        backImg.style.objectFit = 'cover';
+                        backImg.draggable = false;
+                        choiceEl.appendChild(backImg);
                         choiceEl.title = '??? (blind pick)';
                     } else {
                         const vm = CardRenderer.getCardViewModel(cardData, { compact: true });
                         choiceEl = CardRenderer.createCardDOM(vm, cardData);
+                        choiceEl.classList.remove('rotate-img-90');
                         choiceEl.classList.add('compact-choice-card', 'has-image');
                     }
                 } else {

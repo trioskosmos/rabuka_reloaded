@@ -1,8 +1,5 @@
-import { State } from '../state.js';
 import { fixImg } from '../constants.js';
-import { Tooltips } from '../ui_tooltips.js';
-import { CardRenderer } from './CardRenderer.js';
-import { DOMUtils } from '../utils/DOMUtils.js';
+import { resolveCardImagePath, CardRenderer } from './CardRenderer.js';
 
 export const BoardRenderer = {
     renderBoard: (state, p0, p1, validTargets, showDiscardModalCallback) => {
@@ -30,12 +27,6 @@ export const BoardRenderer = {
         
         CardRenderer.renderLiveZone('my-live', p0.live_zone.cards, true, validTargets.myLive, validTargets.hasSelection);
         CardRenderer.renderLiveZone('opp-live', p1.live_zone.cards, true, validTargets.oppLive, validTargets.hasSelection);
-
-        // Engine sends waitroom, fallback to discard for compatibility
-        const p0Discard = p0.discard?.cards || p0.waitroom?.cards;
-        const p1Discard = p1.discard?.cards || p1.waitroom?.cards;
-        CardRenderer.renderDiscardPile('my-discard-visual', p0Discard, 0, validTargets.discard, validTargets.hasSelection, showDiscardModalCallback);
-        CardRenderer.renderDiscardPile('opp-discard-visual', p1Discard, 1, validTargets.discard, validTargets.hasSelection, showDiscardModalCallback);
 
         BoardRenderer.renderEnergy('my-energy', p0.energy.cards, true, validTargets.myEnergy, validTargets.hasSelection, state);
         BoardRenderer.renderEnergy('opp-energy', p1.energy.cards, true, validTargets.oppEnergy, validTargets.hasSelection, state);
@@ -85,8 +76,11 @@ export const BoardRenderer = {
 
         const existingPips = Array.from(el.children);
         const energyCount = energy.length;
+        const activeCount = energy.filter(e => e && e.orientation === 'Active').length;
 
-        // Synchronize pip count
+        const countEl = el.parentElement?.querySelector('.area-count');
+        if (countEl) countEl.textContent = `${activeCount}/${energyCount}`;
+
         while (el.children.length > energyCount) {
             el.removeChild(el.lastChild);
         }
@@ -94,8 +88,6 @@ export const BoardRenderer = {
         energy.forEach((e, i) => {
             const action = validActionMap[i];
             const isValid = action !== undefined;
-            const highlightClass = isValid ? ' valid-target' : '';
-            // Rust backend: orientation is 'Active' or 'Wait'
             const isWait = e.orientation === 'Wait';
             const tappedClass = isWait ? ' tapped' : '';
             const existingPip = existingPips[i];
@@ -108,50 +100,27 @@ export const BoardRenderer = {
                 el.appendChild(div);
             }
 
-            const newClassName = 'energy-pip' + tappedClass + highlightClass;
+            const newClassName = 'energy-pip' + tappedClass;
             if (div.className !== newClassName) div.className = newClassName;
             div.id = `${containerId}-slot-${i}`;
 
-            const imgPath = fixImg('img/texticon/icon_energy.png');
+            const imgPath = e.card_no ? resolveCardImagePath(e.card_no) : fixImg('img/texticon/icon_energy.png');
             let img = div.querySelector('img');
             if (!img) {
                 img = document.createElement('img');
+                img.draggable = false;
                 div.appendChild(img);
             }
             if (img.getAttribute('src') !== imgPath) {
                 img.setAttribute('src', imgPath);
             }
 
-            let numberEl = div.querySelector('.energy-num');
-            if (!numberEl) {
-                numberEl = document.createElement('div');
-                numberEl.className = 'energy-num';
-                div.appendChild(numberEl);
-            }
-            const numberText = String(i + 1);
-            if (numberEl.textContent !== numberText) numberEl.textContent = numberText;
-
-            if (e) {
-                Tooltips.attachCardData(div, e, isValid ? action : undefined);
-            } else if (isValid) {
-                DOMUtils.patchAttributes(div, { 'data-action-id': action.index });
-            }
-
-            if (clickable && isValid) {
+            if (isValid) {
                 div.style.cursor = 'pointer';
                 div.onclick = () => { if (window.doAction) window.doAction(action); };
-
-                div.onmouseenter = () => {
-                    if (window.highlightActionBtn) window.highlightActionBtn(action.index, true);
-                };
-                div.onmouseleave = () => {
-                    if (window.highlightActionBtn) window.highlightActionBtn(action.index, false);
-                };
             } else {
                 div.style.cursor = '';
                 div.onclick = null;
-                div.onmouseenter = null;
-                div.onmouseleave = null;
             }
         });
     }

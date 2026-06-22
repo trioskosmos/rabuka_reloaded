@@ -7,8 +7,7 @@ __pycache__/
 node_modules/
 nul
 *.log
-*.json
-!cards/*.json
+
 .kilo/
 .opencode/
 .ruff_cache/

@@ -574,6 +574,13 @@
     overflow: hidden;
 }
 
+.compact-choice-card.text-option {
+    width: auto;
+    height: auto;
+    aspect-ratio: auto;
+    flex-shrink: 1;
+}
+
 .compact-choice-card.orientation-landscape {
     width: 84px !important;
     height: 60px !important;

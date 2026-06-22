@@ -54,8 +54,7 @@ function initDomCache() {
         oppLive: 'opp-live',
         myEnergy: 'my-energy',
         oppEnergy: 'opp-energy',
-        myDiscard: 'my-discard-visual',
-        oppDiscard: 'opp-discard-visual',
+
         mySuccess: 'my-success',
         oppSuccess: 'opp-success',
         actions: 'actions',

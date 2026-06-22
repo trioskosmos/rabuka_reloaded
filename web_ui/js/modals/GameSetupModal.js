@@ -88,7 +88,7 @@ function setupAutoConvert(pid) {
     const pasteContainer = textarea.closest('.setup-paste-container');
     if (pasteContainer && !pasteContainer.querySelector('.deck-file-load-btn')) {
         const loadBtn = document.createElement('button');
-        loadBtn.className = 'btn btn-small deck-file-load-btn';
+        loadBtn.className = 'btn btn-small';
         loadBtn.textContent = '📂 Load from file';
         loadBtn.type = 'button';
         loadBtn.style.marginTop = '6px';

@@ -272,7 +272,6 @@ export const CardRenderer = {
 
         // 1. Determine CSS Classes
         const classNames = ['card'];
-        if (isHidden) classNames.push('hidden');
         if (compact) classNames.push('card-compact');
         else if (mini) classNames.push('card-mini');
         if (resolvedCard.is_new) classNames.push('new-card');
@@ -325,6 +324,8 @@ export const CardRenderer = {
             } else {
                 imgPath = fixImgPath(resolvedCard.img || resolvedCard.img_path || '');
             }
+        } else {
+            imgPath = fixImgPath('img/texticon/lltcg-back.png');
         }
 
         return {
@@ -356,13 +357,11 @@ export const CardRenderer = {
             Tooltips.attachCardData(div, cardData, viewModel.actionId);
         }
 
-        if (!viewModel.isHidden) {
-            if (viewModel.imgPath) {
-                const img = document.createElement('img');
-                img.draggable = false;
-                ImageLoader.loadImage(img, viewModel.imgPath);
-                div.appendChild(img);
-            }
+        if (viewModel.imgPath) {
+            const img = document.createElement('img');
+            img.draggable = false;
+            ImageLoader.loadImage(img, viewModel.imgPath);
+            div.appendChild(img);
         }
 
         if (onClick) {
@@ -407,38 +406,27 @@ export const CardRenderer = {
             Tooltips.attachCardData(el, cardData, viewModel.actionId);
         }
 
-        if (viewModel.isHidden) {
-            el.innerHTML = '';
-            el.classList.add('card-back');
-        } else {
-            const imgPath = viewModel.imgPath;
-            const existingImg = el.querySelector('img');
-            
-            if (existingImg) {
-                if (imgPath) {
-                    if (existingImg.dataset.originalPath !== imgPath) {
-                        // Different image than before — full load
-                        ImageLoader.loadImage(existingImg, imgPath);
-                        existingImg.dataset.originalPath = imgPath;
-                    } else if (!ImageLoader.loadedImages.has(imgPath)) {
-                        // Same image, but hasn't loaded yet (or previously failed).
-                        // Retry on each state update so pending choices recover
-                        // from transient load failures.
-                        ImageLoader.retryImage(existingImg, imgPath);
-                    }
-                    existingImg.style.display = '';
-                } else {
-                    existingImg.remove();
+        const imgPath = viewModel.imgPath;
+        const existingImg = el.querySelector('img');
+        
+        if (existingImg) {
+            if (imgPath) {
+                if (existingImg.dataset.originalPath !== imgPath) {
+                    ImageLoader.loadImage(existingImg, imgPath);
+                    existingImg.dataset.originalPath = imgPath;
+                } else if (!ImageLoader.loadedImages.has(imgPath)) {
+                    ImageLoader.retryImage(existingImg, imgPath);
                 }
-            } else if (imgPath) {
-                const img = document.createElement('img');
-                img.draggable = false;
-                img.dataset.originalPath = imgPath;
-                ImageLoader.loadImage(img, imgPath);
-                el.prepend(img);
+                existingImg.style.display = '';
+            } else {
+                existingImg.remove();
             }
-
-
+        } else if (imgPath) {
+            const img = document.createElement('img');
+            img.draggable = false;
+            img.dataset.originalPath = imgPath;
+            ImageLoader.loadImage(img, imgPath);
+            el.prepend(img);
         }
 
         el.style.cursor = onClick ? 'pointer' : '';
@@ -799,29 +787,25 @@ export const CardRenderer = {
             slot.id = `${containerId}-slot-${i}`;
 
             if (card && card.card_no) {
-                if (!isCardHidden) {
-                    const existingImg = slot.querySelector('img');
-                    const existingInner = slot.querySelector('.live-card-inner');
-                    const fixedPath = viewModel?.imgPath || resolveCardImagePath(card.card_no);
+                const fixedPath = viewModel?.imgPath || resolveCardImagePath(card.card_no);
+                const existingImg = slot.querySelector('img');
+                const existingInner = slot.querySelector('.live-card-inner');
 
-                    if (existingInner && existingImg) {
-                        if (existingImg.src !== fixedPath) {
-                            ImageLoader.loadImage(existingImg, fixedPath);
-                        }
-                    } else {
-                        const img = document.createElement('img');
-                        img.draggable = false;
-                        ImageLoader.loadImage(img, fixedPath);
-
-                        const inner = document.createElement('div');
-                        inner.className = 'live-card-inner';
-                        inner.appendChild(img);
-
-                        slot.innerHTML = '';
-                        slot.appendChild(inner);
+                if (existingInner && existingImg) {
+                    if (existingImg.src !== fixedPath) {
+                        ImageLoader.loadImage(existingImg, fixedPath);
                     }
                 } else {
+                    const img = document.createElement('img');
+                    img.draggable = false;
+                    ImageLoader.loadImage(img, fixedPath);
+
+                    const inner = document.createElement('div');
+                    inner.className = 'live-card-inner';
+                    inner.appendChild(img);
+
                     slot.innerHTML = '';
+                    slot.appendChild(inner);
                 }
                 
                 const rawText = Tooltips.getEffectiveRawText(card);
