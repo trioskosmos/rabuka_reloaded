@@ -1995,6 +1995,7 @@ impl AbilityResolver {
             return Err(format!("Member not found: {}", target_member));
         }
         gs.position_change_occurred_this_turn = true;
+        gs.recalculate_constants();
         Ok(())
     }
 
@@ -2146,6 +2147,7 @@ impl AbilityResolver {
                 gs.record_card_movement(source_id2);
             }
             gs.position_change_occurred_this_turn = true;
+            gs.recalculate_constants();
             let mover_pid = gs
                 .ability_queue
                 .current_entry()
@@ -2199,6 +2201,7 @@ impl AbilityResolver {
                         gs.record_card_movement(source_id);
                     }
                     gs.position_change_occurred_this_turn = true;
+                    gs.recalculate_constants();
                     let mover_pid = gs
                         .ability_queue
                         .current_entry()
@@ -2274,6 +2277,7 @@ impl AbilityResolver {
             }
         }
         gs.position_change_occurred_this_turn = true;
+        gs.recalculate_constants();
         Ok(())
     }
 
@@ -2320,6 +2324,7 @@ impl AbilityResolver {
         }
 
         gs.position_change_occurred_this_turn = true;
+        gs.recalculate_constants();
         Ok(())
     }
 

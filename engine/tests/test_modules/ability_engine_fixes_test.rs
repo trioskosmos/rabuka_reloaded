@@ -967,3 +967,125 @@ fn kanon_unless_pay_skip_triggers_discard() {
         energy_after
     );
 }
+
+// ====================================================================
+// PL!N-pb1-004-R 朝香果林 — Constant: blade 2 if not_moved; LiveStart: reveal+position_change
+// ====================================================================
+
+fn fill_decks_kari(game: &mut TestGame) {
+    let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+}
+
+fn advance_to_live_start_kari(game: &mut TestGame, live_card: i16) {
+    game.add_to_hand(live_card);
+    for _ in 0..5 {
+        game.pass();
+    }
+    game.set_live_card(live_card);
+    game.pass(); // LiveCardSetSecondAttacker → LiveStart triggers
+    game.pass(); // Live
+    let mut safety = 0;
+    while game.has_pending_choice() && safety < 30 {
+        safety += 1;
+        if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
+            game.select_indices(&[]);
+        } else {
+            game.select_indices(&[0]);
+        }
+    }
+}
+
+/// When Karin moves via her LiveStart position_change, her constant blade bonus
+/// (not_moved condition) must be re-evaluated immediately so it drops to 0.
+#[test]
+fn karin_position_change_removes_not_moved_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let karin = game.id("PL!N-pb1-004-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    let live_card = game.id("PL!-sd1-020-SD");
+
+    fill_decks_kari(&mut game);
+
+    // Put a member with cost≤9 at deck index 1 (index 0 gets drawn during phase advance
+    // to LiveCardSetFirstAttacker, exposing our card as the new top for LiveStart reveal).
+    let cheap_member = game.id("PL!-sd1-010-SD");
+    game.state.player1.main_deck.cards.insert(1, cheap_member);
+
+    game.add_to_hand(karin);
+    game.add_to_hand(filler);
+    game.give_energy(20);
+    game.play_to_stage(filler, MemberArea::LeftSide);
+    game.play_to_stage(karin, MemberArea::Center);
+
+    // Before LiveStart: Karin has not moved → gets blade 2.
+    game.state.recalculate_constants();
+    let blade_before = game.state.mods.get_blade_modifier(karin);
+    assert_eq!(blade_before, 2, "Karin should have +2 blade before moving");
+
+    // Record her initial position so we can verify she moved.
+    let pos_before = game
+        .state
+        .player1
+        .stage
+        .stage
+        .iter()
+        .position(|&c| c == karin);
+    assert_eq!(pos_before, Some(1), "Karin starts at Center");
+
+    // Advance to LiveStart — fires Karin's ab#1 which reveals top card (cheap_member,
+    // cost≤9 member), moves it to hand, and position-changes Karin.
+    advance_to_live_start_kari(&mut game, live_card);
+
+    // Verify: cheap_member was added to hand (not discarded).
+    assert!(
+        game.state.player1.hand.cards.contains(&cheap_member),
+        "cheap member card should be in hand after LiveStart"
+    );
+
+    // Verify: Karin moved.
+    let pos_after = game
+        .state
+        .player1
+        .stage
+        .stage
+        .iter()
+        .position(|&c| c == karin);
+    assert!(
+        pos_after != Some(1),
+        "Karin should have moved from Center after position change"
+    );
+    assert!(
+        pos_after.is_some(),
+        "Karin should still be on stage (not removed)"
+    );
+
+    // Verify: after position change, constant ability is re-evaluated and blade is 0.
+    let blade_after = game.state.mods.get_blade_modifier(karin);
+    assert_eq!(
+        blade_after, 0,
+        "Karin's blade should be 0 after moving (not_moved condition fails)"
+    );
+
+    // Pass through the rest of the Live phase into the next turn.
+    // Sequence: FirstAttackerPerformance → SecondAttackerPerformance →
+    // LiveVictoryDetermination → End → Active (next turn).
+    // During LiveVictoryDetermination, cards_moved_this_turn is cleared.
+    // Next turn's Active phase runs recalculate_constants() → Karin hasn't
+    // moved this turn → not_moved passes again → blade comes back.
+    game.pass(); // → SecondAttackerPerformance
+    game.pass(); // → LiveVictoryDetermination
+    game.pass(); // → End
+    game.pass(); // → Active (next turn, recalculate_constants runs)
+
+    let blade_next_turn = game.state.mods.get_blade_modifier(karin);
+    assert_eq!(
+        blade_next_turn, 2,
+        "Karin's blade should return to 2 in the next turn (movement tracking was reset)"
+    );
+}
