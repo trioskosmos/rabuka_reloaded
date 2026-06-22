@@ -155,10 +155,10 @@ fn emotion_two_in_success_zone() {
     assert_eq!(*val, 6, "Heart00 adjustment should be +6");
 }
 
-/// The score breakdown should have exactly ONE entry per bonus source
-/// (not duplicate entries from success-zone card activations).
+/// Only the live zone card fires (9.3.4.3). The success zone copy does not.
+/// Each EMOTION in success zone adds +2 score and +3 heart00 to the live card.
 #[test]
-fn emotion_score_breakdown_no_duplicates() {
+fn emotion_live_zone_fires_success_zone_does_not() {
     let mut game = setup_game();
     let emo = game.id("PL!N-bp4-027-L");
     let emo_in_success = game.id("PL!N-bp4-027-L");
@@ -170,14 +170,16 @@ fn emotion_score_breakdown_no_duplicates() {
         .push(emo_in_success);
     run_live_full(&mut game, emo);
 
-    let scores = snapshot_score_bonuses(&game);
-    let total_bonus: u32 = scores.iter().map(|(_, v)| v).sum();
+    // +2 score from the live zone EMOTION (success zone copy does NOT fire)
     assert_eq!(
-        scores.len(),
-        1,
-        "Expected exactly 1 ScoreLine (only live_zone card's activation). Got {}: {:?}",
-        scores.len(),
-        scores
+        score_bonus(&game, emo),
+        2,
+        "+2 score from live zone EMOTION"
     );
-    assert_eq!(total_bonus, 2, "Total score bonus should be +2");
+    // +3 heart00 from the live zone EMOTION's condition seeing 1 EMOTION in success
+    assert_eq!(
+        heart_modifier(&game, emo, HeartColor::Heart00),
+        3,
+        "+3 heart00"
+    );
 }

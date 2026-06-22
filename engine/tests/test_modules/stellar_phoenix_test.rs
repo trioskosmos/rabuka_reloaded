@@ -52,8 +52,146 @@ fn both_in_live_zone_both_trigger() {
     assert_eq!(member_heart06, 4, "Stellar Stream: +4 heart06 to member");
 }
 
+/// Condition checks SUCCESS zone: subject in LIVE, target in SUCCESS → should fire.
 #[test]
-fn phoenix_in_success_zone() {
+fn subject_in_live_target_in_success() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let member = game.id("PL!N-PR-003-PR");
+    let phoenix = game.id("PL!N-pb1-038-L");
+    let stellar = game.id("PL!N-pb1-039-L");
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.state
+        .player1
+        .stage
+        .set_area(MemberArea::Center, member);
+    // Subject (PHOENIX) in LIVE zone → ability active (9.3.4.3)
+    game.state.player1.live_card_zone.cards.push(phoenix);
+    // Target (Stellar Stream, heart01=4) in SUCCESS zone → condition should find it
+    game.state
+        .player1
+        .success_live_card_zone
+        .cards
+        .push(stellar);
+    let mut hearts = std::collections::HashMap::new();
+    hearts.insert(HeartColor::Heart01, 7);
+    hearts.insert(HeartColor::Heart02, 2);
+    hearts.insert(HeartColor::Heart06, 6);
+    hearts.insert(HeartColor::Heart00, 10);
+    game.state.player1.stage_hearts = Some(BaseHeart { hearts });
+    game.state.current_phase = Phase::LiveCardSetFirstAttacker;
+    process_abilities(&mut game);
+    // PHOENIX condition: find heart01>=4 Niji card in success/live zone
+    // → finds Stellar Stream (heart01=4) in SUCCESS zone → +1 score
+    let phoenix_score = game.state.mods.get_score_modifier(phoenix);
+    assert_eq!(
+        phoenix_score, 1,
+        "PHOENIX in live zone: +1 score from Stellar Stream in success zone"
+    );
+    // Stellar Stream is in SUCCESS zone → ability NOT active → no heart06
+    let member_heart06 = game
+        .state
+        .mods
+        .get_heart_modifier(member, HeartColor::Heart06);
+    assert_eq!(
+        member_heart06, 0,
+        "Stellar Stream in success zone: ability inactive, no heart06"
+    );
+}
+
+/// Card in SUCCESS zone → live_start ability does NOT fire (9.3.4.3).
+#[test]
+fn subject_in_success_does_not_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let member = game.id("PL!N-PR-003-PR");
+    let phoenix = game.id("PL!N-pb1-038-L");
+    let stellar = game.id("PL!N-pb1-039-L");
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.state
+        .player1
+        .stage
+        .set_area(MemberArea::Center, member);
+    // Subject (PHOENIX) in SUCCESS zone → ability NOT active
+    game.state
+        .player1
+        .success_live_card_zone
+        .cards
+        .push(phoenix);
+    // Target (Stellar Stream) in LIVE zone → would match condition if ability fired
+    game.state.player1.live_card_zone.cards.push(stellar);
+    let mut hearts = std::collections::HashMap::new();
+    hearts.insert(HeartColor::Heart01, 7);
+    hearts.insert(HeartColor::Heart02, 2);
+    hearts.insert(HeartColor::Heart06, 6);
+    hearts.insert(HeartColor::Heart00, 10);
+    game.state.player1.stage_hearts = Some(BaseHeart { hearts });
+    game.state.current_phase = Phase::LiveCardSetFirstAttacker;
+    process_abilities(&mut game);
+    // PHOENIX in success zone → ability doesn't fire → no score
+    let phoenix_score = game.state.mods.get_score_modifier(phoenix);
+    assert_eq!(
+        phoenix_score, 0,
+        "PHOENIX in success zone: ability not active, no score"
+    );
+    // Stellar in LIVE zone → ability fires, condition finds PHOENIX in success (heart01=3≥3)
+    let member_heart06 = game
+        .state
+        .mods
+        .get_heart_modifier(member, HeartColor::Heart06);
+    assert_eq!(
+        member_heart06, 4,
+        "Stellar Stream in live zone: +4 heart06 from PHOENIX in success zone"
+    );
+}
+
+/// Both in SUCCESS zone → neither ability fires (9.3.4.3).
+#[test]
+fn both_in_success_does_not_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let member = game.id("PL!N-PR-003-PR");
+    let phoenix = game.id("PL!N-pb1-038-L");
+    let stellar = game.id("PL!N-pb1-039-L");
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.state
+        .player1
+        .stage
+        .set_area(MemberArea::Center, member);
+    game.state
+        .player1
+        .success_live_card_zone
+        .cards
+        .push(phoenix);
+    game.state
+        .player1
+        .success_live_card_zone
+        .cards
+        .push(stellar);
+    let mut hearts = std::collections::HashMap::new();
+    hearts.insert(HeartColor::Heart01, 7);
+    hearts.insert(HeartColor::Heart02, 2);
+    hearts.insert(HeartColor::Heart06, 6);
+    hearts.insert(HeartColor::Heart00, 10);
+    game.state.player1.stage_hearts = Some(BaseHeart { hearts });
+    game.state.current_phase = Phase::LiveCardSetFirstAttacker;
+    process_abilities(&mut game);
+    assert_eq!(
+        game.state.mods.get_score_modifier(phoenix),
+        0,
+        "PHOENIX in success: no fire"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(member, HeartColor::Heart06),
+        0,
+        "Stellar in success: no fire"
+    );
+}
+
+#[test]
+fn both_in_live_zone_check_success_zone_condition() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let (member, phoenix, _stellar) = {
@@ -65,12 +203,9 @@ fn phoenix_in_success_zone() {
             .player1
             .stage
             .set_area(MemberArea::Center, member);
-        // PHOENIX in success zone, Stellar Stream in live zone
-        game.state
-            .player1
-            .success_live_card_zone
-            .cards
-            .push(phoenix);
+        // Both in live zone (abilities active per 9.3.4.3).
+        // Their conditions check success+live zones for matching cards.
+        game.state.player1.live_card_zone.cards.push(phoenix);
         game.state.player1.live_card_zone.cards.push(stellar);
         let mut hearts = std::collections::HashMap::new();
         hearts.insert(HeartColor::Heart01, 7);
@@ -82,62 +217,20 @@ fn phoenix_in_success_zone() {
         (member, phoenix, stellar)
     };
     process_abilities(&mut game);
-    // PHOENIX should have +1 score (condition: heart01=4 card in zone → Stellar Stream)
-    let phoenix_score = game.state.mods.get_score_modifier(phoenix);
-    assert_eq!(phoenix_score, 1, "PHOENIX in success zone: +1 score");
-    let member_heart06 = game
-        .state
-        .mods
-        .get_heart_modifier(member, HeartColor::Heart06);
-    assert_eq!(
-        member_heart06, 4,
-        "Stellar Stream with PHOENIX in success zone: +4 heart06"
-    );
-}
-
-#[test]
-fn stellar_stream_in_success_zone() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    let (member, phoenix, _stellar) = {
-        let member = game.id("PL!N-PR-003-PR");
-        let phoenix = game.id("PL!N-pb1-038-L");
-        let stellar = game.id("PL!N-pb1-039-L");
-        game.state.player1.stage.stage = [-1, -1, -1];
-        game.state
-            .player1
-            .stage
-            .set_area(MemberArea::Center, member);
-        // Stellar Stream in success zone, PHOENIX in live zone
-        game.state
-            .player1
-            .success_live_card_zone
-            .cards
-            .push(stellar);
-        game.state.player1.live_card_zone.cards.push(phoenix);
-        let mut hearts = std::collections::HashMap::new();
-        hearts.insert(HeartColor::Heart01, 7);
-        hearts.insert(HeartColor::Heart02, 2);
-        hearts.insert(HeartColor::Heart06, 6);
-        hearts.insert(HeartColor::Heart00, 10);
-        game.state.player1.stage_hearts = Some(BaseHeart { hearts });
-        game.state.current_phase = Phase::LiveCardSetFirstAttacker;
-        (member, phoenix, stellar)
-    };
-    process_abilities(&mut game);
-    // PHOENIX should have +1 score (condition: heart01=4 card in zone → Stellar Stream)
+    // PHOENIX: heart01>=4 needed → finds Stellar Stream (heart01=4) in live zone → +1 score
     let phoenix_score = game.state.mods.get_score_modifier(phoenix);
     assert_eq!(
         phoenix_score, 1,
-        "PHOENIX +1 from Stellar Stream in success zone"
+        "PHOENIX: +1 from Stellar Stream in live zone"
     );
+    // Stellar Stream: heart01>=3 needed → finds PHOENIX (heart01=3) in live zone → +4 heart06
     let member_heart06 = game
         .state
         .mods
         .get_heart_modifier(member, HeartColor::Heart06);
     assert_eq!(
         member_heart06, 4,
-        "Stellar Stream in success zone: +4 heart06"
+        "Stellar Stream: +4 heart06 from PHOENIX in live zone"
     );
 }
 
