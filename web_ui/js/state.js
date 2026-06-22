@@ -57,6 +57,7 @@ const stateInternal = {
     selectedHandIdx: -1,
     showingFullLog: false,
     lastPerformanceTurn: -1,
+    deckAnalysis: null,
     fullLogData: null,
     lastActionsHash: null,
     lastShownPerformanceHash: null,

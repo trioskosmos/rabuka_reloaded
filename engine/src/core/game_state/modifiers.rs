@@ -903,6 +903,26 @@ impl GameState {
         self.player2_cheer_revealed_cards.clear();
     }
 
+    pub fn remove_from_source_hands(&mut self, card_ids: &[i16]) {
+        let mut seen = std::collections::HashSet::new();
+        for &cid in card_ids {
+            if !seen.insert(cid) {
+                continue;
+            }
+            // Only remove from hand if the card was from a cost reveal
+            // (tracked in revealed_cost_cards). Non-cost reveals (deck peek, etc.)
+            // should NOT remove from hand.
+            if !self.revealed_cost_cards.contains(&cid) {
+                continue;
+            }
+            for player in [&mut self.player1, &mut self.player2] {
+                if let Some(pos) = player.hand.cards.iter().position(|&c| c == cid) {
+                    player.hand.remove_card(pos);
+                    break;
+                }
+            }
+        }
+    }
     pub fn add_gained_ability(&mut self, card_id: i16, ability_type: String) {
         self.gained_abilities
             .entry(card_id)

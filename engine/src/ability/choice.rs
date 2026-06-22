@@ -993,9 +993,13 @@ impl super::resolver::AbilityResolver {
                     let dst = gs.entry_destination().map(|s| s.to_string());
                     let dst_str = dst.as_deref().unwrap_or(Zone::Hand.to_str());
                     let moved = self.move_from_revealed(gs, indices, &mut validate_card, dst_str);
-                    // If discard_remaining is set, move non-selected revealed cards to discard
-                    if gs
-                        .entry_effect()
+                    // If discard_remaining is set, move non-selected revealed cards to discard.
+                    // Check self.current_effect (the inner sub-action effect) rather than
+                    // gs.entry_effect() (the outer ability effect) — discard_remaining is
+                    // on the select_cards sub-action, not the outer sequential.
+                    if self
+                        .current_effect
+                        .as_ref()
                         .is_some_and(|e| e.discard_remaining.unwrap_or(false))
                     {
                         let remaining: Vec<i16> = gs

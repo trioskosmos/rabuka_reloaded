@@ -463,6 +463,7 @@ impl AbilityResolver {
                     id
                 })
                 .collect();
+            gs.remove_from_source_hands(&taken);
             return Ok(taken);
         }
 
@@ -984,9 +985,6 @@ impl AbilityResolver {
                     );
                     Ok(vec![])
                 } else {
-                    // Cards were drained from source — just return them.
-                    // Also remove from hand: reveal cost only copies to revealed_cards,
-                    // so without this the card stays in hand AND goes to the destination.
                     let player = gs.active_player_mut();
                     for &cid in &cards {
                         if let Some(pos) = player.hand.cards.iter().position(|&c| c == cid) {

@@ -632,6 +632,11 @@ fn sayaka_activate_effect_does_not_place_under() {
         under[0], sayaka_hand,
         "The revealed sayaka should be under sayaka"
     );
+    // Card must NOT remain in hand (duplication bug fix)
+    assert!(
+        !game.state.player1.hand.cards.contains(&sayaka_hand),
+        "revealed card should be removed from hand, not duplicated"
+    );
 }
 
 #[test]

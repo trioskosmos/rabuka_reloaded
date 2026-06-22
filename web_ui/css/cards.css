@@ -790,10 +790,11 @@
     color: white;
 }
 
-.discard-visual-container {
-    display: flex;
-    justify-content: center;
-    margin-bottom: var(--space-xs);
+.stat-item.deck-summary {
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    padding: 2px 0;
+    white-space: nowrap;
 }
 
 .action-list {

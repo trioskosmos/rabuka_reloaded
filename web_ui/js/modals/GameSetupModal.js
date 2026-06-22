@@ -79,42 +79,89 @@ function convertDecklogHtml(html) {
     return result;
 }
 
+function parsePointSectionFormat(text) {
+    const db = State.staticCardDatabase;
+    let members = 0, lives = 0, energy = 0, points = 0;
+    let currentPt = 0;
+    const lines = text.split(/\r?\n/);
+    for (const line of lines) {
+        const t = line.trim();
+        if (!t || t.startsWith('#')) continue;
+        const ptMatch = t.match(/^(\d+)ポイント/);
+        if (ptMatch) { currentPt = parseInt(ptMatch[1], 10); continue; }
+        if (/^テキスト\d+種/.test(t)) continue;
+        const first = t.split(/\s+/)[0];
+        if (first.startsWith('(') || !first.includes('-')) continue;
+        const card = db?.[first.toUpperCase()];
+        const type = card?.type || '';
+        if (type === 'メンバー') members++;
+        else if (type === 'ライブ') lives++;
+        else if (type === 'エネルギー') energy++;
+        points += currentPt || 1;
+    }
+    return { members, lives, energy, points };
+}
+
+function parseSimpleCardLines(text) {
+    const db = State.staticCardDatabase;
+    let members = 0, lives = 0, energy = 0;
+    const lines = text.split(/\r?\n/);
+    for (const line of lines) {
+        const t = line.trim();
+        if (!t || t.startsWith('#')) continue;
+        let cardNo = '', qty = 1;
+        const qtyFirst = t.match(/^(\d+)\s*[xX×]\s*(.+)$/);
+        const qtyLast = t.match(/^(.+?)\s*[xX×]\s*(\d+)$/);
+        if (qtyFirst) { qty = parseInt(qtyFirst[1], 10); cardNo = qtyFirst[2].trim(); }
+        else if (qtyLast) { cardNo = qtyLast[1].trim(); qty = parseInt(qtyLast[2], 10); }
+        else { cardNo = t; }
+        const no = cardNo.toUpperCase();
+        if (!no.includes('-')) continue;
+        const card = db?.[no];
+        const type = card?.type || '';
+        for (let i = 0; i < qty; i++) {
+            if (type === 'メンバー') members++;
+            else if (type === 'ライブ') lives++;
+            else if (type === 'エネルギー') energy++;
+        }
+    }
+    return { members, lives, energy, points: 0 };
+}
+
+function parseDeckText(val) {
+    if (val.includes('<span') || val.includes('title=') || val.includes('class="num"') || val.includes('cardno=')) {
+        const deck = convertDecklogHtml(val);
+        if (deck && deck.length > 0) return { raw: deck.join('\n'), analysis: parseSimpleCardLines(val), converted: true };
+        return null;
+    }
+    if (/\d+ポイント/.test(val)) {
+        return { raw: val, analysis: parsePointSectionFormat(val), converted: false };
+    }
+    return { raw: val, analysis: parseSimpleCardLines(val), converted: false };
+}
+
 function setupAutoConvert(pid) {
     const textarea = document.getElementById(`p${pid}-deck-paste`);
     const status = document.getElementById(`p${pid}-convert-status`);
     if (!textarea || !status) return;
-
     let timeout = null;
     textarea.addEventListener('input', () => {
         clearTimeout(timeout);
         timeout = setTimeout(() => {
             const val = textarea.value.trim();
-            if (!val) {
-                status.textContent = '';
+            if (!val) { status.textContent = ''; return; }
+            const result = parseDeckText(val);
+            if (!result) {
+                status.textContent = 'Could not parse';
+                status.style.color = '#ef4444';
                 return;
             }
-            // Only attempt HTML conversion if it looks like HTML (decklog or official site format)
-            if (val.includes('<span') || val.includes('title=') || val.includes('class="num"') || val.includes('cardno=')) {
-                const deck = convertDecklogHtml(val);
-                if (deck && deck.length > 0) {
-                    textarea.value = deck.join('\n');
-                    status.textContent = `Converted: ${deck.length} cards`;
-                    status.style.color = '#22c55e';
-                } else {
-                    status.textContent = 'Could not parse HTML';
-                    status.style.color = '#ef4444';
-                }
-            } else {
-                // Plain text — count lines
-                const lines = val.split(/\r?\n/).filter(l => l.trim() && !l.startsWith('#'));
-                let total = 0;
-                for (const line of lines) {
-                    const xMatch = line.match(/^(.+?)\s*[xX×]\s*(\d+)$/);
-                    total += xMatch ? parseInt(xMatch[2], 10) : 1;
-                }
-                status.textContent = `${lines.length} types, ${total} cards`;
-                status.style.color = '';
-            }
+            if (result.converted) textarea.value = result.raw;
+            const a = result.analysis;
+            const parts = [`M:${a.members}`, `L:${a.lives}`, `E:${a.energy}`];
+            if (a.points > 0) parts.push(`P:${a.points}`);
+            status.textContent = parts.join(' ');
+            status.style.color = '#22c55e';
         }, 400);
     });
 }
@@ -265,6 +312,13 @@ export const GameSetupModal = {
                 alert("Failed to resolve decks. Please check console.");
                 return;
             }
+
+            const p0Content = (typeof p0Config?.content === 'string' ? p0Config.content : '').trim();
+            const p1Content = (typeof p1Config?.content === 'string' ? p1Config.content : '').trim();
+            State.deckAnalysis = {
+                p0: /\d+ポイント/.test(p0Content) ? parsePointSectionFormat(p0Content) : parseSimpleCardLines(p0Content || p0Deck.main.join('\n')),
+                p1: /\d+ポイント/.test(p1Content) ? parsePointSectionFormat(p1Content) : parseSimpleCardLines(p1Content || p1Deck.main.join('\n')),
+            };
 
             const headers = Network?.getHeaders ? Network.getHeaders() : { 'Content-Type': 'application/json' };
 

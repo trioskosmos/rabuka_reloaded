@@ -1,5 +1,6 @@
 import { fixImg } from '../constants.js';
 import { resolveCardImagePath, CardRenderer } from './CardRenderer.js';
+import { State } from '../state.js';
 
 export const BoardRenderer = {
     renderBoard: (state, p0, p1, validTargets, showDiscardModalCallback) => {
@@ -60,6 +61,18 @@ export const BoardRenderer = {
         
         updateCount('my-hand-count', myHandCount);
         updateCount('opp-hand-count', oppHandCount);
+
+        const da = State.deckAnalysis;
+        const updateSummary = (id, m, l, p) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = `M:${m} L:${l} P:${p}`;
+        };
+        if (da) {
+            const myIdx = State.perspectivePlayer;
+            const oppIdx = 1 - myIdx;
+            updateSummary('my-deck-summary', da[`p${myIdx}`].members, da[`p${myIdx}`].lives, da[`p${myIdx}`].points);
+            updateSummary('opp-deck-summary', da[`p${oppIdx}`].members, da[`p${oppIdx}`].lives, da[`p${oppIdx}`].points);
+        }
     },
 
     renderEnergy: (containerId, energy, clickable = false, validActionMap = {}, hasGlobalSelection = false, state = null) => {
