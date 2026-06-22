@@ -653,3 +653,116 @@ fn issue13_mia_three_conditional_blade_checks() {
     let blade = game.state.mods.get_blade_modifier(mia);
     assert!(blade >= 0, "13: Mia blade >= 0 (got {})", blade);
 }
+
+// ====================================================================
+// サイコーハート (PL!N-bp3-026-L) ab#0: LiveStart conditional alternative.
+// If success zone has score 1 or 5 → +1 score. If both exist → +2.
+// ====================================================================
+
+fn saikou_drain(game: &mut TestGame) {
+    let mut safety = 0;
+    while game.has_pending_choice() && safety < 20 {
+        safety += 1;
+        game.select_indices(&[]);
+    }
+}
+
+// No cards in success zone → no bonus.
+#[test]
+fn saikou_edge_no_cards() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let saikou = game.id("PL!N-bp3-026-L");
+
+    game.state.player1.hand.cards.push(saikou);
+    fill_decks(&mut game);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(saikou);
+    advance_to_live_start(&mut game);
+    saikou_drain(&mut game);
+
+    let score_mod = game.state.mods.get_score_modifier(saikou);
+    assert_eq!(score_mod, 0, "no cards: score unchanged");
+}
+
+// Score-1 card only in success zone → +1.
+#[test]
+fn saikou_edge_score1_only() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let saikou = game.id("PL!N-bp3-026-L");
+    let score1 = game.id("PL!-sd1-019-SD"); // score 1
+
+    game.state.player1.hand.cards.push(saikou);
+    game.state.player1.success_live_card_zone.cards.push(score1);
+    fill_decks(&mut game);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(saikou);
+    advance_to_live_start(&mut game);
+    saikou_drain(&mut game);
+
+    let score_mod = game.state.mods.get_score_modifier(saikou);
+    assert_eq!(score_mod, 1, "score1: +1 bonus");
+}
+
+// Score-5 card only in success zone → +1.
+#[test]
+fn saikou_edge_score5_only() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let saikou = game.id("PL!N-bp3-026-L");
+    let score5 = game.id("PL!-bp3-022-L"); // score 5
+
+    game.state.player1.hand.cards.push(saikou);
+    game.state.player1.success_live_card_zone.cards.push(score5);
+    fill_decks(&mut game);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(saikou);
+    advance_to_live_start(&mut game);
+    saikou_drain(&mut game);
+
+    let score_mod = game.state.mods.get_score_modifier(saikou);
+    assert_eq!(score_mod, 1, "score5: +1 bonus");
+}
+
+// Both score-1 and score-5 in success zone → +2.
+#[test]
+fn saikou_edge_both_scores() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let saikou = game.id("PL!N-bp3-026-L");
+    let score1 = game.id("PL!-sd1-019-SD"); // score 1
+    let score5 = game.id("PL!-bp3-022-L"); // score 5
+
+    game.state.player1.hand.cards.push(saikou);
+    game.state.player1.success_live_card_zone.cards.push(score1);
+    game.state.player1.success_live_card_zone.cards.push(score5);
+    fill_decks(&mut game);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(saikou);
+    advance_to_live_start(&mut game);
+    saikou_drain(&mut game);
+
+    let score_mod = game.state.mods.get_score_modifier(saikou);
+    assert_eq!(score_mod, 2, "both 1&5: +2 bonus");
+}
+
+// Score-2 card (non-matching) in success zone → no bonus.
+#[test]
+fn saikou_edge_score2_only() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let saikou = game.id("PL!N-bp3-026-L");
+    let score2 = game.id("PL!-sd1-020-SD"); // score 2, not 1 or 5
+
+    game.state.player1.hand.cards.push(saikou);
+    game.state.player1.success_live_card_zone.cards.push(score2);
+    fill_decks(&mut game);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(saikou);
+    advance_to_live_start(&mut game);
+    saikou_drain(&mut game);
+
+    let score_mod = game.state.mods.get_score_modifier(saikou);
+    assert_eq!(score_mod, 0, "score2: no bonus (not 1 or 5)");
+}

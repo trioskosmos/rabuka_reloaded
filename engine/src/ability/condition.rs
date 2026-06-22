@@ -309,6 +309,7 @@ impl<'a> ConditionContext<'a> {
             }
             Some(ConditionType::OtherwiseCondition) => true,
             Some(ConditionType::ActionSuccessCondition) => true,
+            Some(ConditionType::BothCondition) => self.evaluate_both_condition(condition),
             Some(ConditionType::Custom) => true,
             Some(ConditionType::NotMoved) | Some(ConditionType::HasMoved) => false,
             // Compound & OrCondition handled above via early return — never reachable here
@@ -360,6 +361,15 @@ impl<'a> ConditionContext<'a> {
             Some(ConditionType::ComparisonCondition) => {
                 let count = self.get_count_for_condition(condition);
                 format!("{}", count)
+            }
+            Some(ConditionType::BothCondition) => {
+                let count = self.get_count_for_condition(condition);
+                let vals = condition
+                    .values
+                    .as_ref()
+                    .map(|v| format!("{:?}", v))
+                    .unwrap_or_default();
+                format!("count={}, values={}", count, vals)
             }
             Some(ConditionType::CardCountCondition) => {
                 let count = self.get_count_for_condition(condition);
@@ -498,6 +508,14 @@ impl<'a> ConditionContext<'a> {
             }
             Some(ConditionType::ResourceCondition) => {
                 format!("資源={}", condition.resource_type.as_deref().unwrap_or("?"))
+            }
+            Some(ConditionType::BothCondition) => {
+                let vals = condition
+                    .values
+                    .as_ref()
+                    .map(|v| format!("{:?}", v))
+                    .unwrap_or_default();
+                format!("両方持つ? values={}", vals)
             }
             _ => String::new(),
         }

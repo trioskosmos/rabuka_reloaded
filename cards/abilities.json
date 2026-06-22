@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-22T19:32:26.178749",
+  "generated_at": "2026-06-22T19:54:44.478177",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -21732,10 +21732,25 @@
           "location": "success_live_card_zone",
           "card_type": "live_card",
           "comparison_type": "score",
-          "type": "comparison_condition"
+          "values": [
+            1,
+            5
+          ],
+          "type": "comparison_condition",
+          "operator": "in"
+        },
+        "alternative_condition": {
+          "type": "both_condition",
+          "text": "それらが両方ある場合",
+          "location": "success_live_card_zone",
+          "target": "self",
+          "values": [
+            1,
+            5
+          ]
         },
         "primary_effect": {
-          "text": "このカードのスコアを+1する。それらが両方ある場合、",
+          "text": "このカードのスコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add",

@@ -50,6 +50,40 @@ impl<'a> ConditionContext<'a> {
         }
     }
 
+    pub(crate) fn evaluate_both_condition(&self, condition: &Condition) -> bool {
+        let values = match condition.values.as_ref() {
+            Some(v) if !v.is_empty() => v.clone(),
+            _ => return false,
+        };
+        let location = condition.location.as_deref().unwrap_or("");
+        let target = condition.target.as_deref().unwrap_or("self");
+        let player = self.resolve_condition_player(target);
+        let cards: Vec<i16> = match Zone::from_str(location) {
+            Some(Zone::SuccessLiveZone) => player.success_live_card_zone.cards.to_vec(),
+            Some(Zone::LiveCardZone) => player.live_card_zone.cards.to_vec(),
+            _ => player
+                .success_live_card_zone
+                .cards
+                .iter()
+                .chain(player.live_card_zone.cards.iter())
+                .copied()
+                .collect(),
+        };
+        for &val in &values {
+            let found = cards.iter().any(|&cid| {
+                self.game_state
+                    .card_database
+                    .get_card(cid)
+                    .and_then(|c| c.score)
+                    .map_or(false, |s| s == val)
+            });
+            if !found {
+                return false;
+            }
+        }
+        true
+    }
+
     pub(crate) fn evaluate_comparison_condition(&self, condition: &Condition) -> bool {
         if let Some(ref pos) = condition.position {
             if pos.get_position() == Some("front") {
@@ -108,6 +142,23 @@ impl<'a> ConditionContext<'a> {
         let count = self.get_count_for_condition(condition);
 
         if let Some(ref values) = condition.values {
+            if condition.comparison_type.as_deref() == Some("score") {
+                let location = condition.location.as_deref().unwrap_or("");
+                let target = condition.target.as_deref().unwrap_or("self");
+                let player = self.resolve_condition_player(target);
+                let cards: Vec<i16> = match Zone::from_str(location) {
+                    Some(Zone::SuccessLiveZone) => player.success_live_card_zone.cards.to_vec(),
+                    Some(Zone::LiveCardZone) => player.live_card_zone.cards.to_vec(),
+                    _ => vec![],
+                };
+                return cards.iter().any(|&cid| {
+                    self.game_state
+                        .card_database
+                        .get_card(cid)
+                        .and_then(|c| c.score)
+                        .map_or(false, |s| values.contains(&s))
+                });
+            }
             return values.contains(&{ count });
         }
 

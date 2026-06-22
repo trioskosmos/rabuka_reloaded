@@ -1840,6 +1840,10 @@ def _extract_generic_fields(condition, text):
         vm = re.search(r"(\d+)(?:、(\d+))+(?:のいずれか)", text)
         if vm:
             condition["values"] = [int(v) for v in re.findall(r"\d+", vm.group(0))]
+    # Also handle "1か5" pattern (score is 1 or 5)
+    vm = re.search(r"(\d+)[か](\d+)", text)
+    if vm:
+        condition["values"] = [int(v) for v in re.findall(r"\d+", vm.group(0))]
 
     # Group
     gns = extract_group_names(text)
@@ -4522,6 +4526,23 @@ def _try_conditional_alternative(text):
         # Check for secondary condition in action text (e.g. "2枚以上いる場合")
         # This handles the "代わりに" (instead of) pattern where a stricter
         # tiered condition qualifies the alternative effect.
+        # Also handle "それらが両方ある場合" (both exist) pattern.
+        if "両方" in at:
+            sec_text = "それらが両方ある場合"
+            alt_cond = parse_condition(sec_text)
+            if alt_cond and alt_cond.get("type") != "custom":
+                if "condition" in result:
+                    for key in (
+                        "location",
+                        "group_names",
+                        "target",
+                        "position",
+                        "values",
+                    ):
+                        if key in result["condition"] and key not in alt_cond:
+                            alt_cond[key] = result["condition"][key]
+                result["alternative_condition"] = alt_cond
+            at = at.replace(sec_text, "").strip().strip("、").strip()
         secondary_m = re.search(r"(\d+)枚以上[いあ]る場合", at)
         if secondary_m:
             sec_text = secondary_m.group(0)

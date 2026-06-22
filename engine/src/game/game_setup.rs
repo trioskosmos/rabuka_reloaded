@@ -881,8 +881,14 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 if card.is_member() && !card.is_live() {
                     let card_cost = card.cost.unwrap_or(0);
                     let hand_count = active_player.hand.cards.len();
-                    let hand_reduction = card.get_hand_cost_reduction(hand_count);
-                    let effective_cost = card_cost.saturating_sub(hand_reduction);
+                    let reduction = crate::ability::util::calculate_play_cost_reduction(
+                        &active_player.stage,
+                        &active_player.success_live_card_zone.cards,
+                        hand_count,
+                        *card_id,
+                        &game_state.card_database,
+                    );
+                    let effective_cost = card_cost.saturating_sub(reduction);
                     let active_energy_count = active_player.energy_zone.active_count();
 
                     let areas = [

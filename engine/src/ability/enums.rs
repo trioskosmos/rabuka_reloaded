@@ -457,6 +457,7 @@ pub enum ConditionType {
     ResourceCondition,
     ActionSuccessCondition,
     AllCostComparisonCondition,
+    BothCondition,
     Custom,
 }
 
@@ -487,6 +488,7 @@ impl ConditionType {
             "complex_condition" => Some(Self::ComplexCondition),
             "no_excess_heart" => Some(Self::NoExcessHeart),
             "otherwise_condition" => Some(Self::OtherwiseCondition),
+            "both_condition" => Some(Self::BothCondition),
             "not_moved" => Some(Self::NotMoved),
             "has_moved" => Some(Self::HasMoved),
             "resource_condition" => Some(Self::ResourceCondition),
@@ -528,6 +530,7 @@ impl ConditionType {
             Self::ResourceCondition => "resource_condition",
             Self::ActionSuccessCondition => "action_success_condition",
             Self::AllCostComparisonCondition => "all_cost_comparison_condition",
+            Self::BothCondition => "both_condition",
             Self::Custom => "custom",
         }
     }
