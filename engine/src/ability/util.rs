@@ -714,8 +714,11 @@ impl<'a> CardFilter<'a> {
                     return false;
                 }
             } else {
-                // Total sum check (original behavior)
-                let card_total = db.get_card(id).map(|c| c.need_heart_total()).unwrap_or(0);
+                // Total sum check — use total_hearts() which returns base_heart
+                // for member cards (the card's printed hearts) and falls back to
+                // need_heart for live cards. need_heart_total() only checks the
+                // live card cost field which is always 0 for members.
+                let card_total = db.get_card(id).map(|c| c.total_hearts()).unwrap_or(0);
                 let op = self.need_heart_operator.unwrap_or(">=");
                 if !compare_counts(Some(op), card_total, need_total) {
                     return false;

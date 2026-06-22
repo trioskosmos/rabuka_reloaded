@@ -2714,6 +2714,13 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
             action["need_heart_total"] = int(nh.group(1))
             action["need_heart_operator"] = ">="
 
+    # Also parse plain-text patterns like "ハートを4つ以上持つ" (without heart icon)
+    nh2 = re.search(r"ハートを(\d+)つ以上持つ", text)
+    if nh2:
+        # Total heart icon count threshold (any colors)
+        action["need_heart_total"] = int(nh2.group(1))
+        action["need_heart_operator"] = ">="
+
     # Parse gained ability text into structured effect
     # Note: NOT done here — done in parse_ability to avoid recursion
 

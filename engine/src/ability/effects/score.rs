@@ -52,7 +52,7 @@ impl AbilityResolver {
         let (live_card_ids, final_value) = {
             let player = gs.resolve_target_player_mut(&target);
 
-            let mut filter = effect.filter_subset();
+            let mut filter = util::CardFilter::from_effect(effect);
             if let Some(ref ct) = card_type_filter {
                 filter.card_type = Some(ct.as_str());
             }

@@ -252,3 +252,6 @@ pub mod otherwise_condition_flow_test;
 
 // Multi-color heart gain (PL!S-PR-040-PR / PL!N-PR-023-PR)
 pub mod multi_color_heart_test;
+
+// modify_score + per_unit + need_heart_total filtering (PL!SP-pb2-045-L)
+pub mod zettai_lover_test;
