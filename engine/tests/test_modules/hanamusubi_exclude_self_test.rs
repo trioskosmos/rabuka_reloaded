@@ -51,7 +51,7 @@ fn hanamusubi_alone_no_reduction() {
     let hanamusubi = game.id("PL!HS-bp5-019-L");
     let filler = game.id("PL!-sd1-010-SD"); // non-Renosora filler
 
-    game.state.player1.stage.stage = [hanamusubi, filler, filler];
+    game.state.player1.stage.stage = [filler, filler, filler];
     game.state.player1.hand.cards.push(hanamusubi);
     for _ in 0..20 {
         game.state.player1.main_deck.cards.push(filler);
@@ -88,7 +88,7 @@ fn hanamusubi_with_one_other_renosora_reduces_2() {
     let other_renosora = game.id("PL!HS-bp5-017-L"); // 蓮ノ空 live card
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [hanamusubi, filler, filler];
+    game.state.player1.stage.stage = [filler, filler, filler];
     game.state.player1.hand.cards.push(hanamusubi);
     game.state.player1.hand.cards.push(other_renosora);
     for _ in 0..20 {
@@ -139,7 +139,7 @@ fn hanamusubi_with_two_other_renosora_reduces_4() {
     let other_b = game.id("PL!HS-bp5-018-L"); // 蓮ノ空 live card
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [hanamusubi, filler, filler];
+    game.state.player1.stage.stage = [filler, filler, filler];
     game.state.player1.hand.cards.push(hanamusubi);
     game.state.player1.hand.cards.push(other_a);
     game.state.player1.hand.cards.push(other_b);
@@ -180,7 +180,7 @@ fn hanamusubi_with_non_renosora_no_reduction() {
     let non_renosora = game.id("PL!-sd1-019-SD"); // μ's live card (non-Renosora)
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [hanamusubi, filler, filler];
+    game.state.player1.stage.stage = [filler, filler, filler];
     game.state.player1.hand.cards.push(hanamusubi);
     game.state.player1.hand.cards.push(non_renosora);
     for _ in 0..20 {
@@ -218,7 +218,7 @@ fn hanamusubi_reduces_only_heart04_not_heart0() {
     let other_renosora = game.id("PL!HS-bp5-017-L");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [hanamusubi, filler, filler];
+    game.state.player1.stage.stage = [filler, filler, filler];
     game.state.player1.hand.cards.push(hanamusubi);
     game.state.player1.hand.cards.push(other_renosora);
     for _ in 0..20 {
@@ -250,4 +250,194 @@ fn hanamusubi_reduces_only_heart04_not_heart0() {
         heart0_mod, 0,
         "heart0 should NOT be reduced, got {heart0_mod}"
     );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Edge case: 2 Hanamusubi in live zone, each should reduce for the other.
+// ─────────────────────────────────────────────────────────────
+#[test]
+fn two_hanamusubi_each_reduces_2() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let a = game.id("PL!HS-bp5-019-L");
+    let b = game.id("PL!HS-bp5-019-L");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [filler, filler, filler];
+    game.state.player1.hand.cards.push(a);
+    game.state.player1.hand.cards.push(b);
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.give_energy(10);
+
+    advance_to_live_card_set(&mut game);
+    game.set_live_card(a);
+    game.set_live_card(b);
+    finish_live_setup(&mut game);
+
+    // A sees B as other 蓮ノ空 → -2
+    let mod_a = game
+        .state
+        .mods
+        .get_need_heart_modifier(a, HeartColor::Heart04);
+    assert_eq!(mod_a, -2, "A with 1 other → -2, got {mod_a}");
+
+    // B sees A as other 蓮ノ空 → -2
+    let mod_b = game
+        .state
+        .mods
+        .get_need_heart_modifier(b, HeartColor::Heart04);
+    assert_eq!(mod_b, -2, "B with 1 other → -2, got {mod_b}");
+}
+
+// ─────────────────────────────────────────────────────────────
+// Edge case: 3 Hanamusubi in live zone, each should reduce for the other two.
+// ─────────────────────────────────────────────────────────────
+#[test]
+fn three_hanamusubi_each_reduces_4() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let a = game.id("PL!HS-bp5-019-L");
+    let b = game.id("PL!HS-bp5-019-L");
+    let c = game.id("PL!HS-bp5-019-L");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [filler, filler, filler];
+    game.state.player1.hand.cards.push(a);
+    game.state.player1.hand.cards.push(b);
+    game.state.player1.hand.cards.push(c);
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.give_energy(10);
+
+    advance_to_live_card_set(&mut game);
+    game.set_live_card(a);
+    game.set_live_card(b);
+    game.set_live_card(c);
+    finish_live_setup(&mut game);
+
+    // Each sees 2 others → -4
+    for (card, label) in [(&a, "A"), (&b, "B"), (&c, "C")] {
+        let mod_val = game
+            .state
+            .mods
+            .get_need_heart_modifier(*card, HeartColor::Heart04);
+        assert_eq!(mod_val, -4, "{label} with 2 others → -4, got {mod_val}");
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Edge case: 2 Hanamusubi + 1 filler (non-Renosora live card)
+// ─────────────────────────────────────────────────────────────
+#[test]
+fn two_hanamusubi_one_filler_each_reduces_2() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let a = game.id("PL!HS-bp5-019-L");
+    let b = game.id("PL!HS-bp5-019-L");
+    let filler_live = game.id("PL!-sd1-019-SD"); // μ's live (non-Renosora)
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [filler, filler, filler];
+    game.state.player1.hand.cards.push(a);
+    game.state.player1.hand.cards.push(b);
+    game.state.player1.hand.cards.push(filler_live);
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.give_energy(10);
+
+    advance_to_live_card_set(&mut game);
+    game.set_live_card(a);
+    game.set_live_card(b);
+    game.set_live_card(filler_live);
+    finish_live_setup(&mut game);
+
+    // Each sees 1 other Renosora (filler doesn't match group) → -2
+    for (card, label) in [(&a, "A"), (&b, "B")] {
+        let mod_val = game
+            .state
+            .mods
+            .get_need_heart_modifier(*card, HeartColor::Heart04);
+        assert_eq!(mod_val, -2, "{label} with 1 other → -2, got {mod_val}");
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Edge case: 1 Hanamusubi + 1 filler (non-Renosora) → 0 reduction
+// ─────────────────────────────────────────────────────────────
+#[test]
+fn one_hanamusubi_one_filler_no_reduction() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let hanamusubi = game.id("PL!HS-bp5-019-L");
+    let filler_live = game.id("PL!-sd1-019-SD"); // μ's live (non-Renosora)
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [filler, filler, filler];
+    game.state.player1.hand.cards.push(hanamusubi);
+    game.state.player1.hand.cards.push(filler_live);
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.give_energy(10);
+
+    advance_to_live_card_set(&mut game);
+    game.set_live_card(hanamusubi);
+    game.set_live_card(filler_live);
+    finish_live_setup(&mut game);
+
+    // No other Renosora → 0 reduction
+    let mod_val = game
+        .state
+        .mods
+        .get_need_heart_modifier(hanamusubi, HeartColor::Heart04);
+    assert_eq!(mod_val, 0, "no other Renosora → 0, got {mod_val}");
+}
+
+// ─────────────────────────────────────────────────────────────
+// Edge case: 1 Hanamusubi + 2 filler (non-Renosora) → 0 reduction
+// ─────────────────────────────────────────────────────────────
+#[test]
+fn one_hanamusubi_two_fillers_no_reduction() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let hanamusubi = game.id("PL!HS-bp5-019-L");
+    let f1 = game.id("PL!-sd1-019-SD"); // μ's live
+    let f2 = game.id("PL!-sd1-020-SD"); // μ's live (different)
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [filler, filler, filler];
+    game.state.player1.hand.cards.push(hanamusubi);
+    game.state.player1.hand.cards.push(f1);
+    game.state.player1.hand.cards.push(f2);
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.give_energy(10);
+
+    advance_to_live_card_set(&mut game);
+    game.set_live_card(hanamusubi);
+    game.set_live_card(f1);
+    game.set_live_card(f2);
+    finish_live_setup(&mut game);
+
+    // No other Renosora → 0 reduction
+    let mod_val = game
+        .state
+        .mods
+        .get_need_heart_modifier(hanamusubi, HeartColor::Heart04);
+    assert_eq!(mod_val, 0, "no other Renosora → 0, got {mod_val}");
 }

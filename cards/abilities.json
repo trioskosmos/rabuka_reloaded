@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-23T08:37:49.468404",
+  "generated_at": "2026-06-23T08:55:00.070516",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -10487,7 +10487,9 @@
         "card_type": "member_card",
         "target": "self",
         "max": true,
-        "action": "move_cards"
+        "action": "move_cards",
+        "cost_limit": 4,
+        "cost_limit_operator": "<="
       }
     },
     {
@@ -31084,7 +31086,9 @@
         "group_names": [
           "蓮ノ空"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "cost_limit": 4,
+        "cost_limit_operator": "<="
       }
     },
     {

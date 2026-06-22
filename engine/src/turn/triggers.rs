@@ -298,6 +298,9 @@ impl super::TurnEngine {
 
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(String, String, Option<i16>)> = Vec::new();
+        // Track (card_id, ability_idx) to prevent the same card's ability from
+        // firing twice when the card is both a stage member AND a live card.
+        let mut seen: std::collections::HashSet<(i16, usize)> = std::collections::HashSet::new();
 
         {
             let player = if player_id_clone == game_state.player1.id {
@@ -310,18 +313,20 @@ impl super::TurnEngine {
                     continue;
                 }
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
-                    for ability in &card.abilities {
+                    for (aidx, ability) in card.abilities.iter().enumerate() {
                         if ability
                             .triggers
                             .as_ref()
                             .is_some_and(|t| t.contains(crate::triggers::LIVE_START))
                         {
-                            let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                            abilities_to_trigger.push((
-                                ability_id,
-                                card.card_no.clone(),
-                                Some(*card_id),
-                            ));
+                            if seen.insert((*card_id, aidx)) {
+                                let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                                abilities_to_trigger.push((
+                                    ability_id,
+                                    card.card_no.clone(),
+                                    Some(*card_id),
+                                ));
+                            }
                         }
                     }
                 }
@@ -329,18 +334,21 @@ impl super::TurnEngine {
             for &card_id in &player.stage.stage {
                 if card_id != -1 && !game_state.negated_abilities.contains(&card_id) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
-                        for ability in &card.abilities {
+                        for (aidx, ability) in card.abilities.iter().enumerate() {
                             if ability
                                 .triggers
                                 .as_ref()
                                 .is_some_and(|t| t.contains(crate::triggers::LIVE_START))
                             {
-                                let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                                abilities_to_trigger.push((
-                                    ability_id,
-                                    card.card_no.clone(),
-                                    Some(card_id),
-                                ));
+                                if seen.insert((card_id, aidx)) {
+                                    let ability_id =
+                                        format!("{}_{}", card.card_no, ability.full_text);
+                                    abilities_to_trigger.push((
+                                        ability_id,
+                                        card.card_no.clone(),
+                                        Some(card_id),
+                                    ));
+                                }
                             }
                         }
                     }
@@ -417,6 +425,7 @@ impl super::TurnEngine {
 
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();
+        let mut seen: std::collections::HashSet<(i16, usize)> = std::collections::HashSet::new();
 
         // LiveSuccess only triggers when the live card's need_heart is satisfied
         if !game_state.should_trigger_live_success(if player_id_clone == game_state.player1.id {
@@ -443,12 +452,15 @@ impl super::TurnEngine {
                 let card_id = player.stage.stage[index];
                 if card_id != -1 && !skip_negated(game_state, card_id) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
-                        for ability in &card.abilities {
+                        for (aidx, ability) in card.abilities.iter().enumerate() {
                             if ability
                                 .triggers
                                 .as_ref()
                                 .is_some_and(|t| t == crate::triggers::LIVE_SUCCESS)
                             {
+                                if !seen.insert((card_id, aidx)) {
+                                    continue;
+                                }
                                 log::debug!(
                                     "[TRIGGER] live_success stage: card={} trigger={:?}",
                                     card.card_no,
@@ -467,21 +479,25 @@ impl super::TurnEngine {
             }
             for card_id in &player.live_card_zone.cards {
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
-                    for ability in &card.abilities {
+                    for (aidx, ability) in card.abilities.iter().enumerate() {
                         let trigger_match = ability.triggers.as_ref().is_some_and(|t| {
                             t == crate::triggers::LIVE_SUCCESS
                                 || t.contains(crate::triggers::LIVE_SUCCESS_EN)
                         });
+                        if !trigger_match {
+                            continue;
+                        }
+                        if !seen.insert((*card_id, aidx)) {
+                            continue;
+                        }
+                        let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                         log::debug!(
                             "[TRIGGER] live_success live_card: card={} trigger={:?} match={}",
                             card.card_no,
                             ability.triggers,
                             trigger_match
                         );
-                        if trigger_match {
-                            let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                            abilities_to_trigger.push((ability_id, card.card_no.clone(), *card_id));
-                        }
+                        abilities_to_trigger.push((ability_id, card.card_no.clone(), *card_id));
                     }
                 }
             }

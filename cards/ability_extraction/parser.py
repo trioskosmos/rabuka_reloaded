@@ -2535,6 +2535,21 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
                 action["actions"] = sub_actions
                 action.pop("card_type", None)
                 action.pop("multiple_targets", None)
+        if "cost_limit" not in action:
+            cl = extract_cost_limit(text)
+            if cl:
+                action["cost_limit"] = cl
+                if "cost_limit_operator" not in action:
+                    if "以下" in text:
+                        action["cost_limit_operator"] = "<="
+                    elif "以上" in text:
+                        action["cost_limit_operator"] = ">="
+                    elif "未満" in text:
+                        action["cost_limit_operator"] = "<"
+                    elif "より大きい" in text:
+                        action["cost_limit_operator"] = ">"
+                    else:
+                        action["cost_limit_operator"] = "="
     # OR card types for ALL action types (not just move_cards/select)
     if a not in ("move_cards", "select") and "or_card_types" not in action:
         card_type_kws = [
@@ -7723,6 +7738,7 @@ def _normalize_effect_tree(effect, original_text=None):
             prev_cost_limit = None
             prev_cost_op = None
             prev_count = None
+            prev_pm_cond = None
             for act in acts:
                 # Propagate cost_limit from select to subsequent reveal
                 if act.get("action") == "select":
@@ -7774,8 +7790,7 @@ def _normalize_effect_tree(effect, original_text=None):
                 if cond.get("source") == "preceding_moved":
                     prev_pm_cond = cond
                 elif (
-                    "prev_pm_cond" in vars()
-                    and prev_pm_cond is not None
+                    prev_pm_cond is not None
                     and cond.get("type") == "card_count_condition"
                     and cond.get("source") is None
                     and "location" not in cond
@@ -8149,6 +8164,8 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         # effect_steps to the sequential handler, so this eliminates
         # per-shape code paths in the engine.
         effect = _collapse_to_effect_steps(effect)
+        if not isinstance(effect, dict):
+            effect = {}
 
         # Fill missing condition from text — unified single field
         if not effect.get("condition"):
@@ -9213,6 +9230,8 @@ def _validate_semantic(abilities):
         eff = entry.get("effect") or {}
         if not t:
             continue
+        cards = entry.get("cards", [])
+        card_lbl = cards[0] if cards else "???"
         # change_state: energy needs card_type=energy_card
         if (
             eff.get("action") == "change_state"
@@ -9221,12 +9240,28 @@ def _validate_semantic(abilities):
         ):
             if eff.get("card_type") != "energy_card":
                 issues.append(
-                    f"  #{i}: energy activation without card_type=energy_card"
+                    f"  #{i} ({card_lbl}): energy change_state without card_type=energy_card"
                 )
         # move_cards: cost_limit in text but not in effect
         if eff.get("action") == "move_cards" and re.search(r"コスト\d+", t):
-            if eff.get("cost_limit") is None:
-                issues.append(f"  #{i}: cost_limit in text but not in effect")
+            has_cl = (
+                eff.get("cost_limit") is not None
+                or eff.get("cost_limit_min") is not None
+                or eff.get("cost_limit_max") is not None
+                or eff.get("cost_limit_operator") is not None
+            )
+            # Also check in condition
+            if not has_cl:
+                cond = eff.get("condition") or {}
+                has_cl = (
+                    cond.get("cost_limit") is not None
+                    or cond.get("cost_limit_min") is not None
+                    or cond.get("cost_limit_max") is not None
+                )
+            if not has_cl:
+                issues.append(
+                    f"  #{i} ({card_lbl}): 'コスト' referenced in text but no cost_limit in effect or condition"
+                )
         # look_and_select: heart_colors on select parent but not on reveal sub-action
         if eff.get("action") == "look_and_select":
             sa = eff.get("select_action")
