@@ -98,6 +98,11 @@ pub struct GameState {
     /// to prevent re-enqueueing the exact same ability while still allowing
     /// other abilities on the same card (e.g. each_time) to fire.
     pub just_completed_ability_key: Option<String>,
+    /// Cutoff index for depth-first each_time drain. Entries enqueued at >= this index
+    /// are newly-triggered (each_time watchers) and must be force-resolved before
+    /// stale entries are offered to the player. Set by process_player_abilities and
+    /// resume_queue_with_choice before calling process_current_ability.
+    pub depth_first_cutoff: Option<usize>,
     // --- 1-byte aligned (bool, enum) ---
     pub rps_winner: Option<u8>,
     pub current_turn_phase: TurnPhase,
@@ -238,6 +243,7 @@ impl GameState {
             activating_card: None,
             activating_ability_index: None,
             just_completed_ability_key: None,
+            depth_first_cutoff: None,
             // 1-byte aligned
             rps_winner: None,
             current_turn_phase: TurnPhase::FirstAttackerNormal,

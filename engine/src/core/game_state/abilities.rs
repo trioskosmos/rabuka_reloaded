@@ -617,7 +617,15 @@ impl GameState {
                 break;
             }
 
-            let available_indices: Vec<usize> = (0..self.ability_queue.len())
+            // Snapshot queue length before resolution. Entries at indices >= pre_len
+            // are freshly triggered (each_time watchers) by the current resolution
+            // and must be drained depth-first (§9.5.3.2→§9.5.3.1 loopback).
+            let pre_len = self
+                .depth_first_cutoff
+                .unwrap_or_else(|| self.ability_queue.len());
+            self.depth_first_cutoff = None;
+
+            let available_indices: Vec<usize> = (0..pre_len)
                 .filter(|&i| {
                     self.ability_queue.is_entry_available(i)
                         && self.ability_queue.entry_player_id(i) == Some(player_id)
@@ -710,6 +718,41 @@ impl GameState {
             }
             if self.has_pending_choice() {
                 break;
+            }
+
+            // Depth-first drain: newly-triggered each_time watchers at indices >= cutoff
+            // (§9.5.3.2→§9.5.3.1 loopback) resolve immediately before the next stale entry.
+            // The range widens dynamically as sub-resolutions queue deeper entries.
+            let cutoff = pre_len;
+            let mut drain_iters = 0;
+            while !self.has_pending_choice() && self.ability_queue.is_idle() {
+                drain_iters += 1;
+                if drain_iters > 50 {
+                    log::error!(
+                        "[PCA_DRAIN_LIMIT] each_time drain exceeded 50 iterations player={}",
+                        player_id
+                    );
+                    break;
+                }
+                let new_idx = (cutoff..self.ability_queue.len()).find(|&i| {
+                    self.ability_queue.is_entry_available(i)
+                        && self.ability_queue.entry_player_id(i) == Some(player_id)
+                });
+                match new_idx {
+                    Some(idx) => {
+                        self.ability_queue.set_current_entry(idx);
+                        if !self.ability_queue.start_next() {
+                            break;
+                        }
+                        self.process_current_ability();
+                        // Sub-resolution may queue deeper entries — while loop catches them
+                        // on next iteration (widening range from pre_len..len).
+                        if self.has_pending_choice() {
+                            break;
+                        }
+                    }
+                    None => break,
+                }
             }
         }
         // After loop, scan for watchers triggered by batch discards from

@@ -436,6 +436,15 @@ impl AbilityQueue {
         self.current_index = 0;
     }
 
+    /// Set the current index to a specific entry without reordering the queue
+    /// (unlike promote_entry_by_abs which removes/inserts). Used by depth-first
+    /// drain loops to process newly-queued entries in-place.
+    pub fn set_current_entry(&mut self, absolute: usize) {
+        if absolute < self.entries.len() {
+            self.current_index = absolute;
+        }
+    }
+
     /// Take the resolver out of the current entry (for use with game_state).
     pub fn take_resolver(&mut self) -> Option<AbilityResolver> {
         self.current_entry_mut().and_then(|e| e.resolver.take())

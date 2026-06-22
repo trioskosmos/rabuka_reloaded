@@ -523,11 +523,47 @@ impl super::TurnEngine {
                     String::new()
                 };
                 game_state.ability_queue.resume_with_choice(result.clone());
+                // Set depth-first cutoff BEFORE resolution so entries queued by
+                // process_current_ability (each_time watchers) are excluded from
+                // the stale-entries pool when process_player_abilities re-enters.
+                let cutoff = game_state.ability_queue.len();
+                game_state.depth_first_cutoff = Some(cutoff);
                 game_state.ability_queue.promote_entry_by_abs(queue_index);
                 if game_state.ability_queue.start_next() {
                     game_state.recently_moved_cards = None;
                     game_state.recently_moved_from_zone = None;
                     game_state.process_current_ability();
+                }
+                // If the ability completed without pausing, drain newly-queued
+                // entries (each_time watchers) immediately. If it paused (e.g.,
+                // sequential effect sub-choice), the cutoff carries forward to
+                // the next process_player_abilities entry.
+                if !game_state.has_pending_choice() && game_state.ability_queue.is_idle() {
+                    let pid = player_id.clone();
+                    let mut drain_iters = 0;
+                    while !game_state.has_pending_choice() && game_state.ability_queue.is_idle() {
+                        drain_iters += 1;
+                        if drain_iters > 50 {
+                            break;
+                        }
+                        let new_idx = (cutoff..game_state.ability_queue.len()).find(|&i| {
+                            game_state.ability_queue.is_entry_available(i)
+                                && game_state.ability_queue.entry_player_id(i) == Some(&pid)
+                        });
+                        match new_idx {
+                            Some(idx) => {
+                                game_state.ability_queue.set_current_entry(idx);
+                                if !game_state.ability_queue.start_next() {
+                                    break;
+                                }
+                                game_state.process_current_ability();
+                                if game_state.has_pending_choice() {
+                                    break;
+                                }
+                            }
+                            None => break,
+                        }
+                    }
                 }
                 if !game_state.has_pending_choice() && !player_id.is_empty() {
                     game_state.process_pending_auto_abilities(&player_id);
