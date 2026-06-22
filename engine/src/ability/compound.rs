@@ -125,14 +125,41 @@ impl AbilityResolver {
                         condition_failed = None;
                         continue 'action_loop;
                     } else if action.condition.is_some() && !is_otherwise {
-                        // Evaluate explicit condition directly so subsequent
-                        // otherwise-condition steps know the result.
-                        let ctx = ConditionContext::with_moved_cards(gs, &self.moved_cards);
-                        condition_failed =
-                            Some(!ctx.evaluate_condition(action.condition.as_ref().unwrap()));
+                        // Evaluate explicit condition — when it fails, skip the
+                        // action. Subsequent otherwise-condition steps check the
+                        // cached result.
+                        // When the same condition text appears on consecutive
+                        // actions (parser splits compound predicates like
+                        // "if X: do A AND do B" into separate steps), reuse
+                        // the first evaluation's result instead of re-evaluating
+                        // against stale state (e.g. revealed_cards emptied by
+                        // the first action's execution).
+                        let same_as_prev = i > 0
+                            && repeat_actions[i - 1]
+                                .condition
+                                .as_ref()
+                                .map(|c| c.text.as_str())
+                                == action.condition.as_ref().map(|c| c.text.as_str());
+                        if same_as_prev {
+                            if condition_failed == Some(true) {
+                                continue 'action_loop;
+                            }
+                        } else {
+                            let ctx = ConditionContext::with_moved_cards(gs, &self.moved_cards);
+                            let passed = ctx.evaluate_condition(action.condition.as_ref().unwrap());
+                            condition_failed = Some(!passed);
+                            if !passed {
+                                continue 'action_loop;
+                            }
+                        }
                     }
 
                     let mut action_to_execute = action.clone();
+                    // Clear the condition on the clone — the sequential loop already
+                    // checked/gated on it above. Without this, execute_effect →
+                    // can_activate_effect re-evaluates the condition against potentially
+                    // stale game state (e.g. revealed_cards emptied by a prior step).
+                    action_to_execute.condition = None;
                     // Only inherit per_unit properties for actions that support them
                     // Discard/move_cards actions should not inherit per_unit multipliers
                     let supports_per_unit = matches!(
@@ -280,6 +307,15 @@ impl AbilityResolver {
                                 } else {
                                     repeat_actions[i + 1..].to_vec()
                                 };
+                                // When the condition already passed (Some(false)),
+                                // strip otherwise-condition actions from remaining
+                                // so they aren't re-executed by RPC.
+                                if condition_failed == Some(false) {
+                                    remaining.retain(|a| {
+                                        !(a.condition.as_ref().and_then(|c| c.condition_type)
+                                            == Some(crate::ability::enums::ConditionType::OtherwiseCondition))
+                                    });
+                                }
                                 // Preserve remaining repeats in the pending state
                                 for _ in 0..repeats_remaining {
                                     remaining.extend_from_slice(repeat_actions);

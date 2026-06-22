@@ -157,9 +157,9 @@ impl<'a> ConditionContext<'a> {
                     .count
                     .unwrap_or(comparison_default_count(condition))
             }
-        } else if condition.comparison_type.as_deref() == Some("score")
-            || condition.comparison_type.as_deref() == Some("cost")
-        {
+        } else if condition.comparison_type.as_deref() == Some("cost") {
+            condition.cost_limit.or(condition.count).unwrap_or(0)
+        } else if condition.comparison_type.as_deref() == Some("score") {
             condition.count.unwrap_or(0)
         } else {
             condition
@@ -253,6 +253,20 @@ impl<'a> ConditionContext<'a> {
         }
 
         let result = compare_counts(condition.operator.as_deref(), count, target_count);
+        // When card_type filters on revealed_cards yield zero matching cards,
+        // the condition fails — no revealed card matched the required type.
+        // Skip this when revealed_cards is empty (re-evaluation after state
+        // change, where compound.rs already handled the original check).
+        let result = if result
+            && condition.card_type.is_some()
+            && condition.location.as_deref() == Some("revealed_cards")
+            && !self.game_state.revealed_cards.is_empty()
+            && count == 0
+        {
+            false
+        } else {
+            result
+        };
         let final_result = if condition.negation.unwrap_or(false) {
             !result
         } else {
@@ -2691,17 +2705,15 @@ impl<'a> ConditionContext<'a> {
             if condition.location.is_none()
                 || condition.location.as_deref() == Some("revealed_cards")
             {
+                let card_db = &self.game_state.card_database;
+                let ct = condition.card_type.as_deref();
                 return self
                     .game_state
-                    .revealed_cost_cards
+                    .revealed_cards
                     .iter()
+                    .filter(|&&id| ct.is_none() || util::card_matches_type(card_db, id, ct))
                     .map(|&id| {
-                        let base = self
-                            .game_state
-                            .card_database
-                            .get_card(id)
-                            .and_then(|c| c.cost)
-                            .unwrap_or(0) as i32;
+                        let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32;
                         (base + self.game_state.mods.get_cost_modifier(id)).max(0) as u32
                     })
                     .sum();
