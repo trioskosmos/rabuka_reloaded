@@ -84,41 +84,6 @@ function setupAutoConvert(pid) {
     const status = document.getElementById(`p${pid}-convert-status`);
     if (!textarea || !status) return;
 
-    // Add "Load from file" button for this paste area
-    const pasteContainer = textarea.closest('.setup-paste-container');
-    if (pasteContainer && !pasteContainer.querySelector('.deck-file-load-btn')) {
-        const loadBtn = document.createElement('button');
-        loadBtn.className = 'btn btn-small';
-        loadBtn.textContent = '📂 Load from file';
-        loadBtn.type = 'button';
-        loadBtn.style.marginTop = '6px';
-        loadBtn.style.fontSize = '0.8rem';
-        loadBtn.addEventListener('click', () => {
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.accept = '.html,.txt,.json';
-            fileInput.style.display = 'none';
-            fileInput.addEventListener('change', async () => {
-                if (fileInput.files[0]) {
-                    try {
-                        const content = await fileInput.files[0].text();
-                        textarea.value = content;
-                        status.textContent = `Loaded: ${fileInput.files[0].name}`;
-                        status.style.color = '#22c55e';
-                        textarea.dispatchEvent(new Event('input'));
-                    } catch (e) {
-                        status.textContent = 'Failed to read file';
-                        status.style.color = '#ef4444';
-                    }
-                }
-                fileInput.remove();
-            });
-            document.body.appendChild(fileInput);
-            fileInput.click();
-        });
-        pasteContainer.appendChild(loadBtn);
-    }
-
     let timeout = null;
     textarea.addEventListener('input', () => {
         clearTimeout(timeout);

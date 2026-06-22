@@ -35,21 +35,6 @@ function buildConfirmedActions(selectedIndices, validTargets) {
     return confirmedActions;
 }
 
-function hasActiveEffects(state, p0, p1) {
-    return Boolean(
-        (state.triggered_abilities && state.triggered_abilities.length > 0) ||
-        (p0.blade_buffs && p0.blade_buffs.some(v => v !== 0)) ||
-        (p0.heart_buffs && p0.heart_buffs.some(hb => hb.some(v => v > 0))) ||
-        (p1.blade_buffs && p1.blade_buffs.some(v => v !== 0)) ||
-        (p1.heart_buffs && p1.heart_buffs.some(hb => hb.some(v => v > 0))) ||
-        (p0.cost_reduction ?? 0) !== 0 ||
-        (p1.cost_reduction ?? 0) !== 0 ||
-        // Support both prevent_baton_touch and prevent_baton
-        ((p0.prevent_baton_touch ?? p0.prevent_baton ?? 0) > 0) ||
-        ((p1.prevent_baton_touch ?? p1.prevent_baton ?? 0) > 0)
-    );
-}
-
 export const ViewState = {
     buildRenderModel(state, uiState, validTargets) {
         const activePlayerNum = state.active_player === 'player2' || state.active_player === '1' || state.active_player === 1 ? 1 : 0;
@@ -98,7 +83,6 @@ export const ViewState = {
             confirmedActions: buildConfirmedActions(selectedIndices, validTargets),
             showMulliganReturn: uiState.showMulliganReturn && uiState.lastMulliganCards.length > 0,
             mulliganReturnCards: uiState.lastMulliganCards,
-            hasActiveEffects: hasActiveEffects(state, p0, p1),
             selectionModal: {
                 isVisible: selectionCards.length > 0,
                 cards: selectionCards,

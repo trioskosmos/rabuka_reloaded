@@ -2944,6 +2944,56 @@ impl<'a> ConditionContext<'a> {
                     .unwrap_or(0);
                 return max_cost;
             }
+            // Fallback for cost comparison with specific location and non-self
+            // target (e.g. "自分のステージにいる『蓮ノ空』のメンバーのコストの
+            // 合計が、相手のステージにいるメンバーのコストの合計より高い").
+            // Sum modified costs with group/type filtering.
+            if let Some(loc) = condition.location.as_deref() {
+                if !loc.is_empty() {
+                    let player = self.resolve_condition_player(target);
+                    let card_db = &self.game_state.card_database;
+                    let cards: Vec<i16> = match Zone::from_str(loc) {
+                        Some(Zone::Stage) => player
+                            .stage
+                            .stage
+                            .iter()
+                            .filter(|&&id| id != -1)
+                            .copied()
+                            .collect(),
+                        Some(Zone::Hand) => player.hand.cards.to_vec(),
+                        Some(Zone::Discard) | Some(Zone::Waitroom) => {
+                            player.waitroom.cards.to_vec()
+                        }
+                        _ => vec![],
+                    };
+                    let total: u32 = cards
+                        .iter()
+                        .filter(|&&id| {
+                            if let Some(ref groups) = condition.group_names {
+                                if !groups.is_empty()
+                                    && !groups
+                                        .iter()
+                                        .any(|g| util::card_matches_group_str(card_db, id, Some(g)))
+                                {
+                                    return false;
+                                }
+                            }
+                            if let Some(ref ct) = condition.card_type {
+                                if !util::card_matches_type(card_db, id, Some(ct)) {
+                                    return false;
+                                }
+                            }
+                            true
+                        })
+                        .map(|&id| {
+                            let base =
+                                card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32;
+                            (base + self.game_state.mods.get_cost_modifier(id)).max(0) as u32
+                        })
+                        .sum();
+                    return total;
+                }
+            }
         }
         if resource_type == Some("hand_count") {
             let player = self.resolve_condition_player(target);

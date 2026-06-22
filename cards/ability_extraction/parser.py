@@ -3203,6 +3203,16 @@ def parse_action(text: str) -> Dict[str, Any]:
         icon_count = text.count("{{icon_energy.png|E}}")
         if icon_count > 0:
             action["count"] = icon_count
+        # Replace コスト with energy texticon in the action text so the
+        # frontend can render an icon instead of plain kanji for the bonus.
+        # Also set count from value when no explicit icon count was found
+        # (the +N value represents N energy units of cost bonus).
+        if "value" in action and "コスト" in action.get("text", text):
+            if "count" not in action:
+                action["count"] = action["value"]
+            action["text"] = action.get("text", text).replace(
+                "コスト", "{{icon_energy.png|E}}", 1
+            )
         return action
 
     def _set_score_op(t, a):
@@ -7412,6 +7422,18 @@ def _normalize_effect_tree(effect, original_text=None):
                                 and sub.get("action") == "gain_resource"
                             ):
                                 continue
+                            # Don't propagate group_names to modify_cost sub-actions
+                            # UNLESS it's a per-unit cost modifier (which needs the
+                            # group filter to count the right cards on stage).
+                            # Leaked group_names on non-per-unit modify_cost would
+                            # cause the engine to apply cost changes to ALL matching
+                            # group members instead of just this card.
+                            if (
+                                f == "group_names"
+                                and sub.get("action") == "modify_cost"
+                                and not sub.get("per_unit")
+                            ):
+                                continue
                             # Don't propagate heart_colors to gain_resource per_unit actions
                             # (the heart color was selected by a previous select action)
                             if (
@@ -7555,6 +7577,7 @@ def _normalize_effect_tree(effect, original_text=None):
                             needs_group
                             and d.get("action") != "gain_resource"
                             and d.get("type") != "card_count_condition"
+                            and (d.get("action") != "modify_cost" or d.get("per_unit"))
                         ):
                             d["group_names"] = gms
                     else:
@@ -7567,6 +7590,7 @@ def _normalize_effect_tree(effect, original_text=None):
                         if (
                             d.get("action") != "gain_resource"
                             and d.get("type") != "card_count_condition"
+                            and (d.get("action") != "modify_cost" or d.get("per_unit"))
                         ):
                             d["group_names"] = gms
 

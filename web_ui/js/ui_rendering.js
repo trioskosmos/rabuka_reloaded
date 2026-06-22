@@ -59,8 +59,6 @@ function initDomCache() {
         oppSuccess: 'opp-success',
         actions: 'actions',
         ruleLog: 'rule-log',
-        activeAbilitiesList: 'active-abilities-list',
-        activeAbilitiesPanel: 'active-abilities-panel',
     })) {
         DOM_CACHE[key] = document.getElementById(id);
     }
@@ -154,8 +152,6 @@ export const Rendering = {
         Rendering.renderCards('opp-hand', p1.hand.cards, false, false);
         Rendering.renderSelectionModal(viewState.selectionModal);
         Rendering.renderRuleLog();
-        Rendering.renderActiveEffects(state);
-        DOMUtils.setVisible(DOM_IDS.ACTIVE_ABILITIES_PANEL, viewState.hasActiveEffects, DISPLAY_VALUES.BLOCK);
         if (state.game_over) {
             Rendering.renderGameOver(state);
         } else {
@@ -303,9 +299,6 @@ export const Rendering = {
 
 
     renderRuleLog: () => Logs.renderRuleLog('rule-log'),
-
-    renderActiveEffects: (state) => Logs.renderActiveEffects(state),
-
 
     renderLookedCards: (selectionTargets = {}, overrideCards = null, overrideTitle = null) => {
         CardRenderer.renderLookedCards(selectionTargets, overrideCards, overrideTitle);

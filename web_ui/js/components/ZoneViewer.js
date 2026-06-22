@@ -112,7 +112,9 @@ export const ZoneViewer = {
 
     _createCardElement: (card) => {
         if (!card) return document.createElement('div');
-        const vm = CardRenderer.getCardViewModel(card, {});
-        return CardRenderer.createCardDOM(vm, card);
+        const vm = CardRenderer.getCardViewModel(card, { compact: true });
+        const el = CardRenderer.createCardDOM(vm, card);
+        el.classList.remove('rotate-img-90', 'orientation-landscape');
+        return el;
     }
 };

@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-23T03:52:41.114426",
+  "generated_at": "2026-06-23T04:26:27.176054",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -4014,7 +4014,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "能力を持たないメンバーカードを自分の手札から登場させるためのコストは1減る",
+        "text": "能力を持たないメンバーカードを自分の手札から登場させるための{{icon_energy.png|E}}は1減る",
         "source": "hand",
         "destination": "stage",
         "card_type": "member_card",
@@ -4023,6 +4023,7 @@
         "operation": "subtract",
         "location": "hand",
         "value": 1,
+        "count": 1,
         "ability_filter": "no_ability"
       }
     },
@@ -4704,7 +4705,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "コスト10の『Liella!』のメンバーカードを自分の手札から登場させるためのコストは2減る",
+        "text": "{{icon_energy.png|E}}10の『Liella!』のメンバーカードを自分の手札から登場させるためのコストは2減る",
         "source": "hand",
         "destination": "stage",
         "cost_limit": 10,
@@ -4717,7 +4718,8 @@
         "action": "modify_cost",
         "operation": "subtract",
         "location": "hand",
-        "value": 2
+        "value": 2,
+        "count": 2
       }
     },
     {
@@ -5870,14 +5872,12 @@
         "action": "sequential",
         "actions": [
           {
-            "text": "このメンバーのコストを+6する",
+            "text": "このメンバーの{{icon_energy.png|E}}を+6する",
             "card_type": "member_card",
             "action": "modify_cost",
             "operation": "add",
             "value": 6,
-            "group_names": [
-              "蓮ノ空"
-            ],
+            "count": 6,
             "duration": "live_end"
           },
           {
@@ -10088,7 +10088,8 @@
         "card_type": "member_card",
         "action": "modify_cost",
         "operation": "add",
-        "value": 4
+        "value": 4,
+        "count": 4
       }
     },
     {
@@ -13152,9 +13153,7 @@
         "operation": "subtract",
         "location": "hand",
         "value": 2,
-        "group_names": [
-          "lilywhite"
-        ]
+        "count": 2
       }
     },
     {
@@ -13548,7 +13547,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "ステージにいるこのメンバーのコストを+3する",
+        "text": "ステージにいるこのメンバーの{{icon_energy.png|E}}を+3する",
         "condition": {
           "text": "自分の成功ライブカード置き場にあるカードのスコアの合計が6以上であるかぎり",
           "target": "self",
@@ -13566,7 +13565,8 @@
         "card_type": "member_card",
         "action": "modify_cost",
         "operation": "add",
-        "value": 3
+        "value": 3,
+        "count": 3
       }
     },
     {
@@ -14941,7 +14941,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "手札にあるこのメンバーカードのコストは2減る",
+        "text": "手札にあるこのメンバーカードの{{icon_energy.png|E}}は2減る",
         "condition": {
           "type": "state_condition",
           "state": "wait",
@@ -14957,7 +14957,8 @@
         "action": "modify_cost",
         "operation": "subtract",
         "location": "hand",
-        "value": 2
+        "value": 2,
+        "count": 2
       }
     },
     {
@@ -16270,10 +16271,11 @@
         "action": "sequential",
         "actions": [
           {
-            "text": "このカードのコストを+4",
+            "text": "このカードの{{icon_energy.png|E}}を+4",
             "action": "modify_cost",
             "operation": "add",
             "value": 4,
+            "count": 4,
             "self_target": true,
             "per_unit": true,
             "per_unit_count": 1,
@@ -18513,6 +18515,7 @@
         "action": "modify_cost",
         "operation": "add",
         "value": 1,
+        "count": 1,
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
@@ -22720,6 +22723,7 @@
         "action": "modify_cost",
         "operation": "add",
         "value": 1,
+        "count": 1,
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
@@ -26454,7 +26458,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "手札にあるこのメンバーカードのコストは2減る",
+        "text": "手札にあるこのメンバーカードの{{icon_energy.png|E}}は2減る",
         "condition": {
           "type": "temporal_condition",
           "temporal": "this_turn",
@@ -26479,7 +26483,8 @@
         "action": "modify_cost",
         "operation": "subtract",
         "location": "hand",
-        "value": 2
+        "value": 2,
+        "count": 2
       }
     },
     {
@@ -29199,7 +29204,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "元々のコストが17以上の『μ's』のメンバーカードを自分の手札から登場させるためのコストは2減る。この効果は重複しない",
+        "text": "元々の{{icon_energy.png|E}}が17以上の『μ's』のメンバーカードを自分の手札から登場させるためのコストは2減る。この効果は重複しない",
         "condition": {
           "text": "このカードが自分の成功ライブカード置き場にあるかぎり",
           "target": "self",
@@ -30006,7 +30011,7 @@
             ]
           },
           {
-            "text": "自分のステージにいる『DOLLCHESTRA』のメンバー1人のコストを+5する",
+            "text": "自分のステージにいる『DOLLCHESTRA』のメンバー1人の{{icon_energy.png|E}}を+5する",
             "duration": "live_end",
             "source": "stage",
             "count": 1,

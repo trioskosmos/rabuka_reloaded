@@ -311,7 +311,7 @@
     gap: 6px;
     justify-content: flex-start;
     align-items: center;
-    min-height: calc(var(--card-h-mini) + 8px);
+    min-height: calc(var(--card-h-compact) + 8px);
 }
 
 .energy-area-container.horizontal {

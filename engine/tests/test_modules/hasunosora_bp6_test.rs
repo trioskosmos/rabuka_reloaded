@@ -123,16 +123,16 @@ fn kosuzu_bp6_condition_not_met_no_heart05_no_blade() {
     let mut game = TestGame::new(db);
 
     let kosuzu = game.id("PL!HS-bp6-005-R＋"); // 蓮ノ空 cost 10
-    let p2_filler1 = game.id("PL!-sd1-010-SD"); // cost 4
-    let p2_filler2 = game.new_id("PL!-sd1-010-SD"); // cost 4
-    let p2_filler3 = game.new_id("PL!-sd1-010-SD"); // cost 4
+                                               // Opponent needs total > 16 (kosuzu 10 + 6 modifier) so condition fails
+    let p2_high = game.id("PL!-sd1-009-SD"); // cost 15
+    let p2_filler = game.new_id("PL!-sd1-010-SD"); // cost 4
     let filler = game.id("PL!-sd1-010-SD");
     let live = game.new_id("PL!-sd1-010-SD");
 
-    // P1 stage: only kosuzu (蓮ノ空 total cost = 10)
+    // P1 stage: only kosuzu (蓮ノ空, base cost 10, +6 = 16 after ability)
     game.state.player1.stage.stage = [-1, kosuzu, -1];
-    // P2 stage: 3 fillers (total cost = 4+4+4 = 12)
-    game.state.player2.stage.stage = [p2_filler1, p2_filler2, p2_filler3];
+    // P2 stage: total cost = 15 + 4 = 19 > 16 → condition NOT met
+    game.state.player2.stage.stage = [p2_high, p2_filler, -1];
 
     // Hand: 1 discardable + 1 live
     game.state.player1.hand.cards.push(filler);
@@ -173,23 +173,11 @@ fn kosuzu_bp6_condition_not_met_no_heart05_no_blade() {
         game.select_indices(&[]);
     }
 
-    game.print_trace();
-
-    eprintln!(
-        "[DEBUG] blade_modifiers: {:?}",
-        game.state.mods.blade_modifiers
-    );
-    eprintln!(
-        "[DEBUG] heart_modifiers: {:?}",
-        game.state.mods.heart_modifiers
-    );
-    eprintln!("[DEBUG] kosuzu={}", kosuzu);
-
-    // 蓮ノ空 total (10) < opponent (12) → should NOT gain blade or heart05
+    // 蓮ノ空 total with +6 = 16 < opponent 19 → should NOT gain blade or heart05
     let blade = game.state.mods.get_blade_modifier(kosuzu);
     assert_eq!(
         blade, 0,
-        "Condition not met: should not gain blade, got {}",
+        "Condition not met: 16 < 19, should not gain blade, got {}",
         blade
     );
 
@@ -199,7 +187,7 @@ fn kosuzu_bp6_condition_not_met_no_heart05_no_blade() {
         .get_heart_modifier(kosuzu, HeartColor::Heart05);
     assert_eq!(
         heart05, 0,
-        "Condition not met: should not gain heart05, got {}",
+        "Condition not met: 16 < 19, should not gain heart05, got {}",
         heart05
     );
 }

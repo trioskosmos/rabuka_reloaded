@@ -23,7 +23,6 @@ export const DOM_IDS = {
   REPLAY_CONTROLS: 'replay-controls',
   SELECTION_MODAL: 'selection-modal',
   SELECTION_CONTENT: 'selection-content',
-  ACTIVE_ABILITIES_PANEL: 'active-abilities-panel',
   MY_DECK_BOTTOM: 'my-deck-bottom',
   OPP_DECK_BOTTOM: 'opp-deck-bottom',
 

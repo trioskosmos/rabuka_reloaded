@@ -804,9 +804,9 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
             let op = effect.operation.as_deref().unwrap_or("subtract");
             let amt = c.unwrap_or(1);
             if op == "subtract" {
-                format!("コストを{}減らす", amt)
+                format!("{{{{icon_energy.png|E}}}}を{}減らす", amt)
             } else {
-                format!("コストを{}増やす", amt)
+                format!("{{{{icon_energy.png|E}}}}を{}増やす", amt)
             }
         }
         "modify_yell_count" => {

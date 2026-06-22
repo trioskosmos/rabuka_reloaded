@@ -1171,3 +1171,161 @@ fn issue16_hanamaru_opponent_higher_cost_no_blade() {
         "16b: Hanamaru gains 0 blade (cost 9 < opponent max 15)"
     );
 }
+
+// ====================================================================
+// Issue 17: PL!HS-bp6-005-R＋ (徒町 小鈴)
+// ====================================================================
+// LiveStart: optional discard 1 → this member's cost +6.
+// Then if self 蓮ノ空 total cost > opponent total cost, gain heart05 + blade.
+// Parser fix: stop group_names leaking to modify_cost;
+//             get_count_for_condition handles cost+location+opponent target.
+// ====================================================================
+
+#[test]
+fn issue17_suzu_cost_bonus_condition_met() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let suzu = game.id("PL!HS-bp6-005-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD");
+    let live = game.id("PL!-sd1-019-SD");
+
+    // Self stage: Suzu (cost 10, 蓮ノ空) + filler (not 蓮ノ空, cost 4)
+    // 蓮ノ空 total after +6: 10 + 6 = 16
+    game.state.player1.stage.stage = [suzu, -1, filler];
+
+    // Opponent stage: 3 fillers (cost 4+4+4 = 12)
+    // 16 > 12 → demonstrates the +6 pushes kosuzu past opponent's total
+    let opp1 = game.new_id("PL!-sd1-010-SD");
+    let opp2 = game.new_id("PL!-sd1-010-SD");
+    let opp3 = game.new_id("PL!-sd1-010-SD");
+    game.state.player2.stage.stage = [opp1, opp2, opp3];
+
+    // Hand: 2 cards (1 to set as live, 1 to discard as optional cost)
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(filler);
+
+    fill_decks(&mut game);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+
+    // Handle prompts:
+    //   SelectAutoAbility → skip
+    //   SelectTarget (conditional_optional) → pay (option 1)
+    //   SelectCard (hand discard) → select first (the filler card)
+    while game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectAutoAbility") => {
+                game.select_indices(&[]);
+            }
+            Some("SelectTarget") => {
+                game.select_option(1); // Pay optional cost
+            }
+            Some("SelectCard") => {
+                game.select_indices(&[0]); // Discard first card from hand (filler)
+            }
+            _ => {
+                game.select_indices(&[]);
+            }
+        }
+    }
+
+    // Assert: cost modifier +6 (10 → 16)
+    let cost_mod = game.state.mods.get_cost_modifier(suzu);
+    assert_eq!(
+        cost_mod, 6,
+        "17a: Suzu should have +6 cost modifier (10→16), got {}",
+        cost_mod
+    );
+
+    // Self 蓮ノ空 total after +6: 16 > opponent 12 → condition met
+    let heart05 = game
+        .state
+        .mods
+        .get_heart_modifier(suzu, HeartColor::Heart05);
+    assert_eq!(
+        heart05, 1,
+        "17a: Suzu should gain heart05 (16>12), got {}",
+        heart05
+    );
+
+    let blade = game.state.mods.get_blade_modifier(suzu);
+    assert_eq!(
+        blade, 1,
+        "17a: Suzu should gain 1 blade (16>12), got {}",
+        blade
+    );
+}
+
+#[test]
+fn issue17_suzu_cost_bonus_condition_not_met() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let suzu = game.id("PL!HS-bp6-005-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD");
+    let live = game.id("PL!-sd1-019-SD");
+
+    // Self stage: Suzu (cost 10, 蓮ノ空) + filler (not 蓮ノ空)
+    game.state.player1.stage.stage = [suzu, -1, filler];
+
+    // Opponent stage: total cost > 16 so condition fails
+    // sd1-009-SD has cost 15, plus a filler cost 4 = 19
+    let opp_high = game.new_id("PL!-sd1-009-SD");
+    let opp_filler = game.new_id("PL!-sd1-010-SD");
+    game.state.player2.stage.stage = [opp_high, opp_filler, -1];
+
+    // Hand: 2 cards (1 to set as live, 1 to discard as optional cost)
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(filler);
+
+    fill_decks(&mut game);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+
+    while game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectAutoAbility") => {
+                game.select_indices(&[]);
+            }
+            Some("SelectTarget") => {
+                game.select_option(1);
+            }
+            Some("SelectCard") => {
+                game.select_indices(&[0]);
+            }
+            _ => {
+                game.select_indices(&[]);
+            }
+        }
+    }
+
+    // Cost modifier SHOULD still be applied (+6) since the cost was paid
+    let cost_mod = game.state.mods.get_cost_modifier(suzu);
+    assert_eq!(
+        cost_mod, 6,
+        "17b: Suzu should have +6 cost modifier (cost was paid), got {}",
+        cost_mod
+    );
+
+    // Self 蓮ノ空 total after +6: 16. Opponent total: 15 + 4 = 19.
+    // Condition NOT met → no resources
+    let heart05 = game
+        .state
+        .mods
+        .get_heart_modifier(suzu, HeartColor::Heart05);
+    assert_eq!(
+        heart05, 0,
+        "17b: Suzu should NOT gain heart05 (16 < 19), got {}",
+        heart05
+    );
+
+    let blade = game.state.mods.get_blade_modifier(suzu);
+    assert_eq!(
+        blade, 0,
+        "17b: Suzu should NOT gain blade (16 < 19), got {}",
+        blade
+    );
+}

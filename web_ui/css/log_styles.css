@@ -26,16 +26,6 @@
     margin-bottom: var(--space-xs);
 }
 
-.active-effects-section .log-section-header {
-    color: var(--accent-pink);
-    background: rgba(255, 85, 170, 0.1);
-}
-
-.log-entry.active-effect {
-    border-left-color: var(--accent-pink);
-    background: rgba(255, 85, 170, 0.05);
-}
-
 .log-entry.turn-event {
     border-left-color: var(--accent-blue);
 }

@@ -57,13 +57,9 @@ export const BoardRenderer = {
 
         const myHandCount = p0.hand.cards.length;
         const oppHandCount = p1.hand.cards.length;
-        const myEnergyCount = p0.energy.cards.length;
-        const oppEnergyCount = p1.energy.cards.length;
         
         updateCount('my-hand-count', myHandCount);
         updateCount('opp-hand-count', oppHandCount);
-        updateCount('my-energy-count', myEnergyCount);
-        updateCount('opp-energy-count', oppEnergyCount);
     },
 
     renderEnergy: (containerId, energy, clickable = false, validActionMap = {}, hasGlobalSelection = false, state = null) => {
