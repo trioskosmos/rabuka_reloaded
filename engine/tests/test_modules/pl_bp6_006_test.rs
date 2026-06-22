@@ -6,6 +6,8 @@ use crate::helpers::*;
 ///   gain 3 blades until live_end, send rest to discard.
 
 fn drain_cost_and_color(game: &mut TestGame) {
+    // Drain cost (hand discard) and heart color selection.
+    // Do NOT drain subsequent choices (revealed_cards selection, etc.).
     if game.has_pending_choice() && game.pending_choice_type().as_deref() == Some("SelectCard") {
         game.select_indices(&[0]);
     }
@@ -43,19 +45,24 @@ fn maki_bp6_cost_discard_works() {
     assert_eq!(game.state.player1.energy_zone.active_energy_count, 10);
 }
 
+/// Maki full flow with actual μ's cards in deck.
+/// Cost: discard 1 from hand → specify heart color → reveal 5 from deck →
+/// select μ's card from revealed → remaining go to discard.
 #[test]
 fn maki_bp6_full_flow_pick_mus_card() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let maki = game.id("PL!-bp6-006-R+");
     let filler = game.id("PL!-sd1-010-SD");
-    let mus_fodder = game.id("PL!-sd1-010-SD");
+    let mus_member = game.id("PL!-bp6-002-R"); // 絢瀬絵里 (μ's, cost 2)
 
     game.state.player1.stage.stage = [-1, maki, -1];
     game.state.player1.hand.cards.push(filler);
     game.state.player1.main_deck.cards.clear();
-    for _ in 0..5 {
-        game.state.player1.main_deck.cards.push(mus_fodder);
+    // Put 1 μ's member + 4 filler in the top 5 of the deck
+    game.state.player1.main_deck.cards.push(mus_member);
+    for _ in 0..4 {
+        game.state.player1.main_deck.cards.push(filler);
     }
     for _ in 0..25 {
         game.state.player1.main_deck.cards.push(filler);
@@ -83,8 +90,12 @@ fn maki_bp6_full_flow_pick_mus_card() {
     let hand_before = game.state.player1.hand.cards.len();
     game.select_indices(&[0]);
 
+    // Selected μ's card was added to hand
     assert_eq!(game.state.player1.hand.cards.len(), hand_before + 1);
-    assert!(!game.has_pending_choice(), "flow completed");
+    assert!(
+        game.state.player1.hand.cards.contains(&mus_member),
+        "μ's member should be in hand"
+    );
 }
 
 #[test]
