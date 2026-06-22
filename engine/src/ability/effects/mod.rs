@@ -430,6 +430,7 @@ impl AbilityResolver {
                 Ok(())
             }
             ActionType::InvalidateAbility => self.execute_invalidate_ability(gs, effect),
+            ActionType::SuppressAbilityTrigger => self.execute_suppress_ability_trigger(gs, effect),
             ActionType::GainAbility => self.execute_gain_ability_effect(gs, effect),
             ActionType::GainAbilityFromSource => self.execute_gain_ability_from_source(gs, effect),
             ActionType::PlayBatonTouch => {

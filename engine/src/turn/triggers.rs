@@ -251,7 +251,51 @@ impl super::TurnEngine {
         }
     }
 
+    fn has_live_start_suppression(game_state: &GameState, player_id: &str) -> bool {
+        let player = if player_id == game_state.player1.id {
+            &game_state.player1
+        } else {
+            &game_state.player2
+        };
+        let check_card = |card_id: i16| -> bool {
+            if card_id == -1 {
+                return false;
+            }
+            if let Some(card) = game_state.card_database.get_card(card_id) {
+                for ability in &card.abilities {
+                    if let Some(ref effect) = ability.effect {
+                        if effect.action == "suppress_ability_trigger" {
+                            if effect.suppressed_trigger.as_deref() == Some("live_start") {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            false
+        };
+        for &card_id in &player.stage.stage {
+            if check_card(card_id) {
+                return true;
+            }
+        }
+        for &card_id in &player.live_card_zone.cards {
+            if check_card(card_id) {
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn trigger_live_start_abilities(game_state: &mut GameState, player_id: &str) {
+        if Self::has_live_start_suppression(game_state, player_id) {
+            log::debug!(
+                "[LIVE_START_SUPPRESSED] live_start abilities suppressed for player {}",
+                player_id
+            );
+            return;
+        }
+
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(String, String, Option<i16>)> = Vec::new();
 

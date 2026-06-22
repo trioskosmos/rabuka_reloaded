@@ -163,6 +163,7 @@ pub enum ActionType {
     GainAbility,
     GainAbilityFromSource,
     InvalidateAbility,
+    SuppressAbilityTrigger,
     ActivateAbility,
 
     // Cost modifications
@@ -247,6 +248,7 @@ impl ActionType {
             "gain_ability" => Some(ActionType::GainAbility),
             "gain_ability_from_source" => Some(ActionType::GainAbilityFromSource),
             "invalidate_ability" => Some(ActionType::InvalidateAbility),
+            "suppress_ability_trigger" => Some(ActionType::SuppressAbilityTrigger),
             "activate_ability" => Some(ActionType::ActivateAbility),
             "modify_score" => Some(ActionType::ModifyScore),
             "modify_required_hearts" => Some(ActionType::ModifyRequiredHearts),
@@ -315,6 +317,7 @@ impl ActionType {
             ActionType::GainAbility => "gain_ability",
             ActionType::GainAbilityFromSource => "gain_ability_from_source",
             ActionType::InvalidateAbility => "invalidate_ability",
+            ActionType::SuppressAbilityTrigger => "suppress_ability_trigger",
             ActionType::ActivateAbility => "activate_ability",
             ActionType::ModifyScore => "modify_score",
             ActionType::ModifyRequiredHearts => "modify_required_hearts",
@@ -381,6 +384,7 @@ impl ActionType {
             ActionType::GainAbility => "Gain Ability",
             ActionType::GainAbilityFromSource => "Gain Ability from Source",
             ActionType::InvalidateAbility => "Invalidate Ability",
+            ActionType::SuppressAbilityTrigger => "Suppress Ability Trigger",
             ActionType::ActivateAbility => "Activate Ability",
             ActionType::ModifyScore => "Modify Score",
             ActionType::ModifyRequiredHearts => "Modify Required Hearts",

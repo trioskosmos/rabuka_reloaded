@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-22T20:34:16.543106",
+  "generated_at": "2026-06-22T20:54:50.460913",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -32240,7 +32240,8 @@
         "source": "stage",
         "card_type": "member_card",
         "target": "self",
-        "action": "custom"
+        "action": "suppress_ability_trigger",
+        "suppressed_trigger": "live_start"
       }
     },
     {

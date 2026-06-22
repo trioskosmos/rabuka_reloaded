@@ -3499,6 +3499,19 @@ def parse_action(text: str) -> Dict[str, Any]:
     R(lambda t: "起動でき" in t or "起動して" in t, "activate_ability", None)
     R(lambda t: "無効に" in t, "invalidate_ability", None)
     R(
+        lambda t: "能力は発動しない" in t,
+        "suppress_ability_trigger",
+        lambda t, a: a.update(
+            {
+                "suppressed_trigger": (
+                    m.group(1)
+                    if (m := re.search(r"\{\{(\w+)\.png\|", t[: t.find("能力")]))
+                    else None
+                ),
+            }
+        ),
+    )
+    R(
         lambda t: "必要ハート" in t or "ハートを増やす" in t or "ハートを減らす" in t,
         "modify_required_hearts",
         None,

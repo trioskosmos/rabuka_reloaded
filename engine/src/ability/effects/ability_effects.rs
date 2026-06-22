@@ -156,6 +156,26 @@ impl AbilityResolver {
         Ok(())
     }
 
+    pub(crate) fn execute_suppress_ability_trigger(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(), String> {
+        let trigger = effect.suppressed_trigger.as_deref().unwrap_or("unknown");
+        if let Some(card_id) = gs.activating_card {
+            let pp = self.player_prefix(gs);
+            let cn = self.card_name(card_id);
+            gs.rule_log
+                .push(format!("{} {}: {}能力抑制", pp, cn, trigger));
+        }
+        log::info!(
+            "[SUPPRESS] suppressing trigger={} for card={:?}",
+            trigger,
+            gs.activating_card
+        );
+        Ok(())
+    }
+
     pub(crate) fn execute_gain_ability(
         &mut self,
         gs: &mut GameState,

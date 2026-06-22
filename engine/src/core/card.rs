@@ -717,6 +717,8 @@ pub struct AbilityEffect {
     pub optional: Option<bool>,
     #[serde(default)]
     pub negation: Option<bool>,
+    #[serde(default)]
+    pub suppressed_trigger: Option<String>,
     pub max: Option<bool>,
     pub effect_constraint: Option<String>,
     pub resource_icon_count: Option<u32>,

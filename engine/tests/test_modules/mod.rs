@@ -15,6 +15,7 @@ pub mod baton_touch_test;
 pub mod blade_per_discard_test;
 pub mod bloom_hs_test;
 pub mod bring_love_test;
+pub mod butterfly_wing_suppress_test;
 pub mod cannot_baton_touch_test;
 pub mod card_ability_tests;
 pub mod card_count_state_test;
