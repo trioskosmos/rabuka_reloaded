@@ -1686,8 +1686,9 @@ impl AbilityResolver {
         indices: &[usize],
         validate_card: &mut impl FnMut(i16) -> bool,
         dst: &str,
+        target: &str,
     ) -> Result<Vec<i16>, String> {
-        let player = gs.active_player_mut();
+        let player = gs.resolve_target_player_mut(target);
         let mut cards_to_move: Vec<(usize, i16)> = Vec::new();
         for &idx in indices.iter() {
             let mut global_idx = 0;
@@ -1712,8 +1713,6 @@ impl AbilityResolver {
             }
         }
         let selected_ids: Vec<i16> = cards_to_move.iter().map(|&(_, cid)| cid).collect();
-        let _ = player;
-        let player = gs.active_player_mut();
         for (si, card_id) in &cards_to_move {
             if let Some(pos) = player.stage.under_cards[*si]
                 .iter()

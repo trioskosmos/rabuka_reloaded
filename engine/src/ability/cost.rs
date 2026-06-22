@@ -848,7 +848,18 @@ impl AbilityResolver {
                         "[HANDLE_OPT_COST2] calling execute_effect with action={}",
                         effect.action
                     );
-                    if let Err(e) = self.execute_effect(gs, &effect) {
+                    // For PlaceEnergyUnderMember, call directly with optional=false
+                    // to avoid re-creating the optional cost choice (infinite loop).
+                    if effect.action == "place_energy_under_member" {
+                        self.execute_place_energy_under_member(
+                            gs,
+                            effect.energy_count.unwrap_or(effect.count_or(1)),
+                            effect.target_name(),
+                            effect.position.as_ref(),
+                            false,
+                            effect.source.as_deref(),
+                        );
+                    } else if let Err(e) = self.execute_effect(gs, &effect) {
                         log::debug!("Failed to execute effect after optional cost: {}", e);
                     }
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {

@@ -1458,22 +1458,32 @@ impl AbilityResolver {
         // Original logic: move from energy_zone to under_member
         // This should only execute if source is NOT "under_member"
         if optional {
-            let is_activation = self
-                .current_ability
-                .as_ref()
-                .and_then(|a| a.triggers.as_ref())
-                .is_some_and(|t| t == crate::triggers::ACTIVATION);
-            if !is_activation {
-                self.pending_choice = Some(Choice::SelectTarget {
-                    target: "pay_optional_cost:skip_optional_cost".to_string(),
-                    description: "Place energy under member? (pay or skip)".to_string(),
-                    allow_skip: false,
-                    options: None,
-                });
-                if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
+            // If the optional cost was already paid (re-entry from
+            // handle_optional_cost_payment), skip the prompt and place energy.
+            let cost_already_paid = gs
+                .ability_queue
+                .current_entry()
+                .is_some_and(|e| e.optional_cost_result == Some(true));
+            if cost_already_paid {
+                // Fall through to energy placement
+            } else {
+                let is_activation = self
+                    .current_ability
+                    .as_ref()
+                    .and_then(|a| a.triggers.as_ref())
+                    .is_some_and(|t| t == crate::triggers::ACTIVATION);
+                if !is_activation {
+                    self.pending_choice = Some(Choice::SelectTarget {
+                        target: "pay_optional_cost:skip_optional_cost".to_string(),
+                        description: "Place energy under member? (pay or skip)".to_string(),
+                        allow_skip: false,
+                        options: None,
+                    });
+                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                        entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
+                    }
+                    return;
                 }
-                return;
             }
         }
         let player = gs.resolve_target_player_mut(target);

@@ -1022,7 +1022,10 @@ impl super::resolver::AbilityResolver {
                         .as_deref()
                         .unwrap_or(Zone::EnergyDeck.to_str())
                         .to_string();
-                    self.move_from_under_member(gs, indices, &mut validate_card, &dst_str)?;
+                    let tgt = target_player_id
+                        .clone()
+                        .unwrap_or_else(|| "self".to_string());
+                    self.move_from_under_member(gs, indices, &mut validate_card, &dst_str, &tgt)?;
                     return self.finalize_choice(gs, &context);
                 }
                 _ => {
@@ -1749,7 +1752,10 @@ impl super::resolver::AbilityResolver {
                     .as_deref()
                     .unwrap_or(Zone::EnergyDeck.to_str())
                     .to_string();
-                self.move_from_under_member(gs, indices, &mut validate_card, &dst_str)?;
+                let tgt = target_player_id
+                    .clone()
+                    .unwrap_or_else(|| "self".to_string());
+                self.move_from_under_member(gs, indices, &mut validate_card, &dst_str, &tgt)?;
             }
             Some(Zone::SuccessLiveZone) => {
                 let mapped: Vec<usize> = if let Some(ref fidx) = filtered_indices {
