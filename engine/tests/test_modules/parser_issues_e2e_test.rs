@@ -1036,6 +1036,114 @@ fn issue12_proof_look_and_select_cost_30plus() {
 }
 
 // ====================================================================
+// Proof edge case: cost < 20 → no effect at all
+// ====================================================================
+
+#[test]
+fn proof_cost_below_20_no_effect() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let proof = game.id("PL!HS-bp6-029-L");
+    let hs_low = game.id("PL!HS-bp1-005-PR"); // cost=9
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [hs_low, filler, filler];
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.main_deck.cards.push(filler);
+    game.state.player1.main_deck.cards.push(filler);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    game.state.player1.hand.cards.push(proof);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(proof);
+    advance_to_live_start(&mut game);
+
+    while game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectAutoAbility") => game.select_indices(&[]),
+            _ => game.select_indices(&[0]),
+        }
+    }
+
+    // Cost 9 < 20 → no effect at all. Hand should have only proof.
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        1,
+        "Proof: cost=9 < 20 → should draw nothing"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_need_heart_modifier(proof, HeartColor::Heart00),
+        0,
+        "Proof: cost=9 < 20 → no heart reduction"
+    );
+}
+
+// ====================================================================
+// Proof edge case: cost >=20 → look-and-select draws 1 card
+// ====================================================================
+
+#[test]
+fn proof_cost_20plus_draws_card() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let proof = game.id("PL!HS-bp6-029-L");
+    // Use abilityless 蓮ノ空 members (no LiveStart to interfere):
+    //   PL!HS-bp1-016-PR cost=9, PL!HS-bp1-016-N cost=9, PL!HS-bp1-012-PR cost=4
+    //   Total: 9+9+4=22 >= 20
+    let hs1 = game.id("PL!HS-bp1-016-PR");
+    let hs2 = game.id("PL!HS-bp1-016-N");
+    let hs3 = game.id("PL!HS-bp1-012-PR");
+    // Use filler for remaining cards
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [hs1, hs2, hs3];
+    game.state.player1.main_deck.cards.clear();
+    // Top 2 must be 蓮ノ空 cards (select_action has group_names filter)
+    let top1 = game.id("PL!HS-bp1-012-PR"); // abilityless 蓮ノ空 cost=4
+    let top2 = game.id("PL!HS-bp1-012-N"); // abilityless 蓮ノ空 cost=4
+    game.state.player1.main_deck.cards.push(top1);
+    game.state.player1.main_deck.cards.push(top2);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    game.state.player1.hand.cards.push(proof);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(proof);
+    advance_to_live_start(&mut game);
+
+    // Only Proof's LiveStart fires (abilityless members have none).
+    // Proof's look-and-select creates a SelectCard choice → pick index 0.
+    let hand_after_setup = game.state.player1.hand.cards.len();
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    // Total cost 9+9+4=22 >= 20 → look-and-select fires → draws 1 card
+    let hand_after = game.state.player1.hand.cards.len();
+    assert_eq!(
+        hand_after,
+        hand_after_setup + 1,
+        "Proof: cost 22 >= 20 → should draw 1 card (hand {}=>{} )",
+        hand_after_setup,
+        hand_after
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_need_heart_modifier(proof, HeartColor::Heart00),
+        0,
+        "Proof: cost 22 < 30 → no heart reduction"
+    );
+}
+
+// ====================================================================
 // Issue 13: PL!HS-bp6-027-L (月夜見海月)
 // ====================================================================
 // Auto (1/turn): when yell, discard up to 3 蓮ノ空 from revealed → extra yell.

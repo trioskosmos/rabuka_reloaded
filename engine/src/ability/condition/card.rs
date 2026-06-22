@@ -2136,6 +2136,53 @@ impl<'a> ConditionContext<'a> {
                         push_rich(&format!("全エリア未充足({}/3)", filled_count), false);
                         return false;
                     }
+                    // Check cost_limit if specified (e.g. コスト10のメンバー)
+                    if let Some(cost_limit) = condition.cost_limit {
+                        let operator = condition.operator.as_deref().unwrap_or("=");
+                        let cost_match = stage_ids.iter().any(|&cid| {
+                            self.game_state
+                                .card_database
+                                .get_card(cid)
+                                .and_then(|c| c.cost)
+                                .map_or(false, |cost| match operator {
+                                    ">=" => cost >= cost_limit,
+                                    "<=" => cost <= cost_limit,
+                                    ">" => cost > cost_limit,
+                                    "<" => cost < cost_limit,
+                                    "!=" => cost != cost_limit,
+                                    _ => cost == cost_limit,
+                                })
+                        });
+                        if !cost_match {
+                            push_rich(&format!("コスト不一致(limit={})", cost_limit), false);
+                            return false;
+                        }
+                    }
+                    // Check card_type if specified (e.g. メンバー → member_card)
+                    if let Some(ref ct) = condition.card_type {
+                        if !stage_ids.iter().any(|&cid| {
+                            util::card_matches_type(&self.game_state.card_database, cid, Some(ct))
+                        }) {
+                            push_rich(&format!("カード種別不一致(type={})", ct), false);
+                            return false;
+                        }
+                    }
+                    // Generalized self-trigger guard: when cost_limit or card_type filters
+                    // are set, prevent the activating card from triggering on its own appearance
+                    // (the same logic as the group_names guard below).
+                    if !baton_touch_trigger
+                        && !self.game_state.cards_appeared_this_turn.is_empty()
+                        && (condition.cost_limit.is_some() || condition.card_type.is_some())
+                    {
+                        let has_other_appeared = stage_ids.iter().any(|&cid| {
+                            self.activating_card_id.map_or(true, |act_id| cid != act_id)
+                                && self.game_state.has_card_appeared_this_turn(cid)
+                        });
+                        if !has_other_appeared {
+                            push_rich("自カードのみ登場", false);
+                            return false;
+                        }
+                    }
                     if let Some(ref groups) = condition.group_names {
                         if !groups.is_empty() {
                             let card_db = &self.game_state.card_database;

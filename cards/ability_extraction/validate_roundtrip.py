@@ -9,11 +9,13 @@ Usage:  python validate_roundtrip.py
 
 import json, re, sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent))
 from parser import parse_ability, parse_effect, _normalize_effect_tree
 
 CARDS_JSON = Path(__file__).parent.parent / "cards.json"
-MAX_SHOW = 5  # max card examples per pattern
+MAX_SHOW = 50  # max card examples per pattern
+
 
 def walk(obj, path=""):
     """Yield (path, value) leaf pairs from a nested dict/list."""
@@ -94,6 +96,7 @@ def main():
             # 1. 能力を持たない → ability_filter or or_ability_filters
             if "能力を持たない" in triggerless:
                 found_af = False
+
                 def scan_af(d):
                     nonlocal found_af
                     if isinstance(d, dict):
@@ -106,9 +109,12 @@ def main():
                     elif isinstance(d, list):
                         for item in d:
                             scan_af(item)
+
                 scan_af(e)
                 if not found_af:
-                    issues.append(("ABILITY_FILTER_MISSING", part[:60], card_no, ab_idx))
+                    issues.append(
+                        ("ABILITY_FILTER_MISSING", part[:60], card_no, ab_idx)
+                    )
 
             # 2. そうした場合 → followup / optional_action / conditional_action / conditional:True
             if "そうした場合" in triggerless:
@@ -118,10 +124,14 @@ def main():
                     or e.get("conditional_action")
                     or e.get("alternative_condition")
                     or (e.get("action") == "conditional_on_optional")
-                    or (e.get("action") == "sequential" and e.get("conditional") is True)
+                    or (
+                        e.get("action") == "sequential" and e.get("conditional") is True
+                    )
                 )
                 if not has:
-                    issues.append(("CONDITIONAL_FOLLOWUP_MISSING", part[:60], card_no, ab_idx))
+                    issues.append(
+                        ("CONDITIONAL_FOLLOWUP_MISSING", part[:60], card_no, ab_idx)
+                    )
 
             # 3. から...に置かれた → preceding_moved in condition or per_unit_source
             # Skip cost:effect patterns (colon-separated) since the movement is in the cost
@@ -131,35 +141,49 @@ def main():
                 and "：" not in triggerless
                 and "このメンバーが" not in triggerless
             ):
-                has_mv = find_in_tree(e, "source", "preceding_moved") or find_in_tree(e, "per_unit_source", "previous_moved_cards")
+                has_mv = find_in_tree(e, "source", "preceding_moved") or find_in_tree(
+                    e, "per_unit_source", "previous_moved_cards"
+                )
                 if not has_mv:
-                    issues.append(("MOVEMENT_PRECEDING_MOVED_MISSING", part[:60], card_no, ab_idx))
+                    issues.append(
+                        ("MOVEMENT_PRECEDING_MOVED_MISSING", part[:60], card_no, ab_idx)
+                    )
 
             # 4. 合計 + 以上 → operator ">=" (not "=")
             # Skip equality comparisons (同じ → comparison_type=equality, legitimately "=")
             if re.search(r"合計.*?以上", triggerless) and "同じ" not in triggerless:
+
                 def scan_aggregate(d):
                     hits = []
                     if isinstance(d, dict):
-                        if d.get("aggregate") == "total" and d.get("operator") == "=" and d.get("comparison_type") != "equality":
-                            hits.append(("=", d.get("text","")[:40]))
+                        if (
+                            d.get("aggregate") == "total"
+                            and d.get("operator") == "="
+                            and d.get("comparison_type") != "equality"
+                        ):
+                            hits.append(("=", d.get("text", "")[:40]))
                         for v in d.values():
                             hits.extend(scan_aggregate(v))
                     elif isinstance(d, list):
                         for item in d:
                             hits.extend(scan_aggregate(item))
                     return hits
+
                 agg_issues = scan_aggregate(e.get("condition") or {})
                 for op, txt in agg_issues:
                     if op == "=":
-                        issues.append(("AGGREGATE_OP_EQ_SHOULD_BE_GE", txt, card_no, ab_idx))
+                        issues.append(
+                            ("AGGREGATE_OP_EQ_SHOULD_BE_GE", txt, card_no, ab_idx)
+                        )
 
             # 5. {{icon_all.png → heart_type "all"
             if "{{icon_all.png" in triggerless:
                 ht = e.get("heart_type")
                 if ht != "all":
                     if e.get("action") == "gain_resource":
-                        issues.append(("ICON_ALL_NO_HEART_TYPE", part[:60], card_no, ab_idx))
+                        issues.append(
+                            ("ICON_ALL_NO_HEART_TYPE", part[:60], card_no, ab_idx)
+                        )
                     # Sequential with multiple gain_resources — check sub-actions
                     elif e.get("action") == "sequential":
                         found_all = False
@@ -171,14 +195,22 @@ def main():
                             pass  # might be combined blade+heart handled differently
 
             # 6. まで (duration) → duration field (skip cost:effect patterns)
-            if "まで" in triggerless and "ライブ終了時まで" in triggerless and "：" not in triggerless:
+            if (
+                "まで" in triggerless
+                and "ライブ終了時まで" in triggerless
+                and "：" not in triggerless
+            ):
                 if not find_in_tree(e, "duration", "live_end"):
                     issues.append(("DURATION_MISSING", part[:60], card_no, ab_idx))
 
             # 7. てもよい → optional (check effect tree; skip cost:effect patterns)
-            if ("てもよい" in triggerless or "してもよい" in triggerless) and "：" not in triggerless:
+            if (
+                "てもよい" in triggerless or "してもよい" in triggerless
+            ) and "：" not in triggerless:
                 # select actions carry optionality internally without the field
-                if e.get("action") != "select" and not find_in_tree(e, "optional", True):
+                if e.get("action") != "select" and not find_in_tree(
+                    e, "optional", True
+                ):
                     issues.append(("OPTIONAL_MISSING", part[:60], card_no, ab_idx))
 
     # ── Report ───────────────────────────────────────────────
@@ -188,6 +220,7 @@ def main():
 
     # Group by type
     from collections import Counter
+
     by_type = Counter()
     grouped = {}
     for label, detail, cno, aidx in issues:
