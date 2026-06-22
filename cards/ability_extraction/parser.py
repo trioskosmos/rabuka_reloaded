@@ -1291,6 +1291,14 @@ def _try_appearance(text):
     tgt = extract_target(text)
     if tgt:
         result["target"] = tgt
+    # Extract cost limit (e.g. コスト10の → cost_limit=10)
+    cl = extract_cost_limit(text)
+    if cl is not None:
+        result["cost_limit"] = cl
+    # Extract card type (e.g. メンバー → member_card)
+    ct = extract_card_type(text)
+    if ct:
+        result["card_type"] = ct
     # Extract position (左サイド/右サイド/センター)
     matched = set()
     for kw, pos in POSITION_KEYWORDS.items():
@@ -5312,6 +5320,7 @@ def _build_look_select_actions(select_text):
 def _build_look_select_actions_inner(select_text):
     """Build the select_action for その中から patterns."""
     result = {"action": "select_cards", "discard_remaining": True}
+    result["text"] = select_text
 
     # Pattern: reveal → add → discard
     if "手札に加え" in select_text and "残りを控え室に置く" in select_text:
@@ -7670,11 +7679,15 @@ def _normalize_effect_tree(effect, original_text=None):
             if "を持つ" in d_text:
                 d["filter_targets_by_heart_colors"] = True
 
-        # Extract heart_colors from parent context for look_and_select select_actions
-        if "heart_colors" not in d and d.get("action") == "select_cards" and ctx_text:
+        # Extract heart_colors from the node's own text for look_and_select select_actions.
+        # Uses d.get("text") instead of ctx_text to avoid inheriting heart colors
+        # from unrelated parts of the parent effect (e.g. a followup condition like
+        # "30以上の場合、さらにこのカードの必要ハートを{{heart_00.png|heart0}}減らす").
+        node_text = d.get("text") or ""
+        if "heart_colors" not in d and d.get("action") == "select_cards" and node_text:
             hc = list(
                 dict.fromkeys(
-                    f"heart{m.zfill(2)}" for m in re.findall(r"heart_(\d+)", ctx_text)
+                    f"heart{m.zfill(2)}" for m in re.findall(r"heart_(\d+)", node_text)
                 )
             )
             if hc:

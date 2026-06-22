@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-23T07:55:45.529737",
+  "generated_at": "2026-06-23T08:37:25.693924",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -175,9 +175,9 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "1枚を手札に加え、残りを控え室に置く",
           "destination": "hand",
-          "count": 1,
-          "text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く"
+          "count": 1
         }
       }
     },
@@ -328,11 +328,11 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
           "destination": "deck_top",
           "placement_order": "any_order",
           "any_number": true,
-          "reveal": false,
-          "text": "自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く"
+          "reveal": false
         },
         "parenthetical": [
           "ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。"
@@ -369,11 +369,11 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
           "destination": "deck_top",
           "placement_order": "any_order",
           "any_number": true,
-          "reveal": false,
-          "text": "自分のデッキの上からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く"
+          "reveal": false
         }
       }
     },
@@ -1219,7 +1219,8 @@
               "group_names": [
                 "蓮ノ空"
               ],
-              "target": "self"
+              "target": "self",
+              "card_type": "member_card"
             },
             {
               "type": "location_condition",
@@ -1557,11 +1558,11 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
           "destination": "deck_top",
           "placement_order": "any_order",
           "any_number": true,
-          "reveal": false,
-          "text": "自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く"
+          "reveal": false
         }
       }
     },
@@ -1632,7 +1633,8 @@
               "group_names": [
                 "Aqours"
               ],
-              "target": "self"
+              "target": "self",
+              "card_type": "member_card"
             },
             {
               "type": "location_condition",
@@ -2079,7 +2081,8 @@
           "text": "自分のステージのエリアすべてにメンバーが登場している場合",
           "location": "stage",
           "all_areas": true,
-          "target": "self"
+          "target": "self",
+          "card_type": "member_card"
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -3447,6 +3450,7 @@
           ],
           "baton_touch_trigger": true,
           "min_baton_touch_count": 2,
+          "card_type": "member_card",
           "position": "center",
           "activation_position": "center"
         },
@@ -3755,9 +3759,9 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "カードを1枚手札に加える。残りを控え室に置く",
           "destination": "hand",
-          "count": 1,
-          "text": "自分のデッキの上から、自分のライブの合計スコアに2を足した数に等しい枚数見る。その中からカードを1枚手札に加える。残りを控え室に置く"
+          "count": 1
         }
       }
     },
@@ -3860,9 +3864,9 @@
           "select_action": {
             "action": "select_cards",
             "discard_remaining": true,
+            "text": "カードを2枚手札に加える。残りを控え室に置く",
             "destination": "hand",
-            "count": 2,
-            "text": "自分のデッキの上からカードを4枚見る。その中からカードを2枚手札に加える。残りを控え室に置く"
+            "count": 2
           }
         },
         "alternative_effect": {
@@ -5663,6 +5667,7 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "{{live_start.png|ライブ開始時}}能力を持たない『Aqours』のライブカードを1枚選び、デッキの一番上に置いてもよい",
           "reveal": false,
           "destination": "deck_top",
           "count": 1,
@@ -5674,11 +5679,6 @@
           "ability_filter": "no_ability_type",
           "ability_filter_triggers": [
             "ライブ開始時"
-          ],
-          "text": "自分のライブカード置き場にカードが2枚以上ある場合、その中から{{live_start.png|ライブ開始時}}能力を持たない『Aqours』のライブカードを1枚選び、デッキの一番上に置いてもよい。そうした場合、ライブ終了時まで、{{heart_02.png|heart02}}と{{heart_04.png|heart04}}を得る",
-          "heart_colors": [
-            "heart02",
-            "heart04"
           ]
         },
         "followup_action": {
@@ -5812,10 +5812,10 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "1枚をデッキの一番上に置き、残りを控え室に置く",
           "reveal": false,
           "destination": "deck_top",
-          "count": 1,
-          "text": "自分のデッキの上から、自分のステージにいるメンバーの数に2を足した数に等しい枚数見る。その中から1枚をデッキの一番上に置き、残りを控え室に置く"
+          "count": 1
         }
       }
     },
@@ -6722,9 +6722,9 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "1枚を手札に加え、残りを控え室に置く",
           "destination": "hand",
-          "count": 1,
-          "text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く"
+          "count": 1
         }
       }
     },
@@ -10898,11 +10898,11 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
           "destination": "deck_top",
           "placement_order": "any_order",
           "any_number": true,
-          "reveal": false,
-          "text": "自分のデッキの上からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く"
+          "reveal": false
         }
       }
     },
@@ -11058,11 +11058,11 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
           "destination": "deck_top",
           "placement_order": "any_order",
           "any_number": true,
-          "reveal": false,
-          "text": "自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く"
+          "reveal": false
         }
       }
     },
@@ -11448,6 +11448,7 @@
             "select_action": {
               "action": "select_cards",
               "discard_remaining": true,
+              "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
               "destination": "deck_top",
               "placement_order": "any_order",
               "any_number": true,
@@ -11771,10 +11772,10 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "1枚を手札に加え、1枚をデッキの上に置き、1枚を控え室に置く",
           "reveal": false,
           "destination": "deck_top",
-          "count": 1,
-          "text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、1枚をデッキの上に置き、1枚を控え室に置く"
+          "count": 1
         }
       }
     },
@@ -12423,11 +12424,11 @@
                 "select_action": {
                   "action": "select_cards",
                   "discard_remaining": true,
+                  "text": "1枚までをデッキの上に置き、残りを控え室に置く",
                   "reveal": false,
                   "destination": "deck_top",
                   "count": 1,
-                  "max": true,
-                  "text": "その中から1枚までをデッキの上に置き、残りを控え室に置く"
+                  "max": true
                 },
                 "per_unit": true,
                 "per_unit_count": 1,
@@ -13335,7 +13336,8 @@
               "group_names": [
                 "Printemps"
               ],
-              "baton_touch_trigger": true
+              "baton_touch_trigger": true,
+              "card_type": "member_card"
             },
             "duration": "unless"
           }
@@ -13810,7 +13812,8 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "これにより登場したメンバーがブレードハートを持つ場合",
-          "location": "stage"
+          "location": "stage",
+          "card_type": "member_card"
         },
         "followup_action": {
           "text": "このメンバーをウェイトにする",
@@ -14860,7 +14863,9 @@
           "appearance": true,
           "text": "自分のステージにコスト10のメンバーが登場したとき",
           "location": "stage",
-          "target": "self"
+          "target": "self",
+          "cost_limit": 10,
+          "card_type": "member_card"
         },
         "count": 1,
         "action": "draw_card",
@@ -15173,7 +15178,9 @@
           "text": "自分のステージにこのメンバー以外のコスト11のメンバーが登場したとき",
           "location": "stage",
           "exclude_self": true,
-          "target": "self"
+          "target": "self",
+          "cost_limit": 11,
+          "card_type": "member_card"
         },
         "source": "energy_deck",
         "destination": "energy_zone",
@@ -15730,9 +15737,9 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "1枚を手札に加え、残りを控え室に置く",
           "destination": "hand",
-          "count": 1,
-          "text": "自分のデッキの上からカードを2枚見る。その中から1枚を手札に加え、残りを控え室に置く"
+          "count": 1
         }
       }
     },
@@ -15882,9 +15889,9 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "1枚を手札に加える。残りを控え室に置く",
           "destination": "hand",
-          "count": 1,
-          "text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加える。残りを控え室に置く"
+          "count": 1
         }
       }
     },
@@ -16153,7 +16160,8 @@
           "group_names": [
             "スリーズブーケ"
           ],
-          "target": "self"
+          "target": "self",
+          "card_type": "member_card"
         },
         "exclude_self": true,
         "group_names": [
@@ -16811,6 +16819,7 @@
             "蓮ノ空"
           ],
           "target": "self",
+          "card_type": "member_card",
           "position": "center",
           "activation_position": "center"
         },
@@ -16969,11 +16978,11 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
           "destination": "deck_top",
           "placement_order": "any_order",
           "any_number": true,
-          "reveal": false,
-          "text": "自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く"
+          "reveal": false
         }
       }
     },
@@ -17924,7 +17933,8 @@
           "group_names": [
             "EdelNote"
           ],
-          "target": "self"
+          "target": "self",
+          "card_type": "member_card"
         },
         "source": "stage",
         "state_change": "wait",
@@ -18269,10 +18279,10 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "コスト4以下の『Liella!』のメンバーカードを1枚まで公開する。そのカードを自分のステージのメンバーのいないエリアに登場させるか、手札に加える。残りを控え室に置く",
           "destination": "hand",
           "count": 1,
           "card_type": "member_card",
-          "text": "自分のデッキの上からカードを5枚見る。その中からコスト4以下の『Liella!』のメンバーカードを1枚まで公開する。そのカードを自分のステージのメンバーのいないエリアに登場させるか、手札に加える。残りを控え室に置く",
           "group_names": [
             "Liella!"
           ]
@@ -19458,11 +19468,11 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
           "destination": "deck_top",
           "placement_order": "any_order",
           "any_number": true,
-          "reveal": false,
-          "text": "自分のデッキの上からカードを3枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く"
+          "reveal": false
         }
       }
     },
@@ -21056,9 +21066,9 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "1枚を手札に加え、残りを控え室に置く",
           "destination": "hand",
-          "count": 1,
-          "text": "自分のエネルギーが9枚以上ある場合、自分のデッキの上からカードを5枚見る。その中から1枚を手札に加え、残りを控え室に置く"
+          "count": 1
         }
       }
     },
@@ -22110,6 +22120,7 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "ハートに{{heart_04.png|heart04}}を2個以上持つメンバーカードか、必要ハートに{{heart_04.png|heart04}}を2以上含むライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く",
           "destination": "hand",
           "count": 1,
           "heart_colors": [
@@ -22119,8 +22130,7 @@
             "live_card",
             "member_card"
           ],
-          "optional": true,
-          "text": "自分のデッキの上からカードを4枚見る。その中からハートに{{heart_04.png|heart04}}を2個以上持つメンバーカードか、必要ハートに{{heart_04.png|heart04}}を2以上含むライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
+          "optional": true
         },
         "optional": true,
         "heart_colors": [
@@ -22160,6 +22170,7 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "ハートに{{heart_02.png|heart02}}を2個以上持つメンバーカードか、必要ハートに{{heart_02.png|heart02}}を2以上含むライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く",
           "destination": "hand",
           "count": 1,
           "heart_colors": [
@@ -22169,8 +22180,7 @@
             "live_card",
             "member_card"
           ],
-          "optional": true,
-          "text": "自分のデッキの上からカードを4枚見る。その中からハートに{{heart_02.png|heart02}}を2個以上持つメンバーカードか、必要ハートに{{heart_02.png|heart02}}を2以上含むライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
+          "optional": true
         },
         "optional": true,
         "heart_colors": [
@@ -22210,6 +22220,7 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "ハートに{{heart_05.png|heart05}}を2個以上持つメンバーカードか、必要ハートに{{heart_05.png|heart05}}を2以上含むライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く",
           "destination": "hand",
           "count": 1,
           "heart_colors": [
@@ -22219,8 +22230,7 @@
             "live_card",
             "member_card"
           ],
-          "optional": true,
-          "text": "自分のデッキの上からカードを4枚見る。その中からハートに{{heart_05.png|heart05}}を2個以上持つメンバーカードか、必要ハートに{{heart_05.png|heart05}}を2以上含むライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
+          "optional": true
         },
         "optional": true,
         "heart_colors": [
@@ -29629,9 +29639,9 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "1枚を手札に加え、残りを控え室に置く",
           "destination": "hand",
-          "count": 1,
-          "text": "控え室から登場している場合、自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く"
+          "count": 1
         }
       }
     },
@@ -30193,7 +30203,8 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "このメンバーが手札以外からステージに登場している場合",
-          "location": "stage"
+          "location": "stage",
+          "card_type": "member_card"
         },
         "action": "sequential",
         "actions": [
@@ -30590,11 +30601,11 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
           "destination": "deck_top",
           "placement_order": "any_order",
           "any_number": true,
-          "reveal": false,
-          "text": "このターン、自分が余剰ハートを1つ以上持っている場合、自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く"
+          "reveal": false
         }
       }
     },
@@ -30635,17 +30646,11 @@
         },
         "select_action": {
           "action": "select_cards",
+          "text": "1枚を手札に加え、残りをデッキの上に戻す",
           "destination": "hand",
           "reveal": false,
           "remainder_destination": "deck_top",
-          "count": 1,
-          "text": "自分のステージにいる『蓮ノ空』のメンバーのコストが合計20以上の場合、デッキの上のカードを2枚見る。その中から1枚を手札に加え、残りをデッキの上に戻す。30以上の場合、さらにこのカードの必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らす",
-          "group_names": [
-            "蓮ノ空"
-          ],
-          "heart_colors": [
-            "heart00"
-          ]
+          "count": 1
         },
         "followup_action": {
           "text": "30以上の場合、さらにこのカードの必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らす",
@@ -30823,9 +30828,9 @@
         "select_action": {
           "action": "select_cards",
           "discard_remaining": true,
+          "text": "カードを2枚手札に加え、残りを控え室に置く",
           "destination": "hand",
-          "count": 2,
-          "text": "自分のデッキの上からカードを6枚見る。その中からカードを2枚手札に加え、残りを控え室に置く"
+          "count": 2
         }
       }
     },
