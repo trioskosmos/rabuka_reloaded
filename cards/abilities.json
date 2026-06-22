@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-22T03:27:13.129324",
+  "generated_at": "2026-06-22T16:04:47.964039",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -14100,17 +14100,39 @@
           },
           {
             "text": "公開したカードを手札に加え",
+            "source": "revealed_cards",
+            "dynamic_count": {
+              "type": "revealed_cards",
+              "reference": "previous_reveal"
+            },
             "action": "move_cards",
             "destination": "hand",
-            "source": "discard",
             "card_type": "card",
-            "count": 1
+            "count": 1,
+            "condition": {
+              "text": "公開したカードがコスト9以下のメンバーカードの場合",
+              "location": "revealed_cards",
+              "card_type": "member_card",
+              "operator": "<=",
+              "comparison_type": "cost",
+              "cost_limit": 9,
+              "type": "comparison_condition"
+            }
           },
           {
             "text": "このメンバーはポジションチェンジする",
             "card_type": "member_card",
             "action": "position_change",
-            "target": null
+            "target": null,
+            "condition": {
+              "text": "公開したカードがコスト9以下のメンバーカードの場合",
+              "location": "revealed_cards",
+              "card_type": "member_card",
+              "operator": "<=",
+              "comparison_type": "cost",
+              "cost_limit": 9,
+              "type": "comparison_condition"
+            }
           },
           {
             "text": "それ以外の場合、公開したカードを控え室に置く",
@@ -14118,9 +14140,13 @@
               "type": "otherwise_condition",
               "text": "それ以外の場合"
             },
+            "source": "revealed_cards",
+            "dynamic_count": {
+              "type": "revealed_cards",
+              "reference": "previous_reveal"
+            },
             "destination": "discard",
             "action": "move_cards",
-            "source": "hand",
             "card_type": "card",
             "count": 1
           }
@@ -15813,9 +15839,13 @@
               "text": "公開したカードがメンバーカードで、かつコストが選んだ数以上の場合",
               "card_type": "member_card"
             },
+            "source": "revealed_cards",
+            "dynamic_count": {
+              "type": "revealed_cards",
+              "reference": "previous_reveal"
+            },
             "destination": "hand",
             "action": "move_cards",
-            "source": "discard",
             "card_type": "card",
             "count": 1
           },

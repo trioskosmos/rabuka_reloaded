@@ -404,6 +404,7 @@ SOURCE_PATTERNS: List[Tuple[str, str]] = [
     ("これにより公開されたほかのすべてのカードを", "revealed_remaining"),
     ("これにより公開したカードを", "revealed_cards"),
     ("公開したカードをすべて", "revealed_cards"),
+    ("公開したカードを", "revealed_cards"),
     ("それらのカードの中から", "those_cards"),
     ("そのライブカードを", "those_cards"),
     ("このカードを手札に加えてもよい", "revealed_cards"),

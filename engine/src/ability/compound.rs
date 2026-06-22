@@ -1,3 +1,5 @@
+use super::condition::ConditionContext;
+use super::enums::ConditionType;
 use super::resolver::AbilityResolver;
 use super::types::{AbilityTraceNode, Choice, ExecutionContext, StepOutput, ZoneSnapshot};
 use crate::ability::debug::ABILITY_DEBUG;
@@ -81,9 +83,12 @@ impl AbilityResolver {
                 repeat_max,
                 self.activating_card_id
             );
+            // Track if a preceding conditional step was satisfied, for
+            // if-then-else (otherwise_condition) support.
+            let mut condition_failed: Option<bool> = None;
             for _repeat in 0..repeat_max {
                 let repeats_remaining = repeat_max.saturating_sub(_repeat + 1);
-                for (i, action) in repeat_actions.iter().enumerate() {
+                'action_loop: for (i, action) in repeat_actions.iter().enumerate() {
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
                         eprintln!(
                             "[SEQ_TRACE] _repeat={} i={} action={}",
@@ -97,6 +102,36 @@ impl AbilityResolver {
                         action.condition.is_some(),
                         self.activating_card_id
                     );
+                    // Conditional routing: determine how this step should be
+                    // handled based on preceding condition results.
+                    //
+                    //  • is_otherwise  → skip if condition met, execute if failed
+                    //  • has condition  → evaluate directly (for otherwise routing)
+                    //  • no condition + parent-conditional → skip if preceding failed
+                    let is_otherwise = action.condition.as_ref().and_then(|c| c.condition_type)
+                        == Some(ConditionType::OtherwiseCondition);
+                    if is_otherwise {
+                        match condition_failed {
+                            Some(false) => {
+                                condition_failed = None;
+                                continue 'action_loop;
+                            }
+                            Some(true) => {
+                                condition_failed = None;
+                            }
+                            None => {}
+                        }
+                    } else if condition_failed == Some(true) && action.condition.is_none() {
+                        condition_failed = None;
+                        continue 'action_loop;
+                    } else if action.condition.is_some() && !is_otherwise {
+                        // Evaluate explicit condition directly so subsequent
+                        // otherwise-condition steps know the result.
+                        let ctx = ConditionContext::with_moved_cards(gs, &self.moved_cards);
+                        condition_failed =
+                            Some(!ctx.evaluate_condition(action.condition.as_ref().unwrap()));
+                    }
+
                     let mut action_to_execute = action.clone();
                     // Only inherit per_unit properties for actions that support them
                     // Discard/move_cards actions should not inherit per_unit multipliers
@@ -131,11 +166,27 @@ impl AbilityResolver {
                     // first verb only, but the intent applies to all verbs in
                     // a compound sentence (e.g. EMOTION: "card's score+2 AND
                     // required hearts+3" — both target the card itself).
+                    // Exception: don't inherit when the current action has an
+                    // explicit card_type that differs from the inherited target
+                    // (e.g. modify_score self_target bleeds into gain_resource
+                    // member_card — the live card is not a member on stage).
                     if action_to_execute.self_target.is_none() {
-                        if effect.self_target.is_some() {
-                            action_to_execute.self_target = effect.self_target;
-                        } else if i > 0 {
-                            action_to_execute.self_target = repeat_actions[0].self_target;
+                        let inheritable = if i > 0 {
+                            let first_ct = repeat_actions[0].card_type.as_deref();
+                            let cur_ct = action.card_type.as_deref();
+                            // If the first action targets a live card (no card_type
+                            // or live_card) and the current targets a member, don't
+                            // inherit — they're different cards entirely.
+                            !(first_ct != Some("member_card") && cur_ct == Some("member_card"))
+                        } else {
+                            true
+                        };
+                        if inheritable {
+                            if effect.self_target.is_some() {
+                                action_to_execute.self_target = effect.self_target;
+                            } else if i > 0 {
+                                action_to_execute.self_target = repeat_actions[0].self_target;
+                            }
                         }
                     }
 
@@ -164,6 +215,7 @@ impl AbilityResolver {
                         self.spawn_context.target = Some("opponent".to_string());
                     }
 
+                    let moved_before = self.moved_cards.len();
                     match self.execute_effect(gs, &action_to_execute) {
                         Ok(_) => {
                             if ABILITY_DEBUG.load(Ordering::Relaxed) {
@@ -248,38 +300,15 @@ impl AbilityResolver {
                                 // Optional change_state completed without creating a choice
                                 // (no valid targets). Skip remaining actions (そうした場合).
                                 return Ok(());
-                            } else if conditional
-                                && self.moved_cards.is_empty()
-                                && !self.pending_choice.is_some()
+                            } else if !self.pending_choice.is_some()
+                                && conditional
+                                && action.condition.is_none()
                             {
-                                // Conditional sequential: if the current step moved nothing
-                                // and there's no pending choice, skip remaining actions
-                                // (そうした場合 / このカードを控え室に置く).
-                                return Ok(());
+                                // Parent-conditional sequential: track implicit
+                                // condition via was_moved (old behavior).
+                                let was_moved = self.moved_cards.len() - moved_before;
+                                condition_failed = Some(was_moved == 0);
                             }
-                        }
-                        Err(e) if e.contains("Pending choice required") => {
-                            let current_was_optional = action.optional.unwrap_or(false);
-                            let is_opponent_action = action.action == "opponent_action"
-                                || action.action_by.as_deref() == Some("opponent");
-                            let mut remaining = if current_was_optional
-                                && i + 1 < repeat_actions.len()
-                                && !is_opponent_action
-                            {
-                                let mut actions: Vec<AbilityEffect> = repeat_actions[i..].to_vec();
-                                if !actions.is_empty() {
-                                    actions[0].optional = None;
-                                }
-                                actions
-                            } else {
-                                repeat_actions[i + 1..].to_vec()
-                            };
-                            // Preserve remaining repeats in the pending state
-                            for _ in 0..repeats_remaining {
-                                remaining.extend_from_slice(repeat_actions);
-                            }
-                            save_remaining(gs, remaining);
-                            return Ok(());
                         }
                         Err(e) => return Err(e),
                     }

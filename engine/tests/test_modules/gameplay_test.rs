@@ -3452,3 +3452,47 @@ fn ai_screeam_soreigai_all_members_on_both_sides_gain_blade() {
         "P2 right member should have blade"
     );
 }
+
+/// Rise Up High! (PL!N-bp4-029-L): Turn 1 live start → score +1 and
+/// 虹ヶ咲 member gains blade.
+#[test]
+fn rise_up_high_turn1_score_and_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let live = game.id("PL!N-bp4-029-L");
+    let niji_member = game.id("PL!N-bp1-016-N"); // 朝香果林 (DiverDiva, 虹ヶ咲)
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // 虹ヶ咲 member on stage center
+    game.state.player1.stage.stage = [-1, niji_member, -1];
+
+    // Live card in hand, filler for deck
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(filler);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // Advance to turn 1 live start
+    assert_eq!(game.state.turn_number, 1);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+
+    // Ability should fire: condition checks turn_number == 1
+    // Score +1
+    let live_id = game.state.player1.live_card_zone.cards[0];
+    assert!(
+        game.state.mods.get_score_modifier(live_id) > 0,
+        "Live card should have score +1 on turn 1"
+    );
+
+    // Blade gain on the 虹ヶ咲 member
+    assert!(
+        game.state.mods.get_blade_modifier(niji_member) > 0,
+        "虹ヶ咲 member should have gained blade"
+    );
+}

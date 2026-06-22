@@ -184,7 +184,25 @@ export const ActionButtons = {
             }
         }
 
-        btn.onclick = () => { if (window.doAction && a.index !== undefined) window.doAction(a); };
+        btn.onclick = () => {
+            if (a.action_type === 'select_mulligan') {
+                const params = a.parameters || a.params || {};
+                const handIdx = params.card_index ?? params.card_indices?.[0];
+                if (handIdx !== undefined) {
+                    if (State.localMulliganSelection.has(handIdx)) {
+                        State.localMulliganSelection.delete(handIdx);
+                    } else {
+                        State.localMulliganSelection.add(handIdx);
+                    }
+                    const cardEl = document.getElementById(`my-hand-card-${handIdx}`);
+                    if (cardEl) cardEl.classList.toggle('mulligan-selected');
+                    const thumb = btn.querySelector('.action-card-thumb');
+                    if (thumb) thumb.classList.toggle('mulligan-selected');
+                }
+            } else if (window.doAction && a.index !== undefined) {
+                window.doAction(a);
+            }
+        };
 
         btn.onmouseenter = () => {
             if (window.highlightActionBtn && a.index !== undefined) {

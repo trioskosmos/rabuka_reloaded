@@ -5949,7 +5949,13 @@ def _try_period_conditional(text):
             ce = _try_conditional(full)
             if ce is not None:
                 ca = ce.get("actions", [])
+                cond = ce.get("condition")
                 if ca:
+                    # Propagate condition to each sub-action so conditional
+                    # gating is preserved even when the action is compound.
+                    for sub in ca:
+                        if cond and "condition" not in sub:
+                            sub["condition"] = cond
                     actions.extend(ca)
                 else:
                     # Issue 7: reference_card binding for select→conditional chain
