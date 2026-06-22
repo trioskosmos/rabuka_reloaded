@@ -7,10 +7,31 @@ use crate::helpers::*;
 use rabuka_engine::game_setup::ActionType;
 use rabuka_engine::turn::TurnEngine;
 
+fn heart_mods(game: &TestGame, card: i16) -> [i32; 6] {
+    use rabuka_engine::card::HeartColor;
+    [
+        game.state
+            .mods
+            .get_heart_modifier(card, HeartColor::Heart01),
+        game.state
+            .mods
+            .get_heart_modifier(card, HeartColor::Heart02),
+        game.state
+            .mods
+            .get_heart_modifier(card, HeartColor::Heart03),
+        game.state
+            .mods
+            .get_heart_modifier(card, HeartColor::Heart04),
+        game.state
+            .mods
+            .get_heart_modifier(card, HeartColor::Heart05),
+        game.state
+            .mods
+            .get_heart_modifier(card, HeartColor::Heart06),
+    ]
+}
+
 /// Test ability activation: pay 2E + draw 1 card
-/// Note: The self-discard cost mechanism requires self_cost flag on the parsed cost,
-/// which the current parser may not emit for this card. Cost resolution still succeeds
-/// (energy is paid, effect resolves) but the hand card may not be discarded.
 #[test]
 fn shizuku_q196_draw_after_discard_cost() {
     let db = load_real_database();
@@ -44,13 +65,11 @@ fn shizuku_q196_draw_after_discard_cost() {
         game.select_indices(&[0]);
     }
 
-    // Energy cost paid (15-2=13)
     assert_eq!(
         game.state.player1.energy_zone.active_energy_count, 13,
         "2 energy should have been paid (15-2=13)"
     );
 
-    // Card drawn from deck
     assert_eq!(
         game.state.player1.main_deck.cards.len(),
         deck_before - 1,
@@ -84,23 +103,20 @@ fn shizuku_q196_needs_hand_activation() {
 }
 
 /// Test ab#1 LiveStart: pay 1E → choose heart04 → gain +1 heart04 (additive).
+/// Base hearts: heart04=1, heart05=3. After ability: heart04=1+1, heart05=3+0.
 #[test]
 fn shizuku_bp1_live_start_gains_chosen_heart() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    // PL!N-bp1-003-R＋ has ab#0 (debut) and ab#1 (LiveStart).
-    // Base hearts: heart04=1, heart05=3.
     let shizuku = game.id("PL!N-bp1-003-R＋");
     let filler = game.id("PL!-sd1-010-SD");
     let live_card = game.id("PL!-sd1-020-SD");
 
-    // Play to stage first (cost=10, need 10 energy)
     game.state.player1.stage.stage = [-1, shizuku, -1];
     game.state.player1.hand.cards.push(live_card);
     game.state.player1.hand.cards.push(filler);
     game.give_energy(20);
-    // Set up deck for draw phase
     game.state.player1.main_deck.cards.clear();
     for _ in 0..30 {
         game.state.player1.main_deck.cards.push(filler);
@@ -110,46 +126,48 @@ fn shizuku_bp1_live_start_gains_chosen_heart() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    // Advance through phases to LiveStart trigger
     game.pass();
     game.pass();
     game.pass();
     game.pass();
     game.pass();
 
-    // Set live card (phase requires it)
     game.set_live_card(live_card);
 
+    let before = heart_mods(&game, shizuku);
+    eprintln!(
+        "[BEFORE] total: 01={} 02={} 03={} 04={} 05={} 06={}",
+        before[0],
+        before[1],
+        before[2],
+        1 + before[3],
+        3 + before[4],
+        before[5]
+    );
+
     game.pass();
     game.pass();
 
-    // At live start, the optional energy cost choice should appear.
-    // Pay 1E (SelectTarget choice — use select_option(1) for "Pay").
     if game.has_pending_choice() {
         game.select_option(1);
     }
-
-    // After cost is paid, the specify_heart_color action runs.
-    // The heart color selection choice should now appear.
     assert!(
         game.has_pending_choice(),
         "heart color selection should be pending"
     );
+    game.select_option(4);
 
-    // Select heart04 (option index 3).
-    game.select_option(3);
+    let after = heart_mods(&game, shizuku);
+    eprintln!(
+        "[AFTER]  total: 01={} 02={} 03={} 04={} 05={} 06={}",
+        after[0],
+        after[1],
+        after[2],
+        1 + after[3],
+        3 + after[4],
+        after[5]
+    );
 
-    // Check heart modifiers: heart04 should have +1 (additive)
-    let heart04_mod = game
-        .state
-        .mods
-        .get_heart_modifier(shizuku, rabuka_engine::card::HeartColor::Heart04);
-    assert_eq!(heart04_mod, 1, "should gain +1 of chosen heart04");
-
-    // heart05 should be unchanged (no modifier)
-    let heart05_mod = game
-        .state
-        .mods
-        .get_heart_modifier(shizuku, rabuka_engine::card::HeartColor::Heart05);
-    assert_eq!(heart05_mod, 0, "heart05 should not be modified");
+    assert_eq!(after[3], 1, "heart04 should have +1 modifier");
+    assert_eq!(after[4], 0, "heart05 should have 0 modifier");
 }
