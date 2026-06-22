@@ -1068,6 +1068,8 @@ impl AbilityEffect {
             } else {
                 Some(&self.card_names)
             },
+            card_property: self.card_property.as_deref(),
+            negation: self.negation.unwrap_or(false),
             ..Default::default()
         }
     }

@@ -101,7 +101,13 @@ impl GameState {
                                                     effect.state.as_deref(),
                                                     &self.mods.orientation_modifiers,
                                                 );
-                                            let base = effect.resource_icon_count.unwrap_or(1);
+                                            let base = if effect.max.unwrap_or(false) {
+                                                1
+                                            } else {
+                                                effect
+                                                    .resource_icon_count
+                                                    .unwrap_or(effect.count.unwrap_or(1))
+                                            };
                                             let mut units = per_count as i32
                                                 / effect.per_unit_count.unwrap_or(1).max(1) as i32;
                                             if effect.max.unwrap_or(false) {
@@ -480,7 +486,13 @@ impl GameState {
                             effect.state.as_deref(),
                             &self.mods.orientation_modifiers,
                         );
-                        let base = effect.resource_icon_count.unwrap_or(1);
+                        let base = if effect.max.unwrap_or(false) {
+                            1
+                        } else {
+                            effect
+                                .resource_icon_count
+                                .unwrap_or(effect.count.unwrap_or(1))
+                        };
                         let mut units =
                             per_count as i32 / effect.per_unit_count.unwrap_or(1).max(1) as i32;
                         if effect.max.unwrap_or(false) {

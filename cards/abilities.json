@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-22T22:35:21.842047",
+  "generated_at": "2026-06-22T23:21:34.061179",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -18167,18 +18167,47 @@
       "cost": null,
       "effect": {
         "text": "バトンタッチして登場した場合、このバトンタッチによって控え室に置かれた『Liella!』のメンバーカード1枚につき、カードを1枚引く。ブレードハートを持たない『Liella!』のメンバーカード1枚につき、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
-        "duration": "live_end",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "カードを1枚引く",
+            "count": 1,
+            "action": "draw_card",
+            "source": "deck",
+            "destination": "hand",
+            "per_unit": true,
+            "per_unit_count": 1,
+            "per_unit_type": "discard",
+            "card_type": "member_card",
+            "group_names": [
+              "Liella!"
+            ]
+          },
+          {
+            "text": "ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+            "duration": "live_end",
+            "per_unit": true,
+            "per_unit_count": 1,
+            "per_unit_type": "discard",
+            "card_type": "member_card",
+            "card_property": "has_blade_heart",
+            "negation": true,
+            "action": "gain_resource",
+            "resource": "blade",
+            "count": 2,
+            "dynamic_count": {
+              "type": "per_unit",
+              "reference": "unit_count"
+            },
+            "group_names": [
+              "Liella!"
+            ]
+          }
+        ],
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "枚",
+        "per_unit_type": "discard",
         "card_type": "member_card",
-        "action": "gain_resource",
-        "resource": "blade",
-        "count": 2,
-        "dynamic_count": {
-          "type": "per_unit",
-          "reference": "unit_count"
-        },
         "group_names": [
           "Liella!"
         ],
@@ -18573,7 +18602,9 @@
         "group_names": [
           "Liella!"
         ],
-        "target": "self"
+        "target": "self",
+        "card_property": "has_blade_heart",
+        "negation": true
       }
     },
     {

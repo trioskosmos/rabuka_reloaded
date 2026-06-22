@@ -676,7 +676,12 @@ impl AbilityResolver {
                 if let Some(cap) = effect.repeat_limit {
                     units = units.min(cap);
                 }
-                units * effect.resource_icon_count.unwrap_or(1)
+                let per_unit_base = if effect.max.unwrap_or(false) {
+                    1
+                } else {
+                    effect.resource_icon_count.unwrap_or(effect.count_or(1))
+                };
+                units * per_unit_base
             } else {
                 count
             };

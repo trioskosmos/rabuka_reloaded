@@ -2753,6 +2753,29 @@ def parse_action(text: str) -> Dict[str, Any]:
     # Strip parenthetical notes first (before any other processing)
     text = strip_parenthetical(text)
 
+    # If text has "。" before the first "につき", the per-unit reference
+    # belongs to a later sentence. Split into sequential first so the
+    # earlier sentence (e.g. draw effect) isn't consumed by the per-unit match.
+    if "。" in text and PER_UNIT_MARKER in text:
+        first_period = text.find("。")
+        first_perunit = text.find("につき")
+        if 0 <= first_period < first_perunit:
+            parts = [t.strip().rstrip("。") for t in text.split("。") if t.strip()]
+            actions = [parse_action(p) for p in parts]
+            # When the first action counts from discard (e.g. "replaced by baton touch
+            # → placed in waitroom"), and a subsequent action has a per-unit type that
+            # came from generic keyword matching ("メンバー" → "member"), inherit the
+            # discard type. Both sentences refer to the same set of cards.
+            if actions and actions[0].get("per_unit_type") in ("discard",):
+                proto_type = actions[0]["per_unit_type"]
+                for sub in actions[1:]:
+                    if sub.get("per_unit") and sub.get("per_unit_type") in (
+                        "member",
+                        "枚",
+                    ):
+                        sub["per_unit_type"] = proto_type
+            return {"text": text, "action": "sequential", "actions": actions}
+
     per_unit_info = None
     # Check for per-unit scaling (e.g., "メンバー1人につき") - CHECK THIS FIRST before any text splitting
     if PER_UNIT_MARKER in text:
@@ -2797,6 +2820,12 @@ def parse_action(text: str) -> Dict[str, Any]:
                 per_unit_info["card_type"] = "energy_card"
             elif "メンバーカード" in per_unit_text:
                 per_unit_info["card_type"] = "member_card"
+            # Extract card_property from per_unit source text
+            if "ブレードハートを持たない" in per_unit_text:
+                per_unit_info["card_property"] = "has_blade_heart"
+                per_unit_info["negation"] = True
+            elif "ブレードハートを持つ" in per_unit_text:
+                per_unit_info["card_property"] = "has_blade_heart"
             # Infer action from text
             if "ブレードを得る" in text or "選んだブレード" in text:
                 per_unit_info["action"] = "gain_resource"
@@ -2805,6 +2834,7 @@ def parse_action(text: str) -> Dict[str, Any]:
                 icon_count = text.count("{{icon_blade.png|ブレード}}")
                 if icon_count > 0:
                     per_unit_info["count"] = icon_count
+                    per_unit_info["resource_icon_count"] = icon_count
                 # Set duration if present
                 if "ライブ終了時まで" in text:
                     per_unit_info["duration"] = "live_end"
@@ -4325,8 +4355,8 @@ def _try_per_unit(text):
                 result["per_unit_type"] = t
                 break
 
-    # "これにより控え室に置いた" = placed in waitroom by this cost → count in discard
-    if "控え室に置いた" in per_text:
+    # "控え室に置いた" (active) / "控え室に置かれた" (passive) = placed in waitroom → count in discard
+    if "控え室に置" in per_text:
         result["per_unit_type"] = "discard"
 
     # Check for excluded groups: 『group』以外
@@ -4340,6 +4370,13 @@ def _try_per_unit(text):
         result["group_names"] = [gm.group(1)]
     if "名前の異なる" in per_text or "カード名の異なる" in per_text:
         result["distinct"] = "card_name"
+
+    # Extract card_property from per_text (e.g. "ブレードハートを持たない")
+    if "ブレードハートを持たない" in per_text:
+        result["card_property"] = "has_blade_heart"
+        result["negation"] = True
+    elif "ブレードハートを持つ" in per_text:
+        result["card_property"] = "has_blade_heart"
 
     # Extract exclude_self from per_text (self-referential "other" patterns)
     if (
@@ -4434,6 +4471,57 @@ def _try_per_unit(text):
 
     action = parse_action(action_text)
     _propagate(result, action)
+    # Propagate resource_icon_count from the parsed action back to result,
+    # so it reaches sub-actions via the sequential propagation below.
+    if (
+        "resource_icon_count" not in result
+        and action.get("count")
+        and action.get("action") in ("gain_resource", "gain_heart")
+    ):
+        result["resource_icon_count"] = action["count"]
+    # When action is a sequential, propagate per-unit config into each sub-action
+    # so the engine can resolve per-unit counts for each sub-action individually.
+    # Exclude condition — it should remain on the sequential wrapper only.
+    if action.get("action") == "sequential":
+        first_put = None
+        for sub in action.get("actions", []):
+            for k in (
+                "per_unit",
+                "per_unit_count",
+                "per_unit_type",
+                "card_type",
+                "group_names",
+                "exclude_group_names",
+                "distinct",
+                "timing_condition",
+                "state",
+                "location",
+                "cost_limit",
+                "cost_limit_operator",
+                "duration",
+                "target",
+                "exclude_self",
+                "card_property",
+                "negation",
+                "resource_icon_count",
+            ):
+                if k in result and k not in sub:
+                    sub[k] = result[k]
+            if first_put is None and sub.get("per_unit_type"):
+                first_put = sub
+        # When the first per-unit sub-action counts from discard (e.g. replaced by
+        # baton touch → placed in waitroom), propagate to subsequent per-unit
+        # sub-actions that only have a generic ("member"/"枚") per_unit_type.
+        # Both sub-effects refer to the same set of cards.
+        if first_put and first_put.get("per_unit_type") in ("discard",):
+            proto_type = first_put["per_unit_type"]
+            for sub in action.get("actions", []):
+                if (
+                    sub is not first_put
+                    and sub.get("per_unit")
+                    and sub.get("per_unit_type") in ("member", "枚")
+                ):
+                    sub["per_unit_type"] = proto_type
 
     # Detect cost reduction per unit patterns (コストが～につき～少なくなる/減る)
     if (
@@ -4503,6 +4591,9 @@ def _propagate(src, dst):
         "condition",
         "target",
         "exclude_self",
+        "card_property",
+        "negation",
+        "resource_icon_count",
     ):
         if k in src:
             dst[k] = src[k]

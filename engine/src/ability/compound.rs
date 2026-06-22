@@ -45,14 +45,12 @@ impl AbilityResolver {
         // ability's outputs never leak in.
         self.step_state.clear();
 
-        let cond_met = if conditional {
+        let cond_met = {
             let ctx = super::condition::ConditionContext::new(gs);
             effect
                 .condition
                 .as_ref()
                 .is_none_or(|c| ctx.evaluate_condition(c))
-        } else {
-            true
         };
         if !cond_met {
             return Ok(());

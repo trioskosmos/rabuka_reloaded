@@ -24,6 +24,7 @@ pub mod chika_test;
 pub mod chisato_bp5_test;
 pub mod chisato_jidou_move_analysis_test;
 pub mod chisato_move_test;
+pub mod chisato_natsumi_test;
 pub mod chisato_test;
 pub mod choice_bullet_test;
 pub mod condition_negative_test;
