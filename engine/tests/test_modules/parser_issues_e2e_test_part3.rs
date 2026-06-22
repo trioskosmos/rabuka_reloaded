@@ -211,10 +211,343 @@ fn issue9_karin_select_from_discard_place_on_deck() {
         }
     }
 
+    // hand = hand_before + 1 (live start rule draw + ab#0 draw, minus live card removal)
     assert_eq!(
         game.state.player1.hand.cards.len(),
-        hand_before,
+        hand_before + 1,
         "9: hand unchanged (cards from discard via selected_cards, not from hand)"
+    );
+}
+
+// ====================================================================
+// Helper: drain all pending choices with safety limit.
+// ====================================================================
+
+fn drain_choices(game: &mut TestGame) {
+    let mut safety = 0;
+    while game.has_pending_choice() && safety < 30 {
+        safety += 1;
+        if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
+            game.select_indices(&[]);
+        } else {
+            game.select_indices(&[]); // skip all other choices
+        }
+    }
+}
+
+// ====================================================================
+// Karin ab#1 edge case: opponent has 0 waited members → select 0 cards.
+// ====================================================================
+
+#[test]
+fn karin_edge_0_waited_members() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let karin = game.id("PL!N-bp4-004-R\u{ff0b}");
+    let live = game.id("PL!-sd1-019-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+    let niji = game.id("PL!N-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = karin;
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(filler);
+    game.add_to_discard(niji);
+    fill_decks(&mut game);
+    let waitroom_before = game.state.player1.waitroom.cards.len();
+    let deck_after_fill = game.state.player1.main_deck.cards.len();
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+    drain_choices(&mut game);
+
+    // 0 waited → select 0 → nothing moved from waitroom
+    // Deck: 20 - 1 (ab#0 draw) = 19
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        waitroom_before,
+        "0 wait: waitroom unchanged"
+    );
+    assert!(
+        game.state.player1.main_deck.cards.len() < deck_after_fill,
+        "0 wait: deck decreased by draws (no placement)"
+    );
+}
+
+// ====================================================================
+// Helper: drain choices by selecting index 0 for any non-auto choice.
+// Use for tests that need actual card selection from discard.
+// ====================================================================
+
+fn drain_with_select_first(game: &mut TestGame) {
+    let mut safety = 0;
+    while game.has_pending_choice() && safety < 30 {
+        safety += 1;
+        if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
+            game.select_indices(&[]);
+        } else {
+            game.select_indices(&[0]);
+        }
+    }
+}
+
+// ====================================================================
+// Karin ab#1 edge case: 1 waited member, 1 Nijigasaki in discard.
+// ====================================================================
+
+#[test]
+fn karin_edge_1_waited_1_niji_in_discard() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let karin = game.id("PL!N-bp4-004-R\u{ff0b}");
+    let live = game.id("PL!-sd1-019-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+    let niji = game.id("PL!N-sd1-010-SD");
+    let opp_member = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = karin;
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(filler);
+    game.add_to_discard(niji);
+
+    game.state.player2.stage.stage[0] = opp_member;
+    game.state.mods.add_orientation_modifier(opp_member, "wait");
+
+    fill_decks(&mut game);
+    let waitroom_before = game.state.player1.waitroom.cards.len();
+    let deck_after_fill = game.state.player1.main_deck.cards.len();
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+    drain_with_select_first(&mut game);
+
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        waitroom_before - 1,
+        "1 wait: waitroom lost 1 card"
+    );
+    assert!(
+        game.state.player1.main_deck.cards[0] == niji,
+        "1 wait: selected card on deck top"
+    );
+}
+
+// ====================================================================
+// Karin ab#1 edge case: 3 waited members, only 1 Nijigasaki in discard.
+// ====================================================================
+
+#[test]
+fn karin_edge_3_waited_1_niji_available() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let karin = game.id("PL!N-bp4-004-R\u{ff0b}");
+    let live = game.id("PL!-sd1-019-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+    let niji = game.id("PL!N-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = karin;
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(filler);
+    game.add_to_discard(niji);
+
+    for i in 0..3 {
+        let m = game.id("PL!-sd1-010-SD");
+        game.state.player2.stage.stage[i] = m;
+        game.state.mods.add_orientation_modifier(m, "wait");
+    }
+
+    fill_decks(&mut game);
+    let waitroom_before = game.state.player1.waitroom.cards.len();
+    let deck_after_fill = game.state.player1.main_deck.cards.len();
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+    drain_with_select_first(&mut game);
+
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        waitroom_before - 1,
+        "3 wait/1 avail: waitroom lost 1 card"
+    );
+    assert!(
+        game.state.player1.main_deck.cards[0] == niji,
+        "3 wait/1 avail: selected card on deck top"
+    );
+}
+
+// ====================================================================
+// Karin ab#1 edge case: 2 waited members, 2 Nijigasaki in discard.
+// Select 2 cards → both on deck top in any order.
+// ====================================================================
+
+#[test]
+fn karin_edge_2_waited_2_niji_select_both() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let karin = game.id("PL!N-bp4-004-R\u{ff0b}");
+    let live = game.id("PL!-sd1-019-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+    let niji1 = game.id("PL!N-sd1-010-SD");
+    let niji2 = game.id("PL!N-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = karin;
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(filler);
+    game.add_to_discard(niji1);
+    game.add_to_discard(niji2);
+
+    for i in 0..2 {
+        let m = game.id("PL!-sd1-010-SD");
+        game.state.player2.stage.stage[i] = m;
+        game.state.mods.add_orientation_modifier(m, "wait");
+    }
+
+    fill_decks(&mut game);
+    let waitroom_before = game.state.player1.waitroom.cards.len();
+    let deck_after_fill = game.state.player1.main_deck.cards.len();
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+
+    let mut safety = 0;
+    while game.has_pending_choice() && safety < 30 {
+        safety += 1;
+        if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
+            game.select_indices(&[]);
+        } else {
+            game.select_indices(&[0, 1]);
+        }
+    }
+
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        waitroom_before - 2,
+        "2 wait: waitroom lost 2 cards"
+    );
+}
+
+// ====================================================================
+// Karin ab#1 edge case: non-Nijigasaki cards in discard are NOT selectable.
+// ====================================================================
+
+#[test]
+fn karin_edge_non_niji_not_selectable() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let karin = game.id("PL!N-bp4-004-R\u{ff0b}");
+    let live = game.id("PL!-sd1-019-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+    let non_niji = game.id("PL!SP-sd1-001-SD");
+    let opp_member = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = karin;
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(filler);
+    game.add_to_discard(non_niji);
+
+    game.state.player2.stage.stage[0] = opp_member;
+    game.state.mods.add_orientation_modifier(opp_member, "wait");
+
+    fill_decks(&mut game);
+    let waitroom_before = game.state.player1.waitroom.cards.len();
+    let deck_after_fill = game.state.player1.main_deck.cards.len();
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+    drain_choices(&mut game);
+
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        waitroom_before,
+        "non-niji: waitroom unchanged"
+    );
+}
+
+// ====================================================================
+// Karin ab#1 edge case: opponent's waitroom is NOT used as source.
+// ====================================================================
+
+#[test]
+fn karin_edge_not_opponent_waitroom() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let karin = game.id("PL!N-bp4-004-R\u{ff0b}");
+    let live = game.id("PL!-sd1-019-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+    let niji = game.id("PL!N-sd1-010-SD");
+    let opp_member = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = karin;
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(filler);
+    game.add_to_discard(niji);
+    game.state.player2.waitroom.cards.push(niji);
+
+    game.state.player2.stage.stage[0] = opp_member;
+    game.state.mods.add_orientation_modifier(opp_member, "wait");
+
+    fill_decks(&mut game);
+    let p1_waitroom_before = game.state.player1.waitroom.cards.len();
+    let p2_waitroom_before = game.state.player2.waitroom.cards.len();
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+    drain_with_select_first(&mut game);
+
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        p1_waitroom_before - 1,
+        "target=self: P1 waitroom lost 1 card"
+    );
+    assert_eq!(
+        game.state.player2.waitroom.cards.len(),
+        p2_waitroom_before,
+        "target=self: P2 waitroom unchanged"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards[0], niji,
+        "target=self: card on P1 deck top"
+    );
+}
+
+// ====================================================================
+// Karin ab#1 edge case: hand is NOT affected by the select+move.
+// ====================================================================
+
+#[test]
+fn karin_edge_hand_unchanged() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let karin = game.id("PL!N-bp4-004-R\u{ff0b}");
+    let live = game.id("PL!-sd1-019-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+    let niji = game.id("PL!N-sd1-010-SD");
+    let opp_member = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = karin;
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(filler);
+    game.add_to_discard(niji);
+
+    game.state.player2.stage.stage[0] = opp_member;
+    game.state.mods.add_orientation_modifier(opp_member, "wait");
+
+    fill_decks(&mut game);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+    drain_with_select_first(&mut game);
+
+    // Hand = hand_before(2) + 1 (draw) = 3; select+move does NOT touch hand
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        3,
+        "hand unchanged by select+move"
     );
 }
 

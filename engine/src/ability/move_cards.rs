@@ -1154,8 +1154,12 @@ impl AbilityResolver {
         )?;
 
         // --- STEP 2: Any-order deck placement (before consuming taken) ---
-        if Zone::from_str(&source) == Some(Zone::Discard)
-            && Zone::from_str(&destination) == Some(Zone::Deck)
+        let is_deck_dest = Zone::from_str(&destination) == Some(Zone::Deck)
+            || Zone::from_str(&destination) == Some(Zone::DeckTop);
+        let is_eligible_source = Zone::from_str(&source) == Some(Zone::Discard)
+            || Zone::from_str(&source) == Some(Zone::SelectedCards);
+        if is_eligible_source
+            && is_deck_dest
             && effect.placement_order.as_deref() == Some("any_order")
             && taken.len() > 1
         {

@@ -238,13 +238,14 @@ fn issue3_karin_live_start_draw_card() {
         safety += 1;
     }
 
-    // Ab#0 draws 1 → hand = hand_before (lost live + drew 1)
+    // Ab#0 draws 1, live start rule draw compensates live card removal.
+    // Ab#1 (select from discard → deck_top) does not affect hand.
     assert_eq!(
         game.state.player1.hand.cards.len(),
-        hand_before,
-        "3: hand = hand_before (draw 1), got {} vs {}",
+        hand_before + 1,
+        "3: hand = hand_before + 1 (draw ability + live start rule), got {} vs {}",
         game.state.player1.hand.cards.len(),
-        hand_before
+        hand_before + 1
     );
     assert!(
         game.state.player1.stage.stage.contains(&karin),

@@ -455,9 +455,14 @@ impl AbilityResolver {
             .current_effect
             .as_ref()
             .is_some_and(|e| e.optional.unwrap_or(false));
-        if gs.looked_at_cards.len() < count as usize {
-            return Ok(()); // Not enough distinct cards — skip silently
+        if count == 0 {
+            return Ok(()); // Up to 0 cards to select — skip
         }
+        if gs.looked_at_cards.is_empty() {
+            return Ok(()); // No matching cards at all — skip silently
+        }
+        // Cap count to available cards (handles max-mode where count > available)
+        let count = count.min(gs.looked_at_cards.len() as u32);
         // Compute filtered stage indices: map looked_at_cards back to stage positions.
         // This ensures handle_select_card looks up the right card when exclude_selected
         // or other filters shift which cards are available.

@@ -2386,6 +2386,8 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
             # "それらのカード" refers to cards from a preceding reveal/yell
             if "それらのカード" in text:
                 action["source"] = "revealed_cards"
+            elif "それら" in text:
+                action["source"] = "selected_cards"
             elif dest in ("deck_top", "deck_bottom", "deck"):
                 if "メンバー" not in text:
                     action["source"] = "hand"
@@ -2613,16 +2615,39 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
 
     if "optional" not in action and extract_optional(text):
         action["optional"] = True
-    # Infer source for select actions from common location patterns
+    # Infer source for select actions from common location patterns.
+    # When multiple zones appear in text (e.g. count reference mentions stage
+    # but actual selection is from waiting room), prefer the selection source.
     if a == "select" and "source" not in action:
-        if "ステージにいる" in text or "ステージの" in text:
-            action["source"] = "stage"
-        elif "控え室にある" in text or "控え室の" in text:
+        if "控え室にある" in text or "控え室の" in text:
             action["source"] = "discard"
         elif "手札の" in text or "手札にある" in text:
             action["source"] = "hand"
+        elif "ステージにいる" in text or "ステージの" in text:
+            action["source"] = "stage"
         elif "ライブ中の" in text or "ライブカード置き場" in text:
             action["source"] = "live_card_zone"
+    # Fix target for select actions: when both "自分の" and "相手の" appear in text
+    # (e.g., count reference mentions opponent but selection is from your waiting room),
+    # extract_target may incorrectly return "both". Override to the correct player
+    # based on the source zone's owner.
+    if a == "select" and action.get("target") == "both":
+        src = action.get("source", "")
+        if src == "discard":
+            if "自分の控え室" in text and "相手の控え室" not in text:
+                action["target"] = "self"
+            elif "相手の控え室" in text and "自分の控え室" not in text:
+                action["target"] = "opponent"
+        elif src == "stage":
+            if "自分のステージ" in text and "相手のステージ" not in text:
+                action["target"] = "self"
+            elif "相手のステージ" in text and "自分のステージ" not in text:
+                action["target"] = "opponent"
+        elif src == "hand":
+            if "自分の手札" in text and "相手の手札" not in text:
+                action["target"] = "self"
+            elif "相手の手札" in text and "自分の手札" not in text:
+                action["target"] = "opponent"
     if "max" not in action and extract_max(text):
         action["max"] = True
     if "好きな枚数" in text or "好きな枚数まで" in text or "任意の枚数" in text:
@@ -7958,26 +7983,24 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
 def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
     """Post-process already-parsed abilities: infer actions, apply targeted fixes."""
 
-    # Post-processing: infer action for any effect with empty action
+    # Post-processing: infer action for any effect with empty action,
+    # plus apply sequential action chaining fixes for ALL abilities
     for ability in data["unique_abilities"]:
         eff = ability.get("effect")
         if not isinstance(eff, dict):
             continue
-        if eff.get("action"):
-            continue
-        # source + destination → move_cards
-        if eff.get("source") and eff.get("destination"):
-            eff["action"] = "move_cards"
-        # actions array → sequential
-        elif eff.get("actions"):
-            eff["action"] = "sequential"
-        # opponent_action wrapper
-        elif eff.get("opponent_action"):
-            eff["action"] = "opponent_action"
-        # per_unit + draw → set default count
-        if eff.get("per_unit") and eff.get("action") in ("draw", "draw_card"):
-            if eff.get("count") is None:
-                eff["count"] = 1
+        # --- Action inference (only for abilities without an action set) ---
+        if not eff.get("action"):
+            # source + destination → move_cards
+            if eff.get("source") and eff.get("destination"):
+                eff["action"] = "move_cards"
+            # actions array → sequential
+            elif eff.get("actions"):
+                eff["action"] = "sequential"
+            # opponent_action wrapper
+            elif eff.get("opponent_action"):
+                eff["action"] = "opponent_action"
+        # --- Universal fixes (apply to ALL abilities) ---
         # Fix nested actions: ensure each sub-action has card_type propagated
         if eff.get("action") == "sequential":
             parent_card_type = eff.get("card_type")
@@ -7999,16 +8022,16 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 if not isinstance(sub, dict):
                     prev_was_select = False
                     continue
-                if sub.get("action") in ("select_cards", "look_and_select"):
+                if sub.get("action") in ("select_cards", "look_and_select", "select"):
                     prev_was_select = True
                 elif sub.get("action") == "move_cards" and prev_was_select:
                     if sub.get("source") != "selected_cards":
                         sub["source"] = "selected_cards"
-                        # Remove hardcoded count; it's dynamic from selection
-                        if sub.get("count") is not None and "count" not in sub.get(
-                            "text", ""
-                        ):
-                            sub.pop("count", None)
+                    # Remove hardcoded count; it's dynamic from selection
+                    if sub.get("count") is not None and "count" not in sub.get(
+                        "text", ""
+                    ):
+                        sub.pop("count", None)
                     prev_was_select = False
                 else:
                     prev_was_select = False

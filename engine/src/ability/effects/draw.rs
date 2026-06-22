@@ -295,15 +295,23 @@ impl AbilityResolver {
                 return Ok(());
             }
         }
-        let source = if effect.card_type.as_deref() == Some("member_card") {
-            Zone::Stage.to_str()
+        let source =
+            if effect.card_type.as_deref() == Some("member_card") && effect.source.is_none() {
+                Zone::Stage.to_str()
+            } else {
+                effect.source_or(Zone::Hand.to_str())
+            };
+        let count = if let Some(c) = effect.count {
+            c
+        } else if let Some(ref dc) = effect.dynamic_count {
+            self.resolve_dynamic_count(gs, dc)
         } else {
-            effect.source_or(Zone::Hand.to_str())
+            1
         };
         self.execute_select(
             gs,
             source,
-            effect.count_or(1),
+            count,
             effect.target_name(),
             effect.card_type.as_deref(),
             effect.distinct.as_deref(),

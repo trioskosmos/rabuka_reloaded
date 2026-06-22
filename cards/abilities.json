@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-22T17:23:28.242197",
+  "generated_at": "2026-06-22T18:09:24.599306",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -2934,14 +2934,14 @@
         "actions": [
           {
             "text": "相手のステージにいるウェイト状態のメンバーの数まで、自分の控え室にある『虹ヶ咲』のメンバーカードを選ぶ",
-            "source": "stage",
+            "source": "discard",
             "dynamic_count": {
               "type": "dynamic_count",
               "reference": "相手のステージにいるウェイト状態のメンバー",
               "mode": "max"
             },
             "card_type": "member_card",
-            "target": "both",
+            "target": "self",
             "group_names": [
               "虹ヶ咲"
             ],
@@ -2952,9 +2952,8 @@
             "destination": "deck_top",
             "placement_order": "any_order",
             "action": "move_cards",
-            "source": "hand",
-            "card_type": "card",
-            "count": 1
+            "source": "selected_cards",
+            "card_type": "card"
           }
         ],
         "group_names": [
@@ -26179,7 +26178,7 @@
       "cost": null,
       "effect": {
         "text": "自分の控え室にある、自分のステージにいるすべてのメンバーと異なるグループ名を持つカード1枚を手札に加える",
-        "source": "stage",
+        "source": "discard",
         "destination": "hand",
         "card_type": "member_card",
         "target": "self",
@@ -28085,7 +28084,7 @@
             "destination": "deck_top",
             "placement_order": "any_order",
             "action": "move_cards",
-            "source": "hand",
+            "source": "selected_cards",
             "card_type": "card",
             "count": 1
           }
