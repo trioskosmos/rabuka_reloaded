@@ -542,8 +542,11 @@ export const CardRenderer = {
                         }
                         const cardEl = document.getElementById(`${containerId}-card-${handIdx}`);
                         if (cardEl) cardEl.classList.toggle('mulligan-selected');
-                        const actionThumb = document.querySelector(`.action-btn[data-card-index="${handIdx}"] .action-card-thumb`);
-                        if (actionThumb) actionThumb.classList.toggle('mulligan-selected');
+                        const mBtn = State.mulliganButtons.get(handIdx);
+                        if (mBtn) {
+                            const thumb = mBtn.querySelector('.action-card-thumb');
+                            if (thumb) thumb.classList.toggle('mulligan-selected');
+                        }
                     }
                     return;
                 }
@@ -572,12 +575,14 @@ export const CardRenderer = {
                 CardRenderer.updateCardDOM(existingChild, viewModel, card, onClick);
                 existingChild.id = `${containerId}-card-${idx}`;
                 existingChild.dataset.cardKey = cardKey;
+                CardRenderer.renderCardBonuses(existingChild, card, true);
             } else {
                 // New card — create DOM with enter animation
                 const cardEl = CardRenderer.createCardDOM(viewModel, card, onClick);
                 cardEl.id = `${containerId}-card-${idx}`;
                 cardEl.dataset.cardKey = cardKey;
                 cardEl.classList.add('card-enter');
+                CardRenderer.renderCardBonuses(cardEl, card, true);
                 if (childAtPos) el.replaceChild(cardEl, childAtPos);
                 else el.appendChild(cardEl);
                 // Kick off enter animation on next frame
@@ -819,6 +824,10 @@ export const CardRenderer = {
                 if (isValid) slot.setAttribute('data-action-id', action.index);
                 else slot.removeAttribute('data-action-id');
 
+                if (!isCardHidden) {
+                    CardRenderer.renderCardBonuses(slot, card, true);
+                }
+
                 if (isValid) {
                     slot.style.cursor = 'pointer';
                     slot.onclick = () => { if (window.doAction) window.doAction(action); };
@@ -995,12 +1004,13 @@ export const CardRenderer = {
             // Explicitly set class and ID for the item
             cardEl.classList.add('looked-card-item');
             cardEl.id = `looked-card-${idx}`;
+            CardRenderer.renderCardBonuses(cardEl, c, true);
             
             content.appendChild(cardEl);
         });
     },
 
-    renderCardBonuses: (slotEl, card) => {
+    renderCardBonuses: (slotEl, card, overlay = false) => {
         if (!card) return;
         let existing = slotEl.querySelector('.card-bonuses');
         if (existing) existing.remove();
@@ -1035,7 +1045,7 @@ export const CardRenderer = {
         if (bonuses.length === 0) return;
 
         const container = document.createElement('div');
-        container.className = 'card-bonuses';
+        container.className = 'card-bonuses' + (overlay ? ' overlay' : '');
 
         bonuses.forEach(b => {
             const badge = document.createElement('div');

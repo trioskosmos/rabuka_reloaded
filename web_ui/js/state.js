@@ -65,6 +65,9 @@ const stateInternal = {
     capturedErrors: [],
     hoveredActionId: null,
     localMulliganSelection: new Set(),
+    // Maps card_index → button element for mulligan action thumbnails.
+    // Populated by ActionButtons.js, consumed by CardRenderer.js.
+    mulliganButtons: new Map(),
     lastMulliganCards: [],
     showMulliganReturn: false,
 

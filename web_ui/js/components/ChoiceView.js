@@ -324,6 +324,7 @@ export const ChoiceView = {
                             ImageLoader.loadImage(img, imgSrc);
                             cardEl.appendChild(imgWrap);
                         }
+                        Tooltips.attachCardData(cardEl, cardData);
                     }
                     const textWrap = document.createElement('div');
                     textWrap.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;';

@@ -282,6 +282,7 @@ export const Rendering = {
             const cardEl = CardRenderer.createCardDOM(viewModel, c, () => {
                 if (window.doAction) window.doAction(action);
             });
+            CardRenderer.renderCardBonuses(cardEl, c, true);
             cardEl.className = `selection-card-item ${viewModel.classes}`;
             content.appendChild(cardEl);
         });

@@ -42,6 +42,9 @@ export const ActionListView = {
         const abilityActions = [];
         const systemActions = [];
 
+        // Clear stale button references before re-render
+        State.mulliganButtons.clear();
+
         state.legal_actions.forEach(a => {
             const category = a.category || a.type;
             const cardNo = a.parameters?.card_no;

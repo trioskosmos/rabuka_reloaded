@@ -543,6 +543,37 @@ pub fn zone_to_display(card_ids: &[i16], card_db: &CardDatabase) -> ZoneDisplay 
     }
 }
 
+pub fn zone_to_display_full(
+    card_ids: &[i16],
+    card_db: &CardDatabase,
+    blade_modifiers: &std::collections::HashMap<i16, i32>,
+    score_modifiers: &std::collections::HashMap<i16, i32>,
+    heart_modifiers: &std::collections::HashMap<
+        i16,
+        std::collections::HashMap<crate::card::HeartColor, i32>,
+    >,
+    heart_color_multiplier: &std::collections::HashMap<i16, crate::card::HeartColor>,
+    cost_modifiers: &std::collections::HashMap<i16, i32>,
+) -> ZoneDisplay {
+    ZoneDisplay {
+        cards: card_ids
+            .iter()
+            .filter_map(|&id| {
+                card_to_display_full(
+                    id,
+                    card_db,
+                    None,
+                    blade_modifiers.get(&id).copied().unwrap_or(0),
+                    score_modifiers.get(&id).copied().unwrap_or(0),
+                    &heart_modifiers.get(&id).cloned().unwrap_or_default(),
+                    heart_color_multiplier.get(&id).copied(),
+                    cost_modifiers.get(&id).copied().unwrap_or(0),
+                )
+            })
+            .collect(),
+    }
+}
+
 pub fn stage_to_display(
     stage: &crate::zones::Stage,
     card_db: &CardDatabase,
@@ -811,7 +842,15 @@ pub fn player_to_display(
 
     PlayerDisplay {
         energy: energy_display,
-        hand: zone_to_display(&player.hand.cards, card_db),
+        hand: zone_to_display_full(
+            &player.hand.cards,
+            card_db,
+            blade_modifiers,
+            score_modifiers,
+            heart_modifiers,
+            heart_color_multiplier,
+            cost_modifiers,
+        ),
         stage: stage_to_display(
             &player.stage,
             card_db,
@@ -822,8 +861,24 @@ pub fn player_to_display(
             heart_color_multiplier,
             cost_modifiers,
         ),
-        live_zone: zone_to_display(&player.live_card_zone.cards, card_db),
-        success_live_card_zone: zone_to_display(&player.success_live_card_zone.cards, card_db),
+        live_zone: zone_to_display_full(
+            &player.live_card_zone.cards,
+            card_db,
+            blade_modifiers,
+            score_modifiers,
+            heart_modifiers,
+            heart_color_multiplier,
+            cost_modifiers,
+        ),
+        success_live_card_zone: zone_to_display_full(
+            &player.success_live_card_zone.cards,
+            card_db,
+            blade_modifiers,
+            score_modifiers,
+            heart_modifiers,
+            heart_color_multiplier,
+            cost_modifiers,
+        ),
         waitroom: waitroom_display.clone(),
         discard: waitroom_display,
         main_deck_count: player.main_deck.len(),

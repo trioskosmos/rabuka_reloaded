@@ -175,6 +175,7 @@ export const ActionButtons = {
             const ci = (a.parameters || a.params || {}).card_index;
             if (ci !== undefined) {
                 btn.dataset.cardIndex = ci;
+                State.mulliganButtons.set(ci, btn);
                 if (State.localMulliganSelection.has(ci)) {
                     const thumb = btn.querySelector('.action-card-thumb');
                     if (thumb) {

@@ -1181,22 +1181,25 @@ impl GameState {
                     "ability_text".into(),
                     serde_json::Value::String(entry.ability.full_text.clone()),
                 );
-                // Follow same structure as prompt_en: show choice-specific text when
-                // this is a choice ability, otherwise use the existing short title.
-                let prompt_ja = entry
-                    .choice_effect_text
-                    .clone()
-                    .unwrap_or_else(|| existing_title.clone());
-                obj.insert("prompt_ja".into(), serde_json::Value::String(prompt_ja));
                 let prompt_en = if entry.choice_effect_text.is_some() {
                     if let Some(ref effect) = entry.ability.effect {
                         crate::ability::describe::describe_effect_en(effect)
                     } else {
-                        existing_title
+                        existing_title.clone()
                     }
                 } else {
-                    existing_title
+                    existing_title.clone()
                 };
+                let prompt_ja = if entry.choice_effect_text.is_some() {
+                    if let Some(ref effect) = entry.ability.effect {
+                        crate::ability::describe::describe_effect_ja(effect)
+                    } else {
+                        existing_title.clone()
+                    }
+                } else {
+                    existing_title.clone()
+                };
+                obj.insert("prompt_ja".into(), serde_json::Value::String(prompt_ja));
                 obj.insert("prompt_en".into(), serde_json::Value::String(prompt_en));
                 obj.insert(
                     "trigger_type".into(),

@@ -112,7 +112,17 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
                 }
             }
         }
-        "draw_card" => maybe_plural(c, "card"),
+        "draw_card" => {
+            if let Some(src) = s {
+                format!(
+                    "Draw {} from {}",
+                    maybe_plural(c, "card"),
+                    zone_label(Some(src))
+                )
+            } else {
+                maybe_plural(c, "card")
+            }
+        }
 
         "gain_resource" => {
             let r = resource_label(effect.resource.as_deref());
@@ -139,11 +149,16 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
                 Some("opponent") => "opponent ",
                 _ => "",
             };
+            let loc = s
+                .map(|src| format!(" on {}", zone_label(Some(src))))
+                .unwrap_or_default();
             let lim = effect
                 .cost_limit
                 .map(|cl| format!(" (cost ≤ {})", cl))
                 .unwrap_or_default();
-            format!("{} {}{} {}{}", verb, cnt, gn, who, lim)
+            format!("{} {}{}{} {}{}", verb, cnt, gn, loc, who, lim)
+                .trim()
+                .to_string()
         }
 
         "modify_score" => {
@@ -250,14 +265,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
             }
         }
 
-        "choice" => {
-            if let Some(ref opts) = effect.options {
-                let parts: Vec<String> = opts.iter().map(|o| describe_effect_en(o)).collect();
-                format!("Choose 1:\n{}", parts.join("\n"))
-            } else {
-                "Choose 1".to_string()
-            }
-        }
+        "choice" => "Choose 1".to_string(),
 
         "play_baton_touch" => format!(
             "Baton touch {} member{}",
@@ -326,14 +334,18 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         }
 
         "draw_until_count" => {
+            let from = s
+                .map(|src| format!(" from {}", zone_label(Some(src))))
+                .unwrap_or_default();
             format!(
-                "Draw until {} card{} in hand",
+                "Draw until {} card{} in hand{}",
                 effect.target_count.unwrap_or(1),
                 if effect.target_count == Some(1) {
                     ""
                 } else {
                     "s"
-                }
+                },
+                from
             )
         }
 
@@ -459,6 +471,437 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
             }
         }
 
+        _ => effect.text.clone(),
+    }
+}
+
+// ── Japanese description ──────────────────────────────────────────────
+
+fn zone_label_ja(zone: Option<&str>) -> &str {
+    match zone {
+        Some("hand") => "手札",
+        Some("discard") | Some("waitroom") => "控え室",
+        Some("deck") => "デッキ",
+        Some("deck_top") => "デッキの上",
+        Some("stage") => "ステージ",
+        Some("energy") => "エネルギー",
+        Some("energy_deck") => "エネルギーデッキ",
+        Some("energy_zone") => "エネルギーゾーン",
+        Some("success_zone") => "成功ライブカード置き場",
+        Some("live_card_zone") => "ライブカードゾーン",
+        Some("under_member") => "このメンバーの下",
+        Some("revealed_cards") => "公開されたカード",
+        Some("those_cards") => "それらのカード",
+        Some("all_selected") => "選択したカード",
+        Some(s) => s,
+        None => "不明",
+    }
+}
+
+fn card_type_label_ja(ct: Option<&str>) -> &str {
+    match ct {
+        Some("member_card") => "メンバー",
+        Some("live_card") => "ライブカード",
+        Some("energy_card") => "エネルギー",
+        Some("card") => "カード",
+        Some(s) => s,
+        None => "カード",
+    }
+}
+
+fn state_verb_ja(state: Option<&str>) -> &str {
+    match state {
+        Some("wait") => "ウェイト",
+        Some("active") => "アクティブ",
+        Some(s) => s,
+        None => "状態変更",
+    }
+}
+
+fn resource_label_ja(r: Option<&str>) -> &str {
+    match r {
+        Some("blade") => "ブレード",
+        Some("heart") => "ハート",
+        Some(s) => s,
+        None => "リソース",
+    }
+}
+
+fn duration_label_ja(d: Option<&str>) -> &str {
+    match d {
+        Some("live_end") => "ライブ終了時まで",
+        Some("live_start") => "このライブの間",
+        Some("live_success") => "ライブ成功時",
+        Some("turn_end") | Some("turn") => "ターン終了時まで",
+        Some(s) => s,
+        None => "",
+    }
+}
+
+pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
+    let action = effect.action.as_str();
+    let ct = card_type_label_ja(effect.card_type.as_deref());
+    let c = effect.count;
+    let t = effect.target.as_deref();
+    let s = effect.source.as_deref();
+    let d = effect.destination.as_deref();
+    let gn = group_label(effect.group_names.as_ref());
+
+    match action {
+        "move_cards" => {
+            let dest = zone_label_ja(d);
+            match s {
+                Some("those_cards") | Some("all_selected") => {
+                    format!("選択したカードを{}に置く", dest)
+                }
+                _ => {
+                    let src = zone_label_ja(s);
+                    let mut result = format!(
+                        "{}を{}から{}に置く",
+                        if c == Some(1) {
+                            format!("{}の{}", 1, ct).to_string()
+                        } else {
+                            format!("{}枚の{}", c.unwrap_or(1), ct)
+                        },
+                        src,
+                        dest
+                    );
+                    if let Some("wait") = effect.state_change.as_deref() {
+                        result += "（レスト）";
+                    }
+                    result
+                }
+            }
+        }
+        "draw_card" => {
+            let count_str = if c == Some(1) {
+                "1枚".to_string()
+            } else {
+                format!("{}枚", c.unwrap_or(1))
+            };
+            if let Some(src) = s {
+                format!("{}から{}引く", zone_label_ja(Some(src)), count_str)
+            } else {
+                format!("{}引く", count_str)
+            }
+        }
+        "gain_resource" => {
+            let r = resource_label_ja(effect.resource.as_deref());
+            let dur = effect.duration.as_deref().and_then(|d| {
+                let lbl = duration_label_ja(Some(d));
+                if lbl.is_empty() {
+                    None
+                } else {
+                    Some(lbl)
+                }
+            });
+            let dur_str = dur.map(|d| format!("（{}）", d)).unwrap_or_default();
+            let count_str = if c == Some(1) {
+                format!("{}", r)
+            } else {
+                format!("{} {}", c.unwrap_or(1), r)
+            };
+            match t {
+                Some("opponent") => format!("相手に{}を与える{}", count_str, dur_str),
+                _ => format!("{}{}を得る{}", count_str, gn, dur_str),
+            }
+        }
+        "change_state" => {
+            let verb = state_verb_ja(effect.state_change.as_deref());
+            let cnt = c.unwrap_or(1);
+            let who = match t {
+                Some("opponent") => "相手の",
+                _ => "",
+            };
+            let loc = s.map(|src| zone_label_ja(Some(src))).unwrap_or("");
+            let lim = effect
+                .cost_limit
+                .map(|cl| format!("（コスト{}以下）", cl))
+                .unwrap_or_default();
+            if loc.is_empty() {
+                format!("{}を{}体{}{}にする{}", who, cnt, gn, verb, lim)
+            } else {
+                format!("{}の{}{}体{}を{}にする{}", who, loc, cnt, gn, verb, lim)
+            }
+        }
+        "modify_score" => {
+            let val = effect.value.unwrap_or(1);
+            let op = effect.operation.as_deref().unwrap_or("add");
+            if op == "subtract" {
+                format!("スコアを{}減らす", val)
+            } else {
+                format!("スコアを{}増やす", val)
+            }
+        }
+        "position_change" => {
+            if let Some(ep) = effect.exclude_position.as_deref() {
+                format!("{}を避けてポジションチェンジ", ep)
+            } else if c == Some(1) || c.is_none() {
+                format!("ポジションチェンジ{}", gn)
+            } else {
+                format!("{}体ポジションチェンジ{}", c.unwrap_or(1), gn)
+            }
+        }
+        "select" | "select_cards" => {
+            let src = zone_label_ja(s);
+            let opt = if effect.optional.unwrap_or(false) {
+                "（任意）"
+            } else {
+                ""
+            };
+            format!(
+                "{}から{}を選ぶ{}",
+                src,
+                if c == Some(1) {
+                    format!("{}枚の{}", 1, ct)
+                } else {
+                    format!("{}枚の{}", c.unwrap_or(1), ct)
+                },
+                opt
+            )
+        }
+        "look_at" => {
+            let count_str = if c == Some(1) {
+                "1枚".to_string()
+            } else {
+                format!("{}枚", c.unwrap_or(1))
+            };
+            format!("{}のカードを{}見る", zone_label_ja(s), count_str)
+        }
+        "reveal" => {
+            let count_str = if c == Some(1) {
+                "1枚".to_string()
+            } else {
+                format!("{}枚", c.unwrap_or(1))
+            };
+            format!("{}のカードを{}公開する", zone_label_ja(s), count_str)
+        }
+        "pay_energy" => {
+            let opt = if effect.optional.unwrap_or(false) {
+                "（任意）"
+            } else {
+                ""
+            };
+            format!("エネルギーを{}払う{}", c.unwrap_or(1), opt)
+        }
+        "look_and_select" => {
+            let look_count = effect.compound.look_action.as_ref().and_then(|a| a.count);
+            let select_count = effect.compound.select_action.as_ref().and_then(|a| a.count);
+            let select_dest = effect
+                .compound
+                .select_action
+                .as_ref()
+                .and_then(|a| a.destination.as_deref())
+                .map(|s| zone_label_ja(Some(s)));
+            if let (Some(lc), Some(sc)) = (look_count, select_count) {
+                if sc == 1 {
+                    format!("{}枚見て、1枚を{}に選ぶ", lc, select_dest.unwrap_or("手札"))
+                } else {
+                    format!(
+                        "{}枚見て、{}枚を{}に選ぶ",
+                        lc,
+                        sc,
+                        select_dest.unwrap_or("手札")
+                    )
+                }
+            } else {
+                "カードを見て選ぶ".to_string()
+            }
+        }
+        "restriction" => {
+            let rt = effect.restriction_type.as_deref().unwrap_or("制限");
+            format!("{}制限を適用", rt)
+        }
+        "gain_ability" => {
+            if let Some(ref ga) = effect.ability_gain {
+                format!("アビリティを得る：{}", ga)
+            } else {
+                "アビリティを得る".to_string()
+            }
+        }
+        "do_nothing" => String::new(),
+        "sequential" => {
+            if let Some(ref actions) = effect.compound.actions {
+                let parts: Vec<String> = actions.iter().map(|a| describe_effect_ja(a)).collect();
+                if parts.len() == 1 {
+                    parts[0].clone()
+                } else {
+                    format!(
+                        "{}、その後{}",
+                        parts[..parts.len() - 1].join("、"),
+                        parts.last().unwrap()
+                    )
+                }
+            } else {
+                effect.text.clone()
+            }
+        }
+        "choice" => "1つを選ぶ".to_string(),
+        "play_baton_touch" => {
+            let suffix = if c == Some(1) {
+                String::new()
+            } else {
+                format!("（{}体）", c.unwrap_or(1))
+            };
+            format!("バトンタッチ{}", suffix)
+        }
+        "modify_required_hearts" | "modify_required_hearts_global" => {
+            let val = effect.value.unwrap_or(1);
+            if val == 0 {
+                "必要ハートをクリア".to_string()
+            } else if val > 0 {
+                format!("必要ハートを{}増やす", val)
+            } else {
+                format!("必要ハートを{}減らす", (val as i32).unsigned_abs())
+            }
+        }
+        "activate_ability" => {
+            if let Some(ref at) = effect.target_trigger {
+                format!("{}アビリティを発動", at)
+            } else {
+                "アビリティを発動".to_string()
+            }
+        }
+        "set_card_identity" => {
+            if let Some(ref ids) = effect.identities {
+                format!("扱い：{}", ids.join(", "))
+            } else {
+                "カードの扱いを設定".to_string()
+            }
+        }
+        "set_blade_count" => format!("ブレードを{}に設定", c.unwrap_or(0)),
+        "set_heart_type" => {
+            if let Some(ref ht) = effect.heart_type {
+                format!("ハートタイプを{}に設定", ht)
+            } else {
+                "ハートタイプを設定".to_string()
+            }
+        }
+        "set_blade_type" => {
+            if let Some(ref bt) = effect.blade_type {
+                format!("ブレードタイプを{}に設定", bt)
+            } else {
+                "ブレードタイプを設定".to_string()
+            }
+        }
+        "discard_until_count" => {
+            format!(
+                "手札が{}枚になるまで捨てる",
+                effect.target_count.unwrap_or(1)
+            )
+        }
+        "draw_until_count" => {
+            let from = s
+                .map(|src| format!("{}から", zone_label_ja(Some(src))))
+                .unwrap_or_default();
+            format!(
+                "手札が{}枚になるまで{}引く",
+                effect.target_count.unwrap_or(1),
+                from
+            )
+        }
+        "modify_cost" => {
+            let op = effect.operation.as_deref().unwrap_or("subtract");
+            let amt = c.unwrap_or(1);
+            if op == "subtract" {
+                format!("コストを{}減らす", amt)
+            } else {
+                format!("コストを{}増やす", amt)
+            }
+        }
+        "modify_yell_count" => {
+            let op = effect.operation.as_deref().unwrap_or("add");
+            let amt = c.unwrap_or(1);
+            if op == "subtract" {
+                format!("エール回数を{}減らす", amt)
+            } else {
+                format!("エール回数を{}増やす", amt)
+            }
+        }
+        "perform_yell" => {
+            let amt = c.unwrap_or(1);
+            let max = effect.repeat_limit.unwrap_or(amt);
+            if amt == max {
+                format!("エールを{}回行う", amt)
+            } else {
+                format!("最大{}回エールを行う", max)
+            }
+        }
+        "re_yell" => {
+            let suffix = if effect.lose_blade_hearts.unwrap_or(false) {
+                "（ブレード/ハートを失う）"
+            } else {
+                ""
+            };
+            format!("再エール{}", suffix)
+        }
+        "specify_heart_color" => "ハートの色を指定する".to_string(),
+        "place_energy_under_member" => {
+            let e = effect.energy_count.or(c).unwrap_or(1);
+            format!("このメンバーの下にエネルギーを{}枚置く", e)
+        }
+        "invalidate_ability" => "アビリティを無効にする".to_string(),
+        "choose_target_player" => "自分か相手を選ぶ".to_string(),
+        "repeat_procedure" => {
+            let max = effect.repeat_limit.unwrap_or(c.unwrap_or(1));
+            format!("最大{}回繰り返す", max)
+        }
+        "reveal_until_live_card" => "ライブカードが出るまでデッキを公開する".to_string(),
+        "gain_ability_from_source" => "アビリティをコピーする".to_string(),
+        "conditional_on_optional" => {
+            let parts: Vec<String> = [effect
+                .compound
+                .conditional_action
+                .as_ref()
+                .map(|a| describe_effect_ja(a))]
+            .into_iter()
+            .flatten()
+            .collect();
+            if parts.is_empty() {
+                "コストを払うかスキップ".to_string()
+            } else {
+                format!("コストを払うかスキップ：{}", parts.join("、"))
+            }
+        }
+        "conditional_on_result" => {
+            let parts: Vec<String> = [
+                effect
+                    .compound
+                    .primary_effect
+                    .as_ref()
+                    .map(|a| describe_effect_ja(a)),
+                effect
+                    .compound
+                    .followup_action
+                    .as_ref()
+                    .map(|a| describe_effect_ja(a)),
+            ]
+            .into_iter()
+            .flatten()
+            .collect();
+            if parts.is_empty() {
+                effect.text.clone()
+            } else {
+                parts.join("、その後")
+            }
+        }
+        "conditional_alternative" => {
+            let primary = effect
+                .compound
+                .primary_effect
+                .as_ref()
+                .map(|a| describe_effect_ja(a));
+            let alt = effect
+                .alternative_effect
+                .as_ref()
+                .map(|a| describe_effect_ja(a));
+            match (primary, alt) {
+                (Some(p), Some(a)) => format!("どちらか：{} / または：{}", p, a),
+                (Some(p), None) => p,
+                (None, Some(a)) => a,
+                (None, None) => effect.text.clone(),
+            }
+        }
         _ => effect.text.clone(),
     }
 }

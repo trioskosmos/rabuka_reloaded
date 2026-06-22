@@ -2368,6 +2368,14 @@ impl AbilityResolver {
         // can react to them as a single batch discard event.
         self.finalize_card_movement(gs, &remaining_cards, dest_zone, "deck_top", &None, None);
 
+        // Clear the stale looked_at choice now that all cards have been
+        // processed (selected cards → hand, remaining → waitroom).
+        // Without this, finalize_choice's should_preserve logic keeps the
+        // original looked_at SelectCard alive through the followup_action
+        // pending command, and resume_queue_with_choice re-stages it as a
+        // spurious sub-choice prompt.
+        self.pending_choice = None;
+
         Ok(())
     }
 
