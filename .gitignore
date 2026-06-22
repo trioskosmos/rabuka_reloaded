@@ -15,4 +15,5 @@ nul
 web_ui/dist/
 root_files/
 poll_data/
+cloudflared.exe
 
