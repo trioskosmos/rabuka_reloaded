@@ -222,99 +222,133 @@ function renderAggregateHeartSummary(result) {
 
     const totalHearts = result.total_hearts || [0,0,0,0,0,0,0,0];
     const totalAvailable = sumHearts(totalHearts);
+    const allPassed = lives.every(l => l.passed);
+    const allocations = result?.breakdown?.allocations || [];
 
-    // Sum required and filled across ALL live cards (shared pool)
-    const totalRequired = [0,0,0,0,0,0,0,0];
+    const fmtPool = (arr, label) => `
+        <div class="perf-agg-row">
+            <span class="perf-agg-label"></span>
+            ${renderHeartsCompact(arr)}
+            <span class="perf-agg-sum">${sumHearts(arr)}</span>
+            ${label ? `<span class="perf-agg-desc">${label}</span>` : ''}
+        </div>`;
+
+    // Reconstruct remaining pool at each step using allocations
     const totalFilled = [0,0,0,0,0,0,0,0];
     for (const live of lives) {
-        const req = live.required || [0,0,0,0,0,0,0,0];
         const fill = live.filled || [0,0,0,0,0,0,0,0];
-        for (let i = 0; i < 7; i++) {
-            totalRequired[i] += req[i];
-            totalFilled[i] += fill[i];
-        }
+        for (let i = 0; i < 7; i++) totalFilled[i] += fill[i];
     }
+    const surplus = totalAvailable - sumHearts(totalFilled);
 
-    const totalReqSum = sumHearts(totalRequired);
-    const totalFilledSum = sumHearts(totalFilled);
-    const surplus = totalAvailable - totalFilledSum;
-
-    // Step 1: colored hearts (1-6) fill colored requirements
-    const coloredAvail = sumHearts(totalHearts.slice(1, 7));
-    const coloredReq = sumHearts(totalRequired.slice(1, 7));
-    const coloredFilled = sumHearts(totalFilled.slice(1, 7));
-    const coloredDeficit = Math.max(0, coloredReq - coloredFilled);
-
-    // Step 2: wild (heart00) covers remaining colored deficits
-    const wildAvail = totalHearts[0] || 0;
-    const wildForDeficit = Math.min(wildAvail, coloredDeficit);
-    const wildRemaining = wildAvail - wildForDeficit;
-
-    // Step 3: remaining colored + wild fill wild requirement (required[0])
-    const coloredRemaining = Math.max(0, coloredAvail - coloredFilled);
-    const wildReq = totalRequired[0] || 0;
-    const availableForWildReq = coloredRemaining + wildRemaining;
-
-    // Check how the engine judges: wildcard(0) fills colored deficits first,
-    // then remaining covers heart00 requirement
-    const h00Filled = Math.min(availableForWildReq, wildReq);
-    const h00Deficit = Math.max(0, wildReq - h00Filled);
-
-    const allPassed = lives.every(l => l.passed);
-
-    return `
+    let html = `
         <div class="perf-agg-summary ${allPassed ? 'success' : 'failure'}">
             <div class="perf-agg-header">
                 <img src="img/texticon/icon_heart.png" class="heart-mini-icon" alt="">
-                Heart Allocation (shared pool across ${lives.length} live card${lives.length > 1 ? 's' : ''})
+                Heart Allocation — sequential per live card
             </div>
             <div class="perf-agg-table">
                 <div class="perf-agg-row">
-                    <span class="perf-agg-label">Available</span>
+                    <span class="perf-agg-label">Available pool</span>
                     ${renderHeartsCompact(totalHearts)}
                     <span class="perf-agg-sum">${totalAvailable}</span>
+                </div>`;
+
+    // Simulate the engine's sequential allocation for each live card
+    const remaining = totalHearts.map(v => v);
+    for (let liveIdx = 0; liveIdx < lives.length; liveIdx++) {
+        const live = lives[liveIdx];
+        const cd = live.card_no ? State.resolveCardData(live.card_no) : null;
+        const liveName = cd?.name || `Live ${liveIdx + 1}`;
+        const req = live.required || [0,0,0,0,0,0,0,0];
+        const filled = live.filled || [0,0,0,0,0,0,0,0];
+        const reqSum = sumHearts(req);
+        const fillSum = sumHearts(filled);
+        const passed = live.passed;
+        const colorReq = req.slice(1, 7);
+        const colorFill = filled.slice(1, 7);
+        const colorReqSum = sumHearts(colorReq);
+        const colorFillSum = sumHearts(colorFill);
+        const colDeficit = Math.max(0, colorReqSum - colorFillSum);
+        const wildReq = req[0] || 0;
+        const wildFill = filled[0] || 0;
+
+        // Phase 1: filtered allocations for this card (non-wildcard, color 1-6)
+        const p1Allocs = allocations.filter(a => a.target_idx === liveIdx && !a.wildcard && a.color >= 1 && a.color <= 6);
+        // Phase 2: wildcard filling colored slots
+        const p2Allocs = allocations.filter(a => a.target_idx === liveIdx && a.wildcard);
+        // Phase 3: any color filling Heart00 (color === 0 and !wildcard) OR colored hearts filling Heart00
+        const p3Allocs = allocations.filter(a => a.target_idx === liveIdx && !a.wildcard && a.color === 0);
+
+        // Also track colored hearts used to fill Heart00 req (engine phase 3 step 1)
+        const p3ColoredAllocs = allocations.filter(a => a.target_idx === liveIdx && !a.wildcard && a.color >= 1 && a.color <= 6 && wildReq > 0);
+
+        // Compute what was left before this card
+        const beforeDisplay = remaining.map(v => v);
+
+        // Deduct what this card consumed
+        for (const a of allocations) {
+            if (a.target_idx === liveIdx) {
+                remaining[a.color] = Math.max(0, remaining[a.color] - a.amount);
+            }
+        }
+
+        const afterDisplay = remaining.map(v => v);
+        const beforeSum = sumHearts(beforeDisplay);
+        const afterSum = sumHearts(afterDisplay);
+
+        html += `
+            <div class="perf-agg-card ${passed ? 'success' : 'failure'}">
+                <div class="perf-agg-card-head">
+                    <strong>${escapeHtml(liveName)}</strong>
+                    <span class="perf-status-pill tiny ${passed ? 'success' : 'failure'}">${passed ? 'PASS' : 'FAIL'}</span>
                 </div>
-                <div class="perf-agg-row">
-                    <span class="perf-agg-label">Required (total)</span>
-                    ${renderHeartsCompact(totalRequired)}
-                    <span class="perf-agg-sum">${totalReqSum}</span>
+                <div class="perf-agg-card-require">Need ${renderHeartsCompact(req)} = ${reqSum}</div>
+                <div class="perf-agg-card-pool">Before: ${renderHeartsCompact(beforeDisplay)} = ${beforeSum}</div>
+                <div class="perf-agg-steps">
+                    ${colorReqSum > 0 ? `
+                    <div class="perf-agg-step done">
+                        <span class="perf-agg-marker">①</span>
+                        <span>Colored hearts → colored req</span>
+                        <span class="perf-agg-step-stat">${colorFillSum}/${colorReqSum}</span>
+                        ${p1Allocs.length > 0 ? `<div class="perf-agg-alloc-detail">${p1Allocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ')}</div>` : ''}
+                    </div>` : ''}
+                    ${colDeficit > 0 ? `
+                    <div class="perf-agg-step done">
+                        <span class="perf-agg-marker">②</span>
+                        <span>Wild (Any) → colored deficit</span>
+                        <span class="perf-agg-step-stat">${p2Allocs.reduce((s, a) => s + a.amount, 0)} used</span>
+                        ${p2Allocs.length > 0 ? `<div class="perf-agg-alloc-detail">${p2Allocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ')}</div>` : ''}
+                    </div>` : ''}
+                    ${wildReq > 0 ? `
+                    <div class="perf-agg-step ${wildFill >= wildReq ? 'done' : 'fail'}">
+                        <span class="perf-agg-marker">③</span>
+                        <span>Remaining → Any (Heart00)</span>
+                        <span class="perf-agg-step-stat">${wildFill}/${wildReq}${wildFill < wildReq ? `<span class="perf-agg-fail"> (${wildReq - wildFill} short)</span>` : ''}</span>
+                        ${p3Allocs.length > 0 || p3ColoredAllocs.length > 0 ? `
+                        <div class="perf-agg-alloc-detail">
+                            ${p3ColoredAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ')}
+                            ${p3Allocs.length > 0 ? (p3ColoredAllocs.length > 0 ? ' + ' : '') + p3Allocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ') : ''}
+                        </div>` : ''}
+                    </div>` : ''}
                 </div>
-                <div class="perf-agg-row allocated">
-                    <span class="perf-agg-label">Allocated</span>
-                    ${renderHeartsCompact(totalFilled)}
-                    <span class="perf-agg-sum">${totalFilledSum}</span>
-                </div>
-                <div class="perf-agg-divider"></div>
-                ${coloredReq > 0 ? `
-                <div class="perf-agg-step">
-                    <span class="perf-agg-marker">①</span>
-                    <span>Colored hearts → colored requirements</span>
-                    <span class="perf-agg-step-stat">${coloredFilled}/${coloredReq} filled</span>
-                </div>
-                ` : ''}
-                ${coloredDeficit > 0 ? `
-                <div class="perf-agg-step">
-                    <span class="perf-agg-marker">②</span>
-                    <span>Wild (Any) covers colored deficit</span>
-                    <span class="perf-agg-step-stat">${wildForDeficit} used</span>
-                </div>
-                ` : ''}
-                ${wildReq > 0 ? `
-                <div class="perf-agg-step">
-                    <span class="perf-agg-marker">③</span>
-                    <span>Remaining hearts fill Any requirement</span>
-                    <span class="perf-agg-step-stat">${h00Filled}/${wildReq} filled${h00Deficit > 0 ? `, <span class="perf-agg-fail">${h00Deficit} short</span>` : ''}</span>
-                </div>
-                ` : ''}
+                <div class="perf-agg-card-after">After: ${renderHeartsCompact(afterDisplay)} = ${afterSum}</div>
+            </div>`;
+    }
+
+    // Final surplus
+    const finalRemaining = remaining.map(v => v);
+    html += `
                 <div class="perf-agg-divider"></div>
                 <div class="perf-agg-row surplus ${surplus > 0 ? 'positive' : 'zero'}">
                     <span class="perf-agg-label">Surplus</span>
-                    ${renderHeartsCompact(totalHearts.map((v, i) => Math.max(0, (v || 0) - (totalFilled[i] || 0))))}
+                    ${renderHeartsCompact(finalRemaining)}
                     <span class="perf-agg-surplus-value">${surplus > 0 ? '+' : ''}${surplus}</span>
                 </div>
             </div>
-        </div>
-    `;
+        </div>`;
+
+    return html;
 }
 
 function renderTurnNavigation() {
@@ -699,88 +733,131 @@ function renderContributionSection(result) {
 
     const slotLabels = ['Left', 'Center', 'Right'];
 
+    const slotLabels = ['Left', 'Center', 'Right'];
+
+    const rendered = members.map((member) => {
+        const base = member.base_hearts || [0,0,0,0,0,0,0,0];
+        const bonus = member.bonus_hearts || [0,0,0,0,0,0,0,0];
+        const total = base.map((v, i) => v + (bonus[i] || 0));
+        const isWait = member.is_wait;
+        const totalBlade = isWait ? 0 : (member.base_blades || 0) + (member.bonus_blades || 0);
+        const heartBonuses = member.ability_heart_bonuses || [];
+        const bladeBonuses = member.ability_blade_bonuses || [];
+        const slot = member.slot !== undefined && member.slot >= 0 && member.slot < 3
+            ? slotLabels[member.slot] : `Slot ${(member.slot ?? -1) + 1}`;
+        const memberImg = member.card_no ? (() => { const cd = State.resolveCardData(member.card_no); return cd?.img ? fixImg(cd.img) : ''; })() : '';
+        const memberName = member.card_no ? (() => { const cd = State.resolveCardData(member.card_no); return cd?.name || member?.source || 'Member'; })() : (member?.source || 'Member');
+        return `
+            <article class="perf-contrib-card${isWait ? ' perf-contrib-wait' : ''}" data-member-id="${member?.source_id ?? ''}" data-member-slot="${member?.slot ?? ''}">
+                <div class="perf-contrib-header">
+                    ${memberImg ? `<img src="${memberImg}" class="perf-contrib-art" alt="${escapeHtml(memberName)}">` : ''}
+                    <div>
+                        <h4>${escapeHtml(memberName)}${isWait ? ' <span class="perf-wait-badge">(wait)</span>' : ''}</h4>
+                        <div class="perf-breakdown-row total">
+                            <span class="perf-mini-heading">Total hearts</span>
+                            ${renderHeartsCompact(total)}
+                            <span class="perf-breakdown-sum">${sumHearts(total)}</span>
+                        </div>
+                        ${heartBonuses.length > 0 ? `
+                        <div class="perf-breakdown-bonuses">
+                            ${heartBonuses.map((bonus) => `
+                                <div class="perf-bonus-item compact">
+                                    <div class="perf-bonus-title">${escapeHtml(bonus?.source || 'Effect')} +${bonus?.amount || 0} ${escapeHtml(HEART_LABELS[bonus?.color ?? 0] || 'heart')}</div>
+                                    ${bonus?.ability_text ? `<div class="perf-bonus-text">${enrichText(bonus.ability_text)}</div>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+                <div class="perf-stage-breakdown">
+                    <div class="perf-breakdown-subrows">
+                        <div class="perf-breakdown-row sub">
+                            <span class="perf-mini-heading">Base hearts</span>
+                            ${renderHeartsCompact(base)}
+                        </div>
+                        ${bonus.some(v => v > 0) ? `
+                        <div class="perf-breakdown-row sub">
+                            <span class="perf-mini-heading">Ability additions</span>
+                            ${renderHeartsCompact(bonus)}
+                        </div>
+                        ` : ''}
+                    </div>
+                    <div class="perf-breakdown-row${isWait ? ' perf-dimmed' : ''}">
+                        <span class="perf-mini-heading">Blades</span>
+                        ${renderBladesCompact(totalBlade)}
+                        ${!isWait && (member.bonus_blades || 0) > 0 ? `<span class="perf-breakdown-detail">(+${member.bonus_blades} from abilities)</span>` : ''}
+                        ${isWait ? `<span class="perf-breakdown-detail">(negated — card is in wait)</span>` : ''}
+                        ${!isWait && bladeBonuses.length > 0 ? `
+                        <div class="perf-breakdown-bonuses">
+                            ${bladeBonuses.map((bonus) => `
+                                <div class="perf-bonus-item compact">
+                                    <div class="perf-bonus-title">${escapeHtml(bonus?.source || 'Effect')} +${bonus?.amount || bonus?.value || 0} blade</div>
+                                    ${bonus?.ability_text ? `<div class="perf-bonus-text">${enrichText(bonus.ability_text)}</div>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                        ` : ''}
+                    </div>
+                    <div class="perf-breakdown-row minor">
+                        <span class="perf-mini-heading"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> Notes</span>
+                        <span class="perf-breakdown-value">${member?.base_notes || 0}${member?.bonus_notes ? ` (+${member.bonus_notes})` : ''}</span>
+                        <span style="margin-left:12px;" class="perf-mini-heading"><img src="img/texticon/icon_draw.png" class="heart-mini-icon"> Draw</span>
+                        <span class="perf-breakdown-value">${member?.draw_icons || 0}</span>
+                    </div>
+                </div>
+            </article>
+        `;
+    });
+
+    // Compute totals across all 3 slots
+    const grandTotal = [0,0,0,0,0,0,0,0];
+    let grandBlade = 0, grandNotes = 0, grandDraw = 0;
+    for (const m of members) {
+        const b = m.base_hearts || [0,0,0,0,0,0,0,0];
+        const bn = m.bonus_hearts || [0,0,0,0,0,0,0,0];
+        for (let i = 0; i < 8; i++) grandTotal[i] += b[i] + bn[i];
+        if (!m.is_wait) grandBlade += (m.base_blades || 0) + (m.bonus_blades || 0);
+        grandNotes += (m.base_notes || 0) + (m.bonus_notes || 0);
+        grandDraw += m.draw_icons || 0;
+    }
+
     return `
         <section class="perf-section-card">
             <div class="perf-section-heading-row compact">
                 <div>
                     <div class="perf-eyebrow">Stage Contributors</div>
+                    ${members.length > 0 ? `<div class="perf-total-badge">${sumHearts(grandTotal)} hearts · ${grandBlade} blades · ${grandNotes} notes · ${grandDraw} draw</div>` : ''}
                 </div>
             </div>
             <div class="perf-contrib-grid">
-                ${members.map((member) => {
-                    const base = member.base_hearts || [0,0,0,0,0,0,0,0];
-                    const bonus = member.bonus_hearts || [0,0,0,0,0,0,0,0];
-                    const total = base.map((v, i) => v + (bonus[i] || 0));
-                    const isWait = member.is_wait;
-                    const totalBlade = isWait ? 0 : (member.base_blades || 0) + (member.bonus_blades || 0);
-                    const heartBonuses = member.ability_heart_bonuses || [];
-                    const bladeBonuses = member.ability_blade_bonuses || [];
-                    const slot = member.slot !== undefined && member.slot >= 0 && member.slot < 3
-                        ? slotLabels[member.slot] : `Slot ${(member.slot ?? -1) + 1}`;
-                    const memberImg = member.card_no ? (() => { const cd = State.resolveCardData(member.card_no); return cd?.img ? fixImg(cd.img) : ''; })() : '';
-                    const memberName = member.card_no ? (() => { const cd = State.resolveCardData(member.card_no); return cd?.name || member?.source || 'Member'; })() : (member?.source || 'Member');
-                    return `
-                        <article class="perf-contrib-card${isWait ? ' perf-contrib-wait' : ''}" data-member-id="${member?.source_id ?? ''}" data-member-slot="${member?.slot ?? ''}">
-                            <div class="perf-contrib-header">
-                                ${memberImg ? `<img src="${memberImg}" class="perf-contrib-art" alt="${escapeHtml(memberName)}">` : ''}
-                                <div>
-                                    <h4>${escapeHtml(memberName)}${isWait ? ' <span class="perf-wait-badge">(wait)</span>' : ''}</h4>
-                                    <div class="perf-breakdown-row total">
-                                        <span class="perf-mini-heading">Total hearts</span>
-                                        ${renderHeartsCompact(total)}
-                                        <span class="perf-breakdown-sum">${sumHearts(total)}</span>
-                                    </div>
-                                    ${heartBonuses.length > 0 ? `
-                                    <div class="perf-breakdown-bonuses">
-                                        ${heartBonuses.map((bonus) => `
-                                            <div class="perf-bonus-item compact">
-                                                <div class="perf-bonus-title">${escapeHtml(bonus?.source || 'Effect')} +${bonus?.amount || 0} ${escapeHtml(HEART_LABELS[bonus?.color ?? 0] || 'heart')}</div>
-                                                ${bonus?.ability_text ? `<div class="perf-bonus-text">${enrichText(bonus.ability_text)}</div>` : ''}
-                                            </div>
-                                        `).join('')}
-                                    </div>
-                                    ` : ''}
-                                </div>
+                ${rendered.join('')}
+                ${members.length > 1 ? `
+                <article class="perf-contrib-card perf-total-row">
+                    <div class="perf-contrib-header">
+                        <div>
+                            <h4>Total (all slots)</h4>
+                            <div class="perf-breakdown-row total">
+                                <span class="perf-mini-heading">Hearts</span>
+                                ${renderHeartsCompact(grandTotal)}
+                                <span class="perf-breakdown-sum">${sumHearts(grandTotal)}</span>
                             </div>
-                            <div class="perf-stage-breakdown">
-                                <div class="perf-breakdown-subrows">
-                                    <div class="perf-breakdown-row sub">
-                                        <span class="perf-mini-heading">Base hearts</span>
-                                        ${renderHeartsCompact(base)}
-                                    </div>
-                                    ${bonus.some(v => v > 0) ? `
-                                    <div class="perf-breakdown-row sub">
-                                        <span class="perf-mini-heading">Ability additions</span>
-                                        ${renderHeartsCompact(bonus)}
-                                    </div>
-                                    ` : ''}
-                                </div>
-                                <div class="perf-breakdown-row${isWait ? ' perf-dimmed' : ''}">
-                                    <span class="perf-mini-heading">Blades</span>
-                                    ${renderBladesCompact(totalBlade)}
-                                    ${!isWait && (member.bonus_blades || 0) > 0 ? `<span class="perf-breakdown-detail">(+${member.bonus_blades} from abilities)</span>` : ''}
-                                    ${isWait ? `<span class="perf-breakdown-detail">(negated — card is in wait)</span>` : ''}
-                                    ${!isWait && bladeBonuses.length > 0 ? `
-                                    <div class="perf-breakdown-bonuses">
-                                        ${bladeBonuses.map((bonus) => `
-                                            <div class="perf-bonus-item compact">
-                                                <div class="perf-bonus-title">${escapeHtml(bonus?.source || 'Effect')} +${bonus?.amount || bonus?.value || 0} blade</div>
-                                                ${bonus?.ability_text ? `<div class="perf-bonus-text">${enrichText(bonus.ability_text)}</div>` : ''}
-                                            </div>
-                                        `).join('')}
-                                    </div>
-                                    ` : ''}
-                                </div>
-                                <div class="perf-breakdown-row minor">
-                                    <span class="perf-mini-heading"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> Notes</span>
-                                    <span class="perf-breakdown-value">${member?.base_notes || 0}${member?.bonus_notes ? ` (+${member.bonus_notes})` : ''}</span>
-                                    <span style="margin-left:12px;" class="perf-mini-heading"><img src="img/texticon/icon_draw.png" class="heart-mini-icon"> Draw</span>
-                                    <span class="perf-breakdown-value">${member?.draw_icons || 0}</span>
-                                </div>
-                            </div>
-                        </article>
-                    `;
-                }).join('')}
+                        </div>
+                    </div>
+                    <div class="perf-stage-breakdown">
+                        <div class="perf-breakdown-row">
+                            <span class="perf-mini-heading">Blades</span>
+                            <span class="perf-breakdown-value">${grandBlade}</span>
+                        </div>
+                        <div class="perf-breakdown-row minor">
+                            <span class="perf-mini-heading">Notes</span>
+                            <span class="perf-breakdown-value">${grandNotes}</span>
+                            <span style="margin-left:12px;" class="perf-mini-heading">Draw</span>
+                            <span class="perf-breakdown-value">${grandDraw}</span>
+                        </div>
+                    </div>
+                </article>
+                ` : ''}
                 ${triggered.length > 0 ? `
                 <article class="perf-contrib-card global-bonuses">
                     <div class="perf-contrib-header">

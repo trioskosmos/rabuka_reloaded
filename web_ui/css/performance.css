@@ -301,6 +301,64 @@
 .perf-agg-fail {
     color: var(--accent-red);
 }
+.perf-agg-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px;
+    padding: 5px 7px;
+    margin: 3px 0;
+    font-size: 0.7rem;
+}
+.perf-agg-card.success { border-left: 2px solid var(--accent-green); }
+.perf-agg-card.failure { border-left: 2px solid var(--accent-red); }
+.perf-agg-card-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    margin-bottom: 3px;
+}
+.perf-agg-card-require,
+.perf-agg-card-pool,
+.perf-agg-card-after {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    padding: 1px 0;
+}
+.perf-agg-card-pool { color: var(--text-muted); }
+.perf-agg-card-after { color: var(--text-dim); border-top: 1px solid rgba(255,255,255,0.04); margin-top: 2px; padding-top: 2px; }
+.perf-agg-steps { margin: 2px 0; }
+.perf-agg-step.done .perf-agg-step-stat { color: var(--accent-green); }
+.perf-agg-step.fail .perf-agg-step-stat { color: var(--accent-red); }
+.perf-agg-alloc-detail {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    margin-left: 19px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.perf-agg-desc {
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    margin-left: 4px;
+}
+.perf-status-pill.tiny {
+    font-size: 0.55rem;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-weight: 600;
+}
+.perf-total-badge {
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    margin-top: 1px;
+}
+.perf-contrib-card.perf-total-row {
+    border-color: var(--accent-gold);
+    border-style: dashed;
+    background: rgba(255, 215, 0, 0.03);
+}
 .perf-panel-body-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);

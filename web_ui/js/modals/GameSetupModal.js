@@ -179,7 +179,7 @@ function parseSimpleCardLines(text) {
 function parseDeckText(val) {
     if (val.includes('<span') || val.includes('title=') || val.includes('class="num"') || val.includes('cardno=')) {
         const deck = convertDecklogHtml(val);
-        if (deck && deck.length > 0) return { raw: deck.join('\n'), analysis: parseSimpleCardLines(val), converted: true };
+        if (deck && deck.length > 0) { const raw = deck.join('\n'); return { raw, analysis: parseSimpleCardLines(raw), converted: true }; }
         return null;
     }
     if (/\d+ポイント/.test(val)) {

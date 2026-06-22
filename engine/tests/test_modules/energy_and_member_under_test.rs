@@ -1,16 +1,10 @@
 /// Integration tests for energy-under-member and member-under-member mechanics.
 ///
-/// GAP: Engine: re-entry for effect-based optional placement,
-///   use_limit recording at cost-pay time,
-///   under_member source handler in move_cards,
-///   under_member zone in per_unit/zone_cards/count functions,
-///   heart gain targeting activating card when no explicit filter,
-///   reveal cost auto-resolve applies character filter,
-///   reveal cost removes card from hand, routes to revealed_cards.
-///   Parser: emits "under_member" for 下にある per-unit references.
-///   Web UI: under-cards get energy-type/member-type CSS class.
-///
 /// Rules verified: 4.5.5, 4.5.5.3, 10.5.3, 10.5.4, Q157, Q184
+///
+/// Remaining items for future work (not blocking functionality):
+///   - Parser: emit "under_member" for 下にある per-unit references
+///   - Web UI: under-cards get energy-type/member-type CSS class
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
@@ -54,10 +48,7 @@ fn kasumi_debut_skip_optional_no_energy_moved() {
     game.state.player1.hand.cards.push(kasumi);
     game.give_energy(13);
     game.play_to_stage(kasumi, MemberArea::Center);
-    assert!(
-        game.has_pending_choice(),
-        "GAP: should prompt optional cost"
-    );
+    assert!(game.has_pending_choice(), "should prompt optional cost");
     game.select_indices(&[]);
     assert_eq!(game.state.player1.energy_zone.cards.len(), 13);
     assert_eq!(game.state.player1.stage.stage[1], kasumi);
@@ -73,7 +64,6 @@ fn kasumi_debut_place_two_energy_under() {
     game.play_to_stage(kasumi, MemberArea::Center);
     assert!(game.has_pending_choice(), "should prompt optional cost");
     game.select_option(1); // "pay" (index 1 = pay_optional_cost)
-                           // GAP: handle_optional_cost_payment re-enters placement for effect-based optional
     assert_eq!(
         game.state.player1.energy_zone.cards.len(),
         11,
@@ -171,10 +161,6 @@ fn kasumi_rule_4553_under_cards_follow_position_change() {
 // ====================================================================
 // PL!N-pb1-011 ミア・テイラー (cost 15) — Activation: place 1 energy under, retrieve 虹ヶ咲 live
 // ====================================================================
-// GAPS FOUND:
-//   - Custom cost handler says OK but does NOT remove energy from zone
-//   - Under cards count is 0 after cost → energy not actually placed under
-//   - use_limit=1 not enforced — second activation also succeeds
 
 #[test]
 fn mia_activate_cost_does_not_remove_energy() {
@@ -199,11 +185,10 @@ fn mia_activate_cost_does_not_remove_energy() {
         .stage
         .get_under_cards(MemberArea::Center)
         .len();
-    // GAP: cost now correctly removes energy and places under member
     assert_eq!(
         energy_after,
         energy_before - 1,
-        "custom cost removes 1 energy from zone"
+        "cost removes 1 energy from zone"
     );
     assert_eq!(under, 1, "1 energy placed under member");
 }
@@ -253,8 +238,7 @@ fn mia_use_limit_not_enforced() {
         game.state.player1.hand.cards.contains(&niji1),
         "First activation works"
     );
-    // use_limit=1: second activation's error is swallowed by ability queue
-    // (process_ability_queue logs "Failed to resolve ability" but doesn't propagate)
+    // use_limit=1: second activation is blocked by use_limit check
     let hand_before = game.state.player1.hand.cards.len();
     let energy_before = game.state.player1.energy_zone.cards.len()
         + game
@@ -400,8 +384,6 @@ fn ayumu_bp3n_q157_wait_energy_placed_under() {
 // ====================================================================
 // PL!N-bp3-025-L Awakening Promise — LiveStart: remove energy from under → hearts
 // ====================================================================
-// GAP: `source: "under_member"` not handled in execute_move_cards
-// Engine returns "Unknown source zone" error when resolving effect.
 
 #[test]
 fn awakening_move_energy_from_under_to_deck() {
@@ -470,8 +452,6 @@ fn awakening_move_energy_from_under_to_deck() {
 // ====================================================================
 // PL!N-bp5-013-N 上原歩夢 (cost 2) — LiveStart: if energy under any member → heart01
 // ====================================================================
-// GAP: Condition PASSES (logs show PASS) but get_heart_modifier returns 0.
-// The heart01 modifier may be stored differently (on the card vs member).
 
 #[test]
 fn ayumu_bp5n_heart01_condition_passes_but_modifier_not_found() {
@@ -501,7 +481,6 @@ fn ayumu_bp5n_heart01_condition_passes_but_modifier_not_found() {
 // ====================================================================
 // PL!N-PR-026-PR 天王寺璃奈 (cost ~15) — Debut: place member under; gains LiveSuccess
 // ====================================================================
-// GAP: debut ability may not trigger properly for high-cost cards
 
 #[test]
 fn rina_debit_triggers_with_target_in_discard() {
@@ -595,12 +574,6 @@ fn rina_rule_4553_under_member_follows_position_change() {
 // ====================================================================
 // PL!HS-pb1-002 村野さやか — Activation: reveal & place under; LiveStart: per-under heart05
 // ====================================================================
-// GAPS:
-//   1. Activation: effect `destination: "under_member"` not reached via move_cards
-//      from revealed_cards → revealed cards stay in revealed, don't go under
-//   2. LiveStart: `per_unit_type: "枚"` resolves to hand cards, NOT under cards
-//      → engine needs "under_member" zone type for per_unit counting
-//   3. Heart05 modifier always = hand.len() regardless of under card count
 
 #[test]
 fn sayaka_activate_effect_does_not_place_under() {

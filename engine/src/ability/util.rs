@@ -1232,6 +1232,16 @@ pub fn count_in_zone(
     filter: &CardFilter,
     card_db: &CardDatabase,
 ) -> u32 {
+    if Zone::from_str(zone) == Some(Zone::UnderMember) {
+        let cards: Vec<i16> = player
+            .stage
+            .under_cards
+            .iter()
+            .flat_map(|sv| sv.iter())
+            .copied()
+            .collect();
+        return count_matching(&cards, card_db, filter, false);
+    }
     count_matching(
         zone_cards(player, zone),
         card_db,
@@ -1746,6 +1756,9 @@ pub fn apply_distinct_filter(
 pub fn get_zone_card_count(player: &crate::player::Player, zone: &str) -> usize {
     if Zone::from_str(zone) == Some(Zone::Stage) {
         return player.stage.stage.iter().filter(|&&c| c != -1).count();
+    }
+    if Zone::from_str(zone) == Some(Zone::UnderMember) {
+        return player.stage.under_cards.iter().map(|sv| sv.len()).sum();
     }
     zone_cards(player, zone).len()
 }
