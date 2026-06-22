@@ -896,3 +896,212 @@ fn live_card_own_live_success_no_trigger() {
         "Live card's own LiveSuccess draws; Victory Road does NOT fire for non-member"
     );
 }
+
+/// T19: バアドケージ card_count_condition with cost_limit — NO qualifying members.
+///
+/// Place Baad Cage as live card with 2 filler members on stage
+/// (no 蓮ノ空 group, no cost >= 10). The condition should be false.
+#[test]
+fn baad_cage_cost_limit_no_match() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let baad_cage = game.id("PL!HS-bp5-020-L");
+    let filler = game.new_id("PL!-sd1-010-SD");
+
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // Verify cost_limit is parsed correctly on the ability
+    let card_data = game.state.card_database.get_card(baad_cage);
+    assert!(card_data.is_some(), "Baad Cage card should load");
+    if let Some(card) = card_data {
+        let has_cost_limit = card.abilities.iter().any(|ab| {
+            ab.effect.as_ref().is_some_and(|eff| {
+                eff.condition.as_ref().is_some_and(|cond| {
+                    cond.cost_limit == Some(10) && cond.cost_limit_operator.as_deref() == Some(">=")
+                })
+            })
+        });
+        assert!(
+            has_cost_limit,
+            "Baad Cage should have cost_limit=10, operator=>="
+        );
+    }
+
+    game.state.player1.hand.cards.push(baad_cage);
+    game.state.player1.hand.cards.push(filler);
+
+    advance_to_live_start(&mut game);
+    game.set_live_card(baad_cage);
+    finish_live_setup(&mut game);
+    drain_choices(&mut game);
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(baad_cage),
+        0,
+        "No qualifying members → score 0"
+    );
+}
+
+/// T20: バアドケージ — 2 蓮ノ空 members with cost >= 10 → score +1.
+///
+/// Place Baad Cage as live card with 2 蓮ノ空 members on stage
+/// (sayaka cost=11, kozue cost=13). Both match the condition
+/// (group=蓮ノ空, cost >= 10, count >= 2) → LiveStart grants +1 score.
+#[test]
+fn baad_cage_cost_limit_two_hasunosora_members_grants_score() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let baad_cage = game.id("PL!HS-bp5-020-L");
+    let sayaka = game.id("PL!HS-bp1-002-R");
+    let kozue = game.id("PL!HS-bp1-003-R\u{ff0b}");
+    let filler = game.new_id("PL!-sd1-010-SD");
+
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // Stage: 2 蓮ノ空 members (both cost >= 10) → condition met
+    game.state.player1.stage.stage[0] = sayaka;
+    game.state.player1.stage.stage[1] = kozue;
+    game.state.player1.stage.stage[2] = -1;
+    game.state.player1.hand.cards.push(baad_cage);
+    game.state.player1.hand.cards.push(filler);
+
+    advance_to_live_start(&mut game);
+    game.set_live_card(baad_cage);
+    finish_live_setup(&mut game);
+    drain_choices(&mut game);
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(baad_cage),
+        1,
+        "2 蓮ノ空 members with cost >= 10 → score +1"
+    );
+}
+
+/// T21: バアドケージ — 1 蓮ノ空 member with cost >= 10 → score 0.
+///
+/// Only 1 member meets the condition (count >= 2 required).
+/// Verifies the count threshold is enforced independently of cost_limit.
+#[test]
+fn baad_cage_cost_limit_one_member_no_score() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let baad_cage = game.id("PL!HS-bp5-020-L");
+    let sayaka = game.id("PL!HS-bp1-002-R"); // cost=11, 蓮ノ空
+    let filler = game.new_id("PL!-sd1-010-SD");
+
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // Stage: 1 蓮ノ空 member (cost >= 10) + 1 filler → condition fails (count < 2)
+    game.state.player1.stage.stage[0] = sayaka;
+    game.state.player1.stage.stage[1] = filler;
+    game.state.player1.stage.stage[2] = -1;
+    game.state.player1.hand.cards.push(baad_cage);
+    game.state.player1.hand.cards.push(filler);
+
+    advance_to_live_start(&mut game);
+    game.set_live_card(baad_cage);
+    finish_live_setup(&mut game);
+    drain_choices(&mut game);
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(baad_cage),
+        0,
+        "Only 1 qualifying member → score 0"
+    );
+}
+
+/// T22: バアドケージ — 2 蓮ノ空 members, one cost < 10 → score 0.
+///
+/// Verify cost_limit works: one member has cost=9 (< 10) so only 1
+/// member meets the full condition → count < 2 → no score.
+#[test]
+fn baad_cage_cost_limit_one_below_threshold_no_score() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let baad_cage = game.id("PL!HS-bp5-020-L");
+    let sayaka = game.id("PL!HS-bp1-002-R"); // cost=11, 蓮ノ空 ✓
+    let low_cost = game.id("PL!HS-bp1-005-PR"); // cost=9, 蓮ノ空 ✗ (< 10)
+    let filler = game.new_id("PL!-sd1-010-SD");
+
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // Stage: 2 蓮ノ空 members, but one cost=9 → only 1 qualifies → condition fails
+    game.state.player1.stage.stage[0] = sayaka;
+    game.state.player1.stage.stage[1] = low_cost;
+    game.state.player1.stage.stage[2] = -1;
+    game.state.player1.hand.cards.push(baad_cage);
+    game.state.player1.hand.cards.push(filler);
+
+    advance_to_live_start(&mut game);
+    game.set_live_card(baad_cage);
+    finish_live_setup(&mut game);
+    drain_choices(&mut game);
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(baad_cage),
+        0,
+        "Only 1 of 2 蓮ノ空 members has cost >= 10 → score 0"
+    );
+}
+
+/// T23: 3 qualifying 蓮ノ空 members → score +1 (same as 2, condition is >=2).
+#[test]
+fn baad_cage_three_members_score_still_one() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let baad_cage = game.id("PL!HS-bp5-020-L");
+    let sayaka = game.id("PL!HS-bp1-002-R"); // cost=11
+    let kozue = game.id("PL!HS-bp1-003-R\u{ff0b}"); // cost=13
+    let multiname = game.id("LL-bp1-001-R\u{ff0b}"); // cost=20, matches 蓮ノ空
+    let filler = game.new_id("PL!-sd1-010-SD");
+
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // Stage: 3 qualifying 蓮ノ空 members (all cost >= 10)
+    game.state.player1.stage.stage[0] = sayaka;
+    game.state.player1.stage.stage[1] = kozue;
+    game.state.player1.stage.stage[2] = multiname;
+    game.state.player1.hand.cards.push(baad_cage);
+    game.state.player1.hand.cards.push(filler);
+
+    advance_to_live_start(&mut game);
+    game.set_live_card(baad_cage);
+    finish_live_setup(&mut game);
+    drain_choices(&mut game);
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(baad_cage),
+        1,
+        "3 qualifying members → score +1 (condition is >=2)"
+    );
+}
