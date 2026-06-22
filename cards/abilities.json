@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-23T06:39:44.921109",
+  "generated_at": "2026-06-23T07:17:08.632449",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -927,9 +927,9 @@
           {
             "text": "好きなハートの色を1つ指定する",
             "count": 1,
-            "action": "gain_resource",
-            "resource": "heart",
-            "heart_selection": true
+            "action": "specify_heart_color",
+            "choice": true,
+            "target": "self"
           },
           {
             "text": "そのハートを1つ得る",
@@ -1392,9 +1392,9 @@
           {
             "text": "好きなハートの色を1つ指定する",
             "count": 1,
-            "action": "gain_resource",
-            "resource": "heart",
-            "heart_selection": true
+            "action": "specify_heart_color",
+            "choice": true,
+            "target": "self"
           },
           {
             "text": "そのハートを1つ得る",
@@ -3349,9 +3349,9 @@
           {
             "text": "好きなハートの色を1つ指定する",
             "count": 1,
-            "action": "gain_resource",
-            "resource": "heart",
-            "heart_selection": true
+            "action": "specify_heart_color",
+            "choice": true,
+            "target": "self"
           },
           {
             "text": "そのハートを1つ得る",
@@ -4663,8 +4663,7 @@
               "state_change": "active",
               "card_type": "member_card",
               "action": "change_state",
-              "count": 1,
-              "activation_position": "left_side"
+              "count": 1
             },
             {
               "text": "2枚ある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -4682,8 +4681,7 @@
               "action": "gain_resource",
               "resource": "blade",
               "count": 2,
-              "duration": "live_end",
-              "activation_position": "left_side"
+              "duration": "live_end"
             }
           ],
           "activation_position": "left_side"
@@ -5333,11 +5331,14 @@
               {
                 "text": "好きなハートの色を1つ指定する",
                 "count": 1,
-                "action": "gain_resource",
-                "resource": "heart",
-                "heart_selection": true,
+                "action": "specify_heart_color",
+                "choice": true,
+                "target": "self",
                 "position": "center",
-                "activation_position": "center"
+                "activation_position": "center",
+                "group_names": [
+                  "μ's"
+                ]
               },
               {
                 "text": "そのハートを1つ得る",
@@ -12087,9 +12088,12 @@
           {
             "text": "好きなハートの色を1つ指定する",
             "count": 1,
-            "action": "gain_resource",
-            "resource": "heart",
-            "heart_selection": true
+            "action": "specify_heart_color",
+            "choice": true,
+            "target": "self",
+            "group_names": [
+              "虹ヶ咲"
+            ]
           },
           {
             "text": "自分のステージにいるこのメンバー以外の『虹ヶ咲』のメンバー1人は、そのハートを1つ得る",

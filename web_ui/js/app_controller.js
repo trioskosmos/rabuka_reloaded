@@ -142,6 +142,7 @@ const actionHandlers = {
     'close-game-state-modal': () => GameStateModal.close(),
     'switch-game-state-tab': ({ value }) => GameStateModal.showTab(value),
     'close-discard-modal': () => ModalManager.hide(DOM_IDS.MODAL_DISCARD),
+    'close-revealed-modal': () => ModalManager.hide(DOM_IDS.MODAL_REVEALED),
     'close-log-detail-modal': LogDetailModal.close,
     'reload-page': () => window.location.reload(),
     'cheat-add-energy': ({ player }) => {

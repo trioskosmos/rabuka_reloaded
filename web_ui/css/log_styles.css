@@ -280,6 +280,15 @@
 }
 
 /* Card thumbnail in log entries */
+.log-revealed-thumb {
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+.log-revealed-thumb:hover {
+    transform: scale(1.15);
+    z-index: 2;
+}
+
 .log-card-thumb {
     width: 24px;
     height: 34px;
@@ -550,9 +559,6 @@
 
 .compact-choice-card {
     position: relative;
-    width: 60px;
-    height: 84px;
-    aspect-ratio: 512 / 720;
     border-radius: 4px;
     border: 1px solid var(--border);
     background: rgba(255,255,255,0.05);
@@ -572,8 +578,6 @@
 }
 
 .compact-choice-card.orientation-landscape {
-    width: 84px !important;
-    height: 60px !important;
     aspect-ratio: 720 / 512;
 }
 

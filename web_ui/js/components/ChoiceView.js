@@ -295,7 +295,7 @@ export const ChoiceView = {
                         text-align: left;
                     `;
                     if (cardData && cardData.card_no) {
-                        const vm = CardRenderer.getCardViewModel(cardData, { compact: true });
+                        const vm = CardRenderer.getCardViewModel(cardData, { mini: true });
                         const cardPortion = CardRenderer.createCardDOM(vm, cardData);
                         cardPortion.classList.remove('rotate-img-90');
                         choiceEl.appendChild(cardPortion);
@@ -363,7 +363,7 @@ export const ChoiceView = {
                         choiceEl.appendChild(backImg);
                         choiceEl.title = '??? (blind pick)';
                     } else {
-                        const vm = CardRenderer.getCardViewModel(cardData, { compact: true });
+                        const vm = CardRenderer.getCardViewModel(cardData, { mini: true });
                         choiceEl = CardRenderer.createCardDOM(vm, cardData);
                         choiceEl.classList.remove('rotate-img-90');
                         choiceEl.classList.add('compact-choice-card', 'has-image');

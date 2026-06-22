@@ -65,6 +65,11 @@ export const DOM_IDS = {
   LOOKED_CARDS_PANEL: 'looked-cards-panel',
   LOOKED_CARDS_CONTENT: 'looked-cards-content',
 
+  // Revealed Cards Modal
+  MODAL_REVEALED: 'revealed-modal',
+  REVEALED_TITLE: 'revealed-modal-title',
+  REVEALED_CONTENT: 'revealed-modal-content',
+
   // Log Detail Modal
   MODAL_LOG_DETAIL: 'log-detail-modal',
   LOG_DETAIL_TITLE: 'log-detail-title',

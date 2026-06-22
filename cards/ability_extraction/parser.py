@@ -3635,15 +3635,18 @@ def parse_action(text: str) -> Dict[str, Any]:
             }
         ),
     )
+    # "ハートの色を指定する" → specify_heart_color (separate from the actual gain)
     R(
-        lambda t: (
-            "ハートの色を" in t
-            or (
-                "ハートを" in t
-                and "にする" in t
-                and not ("すべて" in t and "{{heart_" in t)
-            )
-        ),
+        lambda t: "ハートの色を" in t,
+        "specify_heart_color",
+        lambda t, a: a.update({"choice": True, "target": "self"}),
+    )
+    # "ハートをXXにする" → gain_resource with heart_selection
+    R(
+        lambda t: "ハートを" in t
+        and "にする" in t
+        and not ("すべて" in t and "{{heart_" in t)
+        and not "ハートの色を" in t,
         "gain_resource",
         lambda t, a: a.update({"resource": "heart", "heart_selection": True}),
     )

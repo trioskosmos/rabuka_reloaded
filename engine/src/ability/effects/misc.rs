@@ -448,6 +448,15 @@ impl AbilityResolver {
                     gs.ability_queue
                         .current_entry()
                         .and_then(|e| e.conditional_choice.clone())
+                        .or_else(|| {
+                            // Fallback: handle_heart_color_selection stores the color in
+                            // prohibition_effects as "selected_heart_color:{color}" before
+                            // clear_choice_meta resets conditional_choice.
+                            gs.prohibition_effects
+                                .iter()
+                                .find_map(|e| e.strip_prefix("selected_heart_color:"))
+                                .map(|s| s.to_string())
+                        })
                 } else {
                     None
                 }

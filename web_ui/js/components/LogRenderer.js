@@ -4,7 +4,10 @@ import { Tooltips } from '../ui_tooltips.js';
 import { LogFilter } from '../utils/LogFilter.js';
 import { PerformanceMonitor } from '../utils/PerformanceMonitor.js';
 import { LogViewerModal } from '../modals/LogViewerModal.js';
-import { resolveCardImagePath } from './CardRenderer.js';
+import { ModalManager } from '../utils/ModalManager.js';
+import { DOM_IDS } from '../constants_dom.js';
+import { fixImg } from '../constants.js';
+import { resolveCardImagePath, CardRenderer } from './CardRenderer.js';
 
 const Phase = {
     RPS: 0, SETUP: 1, MULLIGAN_P1: 2, MULLIGAN_P2: 3,
@@ -957,9 +960,13 @@ export const LogRenderer = {
                 if (imgPath) {
                     const img = document.createElement('img');
                     img.src = imgPath;
-                    img.className = 'log-card-thumb';
+                    img.className = 'log-card-thumb log-revealed-thumb';
                     img.alt = cardData.name || name;
                     img.loading = 'lazy';
+                    img.onclick = (e) => {
+                        e.stopPropagation();
+                        LogRenderer.showRevealedCardsModal();
+                    };
                     fragment.appendChild(img);
                 }
                 if (!entryEl.dataset.cardId && cardData.id !== undefined) {
@@ -970,6 +977,42 @@ export const LogRenderer = {
         if (fragment.childNodes.length > 0) {
             entryEl.insertBefore(fragment, entryEl.firstChild);
         }
+    },
+
+    showRevealedCardsModal: () => {
+        const s = State.data;
+        if (!s) return;
+        const title = document.getElementById(DOM_IDS.REVEALED_TITLE);
+        const content = document.getElementById(DOM_IDS.REVEALED_CONTENT);
+        if (!title || !content) return;
+
+        const p1Revealed = s.player1_cheer_revealed_cards || [];
+        const p2Revealed = s.player2_cheer_revealed_cards || [];
+        const costRevealed = s.revealed_cost_cards || [];
+
+        const cardToHtml = (id) => {
+            const card = State.resolveCardData(id);
+            if (!card) return `<div class="revealed-card chip">ID:${id}</div>`;
+            const imgPath = resolveCardImagePath(card.card_no);
+            const img = imgPath ? `<img src="${fixImg(imgPath)}" class="revealed-card-img" alt="${card.name}">` : '';
+            return `<div class="revealed-card">${img}<span class="revealed-card-name">${card.name}</span></div>`;
+        };
+
+        const section = (label, ids) => ids.length > 0
+            ? `<div class="revealed-section"><h4>${label} (${ids.length})</h4><div class="revealed-grid">${ids.map(cardToHtml).join('')}</div></div>`
+            : '';
+
+        const p1Label = State.perspectivePlayer === 0 ? i18n.t('you') : i18n.t('opponent');
+        const p2Label = State.perspectivePlayer === 1 ? i18n.t('you') : i18n.t('opponent');
+
+        title.textContent = 'Revealed Cards';
+        content.innerHTML = section(p1Label, p1Revealed) + section(p2Label, p2Revealed) + section('Cost Revealed', costRevealed);
+
+        if (!p1Revealed.length && !p2Revealed.length && !costRevealed.length) {
+            content.innerHTML = '<div style="opacity:0.5;padding:40px;text-align:center;">No cards have been revealed this game.</div>';
+        }
+
+        ModalManager.show(DOM_IDS.MODAL_REVEALED);
     },
 
     appendFullAbility: (containerEl, cardData) => {
