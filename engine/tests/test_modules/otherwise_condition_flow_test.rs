@@ -168,7 +168,7 @@ fn karin_reveal_condition_met_hand_count_increases() {
     game.add_to_hand(karin);
     game.add_to_hand(filler);
     game.give_energy(20);
-    let hand_before = game.state.player1.hand.cards.len();
+    let _hand_before = game.state.player1.hand.cards.len();
     game.play_to_stage(filler, MemberArea::LeftSide);
     game.play_to_stage(karin, MemberArea::Center);
     // After playing 2 members: hand decreased by 2

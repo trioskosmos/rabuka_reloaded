@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-22T21:13:43.193223",
+  "generated_at": "2026-06-22T21:45:21.243648",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1611,7 +1611,8 @@
           "text": "合計スコアを+2する。」を得る",
           "action": "modify_score",
           "value": 2,
-          "operation": "add"
+          "operation": "add",
+          "location": "stage"
         },
         "condition": {
           "type": "compound",
@@ -1668,7 +1669,8 @@
           "target": "self",
           "action": "modify_score",
           "value": 1,
-          "operation": "add"
+          "operation": "add",
+          "location": "stage"
         },
         "group_names": [
           "Aqours"
@@ -4182,7 +4184,8 @@
               "count": 6,
               "operator": ">=",
               "text": "6種類以上ある場合",
-              "unit": "types"
+              "unit": "types",
+              "location": "revealed_cards"
             },
             "action": "gain_ability",
             "ability_gain": "ライブの合計スコアを+1する。",
@@ -4856,7 +4859,8 @@
           "text": "{{icon_energy.png|E}}支払ってもよい。",
           "action": "pay_energy",
           "energy": 1,
-          "count": 1
+          "count": 1,
+          "location": "discard"
         },
         "conditional_action": {
           "text": "それらのカードの中から1枚手札に加える",
@@ -4864,7 +4868,8 @@
           "destination": "hand",
           "count": 1,
           "action": "move_cards",
-          "card_type": "card"
+          "card_type": "card",
+          "location": "discard"
         }
       }
     },
@@ -5673,7 +5678,8 @@
           "heart_colors": [
             "heart02",
             "heart04"
-          ]
+          ],
+          "location": "live_card_zone"
         },
         "group_names": [
           "Aqours"
@@ -10161,7 +10167,8 @@
               "state": "active",
               "text": "自分のエネルギーがすべてアクティブ状態の場合",
               "resource_type": "energy",
-              "all": true
+              "all": true,
+              "location": "stage"
             },
             "action": "modify_score",
             "value": 1,
@@ -10413,7 +10420,8 @@
             "target": "self",
             "text": "エールにより公開された自分のカードの中にライブカードがないとき",
             "negation": true
-          }
+          },
+          "location": "revealed_cards"
         },
         "result_condition": {
           "type": "card_count_condition",
@@ -10425,7 +10433,8 @@
         "followup_action": {
           "text": "そのエールで得たブレードハートを失い、もう一度エールを行う",
           "action": "re_yell",
-          "lose_blade_hearts": true
+          "lose_blade_hearts": true,
+          "location": "revealed_cards"
         },
         "all": true,
         "condition": {
@@ -12667,7 +12676,8 @@
             "action": "modify_score",
             "value": 2,
             "operation": "add"
-          }
+          },
+          "location": "success_live_card_zone"
         },
         "condition": {
           "type": "card_count_condition",
@@ -12706,7 +12716,8 @@
             "action": "modify_score",
             "value": 1,
             "operation": "add"
-          }
+          },
+          "location": "success_live_card_zone"
         },
         "parenthetical": [
           "この能力はセンターエリアに登場した場合のみ発動する。"
@@ -14801,7 +14812,8 @@
             "text": "それ以外の場合、公開したカードを控え室に置く",
             "condition": {
               "type": "otherwise_condition",
-              "text": "それ以外の場合"
+              "text": "それ以外の場合",
+              "location": "revealed_cards"
             },
             "source": "revealed_cards",
             "dynamic_count": {
@@ -16137,7 +16149,8 @@
           "text": "{{icon_energy.png|E}}支払ってもよい。",
           "action": "pay_energy",
           "energy": 1,
-          "count": 1
+          "count": 1,
+          "location": "stage"
         },
         "conditional_action": {
           "text": "エネルギーを2枚アクティブにする",
@@ -16145,7 +16158,8 @@
           "count": 2,
           "action": "change_state",
           "card_type": "energy_card",
-          "exclude_self": true
+          "exclude_self": true,
+          "location": "stage"
         }
       }
     },
@@ -22309,7 +22323,8 @@
               "condition": {
                 "type": "opponent_live_success",
                 "no_excess_heart": true,
-                "text": "このターン、相手が余剰のハートを持たずにライブを成功させていた場合"
+                "text": "このターン、相手が余剰のハートを持たずにライブを成功させていた場合",
+                "location": "stage"
               },
               "text": "このターン、相手が余剰のハートを持たずにライブを成功させていた場合"
             }
@@ -23091,7 +23106,8 @@
           "text": "スコアを+2する",
           "action": "modify_score",
           "value": 2,
-          "operation": "add"
+          "operation": "add",
+          "location": "success_live_card_zone"
         },
         "condition": {
           "text": "自分の成功ライブカード置き場にスコアが1か5のカードがある場合",
@@ -23121,7 +23137,8 @@
           "action": "modify_score",
           "value": 1,
           "operation": "add",
-          "self_target": true
+          "self_target": true,
+          "location": "success_live_card_zone"
         }
       }
     },
@@ -23908,7 +23925,8 @@
               "operator": ">=",
               "comparison_type": "score",
               "aggregate": "total",
-              "type": "comparison_condition"
+              "type": "comparison_condition",
+              "location": "success_live_card_zone"
             },
             "action": "modify_score",
             "value": 1,
@@ -24315,7 +24333,8 @@
           "text": "スコアを+2する",
           "action": "modify_score",
           "value": 2,
-          "operation": "add"
+          "operation": "add",
+          "location": "discard"
         },
         "condition": {
           "type": "card_count_condition",
@@ -24346,7 +24365,8 @@
           "action": "modify_score",
           "value": 1,
           "operation": "add",
-          "self_target": true
+          "self_target": true,
+          "location": "discard"
         },
         "group_names": [
           "虹ヶ咲"
@@ -25373,7 +25393,8 @@
               "operator": ">=",
               "text": "2人以上いる場合",
               "unit": "人",
-              "card_type": "member_card"
+              "card_type": "member_card",
+              "location": "stage"
             },
             "duration": "live_end",
             "count": 1,
@@ -25401,7 +25422,8 @@
                   "operator": ">=",
                   "text": "3人以上おり、",
                   "unit": "人",
-                  "card_type": "member_card"
+                  "card_type": "member_card",
+                  "location": "stage"
                 },
                 {
                   "type": "location_condition",
@@ -25412,7 +25434,8 @@
                 }
               ],
               "text": "3人以上おり、かつそれぞれ名前が異なる場合",
-              "distinct": "card_name"
+              "distinct": "card_name",
+              "location": "stage"
             },
             "action": "modify_score",
             "value": 1,
@@ -26402,7 +26425,8 @@
             "text": "自分のステージにいる『Liella!』のメンバーがこのターンにエリアを移動しているかぎり",
             "group_names": [
               "Liella!"
-            ]
+            ],
+            "location": "hand"
           },
           "text": "自分のステージにいる『Liella!』のメンバーがこのターンにエリアを移動しているかぎり",
           "card_type": "member_card",
@@ -28839,7 +28863,8 @@
               "operator": ">=",
               "text": "2人以上いる場合",
               "unit": "人",
-              "card_type": "member_card"
+              "card_type": "member_card",
+              "location": "stage"
             },
             "action": "modify_required_hearts",
             "heart_colors": [
@@ -29413,7 +29438,8 @@
           ],
           "optional": true,
           "action": "move_cards",
-          "destination": null
+          "destination": null,
+          "location": "success_live_card_zone"
         },
         "condition": {
           "type": "location_condition",
@@ -30593,7 +30619,8 @@
           ],
           "operation": "decrease",
           "self_target": true,
-          "value": 2
+          "value": 2,
+          "location": "stage"
         },
         "group_names": [
           "蓮ノ空"
@@ -31573,7 +31600,8 @@
               "type": "card_count_condition",
               "count": 8,
               "operator": ">=",
-              "text": "8枚以上あるかぎり"
+              "text": "8枚以上あるかぎり",
+              "location": "energy_zone"
             },
             "duration": "as_long_as",
             "conditional": true,
@@ -31658,7 +31686,8 @@
               "type": "card_count_condition",
               "count": 8,
               "operator": ">=",
-              "text": "8枚以上あるかぎり"
+              "text": "8枚以上あるかぎり",
+              "location": "energy_zone"
             },
             "duration": "as_long_as",
             "conditional": true,
@@ -31806,7 +31835,8 @@
               "type": "card_count_condition",
               "count": 8,
               "operator": ">=",
-              "text": "8枚以上あるかぎり"
+              "text": "8枚以上あるかぎり",
+              "location": "energy_zone"
             },
             "duration": "as_long_as",
             "conditional": true,
@@ -31965,7 +31995,9 @@
           "Liella!"
         ],
         "location": "stage",
-        "target": "self"
+        "target": "self",
+        "need_heart_total": 4,
+        "need_heart_operator": ">="
       }
     },
     {

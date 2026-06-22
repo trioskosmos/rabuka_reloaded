@@ -324,7 +324,7 @@ fn dia_position_change_two_saintsnow_both_selectable() {
     let dia = game.id("PL!S-bp5-004-R");
     let seira1 = game.id("PL!S-bp5-222-R"); // 理亞 (SaintSnow)
     let seira2 = game.id("PL!S-bp5-222-R"); // second copy
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
 
     // Stage: [理亞1(SaintSnow), 理亞2(SaintSnow), -]
     game.state.player1.stage.stage = [seira1, seira2, -1];

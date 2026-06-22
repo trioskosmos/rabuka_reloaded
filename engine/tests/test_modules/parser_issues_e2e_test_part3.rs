@@ -315,7 +315,7 @@ fn karin_edge_1_waited_1_niji_in_discard() {
 
     fill_decks(&mut game);
     let waitroom_before = game.state.player1.waitroom.cards.len();
-    let deck_after_fill = game.state.player1.main_deck.cards.len();
+    let _deck_after_fill = game.state.player1.main_deck.cards.len();
 
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
@@ -359,7 +359,7 @@ fn karin_edge_3_waited_1_niji_available() {
 
     fill_decks(&mut game);
     let waitroom_before = game.state.player1.waitroom.cards.len();
-    let deck_after_fill = game.state.player1.main_deck.cards.len();
+    let _deck_after_fill = game.state.player1.main_deck.cards.len();
 
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
@@ -406,7 +406,7 @@ fn karin_edge_2_waited_2_niji_select_both() {
 
     fill_decks(&mut game);
     let waitroom_before = game.state.player1.waitroom.cards.len();
-    let deck_after_fill = game.state.player1.main_deck.cards.len();
+    let _deck_after_fill = game.state.player1.main_deck.cards.len();
 
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
@@ -453,7 +453,7 @@ fn karin_edge_non_niji_not_selectable() {
 
     fill_decks(&mut game);
     let waitroom_before = game.state.player1.waitroom.cards.len();
-    let deck_after_fill = game.state.player1.main_deck.cards.len();
+    let _deck_after_fill = game.state.player1.main_deck.cards.len();
 
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);

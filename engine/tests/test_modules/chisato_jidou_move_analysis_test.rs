@@ -47,7 +47,7 @@ fn chisato_auto_first_no_energy() {
 
     let chisato = game.id("PL!SP-bp2-003-R");
     let shiki = game.id("PL!SP-bp4-008-R＋");
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
 
     game.add_to_hand(shiki);
     game.state.player1.stage.stage[0] = chisato;
@@ -102,7 +102,7 @@ fn debut_first_chisato_auto_second_no_energy() {
 
     let chisato = game.id("PL!SP-bp2-003-R");
     let shiki = game.id("PL!SP-bp4-008-R＋");
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
 
     game.add_to_hand(shiki);
     game.state.player1.stage.stage[0] = chisato;

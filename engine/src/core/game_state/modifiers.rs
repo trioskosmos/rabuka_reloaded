@@ -313,6 +313,13 @@ impl GameState {
                             Some(crate::ability::enums::ActionType::Sequential) => {
                                 if let Some(ref actions) = effect.compound.actions {
                                     for sub in actions {
+                                        let sub_cond = sub
+                                            .condition
+                                            .as_ref()
+                                            .is_none_or(|c| ctx.evaluate_condition(c));
+                                        if !sub_cond {
+                                            continue;
+                                        }
                                         if let Some(
                                             crate::ability::enums::ActionType::GainResource,
                                         ) =

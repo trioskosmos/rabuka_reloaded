@@ -102,7 +102,7 @@ fn q250_use_limit() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let (ceras, first) = setup_ceras_appearance(&mut game, 2);
+    let (ceras, _first) = setup_ceras_appearance(&mut game, 2);
     trigger_ceras_auto(&mut game);
     assert!(game.has_pending_choice(), "First trigger works");
     game.select_indices(&[0]);

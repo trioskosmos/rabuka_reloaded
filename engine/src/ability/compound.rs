@@ -216,6 +216,12 @@ impl AbilityResolver {
                             }
                         }
                     }
+                    // Inherit card_names from the parent (set at the sequential
+                    // level, e.g. EMOTION's "card_names": ["EMOTION"]) so that
+                    // per-unit counting in sub-actions only counts matching cards.
+                    if action_to_execute.card_names.is_empty() && !effect.card_names.is_empty() {
+                        action_to_execute.card_names.clone_from(&effect.card_names);
+                    }
 
                     log::debug!(
                         "[SEQ_LOOP] executing action[{}] action={} pending_before={:?}",

@@ -758,6 +758,11 @@ pub struct AbilityEffect {
     /// - Empty: use default (heart00 for single-value ops, no filter for filter ops)
     #[serde(default)]
     pub heart_colors: Vec<String>,
+    /// Card names to filter by (e.g. `["EMOTION"]`).  When set, per-unit
+    /// counting and effect targeting only consider cards whose name
+    /// contains one of these strings (case-insensitive substring match).
+    #[serde(default)]
+    pub card_names: Vec<String>,
     pub blade_type: Option<String>,
     #[serde(alias = "energy")]
     pub energy_count: Option<u32>,
@@ -1048,6 +1053,11 @@ impl AbilityEffect {
                 None
             },
             exclude_group_names: self.exclude_group_names.as_ref(),
+            name_fragments: if self.card_names.is_empty() {
+                None
+            } else {
+                Some(&self.card_names)
+            },
             ..Default::default()
         }
     }

@@ -8240,6 +8240,19 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 cond["card_property"] = "has_score_icon"
                 fix_stats["card_property"] += 1
 
+        # FIX 8f: need_heart_total from "ハートをNつ以上持つ" (heart threshold)
+        # Only in per_unit contexts (move_cards already handled by _try_virtuoso_move_cards).
+        if (
+            eff.get("per_unit")
+            and not eff.get("need_heart_total")
+            and not eff.get("dynamic_count")
+        ):
+            nh = re.search(r"ハートを(\d+)つ以上持つ", t)
+            if nh:
+                eff["need_heart_total"] = int(nh.group(1))
+                eff["need_heart_operator"] = ">="
+                fix_stats["need_heart"] = fix_stats.get("need_heart", 0) + 1
+
         # FIX 9: Result condition enrichment in conditional_on_result
         rc = eff.get("result_condition")
         if isinstance(rc, dict) and rc.get("type") == "card_count_condition":
@@ -8793,6 +8806,17 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 ch = node.get(ck)
                 if isinstance(ch, dict):
                     _propagate_context(ch, new_ctx)
+                    # Propagate location from condition back to the parent
+                    # context so sibling actions in a sequential inherit it.
+                    # Only propagate location — target and card_type are too
+                    # context-dependent and would be incorrectly injected.
+                    for f in ("location",):
+                        if f in ch and f not in node and f not in ctx:
+                            ctx[f] = ch[f]
+                    # Also inherit missing location from parent context into condition
+                    for f in ("location",):
+                        if f not in ch and f in ctx:
+                            ch[f] = ctx[f]
 
             for ak in ("actions",):
                 arr = node.get(ak, [])

@@ -177,7 +177,7 @@ fn keke_blocked_from_locked_area() {
     // Now play Keke to Left (index of keke in hand... we need to track carefully)
     // After playing starter, hand should have [liella, keke]
     // Let's find keke's position
-    let keke_pos = v
+    let _keke_pos = v
         .state
         .player1
         .hand
