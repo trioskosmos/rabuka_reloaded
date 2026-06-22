@@ -48,6 +48,11 @@ pub struct GameState {
     pub card_appearance_source: std::collections::HashMap<i16, String>,
     pub cards_moved_this_turn: std::collections::HashSet<i16>,
     pub gained_abilities: std::collections::HashMap<i16, Vec<String>>,
+    /// Gained effects that couldn't be evaluated at constant time (e.g. because
+    /// they depend on revealed_cards from the yell).  Stored as `(card_id, effect)`
+    /// and evaluated during `execute_live_victory_determination` when the yell
+    /// results are available.
+    pub delayed_gained_effects: Vec<(i16, crate::card::AbilityEffect)>,
     pub negated_abilities: std::collections::HashSet<i16>,
     pub replacement_effects: Vec<ReplacementEffect>,
     pub revealed_cards: Vec<i16>,
@@ -196,6 +201,7 @@ impl GameState {
             card_appearance_source: std::collections::HashMap::new(),
             cards_moved_this_turn: std::collections::HashSet::new(),
             gained_abilities: std::collections::HashMap::new(),
+            delayed_gained_effects: Vec::new(),
             negated_abilities: std::collections::HashSet::new(),
             replacement_effects: Vec::new(),
             revealed_cards: Vec::new(),

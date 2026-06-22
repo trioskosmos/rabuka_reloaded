@@ -4633,6 +4633,16 @@ def _try_conditional_alternative(text):
         ALTERNATIVE_MARKER
     ):
         return None
+    # If 代わりに is inside quoted text that ends with 」を得る (gain_ability
+    # pattern), skip — the inline gain_ability handler in parse_action will
+    # process it and the inner effect will be parsed from the quoted text.
+    alt_pos = text.find(ALTERNATIVE_MARKER)
+    qs = text.rfind("「", 0, alt_pos)
+    qe = text.find("」", qs) if qs >= 0 else -1
+    if qs >= 0 and qe >= 0 and alt_pos > qs and alt_pos < qe:
+        after = text[qe + 1 :].strip()
+        if after.startswith("を得る") or after.startswith("を得る。"):
+            return None
     parts = text.split(ALTERNATIVE_MARKER, 1)
     if len(parts) != 2:
         return None

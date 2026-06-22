@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-22T23:21:34.061179",
+  "generated_at": "2026-06-23T00:12:21.564901",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1606,72 +1606,75 @@
       "cost": null,
       "effect": {
         "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合、「{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを+1する。ライブカードが3枚以上ある場合、代わりに合計スコアを+2する。」を得る",
-        "action": "conditional_alternative",
-        "alternative_effect": {
-          "text": "合計スコアを+2する。」を得る",
-          "action": "modify_score",
-          "value": 2,
-          "operation": "add",
-          "location": "stage"
-        },
-        "condition": {
-          "type": "compound",
-          "operator": "and",
-          "conditions": [
-            {
-              "type": "appearance_condition",
-              "appearance": true,
-              "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、",
-              "location": "stage",
-              "all_areas": true,
-              "group_names": [
-                "Aqours"
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合、「{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを+1する",
+            "condition": {
+              "type": "compound",
+              "operator": "and",
+              "conditions": [
+                {
+                  "type": "appearance_condition",
+                  "appearance": true,
+                  "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、",
+                  "location": "stage",
+                  "all_areas": true,
+                  "group_names": [
+                    "Aqours"
+                  ],
+                  "target": "self"
+                },
+                {
+                  "type": "location_condition",
+                  "target": "self",
+                  "distinct": "card_name",
+                  "text": "名前が異なる場合",
+                  "location": "stage",
+                  "group_names": [
+                    "Aqours"
+                  ]
+                }
               ],
-              "target": "self"
-            },
-            {
-              "type": "location_condition",
+              "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合",
               "target": "self",
-              "distinct": "card_name",
-              "text": "名前が異なる場合",
               "location": "stage",
+              "card_type": "member_card",
+              "distinct": "card_name",
               "group_names": [
                 "Aqours"
               ]
-            }
-          ],
-          "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合",
-          "target": "self",
-          "location": "stage",
-          "card_type": "member_card",
-          "distinct": "card_name",
-          "group_names": [
-            "Aqours"
-          ]
-        },
-        "alternative_condition": {
-          "type": "card_count_condition",
-          "count": 1,
-          "operator": ">=",
-          "text": "1枚以上ある場合",
-          "location": "stage",
-          "target": "self"
-        },
-        "primary_effect": {
-          "text": "「{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが、ライブの合計スコアを+1する。ライブカードが3枚以上ある場合",
-          "source": "revealed_cards",
-          "dynamic_count": {
-            "type": "revealed_cards",
-            "reference": "previous_reveal"
+            },
+            "action": "modify_score",
+            "value": 1,
+            "operation": "add",
+            "group_names": [
+              "Aqours"
+            ]
           },
-          "count": 3,
-          "card_type": "live_card",
-          "target": "self",
-          "action": "modify_score",
-          "value": 1,
-          "operation": "add",
-          "location": "stage"
-        },
+          {
+            "text": "ライブカードが3枚以上ある場合、代わりに合計スコアを+2する",
+            "condition": {
+              "type": "card_count_condition",
+              "count": 3,
+              "operator": ">=",
+              "text": "ライブカードが3枚以上ある場合",
+              "card_type": "live_card",
+              "location": "stage"
+            },
+            "action": "conditional_alternative",
+            "alternative_effect": {
+              "text": "合計スコアを+2する",
+              "action": "modify_score",
+              "value": 2,
+              "operation": "add",
+              "location": "stage"
+            },
+            "group_names": [
+              "Aqours"
+            ]
+          }
+        ],
         "group_names": [
           "Aqours"
         ]

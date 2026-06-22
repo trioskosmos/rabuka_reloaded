@@ -258,6 +258,17 @@ impl GameState {
                                                     val,
                                                 ));
                                             }
+                                        } else if action
+                                            == Some(
+                                                crate::ability::enums::ActionType::ConditionalAlternative,
+                                            )
+                                        {
+                                            // Conditional gained effects (e.g. live_success score
+                                            // based on revealed card count) can't be evaluated at
+                                            // constant evaluation time.  Store them for later
+                                            // evaluation during execute_live_victory_determination.
+                                            self.delayed_gained_effects
+                                                .push((*card_id, (**gained).clone()));
                                         }
                                     } else {
                                         // Fallback: parse value from text (legacy path)

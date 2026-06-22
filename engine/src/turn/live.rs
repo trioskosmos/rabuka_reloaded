@@ -458,6 +458,50 @@ impl super::TurnEngine {
             snap.success = snap.lives.iter().all(|l| l.passed) && snap.total_score > 0;
         }
 
+        // Process delayed gained effects (e.g. constant gain_ability with
+        // conditional_alternative gained_effect that checks revealed_cards).
+        // These couldn't be evaluated at constant-evaluation time because the
+        // yell result wasn't available yet.
+        if !game_state.delayed_gained_effects.is_empty() {
+            let saved_revealed = std::mem::take(&mut game_state.revealed_cards);
+            // Populate revealed_cards from the first snapshot's yell data.
+            if let Some(snap) = game_state.performance_snapshots.first() {
+                game_state.revealed_cards = snap.yell_cards.iter().map(|yc| yc.card_id).collect();
+            }
+            let delayed = std::mem::take(&mut game_state.delayed_gained_effects);
+            for (card_id, gained) in &delayed {
+                use crate::ability::condition::ConditionContext;
+                use crate::ability::enums::ActionType;
+                use crate::ability::resolver::AbilityResolver;
+                let ctx = ConditionContext::new(game_state);
+                if ActionType::from_str(&gained.action) == Some(ActionType::ConditionalAlternative)
+                {
+                    // Evaluate the conditional_alternative: check alternative
+                    // condition first, then base condition.
+                    let alt_cond = gained.compound.alternative_condition.as_ref();
+                    let base_cond = gained.condition.as_ref();
+                    let alt_met = alt_cond.is_some_and(|c| ctx.evaluate_condition(c));
+                    let base_met = base_cond.is_some_and(|c| ctx.evaluate_condition(c));
+                    if alt_met || base_met {
+                        let effect_to_apply = if alt_met {
+                            gained.alternative_effect.as_ref()
+                        } else {
+                            gained.compound.primary_effect.as_ref()
+                        };
+                        if let Some(apply) = effect_to_apply {
+                            let mut resolver = AbilityResolver::new(
+                                game_state.card_database.clone(),
+                                Some(*card_id),
+                            );
+                            resolver.activating_card_id = Some(*card_id);
+                            let _ = resolver.execute_effect(game_state, apply);
+                        }
+                    }
+                }
+            }
+            game_state.revealed_cards = saved_revealed;
+        }
+
         // Merge LiveSuccess-triggered ability applications into breakdown.scores.
         // These were recorded after enrich_from_applications ran (in execute_performance_phase),
         // so they weren't picked up yet.
