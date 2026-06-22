@@ -3,12 +3,10 @@
  * Handles the display of deck, discard, and various "card list" viewports.
  */
 import * as i18n from '../i18n/index.js';
-import { fixImg } from '../constants.js';
-import { Tooltips } from '../ui_tooltips.js';
 import { State } from '../state.js';
 import { ModalManager } from '../utils/ModalManager.js';
 import { DOM_IDS } from '../constants_dom.js';
-import { resolveCardImagePath, ImageLoader } from './CardRenderer.js';
+import { CardRenderer } from './CardRenderer.js';
 
 export const ZoneViewer = {
     cache: {
@@ -89,7 +87,7 @@ export const ZoneViewer = {
             cards.forEach(c => {
                 // IMPORTANT: Resolve ID into rich card data if it's just a number
                 const card = (typeof c === 'number') ? State.resolveCardData(c) : c;
-                const div = ZoneViewer._createCardElement(card, false);
+                const div = ZoneViewer._createCardElement(card);
                 grid.appendChild(div);
             });
 
@@ -112,33 +110,9 @@ export const ZoneViewer = {
         ModalManager.show(DOM_IDS.MODAL_DISCARD);
     },
 
-    _createCardElement: (card, isMini = false) => {
+    _createCardElement: (card) => {
         if (!card) return document.createElement('div');
-        const div = document.createElement('div');
-        const rawType = (card.card_type || card.type || '').toLowerCase();
-        const isLiveCard = rawType === 'live' || rawType === 'ライブ' ||
-            (typeof card.card_no === 'string' && card.card_no.startsWith('live'));
-        div.className = (isMini ? 'card card-mini' : 'card') + (isLiveCard ? ' type-live orientation-landscape' : '');
-        
-        // Resolve card data if card_no is present but no image path
-        let imgPath = '';
-        if (card.card_no) {
-            imgPath = resolveCardImagePath(card.card_no);
-        }
-        if (!imgPath) {
-            imgPath = fixImg(card.img || card.img_path || card.image || '');
-        }
-        
-        const img = document.createElement('img');
-        img.draggable = false;
-        ImageLoader.loadImage(img, imgPath);
-        div.appendChild(img);
-        
-        const rawText = Tooltips.getEffectiveRawText(card);
-        if (rawText) div.setAttribute('data-text', rawText);
-        if (card.id !== undefined) div.setAttribute('data-card-id', card.id);
-        
-        Tooltips.attachCardData(div, card);
-        return div;
+        const vm = CardRenderer.getCardViewModel(card, {});
+        return CardRenderer.createCardDOM(vm, card);
     }
 };

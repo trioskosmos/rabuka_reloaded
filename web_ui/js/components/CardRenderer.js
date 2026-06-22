@@ -247,7 +247,7 @@ export const CardRenderer = {
         if (!card) return null;
 
         const state = State.data;
-        const { isSelected, isValid, mini, containerId } = options;
+        const { isSelected, isValid, mini, compact, containerId } = options;
 
         // Resolve card data if it's just a number or missing name
         let resolvedCard = card;
@@ -268,14 +268,13 @@ export const CardRenderer = {
                          resolvedCard.card_no === "-2" || resolvedCard.card_no === "-1";
         // Engine sends card_type as string enum; static database uses `type`.
         // Check case-insensitively and also check card_no prefix as fallback.
-        const rawCardType = (resolvedCard.card_type || resolvedCard.type || '').toLowerCase();
-        const isLive = rawCardType === 'live' || rawCardType === 'ライブ' ||
-            (typeof resolvedCard.card_no === 'string' && resolvedCard.card_no.startsWith('live'));
+        const isLive = CardRenderer.isCardLive(resolvedCard);
 
         // 1. Determine CSS Classes
         const classNames = ['card'];
         if (isHidden) classNames.push('hidden');
-        if (mini) classNames.push('card-mini');
+        if (compact) classNames.push('card-compact');
+        else if (mini) classNames.push('card-mini');
         if (resolvedCard.is_new) classNames.push('new-card');
         if (isLive) classNames.push('type-live');
 
@@ -337,6 +336,13 @@ export const CardRenderer = {
             isValid,
             actionId: options.actionId
         };
+    },
+
+    isCardLive: (cardOrData) => {
+        if (!cardOrData) return false;
+        const rawType = (cardOrData.card_type || cardOrData.type || '').toLowerCase();
+        return rawType === 'live' || rawType === 'ライブ' ||
+            (typeof cardOrData.card_no === 'string' && cardOrData.card_no.startsWith('live'));
     },
 
     /**
@@ -783,6 +789,7 @@ export const CardRenderer = {
                 containerId,
                 actionId: action?.index
             });
+            const isCardHidden = viewModel?.isHidden;
             
             let newClassName = viewModel ? viewModel.classes : (`card empty orientation-landscape${validClass}`);
             if (isValid && action?.index === State.hoveredActionId) {
@@ -792,7 +799,6 @@ export const CardRenderer = {
             slot.id = `${containerId}-slot-${i}`;
 
             if (card && card.card_no) {
-                const isCardHidden = viewModel?.isHidden;
                 if (!isCardHidden) {
                     const existingImg = slot.querySelector('img');
                     const existingInner = slot.querySelector('.live-card-inner');
@@ -870,24 +876,10 @@ export const CardRenderer = {
             const showCount = Math.min(3, discard.length);
             for (let i = 0; i < showCount; i++) {
                 const card = discard[discard.length - 1 - i];
-                const div = document.createElement('div');
-                const dbCard = card.card_no ? State.resolveCardData(card.card_no) : null;
-                const combined = dbCard ? { ...card, ...dbCard } : card;
-                const rawType = (combined.card_type || combined.type || '').toLowerCase();
-                const isLiveCard = rawType === 'live' || rawType === 'ライブ';
-                div.className = 'card card-mini' + (isLiveCard ? ' type-live orientation-landscape rotate-img-90' : '');
-                const img = document.createElement('img');
-                img.draggable = false;
-                ImageLoader.loadImage(img, resolveCardImagePath(card.card_no));
-                div.appendChild(img);
+                const vm = CardRenderer.getCardViewModel(card, { mini: true });
+                const div = CardRenderer.createCardDOM(vm, card);
                 div.style.transform = `translate(${i * 2}px, ${i * 2}px)`;
                 div.style.zIndex = 10 - i;
-
-                if (card.card_no !== undefined) {
-                    div.setAttribute('data-card-id', card.card_no);
-                    const rawText = Tooltips.getEffectiveRawText(card);
-                    if (rawText) div.setAttribute('data-text', rawText);
-                }
                 el.appendChild(div);
             }
         }

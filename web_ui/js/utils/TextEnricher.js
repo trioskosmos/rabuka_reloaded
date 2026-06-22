@@ -287,7 +287,7 @@ export const TextEnricher = {
         // 2. Trigger icons: toujyou, jidou, jyouji, kidou, live_start, live_success, etc.
         // We use a negative lookahead to ensure we don't split on heart/blade icons or other descriptors.
         const triggerPattern = '(?:toujyou|jidou|jyouji|kidou|live_start|live_success|live_kaishi|開始時|成功時|登場|自動|永続|起動)';
-        const regex = new RegExp(`\\r?\\n|\\\\n|(?<!^)(?=\{\{(?:${triggerPattern})\\.png\\|.*?\}\})`);
+        const regex = new RegExp(`\\r?\\n|\\\\n|(?<!/)(?<!^)(?=\{\{(?:${triggerPattern})\\.png\\|.*?\}\})`);
 
         return text.split(regex).map(s => s.trim()).filter(s => s.length > 0);
     },

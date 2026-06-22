@@ -17,26 +17,29 @@ fn fill_deck(game: &mut TestGame) {
 }
 
 #[test]
-fn test_sumire_play_triggers_draw_and_heart() {
+fn test_sumire_area_move_triggers_draw_and_heart() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let sumire = game.id("PL!SP-bp5-004-R+");
     fill_deck(&mut game);
     game.give_energy(15);
-    game.state.player1.hand.cards.push(sumire);
-    // Playing Sumire triggers the "moves" condition (area move by self's card effect).
-    // This consumes the 1/turn use_limit and draws a card + grants heart02.
-    // play_to_stage internally calls trigger_auto_abilities + process_pending_auto_abilities,
-    // so the ability fires immediately.
-    game.play_to_stage(sumire, MemberArea::Center);
+    game.add_to_stage(MemberArea::Center, sumire);
+    // Simulate area move by own card effect — this SHOULD trigger Sumire's auto ability.
+    game.state.cards_moved_this_turn.insert(sumire);
+    game.state.last_area_move_card_id = Some(sumire);
+    game.state.last_area_move_by_player = Some(game.state.player1.id.clone());
+    game.state.last_energy_placed_by_effect = false;
 
-    // After play_to_stage, the ability already fired: 1 card drawn, heart02 granted.
+    let player_id = game.state.player1.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
+    game.state.process_pending_auto_abilities(&player_id);
+
     let hand_size = game.state.player1.hand.cards.len();
-    assert_eq!(hand_size, 1, "One card drawn during play");
+    assert_eq!(hand_size, 1, "One card drawn after area move");
     assert_eq!(
         heart02_mod(&game, sumire),
         1,
-        "Gained 1 heart02 during play"
+        "Gained 1 heart02 after area move"
     );
 }
 
@@ -220,23 +223,29 @@ fn test_sumire_use_limit_blocks_second() {
     let sumire = game.id("PL!SP-bp5-004-R+");
     fill_deck(&mut game);
     game.give_energy(15);
-    game.state.player1.hand.cards.push(sumire);
-    // Play triggers the ability once (1/turn)
-    game.play_to_stage(sumire, MemberArea::Center);
+    game.add_to_stage(MemberArea::Center, sumire);
 
     let player_id = game.state.player1.id.clone();
-    // First trigger consumed use_limit during play_to_stage.
-    // Set up energy trigger and try again → should be blocked by use_limit.
+    // First trigger via area move (simulated own-card-effect area move)
+    game.state.cards_moved_this_turn.insert(sumire);
+    game.state.last_area_move_card_id = Some(sumire);
+    game.state.last_area_move_by_player = Some(game.state.player1.id.clone());
+    game.state.last_energy_placed_by_effect = false;
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
+    game.state.process_pending_auto_abilities(&player_id);
+    // First trigger consumed use_limit and granted heart02.
+    assert_eq!(
+        heart02_mod(&game, sumire),
+        1,
+        "heart02 from area move trigger"
+    );
+
+    // Now try to trigger via energy — should be blocked by use_limit.
     game.state.last_energy_placed_by_effect = true;
     game.state.last_energy_placed_by_player = Some(game.state.player1.id.clone());
     game.state.last_area_move_card_id = None;
     game.state.last_area_move_by_player = None;
-    let _ = rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
-        &mut game.state,
-        &player_id,
-    );
-    // The first trigger from play_to_stage already granted heart02.
-    // Second trigger is blocked by use_limit.
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
     assert_eq!(
         heart02_mod(&game, sumire),
         1,

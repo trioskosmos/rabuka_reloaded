@@ -1771,6 +1771,7 @@ impl Card {
                     == Some(crate::ability::enums::ActionType::ModifyCost)
                     && effect.operation.as_deref() == Some("subtract")
                     && Zone::from_str(effect.location.as_deref().unwrap_or("")) == Some(Zone::Hand)
+                    && effect.cost_limit.is_none()
                 {
                     let per_unit = effect.per_unit_count.unwrap_or(1) as usize;
                     return (hand_size.saturating_sub(1) * per_unit) as u32;

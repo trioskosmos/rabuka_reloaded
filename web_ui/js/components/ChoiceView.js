@@ -1,7 +1,6 @@
 import { State } from '../state.js';
 import { Tooltips } from '../ui_tooltips.js';
-import { CardRenderer, resolveCardImagePath, ImageLoader } from './CardRenderer.js';
-import { fixImg } from '../constants.js';
+import { CardRenderer } from './CardRenderer.js';
 import * as i18n from '../i18n/index.js';
 
 export const ChoiceView = {
@@ -266,20 +265,22 @@ export const ChoiceView = {
 
             unique.forEach(item => {
                 const cardData = item.card;
-                const cardEl = document.createElement('div');
-                cardEl.className = 'compact-choice-card';
-                cardEl.title = item.name;
+                let choiceEl;
 
                 // Auto-ability option: show card image + name + ability text
                 if (item.desc) {
-                    cardEl.className += ' text-option auto-ability';
-                    cardEl.style.cssText = `
+                    choiceEl = document.createElement('div');
+                    choiceEl.className = 'compact-choice-card text-option auto-ability';
+                    choiceEl.style.cssText = `
                         display: flex;
                         flex-direction: row;
                         align-items: center;
                         gap: 8px;
                         padding: 4px 8px;
                         width: 100%;
+                        height: auto;
+                        min-height: 0;
+                        flex-shrink: 1;
                         box-sizing: border-box;
                         cursor: pointer;
                         font-size: 0.9rem;
@@ -290,41 +291,9 @@ export const ChoiceView = {
                         text-align: left;
                     `;
                     if (cardData && cardData.card_no) {
-                        const resolvedForType = State.resolveCardData(cardData.card_no) || cardData;
-                        const rawType = (resolvedForType.type || resolvedForType.card_type || '').toLowerCase();
-                        const isLive = rawType === 'live' || rawType === 'ライブ' ||
-                            (typeof cardData.card_no === 'string' && cardData.card_no.startsWith('live'));
-                        const imgSrc = resolveCardImagePath(cardData.card_no);
-                        if (imgSrc) {
-                            const imgWrap = document.createElement('div');
-                            imgWrap.className = 'compact-choice-card' + (isLive ? ' type-live orientation-landscape' : '');
-                            if (isLive) {
-                                imgWrap.style.setProperty('width', '84px', 'important');
-                                imgWrap.style.setProperty('height', '60px', 'important');
-                            }
-                            const img = document.createElement('img');
-                            img.draggable = false;
-                            let fallbackEl = null;
-                            const showFallback = () => {
-                                if (fallbackEl) return;
-                                img.style.display = 'none';
-                                fallbackEl = document.createElement('div');
-                                fallbackEl.style.cssText = 'display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:0.55rem;color:var(--text-dim);text-align:center;padding:2px;overflow:hidden;word-break:break-all;';
-                                fallbackEl.textContent = cardData.name || cardData.card_no || '?';
-                                imgWrap.appendChild(fallbackEl);
-                            };
-                            const hideFallback = () => {
-                                if (fallbackEl) { fallbackEl.remove(); fallbackEl = null; }
-                                img.style.display = '';
-                            };
-                            img.addEventListener('imagePermanentFailure', showFallback);
-                            img.addEventListener('imageRetrying', hideFallback);
-                            img.addEventListener('load', hideFallback);
-                            imgWrap.appendChild(img);
-                            ImageLoader.loadImage(img, imgSrc);
-                            cardEl.appendChild(imgWrap);
-                        }
-                        Tooltips.attachCardData(cardEl, cardData);
+                        const vm = CardRenderer.getCardViewModel(cardData, { compact: true });
+                        const cardPortion = CardRenderer.createCardDOM(vm, cardData);
+                        choiceEl.appendChild(cardPortion);
                     }
                     const textWrap = document.createElement('div');
                     textWrap.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;';
@@ -332,16 +301,20 @@ export const ChoiceView = {
                         <div style="font-weight:bold;color:#cc88ff;font-size:0.85rem;">${Tooltips.enrichAbilityText(item.name)}</div>
                         <div style="opacity:0.8;font-size:0.75rem;line-height:1.3;">${Tooltips.enrichAbilityText(item.desc)}</div>
                     `;
-                    cardEl.appendChild(textWrap);
+                    choiceEl.appendChild(textWrap);
                 } else if (item.isText) {
-                    cardEl.className += ' text-option';
-                    cardEl.style.cssText = `
+                    choiceEl = document.createElement('div');
+                    choiceEl.className = 'compact-choice-card text-option';
+                    choiceEl.style.cssText = `
                         display: flex;
                         align-items: center;
                         justify-content: center;
                         padding: 12px 16px;
+                        width: auto;
+                        height: auto;
                         min-width: 80px;
                         min-height: 48px;
+                        flex-shrink: 1;
                         cursor: pointer;
                         font-size: 0.95rem;
                         background: var(--input-bg, #2a2a3a);
@@ -349,11 +322,12 @@ export const ChoiceView = {
                         border-radius: 8px;
                         color: var(--text, #eee);
                     `;
-                    cardEl.textContent = item.name;
+                    choiceEl.textContent = item.name;
                 } else if (item.name.startsWith('♥') || item.name.match(/heart\d{2}/)) {
                     const heartIdx = parseInt(item.name.replace(/\D/g, '')) || 1;
-                    cardEl.className += ' has-image heart-option';
-                    cardEl.style.cssText = `
+                    choiceEl = document.createElement('div');
+                    choiceEl.className = 'compact-choice-card has-image heart-option';
+                    choiceEl.style.cssText = `
                         background: none;
                         border: 2px solid var(--border);
                         display: flex;
@@ -369,17 +343,16 @@ export const ChoiceView = {
                     heartImg.className = 'heart-mini-icon';
                     heartImg.style.width = '48px';
                     heartImg.style.height = '48px';
-                    cardEl.innerHTML = '';
-                    cardEl.appendChild(heartImg);
+                    choiceEl.innerHTML = '';
+                    choiceEl.appendChild(heartImg);
                 } else if (cardData && cardData.card_no) {
                     if (choice.blind) {
-                        // Blind pick: show card back, not the actual card face
-                        cardEl.style.cssText = `
+                        choiceEl = document.createElement('div');
+                        choiceEl.className = 'compact-choice-card has-image blind-card card card-compact card-back';
+                        choiceEl.style.cssText = `
                             display: flex;
                             align-items: center;
                             justify-content: center;
-                            width: 60px;
-                            height: 84px;
                             border-radius: 4px;
                             border: 2px solid var(--accent-gold, #d4a843);
                             background: linear-gradient(135deg, #2a2a3a 0%, #1a1a2e 50%, #2a2a3a 100%);
@@ -388,77 +361,38 @@ export const ChoiceView = {
                             color: var(--accent-gold, #d4a843);
                             flex-shrink: 0;
                         `;
-                        cardEl.textContent = '?';
-                        cardEl.className += ' has-image blind-card';
-                        cardEl.title = '??? (blind pick)';
+                        choiceEl.textContent = '?';
+                        choiceEl.title = '??? (blind pick)';
                     } else {
-                        // Re-resolve by card_no for proper type (selection_cards skips it)
-                        const resolvedForType = cardData.card_no ? (State.resolveCardData(cardData.card_no) || cardData) : cardData;
-                        const rawType = (resolvedForType.type || resolvedForType.card_type || '').toLowerCase();
-                        const isLive = rawType === 'live' || rawType === 'ライブ' ||
-                            (typeof cardData.card_no === 'string' && cardData.card_no.startsWith('live'));
-                        let imgSrc = resolveCardImagePath(cardData.card_no);
-                        if (!imgSrc) {
-                            imgSrc = fixImg(cardData.img || cardData.img_path || cardData.image || '');
-                        }
-                        if (imgSrc) {
-                            cardEl.className += ' has-image';
-                            const img = document.createElement('img');
-                            img.draggable = false;
-                            let fallbackEl = null;
-                            const showFallback = () => {
-                                if (fallbackEl) return;
-                                img.style.display = 'none';
-                                fallbackEl = document.createElement('div');
-                                fallbackEl.style.cssText = 'display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:0.55rem;color:var(--text-dim);text-align:center;padding:2px;overflow:hidden;word-break:break-all;';
-                                fallbackEl.textContent = cardData.name || cardData.card_no || '?';
-                                cardEl.appendChild(fallbackEl);
-                            };
-                            const hideFallback = () => {
-                                if (fallbackEl) { fallbackEl.remove(); fallbackEl = null; }
-                                img.style.display = '';
-                            };
-                            img.addEventListener('imagePermanentFailure', showFallback);
-                            img.addEventListener('imageRetrying', hideFallback);
-                            img.addEventListener('load', hideFallback);
-                            cardEl.appendChild(img);
-                            ImageLoader.loadImage(img, imgSrc);
-                            if (isLive) {
-                                cardEl.style.setProperty('width', '84px', 'important');
-                                cardEl.style.setProperty('height', '60px', 'important');
-                                cardEl.classList.add('type-live', 'orientation-landscape');
-                            }
-                        } else {
-                            const fb = document.createElement('div');
-                            fb.style.cssText = 'display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:0.55rem;color:var(--text-dim);text-align:center;padding:2px;overflow:hidden;word-break:break-all;';
-                            fb.textContent = cardData.name || cardData.card_no || '?';
-                            cardEl.appendChild(fb);
-                        }
-                        Tooltips.attachCardData(cardEl, cardData);
+                        const vm = CardRenderer.getCardViewModel(cardData, { compact: true });
+                        choiceEl = CardRenderer.createCardDOM(vm, cardData);
+                        choiceEl.classList.add('compact-choice-card', 'has-image');
                     }
                 } else {
-                    cardEl.className += ' text-option';
-                    cardEl.style.cssText = `
+                    choiceEl = document.createElement('div');
+                    choiceEl.className = 'compact-choice-card text-option';
+                    choiceEl.style.cssText = `
                         display: flex;
                         align-items: center;
                         justify-content: center;
                         padding: 8px 12px;
                         width: 100%;
+                        height: auto;
+                        flex-shrink: 1;
                         font-size: 0.85rem;
                         background: var(--input-bg, #2a2a3a);
                         border: 1px solid var(--border, #555);
                         border-radius: 6px;
                         color: var(--text, #eee);
                         box-sizing: border-box;
-                        height: auto;
                     `;
-                    cardEl.textContent = item.name;
+                    choiceEl.textContent = item.name;
                 }
 
-                cardEl.onclick = () => {
+                choiceEl.onclick = () => {
                     if (window.doAction) window.doAction(item.action);
                 };
-                optContainer.appendChild(cardEl);
+                optContainer.appendChild(choiceEl);
             });
 
             if (unique.length > 0) {

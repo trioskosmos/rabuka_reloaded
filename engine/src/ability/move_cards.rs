@@ -1577,6 +1577,7 @@ impl AbilityResolver {
         self.moved_cards.extend(moved_cards);
         if Zone::from_str(destination) == Some(Zone::Discard)
             || Zone::from_str(destination) == Some(Zone::Waitroom)
+            || Zone::from_str(destination) == Some(Zone::Hand)
             || Zone::from_str(destination) == Some(Zone::DeckBottom)
             || is_energy
         {

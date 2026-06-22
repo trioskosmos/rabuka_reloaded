@@ -144,6 +144,7 @@ impl super::TurnEngine {
                     game_state.current_turn_phase =
                         crate::game_state::TurnPhase::FirstAttackerNormal;
                     game_state.current_phase = Phase::Active;
+                    game_state.clear_card_movement_tracking();
                     game_state.check_expired_effects();
                 }
                 _ => {}
@@ -610,7 +611,6 @@ impl super::TurnEngine {
             for &a in &db_areas {
                 player.areas_locked_this_turn.insert(a);
             }
-            game_state.record_card_movement(card_id);
             // Record 2 baton touches
             for _ in 0..2 {
                 game_state.record_baton_touch();
@@ -657,7 +657,6 @@ impl super::TurnEngine {
 
         let (cost_paid, baton_touch_used, replaced_member_cost, replaced_member_id) =
             player.move_card_from_hand_to_stage(idx, area, use_baton_touch, &card_db)?;
-        game_state.record_card_movement(card_id);
         game_state.baton_touch_zero_cost = baton_touch_used && cost_paid == 0;
         game_state.baton_touch_replaced_member_cost = replaced_member_cost;
         game_state.baton_touch_replaced_member_id = replaced_member_id;
