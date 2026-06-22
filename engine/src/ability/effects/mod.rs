@@ -640,6 +640,10 @@ impl AbilityResolver {
                 effect.operation.as_deref().unwrap_or("decrease"),
                 effect.count_or(0),
             ),
+            ActionType::ReduceLiveCardSetLimit => {
+                self.execute_reduce_live_card_set_limit(gs, effect.count_or(1));
+                Ok(())
+            }
             ActionType::SetBladeCount => {
                 self.execute_set_blade_count(
                     gs,

@@ -205,6 +205,7 @@ pub enum ActionType {
     // Replacement and triggers
     AllBladeTiming,
     SetCardIdentityAllRegions,
+    ReduceLiveCardSetLimit,
 
     // Player target choice
     ChooseTargetPlayer,
@@ -277,6 +278,7 @@ impl ActionType {
             "discard_until_count" => Some(ActionType::DiscardUntilCount),
             "all_blade_timing" => Some(ActionType::AllBladeTiming),
             "set_card_identity_all_regions" => Some(ActionType::SetCardIdentityAllRegions),
+            "reduce_live_card_set_limit" => Some(ActionType::ReduceLiveCardSetLimit),
 
             // Legacy string mappings
             "play_baton_touch" => Some(ActionType::PlayBatonTouch),
@@ -346,6 +348,7 @@ impl ActionType {
             ActionType::DiscardUntilCount => "discard_until_count",
             ActionType::AllBladeTiming => "all_blade_timing",
             ActionType::SetCardIdentityAllRegions => "set_card_identity_all_regions",
+            ActionType::ReduceLiveCardSetLimit => "reduce_live_card_set_limit",
             ActionType::PlayBatonTouch => "play_baton_touch",
             ActionType::ModifyRequiredHeartsGlobal => "modify_required_hearts_global",
             ActionType::ModifyYellCount => "modify_yell_count",
@@ -412,6 +415,7 @@ impl ActionType {
             ActionType::DiscardUntilCount => "Discard Until Count",
             ActionType::AllBladeTiming => "All Blade Timing",
             ActionType::SetCardIdentityAllRegions => "Set Card Identity All Regions",
+            ActionType::ReduceLiveCardSetLimit => "Reduce Live Card Set Limit",
             ActionType::PlayBatonTouch => "Play Baton Touch",
             ActionType::ModifyRequiredHeartsGlobal => "Modify Required Hearts (Global)",
             ActionType::ModifyYellCount => "Modify Yell Count",

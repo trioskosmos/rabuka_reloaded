@@ -372,6 +372,15 @@ impl GameState {
                                         if !passes {
                                             continue;
                                         }
+                                    } else if condition.self_target.unwrap_or(false) {
+                                        if let Some(ref locs) = condition.locations {
+                                            if locs.len() == 2 {
+                                                // self_target + 2 locations = movement-based
+                                                // condition (e.g. discard→hand). Only trigger
+                                                // via trigger_auto_for_discarded_cards, not here.
+                                                continue;
+                                            }
+                                        }
                                     }
                                 }
                             }

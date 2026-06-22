@@ -361,6 +361,7 @@ const stateInternal = {
                     }
                     if (replaced > 0) console.log('[State] Replaced', replaced, 'remote img URLs with local WebP paths');
                 }
+                State.emit('carddb-loaded');
                 if (State.data) {
                     State.emit('change', State.data);
                 }

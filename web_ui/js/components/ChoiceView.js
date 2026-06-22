@@ -85,7 +85,7 @@ export const ChoiceView = {
         // Render prompt/instruction between ability text and options
         const prompt = State.currentLang === 'en'
             ? (choice.prompt_en || choice.title || '')
-            : (choice.prompt_ja || choice.title || '');
+            : (choice.prompt_ja || window.translateChoiceDescription?.(choice.title) || choice.title || '');
         if (prompt) {
             const displayPrompt = State.currentLang === 'en' && window.translateAbility
                 ? window.translateAbility(prompt, 'en')
@@ -131,7 +131,10 @@ export const ChoiceView = {
             if (choice.options && choice.options.length > 0 && choice.options[0].ability_text) {
                 choice.options.forEach((opt, idx) => {
                     const cardName = opt.card_name || `Ability ${idx + 1}`;
-                    const abilityText = opt.ability_text || '';
+                    let abilityText = opt.ability_text || '';
+                    if (State.currentLang === 'en' && window.translateAbility) {
+                        abilityText = window.translateAbility(abilityText, 'en');
+                    }
                     const optCard = opt.card_id !== undefined ? (State.resolveCardData(opt.card_id) || Tooltips.findCardById(opt.card_id)) : (opt.card_no ? State.resolveCardData(opt.card_no) : null);
                     const action = state.legal_actions?.find(a => {
                         return a.parameters?.card_id === idx || a.description?.startsWith(cardName);

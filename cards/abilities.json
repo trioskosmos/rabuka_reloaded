@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-23T05:11:45.988556",
+  "generated_at": "2026-06-23T06:23:26.486800",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -21712,7 +21712,7 @@
             "text": "次のライブカードセットフェイズで自分がライブカード置き場に置けるカード枚数の上限が1枚減る",
             "count": 1,
             "card_type": "live_card",
-            "action": "set_card_identity"
+            "action": "reduce_live_card_set_limit"
           }
         ]
       }
@@ -24251,7 +24251,7 @@
             "text": "次のライブカードセットフェイズで自分がライブカード置き場に置けるカード枚数の上限が1枚減る",
             "count": 1,
             "card_type": "live_card",
-            "action": "set_card_identity"
+            "action": "reduce_live_card_set_limit"
           }
         ],
         "conditional": true,

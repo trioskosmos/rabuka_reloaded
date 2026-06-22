@@ -1327,6 +1327,14 @@ impl<'a> ConditionContext<'a> {
         let count_threshold = condition.count.unwrap_or(1);
         let locs = condition.locations.as_ref().unwrap();
 
+        if condition.self_target.unwrap_or(false) && locs.len() == 2 {
+            let dest_zone = &locs[1];
+            let dest_cards = util::zone_cards(player, dest_zone);
+            return self
+                .activating_card_id
+                .is_some_and(|cid| dest_cards.contains(&cid));
+        }
+
         let mut combined: Vec<i16> = Vec::new();
         for loc in locs {
             let cards = util::zone_cards(player, loc.as_str());

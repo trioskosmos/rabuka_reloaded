@@ -3801,6 +3801,13 @@ def parse_action(text: str) -> Dict[str, Any]:
         else None,
     )
     R(
+        lambda t: "ライブカードセットフェイズ" in t
+        and ("上限" in t or "枚数" in t)
+        and ("減る" in t or "減らす" in t),
+        "reduce_live_card_set_limit",
+        None,
+    )
+    R(
         lambda t: ("セット" in t or "設定" in t) and "コスト" not in t,
         "set_card_identity",
         None,
@@ -9114,6 +9121,25 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
     # actually a gain_ability.  _try_sequential splices the text before
     # parse_action's gain_ability fallback runs, so we fix it post-hoc.
     _fix_mari_gain_ability(data, fix_stats)
+
+    # FIX: Parser misclassifies "ライブカードセットフェイズ..." as
+    # set_card_identity because "セット" matches. Re-classify to
+    # reduce_live_card_set_limit.
+    for ability in data["unique_abilities"]:
+        eff = ability.get("effect")
+        if not isinstance(eff, dict):
+            continue
+        if eff.get("action") == "sequential":
+            for sub in eff.get("actions", []):
+                if isinstance(sub, dict) and sub.get("action") == "set_card_identity":
+                    act_text = sub.get("text", "")
+                    if (
+                        "ライブカードセットフェイズ" in act_text
+                        and ("上限" in act_text or "枚数" in act_text)
+                        and ("減る" in act_text or "減らす" in act_text)
+                    ):
+                        sub["action"] = "reduce_live_card_set_limit"
+                        sub.pop("card_type", None)
 
     # Group/unit filter fields are validated in extract_card_abilities.py
     return data

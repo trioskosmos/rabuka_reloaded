@@ -244,7 +244,6 @@ export const AppController = {
             loadTranslations(State.currentLang),
             State.loadStaticCardDatabase()
         ]);
-        await loadTranslations(State.currentLang);
         
         const syncRoomState = () => syncRoomDisplay();
         State.on('roomUpdate', syncRoomState);

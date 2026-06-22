@@ -103,6 +103,8 @@ impl super::TurnEngine {
                     game_state.current_phase = Phase::LiveCardSetSecondAttacker;
                 }
                 Phase::LiveCardSetSecondAttacker => {
+                    game_state.player1.live_card_set_limit_reduction = 0;
+                    game_state.player2.live_card_set_limit_reduction = 0;
                     game_state.recalculate_constants();
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::FirstAttackerPerformance;

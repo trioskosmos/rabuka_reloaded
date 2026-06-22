@@ -769,6 +769,12 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
                 "カードの扱いを設定".to_string()
             }
         }
+        "reduce_live_card_set_limit" => {
+            format!(
+                "次のライブカードセットフェイズの上限を{}減らす",
+                c.unwrap_or(1)
+            )
+        }
         "set_blade_count" => format!("ブレードを{}に設定", c.unwrap_or(0)),
         "set_heart_type" => {
             if let Some(ref ht) = effect.heart_type {

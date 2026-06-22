@@ -222,5 +222,33 @@
     "gs_zones": "ゾーン",
     "gs_tracking": "内部追跡"
   },
+  "choice_descriptions": {
+    "Choose a heart color": "ハートの色を選んでください",
+    "Reveal cards from deck (optional cost)?": "デッキからカードを公開しますか？（任意コスト）",
+    "Choose 2 occupied areas for double baton touch": "ダブルバトンタッチするエリアを2つ選んでください",
+    "Select energy cards to move from under member to energy deck": "メンバーの下からエネルギーデッキに戻すエネルギーカードを選択",
+    "Place energy under member? (pay or skip)": "メンバーの下にエネルギーを置きますか？（支払う/スキップ）",
+    "Choose which opponent member to move": "移動させる相手のメンバーを選んでください",
+    "Choose which member to move": "移動させるメンバーを選んでください",
+    "Choose required hearts": "必要なハートを選んでください",
+    "Choose self or opponent": "自分か相手を選んでください",
+    "Choose an area": "エリアを選んでください",
+    "Place top card of deck to waiting room?": "デッキの一番上のカードを控え室に置きますか？",
+    "Choose deck top or bottom": "デッキの上か下を選んでください",
+    "Choose a live card from discard to place in your success zone (or skip to place the original card)": "控え室から成功ゾーンに置くライブカードを選んでください（スキップで元のカードを置きます）",
+    "Repeat effect?": "効果をもう一度実行しますか？",
+    "Pay optional cost or skip": "任意コストを支払うかスキップ",
+    "Select cards to reveal from hand": "手札から公開するカードを選択",
+    "Choose which live card goes to your success zone": "成功ゾーンに置くライブカードを選んでください",
+    "Choose a μ's live card from discard to place in your success zone (or skip to place the original card)": "控え室から成功ゾーンに置くμ'sのライブカードを選んでください（スキップで元のカードを置きます）",
+    "Select a member card to deploy from under this member": "このメンバーの下から出すメンバーカードを選択",
+    "No eligible cards found among looked-at cards": "確認済みカードの中に対象のカードはありません",
+    "Select 1 card to place on deck": "デッキに置くカードを1枚選択",
+    "Select card(s)": "カードを選択",
+    "Select card(s): ": "カードを選択: ",
+    "Skip": "スキップ",
+    "Pay optional cost": "任意コストを支払う",
+    "Skip optional cost": "任意コストを支払わない"
+  },
   "heuristics": []
 }

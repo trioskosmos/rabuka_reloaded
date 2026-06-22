@@ -47,6 +47,8 @@ pub struct Player {
 
     pub debut_count_this_turn: u32,
 
+    pub live_card_set_limit_reduction: u32,
+
     pub last_resolution_cards: Vec<i16>,
 }
 
@@ -82,6 +84,8 @@ impl Player {
             stage_hearts: None,
 
             debut_count_this_turn: 0,
+
+            live_card_set_limit_reduction: 0,
 
             last_resolution_cards: Vec::new(),
         }

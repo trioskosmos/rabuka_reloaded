@@ -12,5 +12,6 @@ export {
     translateCardType,
     translateProduct,
     translateSeries,
+    translateChoiceDescription,
     getCurrentTranslations
 } from './translator.js';

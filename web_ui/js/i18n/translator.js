@@ -59,6 +59,7 @@ if (typeof window !== 'undefined') {
     window.translateAbility = translateAbility;
     window.translateCard = translateCard;
     window.translateMetadata = translateMetadata;
+    window.translateChoiceDescription = translateChoiceDescription;
     window.t = t;
 }
 
@@ -512,6 +513,13 @@ function parseParams(paramsStr) {
         if (k && v) params[k.trim()] = v.trim();
     }
     return params;
+}
+
+export function translateChoiceDescription(desc) {
+    if (!desc) return '';
+    if (currentLanguage === 'en') return desc;
+    const langData = translations[currentLanguage] || {};
+    return langData.choice_descriptions?.[desc] || desc;
 }
 
 export function getCurrentTranslations() {

@@ -1238,7 +1238,9 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
         "Pass - Finished setting live cards",
     )];
 
-    let can_add_more = active_player.live_card_zone.cards.len() < 3;
+    let max_live_cards =
+        3i32 - i32::try_from(active_player.live_card_set_limit_reduction).unwrap_or(0);
+    let can_add_more = active_player.live_card_zone.cards.len() < max_live_cards.max(0) as usize;
     if can_add_more {
         for (hand_index, card_id) in active_player.hand.cards.iter().enumerate() {
             let card_name = game_state

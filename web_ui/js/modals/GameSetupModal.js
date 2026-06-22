@@ -81,10 +81,10 @@ function convertDecklogHtml(html) {
 
 let _ciIndex = null;
 function _ensureIndex() {
-    if (_ciIndex) return;
-    _ciIndex = {};
     const db = State.staticCardDatabase;
     if (!db) return;
+    if (_ciIndex) return;
+    _ciIndex = {};
     for (const key of Object.keys(db)) {
         const nk = key.replace(/＋/g, '+').toUpperCase();
         _ciIndex[nk] = key;
@@ -188,29 +188,40 @@ function parseDeckText(val) {
     return { raw: val, analysis: parseSimpleCardLines(val), converted: false };
 }
 
+function updateStatus(status, val) {
+    if (!val) { status.textContent = ''; return; }
+    const result = parseDeckText(val);
+    if (!result) {
+        status.textContent = 'Could not parse';
+        status.style.color = '#ef4444';
+        return;
+    }
+    if (result.converted) {
+        const textarea = status.parentElement?.querySelector('textarea');
+        if (textarea) textarea.value = result.raw;
+    }
+    const a = result.analysis;
+    const parts = [`M:${a.members}`, `L:${a.lives}`, `E:${a.energy}`];
+    if (a.points > 0) parts.push(`P:${a.points}`);
+    status.textContent = parts.join(' ');
+    status.style.color = '#22c55e';
+}
+
 function setupAutoConvert(pid) {
     const textarea = document.getElementById(`p${pid}-deck-paste`);
     const status = document.getElementById(`p${pid}-convert-status`);
     if (!textarea || !status) return;
+
+    // Re-run on DB load in case it wasn't ready yet
+    const onDbReady = () => {
+        if (textarea.value.trim()) updateStatus(status, textarea.value.trim());
+    };
+    document.addEventListener('carddb-loaded', onDbReady, { once: true });
+
     let timeout = null;
     textarea.addEventListener('input', () => {
         clearTimeout(timeout);
-        timeout = setTimeout(() => {
-            const val = textarea.value.trim();
-            if (!val) { status.textContent = ''; return; }
-            const result = parseDeckText(val);
-            if (!result) {
-                status.textContent = 'Could not parse';
-                status.style.color = '#ef4444';
-                return;
-            }
-            if (result.converted) textarea.value = result.raw;
-            const a = result.analysis;
-            const parts = [`M:${a.members}`, `L:${a.lives}`, `E:${a.energy}`];
-            if (a.points > 0) parts.push(`P:${a.points}`);
-            status.textContent = parts.join(' ');
-            status.style.color = '#22c55e';
-        }, 400);
+        timeout = setTimeout(() => updateStatus(status, textarea.value.trim()), 400);
     });
 }
 

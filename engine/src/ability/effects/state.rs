@@ -787,6 +787,20 @@ impl AbilityResolver {
         }
     }
 
+    pub(crate) fn execute_reduce_live_card_set_limit(&mut self, gs: &mut GameState, count: u32) {
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log.push(format!(
+            "{} {}: ライブカードセット上限を{}減らす",
+            pp, act_name, count
+        ));
+        let player = gs.resolve_target_player_mut("self");
+        player.live_card_set_limit_reduction += count;
+    }
+
     pub(crate) fn execute_set_blade_count(&mut self, gs: &mut GameState, value: u32, target: &str) {
         let pp = self.player_prefix(gs);
         let act_name = gs
