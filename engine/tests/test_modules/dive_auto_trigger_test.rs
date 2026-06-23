@@ -149,6 +149,7 @@ fn ab1_two_niji_members_only_one_gets_blade() {
     let filler = g.id("PL!-sd1-010-SD");
 
     g.state.player1.live_card_zone.cards.push(dive);
+    g.state.recently_moved_cards = Some(vec![dive]);
     g.state.player1.hand.cards.push(filler);
     g.state.player1.stage.stage = [-1, niji_a, niji_b];
     for _ in 0..10 {
@@ -191,6 +192,7 @@ fn ab1_fires_on_direct_placement() {
     let filler = g.id("PL!-sd1-010-SD");
 
     g.state.player1.live_card_zone.cards.push(dive);
+    g.state.recently_moved_cards = Some(vec![dive]);
     g.state.player1.stage.stage = [-1, niji, -1];
     g.state.player1.hand.cards.push(filler);
     for _ in 0..10 {

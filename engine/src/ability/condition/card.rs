@@ -1119,6 +1119,15 @@ impl<'a> ConditionContext<'a> {
             return false;
         }
 
+        // NOTE: Movement gating for "was placed" (置かれた) triggers
+        // is handled at the TAS enqueue level — see the pre-filter
+        // in trigger_auto_abilities_for_player_with_event. At this
+        // condition-evaluation layer, moved_cards may be empty (e.g.
+        // during resolver::can_activate_effect where only the resolver's
+        // own movement tracker is available, not the trigger event data).
+        // The TAS-level gate prevents stale enqueue; this layer is purely
+        // state-based (is the card in the zone?).
+
         if condition.comparison_type.as_deref() == Some("equality") {
             // Cross-position equality: compare cost/count at position vs position_compare
             if let (Some(ref pos_a), Some(ref pos_b)) =

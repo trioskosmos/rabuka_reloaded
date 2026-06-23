@@ -332,6 +332,20 @@ impl GameState {
                             {
                                 continue;
                             }
+                            // Movement gate for "was placed" (置かれた) triggers:
+                            // self_target + single-location + movement:"moved" requires
+                            // the card to be in event.moved_cards (recently placed).
+                            if let Some(ref eff) = ability.effect {
+                                if let Some(ref cond) = eff.condition {
+                                    if cond.self_target.unwrap_or(false)
+                                        && cond.movement.as_deref() == Some("moved")
+                                        && cond.locations.as_ref().map_or(true, |l| l.len() < 2)
+                                        && !event.moved_cards.contains(&card_id)
+                                    {
+                                        continue;
+                                    }
+                                }
+                            }
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                             // Re-scan guard: skip re-enqueueing the exact auto
                             // ability that just completed.
@@ -380,6 +394,18 @@ impl GameState {
                                                 continue;
                                             }
                                         }
+                                    }
+                                }
+                            }
+                            // Same movement gate for live cards:
+                            if let Some(ref eff) = ability.effect {
+                                if let Some(ref cond) = eff.condition {
+                                    if cond.self_target.unwrap_or(false)
+                                        && cond.movement.as_deref() == Some("moved")
+                                        && cond.locations.as_ref().map_or(true, |l| l.len() < 2)
+                                        && !event.moved_cards.contains(&card_id)
+                                    {
+                                        continue;
                                     }
                                 }
                             }

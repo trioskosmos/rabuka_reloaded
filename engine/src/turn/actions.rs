@@ -794,13 +794,30 @@ impl super::TurnEngine {
                         }
                     }
                 }
-                // Save tracking state before clear_effect_tracking
-                // erases them (they were set by position_change,
-                // look_and_select discard_remaining, or similar
-                // during this ability's resolution).
+                // Post-resolution TAS scan for movement-based triggers.
+                // Mirrors process_current_ability's post-resolution scan (line ~1072)
+                // which is NOT called when a resolver completes via this path.
+                // Must run AFTER complete_current() to match process_current_ability ordering.
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
                 let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
+                if (game_state.recently_moved_cards.is_some()
+                    || game_state.last_energy_placed_by_effect())
+                    && game_state.current_phase == crate::types::Phase::Main
+                {
+                    let event = crate::ability::types::TriggerEvent {
+                        moved_cards: game_state.recently_moved_cards.clone().unwrap_or_default(),
+                        moved_from_zone: game_state.recently_moved_from_zone.clone(),
+                        energy_placed_by_effect: game_state.last_energy_placed_by_effect(),
+                        energy_placed_by_player: game_state
+                            .last_energy_placed_by_player()
+                            .map(|s| s.to_string()),
+                        ..Default::default()
+                    };
+                    game_state.just_completed_ability_key = just_completed_key.clone();
+                    game_state.trigger_auto_abilities_for_player_with_event(&player_id, &event);
+                    game_state.just_completed_ability_key = None;
+                }
                 game_state.just_completed_ability_key = just_completed_key.clone();
                 game_state.process_pending_auto_abilities(&player_id);
                 game_state.just_completed_ability_key = None;
@@ -809,6 +826,23 @@ impl super::TurnEngine {
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
                 let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
+                if (game_state.recently_moved_cards.is_some()
+                    || game_state.last_energy_placed_by_effect())
+                    && game_state.current_phase == crate::types::Phase::Main
+                {
+                    let event = crate::ability::types::TriggerEvent {
+                        moved_cards: game_state.recently_moved_cards.clone().unwrap_or_default(),
+                        moved_from_zone: game_state.recently_moved_from_zone.clone(),
+                        energy_placed_by_effect: game_state.last_energy_placed_by_effect(),
+                        energy_placed_by_player: game_state
+                            .last_energy_placed_by_player()
+                            .map(|s| s.to_string()),
+                        ..Default::default()
+                    };
+                    game_state.just_completed_ability_key = just_completed_key.clone();
+                    game_state.trigger_auto_abilities_for_player_with_event(&player_id, &event);
+                    game_state.just_completed_ability_key = None;
+                }
                 game_state.just_completed_ability_key = just_completed_key.clone();
                 game_state.process_pending_auto_abilities(&player_id);
                 game_state.just_completed_ability_key = None;
