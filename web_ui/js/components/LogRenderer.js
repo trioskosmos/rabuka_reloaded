@@ -228,7 +228,7 @@ export const LogRenderer = {
             }
         };
 
-        const logArray = [...logData];
+        const logArray = [...logData].filter(e => !e.match(/Performance:/));
         logArray.reverse();
         logArray.forEach((entry, revIdx) => {
             const idMatch = entry.match(/\[Turn \d+\] \[ID: (\d+)\] (.*)/);

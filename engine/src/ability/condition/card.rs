@@ -1244,6 +1244,49 @@ impl<'a> ConditionContext<'a> {
                 })
                 .count() as u32
         };
+        // For revealed_cards: check that filtered cards collectively have all required
+        // heart colors in their base_heart (printed hearts).
+        if Zone::from_str(location) == Some(Zone::RevealedCards) {
+            if let Some(hc) = &condition.heart_colors {
+                if !hc.is_empty()
+                    && !hc.iter().any(|cs| {
+                        crate::zones::parse_heart_color(cs) == crate::card::HeartColor::Heart00
+                    })
+                {
+                    let filtered: Vec<i16> = cards
+                        .iter()
+                        .filter(|&&id| {
+                            id != -1
+                                && util::card_matches_type(
+                                    card_db,
+                                    id,
+                                    condition.card_type.as_deref(),
+                                )
+                                && util::card_matches_group_str(card_db, id, group)
+                                && util::card_matches_characters(
+                                    card_db,
+                                    id,
+                                    condition.characters.as_ref(),
+                                )
+                        })
+                        .copied()
+                        .collect();
+                    for color_str in hc {
+                        let color = crate::zones::parse_heart_color(color_str);
+                        let found = filtered.iter().any(|&cid| {
+                            card_db.get_card(cid).is_some_and(|c| {
+                                c.base_heart
+                                    .as_ref()
+                                    .is_some_and(|bh| bh.hearts.contains_key(&color))
+                            })
+                        });
+                        if !found {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
         if condition.all_areas.unwrap_or(false) {
             let areas_ok = if is_both {
                 let self_p = self.resolve_condition_player("self");

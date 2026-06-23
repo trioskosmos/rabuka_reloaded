@@ -51,12 +51,12 @@ export const DeckSetupModal = {
 
         if (random) select.appendChild(random);
 
-        if (decks && decks.length > 0) {
-            select.value = decks[0].id;
-        } else if (paste) {
+        if (paste) {
             select.value = 'paste';
         } else if (manual) {
             select.value = 'manual';
+        } else if (decks && decks.length > 0) {
+            select.value = decks[0].id;
         }
     },
 

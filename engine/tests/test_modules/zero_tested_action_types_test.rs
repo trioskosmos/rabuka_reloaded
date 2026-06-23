@@ -4,9 +4,12 @@
 /// 2. set_blade_type — VIVID WORLD (PL!N-bp4-025-L), Dazzling Game (PL!SP-bp4-023-L)
 /// 3. any_number pay_energy — 常夏☆サンシャイン (PL!SP-bp5-025-L): pay any energy for score
 use crate::helpers::*;
+use rabuka_engine::card::{BaseHeart, HeartColor};
 use rabuka_engine::game_setup::ActionType;
+use rabuka_engine::game_state::Phase;
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
+use std::collections::HashMap;
 
 /// Kanon's debut: may nullify a Liella! member's live_start abilities.
 /// If nullified, followup: add a Liella! card from waitroom to hand.
@@ -162,69 +165,113 @@ fn vivid_world_live_phase_blade_and_success() {
     // test verifies set_blade_type and basic live flow complete cleanly.
 }
 
-/// VIVID WORLD ab#1: live_success checks yell cards for all 6 heart colors.
-/// Stage members produce blade to draw yell cards from deck.
-/// Yell cards (虹ヶ咲 members) collectively must have base_heart covering heart01–heart06.
+/// VIVID WORLD ab#1: live_success checks yell-revealed 虹ヶ咲 member cards for
+/// collective base_heart coverage of heart01–heart06.
+/// All tests use Heart00 injection into stage_hearts to guarantee live success,
+/// and directly populate revealed_cards + trigger_live_success_abilities for
+/// targeted condition evaluation without going through the full yell pipeline.
 #[test]
-fn vivid_world_live_success_grants_score() {
+fn vivid_world_all_heart_colors_present() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let filler = game.id("PL!-sd1-010-SD");
+
     let live_card = game.id("PL!N-bp4-025-L");
     // 5 虹ヶ咲 members whose base_hearts collectively = heart01–heart06
-    let y1 = game.id("PL!N-bp1-012-R\u{ff0b}"); // 鐘嵐珠: heart01,heart04,heart06
-    let y2 = game.id("PL!N-bp1-005-R"); // 宮下愛:  heart01,heart02
+    let y1 = game.id("PL!N-bp1-012-R\u{ff0b}"); // 鐘嵐珠:   heart01,heart04,heart06
+    let y2 = game.id("PL!N-bp1-005-R"); // 宮下愛:   heart01,heart02
     let y3 = game.id("PL!N-bp1-007-R"); // 優木せつ菜: heart02,heart03
     let y4 = game.id("PL!N-bp1-004-R"); // 朝香果林: heart05,heart06
-    let y5 = game.id("PL!N-bp1-003-R\u{ff0b}"); // 桜坂しずく: heart04,heart05 (NOT エマ)
+    let y5 = game.id("PL!N-bp1-003-R\u{ff0b}"); // 桜坂しずく: heart04,heart05
 
-    game.state.player1.main_deck.cards.clear();
-    game.state.player1.hand.cards.clear();
-    game.state.player2.main_deck.cards.clear();
-    game.state.player2.hand.cards.clear();
+    game.state.player1.live_card_zone.cards.push(live_card);
 
-    // 5 yell cards at top → all drawn with ≥5 blade
-    for c in [y1, y2, y3, y4, y5] {
-        game.state.player1.main_deck.cards.push(c);
-    }
-    for _ in 0..40 {
-        game.state.player1.main_deck.cards.push(filler);
-        game.state.player2.main_deck.cards.push(filler);
-    }
-    // 3× blade=5 stage → 15 draws → all 5 yell cards drawn
-    let stage = game.id("PL!-sd1-009-SD");
-    game.state.player1.stage.stage = [stage, stage, stage];
-    game.state.player2.stage.stage = [-1, -1, -1];
-    let energy = game.id("LL-E-001-SD");
-    game.state.player1.energy_deck.cards.clear();
-    for _ in 0..30 {
-        game.state.player1.energy_deck.cards.push(energy);
-    }
-    game.state.player1.hand.cards.push(live_card);
-    game.state.player1.hand.cards.push(filler);
+    // Inject Heart00 wildcard into stage_hearts to guarantee live success
+    let mut h = BaseHeart {
+        hearts: HashMap::new(),
+    };
+    h.hearts.insert(HeartColor::Heart00, 20);
+    game.state.player1.stage_hearts = Some(h);
 
-    for _ in 0..5 {
-        game.pass();
-    }
-    assert!(game.state.current_phase.to_string().contains("LiveCardSet"));
-    game.set_live_card(live_card);
-    game.pass();
-    game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
-    game.pass();
-    game.pass();
-    game.pass();
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // Populate revealed_cards with 虹ヶ咲 members covering all 6 heart colors
+    game.state.revealed_cards.extend([y1, y2, y3, y4, y5]);
 
-    assert!(
-        !game.state.mods.blade_type_modifiers.is_empty(),
-        "blade_type set"
+    game.state.current_phase = Phase::LiveVictoryDetermination;
+    TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
+    game.state.process_pending_auto_abilities("p1");
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(live_card),
+        1,
+        "all 6 heart colors present → +1 score"
     );
-    assert_eq!(game.state.mods.get_score_modifier(live_card), 1, "score +1");
+}
+
+#[test]
+fn vivid_world_missing_heart_color() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let live_card = game.id("PL!N-bp4-025-L");
+    // 3 虹ヶ咲 members covering heart01–heart05 only (heart06 missing)
+    let y1 = game.id("PL!N-bp1-005-R"); // 宮下愛:   heart01,heart02
+    let y2 = game.id("PL!N-bp1-007-R"); // 優木せつ菜: heart02,heart03
+    let y3 = game.id("PL!N-bp1-003-R\u{ff0b}"); // 桜坂しずく: heart04,heart05
+
+    game.state.player1.live_card_zone.cards.push(live_card);
+
+    let mut h = BaseHeart {
+        hearts: HashMap::new(),
+    };
+    h.hearts.insert(HeartColor::Heart00, 20);
+    game.state.player1.stage_hearts = Some(h);
+
+    game.state.revealed_cards.extend([y1, y2, y3]);
+
+    game.state.current_phase = Phase::LiveVictoryDetermination;
+    TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
+    game.state.process_pending_auto_abilities("p1");
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(live_card),
+        0,
+        "heart06 missing from 虹ヶ咲 subset → no score"
+    );
+}
+
+#[test]
+fn vivid_world_half_nijigasaki_half_other() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let live_card = game.id("PL!N-bp4-025-L");
+    // 3 虹ヶ咲 members covering heart01–heart05 only (missing heart06)
+    let y1 = game.id("PL!N-bp1-005-R"); // 宮下愛:   heart01,heart02
+    let y2 = game.id("PL!N-bp1-007-R"); // 優木せつ菜: heart02,heart03
+    let y3 = game.id("PL!N-bp1-003-R\u{ff0b}"); // 桜坂しずく: heart04,heart05
+                                                // 1 non-虹ヶ咲 (μ's) member that DOES provide the missing heart06
+    let n1 = game.id("PL!-sd1-009-SD"); // 矢澤にこ: heart01=2,heart03=2,heart06=2
+
+    game.state.player1.live_card_zone.cards.push(live_card);
+
+    let mut h = BaseHeart {
+        hearts: HashMap::new(),
+    };
+    h.hearts.insert(HeartColor::Heart00, 20);
+    game.state.player1.stage_hearts = Some(h);
+
+    // ALL cards collectively cover heart01–heart06, but the non-虹ヶ咲 card
+    // supplying heart06 must be filtered out by the group check.
+    game.state.revealed_cards.extend([y1, y2, y3, n1]);
+
+    game.state.current_phase = Phase::LiveVictoryDetermination;
+    TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
+    game.state.process_pending_auto_abilities("p1");
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(live_card),
+        0,
+        "non-虹ヶ咲 heart06 filtered out — 虹ヶ咲-only subset missing heart06 → no score"
+    );
 }
 
 /// 常夏☆サンシャイン (PL!SP-bp5-025-L): Live success — pay any number of energy,

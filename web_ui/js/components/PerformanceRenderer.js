@@ -681,18 +681,33 @@ function renderTotalSection(result) {
 function renderLiveCards(result) {
     const lives = Array.isArray(result?.lives) ? result.lives : [];
     const triggered = result?.triggered_abilities || [];
-    if (lives.length === 0) {
-        return `
-            <section class="perf-section-card">
-                <div class="perf-section-heading-row compact">
-                    <div>
-                        <div class="perf-eyebrow">Live Checks</div>
-                    </div>
-                </div>
-                <div class="perf-empty-state">No live cards were stored in this snapshot.</div>
-            </section>
-        `;
+    const noLives = lives.length === 0;
+
+    // Collect triggered abilities already shown in per-member bonuses
+    // so global-bonuses only shows the ones not claimed by a specific card.
+    const claimedTexts = new Set();
+    if (!noLives) {
+        for (const live of lives) {
+            for (const sLine of (result?.breakdown?.scores || []).filter(s => s.value > 0)) {
+                const srcAbility = findAbilitySource(triggered, sLine.source);
+                if (srcAbility?.effect_text) claimedTexts.add(srcAbility.effect_text);
+            }
+            for (const adj of (live.adjustments || [])) {
+                const adjAbility = findAbilitySource(triggered, adj?.source || '');
+                if (adjAbility?.effect_text) claimedTexts.add(adjAbility.effect_text);
+            }
+        }
+        // Check per-member heart/blade bonuses (shown in renderContributionSection)
+        for (const member of (result?.member_contributions || [])) {
+            for (const hb of (member.ability_heart_bonuses || [])) {
+                if (hb?.ability_text) claimedTexts.add(hb.ability_text);
+            }
+            for (const bb of (member.ability_blade_bonuses || [])) {
+                if (bb?.ability_text) claimedTexts.add(bb.ability_text);
+            }
+        }
     }
+    const globalTriggered = triggered.filter(t => !t.effect_text || !claimedTexts.has(t.effect_text));
 
     return `
         <section class="perf-section-card">
@@ -701,8 +716,10 @@ function renderLiveCards(result) {
                     <div class="perf-eyebrow">Live Checks</div>
                 </div>
             </div>
+            ${noLives ? '<div class="perf-empty-state">No live cards were stored in this snapshot.</div>' : ''}
             <div class="perf-live-grid">
-                ${lives.map((live, index) => {
+                ${noLives ? renderAggregateHeartSummary(lives, result?.total_hearts || [0,0,0,0,0,0,0,0], result?.breakdown?.allocations || [], 0)
+                : lives.map((live, index) => {
                     const cd = live.card_no ? State.resolveCardData(live.card_no) : null;
                     const required = live?.required || [0,0,0,0,0,0,0,0];
                     const filled = live?.filled || [0,0,0,0,0,0,0,0];
@@ -804,7 +821,6 @@ function renderContributionSection(result) {
     const rendered = members.map((member) => {
         const base = member.base_hearts || [0,0,0,0,0,0,0,0];
         const bonus = member.bonus_hearts || [0,0,0,0,0,0,0,0];
-        const total = base.map((v, i) => v + (bonus[i] || 0));
         const isWait = member.is_wait;
         const totalBlade = isWait ? 0 : (member.base_blades || 0) + (member.bonus_blades || 0);
         const heartBonuses = member.ability_heart_bonuses || [];
@@ -813,6 +829,22 @@ function renderContributionSection(result) {
             ? slotLabels[member.slot] : `Slot ${(member.slot ?? -1) + 1}`;
         const memberImg = member.card_no ? (() => { const cd = State.resolveCardData(member.card_no); return cd?.img ? fixImg(cd.img) : ''; })() : '';
         const memberName = member.card_no ? (() => { const cd = State.resolveCardData(member.card_no); return cd?.name || member?.source || 'Member'; })() : (member?.source || 'Member');
+
+        // Step 1: base_hearts — the card's original hearts
+        // Step 2: transform changes the color of all base hearts (no addition/subtraction)
+        // Step 3: ability bonuses add hearts on top
+        // bonus_hearts = transform_delta + ability_total per color
+        // So: transform_delta = bonus_hearts - ability_total
+        const abilityPerColor = [0,0,0,0,0,0,0,0];
+        for (const ab of heartBonuses) {
+            if (ab.color !== undefined && ab.color >= 0 && ab.color < 8) {
+                abilityPerColor[ab.color] += ab.amount;
+            }
+        }
+        const transformDelta = bonus.map((v, i) => v - abilityPerColor[i]);
+        const afterTransform = base.map((v, i) => v + transformDelta[i]);
+        const total = base.map((v, i) => v + bonus[i]);
+
         return `
             <article class="perf-contrib-card${isWait ? ' perf-contrib-wait' : ''}" data-member-id="${member?.source_id ?? ''}" data-member-slot="${member?.slot ?? ''}">
                 <div class="perf-contrib-header">
@@ -824,28 +856,36 @@ function renderContributionSection(result) {
                             ${renderHeartsCompact(total)}
                             <span class="perf-breakdown-sum">${sumHearts(total)}</span>
                         </div>
-                        ${heartBonuses.length > 0 ? `
-                        <div class="perf-breakdown-bonuses">
-                            ${heartBonuses.map((bonus) => `
-                                <div class="perf-bonus-item compact">
-                                    <div class="perf-bonus-title">${escapeHtml(bonus?.source || 'Effect')} +${bonus?.amount || 0} ${escapeHtml(HEART_LABELS[bonus?.color ?? 0] || 'heart')}</div>
-                                    ${bonus?.ability_text ? `<div class="perf-bonus-text">${enrichText(bonus.ability_text)}</div>` : ''}
-                                </div>
-                            `).join('')}
-                        </div>
-                        ` : ''}
                     </div>
                 </div>
                 <div class="perf-stage-breakdown">
                     <div class="perf-breakdown-subrows">
                         <div class="perf-breakdown-row sub">
-                            <span class="perf-mini-heading">Base hearts</span>
+                            <span class="perf-mini-heading">① Base hearts</span>
                             ${renderHeartsCompact(base)}
+                            <span class="perf-breakdown-sum">${sumHearts(base)}</span>
                         </div>
-                        ${bonus.some(v => v > 0) ? `
+                        ${base.some((v, i) => v !== afterTransform[i]) ? `
                         <div class="perf-breakdown-row sub">
-                            <span class="perf-mini-heading">Ability additions</span>
-                            ${renderHeartsCompact(bonus)}
+                            <span class="perf-mini-heading">② After transform</span>
+                            ${renderHeartsCompact(afterTransform)}
+                            <span class="perf-breakdown-sum">${sumHearts(afterTransform)}</span>
+                        </div>
+                        ` : ''}
+                        ${transformDelta.some(v => v !== 0) ? `
+                        <div class="perf-breakdown-row sub">
+                            <span class="perf-mini-heading">③ Transform Δ</span>
+                            ${renderHeartsCompact(transformDelta)}
+                        </div>
+                        ` : ''}
+                        ${heartBonuses.length > 0 ? `
+                        <div class="perf-breakdown-bonuses">
+                            ${heartBonuses.map((b) => `
+                                <div class="perf-bonus-item compact">
+                                    <div class="perf-bonus-title">${escapeHtml(b?.source || 'Effect')} +${b?.amount || 0} ${escapeHtml(HEART_LABELS[b?.color ?? 0] || 'heart')}</div>
+                                    ${b?.ability_text ? `<div class="perf-bonus-text">${enrichText(b.ability_text)}</div>` : ''}
+                                </div>
+                            `).join('')}
                         </div>
                         ` : ''}
                     </div>
@@ -924,13 +964,13 @@ function renderContributionSection(result) {
                     </div>
                 </article>
                 ` : ''}
-                ${triggered.length > 0 ? `
+                ${globalTriggered.length > 0 ? `
                 <article class="perf-contrib-card global-bonuses">
                     <div class="perf-contrib-header">
                         <div>
                             <h4>Global Bonuses</h4>
                             <div class="perf-breakdown-bonuses">
-                                ${triggered.map((ability) => {
+                                ${globalTriggered.map((ability) => {
                                     const effectText = ability?.effect_text || '';
                                     const condText = ability?.condition_text || '';
                                     const abilityDisplay = effectText ? enrichText(effectText) : '';
