@@ -493,7 +493,20 @@ impl super::TurnEngine {
         card_id: Option<i16>,
     ) -> Result<(), String> {
         let cid = card_id.ok_or("No card selected for live card set")?;
+        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            eprintln!(
+                "[SET_LIVE] phase={:?} cid={}",
+                game_state.current_phase, cid
+            );
+        }
         let player = game_state.active_player_mut();
+        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            eprintln!(
+                "[SET_LIVE] hand.len={} live_zone_before={:?}",
+                player.hand.cards.len(),
+                player.live_card_zone.cards
+            );
+        }
         let idx = player
             .get_card_index_by_id(cid)
             .ok_or("Selected card not found in hand")?;
@@ -504,6 +517,12 @@ impl super::TurnEngine {
                 return Err("Live card zone is full".to_string());
             }
             live_cards.push(card);
+            if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                eprintln!(
+                    "[SET_LIVE] live_zone_after={:?}",
+                    player.live_card_zone.cards
+                );
+            }
             Ok(())
         } else {
             Err("Invalid card selection".to_string())

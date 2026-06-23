@@ -238,12 +238,20 @@ impl AbilityResolver {
                     let player = gs.resolve_target_player(effect.target_name());
                     let location = effect.location.as_deref().unwrap_or(Zone::Stage.to_str());
                     let cards: Vec<i16> = util::zone_cards(player, location).to_vec();
-                    let mut per_unit_filter = effect.filter_subset();
+                    let mut per_unit_filter = util::CardFilter::from_effect(effect);
+                    per_unit_filter.card_type = None;
                     per_unit_filter.cost_limit = change_cost_limit;
-                    let count = cards
+                    let matching: Vec<i16> = cards
                         .iter()
                         .filter(|&&cid| per_unit_filter.matches(&gs.card_database, cid, false))
-                        .count() as u32;
+                        .copied()
+                        .collect();
+                    let count = util::apply_distinct_filter(
+                        &matching,
+                        effect.distinct.as_deref(),
+                        &gs.card_database,
+                    )
+                    .len() as u32;
                     let per_unit_cnt = effect.per_unit_count.unwrap_or(1);
                     change_count = (count / per_unit_cnt) * change_count.max(1);
                     change_group = None;

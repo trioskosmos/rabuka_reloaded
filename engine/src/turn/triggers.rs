@@ -307,6 +307,12 @@ impl super::TurnEngine {
     }
 
     pub fn trigger_live_start_abilities(game_state: &mut GameState, player_id: &str) {
+        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            eprintln!(
+                "[TLS_ENTER] player={} phase={:?} turn_phase={:?}",
+                player_id, game_state.current_phase, game_state.current_turn_phase
+            );
+        }
         if Self::is_trigger_suppressed(game_state, player_id, "live_start") {
             log::debug!(
                 "[LIVE_START_SUPPRESSED] live_start abilities suppressed for player {}",
@@ -327,12 +333,40 @@ impl super::TurnEngine {
             } else {
                 &game_state.player2
             };
+            if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                eprintln!(
+                    "[TLS_LIVE] player={} live_zone_cards={:?} stage={:?}",
+                    player_id, player.live_card_zone.cards, player.stage.stage
+                );
+            }
             for card_id in &player.live_card_zone.cards {
+                if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                    eprintln!(
+                        "[TLS_LIVE] checking card={} negated={}",
+                        card_id,
+                        game_state.negated_abilities.contains(card_id)
+                    );
+                }
                 if game_state.negated_abilities.contains(card_id) {
                     continue;
                 }
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
+                    if crate::ability::debug::ABILITY_DEBUG
+                        .load(std::sync::atomic::Ordering::Relaxed)
+                    {
+                        eprintln!(
+                            "[TLS_LIVE] card_id={} card_no={} abilities={}",
+                            card_id,
+                            card.card_no,
+                            card.abilities.len()
+                        );
+                    }
                     for (aidx, ability) in card.abilities.iter().enumerate() {
+                        if crate::ability::debug::ABILITY_DEBUG
+                            .load(std::sync::atomic::Ordering::Relaxed)
+                        {
+                            eprintln!("[TLS_LIVE]   aidx={} triggers={:?}", aidx, ability.triggers);
+                        }
                         if ability
                             .triggers
                             .as_ref()

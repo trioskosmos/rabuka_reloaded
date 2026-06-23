@@ -194,6 +194,7 @@ pub mod yoshiko_debug_move_test;
 pub mod yoshiko_debug_test;
 pub mod yoshiko_debut_test;
 pub mod yoshiko_detailed_test;
+pub mod yoshiko_edge_cases_test;
 pub mod yoshiko_filter_test;
 pub mod yoshiko_fixed_test;
 pub mod yoshiko_group_check_test;
@@ -246,6 +247,7 @@ pub mod dive_auto_trigger_test;
 pub mod dive_live_card_test;
 pub mod emotion_bp4_test;
 pub mod kanon_bp5_constant_test;
+pub mod live_card_zone_movement_test;
 pub mod ll_bp2_001_cost_reduction_test;
 pub mod maki_pb1_test;
 pub mod nozomi_bp4_aggregate_test;
@@ -253,7 +255,6 @@ pub mod on_energy_placed_test;
 pub mod on_hand_to_discard_test;
 pub mod pl_hs_bp1_003_test;
 pub mod pl_hs_sd1_008_test;
-pub mod live_card_zone_movement_test;
 pub mod trigger_card_integration_test;
 pub mod upper_batch_on_yell_test;
 
@@ -268,3 +269,6 @@ pub mod zettai_lover_test;
 
 // KALEIDOSCORE debut: discard → energy wait + conditional draw (PL!SP-pb2-013-R)
 pub mod keke_pb2_013_debut_test;
+
+// CatChu! per-unit energy activation (PL!SP-pb2-018-R)
+pub mod catchu_energy_activation_test;

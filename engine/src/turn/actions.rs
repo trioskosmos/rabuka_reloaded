@@ -166,6 +166,13 @@ impl super::TurnEngine {
                     })
                     .unwrap_or(Zone::Stage);
 
+                eprintln!(
+                    "[ACTIVATE_CHECK] ability idx={} triggers={:?} loc={:?} card_pos={:?}",
+                    idx,
+                    ability.triggers,
+                    loc,
+                    player.stage.stage.iter().position(|&id| id == card_id)
+                );
                 let can_activate = match loc {
                     Zone::Hand => player.hand.cards.contains(&card_id),
                     Zone::Discard => player.waitroom.cards.contains(&card_id),
