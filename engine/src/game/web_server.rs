@@ -2806,6 +2806,7 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
             .route("/api/rooms/join", web::post().to(rooms_join))
             .route("/api/rooms/leave", web::post().to(rooms_leave))
             .service(fs::Files::new("/engine", "../engine").prefer_utf8(true))
+            .service(fs::Files::new("/cards", "../cards").prefer_utf8(true))
             .service(
                 fs::Files::new("/", "../web_ui")
                     .index_file("index.html")

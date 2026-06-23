@@ -632,10 +632,9 @@ export const CardRenderer = {
                     area.appendChild(underContainer);
                 }
                 // Sync under-card count
-                const existingUnder = Array.from(underContainer.children);
                 while (underContainer.children.length < under.length) {
                     const uc = document.createElement('div');
-                    const cardType = (card.card_type || '').toLowerCase();
+                    const cardType = (under[underContainer.children.length].card_type || '').toLowerCase();
                     uc.className = 'under-card' + (cardType === 'energy' ? ' energy-type' : cardType === 'member' ? ' member-type' : '');
                     underContainer.appendChild(uc);
                 }

@@ -733,8 +733,6 @@ function renderContributionSection(result) {
 
     const slotLabels = ['Left', 'Center', 'Right'];
 
-    const slotLabels = ['Left', 'Center', 'Right'];
-
     const rendered = members.map((member) => {
         const base = member.base_hearts || [0,0,0,0,0,0,0,0];
         const bonus = member.bonus_hearts || [0,0,0,0,0,0,0,0];

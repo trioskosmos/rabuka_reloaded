@@ -111,54 +111,7 @@ export const ActionListView = {
                 }
             });
 
-            // Select All button — dispatches all unselected select_mulligan actions
-            const selectAllBtn = document.createElement('button');
-            selectAllBtn.className = 'btn action-btn system';
-            selectAllBtn.textContent = i18n.t('select_all');
-            selectAllBtn.onclick = async () => {
-                const cur = State.data;
-                if (!cur) return;
-                const player = perspectivePlayer === 0 ? cur.player1 : cur.player2;
-                if (!player) return;
-                const handCards = player.hand.cards;
 
-                // Build set of already-selected indices from current state
-                const selectedSet = new Set();
-                if (player.mulligan_selection) {
-                    if (typeof player.mulligan_selection === 'number') {
-                        for (let i = 0; i < handCards.length; i++) {
-                            if ((player.mulligan_selection >> i) & 1) selectedSet.add(i);
-                        }
-                    } else if (Array.isArray(player.mulligan_selection)) {
-                        player.mulligan_selection.forEach(i => selectedSet.add(Number(i)));
-                    }
-                }
-
-                // Find select_mulligan actions for cards NOT yet selected
-                const actionsToSend = cur.legal_actions.filter(a =>
-                    a.action_type === 'select_mulligan' &&
-                    a.parameters?.card_index !== undefined &&
-                    !selectedSet.has(a.parameters.card_index)
-                );
-
-                if (actionsToSend.length === 0) return;
-
-                selectAllBtn.disabled = true;
-                selectAllBtn.textContent = i18n.t('loading');
-                try {
-                    for (const action of actionsToSend) {
-                        if (window.Network?.sendAction) {
-                            await window.Network.sendAction(action);
-                        } else {
-                            window.doAction(action);
-                        }
-                    }
-                } finally {
-                    selectAllBtn.disabled = false;
-                    selectAllBtn.textContent = i18n.t('select_all');
-                }
-            };
-            listDiv.appendChild(selectAllBtn);
         }
 
         if (Object.keys(playActionsByHand).length > 0) {

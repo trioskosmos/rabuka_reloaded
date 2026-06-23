@@ -1686,13 +1686,6 @@ impl<'a> ConditionContext<'a> {
                         && card_db.get_card(cid).is_some_and(|c| c.has_blade_heart());
                     let bh_reject =
                         wants_blade_heart_prop && ((negate && has_bh) || (!negate && !has_bh));
-                    log::debug!(
-                        "[MFLT] cid={} type={} has_bh={} bh_reject={}",
-                        cid,
-                        type_ok,
-                        has_bh,
-                        bh_reject
-                    );
                     if !type_ok || bh_reject {
                         return false;
                     }
@@ -1753,7 +1746,8 @@ impl<'a> ConditionContext<'a> {
             // negation for the count comparison only applies when card_property is not
             // driving the per-card filter (handled above). For pure count negation
             // ("ない場合" style), flip the compare result.
-            let passed = compare_counts(condition.operator.as_deref(), actual, count);
+            let op = condition.operator.as_deref().unwrap_or(">=");
+            let passed = compare_counts(Some(op), actual, count);
             let result = if wants_blade_heart_prop {
                 // Per-card negation already applied in the filter above
                 passed

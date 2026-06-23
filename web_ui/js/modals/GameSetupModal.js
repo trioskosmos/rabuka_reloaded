@@ -212,11 +212,15 @@ function setupAutoConvert(pid) {
     const status = document.getElementById(`p${pid}-convert-status`);
     if (!textarea || !status) return;
 
-    // Re-run on DB load in case it wasn't ready yet
-    const onDbReady = () => {
+    const doUpdate = () => {
         if (textarea.value.trim()) updateStatus(status, textarea.value.trim());
     };
-    document.addEventListener('carddb-loaded', onDbReady, { once: true });
+    if (State.staticCardDatabase) {
+        doUpdate();
+    } else {
+        const _onDbReady = () => { State.off('carddb-loaded', _onDbReady); doUpdate(); };
+        State.on('carddb-loaded', _onDbReady);
+    }
 
     let timeout = null;
     textarea.addEventListener('input', () => {

@@ -101,9 +101,8 @@
 }
 
 .modal-content {
-    background: var(--glass-bg);
-    backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     width: min(90vw, 800px);
     max-height: 98vh;
@@ -183,6 +182,10 @@
     transform: rotate(90deg);
 }
 
+.setup-modal-content .modal-body {
+    padding: 6px 10px;
+}
+
 /* --- Specific Modals --- */
 
 /* Lobby Styles */
@@ -224,6 +227,11 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 6px;
+}
+
+#discard-modal-cards .card-mini {
+    width: calc(var(--card-w) * 1);
+    height: calc(var(--card-h) * 1);
 }
 
 .discard-grid {

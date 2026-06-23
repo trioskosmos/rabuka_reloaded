@@ -986,13 +986,18 @@ export const LogRenderer = {
         const content = document.getElementById(DOM_IDS.REVEALED_CONTENT);
         if (!title || !content) return;
 
-        const p1Revealed = s.player1_cheer_revealed_cards || [];
-        const p2Revealed = s.player2_cheer_revealed_cards || [];
+        const allRevealed = s.revealed_cards || [];
+        const p1Cheer = s.player1_cheer_revealed_cards || [];
+        const p2Cheer = s.player2_cheer_revealed_cards || [];
         const costRevealed = s.revealed_cost_cards || [];
 
-        const cardToHtml = (id) => {
-            const card = State.resolveCardData(id);
-            if (!card) return `<div class="revealed-card chip">ID:${id}</div>`;
+        // Live zone cards (公開領域)
+        const p1Live = s.player1?.live_zone?.cards || [];
+        const p2Live = s.player2?.live_zone?.cards || [];
+
+        const cardToHtml = (idOrCard) => {
+            const card = typeof idOrCard === 'number' ? State.resolveCardData(idOrCard) : idOrCard;
+            if (!card) return `<div class="revealed-card chip">ID:${typeof idOrCard === 'number' ? idOrCard : '?'}</div>`;
             const imgPath = resolveCardImagePath(card.card_no);
             const img = imgPath ? `<img src="${fixImg(imgPath)}" class="revealed-card-img" alt="${card.name}">` : '';
             return `<div class="revealed-card">${img}<span class="revealed-card-name">${card.name}</span></div>`;
@@ -1006,9 +1011,15 @@ export const LogRenderer = {
         const p2Label = State.perspectivePlayer === 1 ? i18n.t('you') : i18n.t('opponent');
 
         title.textContent = 'Revealed Cards';
-        content.innerHTML = section(p1Label, p1Revealed) + section(p2Label, p2Revealed) + section('Cost Revealed', costRevealed);
+        content.innerHTML =
+            section('All Revealed Cards', allRevealed) +
+            section(p1Label + ' (yell)', p1Cheer) +
+            section(p2Label + ' (yell)', p2Cheer) +
+            section('Cost Revealed', costRevealed) +
+            section(p1Label + ' (live set)', p1Live) +
+            section(p2Label + ' (live set)', p2Live);
 
-        if (!p1Revealed.length && !p2Revealed.length && !costRevealed.length) {
+        if (!allRevealed.length && !p1Cheer.length && !p2Cheer.length && !costRevealed.length && !p1Live.length && !p2Live.length) {
             content.innerHTML = '<div style="opacity:0.5;padding:40px;text-align:center;">No cards have been revealed this game.</div>';
         }
 

@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-23T08:55:00.070516",
+  "generated_at": "2026-06-23T08:47:00.460872",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -4667,8 +4667,7 @@
               "state_change": "active",
               "card_type": "member_card",
               "action": "change_state",
-              "count": 1,
-              "activation_position": "left_side"
+              "count": 1
             },
             {
               "text": "2枚ある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -4686,8 +4685,7 @@
               "action": "gain_resource",
               "resource": "blade",
               "count": 2,
-              "duration": "live_end",
-              "activation_position": "left_side"
+              "duration": "live_end"
             }
           ],
           "activation_position": "left_side"
@@ -10487,9 +10485,7 @@
         "card_type": "member_card",
         "target": "self",
         "max": true,
-        "action": "move_cards",
-        "cost_limit": 4,
-        "cost_limit_operator": "<="
+        "action": "move_cards"
       }
     },
     {
@@ -31086,9 +31082,7 @@
         "group_names": [
           "蓮ノ空"
         ],
-        "action": "move_cards",
-        "cost_limit": 4,
-        "cost_limit_operator": "<="
+        "action": "move_cards"
       }
     },
     {

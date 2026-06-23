@@ -341,6 +341,8 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub player2_cheer_revealed_cards: Vec<i16>,
     #[serde(default)]
+    pub revealed_cards: Vec<i16>,
+    #[serde(default)]
     pub heart_color_decision_phase: String,
     #[serde(default)]
     pub live_owned_hearts: std::collections::HashMap<String, Vec<[String; 2]>>,
@@ -967,9 +969,8 @@ pub fn player_to_display(
 }
 
 pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
-    // Collect looked-at cards: looked_at_cards + revealed_cards + pending_choice selection cards
-    let mut looked_ids: Vec<i16> = game_state.looked_at_cards.clone();
-    looked_ids.extend(&game_state.revealed_cards);
+    // Collect publicly visible revealed cards + pending_choice selection cards
+    let mut looked_ids: Vec<i16> = game_state.revealed_cards.clone();
     if let Some(ref pc) = game_state.get_pending_choice_json() {
         if let Some(cards) = pc.get("selection_cards").and_then(|v| v.as_array()) {
             for val in cards {
@@ -1332,6 +1333,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         player2_cheer_blade_heart_count: game_state.player2_cheer_blade_heart_count,
         player1_cheer_revealed_cards: game_state.player1_cheer_revealed_cards.clone(),
         player2_cheer_revealed_cards: game_state.player2_cheer_revealed_cards.clone(),
+        revealed_cards: game_state.revealed_cards.clone(),
         heart_color_decision_phase: game_state.heart_color_decision_phase.clone(),
         live_owned_hearts: live_owned,
         opponent_choice_declined: game_state.opponent_choice_declined,
