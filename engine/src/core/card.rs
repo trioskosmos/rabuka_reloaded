@@ -1287,6 +1287,9 @@ pub struct Condition {
     pub card_type: Option<String>,
     pub target: Option<String>,
     pub group_names: Option<Vec<String>>,
+    /// Dynamic group reference: "same_group_name" — resolve from activating card's unit
+    #[serde(default)]
+    pub group_reference: Option<String>,
     #[serde(default)]
     pub exclude_group_names: Option<Vec<String>>,
     pub characters: Option<Vec<String>>,

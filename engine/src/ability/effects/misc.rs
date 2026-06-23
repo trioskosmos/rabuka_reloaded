@@ -1092,13 +1092,12 @@ impl AbilityResolver {
         }
 
         // group_reference: "same_group_name" — filter heart targets to only
-        // include cards whose group (unit) matches the recently-moved card's group.
+        // include cards whose group (unit) matches the activating card's group.
         if effect.group_reference.as_deref() == Some("same_group_name") {
-            let ref_group: Option<String> = gs.recently_moved_cards.as_ref().and_then(|moved| {
-                moved
-                    .iter()
-                    .find_map(|&cid| gs.card_database.get_card(cid).and_then(|c| c.unit.clone()))
-            });
+            let ref_group: Option<String> = gs
+                .activating_card
+                .and_then(|cid| gs.card_database.get_card(cid))
+                .and_then(|c| c.unit.clone());
             if let Some(ref group) = ref_group {
                 heart_targets.retain(|cid: &i16| {
                     util::card_matches_group_str(&gs.card_database, *cid, Some(group.as_str()))

@@ -1452,9 +1452,24 @@
     color: var(--text-dim, #888);
     font-weight: normal;
 }
+.ability-player {
+    font-size: 0.7rem;
+    color: var(--accent-blue, #4da6ff);
+    font-weight: normal;
+    margin-left: 4px;
+}
 .ability-trigger {
     font-weight: bold;
 }
 .ability-scan {
     font-size: 0.85rem;
+}
+.ability-full-text {
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    word-break: break-word;
 }

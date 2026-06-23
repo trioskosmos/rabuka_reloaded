@@ -1159,7 +1159,16 @@ impl<'a> ConditionContext<'a> {
         let group = condition
             .group_names
             .as_ref()
-            .and_then(|g| g.first().map(|s| s.as_str()));
+            .and_then(|g| g.first().map(|s| s.as_str()))
+            .or_else(|| {
+                if condition.group_reference.as_deref() == Some("same_group_name") {
+                    self.activating_card_id
+                        .and_then(|cid| self.game_state.card_database.get_card(cid))
+                        .and_then(|c| c.unit.as_deref())
+                } else {
+                    None
+                }
+            });
         let op = condition.operator.as_deref();
         let cost_op = condition.cost_limit_operator.as_deref();
 

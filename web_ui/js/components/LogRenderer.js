@@ -24,7 +24,9 @@ export const LogRenderer = {
         if (!state) return;
 
         const logData = state.rule_log || [];
-        const logHash = logData.length + '|' + (logData.length > 0 ? logData[logData.length - 1] : '') + '|' + (State.selectedTurn || -1);
+        const structData = state.structured_log || [];
+        const lastStruct = structData.length > 0 ? structData[structData.length - 1].text || '' : '';
+        const logHash = logData.length + '|' + (logData.length > 0 ? logData[logData.length - 1] : '') + '|' + structData.length + '|' + lastStruct + '|' + (State.selectedTurn || -1);
         if (logHash === LogRenderer._lastLogHash && !State.showingFullLog) return;
         LogRenderer._lastLogHash = logHash;
 
@@ -301,7 +303,7 @@ export const LogRenderer = {
         // Render structured ability resolution entries (from structured_log, category=ability_resolution)
         const abilityResolutions = (state.structured_log || []).filter(
             e => e.category === 'ability_resolution' && e.metadata
-        );
+        ).reverse();
         abilityResolutions.forEach(entry => {
             const block = LogRenderer.createAbilityResolutionBlock(entry, currentLang, showFriendlyAbilities);
             if (block) section.appendChild(block);
@@ -310,7 +312,7 @@ export const LogRenderer = {
         // Render trigger evaluation entries (from structured_log, category=trigger_evaluation)
         const triggerEvals = (state.structured_log || []).filter(
             e => e.category === 'trigger_evaluation' && e.metadata
-        );
+        ).reverse();
         triggerEvals.forEach(entry => {
             const block = LogRenderer.createTriggerEvaluationBlock(entry, currentLang, showFriendlyAbilities);
             if (block) section.appendChild(block);
@@ -335,11 +337,13 @@ export const LogRenderer = {
         const triggerText = meta.trigger || '?';
         const zoneLabel = meta.zone === 'stage' ? 'ステージ' : meta.zone === 'live_card_zone' ? 'ライブ置場' : meta.zone === 'success_live_card_zone' ? '成功ライブ置場' : meta.zone || '';
         const cardName = entry.source_card_name || meta.card_name || '';
+        const playerLabel = entry.player_label || '';
         headerDiv.innerHTML = `
             <div class="log-entry-icon"> </div>
             <div class="log-entry-content">
                 <span class="${resultClass}">${resultIcon}</span>
                 <strong>${cardName}</strong>
+                <span class="ability-player">${playerLabel}</span>
                 ${zoneLabel ? `<span class="ability-zone">[${zoneLabel}]</span>` : ''}:
                 <span class="ability-trigger">${triggerText}</span>
             </div>
@@ -351,6 +355,14 @@ export const LogRenderer = {
         const detailsContainer = document.createElement('div');
         detailsContainer.className = 'log-group-details';
         detailsContainer.style.display = 'block';
+
+        // Show ability text at the top (enriched for texticons)
+        if (meta.ability_text) {
+            const abilityTextDiv = document.createElement('div');
+            abilityTextDiv.className = 'log-entry effect detail ability-full-text';
+            abilityTextDiv.innerHTML = Tooltips.enrichAbilityText(meta.ability_text);
+            detailsContainer.appendChild(abilityTextDiv);
+        }
 
         meta.items.forEach(item => {
             LogRenderer._renderAbilityLogItem(item, detailsContainer);
@@ -385,6 +397,7 @@ export const LogRenderer = {
             <div class="log-entry-content">
                 <span class="ability-scan">🔍</span>
                 <strong>${entry.source_card_name || ''}</strong>
+                <span class="ability-player">${entry.player_label || ''}</span>
                 <span class="ability-zone">[${zoneLabel}]</span>:
                 能力確認 [${triggerText}]
             </div>
@@ -412,6 +425,7 @@ export const LogRenderer = {
 
     _renderAbilityLogItem: (item, container) => {
         if (!item) return;
+        const e = (text) => Tooltips.enrichAbilityText(text || '');
         const div = document.createElement('div');
         div.className = 'log-entry effect detail ability-log-item';
 
@@ -421,15 +435,15 @@ export const LogRenderer = {
                 const iconChar = item.passed ? '✓' : '✗';
                 let html = `<div class="ability-cond-row">
                     <span class="ability-cond-icon">${iconChar}</span>
-                    <span class="ability-cond-text">${item.text || ''}</span>
+                    <span class="ability-cond-text">${e(item.text)}</span>
                     <span class="ability-cond-type">[${item.type || ''}]</span>
                 </div>`;
                 if (item.expectation || item.actual) {
                     html += `<div class="ability-cond-detail">
                         <span class="ability-label">期待:</span>
-                        <span class="ability-value">${item.expectation || '—'}</span>
+                        <span class="ability-value">${e(item.expectation)}</span>
                         <span class="ability-label">実際:</span>
-                        <span class="ability-value">${item.actual || '—'}</span>
+                        <span class="ability-value">${e(item.actual)}</span>
                         <span class="ability-result ${item.passed ? 'pass' : 'fail'}">
                             ${iconChar}
                         </span>
@@ -454,11 +468,11 @@ export const LogRenderer = {
                 const iconChar = item.passed ? '✓' : '✗';
                 div.innerHTML = `<div class="ability-cost-row">
                     <span class="ability-cond-icon"> </span>
-                    <span class="ability-cond-text">${item.text || ''}</span>
+                    <span class="ability-cond-text">${e(item.text)}</span>
                     <span class="ability-label">期待:</span>
-                    <span class="ability-value">${item.expectation || '—'}</span>
+                    <span class="ability-value">${e(item.expectation)}</span>
                     <span class="ability-label">実際:</span>
-                    <span class="ability-value">${item.actual || '—'}</span>
+                    <span class="ability-value">${e(item.actual)}</span>
                     <span class="ability-result ${item.passed ? 'pass' : 'fail'}">${iconChar}</span>
                 </div>`;
                 break;
@@ -466,8 +480,8 @@ export const LogRenderer = {
             case 'Effect': {
                 div.innerHTML = `<div class="ability-effect-row">
                     <span class="ability-cond-icon"> </span>
-                    <span class="ability-cond-text">${item.text || ''}</span>
-                    <span class="ability-effect-detail">${item.details || item.action || ''}</span>
+                    <span class="ability-cond-text">${e(item.text)}</span>
+                    <span class="ability-effect-detail">${e(item.details || item.action || '')}</span>
                 </div>`;
                 break;
             }
@@ -475,7 +489,7 @@ export const LogRenderer = {
                 const iconChar = item.passed ? '✓' : '✗';
                 div.innerHTML = `<div class="ability-kv-row">
                     <span class="ability-cond-icon"> </span>
-                    <span class="ability-cond-text">${item.key}: ${item.value}</span>
+                    <span class="ability-cond-text">${item.key}: ${e(item.value)}</span>
                     <span class="ability-result ${item.passed ? 'pass' : 'fail'}">${iconChar}</span>
                 </div>`;
                 break;

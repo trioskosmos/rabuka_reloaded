@@ -561,20 +561,6 @@ impl AbilityResolver {
             .current_entry()
             .is_some_and(|e| e.cost_paid);
 
-        // Log ability activation on first entry — skip for auto abilities
-        // (auto abilities log via the structured ability_resolution entry instead,
-        //  avoiding repeated "能力起動" lines when conditions aren't met).
-        if !cost_already_paid {
-            let pp = gs.player_prefix();
-            let trigger = ability.triggers.as_deref().unwrap_or("?");
-            let is_auto =
-                trigger != crate::triggers::ACTIVATION && trigger != crate::triggers::DEBUT;
-            if !is_auto {
-                gs.rule_log
-                    .push(format!("{pp} {card_name}: 能力起動 [{trigger}]",));
-            }
-        }
-
         if !cost_already_paid {
             if let Some(ref cost) = ability.cost {
                 let cost = self.apply_modify_cost_to_ability_cost(gs, cost, ability);

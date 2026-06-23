@@ -210,7 +210,9 @@ impl super::TurnEngine {
             game_state.second_attacker_mut()
         };
         let performer_id = player.id.clone();
-        let perf_data = Self::player_perform_live(
+        // Phase A: yell + blade heart (rules 8.3.10-8.3.12).
+        // Returns intermediate data; resolution_zone still has the yell cards.
+        let yell_data = Self::player_perform_live(
             player,
             &mut resolution_zone,
             &performer_id,
@@ -224,18 +226,48 @@ impl super::TurnEngine {
             &hcm,
             cannot_live,
         );
-        drop(resolution_zone);
+        // player borrow ends here — free to use game_state for ability trigger
 
         let turn = game_state.turn_number;
-        let note_icons = perf_data.note_icons;
-        for cid in &perf_data.revealed_ids {
+        let note_icons = yell_data.note_icons;
+
+        // Collect revealed card IDs from resolution zone before success check drains it
+        let revealed_ids: Vec<i16> = resolution_zone.cards.iter().copied().collect();
+        for cid in &revealed_ids {
             game_state.revealed_cards.push(*cid);
         }
-
-        for cid in &perf_data.revealed_ids {
+        for cid in &revealed_ids {
             game_state.cheer_revealed_cards_first(is_first).push(*cid);
         }
         *game_state.cheer_blade_heart_count_mut(is_first) = note_icons;
+
+        // Rule 8.3.13: Check timing — auto abilities fire here.
+        // "When you yell" abilities grant hearts that feed into 8.3.14.
+        game_state.trigger_auto_abilities_for_player(&performer_id);
+        game_state.process_pending_auto_abilities(&performer_id);
+
+        // Rule 8.3.14-8.3.16: Heart calculation + live success check.
+        let player = if is_first {
+            game_state.first_attacker_mut()
+        } else {
+            game_state.second_attacker_mut()
+        };
+        let perf_data = Self::check_live_success(
+            player,
+            &mut resolution_zone,
+            &card_db,
+            &nhm,
+            &yell_data.live_card_ids,
+            &yell_data.allocations,
+            &yell_data.yell_cards,
+            yell_data.yell_count,
+            yell_data.note_icons,
+            &yell_data.member_contributions,
+            &yell_data.total_hearts,
+            &yell_data.heart_sources,
+            &yell_data.blade_sources,
+        );
+        drop(resolution_zone);
         let (perf_player_id, _perf_player) = if is_first {
             let p = game_state.first_attacker();
             (p.id.clone(), p)

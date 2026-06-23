@@ -1444,13 +1444,46 @@ impl super::TurnEngine {
             }
         }
 
-        // Check each live card's requirement using actual allocation results.
-        // This correctly reflects Rule 8.3.15-8.3.16: hearts are checked and deducted
-        // from a shared pool sequentially per card. Using the actual allocations
-        // catches the case where the total pool can satisfy each card individually
-        // but the shared pool runs out before all cards are served.
+        // Return yell-phase data WITHOUT draining resolution_zone or checking hearts.
+        // execute_performance_phase will populate revealed_cards, trigger auto abilities
+        // (8.3.13 check timing), then call check_live_success (8.3.14-8.3.16).
+        let revealed_ids: Vec<i16> = resolution_zone.cards.iter().copied().collect();
+        let draw_effects_occurred = yell_cards.iter().any(|yc| yc.draw_icons > 0);
+        LivePerformanceData {
+            yell_count: total_blade,
+            note_icons: cheer_icon_count,
+            revealed_ids,
+            member_contributions,
+            yell_cards,
+            total_hearts: total_hearts_arr,
+            allocations,
+            heart_sources,
+            blade_sources,
+            draw_effects_occurred,
+            live_card_ids,
+        }
+    }
+
+    /// Rule 8.3.14-8.3.16: Check heart requirements, determine live success/failure,
+    /// drain resolution zone. Called AFTER the 8.3.13 check timing so hearts granted
+    /// by "when you yell" abilities are included in the live success check.
+    pub fn check_live_success(
+        player: &mut crate::player::Player,
+        resolution_zone: &mut crate::zones::ResolutionZone,
+        card_db: &CardDatabase,
+        need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
+        live_card_ids: &[i16],
+        allocations: &[Allocation],
+        yell_cards: &[YellCardResult],
+        total_blade: u32,
+        cheer_icon_count: u32,
+        member_contributions: &[MemberContribution],
+        total_hearts_arr: &[u32; 8],
+        heart_sources: &[HeartSource],
+        blade_sources: &[BladeSource],
+    ) -> LivePerformanceData {
         let mut per_card_filled: Vec<[u32; 8]> = vec![EMPTY_H8; live_card_ids.len()];
-        for alloc in &allocations {
+        for alloc in allocations {
             if alloc.target_idx < per_card_filled.len() {
                 per_card_filled[alloc.target_idx][alloc.color] += alloc.amount;
             }
@@ -1488,17 +1521,13 @@ impl super::TurnEngine {
                 if nh.hearts.is_empty() {
                     return false;
                 }
-                // Build required array from the adjusted need
                 let mut required_arr = EMPTY_H8;
                 for (color, needed) in &nh.hearts {
                     required_arr[color.index()] = *needed;
                 }
                 let filled = per_card_filled[live_idx];
-                // Check if filled meets required using wildcard logic
-                // (same as execute_live_victory_determination lines 298-325)
                 let mut wildcard = filled[0];
                 let mut ok = true;
-                // Rule 2.11.3 bullet 2: total provided >= total required
                 let total_filled: u32 = filled.iter().sum();
                 let total_required: u32 = required_arr.iter().sum();
                 if total_filled < total_required {
@@ -1509,9 +1538,8 @@ impl super::TurnEngine {
                     if h00_satisfied + wildcard < required_arr[0] {
                         ok = false;
                     } else {
-                        // Fix C: decrement wildcard by amount consumed for Heart00
-                        let used = required_arr[0].saturating_sub(h00_satisfied);
-                        wildcard = wildcard.saturating_sub(used);
+                        wildcard =
+                            wildcard.saturating_sub(required_arr[0].saturating_sub(h00_satisfied));
                     }
                 }
                 if ok {
@@ -1537,25 +1565,23 @@ impl super::TurnEngine {
 
         let revealed_ids: Vec<i16> = resolution_zone.cards.iter().copied().collect();
         player.last_resolution_cards = revealed_ids.clone();
-
         for card_id in resolution_zone.cards.drain(..) {
             player.waitroom.add_card(card_id);
         }
-
         let draw_effects_occurred = yell_cards.iter().any(|yc| yc.draw_icons > 0);
 
         LivePerformanceData {
             yell_count: total_blade,
             note_icons: cheer_icon_count,
             revealed_ids,
-            member_contributions,
-            yell_cards,
-            total_hearts: total_hearts_arr,
-            allocations,
-            heart_sources,
-            blade_sources,
+            member_contributions: member_contributions.to_vec(),
+            yell_cards: yell_cards.to_vec(),
+            total_hearts: *total_hearts_arr,
+            allocations: allocations.to_vec(),
+            heart_sources: heart_sources.to_vec(),
+            blade_sources: blade_sources.to_vec(),
             draw_effects_occurred,
-            live_card_ids: live_card_ids.clone(),
+            live_card_ids: live_card_ids.to_vec(),
         }
     }
 }
