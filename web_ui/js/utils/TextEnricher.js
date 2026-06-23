@@ -112,6 +112,15 @@ for (const [key, data] of Object.entries(ICON_MAP)) {
 
 const REGEX_PSEUDOCODE = /^(TRIGGER|COST|CONDITION|EFFECT|SELECT|PLAY|JUMP|RETURN|NOP):/i;
 
+// Map action trigger IDs to icon filenames matching {{icon.png|label}} in card text.
+// Used by extractRelevantAbility to find the correct ability block by icon match.
+const TRIGGER_ID_TO_ICON = {
+    1: 'toujyou',
+    2: 'live_start',
+    6: 'jyouji',
+    7: 'kidou',
+};
+
 export const TextEnricher = {
     isPseudocode: (text) => {
         if (!text) return false;
@@ -282,18 +291,18 @@ export const TextEnricher = {
 
     splitAbilities: (text) => {
         if (!text) return [];
-        // Support splitting by:
-        // 1. Literal or escaped newlines (\n)
-        // 2. Trigger icons: toujyou, jidou, jyouji, kidou, live_start, live_success, etc.
-        // We use a negative lookahead to ensure we don't split on heart/blade icons or other descriptors.
-        const triggerPattern = '(?:toujyou|jidou|jyouji|kidou|live_start|live_success|live_kaishi|開始時|成功時|登場|自動|永続|起動)';
-        const regex = new RegExp(`\\r?\\n|\\\\n|(?<!/)(?<!^)(?=\{\{(?:${triggerPattern})\\.png\\|.*?\}\})`);
+        // Split only on trigger icon boundaries: {{toujyou.png|...}}, {{kidou.png|...}}, etc.
+        // Do NOT split on newlines — an ability block may span multiple lines.
+        // The split keeps the trigger icon at the start of each resulting block
+        // (split occurs at the position just before the {{trigger}}).
+        const triggerPattern = '(?:toujyou|jidou|jyouji|kidou|live_start|live_success)';
+        const regex = new RegExp(`(?<!/)(?<!^)(?=\\{\{(?:${triggerPattern})\\.png\\|.*?\}\})`);
 
         return text.split(regex).map(s => s.trim()).filter(s => s.length > 0);
     },
 
 
-    extractRelevantAbility: (card, triggerLabel, abilityIndex) => {
+    extractRelevantAbility: (card, triggerLabel, abilityIndex, triggers) => {
         if (!card) return "";
         const raw = TextEnricher.getEffectiveRawText(card);
         const blocks = TextEnricher.splitAbilities(raw);
@@ -305,22 +314,26 @@ export const TextEnricher = {
             return blocks[abilityIndex];
         }
 
-        // 2. Heuristic: Match trigger label (e.g., "登場", "起動") against block content
+        // 2. Match by trigger ID → icon filename (most reliable)
+        //    Builds icon patterns from action.triggers, e.g. [7] → {{kidou.png|...}}
+        if (triggers && triggers.length > 0) {
+            const iconNames = triggers.map(t => TRIGGER_ID_TO_ICON[t]).filter(Boolean);
+            for (const iconName of iconNames) {
+                const iconPattern = `{{${iconName}.png|`;
+                const match = blocks.find(b => b.trim().startsWith(iconPattern));
+                if (match) return match;
+            }
+        }
+
+        // 3. Fallback: Match trigger label (e.g., "起動", "登場") against {{icon.png|label}} format
         if (triggerLabel) {
             const cleanLabel = triggerLabel.replace(/[【】\[\]]/g, "");
-            // First try strict match (e.g. block starts with the label)
-            let match = blocks.find(b => b.includes(`|${cleanLabel}}`) || b.includes(`【${cleanLabel}】`));
-            if (!match) {
-                // Fallback to loose inclusion
-                match = blocks.find(b => b.includes(cleanLabel));
-            }
+            const match = blocks.find(b => b.includes(`|${cleanLabel}}`));
             if (match) return match;
         }
 
         if (blocks.length === 1) return blocks[0];
 
-        // 3. Last resort: if we have multiple blocks but no clear match,
-        // return empty string to avoid showing unrelated ability text if it's a generic choice
         return "";
     },
 
@@ -344,9 +357,8 @@ export const TextEnricher = {
         if (action.source_card_id !== undefined && action.source_card_id !== -1) {
             const srcCard = State.resolveCardData(action.source_card_id);
             if (srcCard && (srcCard.text || srcCard.ability_text || srcCard.original_text || srcCard.ability)) {
-                // If we are in JP mode or friendly is OFF, try to extract specific block
                 if (currentLang === 'jp' || !showFriendlyAbilities) {
-                    const block = TextEnricher.extractRelevantAbility(srcCard, action.name, action.id);
+                    const block = TextEnricher.extractRelevantAbility(srcCard, action.name, action.id, action.triggers);
                     if (block) return TextEnricher.enrichAbilityText(block);
                 }
                 return TextEnricher.enrichAbilityText(TextEnricher.getEffectiveRawText(srcCard));
@@ -359,7 +371,7 @@ export const TextEnricher = {
         } else if (currentLang === 'jp') {
             const srcCard = State.resolveCardData(action.source_card_id);
             if (srcCard && (srcCard.original_text || srcCard.ability)) {
-                effectiveText = TextEnricher.extractRelevantAbility(srcCard, action.name, action.id) || srcCard.original_text || srcCard.ability;
+                effectiveText = TextEnricher.extractRelevantAbility(srcCard, action.name, action.id, action.triggers) || srcCard.original_text || srcCard.ability;
             } else if (window.translateAbility) {
                 effectiveText = window.translateAbility(rawText, 'jp');
             }

@@ -831,30 +831,42 @@ impl GameState {
                                     Zone::from_str(c.location.as_deref().unwrap_or("")),
                                     Some(Zone::Discard | Zone::Waitroom)
                                 );
-                                // Movement from stage to discard (preceding_moved + stage source + locations contains discard)
-                                let movement_to_discard = c.source.as_deref()
+                                // Helper: checks if a zone name matches discard/waitroom
+                                let is_discard_dest = |z: &str| -> bool {
+                                    matches!(
+                                        Zone::from_str(z),
+                                        Some(Zone::Discard | Zone::Waitroom)
+                                    )
+                                };
+                                // Movement from stage to discard (old pattern: preceding_moved + locations)
+                                let movement_to_discard_old = c.source.as_deref()
                                     == Some("preceding_moved")
                                     && c.location.as_deref() == Some("stage")
                                     && c.locations.as_ref().is_some_and(|locs| {
-                                        locs.iter().any(|loc| {
-                                            matches!(
-                                                Zone::from_str(loc),
-                                                Some(Zone::Discard | Zone::Waitroom)
-                                            )
-                                        })
+                                        locs.iter().any(|loc| is_discard_dest(loc))
                                     });
-                                // Movement from live_card_zone to discard
-                                let movement_from_live = c.source.as_deref()
+                                // Movement from stage to discard (new pattern: source + destination)
+                                let movement_to_discard_new = c.source.as_deref() == Some("stage")
+                                    && c.destination
+                                        .as_deref()
+                                        .map_or(false, |d| is_discard_dest(d));
+                                let movement_to_discard =
+                                    movement_to_discard_old || movement_to_discard_new;
+                                // Movement from live_card_zone to discard (old pattern)
+                                let movement_from_live_old = c.source.as_deref()
                                     == Some("preceding_moved")
                                     && c.location.as_deref() == Some("live_card_zone")
                                     && c.locations.as_ref().is_some_and(|locs| {
-                                        locs.iter().any(|loc| {
-                                            matches!(
-                                                Zone::from_str(loc),
-                                                Some(Zone::Discard | Zone::Waitroom)
-                                            )
-                                        })
+                                        locs.iter().any(|loc| is_discard_dest(loc))
                                     });
+                                // Movement from live_card_zone to discard (new pattern)
+                                let movement_from_live_new = c.source.as_deref()
+                                    == Some("live_card_zone")
+                                    && c.destination
+                                        .as_deref()
+                                        .map_or(false, |d| is_discard_dest(d));
+                                let movement_from_live =
+                                    movement_from_live_old || movement_from_live_new;
                                 direct_discard || movement_to_discard || movement_from_live
                             })
                             .unwrap_or(false);

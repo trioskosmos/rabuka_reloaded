@@ -1654,9 +1654,13 @@ impl<'a> ConditionContext<'a> {
             }
         };
 
-        if condition.source.as_deref() == Some("preceding_moved")
-            || condition.source.as_deref() == Some("previous_moved_cards")
-        {
+        let is_old_movement = condition.source.as_deref() == Some("preceding_moved")
+            || condition.source.as_deref() == Some("previous_moved_cards");
+        let is_new_movement = condition.source.as_deref().map_or(false, |s| {
+            s != "preceding_moved" && s != "previous_moved_cards"
+        }) && condition.destination.is_some();
+
+        if is_old_movement || is_new_movement {
             let card_db = &self.game_state.card_database;
             let negate = condition.negation.unwrap_or(false);
             let wants_blade_heart_prop =
@@ -1694,13 +1698,15 @@ impl<'a> ConditionContext<'a> {
                 moved_source
             };
             // Determine destination zone for zone-transition filtering.
-            // When condition.location (source) and condition.locations are both set,
-            // find the destination zone (a zone in locations that is NOT the source).
-            let dest_zone: Option<String> = condition.location.as_ref().and_then(|src| {
-                condition
-                    .locations
-                    .as_ref()
-                    .and_then(|locs| locs.iter().find(|l| l.as_str() != src.as_str()).cloned())
+            // Prefer the explicit `destination` field (new pattern), then fall back
+            // to inferring from locations (old pattern: location=source, locations contains dest).
+            let dest_zone: Option<String> = condition.destination.clone().or_else(|| {
+                condition.location.as_ref().and_then(|src| {
+                    condition
+                        .locations
+                        .as_ref()
+                        .and_then(|locs| locs.iter().find(|l| l.as_str() != src.as_str()).cloned())
+                })
             });
             let moved_group_name = condition
                 .group_names

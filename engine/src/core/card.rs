@@ -1405,10 +1405,18 @@ pub struct Condition {
     /// "のみ" — ALL members on stage must match the group (not just any)
     #[serde(default)]
     pub all_members: Option<bool>,
-    /// Explicit source reference for condition evaluation.
-    /// "preceding_moved" — check against the most recently moved cards from a prior action.
+    /// Source zone for movement-based conditions (e.g. "live_card_zone", "stage", "hand").
+    /// When paired with `destination`, this is the zone cards move FROM.
+    /// Backward compat: "preceding_moved" / "previous_moved_cards" still signal
+    /// the old movement-check pattern.
     #[serde(default)]
     pub source: Option<String>,
+    /// Destination zone for movement-based conditions (e.g. "discard", "waitroom", "stage").
+    /// When paired with `source` set to a zone name, expresses a zone-transition check
+    /// (cards moved FROM source TO destination). Replaces the old pattern of
+    /// `source: "preceding_moved"` + `location`/`locations` inference.
+    #[serde(default)]
+    pub destination: Option<String>,
     /// "自分のカードの効果" — only trigger if the event was caused by the player's own card effect.
     #[serde(default)]
     pub self_effect_only: Option<bool>,

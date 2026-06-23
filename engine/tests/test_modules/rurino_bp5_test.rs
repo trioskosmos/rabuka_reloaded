@@ -47,58 +47,47 @@ fn rurino_bp5_discard_only_matching_unit_gets_heart() {
     assert_eq!(game.pending_choice_type(), Some("SelectCard".to_string()));
     game.select_indices(&[0]);
 
-    // Select 1 member on stage to receive heart01.
-    // Both hs and rurino match the みらくらぱーく！ group.
-    // Pick rurino (stage index 1 = 2nd filtered position).
-    while game.has_pending_choice() {
-        let ct = game.pending_choice_type().unwrap_or_default();
-        match ct.as_str() {
-            "SelectCard" => {
-                game.select_indices(&[1]);
-            }
-            "SelectTarget" => {
-                game.select_option(0);
-            }
-            _ => break,
-        }
+    // Before selecting a target, verify the pending choice's filtered_indices
+    // only includes matching group members (hs at stage pos 0, rurino at pos 1).
+    // muse (Printemps, stage pos 2) is excluded from the candidate pool entirely.
+    if let rabuka_engine::ability::types::Choice::SelectCard {
+        filtered_indices: Some(fi),
+        ..
+    } = game.get_pending_choice()
+    {
+        assert_eq!(
+            fi.as_slice(),
+            &[0usize, 1],
+            "only みらくらぱーく！ members (hs@0, rurino@1) should be selectable, not Printemps@2"
+        );
+    } else {
+        panic!("Expected SelectCard with filtered_indices");
     }
+    // Pick rurino (stage index 1 = 2nd position in filtered_indices)
+    game.select_indices(&[1]);
 
-    // Exactly 1 みらくらぱーく！ member gets +1 heart01 (count=1)
-    let hs_h1 = game
-        .state
-        .mods
-        .get_heart_modifier(hs, rabuka_engine::card::HeartColor::Heart01);
-    let rurino_h1 = game
-        .state
-        .mods
-        .get_heart_modifier(rurino, rabuka_engine::card::HeartColor::Heart01);
-    let total_matching = hs_h1 + rurino_h1;
-    assert_eq!(
-        total_matching, 1,
-        "Exactly one みらくらぱーく！ member should get +1 heart01 (got hs={}, rurino={})",
-        hs_h1, rurino_h1
-    );
-    // μ's member does NOT get heart01
+    // Non-matching member (Printemps) was never selectable → gets nothing
     assert_eq!(
         game.state
             .mods
             .get_heart_modifier(muse, rabuka_engine::card::HeartColor::Heart01),
         0,
-        "μ's member should NOT get heart01"
+        "μ's Printemps member should NOT get heart01"
     );
+    // Other matching member (hs) also gets nothing (target_count=1, we picked rurino)
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(hs, rabuka_engine::card::HeartColor::Heart01),
+        0,
+        "hs (みらくらぱーく！) should NOT get heart01 (only rurino was selected)"
+    );
+    // Selected member (rurino) gets exactly +1 heart01
     assert_eq!(
         game.state
             .mods
             .get_heart_modifier(rurino, rabuka_engine::card::HeartColor::Heart01),
         1,
         "rurino (みらくらぱーく！) should get +1 heart01"
-    );
-    // μ's member does NOT get heart01
-    assert_eq!(
-        game.state
-            .mods
-            .get_heart_modifier(muse, rabuka_engine::card::HeartColor::Heart01),
-        0,
-        "μ's member should NOT get heart01"
     );
 }

@@ -2172,6 +2172,7 @@ impl super::resolver::AbilityResolver {
             if let Err(e) = self.execute_position_change_with_destination(gs, &modified, dest) {
                 log::debug!("Failed to execute position change: {}", e);
             }
+            self.selected_area = None;
         }
         self.clear_choice_state_and_resume(gs)?;
         Ok(())

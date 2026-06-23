@@ -319,6 +319,13 @@
     overflow-x: auto;
 }
 
+.energy-area-container.horizontal .area-count {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    flex-shrink: 0;
+}
+
 .card-area.stage {
     display: flex;
     flex-direction: row;

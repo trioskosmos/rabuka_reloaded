@@ -232,30 +232,51 @@ fn rurino_bp5_live_start_gains_heart_from_discarded_group() {
     game.select_indices(&[0]);
 
     // After cost is paid, prompts to select 1 member to receive heart01.
-    // Both Rurino and mirakura_member match the みらくらぱーく！ group.
-    // Select Rurino (stage index 0 = first in filtered_indices).
-    while game.has_pending_choice() {
-        let ct = game.pending_choice_type().unwrap_or_default();
-        match ct.as_str() {
-            "SelectCard" => {
-                game.select_indices(&[0]);
-            }
-            "SelectTarget" => {
-                game.select_option(0);
-            }
-            _ => break,
-        }
+    // Verify the pending choice's filtered_indices only includes
+    // matching group members (rurino@0, mirakura_member@1).
+    // filler (Printemps, stage pos 2) is excluded from the candidate pool.
+    if let rabuka_engine::ability::types::Choice::SelectCard {
+        filtered_indices: Some(fi),
+        ..
+    } = game.get_pending_choice()
+    {
+        assert_eq!(
+            fi.as_slice(),
+            &[0usize, 1],
+            "only みらくらぱーく！ members (rurino@0, mirakura_member@1) should be selectable, not Printemps@2"
+        );
+    } else {
+        panic!("Expected SelectCard with filtered_indices");
     }
+    // Select Rurino (stage pos 0 = first in filtered_indices)
+    game.select_indices(&[0]);
 
-    // Verify heart01 modifier was applied to Rurino
+    // Rurino (selected) gets heart01 modifier
     assert!(
         game.state.mods.heart_modifiers.contains_key(&rurino),
         "Rurino should have a heart modifier"
     );
     if let Some(heart_mod) = game.state.mods.heart_modifiers.get(&rurino) {
         let h1 = heart_mod.get(&rabuka_engine::card::HeartColor::Heart01);
-        assert!(h1.is_some(), "Heart01 should be present");
-        assert!(h1.unwrap().total() >= 1, "Heart01 should be >= 1");
+        assert!(h1.is_some(), "Heart01 should be present on rurino");
+        assert!(h1.unwrap().total() >= 1, "Heart01 should be >= 1 on rurino");
     }
+    // Other matching member was never selected (target_count=1)
+    assert!(
+        !game
+            .state
+            .mods
+            .heart_modifiers
+            .contains_key(&mirakura_member),
+        "mirakura_member (also matching group) should NOT have a heart modifier"
+    );
+    // Non-matching member (filler, Printemps) was never selectable
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(filler, rabuka_engine::card::HeartColor::Heart01),
+        0,
+        "filler (Printemps) should NOT get heart01"
+    );
     assert!(!game.has_pending_choice(), "No pending choices after setup");
 }

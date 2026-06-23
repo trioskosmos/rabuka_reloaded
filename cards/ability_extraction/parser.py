@@ -1907,6 +1907,11 @@ def _extract_generic_fields(condition, text):
         condition["movement"] = "moved"
     elif "移動する" in text:
         condition["movement"] = "moves"
+    # "置かれた" (was placed) — single-location self_target triggers
+    # (multi-location "置かれた" like discard-from-stage use the engine's
+    # 2-locations mechanism and should NOT get movement:"moved")
+    if "置かれた" in text and "locations" not in condition:
+        condition["movement"] = "moved"
     if "移動している" in text:
         condition["movement_state"] = "has_moved"
 
