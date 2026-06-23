@@ -1,0 +1,176 @@
+warning: unreachable pattern
+   --> src\ability\condition.rs:527:13
+    |
+380 |             Some(ConditionType::BothCondition) => {
+    |             ---------------------------------- matches all the relevant values
+...
+527 |             Some(ConditionType::BothCondition) => {
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no value can reach this
+    |
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `is_energy`
+    --> src\ability\move_cards.rs:1582:13
+     |
+1582 |         let is_energy = Zone::from_str(destination) == Some(Zone::Energy);
+     |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_is_energy`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `characters`
+   --> src\ability\resolver.rs:312:25
+    |
+312 |                         characters,
+    |                         ^^^^^^^^^^ help: try ignoring the field: `characters: _`
+
+warning: unused variable: `cost_limit`
+   --> src\ability\resolver.rs:313:25
+    |
+313 |                         cost_limit,
+    |                         ^^^^^^^^^^ help: try ignoring the field: `cost_limit: _`
+
+warning: unused variable: `cost_limit_operator`
+   --> src\ability\resolver.rs:314:25
+    |
+314 |                         cost_limit_operator,
+    |                         ^^^^^^^^^^^^^^^^^^^ help: try ignoring the field: `cost_limit_operator: _`
+
+warning: unused variable: `filtered_indices`
+   --> src\ability\resolver.rs:315:25
+    |
+315 |                         filtered_indices,
+    |                         ^^^^^^^^^^^^^^^^ help: try ignoring the field: `filtered_indices: _`
+
+warning: `rabuka_engine` (lib) generated 6 warnings (run `cargo fix --lib -p rabuka_engine` to apply 5 suggestions)
+warning: unused import: `rabuka_engine::core::types::Phase`
+ --> tests\test_modules\mari_bp2_test.rs:2:5
+  |
+2 | use rabuka_engine::core::types::Phase;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `osawa`
+   --> tests\test_modules\character_condition_fix_test.rs:120:9
+    |
+120 |     let osawa = game.id("PL!HS-sd1-003-SD");
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_osawa`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `filler`
+   --> tests\test_modules\character_condition_fix_test.rs:151:9
+    |
+151 |     let filler = game.id("PL!-sd1-013-SD");
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_filler`
+
+warning: function `drain_auto` is never used
+ --> tests\test_modules\pl_sp_sd1_002_test.rs:6:4
+  |
+6 | fn drain_auto(v: &mut TestGame) {
+  |    ^^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `snapshot_score_bonuses` is never used
+  --> tests\test_modules\emotion_bp4_test.rs:56:4
+   |
+56 | fn snapshot_score_bonuses<'a>(game: &'a TestGame) -> Vec<(&'a str, u32)> {
+   |    ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `rabuka_engine` (test "run_all") generated 5 warnings (run `cargo fix --test "run_all" -p rabuka_engine` to apply 3 suggestions)
+    Finished `test` profile [optimized] target(s) in 0.35s
+     Running tests\run_all.rs (C:/rust_targets\debug\deps\run_all-28ead575b38e357b.exe)
+
+running 1 test
+test test_modules::character_condition_fix_test::miraclerition_correct_positions_gains_score ... [DEBUG] stage=[-1, -1, -1]
+[DEBUG] cid=9939 name=Some("大沢瑠璃乃")
+[DEBUG] cid=3564 name=Some("安養寺 姫芽")
+[DEBUG] cid=4714 name=Some("藤島 慈")
+[QUEUE_DIAG] process_player_abilities player=p1 queue_len=0
+[QUEUE_DIAG] available_indices=[]
+[QUEUE_DIAG] process_player_abilities player=p2 queue_len=0
+[QUEUE_DIAG] available_indices=[]
+[QUEUE_DIAG] process_player_abilities player=p2 queue_len=0
+[QUEUE_DIAG] available_indices=[]
+[QUEUE_DIAG] process_player_abilities player=p2 queue_len=0
+[QUEUE_DIAG] available_indices=[]
+[QUEUE_DIAG] process_player_abilities player=p2 queue_len=0
+[QUEUE_DIAG] available_indices=[]
+[QUEUE_DIAG] process_player_abilities player=p2 queue_len=0
+[QUEUE_DIAG] available_indices=[]
+[QUEUE_DIAG] process_player_abilities player=p2 queue_len=0
+[QUEUE_DIAG] available_indices=[]
+[QUEUE_DIAG] enqueue player=p1 card_no=PL!HS-bp2-026-L
+[QUEUE_DIAG] enqueue player=p1 card_no=PL!HS-sd1-006-SD
+[QUEUE_DIAG] enqueue player=p1 card_no=PL!HS-sd1-003-SD
+[QUEUE_DIAG] process_player_abilities player=p1 queue_len=3
+[QUEUE_DIAG] available_indices=[0, 1, 2]
+[PCA_ENTER] has_resolver=false
+[PCA] resolve_ability start
+[AB]ABILITY "みらくりえーしょん" (3064)
+[AB]  TRIGGER ライブ開始時 
+[AB]  TEXT {{live_start.png|ライブ開始時}}自分のステージの右サイドエリアに「大沢瑠璃乃」が、左サイドエリアに「安養寺姫芽」が、センターエリアに「藤島慈」がそれぞれ登場している場合、このカードのスコアを＋２する。
+[AB]EFFECT score add 2
+[AB]COND (gated by: 自分のステージの右サイドエリアに「大沢瑠璃乃」が、左サイドエリアに「安養寺姫芽」が、センターエリアに「藤島慈」がそれぞれ...)
+[AB]COND appearance_condition check presence → FAIL
+[AB]  RESULT effect condition not met — skipped
+[PCA] resolve_ability OK
+[PCA] after resolve: pending=false
+[QUEUE_DIAG] process_player_abilities player=p1 queue_len=3
+[QUEUE_DIAG] available_indices=[1, 2]
+[PCA_ENTER] has_resolver=false
+[PCA] resolve_ability start
+[AB]ABILITY "安養寺 姫芽" (3564)
+[AB]  TRIGGER ライブ開始時 
+[AB]  TEXT {{live_start.png|ライブ開始時}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+[AB]  COST pay 1 E (optional)
+[AB]COST pay 1 E (optional) → OK
+[AB]  RESULT cost paid ✓
+[PENDING_CHOICE] SelectTarget target=pay_optional_cost:skip_optional_cost options=None allow_skip=true description=Pay 1 energy (or skip)?
+[PCA] resolve_ability OK
+[PCA] after resolve: pending=true
+[PCA_G1] targets=false spawn=None
+[PENDING_CHOICE] SelectTarget target=pay_optional_cost:skip_optional_cost options=None allow_skip=true description=Pay 1 energy (or skip)?
+[RPC] pending_commands_count=0
+[RWC_BRANCH] cost_was_paid=true effect_started=false had_pending=false optional_skipped=true pending_cleared=false effect_ready=true
+[QUEUE_DIAG] process_player_abilities player=p1 queue_len=3
+[QUEUE_DIAG] available_indices=[2]
+[PCA_ENTER] has_resolver=false
+[PCA] resolve_ability start
+[AB]ABILITY "大沢瑠璃乃" (9939)
+[AB]  TRIGGER ライブ開始時 
+[AB]  TEXT {{live_start.png|ライブ開始時}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、自分のステージにいるこのメンバー以外の『蓮ノ空』のメンバー1人は、{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。
+[AB]  COST pay 1 E (optional)
+[AB]COST pay 1 E (optional) → OK
+[AB]  RESULT cost paid ✓
+[PENDING_CHOICE] SelectTarget target=pay_optional_cost:skip_optional_cost options=None allow_skip=true description=Pay 1 energy (or skip)?
+[PCA] resolve_ability OK
+[PCA] after resolve: pending=true
+[PCA_G1] targets=false spawn=None
+[PENDING_CHOICE] SelectTarget target=pay_optional_cost:skip_optional_cost options=None allow_skip=true description=Pay 1 energy (or skip)?
+[RPC] pending_commands_count=0
+[RWC_BRANCH] cost_was_paid=true effect_started=false had_pending=false optional_skipped=true pending_cleared=false effect_ready=true
+[QUEUE_DIAG] process_player_abilities player=p1 queue_len=3
+[QUEUE_DIAG] available_indices=[]
+[DEBUG] after setup: stage=[3564, 4714, 9939]
+[DEBUG] queue_idle=true
+[DEBUG] pending_choice=false
+[DEBUG] modifiers={}
+[DEBUG] score=0
+
+thread 'test_modules::character_condition_fix_test::miraclerition_correct_positions_gains_score' (20416) panicked at tests\test_modules\character_condition_fix_test.rs:243:5:
+assertion `left == right` failed: Score should be +2 when all characters are at correct positions
+  left: 0
+ right: 2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    test_modules::character_condition_fix_test::miraclerition_correct_positions_gains_score
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1242 filtered out; finished in 0.44s
+
+error: test failed, to rerun pass `-p rabuka_engine --test run_all`

@@ -1314,6 +1314,16 @@ def _try_appearance(text):
         )
         result["cost_reference_type"] = "cost"
     if subject:
+        # Detect position-specific character assignments (e.g.
+        # "右サイドエリアに「大沢瑠璃乃」が、左サイドエリアに「安養寺姫芽」が")
+        pos_char_pairs = re.findall(
+            r"(右サイドエリア|左サイドエリア|センターエリア)に「([^」]+)」", text
+        )
+        if pos_char_pairs:
+            result["positions_characters"] = [
+                {"position": POSITION_KEYWORDS[pos], "character": char}
+                for pos, char in pos_char_pairs
+            ]
         all_quoted = re.findall(r"「([^」]+)」", text)
         if all_quoted:
             result["characters"] = list(dict.fromkeys(all_quoted))
@@ -1359,18 +1369,20 @@ def _try_appearance(text):
     ct = extract_card_type(text)
     if ct:
         result["card_type"] = ct
-    # Extract position (左サイド/右サイド/センター)
-    matched = set()
-    for kw, pos in POSITION_KEYWORDS.items():
-        if kw in text:
-            matched.add(pos)
-    if len(matched) == 1:
-        result["position"] = matched.pop()
-    elif len(matched) > 1:
-        # Cross-position comparison (e.g. "右サイドエリアと左サイドエリア")
-        positions_list = sorted(matched)
-        result["position"] = positions_list[0]
-        result["position_compare"] = positions_list[1]
+    # Extract position (左サイド/右サイド/センター) — skip when
+    # positions_characters already encodes per-position character mappings.
+    if "positions_characters" not in result:
+        matched = set()
+        for kw, pos in POSITION_KEYWORDS.items():
+            if kw in text:
+                matched.add(pos)
+        if len(matched) == 1:
+            result["position"] = matched.pop()
+        elif len(matched) > 1:
+            # Cross-position comparison (e.g. "右サイドエリアと左サイドエリア")
+            positions_list = sorted(matched)
+            result["position"] = positions_list[0]
+            result["position_compare"] = positions_list[1]
     return result
 
 
@@ -2137,7 +2149,8 @@ def parse_condition(text: str) -> Dict[str, Any]:
                 result["aggregate"] = "total"
             # Add position only when exactly one keyword matches (avoids overriding
             # _try_appearance's intentional multi-position detection).
-            if "position" not in result:
+            # Skip when positions_characters already encodes per-position mappings.
+            if "position" not in result and "positions_characters" not in result:
                 matched = {pos for kw, pos in POSITION_KEYWORDS.items() if kw in text}
                 if len(matched) == 1:
                     result["position"] = next(iter(matched))
@@ -2167,7 +2180,8 @@ def parse_condition(text: str) -> Dict[str, Any]:
     if "scope" not in condition and "自分と相手" in text:
         condition["scope"] = "both"
     # Extract position from POSITION_KEYWORDS for fall-through conditions
-    if "position" not in condition:
+    # Skip when positions_characters already encodes per-position mappings.
+    if "position" not in condition and "positions_characters" not in condition:
         matched = {pos for kw, pos in POSITION_KEYWORDS.items() if kw in text}
         # Cross-position equality: left vs right (center comes from activation icon)
         if "left_side" in matched and "right_side" in matched:
@@ -7934,11 +7948,13 @@ def _normalize_effect_tree(effect, original_text=None):
             d["per_unit_count"] = 1
 
         # Propagate position from text context (for condition+action splits)
-        # Don't set position if source_position or exclude_position already set
+        # Don't set position if source_position or exclude_position already set,
+        # or if positions_characters already encodes per-position mappings.
         if (
             "position" not in d
             and "source_position" not in d
             and "exclude_position" not in d
+            and "positions_characters" not in d
             and d_ctx
         ):
             pos = _has_position_keywords(d_ctx)

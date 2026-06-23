@@ -1211,6 +1211,7 @@ impl<'a> ConditionContext<'a> {
                             condition.cost_limit,
                             cost_op,
                         )
+                        && util::card_matches_characters(card_db, id, condition.characters.as_ref())
                         && self.check_original_blade_filter(condition, id)
                         && self.check_original_heart_filter(condition, id)
                         && self.check_heart_type_all_per_card(condition, card_db, id)
@@ -1222,6 +1223,7 @@ impl<'a> ConditionContext<'a> {
             filter.group = group;
             filter.cost_limit = condition.cost_limit;
             filter.cost_operator = cost_op;
+            filter.characters = condition.characters.as_ref();
             cards
                 .iter()
                 .filter(|&&id| {
@@ -2262,6 +2264,7 @@ impl<'a> ConditionContext<'a> {
                             }
                         }
                     }
+                    eprintln!("[REACHED] pos=is_some={}", condition.position.is_some());
                     if condition.position.is_none() {
                         if let Some(ref act_pos) = condition.activation_position {
                             let card_id = self.activating_card_id;
@@ -2285,6 +2288,11 @@ impl<'a> ConditionContext<'a> {
                     }
 
                     if let Some(ref pos) = condition.position {
+                        eprintln!(
+                            "[POS_CHECK] pos={:?} get_position={:?}",
+                            pos,
+                            pos.get_position()
+                        );
                         let pos_str = pos.get_position();
                         let pos_idx = match pos_str {
                             Some("left") | Some("leftside") | Some("left_side") => 0,
@@ -2304,6 +2312,59 @@ impl<'a> ConditionContext<'a> {
                         {
                             push_rich(&format!("位置不一致(idx={})", pos_idx), false);
                             return false;
+                        }
+                    }
+                    eprintln!(
+                        "[PCOND] position={:?} pc_some={} chars={:?} type={:?}",
+                        condition.position,
+                        condition.positions_characters.is_some(),
+                        condition.characters.as_ref().map(|v| v.len()),
+                        condition.condition_type
+                    );
+                    if let Some(ref pos_chars) = condition.positions_characters {
+                        eprintln!(
+                            "[POSCHARS] checking {} entries: {:?}",
+                            pos_chars.len(),
+                            pos_chars
+                                .iter()
+                                .map(|p| format!("{}@{}", p.character, p.position))
+                                .collect::<Vec<_>>()
+                        );
+                        for pc in pos_chars {
+                            let pos_idx = match pc.position.as_str() {
+                                "left_side" => 0,
+                                "center" => 1,
+                                "right_side" => 2,
+                                _ => {
+                                    push_rich(&format!("不明な位置: {}", pc.position), false);
+                                    return false;
+                                }
+                            };
+                            let card_id = player.stage.stage[pos_idx];
+                            if card_id == -1 {
+                                push_rich(&format!("{}にカードなし", pc.position), false);
+                                return false;
+                            }
+                            let card_name = self
+                                .game_state
+                                .card_database
+                                .get_card(card_id)
+                                .map(|c| crate::card::CardDatabase::normalize_name(&c.name));
+                            let norm_char =
+                                crate::card::CardDatabase::normalize_name(&pc.character);
+                            match card_name {
+                                Some(ref name) if name.contains(&norm_char) => {}
+                                _ => {
+                                    push_rich(
+                                        &format!(
+                                            "{}に{}不在(実際={:?})",
+                                            pc.position, pc.character, card_name
+                                        ),
+                                        false,
+                                    );
+                                    return false;
+                                }
+                            }
                         }
                     }
                     if let Some(ref chars) = condition.characters {

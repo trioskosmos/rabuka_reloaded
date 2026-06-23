@@ -1094,11 +1094,7 @@ impl AbilityEffect {
 
     /// Returns true if `card_id` matches this effect's group filter.
     /// When `group_names` is absent or empty, every card passes (no filter).
-    pub fn matches_group_filter(
-        &self,
-        card_db: &CardDatabase,
-        card_id: i16,
-    ) -> bool {
+    pub fn matches_group_filter(&self, card_db: &CardDatabase, card_id: i16) -> bool {
         crate::ability::util::card_matches_any_group(card_db, card_id, self.group_names_slice())
     }
 
@@ -1290,6 +1286,13 @@ impl DistinctInfo {
     }
 }
 
+/// Maps a stage position to the character name required at that position.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PositionCharacter {
+    pub position: String,
+    pub character: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct Condition {
     #[serde(default = "default_empty_string")]
@@ -1310,6 +1313,12 @@ pub struct Condition {
     pub exclude_group_names: Option<Vec<String>>,
     pub characters: Option<Vec<String>>,
     pub exclude_characters: Option<Vec<String>>,
+    /// Per-position character requirements for appearance conditions.
+    /// Example: [{"position": "right_side", "character": "大沢瑠璃乃"},
+    ///           {"position": "left_side", "character": "安養寺姫芽"},
+    ///           {"position": "center", "character": "藤島慈"}]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub positions_characters: Option<Vec<PositionCharacter>>,
     pub state: Option<String>,
     pub position: Option<PositionInfo>,
     /// Cross-position comparison target (e.g. "right_side" when position is "left_side")

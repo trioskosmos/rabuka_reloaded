@@ -155,7 +155,7 @@ impl AbilityResolver {
             if let Some(ref activation_condition) = effect.activation_condition_parsed {
                 let mut merged_cond = activation_condition.clone();
                 // Merge the effect's position info into the condition so it's checked.
-                if merged_cond.position.is_none() {
+                if merged_cond.position.is_none() && merged_cond.positions_characters.is_none() {
                     if let Some(ref pos) = effect.position {
                         merged_cond.position = Some(pos.clone());
                     } else if let Some(ref act_pos) = effect.activation_position {
@@ -174,7 +174,7 @@ impl AbilityResolver {
                 // skip — condition is a branch selector, not a gate
             } else {
                 let mut cond = condition.clone();
-                if cond.position.is_none() {
+                if cond.position.is_none() && cond.positions_characters.is_none() {
                     if let Some(ref pos) = effect.position {
                         cond.position = Some(pos.clone());
                     } else if let Some(ref act_pos) = effect.activation_position {

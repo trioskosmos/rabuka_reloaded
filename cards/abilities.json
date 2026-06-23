@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-23T22:46:43.876664",
+  "generated_at": "2026-06-23T23:37:36.377166",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -11164,14 +11164,26 @@
           "appearance": true,
           "text": "自分のステージの右サイドエリアに「大沢瑠璃乃」が、左サイドエリアに「安養寺姫芽」が、センターエリアに「藤島慈」がそれぞれ登場している場合",
           "location": "stage",
+          "positions_characters": [
+            {
+              "position": "right_side",
+              "character": "大沢瑠璃乃"
+            },
+            {
+              "position": "left_side",
+              "character": "安養寺姫芽"
+            },
+            {
+              "position": "center",
+              "character": "藤島慈"
+            }
+          ],
           "characters": [
             "大沢瑠璃乃",
             "安養寺姫芽",
             "藤島慈"
           ],
-          "target": "self",
-          "position": "center",
-          "position_compare": "left_side"
+          "target": "self"
         },
         "action": "modify_score",
         "value": 2,

@@ -20,6 +20,7 @@ pub mod butterfly_wing_suppress_test;
 pub mod cannot_baton_touch_test;
 pub mod card_ability_tests;
 pub mod card_count_state_test;
+pub mod character_condition_fix_test;
 pub mod cheer_pipeline_test;
 pub mod chika_test;
 pub mod chisato_bp5_test;
