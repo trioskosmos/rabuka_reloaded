@@ -3421,8 +3421,16 @@ def parse_action(text: str) -> Dict[str, Any]:
             {"count": 1, "optional": True, "source": "deck", "destination": "hand"}
         ),
     )
+    # "手札から控え室に置く" + "引いた枚数" → move_cards from hand to discard
+    # (NOT a draw — "引いた" refers to the number of cards drawn previously)
     R(
-        lambda t: "引く" in t or "引き" in t or "引い" in t,
+        lambda t: "引いた枚数" in t and "手札から" in t and "控え室に置く" in t,
+        "move_cards",
+        lambda t, a: a.update({"source": "hand", "destination": "discard"}),
+    )
+    R(
+        lambda t: ("引く" in t or "引き" in t or "引い" in t)
+        and "手札から控え室に置く" not in t,
         "draw_card",
         lambda t, a: a.update({"source": "deck", "destination": "hand"}),
     )

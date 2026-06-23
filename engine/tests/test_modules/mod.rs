@@ -70,6 +70,7 @@ pub mod honoka_test;
 pub mod izumi_bp6_test;
 pub mod izumi_pb1_test;
 pub mod jellyfish_test;
+pub mod jimo_ai_dash_test;
 pub mod joint_card_live_start_test;
 pub mod kagayaiteru_test;
 pub mod kanata_bp1_test;

@@ -12,9 +12,12 @@ let _bothFlipped = false;
 
 function setBoardMode(mode) {
     const gb = document.getElementById('game-board');
-    gb.classList.toggle('both-mode', mode === 'both');
-    if (mode !== 'both') gb.classList.remove('both-mode-flipped');
-    _bothFlipped = false;
+    const enteringBoth = mode === 'both';
+    gb.classList.toggle('both-mode', enteringBoth);
+    if (!enteringBoth) {
+        gb.classList.remove('both-mode-flipped');
+        _bothFlipped = false;
+    }
 
     if (mode === 'both') {
         DOMUtils.setVisible(DOM_IDS.CONTAINER_BOARD_PLAYER, true);

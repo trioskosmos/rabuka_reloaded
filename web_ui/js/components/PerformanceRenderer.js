@@ -803,6 +803,18 @@ function renderContributionSection(result) {
     const members = result.member_contributions;
     const triggered = result.triggered_abilities || [];
 
+    // Filter triggered abilities to those not shown in per-member bonuses
+    const claimedTexts = new Set();
+    for (const member of members) {
+        for (const hb of (member.ability_heart_bonuses || [])) {
+            if (hb?.ability_text) claimedTexts.add(hb.ability_text);
+        }
+        for (const bb of (member.ability_blade_bonuses || [])) {
+            if (bb?.ability_text) claimedTexts.add(bb.ability_text);
+        }
+    }
+    const globalTriggered = triggered.filter(t => !t.effect_text || !claimedTexts.has(t.effect_text));
+
     if (members.length === 0 && triggered.length === 0) {
         return `
             <section class="perf-section-card">

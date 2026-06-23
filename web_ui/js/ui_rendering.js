@@ -21,6 +21,8 @@ import { DOM_IDS, DISPLAY_VALUES } from './constants_dom.js';
 import { DOMUtils } from './utils/DOMUtils.js';
 import { ViewState } from './view_state.js';
 
+let _lastActivePlayer = -1;
+
 // Cached DOM element references for performance
 const DOM_CACHE = {
     myHand: null,
@@ -179,6 +181,30 @@ export const Rendering = {
         // In non-PvP (sandbox), default to both-mode view on first render
         if (state.mode !== 'pvp' && bothBtn && !bothBtn.classList.contains('active')) {
             switchBoard('both');
+        }
+
+        // Track active player for auto-switch (set after first render)
+        if (_lastActivePlayer === -1 && state.active_player !== undefined) {
+            _lastActivePlayer = activePlayerNum;
+        }
+
+        // Auto-switch board tab when active player changes (skip initial render)
+        const gb = document.getElementById('game-board');
+        const activePlayerChanged = _lastActivePlayer !== -1 && state.active_player !== undefined && activePlayerNum !== _lastActivePlayer;
+        if (activePlayerChanged) {
+            _lastActivePlayer = activePlayerNum;
+            if (bothBtn?.classList.contains('active')) {
+                const isFlipped = gb?.classList.contains('both-mode-flipped');
+                const activeOnBottom = isFlipped ? activePlayerNum !== viewState.perspectivePlayer : activePlayerNum === viewState.perspectivePlayer;
+                if (!activeOnBottom) switchBoard('both');
+            } else if (playerBtn?.classList.contains('active') && isSelfActive) {
+                // Already showing player view with active player — correct
+            } else if (oppBtn?.classList.contains('active') && !isSelfActive) {
+                // Already showing opponent view with active player — correct
+            } else {
+                // Switch single view to match current active player
+                switchBoard(isSelfActive ? 'player' : 'opponent');
+            }
         }
 
         Tooltips.highlightPendingSource();

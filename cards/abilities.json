@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-24T07:25:34.997725",
+  "generated_at": "2026-06-24T08:15:54.984378",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -28375,16 +28375,14 @@
           },
           {
             "text": "これにより引いた枚数と同じ枚数を手札から控え室に置く",
-            "source": "deck",
-            "destination": "hand",
+            "source": "hand",
+            "destination": "discard",
             "dynamic_count": {
               "type": "drawn_cards",
               "reference": "previous_draw"
             },
-            "action": "draw_card",
-            "group_names": [
-              "Aqours"
-            ]
+            "action": "move_cards",
+            "card_type": "card"
           }
         ],
         "group_names": [

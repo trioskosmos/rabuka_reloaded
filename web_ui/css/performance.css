@@ -94,12 +94,27 @@
     vertical-align: middle;
 }
 
-.perf-live-art, .perf-contrib-art {
-    width: 36px;
-    height: 36px;
+.perf-guide-member-img,
+.perf-step-member-img,
+.perf-step-card-img-sm {
+    height: 38px;
+    width: auto;
+    aspect-ratio: 512 / 720;
     object-fit: cover;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    display: inline-block;
+}
+
+.perf-live-art, .perf-contrib-art {
+    height: 44px;
+    width: auto;
+    aspect-ratio: 512 / 720;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
 }
 
 .perf-yell-card-modern img {
@@ -876,49 +891,33 @@
 
 /* --- Live Card Rotation Wrappers for Performance Modal --- */
 .perf-live-art-wrapper {
-    position: relative;
-    overflow: hidden;
-    border-radius: var(--radius-sm, 4px);
-    border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
     flex-shrink: 0;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* lg variant: for renderLiveCards -> 50x36 landscape */
-.perf-live-art-wrapper.lg {
-    width: 50px;
-    height: 36px;
+.perf-live-art-wrapper img {
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    object-fit: cover;
+    display: block;
 }
+
 .perf-live-art-wrapper.lg img {
     width: 36px;
     height: 50px;
 }
 
-/* md variant: for step 1 Live Zone and live guide -> 50x36 landscape */
-.perf-live-art-wrapper.md {
-    width: 50px;
-    height: 36px;
-}
 .perf-live-art-wrapper.md img {
-    width: 36px;
-    height: 50px;
+    width: 28px;
+    height: 40px;
 }
 
-/* sm variant: for step 8 judge -> 36x26 landscape */
-.perf-live-art-wrapper.sm {
-    width: 36px;
-    height: 26px;
-}
 .perf-live-art-wrapper.sm img {
-    width: 26px;
-    height: 36px;
-}
-
-.perf-live-art-wrapper img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
+    width: 22px;
+    height: 30px;
 }
 
 /* Performance modal layout — tab content fills available space */

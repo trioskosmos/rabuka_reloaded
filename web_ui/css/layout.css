@@ -286,7 +286,7 @@
 .board-toggle .btn-toggle {
     flex: 1;
     max-width: 300px;
-    padding: 6px 16px;
+    padding: 4px 10px;
     font-size: 0.95rem;
     font-weight: 700;
     border-radius: 4px;
@@ -303,28 +303,65 @@
     box-shadow: var(--glow-blue);
 }
 
-/* Both-mode: show both player sections side-by-side, each 50% height */
-.game-board.both-mode .player-section {
-    height: 50%;
-    max-height: 50%;
-}
-
+/* Both-mode: sections split remaining space after board-toggle equally */
 .game-board.both-mode {
-    --card-h: clamp(80px, 14dvh, 160px);
+    --card-h: clamp(40px, 6dvh, 80px);
+    --card-h-mini: calc(var(--card-h) * 0.6);
+    --card-w: calc(var(--card-h) * (512 / 720));
+    --card-w-mini: calc(var(--card-w) * 0.6);
+    overflow: hidden;
 }
 
-.game-board.both-mode .player-section.opponent {
-    transform: rotate(180deg);
+.game-board.both-mode .player-section {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
 }
 
+.game-board.both-mode .board-inner {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Reverse opponent layout: hand at top, live at bottom */
+.game-board.both-mode .player-section.opponent .board-inner {
+    flex-direction: column-reverse;
+}
+
+/* Hand gets more space in both-mode */
+.game-board.both-mode .hand-row {
+    flex: 0 1 auto;
+    max-height: 28%;
+}
+
+/* Live zone capped */
+.game-board.both-mode .live-group-row {
+    flex-shrink: 1;
+    flex-basis: auto;
+    max-height: 18%;
+}
+
+/* Energy compact */
+.game-board.both-mode .energy-row-hud {
+    flex-shrink: 1;
+    max-height: 8%;
+    overflow: hidden;
+}
+
+.game-board.both-mode .energy-row-hud .card.energy {
+    --card-h: clamp(28px, 4dvh, 48px);
+}
+
+/* Stage takes remaining space */
+.game-board.both-mode .field-row {
+    flex: 1;
+    min-height: 0;
+}
+
+/* Flip perspective: put player on top */
 .game-board.both-mode-flipped .player-section.opponent {
     order: 1;
-}
-
-.game-board.both-mode .player-section.opponent .stat-item,
-.game-board.both-mode .player-section.opponent .area-count,
-.game-board.both-mode .player-section.opponent .deck-summary {
-    transform: rotate(-180deg);
 }
 
 /* Sidebar & Containers */

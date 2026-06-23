@@ -336,6 +336,7 @@ impl AbilityResolver {
                     None,
                 )?;
             }
+            self.step_state.last_draw_count = count;
             return Ok(());
         }
 
@@ -395,6 +396,7 @@ impl AbilityResolver {
                     &card_db,
                     Some(activating_id),
                 )?;
+                self.step_state.last_draw_count = final_count;
                 return Ok(());
             }
         }
@@ -469,6 +471,7 @@ impl AbilityResolver {
                 log::debug!("Draw from source '{}' not yet implemented", source);
             }
         }
+        self.step_state.last_draw_count = final_count;
         Ok(())
     }
 

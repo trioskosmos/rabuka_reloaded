@@ -659,6 +659,20 @@ impl TestGame {
         }
     }
 
+    /// Get the `count` from a pending SelectCard choice.
+    pub fn pending_choice_count(&self) -> usize {
+        if let Some(choice) = self.state.ability_queue.is_waiting_for_choice() {
+            if let Choice::SelectCard { count, .. } = choice {
+                return *count;
+            }
+        } else if let Some(ref pc) = self.state.get_pending_choice_json() {
+            if let Some(count) = pc["count"].as_u64() {
+                return count as usize;
+            }
+        }
+        0
+    }
+
     /// Print the current pending choice details.
     pub fn dbg_choice(&self) {
         if let Some(choice) = self.state.ability_queue.is_waiting_for_choice() {
