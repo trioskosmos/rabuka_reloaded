@@ -677,12 +677,6 @@
     color: var(--accent-gold);
 }
 
-/* --- Heart00 (Any) visual distinction --- */
-.heart-tag.color-any,
-.heart-chip.color-any {
-    border: 1px dashed rgba(255,255,255,0.3);
-    background: rgba(255,255,255,0.04);
-}
 /* Tooltips */
 .perf-bonus-source-tooltip {
     position: absolute;

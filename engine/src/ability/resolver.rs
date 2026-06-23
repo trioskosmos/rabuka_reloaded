@@ -77,6 +77,25 @@ impl AbilityResolver {
     #[allow(unused)]
     pub fn buffer_log<E: AsRef<str>>(&mut self, _gs: &GameState, _text: E) {}
 
+    /// Set `pending_choice` and return `Ok(())` in one call.
+    /// Replaces the repeated 2-liner:
+    ///   `self.pending_choice = Some(c); return Ok(());`
+    /// that appears in ~25 handler sites across effects/*.rs.
+    #[inline]
+    pub fn emit_choice(&mut self, c: Choice) -> Result<(), String> {
+        self.pending_choice = Some(c);
+        Ok(())
+    }
+
+    /// Name of the activating card, or `"<unknown>"` when unavailable.
+    /// Used by log and debug helpers to avoid repeated DB look-ups.
+    pub fn activating_card_name(&self) -> &str {
+        self.activating_card_id
+            .and_then(|cid| self.card_database.get_card(cid))
+            .map(|c| c.name.as_str())
+            .unwrap_or("<unknown>")
+    }
+
     /// Find matching card indices in a zone, prompt if too many.
     /// Takes &[i16] (read-only — works with Vec, SmallVec, any container).
     /// Returns Ok(Some(indices)) if exact match or fewer.
@@ -280,71 +299,73 @@ impl AbilityResolver {
     pub(crate) fn store_pending_choice(&mut self, gs: &mut GameState) {
         gs.ability_queue.snapshot_requested = true;
         if let Some(ref choice) = self.pending_choice {
-            // Permanent debug: log every pending choice to stderr
-            match choice {
-                crate::ability::types::Choice::SelectCard {
-                    zone,
-                    card_type,
-                    count,
-                    description,
-                    allow_skip,
-                    group,
-                    characters,
-                    cost_limit,
-                    cost_limit_operator,
-                    filtered_indices,
-                    is_select_action,
-                    heart_colors,
-                    target_player_id,
-                    ..
-                } => {
-                    eprintln!("[PENDING_CHOICE] SelectCard zone={} count={} allow_skip={} group={:?} card_type={:?} is_select_action={} heart_colors={:?} target_player_id={:?} description={}", zone, count, allow_skip, group, card_type, is_select_action, heart_colors, target_player_id, description);
-                }
-                crate::ability::types::Choice::SelectHeartColor {
-                    count,
-                    options,
-                    description,
-                    ..
-                } => {
-                    eprintln!(
+            // Always-on debug: log every pending choice (ABILITY_DEBUG is set true in tests)
+            if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                match choice {
+                    crate::ability::types::Choice::SelectCard {
+                        zone,
+                        card_type,
+                        count,
+                        description,
+                        allow_skip,
+                        group,
+                        characters,
+                        cost_limit,
+                        cost_limit_operator,
+                        filtered_indices,
+                        is_select_action,
+                        heart_colors,
+                        target_player_id,
+                        ..
+                    } => {
+                        eprintln!("[PENDING_CHOICE] SelectCard zone={} count={} allow_skip={} group={:?} card_type={:?} is_select_action={} heart_colors={:?} target_player_id={:?} description={}", zone, count, allow_skip, group, card_type, is_select_action, heart_colors, target_player_id, description);
+                    }
+                    crate::ability::types::Choice::SelectHeartColor {
+                        count,
+                        options,
+                        description,
+                        ..
+                    } => {
+                        eprintln!(
                         "[PENDING_CHOICE] SelectHeartColor count={} options={:?} description={}",
                         count, options, description
                     );
-                }
-                crate::ability::types::Choice::SelectTarget {
-                    target,
-                    description,
-                    options,
-                    allow_skip,
-                    ..
-                } => {
-                    eprintln!("[PENDING_CHOICE] SelectTarget target={} options={:?} allow_skip={} description={}", target, options, allow_skip, description);
-                }
-                crate::ability::types::Choice::SelectPosition { description, .. } => {
-                    eprintln!(
-                        "[PENDING_CHOICE] SelectPosition description={}",
-                        description
-                    );
-                }
-                crate::ability::types::Choice::SelectHeartType {
-                    count,
-                    options,
-                    description,
-                    ..
-                } => {
-                    eprintln!(
-                        "[PENDING_CHOICE] SelectHeartType count={} options={:?} description={}",
-                        count, options, description
-                    );
-                }
-                crate::ability::types::Choice::SelectAutoAbility { options, .. } => {
-                    eprintln!("[PENDING_CHOICE] SelectAutoAbility options={:?}", options);
-                }
-                crate::ability::types::Choice::SelectLiveSuccess { description, .. } => {
-                    eprintln!(
-                        "[PENDING_CHOICE] SelectLiveSuccess description={}",
-                        description
-                    );
+                    }
+                    crate::ability::types::Choice::SelectTarget {
+                        target,
+                        description,
+                        options,
+                        allow_skip,
+                        ..
+                    } => {
+                        eprintln!("[PENDING_CHOICE] SelectTarget target={} options={:?} allow_skip={} description={}", target, options, allow_skip, description);
+                    }
+                    crate::ability::types::Choice::SelectPosition { description, .. } => {
+                        eprintln!(
+                            "[PENDING_CHOICE] SelectPosition description={}",
+                            description
+                        );
+                    }
+                    crate::ability::types::Choice::SelectHeartType {
+                        count,
+                        options,
+                        description,
+                        ..
+                    } => {
+                        eprintln!(
+                            "[PENDING_CHOICE] SelectHeartType count={} options={:?} description={}",
+                            count, options, description
+                        );
+                    }
+                    crate::ability::types::Choice::SelectAutoAbility { options, .. } => {
+                        eprintln!("[PENDING_CHOICE] SelectAutoAbility options={:?}", options);
+                    }
+                    crate::ability::types::Choice::SelectLiveSuccess { description, .. } => {
+                        eprintln!(
+                            "[PENDING_CHOICE] SelectLiveSuccess description={}",
+                            description
+                        );
+                    }
                 }
             }
             let mut json = choice.to_frontend_json();

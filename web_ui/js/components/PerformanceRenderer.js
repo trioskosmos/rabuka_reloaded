@@ -10,6 +10,7 @@ import * as i18n from '../i18n/index.js';
 import { Tooltips } from '../ui_tooltips.js';
 import { TextEnricher } from '../utils/TextEnricher.js';
 
+// heart types: index 0 = heart_00 (wildcard Any), index 7 = icon_all (counts as ALL colors)
 const HEART_LABELS = ['Any', 'Pink', 'Red', 'Yellow', 'Green', 'Blue', 'Purple', 'All'];
 
 const HEART_ICONS = [
@@ -175,12 +176,14 @@ function renderHeartsCompact(hearts) {
         return '<span class="perf-empty-inline">none</span>';
     }
 
+    const heartNames = ['Any (heart_00 wildcard)', 'Pink', 'Red', 'Yellow', 'Green', 'Blue', 'Purple', 'All (icon_all blade/ability)'];
+
     return `<div class="hearts-compact">${hearts.map((count, index) => {
         if (!count) return '';
         const iconSrc = HEART_ICONS[index];
         return `
-            <div class="heart-tag ${index === 0 ? 'color-any' : `color-${index}`}" title="${escapeHtml(HEART_LABELS[index])}">
-                <img src="${iconSrc}" class="heart-mini-icon" alt="${escapeHtml(HEART_LABELS[index])}">
+            <div class="heart-tag ${index === 0 ? 'color-any' : `color-${index}`}" title="${heartNames[index]}">
+                <img src="${iconSrc}" class="heart-mini-icon" alt="${heartNames[index]}">
                 <span>${count}</span>
             </div>
         `;
@@ -254,7 +257,37 @@ function renderAggregateHeartSummary(result) {
                     <span class="perf-agg-sum">${totalAvailable}</span>
                 </div>`;
 
-    // Simulate the engine's sequential allocation for each live card
+    // The engine allocates hearts from the shared pool to each live card sequentially.
+    // Allocation phases (engine/src/turn/live.rs):
+    //
+    //   Phase ① — Colored hearts → colored req (by matching color, up to req)
+    //     e.g. 4 Red hearts with req 2 Red: 2 go to Phase ①, 2 remain as excess
+    //
+    //   Phase ② — Wild (Any / heart_00) hearts → remaining colored deficits
+    //     Any heart (index 0) is a wildcard that fills any color's unmet req.
+    //
+    //   Phase ③ step 1 — Leftover colored hearts → Heart00 req
+    //     Colored hearts beyond what Phase ① used go to the Any/Heart00 requirement.
+    //     The engine records these under their original color index (1-6), NOT as index 0.
+    //
+    //   Phase ③ step 2 — Remaining Any (heart_00) hearts → Heart00 req
+    //     Recorded with color index 0.
+    //
+    // Heart type reference:
+    //   heart_00  (index 0) — 'Any' wildcard. Used in live card NEED_HEARTS as a
+    //     requirement that accepts any heart color. In the pool it's a wildcard heart.
+    //   icon_all  (index 7) — 'All' / BAll. Blade heart or ability bonus that counts
+    //     as ALL colors simultaneously. NOT the same as heart_00.
+    //   heart_01-06  — Pink, Red, Yellow, Green, Blue, Purple specific colors.
+    //
+    // PASS/FAIL logic (engine):
+    //   1. total_filled < total_required → FAIL
+    //   2. Heart00: sum(filled[1..7]) + filled[0] < req[0] → FAIL
+    //   3. Each colored slot: filled[c] < req[c] and no wildcard remaining → FAIL
+    //
+    // filled[c] includes ALL allocations to color c (Phases ① + ② + ③ step 1).
+    // We split Phase ① and Phase ③ step 1 by capping at per-color req.
+
     const remaining = totalHearts.map(v => v);
     for (let liveIdx = 0; liveIdx < lives.length; liveIdx++) {
         const live = lives[liveIdx];
@@ -269,9 +302,11 @@ function renderAggregateHeartSummary(result) {
         const colorFill = filled.slice(1, 7);
         const colorReqSum = sumHearts(colorReq);
         const colorFillSum = sumHearts(colorFill);
-        const colDeficit = Math.max(0, colorReqSum - colorFillSum);
         const wildReq = req[0] || 0;
         const wildFill = filled[0] || 0;
+
+        // Per-color deficit for colored req (sum of shortfalls per color, not total)
+        const colDeficit = [1,2,3,4,5,6].reduce((sum, c) => sum + Math.max(0, (req[c] || 0) - (filled[c] || 0)), 0);
 
         // Phase 1: colored hearts → colored req (capped at req per color)
         // Phase 3 step 1: excess colored hearts → Heart00 (colored beyond req)
@@ -287,9 +322,9 @@ function renderAggregateHeartSummary(result) {
         const p3ColorTotal = sumHearts(p3ColorPerColor);
         const totalWildFill = wildFill + p3ColorTotal;
 
-        // Phase 2: wildcard filling colored slots
+        // Phase 2: wildcard (Any index-0) hearts filling colored deficit
         const p2Allocs = allocations.filter(a => a.target_idx === liveIdx && a.wildcard);
-        // Phase 3 step 2: Heart00 (color 0) wildcard hearts filling Heart00
+        // Phase 3 step 2: wildcard Any hearts (color 0) filling remaining Heart00
         const p3Allocs = allocations.filter(a => a.target_idx === liveIdx && !a.wildcard && a.color === 0);
 
         // Compute what was left before this card
@@ -306,6 +341,10 @@ function renderAggregateHeartSummary(result) {
         const beforeSum = sumHearts(beforeDisplay);
         const afterSum = sumHearts(afterDisplay);
 
+        const consumedArr = beforeDisplay.map((v, i) => v - afterDisplay[i]);
+        const consumedSum = sumHearts(consumedArr);
+        const totalShort = Math.max(0, reqSum - consumedSum);
+
         html += `
             <div class="perf-agg-card ${passed ? 'success' : 'failure'}">
                 <div class="perf-agg-card-head">
@@ -314,25 +353,27 @@ function renderAggregateHeartSummary(result) {
                 </div>
                 <div class="perf-agg-card-require">Need ${renderHeartsCompact(req)} = ${reqSum}</div>
                 <div class="perf-agg-card-pool">Before: ${renderHeartsCompact(beforeDisplay)} = ${beforeSum}</div>
+                <div class="perf-agg-card-pool consumed">Used: ${renderHeartsCompact(consumedArr)} = ${consumedSum}${totalShort > 0 ? ` <span class="perf-agg-fail">(${totalShort} short of ${reqSum} needed)</span>` : ''}</div>
                 <div class="perf-agg-steps">
                     ${colorReqSum > 0 ? `
-                    <div class="perf-agg-step done">
+                    <div class="perf-agg-step ${phase1Total >= colorReqSum ? 'done' : 'fail'}">
                         <span class="perf-agg-marker">①</span>
                         <span>Colored hearts → colored req</span>
-                        <span class="perf-agg-step-stat">${phase1Total}/${colorReqSum}</span>
+                        <span class="perf-agg-step-stat">${phase1Total}/${colorReqSum}${phase1Total < colorReqSum ? `<span class="perf-agg-fail"> (${colorReqSum - phase1Total} short)</span>` : ''}</span>
                         ${phase1Total > 0 ? `<div class="perf-agg-alloc-detail">${[1,2,3,4,5,6].filter(c => phase1PerColor[c] > 0).map(c => `${phase1PerColor[c]}×${HEART_LABELS[c]}`).join(', ')}</div>` : ''}
                     </div>` : ''}
                     ${colDeficit > 0 ? `
-                    <div class="perf-agg-step done">
+                    <div class="perf-agg-step ${p2Allocs.reduce((s, a) => s + a.amount, 0) >= colDeficit ? 'done' : 'fail'}">
                         <span class="perf-agg-marker">②</span>
                         <span>Wild (Any) → colored deficit</span>
-                        <span class="perf-agg-step-stat">${p2Allocs.reduce((s, a) => s + a.amount, 0)} used</span>
+                        <span class="perf-agg-step-stat">${p2Allocs.reduce((s, a) => s + a.amount, 0)}/${colDeficit}${p2Allocs.reduce((s, a) => s + a.amount, 0) < colDeficit ? `<span class="perf-agg-fail"> (${colDeficit - p2Allocs.reduce((s, a) => s + a.amount, 0)} short)</span>` : ''}</span>
                         ${p2Allocs.length > 0 ? `<div class="perf-agg-alloc-detail">${p2Allocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ')}</div>` : ''}
+                        ${p2Allocs.length === 0 ? '<div class="perf-agg-alloc-detail">No wild (Any) hearts available</div>' : ''}
                     </div>` : ''}
                     ${wildReq > 0 ? `
                     <div class="perf-agg-step ${totalWildFill >= wildReq ? 'done' : 'fail'}">
                         <span class="perf-agg-marker">③</span>
-                        <span>Remaining → Any (Heart00)</span>
+                        <span>Heart00 (any heart color accepted)</span>
                         <span class="perf-agg-step-stat">${totalWildFill}/${wildReq}${totalWildFill < wildReq ? `<span class="perf-agg-fail"> (${wildReq - totalWildFill} short)</span>` : ''}</span>
                         ${totalWildFill > 0 ? `<div class="perf-agg-alloc-detail">${
                             [1,2,3,4,5,6].filter(c => p3ColorPerColor[c] > 0).map(c => `${p3ColorPerColor[c]}×${HEART_LABELS[c]}`).concat(
@@ -345,14 +386,15 @@ function renderAggregateHeartSummary(result) {
             </div>`;
     }
 
-    // Final surplus
+    // Final surplus (always show)
     const finalRemaining = remaining.map(v => v);
+    const surplusTotal = sumHearts(finalRemaining);
     html += `
                 <div class="perf-agg-divider"></div>
-                <div class="perf-agg-row surplus ${surplus > 0 ? 'positive' : 'zero'}">
+                <div class="perf-agg-row surplus ${surplusTotal > 0 ? 'positive' : 'zero'}">
                     <span class="perf-agg-label">Surplus</span>
                     ${renderHeartsCompact(finalRemaining)}
-                    <span class="perf-agg-surplus-value">${surplus > 0 ? '+' : ''}${surplus}</span>
+                    <span class="perf-agg-surplus-value">${surplusTotal > 0 ? '+' : ''}${surplusTotal}</span>
                 </div>
             </div>
         </div>`;

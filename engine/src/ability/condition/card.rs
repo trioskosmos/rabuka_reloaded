@@ -98,11 +98,7 @@ impl<'a> ConditionContext<'a> {
                     if let Some(card_id) = util::card_at_position(player, position) {
                         // Apply group filter if specified (e.g. Aqours)
                         if let Some(ref groups) = condition.group_names {
-                            if !groups.is_empty()
-                                && !groups.iter().any(|g| {
-                                    util::card_matches_group_str(card_db, card_id, Some(g))
-                                })
-                            {
+                            if !util::card_matches_any_group(card_db, card_id, groups) {
                                 return false;
                             }
                         }

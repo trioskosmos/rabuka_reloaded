@@ -298,21 +298,11 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         source: &str,
-        count: u32,
-        target: &str,
-        card_type: Option<&str>,
-        distinct: Option<&str>,
-        heart_colors: &[String],
-        or_card_types: Option<Vec<String>>,
-        exclude_selected: bool,
-        characters: Option<Vec<String>>,
-        group_names: Option<Vec<String>>,
-        exclude_self: Option<bool>,
+        effect: &AbilityEffect,
     ) -> Result<(), String> {
         // Handle or_card_types (type choice, e.g. Honoka: pick live_card or member_card)
-        if let Some(ref or_types) = or_card_types {
+        if let Some(ref or_types) = effect.or_card_types {
             if !or_types.is_empty() {
-                // If already chosen (re-processing after choice was resolved), skip
                 let already_chosen = gs
                     .ability_queue
                     .current_entry()
@@ -330,12 +320,7 @@ impl AbilityResolver {
                             "energy_card" => "Energy card".to_string(),
                             _ => t.clone(),
                         };
-                        let cl = self.current_effect.as_ref().and_then(|e| e.cost_limit);
-                        let co = self
-                            .current_effect
-                            .as_ref()
-                            .and_then(|e| e.cost_limit_operator.as_deref());
-                        match (cl, co) {
+                        match (effect.cost_limit, effect.cost_limit_operator.as_deref()) {
                             (Some(l), Some("<=")) => format!("{} with cost {} or less", base, l),
                             (Some(l), Some(">=")) => format!("{} with cost {} or more", base, l),
                             (Some(l), _) => format!("{} with cost {}", base, l),
@@ -350,7 +335,6 @@ impl AbilityResolver {
                     options: Some(desc_parts.clone()),
                 });
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
-                // Store the options as JSON array in conditional_choice so the reveal can read the player's pick
                 if let Some(e) = gs.ability_queue.current_entry_mut() {
                     e.conditional_choice = Some(serde_json::to_string(or_types).unwrap());
                 }
@@ -358,7 +342,18 @@ impl AbilityResolver {
             }
         }
 
-        let target = target.to_string();
+        let card_type = effect.card_type.as_deref();
+        let target = effect.target_name().to_string();
+        let count = effect
+            .count
+            .or_else(|| {
+                effect
+                    .dynamic_count
+                    .as_ref()
+                    .and_then(|dc| self.resolve_dynamic_count(gs, dc).into())
+            })
+            .unwrap_or(1);
+        let optional = effect.optional.unwrap_or(false);
         let card_db = gs.card_database.clone();
         let player = gs.resolve_target_player_mut(&target);
 
@@ -390,82 +385,58 @@ impl AbilityResolver {
             .iter()
             .filter(|&&card_id| {
                 super::util::card_matches_type(&card_db, card_id, card_type)
-                    && super::util::card_matches_heart_colors(&card_db, card_id, heart_colors)
+                    && super::util::card_matches_heart_colors(
+                        &card_db,
+                        card_id,
+                        &effect.heart_colors,
+                    )
             })
             .copied()
             .collect();
 
-        // Apply distinct filter if needed, then check count
-        let distinct_filter = super::util::filter_from_parts_full(
-            None, None, None, None, None, None, distinct, None, None, None,
-        );
-        let distinct_indices =
-            super::util::filter_distinct(&filtered, &card_db, &distinct_filter, false);
-        gs.looked_at_cards = distinct_indices.iter().map(|&i| filtered[i]).collect();
+        if let Some(distinct) = effect.distinct.as_deref() {
+            let distinct_filter = super::util::filter_from_parts_full(
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(distinct),
+                None,
+                None,
+                None,
+            );
+            let distinct_indices =
+                super::util::filter_distinct(&filtered, &card_db, &distinct_filter, false);
+            gs.looked_at_cards = distinct_indices.iter().map(|&i| filtered[i]).collect();
+        } else {
+            gs.looked_at_cards = filtered;
+        }
 
-        // Apply additional filters (characters, group, cost_limit) that the choice will validate.
-        // These come from parameters or fall back to current_effect.
-        let ce_chars = self
-            .current_effect
-            .as_ref()
-            .and_then(|e| e.characters.as_ref());
-        let ce_group = self
-            .current_effect
-            .as_ref()
-            .and_then(|e| e.group_names.as_ref())
-            .and_then(|v| v.first().map(|s| s.as_str()));
-        let ce_cost_limit = self.current_effect.as_ref().and_then(|e| e.cost_limit);
-        let ce_cost_op = self
-            .current_effect
-            .as_ref()
-            .and_then(|e| e.cost_limit_operator.as_deref());
-        let filter = super::util::CardFilter {
-            card_type: None,
-            group: group_names
-                .as_ref()
-                .and_then(|v| v.first().map(|s| s.as_str()))
-                .or(ce_group),
-            groups: None,
-            cost_limit: ce_cost_limit,
-            cost_operator: ce_cost_op,
-            characters: characters.as_ref().or(ce_chars),
-            ..Default::default()
-        };
+        // Apply CardFilter::from_effect for all remaining filters
+        let filter = super::util::CardFilter::from_effect(effect);
         gs.looked_at_cards
             .retain(|&id| filter.matches(&card_db, id, false));
 
-        // Exclude previously selected cards if exclude_selected is true
-        log::debug!(
-            "[EXCLUDE_SEL] selected={:?} looked_at_before={:?}",
-            self.selected_cards,
-            gs.looked_at_cards
-        );
-        if exclude_selected && !self.selected_cards.is_empty() {
+        if effect.exclude_selected.unwrap_or(false) && !self.selected_cards.is_empty() {
             gs.looked_at_cards
                 .retain(|id| !self.selected_cards.contains(id));
         }
-        if exclude_self.unwrap_or(false) {
+        if effect.exclude_self.unwrap_or(false) {
             if let Some(activating_id) = gs.activating_card {
                 gs.looked_at_cards.retain(|&id| id != activating_id);
             }
         }
-        log::debug!("[EXCLUDE_SEL] looked_at_after={:?}", gs.looked_at_cards);
 
-        let optional = self
-            .current_effect
-            .as_ref()
-            .is_some_and(|e| e.optional.unwrap_or(false));
         if count == 0 {
-            return Ok(()); // Up to 0 cards to select — skip
+            return Ok(());
         }
         if gs.looked_at_cards.is_empty() {
-            return Ok(()); // No matching cards at all — skip silently
+            return Ok(());
         }
-        // Cap count to available cards (handles max-mode where count > available)
         let count = count.min(gs.looked_at_cards.len() as u32);
-        // Compute filtered stage indices: map looked_at_cards back to stage positions.
-        // This ensures handle_select_card looks up the right card when exclude_selected
-        // or other filters shift which cards are available.
+
         let filtered_indices: Option<Vec<usize>> = if Zone::from_str(source) == Some(Zone::Stage) {
             let looked = gs.looked_at_cards.clone();
             Some(
@@ -490,29 +461,10 @@ impl AbilityResolver {
                 format!("Select {} card(s) from {}", count, source),
                 optional,
             )
-            .card_type(card_type.map(|s| s.to_string()))
-            .cost_limit(
-                self.current_effect.as_ref().and_then(|e| e.cost_limit),
-                self.current_effect
-                    .as_ref()
-                    .and_then(|e| e.cost_limit_operator.clone()),
-            )
-            .group(
-                group_names
-                    .as_ref()
-                    .and_then(|v| v.first().cloned())
-                    .or_else(|| {
-                        self.current_effect
-                            .as_ref()
-                            .and_then(|e| e.group_names.as_ref())
-                            .and_then(|v| v.first().cloned())
-                    }),
-            )
-            .characters(characters.clone().or_else(|| {
-                self.current_effect
-                    .as_ref()
-                    .and_then(|e| e.characters.clone())
-            }))
+            .card_type(effect.card_type.clone())
+            .cost_limit(effect.cost_limit, effect.cost_limit_operator.clone())
+            .group(effect.group_names.as_ref().and_then(|v| v.first().cloned()))
+            .characters(effect.characters.clone())
             .filtered_indices(filtered_indices.clone())
             .target_player_id(Some(target.clone()))
             .is_select_action(true)

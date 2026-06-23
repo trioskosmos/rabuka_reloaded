@@ -301,27 +301,7 @@ impl AbilityResolver {
             } else {
                 effect.source_or(Zone::Hand.to_str())
             };
-        let count = if let Some(c) = effect.count {
-            c
-        } else if let Some(ref dc) = effect.dynamic_count {
-            self.resolve_dynamic_count(gs, dc)
-        } else {
-            1
-        };
-        self.execute_select(
-            gs,
-            source,
-            count,
-            effect.target_name(),
-            effect.card_type.as_deref(),
-            effect.distinct.as_deref(),
-            &effect.heart_colors,
-            effect.or_card_types.clone(),
-            effect.exclude_selected.unwrap_or(false),
-            effect.characters.clone(),
-            effect.group_names.clone(),
-            effect.exclude_self,
-        )
+        self.execute_select(gs, source, effect)
     }
 
     pub fn execute_draw(

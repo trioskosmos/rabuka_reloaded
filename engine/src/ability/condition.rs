@@ -90,6 +90,18 @@ impl<'a> ConditionContext<'a> {
             self_player: Self::resolve_self_player(game_state),
         }
     }
+
+    /// Returns true if the effect has no condition, or if its condition passes.
+    /// Intended as a single-expression guard in sequential and handler loops:
+    ///   `if !ConditionContext::new(gs).allows(action) { continue; }`
+    /// replaces the repeated 4-line inline check pattern.
+    #[inline]
+    pub fn allows(&self, effect: &crate::card::AbilityEffect) -> bool {
+        effect
+            .condition
+            .as_ref()
+            .map_or(true, |c| self.evaluate_condition(c))
+    }
 }
 
 /// Push a condition verdict to the structured log buffer.

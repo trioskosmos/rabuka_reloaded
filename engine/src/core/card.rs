@@ -1086,6 +1086,22 @@ impl AbilityEffect {
             .and_then(|gn| gn.first().map(|s| s.as_str()))
     }
 
+    /// Returns the group_names slice, or `&[]` if absent.
+    /// Avoids repeated `.as_ref().map(|v| v.as_slice()).unwrap_or_default()`.
+    pub fn group_names_slice(&self) -> &[String] {
+        self.group_names.as_deref().unwrap_or(&[])
+    }
+
+    /// Returns true if `card_id` matches this effect's group filter.
+    /// When `group_names` is absent or empty, every card passes (no filter).
+    pub fn matches_group_filter(
+        &self,
+        card_db: &CardDatabase,
+        card_id: i16,
+    ) -> bool {
+        crate::ability::util::card_matches_any_group(card_db, card_id, self.group_names_slice())
+    }
+
     /// Returns the first heart color as a string reference, or a static default.
     /// For single-color operations like modify_required_hearts.
     pub fn heart_color_or(&self, default: &'static str) -> &str {

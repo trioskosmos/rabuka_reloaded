@@ -721,10 +721,7 @@ impl AbilityResolver {
                     // Use resolve_per_unit_count which handles under_member,
                     // discard, waitroom_card and other special zones that
                     // zone_cards() cannot represent as a flat slice.
-                    let per_unit_filter = util::CardFilter {
-                        card_type: effect.card_type.as_deref(),
-                        ..util::CardFilter::default()
-                    };
+                    let per_unit_filter = util::CardFilter::from_effect(effect);
                     let matching_count = util::resolve_per_unit_count(
                         true,
                         Some(per_unit_type_str),

@@ -108,6 +108,7 @@ pub fn calculate_play_cost_reduction(
         None => return 0,
     };
 
+    // ── 1. Scan the played card's own abilities for a self-reduction ──────────
     let mut cost_reduction: u32 = 0;
     for ability in &card.abilities {
         if let Some(ref effect) = ability.effect {
@@ -126,60 +127,24 @@ pub fn calculate_play_cost_reduction(
         }
     }
 
+    // ── 2. Scan stage cards for cost-reduction auras that apply to card_id ───
     if cost_reduction == 0 {
         for &stage_id in &stage.stage {
             if stage_id == -1 {
                 continue;
             }
             if let Some(stage_card) = card_db.get_card(stage_id) {
-                for ability in &stage_card.abilities {
-                    if let Some(ref effect) = ability.effect {
-                        if ActionType::from_str(&effect.action) == Some(ActionType::ModifyCost)
-                            && effect.operation.as_deref() == Some("subtract")
-                            && effect.location.as_deref().and_then(Zone::from_str)
-                                == Some(Zone::Hand)
-                        {
-                            // Skip effects with a location condition requiring hand
-                            // (e.g. "手札にあるこのカード") — the card is on stage, so
-                            // the condition is not met.
-                            if let Some(ref cond) = effect.condition {
-                                if cond.location.as_deref() == Some("hand") {
-                                    continue;
-                                }
-                            }
-                            let group_matches = effect
-                                .group_names
-                                .as_ref()
-                                .and_then(|gn| {
-                                    gn.first()
-                                        .map(|g| card_matches_group_str(card_db, card_id, Some(g)))
-                                })
-                                .unwrap_or(true);
-                            if !group_matches {
-                                continue;
-                            }
-                            if let Some(limit) = effect.cost_limit {
-                                if card.cost != Some(limit) {
-                                    continue;
-                                }
-                            }
-                            if !cost_threshold_met(card, effect) {
-                                continue;
-                            }
-                            if let Some(ref ct) = effect.card_type {
-                                if ct != "member_card" && ct != "card" && ct != "member" {
-                                    continue;
-                                }
-                            }
-                            let reduction = if effect.per_unit.unwrap_or(false) {
-                                per_unit_cost_reduction(effect, stage, hand_count, card_db)
-                            } else {
-                                effect.value.unwrap_or(1)
-                            };
-                            cost_reduction = cost_reduction.max(reduction);
-                            break;
-                        }
-                    }
+                if let Some(r) = scan_abilities_for_cost_reduction(
+                    &stage_card.abilities,
+                    card_id,
+                    card,
+                    card_db,
+                    stage,
+                    hand_count,
+                    true, // enforce hand-condition guard (card is on stage, not in hand)
+                ) {
+                    cost_reduction = cost_reduction.max(r);
+                    break;
                 }
             }
             if cost_reduction > 0 {
@@ -188,49 +153,21 @@ pub fn calculate_play_cost_reduction(
         }
     }
 
+    // ── 3. Scan succeeded live cards for cost-reduction auras ─────────────────
     if cost_reduction == 0 {
         for &live_id in success_live_cards {
             if let Some(live_card) = card_db.get_card(live_id) {
-                for ability in &live_card.abilities {
-                    if let Some(ref effect) = ability.effect {
-                        if ActionType::from_str(&effect.action) == Some(ActionType::ModifyCost)
-                            && effect.operation.as_deref() == Some("subtract")
-                            && effect.location.as_deref().and_then(Zone::from_str)
-                                == Some(Zone::Hand)
-                        {
-                            if let Some(ref cond) = effect.condition {
-                                if cond.location.as_deref() == Some("hand") {
-                                    continue;
-                                }
-                            }
-                            let group_matches = effect
-                                .group_names
-                                .as_ref()
-                                .and_then(|gn| {
-                                    gn.first()
-                                        .map(|g| card_matches_group_str(card_db, card_id, Some(g)))
-                                })
-                                .unwrap_or(true);
-                            if !group_matches {
-                                continue;
-                            }
-                            if !cost_threshold_met(card, effect) {
-                                continue;
-                            }
-                            if let Some(ref ct) = effect.card_type {
-                                if ct != "member_card" && ct != "card" && ct != "member" {
-                                    continue;
-                                }
-                            }
-                            let reduction = if effect.per_unit.unwrap_or(false) {
-                                per_unit_cost_reduction(effect, stage, hand_count, card_db)
-                            } else {
-                                effect.value.unwrap_or(1)
-                            };
-                            cost_reduction = cost_reduction.max(reduction);
-                            break;
-                        }
-                    }
+                if let Some(r) = scan_abilities_for_cost_reduction(
+                    &live_card.abilities,
+                    card_id,
+                    card,
+                    card_db,
+                    stage,
+                    hand_count,
+                    false, // live cards have no hand-condition guard
+                ) {
+                    cost_reduction = cost_reduction.max(r);
+                    break;
                 }
             }
             if cost_reduction > 0 {
@@ -240,6 +177,74 @@ pub fn calculate_play_cost_reduction(
     }
 
     cost_reduction
+}
+
+/// Inner predicate shared across the three cost-reduction source scans.
+/// Returns `Some(reduction)` if the first qualifying ModifyCost-subtract-hand
+/// ability is found in `abilities`, or `None` if none match.
+///
+/// `hand_condition_guard`: when `true`, effects whose condition explicitly
+/// requires `location == "hand"` are skipped (the aura card is on stage, not
+/// in hand, so the condition is not met).
+fn scan_abilities_for_cost_reduction(
+    abilities: &[crate::card::Ability],
+    target_id: i16,
+    target_card: &crate::card::Card,
+    card_db: &CardDatabase,
+    stage: &crate::core::zones::Stage,
+    hand_count: usize,
+    hand_condition_guard: bool,
+) -> Option<u32> {
+    for ability in abilities {
+        if let Some(ref effect) = ability.effect {
+            if ActionType::from_str(&effect.action) != Some(ActionType::ModifyCost)
+                || effect.operation.as_deref() != Some("subtract")
+                || effect.location.as_deref().and_then(Zone::from_str) != Some(Zone::Hand)
+            {
+                continue;
+            }
+            // Skip if the effect requires the aura-source to be in hand
+            // (the card is on stage/live zone so this condition can't be met).
+            if hand_condition_guard {
+                if let Some(ref cond) = effect.condition {
+                    if cond.location.as_deref() == Some("hand") {
+                        continue;
+                    }
+                }
+            }
+            // Group filter: the played card must belong to the aura's group.
+            let group_matches = effect
+                .group_names
+                .as_deref()
+                .map(|gns| card_matches_any_group(card_db, target_id, gns))
+                .unwrap_or(true);
+            if !group_matches {
+                continue;
+            }
+            // Exact cost-limit guard (e.g. "only for cost-N cards")
+            if let Some(limit) = effect.cost_limit {
+                if target_card.cost != Some(limit) {
+                    continue;
+                }
+            }
+            if !cost_threshold_met(target_card, effect) {
+                continue;
+            }
+            // Card-type guard: only applies to member/card types
+            if let Some(ref ct) = effect.card_type {
+                if ct != "member_card" && ct != "card" && ct != "member" {
+                    continue;
+                }
+            }
+            let reduction = if effect.per_unit.unwrap_or(false) {
+                per_unit_cost_reduction(effect, stage, hand_count, card_db)
+            } else {
+                effect.value.unwrap_or(1)
+            };
+            return Some(reduction);
+        }
+    }
+    None
 }
 
 fn cost_threshold_met(card: &crate::card::Card, effect: &crate::card::AbilityEffect) -> bool {
@@ -412,6 +417,18 @@ pub fn card_matches_group_str(
     };
     debug_group_match(card_db, card_id, group_name, result);
     result
+}
+
+/// Returns true if `card_id` matches ANY group in `groups`, or if `groups` is
+/// empty (meaning no group filter). This replaces the repeated pattern:
+///   `effect.group_names.as_ref().and_then(|gn| gn.first().map(|g| card_matches_group_str(...)))`
+/// across ~35 handler call-sites.
+pub fn card_matches_any_group(
+    card_db: &CardDatabase,
+    card_id: i16,
+    groups: &[String],
+) -> bool {
+    groups.is_empty() || groups.iter().any(|g| card_matches_group_str(card_db, card_id, Some(g)))
 }
 
 fn card_series_matches_group(series: &str, group: &str) -> bool {
@@ -610,6 +627,35 @@ impl<'a> CardFilter<'a> {
     pub fn exclude_self_opt(mut self, id: Option<i16>) -> Self {
         self.exclude_self = id;
         self
+    }
+
+    /// Set `group` from the first element of a group-names slice.
+    /// For multi-group OR matching, use `CardFilter::from_effect` instead
+    /// (which also sets the `groups` field for the full slice).
+    pub fn with_groups(mut self, groups: &'a [String]) -> Self {
+        if let Some(first) = groups.first() {
+            self.group = Some(first.as_str());
+        }
+        self
+    }
+
+    /// Set `cost_limit` (upper bound) and `cost_limit_min` (lower bound) together.
+    /// Eliminates the dual-field assignment in range-filter handlers.
+    pub fn with_cost_range(mut self, min: Option<u32>, max: Option<u32>, op: Option<&'a str>) -> Self {
+        self.cost_limit = max;
+        self.cost_operator = op;
+        self.cost_limit_min = min;
+        self
+    }
+
+    /// Like `matches()` but additionally excludes every card in `excluded`.
+    /// Replaces the pattern where handlers filter `selected_cards` out of a
+    /// candidate list before passing to CardFilter (~8 sites).
+    pub fn matches_with_excluded(&self, db: &CardDatabase, id: i16, excluded: &[i16]) -> bool {
+        if excluded.contains(&id) {
+            return false;
+        }
+        self.matches(db, id, false)
     }
 
     /// Returns true if any filter field is set that could cause cards to be rejected.
