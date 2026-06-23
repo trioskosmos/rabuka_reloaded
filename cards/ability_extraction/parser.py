@@ -7482,12 +7482,11 @@ def _normalize_effect_tree(effect, original_text=None):
                                 and not sub.get("per_unit")
                             ):
                                 continue
-                            # Don't propagate heart_colors to gain_resource per_unit actions
+                            # Don't propagate heart_colors to gain_resource actions
                             # (the heart color was selected by a previous select action)
                             if (
                                 f == "heart_colors"
                                 and sub.get("action") == "gain_resource"
-                                and sub.get("per_unit") == True
                             ):
                                 continue
                             sub[f] = parent_effect[f]
@@ -7652,10 +7651,10 @@ def _normalize_effect_tree(effect, original_text=None):
             "modify_required_hearts",
             "move_cards",
         ):
-            # Per-unit gain_resource uses the heart color selected by a
+            # gain_resource uses the heart color selected by a
             # preceding select action (stored in conditional_choice) —
             # never inherit heart_colors from parent context.
-            if d.get("action") == "gain_resource" and d.get("per_unit"):
+            if d.get("action") == "gain_resource":
                 search_text = d_text or ""
             else:
                 # Check own text first, then parent context

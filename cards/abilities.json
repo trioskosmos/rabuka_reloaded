@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-23T21:21:51.228286",
+  "generated_at": "2026-06-23T21:29:31.095966",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -2407,12 +2407,7 @@
             "duration": "live_end",
             "count": 1,
             "action": "gain_resource",
-            "resource": "heart",
-            "heart_colors": [
-              "heart01",
-              "heart03",
-              "heart06"
-            ]
+            "resource": "heart"
           }
         ],
         "heart_colors": [
@@ -4124,12 +4119,7 @@
               "Aqours"
             ],
             "timing_condition": "appeared_this_turn",
-            "all": true,
-            "heart_colors": [
-              "heart03",
-              "heart04",
-              "heart05"
-            ]
+            "all": true
           }
         ],
         "group_names": [
@@ -19233,12 +19223,7 @@
             "duration": "live_end",
             "count": 1,
             "action": "gain_resource",
-            "resource": "heart",
-            "heart_colors": [
-              "heart01",
-              "heart03",
-              "heart06"
-            ]
+            "resource": "heart"
           }
         ],
         "heart_colors": [
@@ -22589,12 +22574,7 @@
             ],
             "target_count": 1,
             "action": "gain_resource",
-            "resource": "heart",
-            "heart_colors": [
-              "heart01",
-              "heart03",
-              "heart06"
-            ]
+            "resource": "heart"
           }
         ],
         "group_names": [
@@ -27853,13 +27833,7 @@
             ],
             "target_count": 1,
             "action": "gain_resource",
-            "resource": "heart",
-            "heart_colors": [
-              "heart01",
-              "heart04",
-              "heart05",
-              "heart06"
-            ]
+            "resource": "heart"
           }
         ],
         "exclude_self": true,

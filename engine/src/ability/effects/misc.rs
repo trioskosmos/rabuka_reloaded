@@ -423,11 +423,17 @@ impl AbilityResolver {
             return Ok(());
         }
 
-        // For per_unit gain_resource, skip heart_colors selection and use
-        // the previously selected heart from conditional_choice (set by a
-        // preceding select action). Multiple heart_colors would create a
-        // spurious choice in the middle of a per-unit counting operation.
-        let single_fixed_heart = if per_unit && resource == "heart" {
+        // If a preceding select action already set the heart color in
+        // conditional_choice, use it directly — skip any heart_colors prompt.
+        // This handles both per_unit and non-per_unit gain_resource that
+        // follow a select in a sequential effect.
+        let existing_choice = gs
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.conditional_choice.clone());
+        let single_fixed_heart = if let Some(chosen) = existing_choice {
+            Some(chosen)
+        } else if per_unit && resource == "heart" {
             gs.ability_queue
                 .current_entry()
                 .and_then(|e| e.conditional_choice.clone())

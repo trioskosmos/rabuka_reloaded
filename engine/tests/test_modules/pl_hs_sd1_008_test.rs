@@ -42,50 +42,49 @@ fn pl_hs_sd1_008_live_start_pay_cost_select_heart01_target_ally() {
     game.set_live_card(live);
     finish_live_setup(&mut game);
 
-    let mut step = 0;
-    while game.has_pending_choice() && step < 20 {
-        step += 1;
-        let ct = game.pending_choice_type().unwrap_or_default();
-        eprintln!("[STEP {}] choice_type={}", step, ct);
-        game.dbg_choice();
-        match ct.as_str() {
-            "SelectCard" => {
-                game.select_indices(&[0]);
-            }
-            "SelectHeartColor" => {
-                game.select_indices(&[1]);
-            }
-            "SelectAutoAbility" => {
-                game.select_indices(&[]);
-            }
-            "SelectTarget" => {
-                game.select_indices(&[]);
-            }
-            _ => {
-                game.dbg_all();
-                panic!("Unknown choice type at step {}: {}", step, ct);
-            }
-        }
-    }
+    // Step 1: Pay optional cost — SelectCard: pick 2 蓮ノ空 from hand
+    assert!(game.has_pending_choice(), "Should prompt for optional cost");
+    assert_eq!(game.pending_choice_type(), Some("SelectCard".to_string()));
+    game.select_indices(&[0, 1]);
 
-    for &card in &[kozue, izumi, tsuzuri] {
-        for &hc in &[
-            HeartColor::Heart01,
-            HeartColor::Heart04,
-            HeartColor::Heart05,
-            HeartColor::Heart06,
-        ] {
-            let mod_val = game.state.mods.get_heart_modifier(card, hc);
-            eprintln!("  card={} heart={:?} mod={}", game.name(card), hc, mod_val);
-        }
-    }
+    // Step 2: SelectHeartColor — pick heart01 from [heart01, heart04, heart05, heart06]
+    assert!(game.has_pending_choice(), "Should prompt for heart color");
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectHeartColor".to_string())
+    );
+    game.select_indices(&[1]); // heart01 index
 
+    // Step 3: SelectCard — pick target member from stage (蓮ノ空, exclude_self)
+    assert!(game.has_pending_choice(), "Should prompt for target member");
+    assert_eq!(game.pending_choice_type(), Some("SelectCard".to_string()));
+    game.select_indices(&[0]); // kozue
+
+    assert!(!game.has_pending_choice(), "All choices should be resolved");
+
+    // Verify kozue gained +2 heart01
     assert_eq!(
         game.state
             .mods
             .get_heart_modifier(kozue, HeartColor::Heart01),
         2,
         "kozue should have +2 heart01"
+    );
+    // izumi (self) should not gain hearts
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(izumi, HeartColor::Heart01),
+        0,
+        "izumi (self) should not gain heart01"
+    );
+    // tsuzuri should not gain heart01
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(tsuzuri, HeartColor::Heart01),
+        0,
+        "tsuzuri should not gain heart01"
     );
 }
 
@@ -113,18 +112,15 @@ fn pl_hs_sd1_008_live_start_skip_cost_no_effect() {
     game.set_live_card(live);
     finish_live_setup(&mut game);
 
-    let mut step = 0;
-    while game.has_pending_choice() && step < 10 {
-        step += 1;
-        let ct = game.pending_choice_type().unwrap_or_default();
-        eprintln!("[SKIP STEP {}] choice_type={}", step, ct);
-        if ct == "SelectAutoAbility" {
+    let mut safety = 0;
+    while game.has_pending_choice() && safety < 10 {
+        safety += 1;
+        if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
             game.select_indices(&[]);
         } else {
-            game.select_indices(&[]);
+            break;
         }
     }
-    eprintln!("[SKIP] done, step={}", step);
 
     let total: i32 = [
         HeartColor::Heart01,
