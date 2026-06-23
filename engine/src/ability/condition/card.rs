@@ -1598,7 +1598,17 @@ impl<'a> ConditionContext<'a> {
         let card_db = &self.game_state.card_database;
 
         let location = condition.location.as_deref().unwrap_or("");
-        let group_names = condition.group_names.as_ref();
+        let group_names_base: Option<Vec<String>> = condition.group_names.clone().or_else(|| {
+            if condition.group_reference.as_deref() == Some("same_group_name") {
+                self.activating_card_id
+                    .and_then(|cid| self.game_state.card_database.get_card(cid))
+                    .and_then(|c| c.unit.clone())
+                    .map(|u| vec![u])
+            } else {
+                None
+            }
+        });
+        let group_names: Option<&Vec<String>> = group_names_base.as_ref();
         let hc: &[String] = condition.heart_colors.as_deref().unwrap_or(&[]);
 
         // Early-out for aggregate total (sum heart colors, not count cards)

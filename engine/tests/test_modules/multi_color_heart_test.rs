@@ -53,6 +53,38 @@ fn multi_color_heart_condition_not_met_does_not_queue() {
     );
 }
 
+/// Condition NOT met: 3 members from a DIFFERENT group (not AZALEA) in revealed_cards.
+/// The group_reference: "same_group_name" must reject wrong-group cards.
+#[test]
+fn multi_color_heart_wrong_group_does_not_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let wrong1 = game.id("PL!S-sd1-001-SD");
+    let wrong2 = game.id("PL!S-sd1-002-SD");
+    let wrong3 = game.id("PL!S-sd1-003-SD");
+    let ability_card = game.id(ABILITY_CARD);
+
+    game.state.player1.stage.stage = [-1, ability_card, -1];
+    for &id in &[wrong1, wrong2, wrong3] {
+        game.state.revealed_cards.push(id);
+        game.state.player1.waitroom.cards.push(id);
+    }
+
+    game.state.trigger_auto_abilities_for_player("p1");
+    game.state.process_pending_auto_abilities("p1");
+
+    assert_eq!(
+        get_heart_modifier(&game, ability_card, HeartColor::Heart01),
+        0,
+        "Wrong-group cards must NOT trigger"
+    );
+    assert_eq!(
+        get_heart_modifier(&game, ability_card, HeartColor::Heart04),
+        0,
+        "Wrong-group cards must NOT trigger"
+    );
+}
+
 /// Condition met (3 same-group members) → ability fires, grants heart01 + heart04, no choice.
 #[test]
 fn multi_color_heart_condition_met_grants_both_colors() {
