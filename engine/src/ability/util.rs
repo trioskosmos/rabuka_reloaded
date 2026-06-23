@@ -1291,13 +1291,14 @@ pub fn count_matching_with_blade(
 // ============== UTILITY ==============
 
 pub fn compare_counts(operator: Option<&str>, actual: u32, expected: u32) -> bool {
-    match operator {
-        Some(">=") => actual >= expected,
-        Some(">") => actual > expected,
-        Some("<=") => actual <= expected,
-        Some("<") => actual < expected,
-        Some("==") | Some("=") => actual == expected,
-        Some("!=") => actual != expected,
+    let op = operator.unwrap_or(">=");
+    match op {
+        ">=" => actual >= expected,
+        ">" => actual > expected,
+        "<=" => actual <= expected,
+        "<" => actual < expected,
+        "==" | "=" => actual == expected,
+        "!=" => actual != expected,
         _ => true,
     }
 }

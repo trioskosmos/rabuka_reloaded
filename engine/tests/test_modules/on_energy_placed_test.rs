@@ -12,21 +12,22 @@ use rabuka_engine::card::HeartColor;
 // trigger_condition: comparison_condition
 //   location: "energy_zone", resource_type: "energy",
 //   card_type: "energy_card"
-// Condition: None
+// Condition: compares count of energy cards ≥ 0.
 // Effect: gain_resource(heart06, duration=live_end)
 //
-// NOTE: The comparison_condition has NO operator/count, so
-// compare_counts(None, _, _) always returns true (util.rs:1237).
-// The trigger_condition always passes when the scan fires.
-// The scan gate at abilities.rs:753 checks
-// last_energy_placed_by_effect, but trigger_auto_abilities_for_player
-// called directly in tests bypasses that gate.
-// In real gameplay the gate prevents re-enqueue between effects.
+// The scan gate at abilities.rs checks last_energy_placed_by_effect,
+// but trigger_auto_abilities_for_player called directly in tests
+// bypasses that gate.  In real gameplay the gate prevents
+// re-enqueue between effects.  Tests must place an energy card
+// in the zone so the default comparison (≥ 1, or ≥ 0 with an
+// explicit operator) passes.
 // ═══════════════════════════════════════════════════════════════
 
 fn setup_hazuki(game: &mut TestGame) -> i16 {
     let hazuki = game.id("PL!SP-bp4-016-N");
     game.state.player1.stage.stage = [-1, hazuki, -1];
+    let energy_card = game.id("LL-E-001-SD");
+    game.state.player1.energy_zone.cards.push(energy_card);
     hazuki
 }
 
@@ -80,9 +81,9 @@ fn hazuki_energy_by_opponent_effect_triggers() {
 }
 
 /// Energy phase draw — last_energy_placed_by_effect is false.
-/// trigger_auto_abilities_for_player still enqueues the ability
-/// (comparison_condition always passes). In real gameplay the
-/// scan gate at abilities.rs:753 blocks re-enqueue.
+/// The each_time guard at abilities.rs blocks enqueue when
+/// last_energy_placed_by_effect is false, even though the
+/// comparison_condition would pass (energy card in zone).
 #[test]
 fn hazuki_energy_phase_no_effect_flag() {
     let db = load_real_database();

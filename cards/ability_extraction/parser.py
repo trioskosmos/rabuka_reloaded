@@ -2535,7 +2535,11 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
                 action["actions"] = sub_actions
                 action.pop("card_type", None)
                 action.pop("multiple_targets", None)
-        if "cost_limit" not in action:
+        if (
+            "cost_limit" not in action
+            and "cost_total" not in action
+            and "cost_limit_min" not in action
+        ):
             cl = extract_cost_limit(text)
             if cl:
                 action["cost_limit"] = cl
