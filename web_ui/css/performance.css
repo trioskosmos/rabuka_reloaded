@@ -920,3 +920,61 @@
     object-fit: cover;
     display: block;
 }
+
+/* Performance modal layout — tab content fills available space */
+.performance-modal-content .modal-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1;
+}
+
+.performance-modal-content .perf-tab-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+#perf-tab-result {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+#performance-result-content {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* Turn navigation — matches .tab-btn styling */
+.perf-turn-nav {
+    display: flex;
+    gap: 2px;
+    border-bottom: 2px solid var(--border);
+    padding: 0 4px;
+    flex-shrink: 0;
+}
+
+.perf-nav-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    padding: 8px 16px;
+    cursor: pointer;
+    font-weight: bold;
+    border-bottom: 2px solid transparent;
+    font-size: 0.85rem;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.perf-nav-btn:hover {
+    color: var(--text);
+}
+
+.perf-nav-btn.active {
+    color: var(--text);
+    border-bottom-color: var(--accent-gold);
+}

@@ -13,6 +13,7 @@ import { Tooltips } from './ui_tooltips.js';
 import { InteractionAdapter } from './interaction_adapter.js';
 import { LogRenderer as Logs } from './components/LogRenderer.js';
 import { PerformanceRenderer } from './components/PerformanceRenderer.js';
+import { switchBoard } from './layout.js';
 
 import { HeaderStats } from './components/HeaderStats.js';
 import { ZoneViewer } from './components/ZoneViewer.js';
@@ -170,8 +171,15 @@ export const Rendering = {
         const ui = i18n.getCurrentTranslations()?.ui || {};
         const playerBtn = document.getElementById('btn-show-player');
         const oppBtn = document.getElementById('btn-show-opponent');
+        const bothBtn = document.getElementById('btn-show-both');
         if (playerBtn) playerBtn.textContent = `${ui.my_board || 'My Board'}${selfSuffix}`;
         if (oppBtn) oppBtn.textContent = `${ui.opponent || 'Opponent'}${oppSuffix}`;
+        if (bothBtn) bothBtn.textContent = `Both (${selfLabel} + ${oppLabel})`;
+
+        // In non-PvP (sandbox), default to both-mode view on first render
+        if (state.mode !== 'pvp' && bothBtn && !bothBtn.classList.contains('active')) {
+            switchBoard('both');
+        }
 
         Tooltips.highlightPendingSource();
 

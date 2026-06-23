@@ -956,31 +956,33 @@ impl super::resolver::AbilityResolver {
 
                     // Check if we can select more cards (for round-based "up to X" abilities).
                     if is_select_cards && !mapped_indices.is_empty() {
-                        let _any_number = select_action_entry
-                            .as_ref()
-                            .and_then(|sa| sa.any_number)
-                            .unwrap_or(false);
+                        let sa = select_action_entry.as_ref();
+                        let any_number = sa.and_then(|s| s.any_number).unwrap_or(false);
+                        let is_max = sa.and_then(|s| s.max).unwrap_or(false);
+                        let is_optional = sa.and_then(|s| s.optional).unwrap_or(false);
+                        let json_count = sa.and_then(|s| s.count).unwrap_or(1) as usize;
                         let max_count = count;
                         let selected_count = mapped_indices.len();
                         let remaining = gs.looked_at_cards.len();
 
-                        // If user can select more and there are remaining cards, create new choice
-                        if max_count > selected_count && remaining > 0 {
+                        let can_reprompt =
+                            is_max || is_optional || any_number || json_count > selected_count;
+                        if can_reprompt && max_count > selected_count && remaining > 0 {
                             let remaining_max = max_count - selected_count;
                             let card_type = card_type.clone();
                             self.pending_choice = Some(Choice::select_cards(
                                 Zone::LookedAt.to_str(),
                                 remaining_max,
                                 format!("Select up to {} more card(s) from the {} remaining looked-at cards", remaining_max, remaining),
-                                true,
+                                is_optional || any_number,
                             )
                             .card_type(card_type)
                             .cost_limit(
-                                select_action_entry.as_ref().and_then(|sa| sa.cost_limit),
-                                select_action_entry.as_ref().and_then(|sa| sa.cost_limit_operator.clone()),
+                                sa.and_then(|s| s.cost_limit),
+                                sa.and_then(|s| s.cost_limit_operator.clone()),
                             )
-                            .group(select_action_entry.as_ref().and_then(|sa| sa.group_names.as_ref()).and_then(|v| v.first().cloned()))
-                            .characters(select_action_entry.as_ref().and_then(|sa| sa.characters.clone()))
+                            .group(sa.and_then(|s| s.group_names.as_ref()).and_then(|v| v.first().cloned()))
+                            .characters(sa.and_then(|s| s.characters.clone()))
                             .build());
                             self.execution_context = context.clone();
                             return Ok(());
@@ -1597,10 +1599,18 @@ impl super::resolver::AbilityResolver {
 
                     // Re-prompt for remaining cards
                     if is_select_cards && !valid.is_empty() {
+                        let sa = select_action_entry.as_ref();
+                        let any_number = sa.and_then(|s| s.any_number).unwrap_or(false);
+                        let is_max = sa.and_then(|s| s.max).unwrap_or(false);
+                        let is_optional = sa.and_then(|s| s.optional).unwrap_or(false);
+                        let json_count = sa.and_then(|s| s.count).unwrap_or(1) as usize;
                         let max_count = count;
                         let selected_count = valid.len();
                         let remaining = gs.looked_at_cards.len();
-                        if max_count > selected_count && remaining > 0 {
+
+                        let can_reprompt =
+                            is_max || is_optional || any_number || json_count > selected_count;
+                        if can_reprompt && max_count > selected_count && remaining > 0 {
                             let remaining_max = max_count - selected_count;
                             let ct = card_type.clone();
                             self.pending_choice = Some(
@@ -1608,15 +1618,15 @@ impl super::resolver::AbilityResolver {
                                     Zone::LookedAt.to_str(),
                                     remaining_max,
                                     format!("Select up to {} more card(s) from the {} remaining looked-at cards", remaining_max, remaining),
-                                    true,
+                                    is_optional || any_number,
                                 )
                                 .card_type(ct)
                                 .cost_limit(
-                                    select_action_entry.as_ref().and_then(|sa| sa.cost_limit),
-                                    select_action_entry.as_ref().and_then(|sa| sa.cost_limit_operator.clone()),
+                                    sa.and_then(|s| s.cost_limit),
+                                    sa.and_then(|s| s.cost_limit_operator.clone()),
                                 )
-                                .group(select_action_entry.as_ref().and_then(|sa| sa.group_names.as_ref()).and_then(|v| v.first().cloned()))
-                                .characters(select_action_entry.as_ref().and_then(|sa| sa.characters.clone()))
+                                .group(sa.and_then(|s| s.group_names.as_ref()).and_then(|v| v.first().cloned()))
+                                .characters(sa.and_then(|s| s.characters.clone()))
                                 .build(),
                             );
                             self.execution_context = context.clone();
@@ -2272,6 +2282,7 @@ impl super::resolver::AbilityResolver {
                 }
                 // Remove card from source zone first, then place in destination.
                 // The card was left in place when the deck_top_or_bottom choice was created.
+                let src_is_hand = source_zone == Zone::Hand.to_str();
                 if source_zone == Zone::Discard.to_str()
                     || source_zone == Zone::Waitroom.to_str()
                     || source_zone == "those_cards"
@@ -2292,6 +2303,14 @@ impl super::resolver::AbilityResolver {
                             player.waitroom.cards.len()
                         );
                     }
+                } else if src_is_hand {
+                    if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                        eprintln!(
+                            "[DECK_DIAG] hand before retain={:?} removing card_id={}",
+                            player.hand.cards, card_id
+                        );
+                    }
+                    player.hand.cards.retain(|c| *c != card_id);
                 }
                 crate::ability::util::place_card_in_zone(
                     player,

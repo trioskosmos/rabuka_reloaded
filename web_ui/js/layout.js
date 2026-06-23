@@ -8,18 +8,28 @@ function setSidebarButtonState(button, isActive) {
     button.style.background = isActive ? '#444' : 'var(--accent-pink)';
 }
 
-function setBoardVisibility(showPlayerBoard) {
-    DOMUtils.setVisible(DOM_IDS.CONTAINER_BOARD_PLAYER, showPlayerBoard);
-    DOMUtils.setVisible(DOM_IDS.CONTAINER_BOARD_OPPONENT, !showPlayerBoard);
+let _bothFlipped = false;
 
-    if (showPlayerBoard) {
-        DOMUtils.addClass(DOM_IDS.BTN_SHOW_PLAYER, CSS_CLASSES.ACTIVE);
+function setBoardMode(mode) {
+    const gb = document.getElementById('game-board');
+    gb.classList.toggle('both-mode', mode === 'both');
+    if (mode !== 'both') gb.classList.remove('both-mode-flipped');
+    _bothFlipped = false;
+
+    if (mode === 'both') {
+        DOMUtils.setVisible(DOM_IDS.CONTAINER_BOARD_PLAYER, true);
+        DOMUtils.setVisible(DOM_IDS.CONTAINER_BOARD_OPPONENT, true);
+        DOMUtils.addClass(DOM_IDS.BTN_SHOW_BOTH, CSS_CLASSES.ACTIVE);
+        DOMUtils.removeClass(DOM_IDS.BTN_SHOW_PLAYER, CSS_CLASSES.ACTIVE);
         DOMUtils.removeClass(DOM_IDS.BTN_SHOW_OPPONENT, CSS_CLASSES.ACTIVE);
-        return;
+    } else {
+        DOMUtils.setVisible(DOM_IDS.CONTAINER_BOARD_PLAYER, mode === 'player');
+        DOMUtils.setVisible(DOM_IDS.CONTAINER_BOARD_OPPONENT, mode === 'opponent');
+        DOMUtils.removeClass(DOM_IDS.BTN_SHOW_BOTH, CSS_CLASSES.ACTIVE);
+        DOMUtils.removeClass(DOM_IDS.BTN_SHOW_PLAYER, CSS_CLASSES.ACTIVE);
+        DOMUtils.removeClass(DOM_IDS.BTN_SHOW_OPPONENT, CSS_CLASSES.ACTIVE);
+        DOMUtils.addClass(DOM_IDS[`BTN_SHOW_${mode.toUpperCase()}`], CSS_CLASSES.ACTIVE);
     }
-
-    DOMUtils.removeClass(DOM_IDS.BTN_SHOW_PLAYER, CSS_CLASSES.ACTIVE);
-    DOMUtils.addClass(DOM_IDS.BTN_SHOW_OPPONENT, CSS_CLASSES.ACTIVE);
 }
 
 function updateMobileSidebarToggleState(side, isOpen) {
@@ -199,5 +209,9 @@ export function closeSidebar() {
  * Tabbed Board Switching
  */
 export function switchBoard(side) {
-    setBoardVisibility(side === 'player');
+    if (side === 'both' && document.getElementById('btn-show-both')?.classList.contains('active')) {
+        _bothFlipped = !_bothFlipped;
+        document.getElementById('game-board').classList.toggle('both-mode-flipped', _bothFlipped);
+    }
+    setBoardMode(side);
 }

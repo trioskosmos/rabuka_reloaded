@@ -303,6 +303,30 @@
     box-shadow: var(--glow-blue);
 }
 
+/* Both-mode: show both player sections side-by-side, each 50% height */
+.game-board.both-mode .player-section {
+    height: 50%;
+    max-height: 50%;
+}
+
+.game-board.both-mode {
+    --card-h: clamp(80px, 14dvh, 160px);
+}
+
+.game-board.both-mode .player-section.opponent {
+    transform: rotate(180deg);
+}
+
+.game-board.both-mode-flipped .player-section.opponent {
+    order: 1;
+}
+
+.game-board.both-mode .player-section.opponent .stat-item,
+.game-board.both-mode .player-section.opponent .area-count,
+.game-board.both-mode .player-section.opponent .deck-summary {
+    transform: rotate(-180deg);
+}
+
 /* Sidebar & Containers */
 .game-container {
     display: flex;

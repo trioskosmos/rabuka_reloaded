@@ -207,9 +207,22 @@ impl AbilityResolver {
                             true
                         };
                         if inheritable {
-                            if effect.self_target.is_some() {
+                            // Only inherit self_target to action types that actually
+                            // support it. "このカード" (this card) in a compound sentence
+                            // applies to score/heart modifiers, not to generic draw or
+                            // move actions. Prevent cascading into nested sequentials
+                            // (draw+move inside would inherit from the nested container).
+                            let at = crate::ability::enums::ActionType::from_str(&action.action);
+                            let supports_self = matches!(
+                                at,
+                                Some(crate::ability::enums::ActionType::ModifyScore)
+                                    | Some(crate::ability::enums::ActionType::ModifyRequiredHearts)
+                                    | Some(crate::ability::enums::ActionType::GainResource)
+                                    | Some(crate::ability::enums::ActionType::ChangeState)
+                            );
+                            if effect.self_target.is_some() && supports_self {
                                 action_to_execute.self_target = effect.self_target;
-                            } else if i > 0 {
+                            } else if i > 0 && supports_self {
                                 action_to_execute.self_target = repeat_actions[0].self_target;
                             }
                         }

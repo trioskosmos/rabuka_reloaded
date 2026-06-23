@@ -396,3 +396,46 @@ fn vitamin_summer_live_success_hand_condition() {
     let score = game.state.mods.get_score_modifier(live);
     assert_eq!(score, 1, "vitamin: hand 5 > opp 3 → +1 score");
 }
+
+/// Step! ZERO to ONE (PL!S-bp6-019-L): Live start — if all stage members are Aqours,
+/// +1 score, draw 1, then move 1 from hand to deck top or bottom.
+#[test]
+fn step_zero_to_one_live_start_full_ability() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let live = game.id("PL!S-bp6-019-L");
+    let aqours = game.id("PL!S-PR-025-RM"); // 高海千歌, Aqours member
+
+    // One Aqours member on stage — satisfies the condition
+    game.state.player1.stage.stage = [aqours, -1, -1];
+    game.state.player2.stage.stage = [-1, -1, -1];
+
+    game.state.player1.live_card_zone.cards.push(live);
+    let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+
+    TurnEngine::trigger_live_start_abilities(&mut game.state, "p1");
+    game.state.process_pending_auto_abilities("p1");
+
+    while game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectCard") => {
+                game.select_indices(&[0]);
+            }
+            Some("position|destination") => {
+                game.select_option(0);
+            }
+            Some(t) if t.contains("destination") => {
+                game.select_option(0);
+            }
+            _ => {
+                game.select_generated(0);
+            }
+        }
+    }
+
+    assert_eq!(game.state.mods.get_score_modifier(live), 1, "score +1");
+}

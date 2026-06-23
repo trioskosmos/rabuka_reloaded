@@ -46,6 +46,7 @@ export const DOM_IDS = {
   SWITCH_BTN: 'switch-btn',
   BTN_SHOW_PLAYER: 'btn-show-player',
   BTN_SHOW_OPPONENT: 'btn-show-opponent',
+  BTN_SHOW_BOTH: 'btn-show-both',
 
   // Debug Overlay Elements
   DEBUG_SYNC: 'debug-sync',

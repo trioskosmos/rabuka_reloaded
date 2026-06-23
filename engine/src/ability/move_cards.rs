@@ -2324,7 +2324,12 @@ impl AbilityResolver {
         };
         let can_select_more = select_action
             .as_ref()
-            .map(|sa| sa.max.unwrap_or(false) || sa.optional.unwrap_or(false) || any_number)
+            .map(|sa| {
+                sa.max.unwrap_or(false)
+                    || sa.optional.unwrap_or(false)
+                    || any_number
+                    || json_count > selected_count
+            })
             .unwrap_or(false);
 
         if selected_count > 0
