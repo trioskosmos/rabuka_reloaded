@@ -181,6 +181,24 @@ export const LogRenderer = {
         header.textContent = i18n.t('rule_log');
         section.appendChild(header);
 
+        // Jyouji (constant/常時) ability status bar at the top of the log
+        const constantStatuses = state.constant_ability_statuses || [];
+        if (constantStatuses.length > 0) {
+            const jyoujiBar = document.createElement('div');
+            jyoujiBar.className = 'jyouji-status-bar';
+            jyoujiBar.innerHTML = `<span class="jyouji-bar-label">⚡ 常時:</span> `;
+            constantStatuses.forEach((cs, idx) => {
+                const allMet = cs.all_conditions_met;
+                const icon = allMet ? '🟢' : '🔴';
+                const zoneLabel = cs.zone === 'stage' ? 'S' : cs.zone === 'live_card_zone' ? 'L' : '?';
+                jyoujiBar.innerHTML += `<span class="jyouji-pill ${allMet ? 'active' : 'inactive'}" title="${Tooltips.enrichAbilityText(cs.ability_text)}">
+                    ${icon} ${cs.card_name} [${zoneLabel}]
+                </span>`;
+                if (idx < constantStatuses.length - 1) jyoujiBar.innerHTML += ' ';
+            });
+            section.appendChild(jyoujiBar);
+        }
+
         if (logData.length === 0) {
             const emptyMsg = document.createElement('div');
             emptyMsg.className = 'log-empty-message';
@@ -289,6 +307,15 @@ export const LogRenderer = {
             if (block) section.appendChild(block);
         });
 
+        // Render trigger evaluation entries (from structured_log, category=trigger_evaluation)
+        const triggerEvals = (state.structured_log || []).filter(
+            e => e.category === 'trigger_evaluation' && e.metadata
+        );
+        triggerEvals.forEach(entry => {
+            const block = LogRenderer.createTriggerEvaluationBlock(entry, currentLang, showFriendlyAbilities);
+            if (block) section.appendChild(block);
+        });
+
         PerformanceMonitor.recordEntryCount(groupedLogs.length + abilityResolutions.length);
         return section;
     },
@@ -306,11 +333,15 @@ export const LogRenderer = {
         const resultClass = meta.result === 'success' ? 'ability-pass' : 'ability-fail';
         const resultIcon = meta.result === 'success' ? '✓' : '✗';
         const triggerText = meta.trigger || '?';
+        const zoneLabel = meta.zone === 'stage' ? 'ステージ' : meta.zone === 'live_card_zone' ? 'ライブ置場' : meta.zone === 'success_live_card_zone' ? '成功ライブ置場' : meta.zone || '';
+        const cardName = entry.source_card_name || meta.card_name || '';
         headerDiv.innerHTML = `
             <div class="log-entry-icon"> </div>
             <div class="log-entry-content">
                 <span class="${resultClass}">${resultIcon}</span>
-                <strong>${meta.card_name || ''}</strong>: ${triggerText}
+                <strong>${cardName}</strong>
+                ${zoneLabel ? `<span class="ability-zone">[${zoneLabel}]</span>` : ''}:
+                <span class="ability-trigger">${triggerText}</span>
             </div>
             <div class="log-group-toggle">▼</div>
         `;
@@ -328,6 +359,47 @@ export const LogRenderer = {
         blockDiv.appendChild(detailsContainer);
 
         // Toggle on click
+        headerDiv.style.cursor = 'pointer';
+        headerDiv.onclick = () => {
+            const isHidden = detailsContainer.style.display === 'none';
+            detailsContainer.style.display = isHidden ? 'block' : 'none';
+            headerDiv.querySelector('.log-group-toggle').textContent = isHidden ? '▼' : '▶';
+        };
+
+        return blockDiv;
+    },
+
+    createTriggerEvaluationBlock: (entry, currentLang, showFriendlyAbilities) => {
+        const meta = entry.metadata;
+        if (!meta) return null;
+
+        const blockDiv = document.createElement('div');
+        blockDiv.className = 'log-group-block trigger-evaluation-block';
+
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'log-entry ability group-header';
+        const triggerText = meta.trigger || '?';
+        const zoneLabel = meta.zone === 'stage' ? 'ステージ' : meta.zone === 'live_card_zone' ? 'ライブ置場' : meta.zone || '?';
+        headerDiv.innerHTML = `
+            <div class="log-entry-icon"> </div>
+            <div class="log-entry-content">
+                <span class="ability-scan">🔍</span>
+                <strong>${entry.source_card_name || ''}</strong>
+                <span class="ability-zone">[${zoneLabel}]</span>:
+                能力確認 [${triggerText}]
+            </div>
+            <div class="log-group-toggle">▼</div>
+        `;
+        blockDiv.appendChild(headerDiv);
+
+        const detailsContainer = document.createElement('div');
+        detailsContainer.className = 'log-group-details';
+        detailsContainer.style.display = 'block';
+        detailsContainer.innerHTML = `<div class="log-entry effect detail">
+            <span class="ability-cond-text">結果: ${meta.result === 'pending' ? '条件評価待ち' : meta.result}</span>
+        </div>`;
+        blockDiv.appendChild(detailsContainer);
+
         headerDiv.style.cursor = 'pointer';
         headerDiv.onclick = () => {
             const isHidden = detailsContainer.style.display === 'none';

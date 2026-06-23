@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-23T19:20:14.573493",
+  "generated_at": "2026-06-23T19:40:31.813740",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -21763,7 +21763,7 @@
             "action": "sequential",
             "actions": [
               {
-                "text": "heart01×2",
+                "text": "{{heart_01.png|heart01}}{{heart_01.png|heart01}}",
                 "action": "modify_required_hearts",
                 "heart_colors": [
                   "heart01"
@@ -21774,7 +21774,7 @@
                 "value": 2
               },
               {
-                "text": "heart00×1",
+                "text": "{{heart_00.png|heart0}}",
                 "action": "modify_required_hearts",
                 "heart_colors": [
                   "heart00"
@@ -21791,7 +21791,7 @@
             "action": "sequential",
             "actions": [
               {
-                "text": "heart04×2",
+                "text": "{{heart_04.png|heart04}}{{heart_04.png|heart04}}",
                 "action": "modify_required_hearts",
                 "heart_colors": [
                   "heart04"
@@ -21802,7 +21802,7 @@
                 "value": 2
               },
               {
-                "text": "heart00×1",
+                "text": "{{heart_00.png|heart0}}",
                 "action": "modify_required_hearts",
                 "heart_colors": [
                   "heart00"
@@ -21819,7 +21819,7 @@
             "action": "sequential",
             "actions": [
               {
-                "text": "heart05×2",
+                "text": "{{heart_05.png|heart05}}{{heart_05.png|heart05}}",
                 "action": "modify_required_hearts",
                 "heart_colors": [
                   "heart05"
@@ -21830,7 +21830,7 @@
                 "value": 2
               },
               {
-                "text": "heart00×1",
+                "text": "{{heart_00.png|heart0}}",
                 "action": "modify_required_hearts",
                 "heart_colors": [
                   "heart00"

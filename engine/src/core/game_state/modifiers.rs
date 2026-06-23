@@ -15,6 +15,7 @@ impl GameState {
         let mut exp_global_need_heart: Vec<(i16, String, i32)> = Vec::new();
         let mut p1_constant_score_bonus: i32 = 0;
         let mut p2_constant_score_bonus: i32 = 0;
+        let mut jyouji_statuses: Vec<crate::types::ConstantAbilityStatus> = Vec::new();
 
         // Compute stage positions for all entries before creating resolver
         let mut entry_positions: std::collections::HashMap<i16, Option<usize>> =
@@ -44,6 +45,17 @@ impl GameState {
             // location_condition) know which card is "self" for this entry.
             let prev_activating = self.activating_card;
             self.activating_card = Some(*card_id);
+            // Capture card info and owner for jyouji status tracking before the ctx borrow
+            let status_card_name = self
+                .card_database
+                .get_card(*card_id)
+                .map(|c| c.name.clone())
+                .unwrap_or_default();
+            let status_owner = if self.player1.stage.stage.contains(card_id) {
+                self.player1.id.clone()
+            } else {
+                self.player2.id.clone()
+            };
 
             {
                 let ctx = crate::ability::condition::ConditionContext::new(self);
@@ -70,6 +82,19 @@ impl GameState {
                         .is_none_or(|c| ctx.evaluate_condition(c));
 
                     if cond_met {
+                        // Record jyouji status for this card
+                        jyouji_statuses.push(crate::types::ConstantAbilityStatus {
+                            card_id: *card_id,
+                            card_name: status_card_name.clone(),
+                            owner: status_owner.clone(),
+                            zone: "stage".to_string(),
+                            ability_text: effect.text.clone(),
+                            all_conditions_met: pos_ok && cond_met,
+                            conditions: vec![crate::types::ConditionResult {
+                                text: "条件".to_string(),
+                                passed: cond_met,
+                            }],
+                        });
                         match crate::ability::enums::ActionType::from_str(&effect.action) {
                             Some(crate::ability::enums::ActionType::GainResource) => {
                                 match effect.resource.as_deref().unwrap_or("") {
@@ -375,6 +400,7 @@ impl GameState {
             // Restore the previous activating_card
             self.activating_card = prev_activating;
         }
+        self.constant_ability_statuses = jyouji_statuses;
 
         // Blade
         let old_blade = std::mem::take(&mut self.mods.constant_blade_bonuses);

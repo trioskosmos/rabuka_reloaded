@@ -1399,3 +1399,62 @@
         color: #777;
     }
 }
+
+/* Jyouji status bar */
+.jyouji-status-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    margin-bottom: 8px;
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 6px;
+    font-size: 0.75rem;
+}
+.jyouji-bar-label {
+    font-weight: bold;
+    color: var(--accent-purple, #8b5cf6);
+    margin-right: 4px;
+}
+.jyouji-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    cursor: help;
+}
+.jyouji-pill.active {
+    background: rgba(74, 222, 128, 0.15);
+    color: #4ade80;
+}
+.jyouji-pill.inactive {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+/* Trigger evaluation block */
+.trigger-evaluation-block {
+    margin-bottom: 4px;
+    border-left: 3px solid #f59e0b;
+}
+.trigger-evaluation-block .log-group-details {
+    background: rgba(245, 158, 11, 0.05);
+    padding: 4px 12px;
+}
+
+/* Ability zone label */
+.ability-zone {
+    font-size: 0.7rem;
+    color: var(--text-dim, #888);
+    font-weight: normal;
+}
+.ability-trigger {
+    font-weight: bold;
+}
+.ability-scan {
+    font-size: 0.85rem;
+}

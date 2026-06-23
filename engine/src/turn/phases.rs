@@ -692,6 +692,9 @@ impl super::TurnEngine {
             game_state.player1.id.clone()
         };
         Self::trigger_auto_abilities_for_player(game_state, &sb_opponent_id);
+        if game_state.recently_moved_cards.is_some() {
+            game_state.trigger_auto_for_discarded_cards(&player_id);
+        }
         game_state.process_pending_auto_abilities(&player_id);
         game_state.recalculate_constants();
 

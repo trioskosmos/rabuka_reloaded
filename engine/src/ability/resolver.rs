@@ -425,6 +425,30 @@ impl AbilityResolver {
         }
     }
 
+    fn zone_for_card(gs: &GameState, card_id: i16) -> String {
+        for player in [&gs.player1, &gs.player2] {
+            if player.stage.stage.contains(&card_id) {
+                return "stage".to_string();
+            }
+            if player.live_card_zone.cards.contains(&card_id) {
+                return "live_card_zone".to_string();
+            }
+            if player.success_live_card_zone.cards.contains(&card_id) {
+                return "success_live_card_zone".to_string();
+            }
+            if player.hand.cards.contains(&card_id) {
+                return "hand".to_string();
+            }
+            if player.waitroom.cards.contains(&card_id) {
+                return "waitroom".to_string();
+            }
+            if player.energy_zone.cards.contains(&card_id) {
+                return "energy_zone".to_string();
+            }
+        }
+        "?".to_string()
+    }
+
     /// Push a structured ability_resolution log entry with the given result and items.
     fn push_ability_result(
         &self,
@@ -449,16 +473,23 @@ impl AbilityResolver {
             .as_ref()
             .map(|a| a.full_text.clone())
             .unwrap_or_default();
+        let zone = card_id
+            .map(|cid| Self::zone_for_card(gs, cid))
+            .unwrap_or_default();
         let mut meta = serde_json::json!({
             "result": result,
             "items": items,
             "ability_text": ability_text,
+            "zone": zone,
         });
         if let Some(e) = error {
             meta["error"] = serde_json::json!(e);
         }
         gs.structured_log.push(LogEntry {
-            text: format!("{pp} {card_name}: 能力発動 [{trigger_str}] — {}", result),
+            text: format!(
+                "{pp} {card_name} [{zone}]: 能力発動 [{trigger_str}] — {}",
+                result
+            ),
             turn: gs.turn_number,
             player_label: pp.clone(),
             source_card_id: card_id,

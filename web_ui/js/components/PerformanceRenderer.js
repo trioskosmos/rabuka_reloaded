@@ -273,15 +273,24 @@ function renderAggregateHeartSummary(result) {
         const wildReq = req[0] || 0;
         const wildFill = filled[0] || 0;
 
-        // Phase 1: filtered allocations for this card (non-wildcard, color 1-6)
-        const p1Allocs = allocations.filter(a => a.target_idx === liveIdx && !a.wildcard && a.color >= 1 && a.color <= 6);
+        // Phase 1: colored hearts → colored req (capped at req per color)
+        // Phase 3 step 1: excess colored hearts → Heart00 (colored beyond req)
+        const phase1PerColor = [0,0,0,0,0,0,0,0];
+        const p3ColorPerColor = [0,0,0,0,0,0,0,0];
+        for (let c = 1; c <= 6; c++) {
+            const fc = filled[c] || 0;
+            const rc = req[c] || 0;
+            phase1PerColor[c] = Math.min(fc, rc);
+            p3ColorPerColor[c] = Math.max(0, fc - rc);
+        }
+        const phase1Total = sumHearts(phase1PerColor);
+        const p3ColorTotal = sumHearts(p3ColorPerColor);
+        const totalWildFill = wildFill + p3ColorTotal;
+
         // Phase 2: wildcard filling colored slots
         const p2Allocs = allocations.filter(a => a.target_idx === liveIdx && a.wildcard);
-        // Phase 3: any color filling Heart00 (color === 0 and !wildcard) OR colored hearts filling Heart00
+        // Phase 3 step 2: Heart00 (color 0) wildcard hearts filling Heart00
         const p3Allocs = allocations.filter(a => a.target_idx === liveIdx && !a.wildcard && a.color === 0);
-
-        // Also track colored hearts used to fill Heart00 req (engine phase 3 step 1)
-        const p3ColoredAllocs = allocations.filter(a => a.target_idx === liveIdx && !a.wildcard && a.color >= 1 && a.color <= 6 && wildReq > 0);
 
         // Compute what was left before this card
         const beforeDisplay = remaining.map(v => v);
@@ -310,8 +319,8 @@ function renderAggregateHeartSummary(result) {
                     <div class="perf-agg-step done">
                         <span class="perf-agg-marker">①</span>
                         <span>Colored hearts → colored req</span>
-                        <span class="perf-agg-step-stat">${colorFillSum}/${colorReqSum}</span>
-                        ${p1Allocs.length > 0 ? `<div class="perf-agg-alloc-detail">${p1Allocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ')}</div>` : ''}
+                        <span class="perf-agg-step-stat">${phase1Total}/${colorReqSum}</span>
+                        ${phase1Total > 0 ? `<div class="perf-agg-alloc-detail">${[1,2,3,4,5,6].filter(c => phase1PerColor[c] > 0).map(c => `${phase1PerColor[c]}×${HEART_LABELS[c]}`).join(', ')}</div>` : ''}
                     </div>` : ''}
                     ${colDeficit > 0 ? `
                     <div class="perf-agg-step done">
@@ -321,15 +330,15 @@ function renderAggregateHeartSummary(result) {
                         ${p2Allocs.length > 0 ? `<div class="perf-agg-alloc-detail">${p2Allocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ')}</div>` : ''}
                     </div>` : ''}
                     ${wildReq > 0 ? `
-                    <div class="perf-agg-step ${wildFill >= wildReq ? 'done' : 'fail'}">
+                    <div class="perf-agg-step ${totalWildFill >= wildReq ? 'done' : 'fail'}">
                         <span class="perf-agg-marker">③</span>
                         <span>Remaining → Any (Heart00)</span>
-                        <span class="perf-agg-step-stat">${wildFill}/${wildReq}${wildFill < wildReq ? `<span class="perf-agg-fail"> (${wildReq - wildFill} short)</span>` : ''}</span>
-                        ${p3Allocs.length > 0 || p3ColoredAllocs.length > 0 ? `
-                        <div class="perf-agg-alloc-detail">
-                            ${p3ColoredAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ')}
-                            ${p3Allocs.length > 0 ? (p3ColoredAllocs.length > 0 ? ' + ' : '') + p3Allocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ') : ''}
-                        </div>` : ''}
+                        <span class="perf-agg-step-stat">${totalWildFill}/${wildReq}${totalWildFill < wildReq ? `<span class="perf-agg-fail"> (${wildReq - totalWildFill} short)</span>` : ''}</span>
+                        ${totalWildFill > 0 ? `<div class="perf-agg-alloc-detail">${
+                            [1,2,3,4,5,6].filter(c => p3ColorPerColor[c] > 0).map(c => `${p3ColorPerColor[c]}×${HEART_LABELS[c]}`).concat(
+                                p3Allocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`)
+                            ).join(', ')
+                        }</div>` : ''}
                     </div>` : ''}
                 </div>
                 <div class="perf-agg-card-after">After: ${renderHeartsCompact(afterDisplay)} = ${afterSum}</div>

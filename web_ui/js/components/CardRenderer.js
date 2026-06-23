@@ -924,7 +924,7 @@ export const CardRenderer = {
             headerHtml = `<div class="looked-cards-header">${overrideTitle}</div>`;
         } else if (state.pending_choice && (state.pending_choice.title || state.pending_choice.text)) {
             const title = state.pending_choice.title || state.pending_choice.text;
-            headerHtml = `<div class="looked-cards-header">${title}</div>`;
+            headerHtml = `<div class="looked-cards-header">${Tooltips.enrichAbilityText(title)}</div>`;
         }
 
         if (state.pending_choice && state.pending_choice.choose_count > 1) {

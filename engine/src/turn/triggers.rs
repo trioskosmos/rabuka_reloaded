@@ -1,4 +1,5 @@
 use crate::game_state::{AbilityTrigger, GameState};
+use crate::types::LogEntry;
 
 impl super::TurnEngine {
     pub(crate) fn trigger_debut_abilities(
@@ -80,6 +81,23 @@ impl super::TurnEngine {
                                     {
                                         continue;
                                     }
+                                    let card_name = card.name.clone();
+                                    let pp = player_id_clone.clone();
+                                    game_state.structured_log.push(LogEntry {
+                                        text: format!(
+                                            "{pp} {card_name} [ステージ]: 能力確認 [登場]"
+                                        ),
+                                        turn: game_state.turn_number,
+                                        player_label: pp,
+                                        source_card_id: Some(card_id),
+                                        source_card_name: Some(card_name),
+                                        category: "trigger_evaluation".to_string(),
+                                        metadata: Some(serde_json::json!({
+                                            "trigger": "debut",
+                                            "zone": "stage",
+                                            "result": "pending"
+                                        })),
+                                    });
                                     let ability_id =
                                         format!("{}_{}", card_no_clone, ability.full_text);
                                     abilities_to_trigger.push((
@@ -321,6 +339,23 @@ impl super::TurnEngine {
                             .is_some_and(|t| t.contains(crate::triggers::LIVE_START))
                         {
                             if seen.insert((*card_id, aidx)) {
+                                let card_name = card.name.clone();
+                                let pp = player_id_clone.clone();
+                                game_state.structured_log.push(LogEntry {
+                                    text: format!(
+                                        "{pp} {card_name} [ライブ置場]: 能力確認 [ライブ開始時]"
+                                    ),
+                                    turn: game_state.turn_number,
+                                    player_label: pp,
+                                    source_card_id: Some(*card_id),
+                                    source_card_name: Some(card_name),
+                                    category: "trigger_evaluation".to_string(),
+                                    metadata: Some(serde_json::json!({
+                                        "trigger": "live_start",
+                                        "zone": "live_card_zone",
+                                        "result": "pending"
+                                    })),
+                                });
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                                 abilities_to_trigger.push((
                                     ability_id,
@@ -342,6 +377,23 @@ impl super::TurnEngine {
                                 .is_some_and(|t| t.contains(crate::triggers::LIVE_START))
                             {
                                 if seen.insert((card_id, aidx)) {
+                                    let card_name = card.name.clone();
+                                    let pp = player_id_clone.clone();
+                                    game_state.structured_log.push(LogEntry {
+                                        text: format!(
+                                            "{pp} {card_name} [ステージ]: 能力確認 [ライブ開始時]"
+                                        ),
+                                        turn: game_state.turn_number,
+                                        player_label: pp,
+                                        source_card_id: Some(card_id),
+                                        source_card_name: Some(card_name),
+                                        category: "trigger_evaluation".to_string(),
+                                        metadata: Some(serde_json::json!({
+                                            "trigger": "live_start",
+                                            "zone": "stage",
+                                            "result": "pending"
+                                        })),
+                                    });
                                     let ability_id =
                                         format!("{}_{}", card.card_no, ability.full_text);
                                     abilities_to_trigger.push((
@@ -462,11 +514,23 @@ impl super::TurnEngine {
                                 if !seen.insert((card_id, aidx)) {
                                     continue;
                                 }
-                                log::debug!(
-                                    "[TRIGGER] live_success stage: card={} trigger={:?}",
-                                    card.card_no,
-                                    ability.triggers
-                                );
+                                let card_name = card.name.clone();
+                                let pp = player_id_clone.clone();
+                                game_state.structured_log.push(LogEntry {
+                                    text: format!(
+                                        "{pp} {card_name} [ステージ]: 能力確認 [ライブ成功時]"
+                                    ),
+                                    turn: game_state.turn_number,
+                                    player_label: pp,
+                                    source_card_id: Some(card_id),
+                                    source_card_name: Some(card_name),
+                                    category: "trigger_evaluation".to_string(),
+                                    metadata: Some(serde_json::json!({
+                                        "trigger": "live_success",
+                                        "zone": "stage",
+                                        "result": "pending"
+                                    })),
+                                });
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                                 abilities_to_trigger.push((
                                     ability_id,
@@ -491,13 +555,22 @@ impl super::TurnEngine {
                         if !seen.insert((*card_id, aidx)) {
                             continue;
                         }
+                        let card_name = card.name.clone();
+                        let pp = player_id_clone.clone();
+                        game_state.structured_log.push(LogEntry {
+                            text: format!("{pp} {card_name} [ライブ置場]: 能力確認 [ライブ成功時]"),
+                            turn: game_state.turn_number,
+                            player_label: pp,
+                            source_card_id: Some(*card_id),
+                            source_card_name: Some(card_name),
+                            category: "trigger_evaluation".to_string(),
+                            metadata: Some(serde_json::json!({
+                                "trigger": "live_success",
+                                "zone": "live_card_zone",
+                                "result": "pending"
+                            })),
+                        });
                         let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                        log::debug!(
-                            "[TRIGGER] live_success live_card: card={} trigger={:?} match={}",
-                            card.card_no,
-                            ability.triggers,
-                            trigger_match
-                        );
                         abilities_to_trigger.push((ability_id, card.card_no.clone(), *card_id));
                     }
                 }

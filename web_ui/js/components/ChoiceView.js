@@ -327,7 +327,11 @@ export const ChoiceView = {
                         border-radius: 8px;
                         color: var(--text, #eee);
                     `;
-                    choiceEl.textContent = item.name;
+                    if (item.name.includes('{{')) {
+                        choiceEl.innerHTML = Tooltips.enrichAbilityText(item.name);
+                    } else {
+                        choiceEl.textContent = item.name;
+                    }
                 } else if (item.name.startsWith('♥') || item.name.match(/heart\d{2}/)) {
                     const heartIdx = parseInt(item.name.replace(/\D/g, '')) || 1;
                     choiceEl = document.createElement('div');
@@ -386,7 +390,11 @@ export const ChoiceView = {
                         color: var(--text, #eee);
                         box-sizing: border-box;
                     `;
-                    choiceEl.textContent = item.name;
+                    if (item.name.includes('{{')) {
+                        choiceEl.innerHTML = Tooltips.enrichAbilityText(item.name);
+                    } else {
+                        choiceEl.textContent = item.name;
+                    }
                 }
 
                 choiceEl.onclick = () => {

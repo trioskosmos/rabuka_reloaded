@@ -6891,15 +6891,19 @@ def _try_heart_choice(text):
             ro = ro[hm.start() :].strip()
         if not ro:
             continue
-        icons = re.findall(icon_pat, ro)
         per_color = {}
-        for m in icons:
-            key = f"heart{m.zfill(2)}"
+        per_color_text = {}
+        for m in re.finditer(icon_pat, ro):
+            full = m.group(0)
+            key = f"heart{m.group(1).zfill(2)}"
             per_color[key] = per_color.get(key, 0) + 1
+            per_color_text.setdefault(key, "")
+            per_color_text[key] += full
         sub_actions = []
         for color_str, color_count in per_color.items():
+            icon_text = per_color_text.get(color_str, "")
             sub = {
-                "text": f"{color_str}×{color_count}",
+                "text": icon_text if icon_text else f"{color_str}×{color_count}",
                 "action": "modify_required_hearts",
                 "heart_colors": [color_str],
                 "operation": operation,
@@ -6909,6 +6913,7 @@ def _try_heart_choice(text):
             sub_actions.append(sub)
         if len(sub_actions) == 1:
             opt = sub_actions[0]
+            opt["text"] = ro
         else:
             opt = {"text": ro, "action": "sequential", "actions": sub_actions}
         options.append(opt)

@@ -313,3 +313,23 @@ pub struct LogEntry {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
 }
+
+/// Condition evaluation result for a single condition on a jyouji ability.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ConditionResult {
+    pub text: String,
+    pub passed: bool,
+}
+
+/// Status of a single constant (常時) ability on the board.
+/// Exposed to the frontend for the jyouji summary bar.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ConstantAbilityStatus {
+    pub card_id: i16,
+    pub card_name: String,
+    pub owner: String,
+    pub zone: String,
+    pub ability_text: String,
+    pub all_conditions_met: bool,
+    pub conditions: Vec<ConditionResult>,
+}

@@ -278,6 +278,8 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub constant_cannot_activate_members: Vec<String>,
     #[serde(default)]
+    pub constant_ability_statuses: Vec<crate::types::ConstantAbilityStatus>,
+    #[serde(default)]
     pub negated_abilities: Vec<i16>,
     #[serde(default)]
     pub temporary_effects: Vec<TempEffectDisplay>,
@@ -1307,6 +1309,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         delayed_prohibition_effects: game_state.delayed_prohibition_effects.clone(),
         cannot_activate_members: game_state.cannot_activate_members.clone(),
         constant_cannot_activate_members: game_state.constant_cannot_activate_members.clone(),
+        constant_ability_statuses: game_state.constant_ability_statuses.clone(),
         negated_abilities: game_state.negated_abilities.iter().copied().collect(),
         temporary_effects: temp_effects,
         replacement_effects: repl_effects,
