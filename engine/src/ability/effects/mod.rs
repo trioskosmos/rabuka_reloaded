@@ -303,21 +303,11 @@ impl AbilityResolver {
                 effect.self_target.unwrap_or(false),
             ),
             ActionType::SetCost => {
-                self.execute_set_cost(
-                    gs,
-                    effect.value.unwrap_or(0),
-                    effect.target_name(),
-                    effect.card_type.as_deref(),
-                );
+                self.execute_set_cost(gs, effect, effect.value.unwrap_or(0));
                 Ok(())
             }
             ActionType::SetBladeType => {
-                self.execute_set_blade_type(
-                    gs,
-                    effect.blade_type.as_deref(),
-                    effect.target_name(),
-                    effect.duration.as_deref(),
-                );
+                self.execute_set_blade_type(gs, effect);
                 Ok(())
             }
             ActionType::SetHeartType => {
@@ -648,8 +638,8 @@ impl AbilityResolver {
             ActionType::SetBladeCount => {
                 self.execute_set_blade_count(
                     gs,
+                    effect,
                     effect.value.unwrap_or(effect.count_or(0)),
-                    effect.target_name(),
                 );
                 Ok(())
             }

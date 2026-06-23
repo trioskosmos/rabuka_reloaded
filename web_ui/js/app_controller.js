@@ -149,6 +149,9 @@ const actionHandlers = {
         const amount = document.getElementById('cheat-energy-amount')?.value || '1';
         window.Actions.execCode(`player_idx=${player}; amount=${amount}; draw_energy`);
     },
+    'cheat-max-energy': ({ player }) => {
+        window.Actions.execCode(`player_idx=${player}; amount=15; draw_energy`);
+    },
     'cheat-add-card': ({ player }) => {
         const cardId = document.getElementById('cheat-card-id')?.value || '';
         if (!cardId) { alert('Enter a card ID'); return; }

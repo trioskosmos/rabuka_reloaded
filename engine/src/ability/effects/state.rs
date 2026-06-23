@@ -605,12 +605,13 @@ impl AbilityResolver {
     pub(crate) fn execute_set_cost(
         &mut self,
         gs: &mut GameState,
+        effect: &AbilityEffect,
         value: u32,
-        target: &str,
-        card_type: Option<&str>,
     ) {
+        let target = effect.target_name();
+        let card_type = effect.card_type.as_deref();
         let player = gs.resolve_target_player_mut(target);
-        let card_ids: Vec<i16> = if let Some("live_card") = card_type {
+        let mut card_ids: Vec<i16> = if let Some("live_card") = card_type {
             player.live_card_zone.cards.iter().copied().collect()
         } else if let Some("member_card") = card_type {
             player
@@ -623,18 +624,31 @@ impl AbilityResolver {
         } else {
             player.hand.cards.iter().copied().collect()
         };
+        if effect.group_names.is_some()
+            || effect.exclude_group_names.is_some()
+            || effect.characters.is_some()
+            || effect.exclude_characters.is_some()
+        {
+            let filter = effect.filter_subset();
+            card_ids = util::matching_ids_filtered(
+                &card_ids,
+                &gs.card_database,
+                &filter,
+                true,
+                None,
+                None,
+                None,
+            );
+        }
         for card_id in card_ids {
             gs.mods.set_cost_modifier(card_id, value as i32);
         }
     }
 
-    pub(crate) fn execute_set_blade_type(
-        &mut self,
-        gs: &mut GameState,
-        blade_type: Option<&str>,
-        target: &str,
-        duration: Option<&str>,
-    ) {
+    pub(crate) fn execute_set_blade_type(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
+        let blade_type = effect.blade_type.as_deref();
+        let target = effect.target_name();
+        let duration = effect.duration.as_deref();
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -657,7 +671,7 @@ impl AbilityResolver {
                 None
             }
         });
-        let stage_card_ids: Vec<(i16, String)> = {
+        let mut stage_card_ids: Vec<(i16, String)> = {
             let player = gs.resolve_target_player(target);
             (0..3)
                 .filter_map(|i| {
@@ -670,6 +684,24 @@ impl AbilityResolver {
                 })
                 .collect()
         };
+        if effect.group_names.is_some()
+            || effect.exclude_group_names.is_some()
+            || effect.characters.is_some()
+            || effect.exclude_characters.is_some()
+        {
+            let filter = effect.filter_subset();
+            let ids: Vec<i16> = stage_card_ids.iter().map(|(id, _)| *id).collect();
+            let filtered = util::matching_ids_filtered(
+                &ids,
+                &gs.card_database,
+                &filter,
+                true,
+                None,
+                None,
+                None,
+            );
+            stage_card_ids.retain(|(id, _)| filtered.contains(id));
+        }
         for (card_id, pid) in stage_card_ids {
             if let Some(color) = blade_color {
                 gs.mods.set_blade_type_modifier(card_id, color);
@@ -804,7 +836,13 @@ impl AbilityResolver {
         player.live_card_set_limit_reduction += count;
     }
 
-    pub(crate) fn execute_set_blade_count(&mut self, gs: &mut GameState, value: u32, target: &str) {
+    pub(crate) fn execute_set_blade_count(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+        value: u32,
+    ) {
+        let target = effect.target_name();
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -812,11 +850,28 @@ impl AbilityResolver {
             .unwrap_or_default();
         gs.rule_log
             .push(format!("{} {}: ブレード数を{}に設定", pp, act_name, value));
-        let stage_cards: Vec<i16> = {
+        let mut stage_cards: Vec<i16> = {
             let player = gs.resolve_target_player_mut(target);
             player.stage.stage.to_vec()
         };
-        for &card_id in stage_cards.iter().filter(|&&id| id != -1) {
+        stage_cards.retain(|&id| id != -1);
+        if effect.group_names.is_some()
+            || effect.exclude_group_names.is_some()
+            || effect.characters.is_some()
+            || effect.exclude_characters.is_some()
+        {
+            let filter = effect.filter_subset();
+            stage_cards = util::matching_ids_filtered(
+                &stage_cards,
+                &gs.card_database,
+                &filter,
+                true,
+                None,
+                None,
+                None,
+            );
+        }
+        for &card_id in &stage_cards {
             let current = gs.mods.get_blade_modifier(card_id);
             let delta = (value as i32) - current;
             gs.mods.add_blade_modifier(card_id, delta);

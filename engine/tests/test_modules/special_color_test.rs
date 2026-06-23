@@ -24,7 +24,7 @@ fn advance_to_live_start(game: &mut TestGame) {
 
 /// Liella! member at Center. Non-Liella at LeftSide.
 /// Special Color as live card. LiveStart fires set_blade_count(3).
-/// Currently engine applies modifier to ALL stage cards (filter bug).
+/// Only Liella! members should get the blade modifier (not ALL stage cards).
 #[test]
 fn special_color_q195_set_blade_liella_at_center() {
     let db = load_real_database();
@@ -32,15 +32,15 @@ fn special_color_q195_set_blade_liella_at_center() {
 
     let special = game.id("PL!SP-bp4-025-L");
     let liella = game.id("PL!SP-bp1-001-R"); // 澁谷かのん, CatChu!, blade=3
-    let filler = game.id("PL!-sd1-010-SD");
+    let non_liella = game.id("PL!-sd1-010-SD"); // 高坂穂乃果, Printemps, not Liella!
 
-    game.state.player1.stage.stage = [filler, liella, -1];
+    game.state.player1.stage.stage = [non_liella, liella, -1];
     game.state.player1.hand.cards.push(special);
-    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(non_liella);
 
     for _ in 0..10 {
-        game.state.player1.main_deck.cards.push(filler);
-        game.state.player2.main_deck.cards.push(filler);
+        game.state.player1.main_deck.cards.push(non_liella);
+        game.state.player2.main_deck.cards.push(non_liella);
     }
 
     advance_to_live_card_set_p1(&mut game);
@@ -54,5 +54,11 @@ fn special_color_q195_set_blade_liella_at_center() {
         game.state.mods.get_blade_modifier(liella),
         3,
         "Liella! member blade modifier should be 3 after set_blade_count"
+    );
+    // Non-Liella! member should NOT get the blade modifier
+    assert_eq!(
+        game.state.mods.get_blade_modifier(non_liella),
+        0,
+        "Non-Liella! member should NOT get blade modifier from set_blade_count"
     );
 }
