@@ -96,6 +96,7 @@ impl super::TurnEngine {
             }
         }
 
+        let moved_snapshot = game_state.recently_moved_cards.clone();
         for (ability_id, card_no, stage_card_id) in abilities_to_trigger {
             game_state.trigger_auto_ability(
                 ability_id,
@@ -103,7 +104,7 @@ impl super::TurnEngine {
                 player_id_clone.clone(),
                 Some(card_no),
                 Some(stage_card_id),
-                None,
+                moved_snapshot.clone(),
                 None,
             );
         }

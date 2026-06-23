@@ -361,17 +361,37 @@ impl AbilityResolver {
 
         let activating_id = gs.activating_card;
         let orientation_modifiers = gs.mods.orientation_modifiers.clone();
+        let (recently_moved_snapshot, entry_trigger_snapshot, last_discard_count) = (
+            gs.recently_moved_cards.clone(),
+            gs.entry_trigger_moved_cards(),
+            gs.mods.last_cost_discard_count,
+        );
         let player = gs.resolve_target_player_mut(target);
 
         let final_count = if per_unit {
-            let multiplier = util::calculate_per_unit_multiplier(
-                per_unit,
-                per_unit_type,
-                player,
-                &orientation_modifiers,
-                effect.state.as_deref(),
-            );
-            count * multiplier * per_unit_count
+            let matching_count = if Some("discard") == per_unit_type {
+                let filter = util::CardFilter::from_effect(effect);
+                let tracked = recently_moved_snapshot
+                    .as_ref()
+                    .or(entry_trigger_snapshot.as_ref());
+                let discard_count = util::resolve_discard_per_unit_count(
+                    tracked,
+                    last_discard_count,
+                    &card_db,
+                    &filter,
+                );
+                discard_count / per_unit_count.max(1)
+            } else {
+                let multiplier = util::calculate_per_unit_multiplier(
+                    per_unit,
+                    per_unit_type,
+                    player,
+                    &orientation_modifiers,
+                    effect.state.as_deref(),
+                );
+                multiplier * per_unit_count
+            };
+            count * matching_count
         } else {
             count
         };

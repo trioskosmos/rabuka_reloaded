@@ -486,6 +486,7 @@ impl AbilityResolver {
         };
 
         let recently_moved = gs.recently_moved_cards.clone();
+        let entry_snapshot = gs.entry_trigger_moved_cards();
 
         let exclude_self_id = if effect.exclude_self.unwrap_or(false) {
             gs.activating_card
@@ -639,39 +640,29 @@ impl AbilityResolver {
                         &orientation_modifiers,
                     )
                 };
-                // For per_unit_type="discard": always use the cost-tracked discard count.
-                // This gives exact discard count for abilities like LL-bp2-001
-                // (cost: discard named characters → gain 1 blade per discarded card).
-                // When the optional cost is skipped, last_cost_discard_count=0 and
-                // recently_moved=None, so we correctly get 0 (no gain).
-                // DO NOT fall back to counting waitroom — that would incorrectly give
-                // 1 blade even when the cost was skipped.
+                // For per_unit_type="discard": always use tracked move/cost counts,
+                // never the full waitroom. Checks recently_moved first, then the
+                // enqueue-time snapshot (trigger_moved_cards) as fallback.
+                let tracked_moved = recently_moved.as_ref().or(entry_snapshot.as_ref());
                 if Zone::from_str(per_unit_type_str.as_deref().unwrap_or("")) == Some(Zone::Discard)
                 {
-                    if let Some(ref moved) = recently_moved {
-                        let filtered = moved
-                            .iter()
-                            .filter(|&&cid| filter.matches(&card_db, cid, false))
-                            .count() as u32;
-                        matching_count = filtered;
-                    } else {
-                        // No recent move tracked → cost was skipped or 0 discarded.
-                        matching_count = last_discard_count;
-                    }
+                    matching_count = util::resolve_discard_per_unit_count(
+                        tracked_moved,
+                        last_discard_count,
+                        &card_db,
+                        &filter,
+                    );
                 } else if (Zone::from_str(per_unit_type_str.as_deref().unwrap_or(""))
                     == Some(Zone::Waitroom)
                     || per_unit_type_str.as_deref() == Some("waitroom_card"))
                     && (last_discard_count > 0 || recently_moved.is_some())
                 {
-                    if let Some(ref moved) = recently_moved {
-                        let filtered = moved
-                            .iter()
-                            .filter(|&&cid| filter.matches(&card_db, cid, false))
-                            .count() as u32;
-                        matching_count = filtered;
-                    } else {
-                        matching_count = last_discard_count;
-                    }
+                    matching_count = util::resolve_discard_per_unit_count(
+                        recently_moved.as_ref(),
+                        last_discard_count,
+                        &card_db,
+                        &filter,
+                    );
                 }
                 let mut units = matching_count / per_unit_count_val;
                 if effect.max.unwrap_or(false) {

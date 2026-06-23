@@ -1250,44 +1250,6 @@ pub fn count_in_zone(
     )
 }
 
-pub fn zone_card_count(
-    cards: &[i16],
-    card_db: &CardDatabase,
-    card_type_filter: Option<&str>,
-) -> u32 {
-    if let Some(filter) = card_type_filter {
-        cards
-            .iter()
-            .filter(|&&id| card_matches_type(card_db, id, Some(filter)))
-            .count() as u32
-    } else {
-        cards.len() as u32
-    }
-}
-
-/// Count matching cards with an additional blade-constraint closure.
-/// Convenience for condition.rs — uses CardFilter internally.
-pub fn count_matching_with_blade(
-    cards: &[i16],
-    card_db: &CardDatabase,
-    card_type: Option<&str>,
-    group: Option<&str>,
-    cost_limit: Option<u32>,
-    cost_op: Option<&str>,
-    blade_filter: impl Fn(i16) -> bool,
-) -> u32 {
-    cards
-        .iter()
-        .filter(|&&id| {
-            id != -1
-                && card_matches_type(card_db, id, card_type)
-                && card_matches_group_str(card_db, id, group)
-                && card_matches_cost_limit_op(card_db, id, cost_limit, cost_op)
-                && blade_filter(id)
-        })
-        .count() as u32
-}
-
 // ============== UTILITY ==============
 
 pub fn compare_counts(operator: Option<&str>, actual: u32, expected: u32) -> bool {
@@ -1572,6 +1534,23 @@ pub fn area_to_index(area: &crate::zones::MemberArea) -> Option<usize> {
         crate::zones::MemberArea::LeftSide => Some(0),
         crate::zones::MemberArea::Center => Some(1),
         crate::zones::MemberArea::RightSide => Some(2),
+    }
+}
+
+/// For per_unit_type="discard": count recently-moved cards matching a filter,
+/// falling back to last_cost_discard_count when no recent moves are tracked.
+/// This is the correct behavior for both draw and gain_resource — they should
+/// count only cards moved by the current cost/effect batch, not the full waitroom.
+pub fn resolve_discard_per_unit_count(
+    recently_moved: Option<&Vec<i16>>,
+    last_discard_count: u32,
+    card_db: &CardDatabase,
+    filter: &CardFilter,
+) -> u32 {
+    if let Some(moved) = recently_moved {
+        count_matching(moved, card_db, filter, false)
+    } else {
+        last_discard_count
     }
 }
 
