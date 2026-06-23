@@ -3,6 +3,7 @@ pub mod ability_from_source_test;
 pub mod abundant_test;
 pub mod action_coverage_test;
 pub mod aurora_flower_identity_test;
+pub mod aurora_flower_test;
 pub mod awake_test;
 pub mod ayumu_azuna_test;
 pub mod ayumu_pb1_test;

@@ -623,6 +623,66 @@ def _try_compound(text):
     return result
 
 
+def _try_dual_distinct(text):
+    """Detect dual-distinct condition 'AとBが両方ともそれぞれ異なる' with count.
+
+    e.g., "名前とコストが両方ともそれぞれ異なるメンバーが3人以上いる場合"
+    Creates a compound (AND) condition with two card_count_condition sub-conditions,
+    one for each attribute with the appropriate distinct flag.
+    """
+    ATTR_PAIRS = [
+        ("名前", "コスト"),
+        ("コスト", "名前"),
+        ("名前", "グループ名"),
+        ("グループ名", "名前"),
+    ]
+    ATTR_MAP = {
+        "名前": "card_name",
+        "コスト": "cost",
+        "グループ名": "group_name",
+        "ユニット名": "group_name",
+    }
+    for attr1, attr2 in ATTR_PAIRS:
+        if f"{attr1}と{attr2}が両方ともそれぞれ異なる" not in text:
+            continue
+        cm = re.search(r"(\d+)人以上", text)
+        if not cm:
+            continue
+        count = int(cm.group(1))
+        dist1 = ATTR_MAP.get(attr1)
+        dist2 = ATTR_MAP.get(attr2)
+        if not dist1 or not dist2:
+            continue
+
+        def mk_sub(d):
+            return {
+                "type": "card_count_condition",
+                "count": count,
+                "operator": ">=",
+                "unit": "人",
+                "card_type": "member_card",
+                "location": "stage",
+                "target": "self",
+                "distinct": d,
+                "text": text,
+            }
+
+        result = {
+            "type": "compound",
+            "operator": "and",
+            "conditions": [mk_sub(dist1), mk_sub(dist2)],
+            "text": text,
+        }
+        tgt = extract_target(text)
+        if tgt:
+            result["target"] = tgt
+        loc = extract_location(text)
+        if loc:
+            result["location"] = loc
+        return result
+    return None
+
+
 def _try_distinct(text):
     if (
         "名前が異なる" not in text
@@ -2040,6 +2100,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
         _try_complex,
         _try_compound,
         _try_distinct,
+        _try_dual_distinct,
         _try_state_change,
         _try_or,
         _try_blade_count,

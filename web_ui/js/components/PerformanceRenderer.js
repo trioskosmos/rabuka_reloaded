@@ -274,16 +274,40 @@ function renderAggregateHeartSummary(result) {
     //     Recorded with color index 0.
     //
     // Heart type reference:
-    //   heart_00  (index 0) — 'Any' wildcard. Used in live card NEED_HEARTS as a
-    //     requirement that accepts any heart color. In the pool it's a wildcard heart.
-    //   icon_all  (index 7) — 'All' / BAll. Blade heart or ability bonus that counts
-    //     as ALL colors simultaneously. NOT the same as heart_00.
+    //   heart_00  (index 0, img/texticon/heart_00.png)
+    //     Rule 2.1.1.2: "heart icon with no specific color" — wildcard.
+    //     In pool: a wildcard heart that can be any single color.
+    //     In need_heart: accepts hearts of ANY color to satisfy this slot.
+    //
+    //   icon_all  (index 7, img/texticon/icon_all.png)
+    //     Rule 2.1.1.3: "can be treated as any ONE of Pink/Red/Yellow/Green/Blue/Purple"
+    //     Rule 8.3.15.1.1: during performance check, each icon_all = any ONE color.
+    //     QA Q46: icon_all's color assignment is decided at perf check time.
+    //     QA Q67: icon_all is ONLY treated as any color during perf check, NOT live start.
+    //     NOTE: icon_all can fill heart00 req by being treated as one of the other colors.
+    //     If there are no specific color deficits, which color you pick doesn't matter —
+    //     h00_satisfied = sum(filled[1..7]) counts all colored hearts equally. The choice
+    //     only matters when a specific colored slot still has a deficit.
+    //
+    //   ALLブレード (BAll, img/texticon/icon_b_all.png)
+    //     QA Q45: during perf check, each ALLブレード counts as any ONE color.
+    //     QA Q112: ALLブレード is classified as a blade heart.
+    //     Engine: BladeColor::All → HeartColor::Heart00 (converted during blade processing).
+    //
     //   heart_01-06  — Pink, Red, Yellow, Green, Blue, Purple specific colors.
     //
-    // PASS/FAIL logic (engine):
-    //   1. total_filled < total_required → FAIL
-    //   2. Heart00: sum(filled[1..7]) + filled[0] < req[0] → FAIL
-    //   3. Each colored slot: filled[c] < req[c] and no wildcard remaining → FAIL
+    // PASS/FAIL logic (engine check_heart_requirement, engine/src/core/card.rs):
+    //   Rule 2.11.3 — Requires BOTH:
+    //     (a) For each non-heart_00 slot: enough hearts of that color exist.
+    //     (b) Total provided hearts >= total required hearts.
+    //   Engine steps:
+    //     1. total_filled < total_required → FAIL (2.11.3 bullet 2)
+    //     2. Heart00: sum(filled[1..7]) + filled[0] < req[0] → FAIL
+    //        All colored hearts consumed count toward Heart00 (h00_satisfied).
+    //     3. Each colored slot: filled[c] < req[c] AND wildcard (heart00+all) can't cover → FAIL
+    //   QA Q115: need_heart modifications apply "set" then "add/subtract".
+    //   QA Q127, Q110: heart_00 increases from multiple sources stack.
+    //   QA Q148, Q114, Q99, Q98: heart_00 reductions per condition.
     //
     // filled[c] includes ALL allocations to color c (Phases ① + ② + ③ step 1).
     // We split Phase ① and Phase ③ step 1 by capping at per-color req.

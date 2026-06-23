@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-23T22:13:27.662838",
+  "generated_at": "2026-06-23T22:26:36.590461",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -26931,14 +26931,35 @@
       "effect": {
         "text": "自分のステージに名前とコストが両方ともそれぞれ異なるメンバーが3人以上いる場合、このカードのスコアを+1する",
         "condition": {
-          "type": "card_count_condition",
-          "count": 3,
-          "operator": ">=",
+          "type": "compound",
+          "operator": "and",
+          "conditions": [
+            {
+              "type": "card_count_condition",
+              "count": 3,
+              "operator": ">=",
+              "unit": "人",
+              "card_type": "member_card",
+              "location": "stage",
+              "target": "self",
+              "distinct": "card_name",
+              "text": "自分のステージに名前とコストが両方ともそれぞれ異なるメンバーが3人以上いる場合"
+            },
+            {
+              "type": "card_count_condition",
+              "count": 3,
+              "operator": ">=",
+              "unit": "人",
+              "card_type": "member_card",
+              "location": "stage",
+              "target": "self",
+              "distinct": "cost",
+              "text": "自分のステージに名前とコストが両方ともそれぞれ異なるメンバーが3人以上いる場合"
+            }
+          ],
           "text": "自分のステージに名前とコストが両方ともそれぞれ異なるメンバーが3人以上いる場合",
-          "unit": "人",
-          "card_type": "member_card",
-          "location": "stage",
-          "target": "self"
+          "target": "self",
+          "location": "stage"
         },
         "action": "modify_score",
         "value": 1,
