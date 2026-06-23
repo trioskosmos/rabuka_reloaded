@@ -68,6 +68,11 @@ pub struct AbilityQueueEntry {
     pub snapshot_movements: Vec<crate::types::MovementEvent>,
     pub snapshot_energy_placed_by_effect: bool,
     pub snapshot_energy_placed_by_player: Option<String>,
+    /// Snapshot of stage positions captured at enqueue time.
+    /// Used by the "has_moved" condition to detect stage-area-to-stage-area
+    /// position changes, even after a new process_current_ability call
+    /// overwrites the GameState-wide snapshot.
+    pub snapshot_stage_positions: Option<std::collections::HashMap<i16, usize>>,
     /// Deferred sequential sub-effects interrupted by a player choice.
     /// When a sequential ability is processing actions [A, B, C] and B pauses for a
     /// choice, the remaining actions [C, ...] are stored here and resumed in
@@ -279,6 +284,7 @@ impl AbilityQueue {
                     snapshot_movements: Vec::new(),
                     snapshot_energy_placed_by_effect: false,
                     snapshot_energy_placed_by_player: None,
+                    snapshot_stage_positions: None,
                     choice_effect_text: None,
                 };
                 self.entries.push(dummy_entry);

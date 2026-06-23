@@ -34,16 +34,16 @@ fn chisato_q126_area_move_triggers_energy_placement() {
     // Perform position change via the stage API
     let chisato_id = game.state.player1.stage.stage[0];
     let filler_id = game.state.player1.stage.stage[2];
+
+    // Snapshot positions BEFORE the move so the TAS scan can
+    // detect the position change by comparing pre vs post state.
+    game.state.stage_position_snapshot = Some(game.state.capture_stage_positions());
+
     game.state
         .player1
         .stage
         .position_change(MemberArea::LeftSide, MemberArea::RightSide)
         .expect("Position change should succeed");
-
-    // Record position change flags so engine condition evaluation can detect it
-    game.state.record_card_movement(chisato_id);
-    game.state.record_card_movement(filler_id);
-    game.state.position_change_occurred_this_turn = true;
 
     // Manually trigger auto abilities for the player
     let player_id = game.state.player1.id.clone();

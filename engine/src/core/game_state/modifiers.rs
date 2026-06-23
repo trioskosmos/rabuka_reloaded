@@ -866,6 +866,27 @@ impl GameState {
         self.cards_moved_this_turn.contains(&card_id)
     }
 
+    /// Capture current stage positions as a card_id → position_index map.
+    /// Used for detecting stage-area-to-stage-area position changes
+    /// (movement_condition "has_moved") by comparing pre-resolution
+    /// snapshots with post-resolution positions.
+    /// Per Q126: triggers only when a member on stage moves between
+    /// left/center/right areas, NOT on zone changes (stage→discard etc.).
+    pub fn capture_stage_positions(&self) -> std::collections::HashMap<i16, usize> {
+        let mut map = std::collections::HashMap::new();
+        for (idx, &cid) in self.player1.stage.stage.iter().enumerate() {
+            if cid != -1 {
+                map.insert(cid, idx);
+            }
+        }
+        for (idx, &cid) in self.player2.stage.stage.iter().enumerate() {
+            if cid != -1 {
+                map.insert(cid, idx);
+            }
+        }
+        map
+    }
+
     pub fn clear_card_movement_tracking(&mut self) {
         self.cards_moved_this_turn.clear();
     }

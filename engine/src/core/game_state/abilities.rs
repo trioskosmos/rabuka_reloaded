@@ -92,6 +92,7 @@ impl GameState {
             snapshot_movements: Vec::new(),
             snapshot_energy_placed_by_effect: false,
             snapshot_energy_placed_by_player: None,
+            snapshot_stage_positions: None,
             choice_effect_text: None,
         }
     }
@@ -477,6 +478,12 @@ impl GameState {
                             self.last_energy_placed_by_effect();
                         entry.snapshot_energy_placed_by_player =
                             self.last_energy_placed_by_player().map(|s| s.to_string());
+                        // Snapshot stage positions at enqueue time so the
+                        // "has_moved" condition can detect position changes
+                        // even after a new process_current_ability call
+                        // overwrites the GameState-wide snapshot during
+                        // sub-ability resolution.
+                        entry.snapshot_stage_positions = self.stage_position_snapshot.clone();
                         if crate::ability::debug::ABILITY_DEBUG
                             .load(std::sync::atomic::Ordering::Relaxed)
                         {
@@ -957,6 +964,12 @@ impl GameState {
         self.activating_card = card_id;
         self.activating_ability_index = Some(ability_index);
 
+        // Snapshot stage positions before this ability resolves so the
+        // post-resolution TAS scan can detect stage-area-to-stage-area
+        // position changes (movement_condition "has_moved") by comparing
+        // the pre-resolution snapshot with the post-resolution positions.
+        self.stage_position_snapshot = Some(self.capture_stage_positions());
+
         // Check if a resolver already exists (e.g., cost phase completed, effect needs to run).
         // If so, reuse it — it carries state (revealed_cost_cards, etc.) needed by the effect.
         let mut resolver = if self.ability_queue.has_resolver() {
@@ -1102,8 +1115,11 @@ impl GameState {
                 .map(|e| format!("{}_{}", e.card_no, e.ability.full_text));
 
             self.ability_queue.complete_current();
-            self.activating_card = None;
-            self.activating_ability_index = None;
+            // Keep activating_card/ability_index alive through the post-resolution
+            // TAS scan below — the guard at line 331-335 uses them to prevent
+            // re-enqueueing the exact same ability (e.g. each_time watchers that
+            // would re-trigger on the same movement batch that just queued them).
+            // Cleared AFTER the TAS scan, before process_pending_auto_abilities.
             // Scan stage watchers (e.g. each_time triggers) BEFORE clearing
             // recently_moved_cards so their preceding_moved conditions pass.
             // Trigger types: each_time:discard, each_time:area_move, each_time:energy_placed
@@ -1127,8 +1143,23 @@ impl GameState {
                 };
                 self.just_completed_ability_key = just_completed_key;
                 self.trigger_auto_abilities_for_player_with_event(&current_pid, &event);
-                self.just_completed_ability_key = None;
+                // just_completed_ability_key intentionally NOT cleared here —
+                // process_pending_auto_abilities' post-loop TAS (line ~803)
+                // also needs the guard to prevent re-enqueueing the same
+                // each_time watcher on stale movement data.
+                // Stage snapshot consumed by TAS — clear so sub-ability
+                // resolutions in process_pending_auto_abilities
+                // capture a fresh pre-resolution state.
+                // NOTE: recently_moved_cards intentionally NOT cleared here —
+                // trigger_auto_for_discarded_cards (for movement-triggered
+                // discard/waitroom→hand auto abilities) reads it after
+                // process_pending_auto_abilities completes.
+                self.stage_position_snapshot = None;
             }
+            // Clear activating_card AFTER the TAS scan (the guard at line 331-335
+            // uses it to prevent re-enqueueing the just-completed ability).
+            self.activating_card = None;
+            self.activating_ability_index = None;
             if let Some(pid) = self.ability_master_id() {
                 self.process_pending_auto_abilities(&pid);
             }
@@ -1270,6 +1301,16 @@ impl GameState {
         self.ability_queue
             .current_entry()
             .and_then(|e| e.trigger_moved_cards.clone())
+    }
+
+    /// Snapshot of stage positions captured at enqueue time.
+    /// Used by the "has_moved" movement condition so that the
+    /// execution-time gate check compares against the original
+    /// pre-move state rather than the current (overwritten) snapshot.
+    pub fn entry_snapshot_stage_positions(&self) -> Option<&std::collections::HashMap<i16, usize>> {
+        self.ability_queue
+            .current_entry()
+            .and_then(|e| e.snapshot_stage_positions.as_ref())
     }
 
     /// If the pending choice is routed to a specific player (PVP), return their player_id.

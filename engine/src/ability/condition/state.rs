@@ -413,9 +413,6 @@ impl<'a> ConditionContext<'a> {
 
         match movement {
             "moved" => {
-                let card_moved = self
-                    .activating_card_id
-                    .is_some_and(|cid| self.game_state.has_card_moved_this_turn(cid));
                 let base_check = if let Some(state) = movement_state {
                     match state {
                         "to_stage" => {
@@ -425,36 +422,11 @@ impl<'a> ConditionContext<'a> {
                         }
                         "from_stage" => !player.waitroom.cards.is_empty(),
                         "to_discard" => !player.waitroom.cards.is_empty(),
-                        "has_moved" => {
-                            if !card_moved {
-                                return false;
-                            }
-                            let is_position_change =
-                                self.game_state.position_change_occurred_this_turn;
-                            if condition.text.contains("登場") {
-                                let has_appeared = self.activating_card_id.is_some_and(|cid| {
-                                    self.game_state.has_card_appeared_this_turn(cid)
-                                });
-                                has_appeared || (is_position_change && card_moved)
-                            } else {
-                                is_position_change && card_moved
-                            }
-                        }
+                        "has_moved" => self.evaluate_has_moved(condition, &player),
                         _ => true,
                     }
                 } else {
-                    if !card_moved {
-                        return false;
-                    }
-                    let is_position_change = self.game_state.position_change_occurred_this_turn;
-                    if condition.text.contains("登場") {
-                        let has_appeared = self
-                            .activating_card_id
-                            .is_some_and(|cid| self.game_state.has_card_appeared_this_turn(cid));
-                        has_appeared || (is_position_change && card_moved)
-                    } else {
-                        is_position_change && card_moved
-                    }
+                    self.evaluate_has_moved(condition, &player)
                 };
                 if !base_check {
                     return false;
@@ -682,6 +654,49 @@ impl<'a> ConditionContext<'a> {
                 Some(Zone::Discard) => !player.waitroom.cards.is_empty(),
                 _ => true,
             },
+        }
+    }
+
+    /// Evaluate whether the activating card changed its stage position since
+    /// the pre-resolution snapshot was taken. This replaces the old flag-based
+    /// check (position_change_occurred_this_turn + cards_moved_this_turn) with
+    /// a direct position comparison.
+    ///
+    /// Per Q126: ステージに登場しているこの能力を持つメンバーが、
+    /// レフトサイドエリア、センターエリア、ライトサイドエリアの
+    /// いずれかのエリアに移動したときに発動する自動能力です。
+    /// (Triggers when a member on stage moves between left/center/right areas,
+    /// NOT on zone changes like hand→stage or stage→discard.)
+    ///
+    /// Per Q220: 他のメンバーがポジションチェンジしたことにより、
+    /// ポジションチェンジ先のこのメンバーが移動した場合、自動能力は発動する。
+    /// (If another member's position change causes this member to move,
+    /// the auto ability does trigger.)
+    ///
+    /// Japanese text forms that map to this evaluation:
+    ///   移動したとき (past tense) — "has_moved" standalone
+    ///   登場か、エリアを移動したとき — "has_moved" with appearance OR
+    fn evaluate_has_moved(&self, condition: &Condition, player: &crate::player::Player) -> bool {
+        let card_moved_position = self
+            .activating_card_id
+            .and_then(|cid| {
+                let snapshot = self
+                    .game_state
+                    .entry_snapshot_stage_positions()
+                    .or_else(|| self.game_state.stage_position_snapshot.as_ref())?;
+                let old_pos = snapshot.get(&cid)?;
+                let new_pos = player.stage.stage.iter().position(|&id| id == cid)?;
+                Some(*old_pos != new_pos)
+            })
+            .unwrap_or(false);
+
+        if condition.text.contains("登場") {
+            let has_appeared = self
+                .activating_card_id
+                .is_some_and(|cid| self.game_state.has_card_appeared_this_turn(cid));
+            has_appeared || card_moved_position
+        } else {
+            card_moved_position
         }
     }
 

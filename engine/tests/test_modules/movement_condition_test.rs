@@ -227,6 +227,10 @@ fn chisato_movement_triggers_with_both_flags() {
 
     let energy_before = game.state.player1.energy_zone.cards.len();
 
+    // Snapshot positions BEFORE the move so the TAS scan can
+    // detect the position change by comparing pre vs post state.
+    game.state.stage_position_snapshot = Some(game.state.capture_stage_positions());
+
     game.state
         .player1
         .stage
