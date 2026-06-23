@@ -161,11 +161,17 @@ export const Rendering = {
         // Update board toggle labels based on perspective
         const selfLabel = viewState.perspectivePlayer === 0 ? 'P1' : 'P2';
         const oppLabel = viewState.perspectivePlayer === 0 ? 'P2' : 'P1';
+        const activePlayerNum = state.active_player === 'player2' || state.active_player === '1' || state.active_player === 1 ? 1 : 0;
+        const isSelfActive = state.active_player !== undefined && viewState.perspectivePlayer === activePlayerNum;
+        const selfRole = isSelfActive ? 'Attacker' : 'Defender';
+        const oppRole = isSelfActive ? 'Defender' : 'Attacker';
+        const selfSuffix = state.active_player !== undefined ? ` — ${selfLabel} (${selfRole})` : ` (${selfLabel})`;
+        const oppSuffix = state.active_player !== undefined ? ` — ${oppLabel} (${oppRole})` : ` (${oppLabel})`;
         const ui = i18n.getCurrentTranslations()?.ui || {};
         const playerBtn = document.getElementById('btn-show-player');
         const oppBtn = document.getElementById('btn-show-opponent');
-        if (playerBtn) playerBtn.textContent = `${ui.my_board || 'My Board'} (${selfLabel})`;
-        if (oppBtn) oppBtn.textContent = `${ui.opponent || 'Opponent'} (${oppLabel})`;
+        if (playerBtn) playerBtn.textContent = `${ui.my_board || 'My Board'}${selfSuffix}`;
+        if (oppBtn) oppBtn.textContent = `${ui.opponent || 'Opponent'}${oppSuffix}`;
 
         Tooltips.highlightPendingSource();
 

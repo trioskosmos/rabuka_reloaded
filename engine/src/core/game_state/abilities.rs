@@ -1020,6 +1020,13 @@ impl GameState {
                     let opponent_id = if current == "p1" { "p2" } else { "p1" };
                     entry.choice_player_id = Some(opponent_id.to_string());
                     eprintln!("[PCA_G1] SET choice_player_id={}", opponent_id);
+                } else if matches!(c, crate::ability::types::Choice::SelectCard { target_player_id: Some(tpid), .. } if tpid == "self")
+                {
+                    entry.choice_player_id = Some(entry.player_id.clone());
+                    eprintln!(
+                        "[PCA_G1] RESET choice_player_id to activator={}",
+                        entry.player_id
+                    );
                 }
             }
 

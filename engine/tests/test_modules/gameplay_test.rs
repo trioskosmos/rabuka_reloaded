@@ -151,12 +151,34 @@ fn ai_screeam_answer_both_discard() {
         game.has_pending_choice(),
         "P1 should get a discard choice first"
     );
+    // Verify choice_player_id is "p1" — P1 chooses their own discard
+    let entry = game
+        .state
+        .ability_queue
+        .current_entry()
+        .expect("Queue should have an entry");
+    assert_eq!(
+        entry.choice_player_id.as_deref(),
+        Some("p1"),
+        "P1's discard choice should have choice_player_id=p1"
+    );
     // P1 discards card from hand
     game.select_indices(&[0]);
     // Now P2 gets a discard choice
     assert!(
         game.has_pending_choice(),
         "P2 should get a discard choice after P1 discards"
+    );
+    // Verify choice_player_id is "p2" — P2 chooses their own discard
+    let entry = game
+        .state
+        .ability_queue
+        .current_entry()
+        .expect("Queue should have an entry");
+    assert_eq!(
+        entry.choice_player_id.as_deref(),
+        Some("p2"),
+        "P2's discard choice should have choice_player_id=p2"
     );
     game.select_indices(&[0]);
 
