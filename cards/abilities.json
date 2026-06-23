@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-24T03:42:07.857295",
+  "generated_at": "2026-06-24T04:03:13.308232",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -4281,15 +4281,11 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "source": "preceding_moved",
           "text": "このメンバーがステージから控え室に置かれたとき",
-          "location": "stage",
-          "locations": [
-            "discard",
-            "stage"
-          ],
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         }
       }
     },
@@ -5074,15 +5070,11 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "source": "preceding_moved",
           "text": "このメンバーがステージから控え室に置かれたとき",
-          "location": "stage",
-          "locations": [
-            "discard",
-            "stage"
-          ],
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         },
         "count": 1,
         "card_type": "member_card",
@@ -5531,18 +5523,14 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "source": "preceding_moved",
           "text": "『Aqours』のライブカードが自分のライブカード置き場から控え室に置かれたとき",
           "group_names": [
             "Aqours"
           ],
           "target": "self",
-          "location": "live_card_zone",
-          "locations": [
-            "live_card_zone",
-            "discard"
-          ],
-          "card_type": "live_card"
+          "card_type": "live_card",
+          "source": "live_card_zone",
+          "destination": "discard"
         },
         "source": "those_cards",
         "destination": "deck_top_or_bottom",
@@ -8610,15 +8598,11 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "source": "preceding_moved",
           "text": "このメンバーがステージから控え室に置かれたとき",
-          "location": "stage",
-          "locations": [
-            "discard",
-            "stage"
-          ],
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         },
         "count": 1,
         "card_type": "member_card",
@@ -10341,15 +10325,11 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "source": "preceding_moved",
           "text": "このメンバーがステージから控え室に置かれたとき",
-          "location": "stage",
-          "locations": [
-            "discard",
-            "stage"
-          ],
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         },
         "group_names": [
           "Aqours"
@@ -15011,18 +14991,14 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "source": "preceding_moved",
           "text": "このターン、ブレードハートを持たないメンバーカードが自分のライブカード置き場から控え室に置かれている場合",
           "target": "self",
-          "location": "live_card_zone",
-          "locations": [
-            "live_card_zone",
-            "discard"
-          ],
           "card_type": "member_card",
           "negation": true,
           "temporal": "this_turn",
           "temporal_scope": "this_turn",
+          "source": "live_card_zone",
+          "destination": "discard",
           "card_property": "has_blade_heart"
         },
         "action": "sequential",
@@ -21502,15 +21478,11 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "source": "preceding_moved",
           "text": "このメンバーがステージから控え室に置かれたとき",
-          "location": "stage",
-          "locations": [
-            "discard",
-            "stage"
-          ],
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         },
         "look_action": {
           "text": "自分のデッキの上からカードを5枚見る。",
@@ -21549,15 +21521,11 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "source": "preceding_moved",
           "text": "このメンバーがステージから控え室に置かれたとき",
-          "location": "stage",
-          "locations": [
-            "discard",
-            "stage"
-          ],
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         },
         "look_action": {
           "text": "自分のデッキの上からカードを5枚見る。",
@@ -21628,15 +21596,11 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "source": "preceding_moved",
           "text": "このメンバーがステージから控え室に置かれたとき",
-          "location": "stage",
-          "locations": [
-            "discard",
-            "stage"
-          ],
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         },
         "action": "sequential",
         "actions": [
@@ -30324,15 +30288,11 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "source": "preceding_moved",
           "text": "このメンバーがステージから控え室に置かれたとき",
-          "location": "stage",
-          "locations": [
-            "discard",
-            "stage"
-          ],
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         }
       }
     },
@@ -30379,15 +30339,11 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "source": "preceding_moved",
           "text": "このメンバーがステージから控え室に置かれたとき",
-          "location": "stage",
-          "locations": [
-            "discard",
-            "stage"
-          ],
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         },
         "heart_colors": [
           "heart05"
@@ -30411,15 +30367,11 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "source": "preceding_moved",
           "text": "このメンバーがステージから控え室に置かれたとき",
-          "location": "stage",
-          "locations": [
-            "discard",
-            "stage"
-          ],
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         },
         "action": "sequential",
         "actions": [

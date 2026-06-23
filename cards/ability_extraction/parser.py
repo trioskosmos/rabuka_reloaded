@@ -1247,21 +1247,36 @@ def _try_zone_placement(text):
         "type": "card_count_condition",
         "count": 1,
         "operator": ">=",
-        "source": "preceding_moved",
         "text": text,
     }
     _extract_generic_fields(result, text)
+    # Extract source zone (before から) into `source`
     m_from = re.search(r"から", text)
     if m_from:
         source_text = text[: m_from.start()]
         if "ライブカード置き場" in source_text:
-            result["location"] = "live_card_zone"
+            result["source"] = "live_card_zone"
         elif "エネルギー置き場" in source_text:
-            result["location"] = "energy_zone"
+            result["source"] = "energy_zone"
         elif "手札" in source_text or "手元" in source_text:
-            result["location"] = "hand"
+            result["source"] = "hand"
         elif "ステージ" in source_text:
-            result["location"] = "stage"
+            result["source"] = "stage"
+    # Extract destination zone (between から and に置かれ) into `destination`
+    dest_match = re.search(r"から(.+?)に置かれ", text)
+    if dest_match:
+        dest_text = dest_match.group(1)
+        if "控え室" in dest_text:
+            result["destination"] = "discard"
+        elif "手札" in dest_text or "手元" in dest_text:
+            result["destination"] = "hand"
+        elif "ステージ" in dest_text:
+            result["destination"] = "stage"
+        elif "デッキ" in dest_text:
+            result["destination"] = "deck"
+    # Remove location/locations — source+destination carry the zone info
+    result.pop("location", None)
+    result.pop("locations", None)
     return result
 
 

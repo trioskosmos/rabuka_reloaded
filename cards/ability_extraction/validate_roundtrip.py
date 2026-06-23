@@ -141,8 +141,10 @@ def main():
                 and "：" not in triggerless
                 and "このメンバーが" not in triggerless
             ):
-                has_mv = find_in_tree(e, "source", "preceding_moved") or find_in_tree(
-                    e, "per_unit_source", "previous_moved_cards"
+                has_mv = (
+                    find_in_tree(e, "source", "preceding_moved")
+                    or find_in_tree(e, "per_unit_source", "previous_moved_cards")
+                    or find_in_tree(e, "destination", None)
                 )
                 if not has_mv:
                     issues.append(

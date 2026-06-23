@@ -81,6 +81,11 @@ pub struct GameState {
     /// Turn-level record of stage-area-to-stage-area movements.
     /// Used by conditions checking "this member has moved areas this turn".
     pub turn_area_movements: Vec<MovementEvent>,
+    /// Turn-level record of ALL zone-to-zone movements.
+    /// Accumulated across the entire turn (not cleared between ability batches).
+    /// Used by movement conditions with source+destination zones
+    /// (e.g. "member card went from live_card_zone to discard this turn").
+    pub turn_movements: Vec<MovementEvent>,
     /// Counter for assigning unique timestamps to MovementEvents within a turn.
     pub movement_event_counter: u32,
     pub debut_ability_triggers: Vec<(String, i16)>,
@@ -232,6 +237,7 @@ impl GameState {
             stage_position_snapshot: None,
             batch_movements: Vec::new(),
             turn_area_movements: Vec::new(),
+            turn_movements: Vec::new(),
             movement_event_counter: 0,
             debut_ability_triggers: Vec::new(),
             last_vacated_stage_area: None,

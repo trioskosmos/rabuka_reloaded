@@ -1674,11 +1674,25 @@ impl<'a> ConditionContext<'a> {
             let negate = condition.negation.unwrap_or(false);
             let wants_blade_heart_prop =
                 condition.card_property.as_deref() == Some("has_blade_heart");
-            // "Those cards" = the snapshot captured at trigger time (trigger_moved_cards
-            // on the queue entry).  Always prefer this over the global recently_moved_cards
-            // so that resolution sees the same set the trigger condition was evaluated against.
-            // The snapshot is captured in trigger_auto_ability when the ability is enqueued.
-            let moved_source: Vec<i16> = if self.moved_cards.is_empty() {
+            // Source of moved card IDs: for the new format (source=zone+dst),
+            // query turn_movements for all matching zone-transition events
+            // this turn. For the old format (preceding_moved), use the
+            // enqueue-time snapshot or recently_moved_cards.
+            let source_zone = condition.source.as_deref().unwrap_or("");
+            let moved_source: Vec<i16> = if is_new_movement {
+                let dest_zone = condition.destination.as_deref().unwrap_or("");
+                self.game_state
+                    .turn_movements
+                    .iter()
+                    .filter(|m| {
+                        m.source_zone == source_zone
+                            && (m.dest_zone == dest_zone
+                                || (dest_zone == "discard" && m.dest_zone == "waitroom")
+                                || (dest_zone == "waitroom" && m.dest_zone == "discard"))
+                    })
+                    .map(|m| m.moved_card_id)
+                    .collect()
+            } else if self.moved_cards.is_empty() {
                 let enqueued = self.game_state.entry_trigger_moved_cards();
                 let global = self.game_state.recently_moved_cards.clone();
                 // Prefer the enqueue-time snapshot — "those cards" per the card text.

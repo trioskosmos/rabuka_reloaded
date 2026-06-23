@@ -29,6 +29,9 @@ export const BoardRenderer = {
         CardRenderer.renderLiveZone('my-live', p0.live_zone.cards, true, validTargets.myLive, validTargets.hasSelection);
         CardRenderer.renderLiveZone('opp-live', p1.live_zone.cards, true, validTargets.oppLive, validTargets.hasSelection);
 
+        BoardRenderer.renderNeedHeartModifiers('my-live', p0.live_zone.cards, p0.need_heart_modifiers);
+        BoardRenderer.renderNeedHeartModifiers('opp-live', p1.live_zone.cards, p1.need_heart_modifiers);
+
         BoardRenderer.renderEnergy('my-energy', p0.energy.cards, true, validTargets.myEnergy, validTargets.hasSelection, state);
         BoardRenderer.renderEnergy('opp-energy', p1.energy.cards, true, validTargets.oppEnergy, validTargets.hasSelection, state);
 
@@ -132,5 +135,52 @@ export const BoardRenderer = {
                 div.onclick = null;
             }
         });
+    },
+
+    renderNeedHeartModifiers: (containerId, liveCards, nhMods) => {
+        const heartIcons = ['heart_00.png','heart_01.png','heart_02.png','heart_03.png','heart_04.png','heart_05.png','heart_06.png','icon_all.png'];
+        const heartNames = ['Any','Pink','Red','Yellow','Green','Blue','Purple','All'];
+
+        for (let i = 0; i < 3; i++) {
+            const slot = document.getElementById(`${containerId}-slot-${i}`);
+            if (!slot) continue;
+
+            const existing = slot.querySelector('.nh-mod-container');
+            if (existing) existing.remove();
+
+            const card = liveCards[i];
+            if (!card?.card_no || !nhMods) continue;
+
+            const mods = nhMods[card.card_no];
+            if (!mods || !Array.isArray(mods)) continue;
+
+            const entries = [];
+            for (let c = 0; c < 8; c++) {
+                if (mods[c] !== 0) {
+                    entries.push({ color: c, value: mods[c], icon: heartIcons[c], label: heartNames[c] });
+                }
+            }
+            if (entries.length === 0) continue;
+
+            const container = document.createElement('div');
+            container.className = 'nh-mod-container';
+
+            for (const e of entries) {
+                const badge = document.createElement('div');
+                badge.className = `nh-mod-badge ${e.value > 0 ? 'inc' : 'dec'}`;
+                badge.title = `${e.label}: ${e.value > 0 ? '+' : ''}${e.value}`;
+                const valSpan = document.createElement('span');
+                valSpan.className = 'nh-mod-value';
+                valSpan.textContent = `${e.value > 0 ? '+' : ''}${e.value}`;
+                badge.appendChild(valSpan);
+                const img = document.createElement('img');
+                img.src = `img/texticon/${e.icon}`;
+                img.alt = e.label;
+                badge.appendChild(img);
+                container.appendChild(badge);
+            }
+
+            slot.appendChild(container);
+        }
     }
 };

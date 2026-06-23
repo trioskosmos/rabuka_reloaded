@@ -852,6 +852,8 @@ impl GameState {
         let cards = self.recently_moved_cards.get_or_insert_with(Vec::new);
         cards.push(moved_card_id);
         self.recently_moved_from_zone = Some(source_zone.to_string());
+        // Track turn-level ALL-zone movement (persists across ability batches)
+        self.turn_movements.push(event.clone());
         // Track turn-level area movement (stage-area-to-stage-area)
         let is_area_move = source_zone == "stage" && dest_zone == "stage";
         if is_area_move {
@@ -889,6 +891,7 @@ impl GameState {
 
     pub fn clear_card_movement_tracking(&mut self) {
         self.cards_moved_this_turn.clear();
+        self.turn_movements.clear();
     }
 
     pub fn set_heart_color_decision_phase(&mut self, phase: &str) {

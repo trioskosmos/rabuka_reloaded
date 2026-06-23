@@ -874,8 +874,10 @@ impl super::TurnEngine {
         Self::check_duplicate_members(&mut game_state.player2, &game_state.card_database);
         Self::check_victory_condition(game_state);
         // Rule 10.5: Invalid card processing
-        Self::check_invalid_live_cards(&mut game_state.player1, &game_state.card_database);
-        Self::check_invalid_live_cards(&mut game_state.player2, &game_state.card_database);
+        let p1_id = game_state.player1.id.clone();
+        let p2_id = game_state.player2.id.clone();
+        Self::check_invalid_live_cards(game_state, &p1_id);
+        Self::check_invalid_live_cards(game_state, &p2_id);
         Self::check_invalid_energy_cards(&mut game_state.player1, &game_state.card_database);
         Self::check_invalid_energy_cards(&mut game_state.player2, &game_state.card_database);
         // Rule 10.5.3-4: Orphaned under-member cards
@@ -937,24 +939,54 @@ impl super::TurnEngine {
     }
 
     /// Rule 10.5.1: Non-live cards in live card zone → moved to discard.
-    /// Also Rule 10.5.2: Non-energy cards in energy zone → moved to discard.
-    fn check_invalid_live_cards(player: &mut crate::player::Player, card_db: &CardDatabase) {
-        let mut invalid_indices = Vec::new();
-        for (i, card_id) in player.live_card_zone.cards.iter().enumerate() {
-            if !card_db.get_card(*card_id).is_some_and(|c| c.is_live()) {
-                invalid_indices.push(i);
-            }
+    /// Also records movement events so turn-level tracking (turn_movements)
+    /// captures which cards moved where, enabling "from live_card_zone to
+    /// discard" conditions.
+    fn check_invalid_live_cards(game_state: &mut GameState, player_id: &str) {
+        let p1_id = game_state.player1.id.clone();
+        let p2_id = game_state.player2.id.clone();
+        if player_id != p1_id && player_id != p2_id {
+            return;
         }
-        for &i in invalid_indices.iter().rev() {
-            if i < player.live_card_zone.cards.len() {
-                let card_id = player.live_card_zone.cards.remove(i);
-                // Rule 10.5.5: Energy cards go to energy deck, not discard
-                if card_db.get_card(card_id).is_some_and(|c| c.is_energy()) {
-                    player.energy_deck.cards.push(card_id);
-                } else {
-                    player.waitroom.add_card(card_id);
+        let card_db = game_state.card_database.clone();
+        // Split borrows: player borrow ends before push_movement_event
+        let moved: Vec<(i16, &str)> = {
+            let player = if player_id == p1_id {
+                &mut game_state.player1
+            } else {
+                &mut game_state.player2
+            };
+            let mut invalid_indices = Vec::new();
+            for (i, card_id) in player.live_card_zone.cards.iter().enumerate() {
+                if !card_db.get_card(*card_id).is_some_and(|c| c.is_live()) {
+                    invalid_indices.push(i);
                 }
             }
+            let mut moved = Vec::new();
+            for &i in invalid_indices.iter().rev() {
+                if i < player.live_card_zone.cards.len() {
+                    let card_id = player.live_card_zone.cards.remove(i);
+                    // Rule 10.5.5: Energy cards go to energy deck, not discard
+                    if card_db.get_card(card_id).is_some_and(|c| c.is_energy()) {
+                        player.energy_deck.cards.push(card_id);
+                        moved.push((card_id, "energy_deck"));
+                    } else {
+                        player.waitroom.add_card(card_id);
+                        moved.push((card_id, "waitroom"));
+                    }
+                }
+            }
+            moved
+        };
+        for (card_id, dest_zone) in moved {
+            game_state.push_movement_event(
+                card_id,
+                "live_card_zone",
+                dest_zone,
+                None,
+                player_id,
+                false,
+            );
         }
     }
 
@@ -1004,17 +1036,11 @@ impl super::TurnEngine {
         }
     }
 
-    pub fn player_set_live_cards(
-        player: &mut crate::player::Player,
-        num_cards_to_set: usize,
-        card_database: &crate::card::CardDatabase,
-    ) {
+    pub fn player_set_live_cards(player: &mut crate::player::Player, num_cards_to_set: usize) {
         let mut cards_set = Vec::new();
         let mut held_back = Vec::new();
         while let Some(card_id) = player.hand.cards.pop() {
-            if cards_set.len() < num_cards_to_set
-                && card_database.get_card(card_id).is_some_and(|c| c.is_live())
-            {
+            if cards_set.len() < num_cards_to_set {
                 cards_set.push(card_id);
             } else {
                 held_back.push(card_id);
