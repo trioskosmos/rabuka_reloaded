@@ -321,6 +321,9 @@ impl<'a> ConditionContext<'a> {
             && !(ct == Some(ConditionType::CardCountCondition) && condition.card_property.is_some())
             && !(ct == Some(ConditionType::LocationCondition)
                 && condition.heart_type.as_deref() == Some("all"))
+            && !(ct == Some(ConditionType::LocationCondition)
+                && condition.location.as_deref() == Some("revealed_cards")
+                && self.game_state.revealed_cards.is_empty())
         {
             !result
         } else {

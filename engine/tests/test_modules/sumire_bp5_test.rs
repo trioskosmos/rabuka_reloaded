@@ -27,7 +27,7 @@ fn test_sumire_area_move_triggers_draw_and_heart() {
     // Simulate area move by own card effect — this SHOULD trigger Sumire's auto ability.
     game.state.cards_moved_this_turn.insert(sumire);
     game.state
-        .push_movement_event(sumire, "stage", "stage", Some(sumire), "player1", true);
+        .push_movement_event(sumire, "stage", "stage", Some(sumire), "p1", true);
     game.state.batch_movements.clear();
 
     let player_id = game.state.player1.id.clone();
@@ -55,7 +55,7 @@ fn test_sumire_energy_effect_triggers() {
     game.add_to_stage(MemberArea::Center, sumire);
     // Simulate energy placed by card effect
     game.state
-        .push_movement_event(-1, "energy_deck", "energy", None, "player1", true);
+        .push_movement_event(-1, "energy_deck", "energy", None, "p1", true);
 
     let before_hand = game.state.player1.hand.cards.len();
     let player_id = game.state.player1.id.clone();
@@ -115,7 +115,7 @@ fn test_sumire_opponent_no_trigger() {
     game.add_to_stage(MemberArea::Center, sumire);
     // Simulate opponent's card effect moving Sumire
     game.state
-        .push_movement_event(sumire, "stage", "stage", Some(sumire), "player2", true);
+        .push_movement_event(sumire, "stage", "stage", Some(sumire), "p2", true);
     game.state.batch_movements.clear();
 
     let before_hand = game.state.player1.hand.cards.len();
@@ -149,7 +149,7 @@ fn test_sumire_opponent_energy_no_trigger() {
     game.add_to_stage(MemberArea::Center, sumire);
     // Simulate opponent's effect placing energy
     game.state
-        .push_movement_event(-1, "energy_deck", "energy", None, "player2", true);
+        .push_movement_event(-1, "energy_deck", "energy", None, "p2", true);
 
     let before_hand = game.state.player1.hand.cards.len();
     let player_id = game.state.player1.id.clone();
@@ -185,7 +185,7 @@ fn test_sumire_other_card_move_triggers() {
     // Sumire's ability says "このメンバーがエリアを移動する" = THIS MEMBER must
     // move.  When a different card moves, Sumire should NOT trigger.
     game.state
-        .push_movement_event(other, "stage", "stage", Some(other), "player1", true);
+        .push_movement_event(other, "stage", "stage", Some(other), "p1", true);
     game.state.batch_movements.clear();
 
     let before_hand = game.state.player1.hand.cards.len();
@@ -222,7 +222,7 @@ fn test_sumire_use_limit_blocks_second() {
     // First trigger via area move (simulated own-card-effect area move)
     game.state.cards_moved_this_turn.insert(sumire);
     game.state
-        .push_movement_event(sumire, "stage", "stage", Some(sumire), "player1", true);
+        .push_movement_event(sumire, "stage", "stage", Some(sumire), "p1", true);
     game.state.batch_movements.clear();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
     game.state.process_pending_auto_abilities(&player_id);
@@ -235,7 +235,7 @@ fn test_sumire_use_limit_blocks_second() {
 
     // Now try to trigger via energy — should be blocked by use_limit.
     game.state
-        .push_movement_event(-1, "energy_deck", "energy", None, "player1", true);
+        .push_movement_event(-1, "energy_deck", "energy", None, "p1", true);
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
     assert_eq!(
         heart02_mod(&game, sumire),

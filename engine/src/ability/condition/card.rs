@@ -1628,21 +1628,23 @@ impl<'a> ConditionContext<'a> {
             let negate = condition.negation.unwrap_or(false);
             let wants_blade_heart_prop =
                 condition.card_property.as_deref() == Some("has_blade_heart");
-            // Prefer the enqueue-time snapshot (trigger_moved_cards) when the global
-            // recently_moved_cards has already been cleared by clear_effect_tracking().
+            // "Those cards" = the snapshot captured at trigger time (trigger_moved_cards
+            // on the queue entry).  Always prefer this over the global recently_moved_cards
+            // so that resolution sees the same set the trigger condition was evaluated against.
             // The snapshot is captured in trigger_auto_ability when the ability is enqueued.
             let moved_source: Vec<i16> = if self.moved_cards.is_empty() {
                 let enqueued = self.game_state.entry_trigger_moved_cards();
                 let global = self.game_state.recently_moved_cards.clone();
-                // Use enqueued snapshot if global is empty (cleared by clear_effect_tracking)
-                // AND the snapshot has real data.  If global is still live, prefer global
-                // so activation-cost flows (yoshiko) see the resolver's cumulative data.
-                match (&enqueued, &global) {
-                    // Use enqueued snapshot if global is empty (cleared by clear_effect_tracking)
-                    // AND the snapshot has real data.  If global is still live, prefer global
-                    // so activation-cost flows (yoshiko) see the resolver's cumulative data.
-                    (Some(ev), None) if !ev.is_empty() => ev.clone(),
-                    _ => global.unwrap_or_default(),
+                // Prefer the enqueue-time snapshot — "those cards" per the card text.
+                // Fall back to the global flag only when there is no entry (TAS pre-filter).
+                if let Some(ev) = &enqueued {
+                    if !ev.is_empty() {
+                        ev.clone()
+                    } else {
+                        global.unwrap_or_default()
+                    }
+                } else {
+                    global.unwrap_or_default()
                 }
             } else {
                 self.moved_cards.to_vec()

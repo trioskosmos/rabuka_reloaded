@@ -437,15 +437,21 @@ impl GameState {
     }
     /// Backward-compat: which player's effect caused the last area move.
     pub fn last_area_move_by_player(&self) -> Option<&str> {
-        self.turn_area_movements.last().map(|m| m.cause_player_id.as_str())
+        self.turn_area_movements
+            .last()
+            .map(|m| m.cause_player_id.as_str())
     }
     /// Backward-compat: whether energy was placed by a card effect this batch.
     pub fn last_energy_placed_by_effect(&self) -> bool {
-        self.batch_movements.iter().any(|m| m.dest_zone == "energy" && m.effect_only)
+        self.batch_movements
+            .iter()
+            .any(|m| (m.dest_zone == "energy" || m.dest_zone == "energy_zone") && m.effect_only)
     }
     /// Backward-compat: which player's effect caused the last energy placement.
     pub fn last_energy_placed_by_player(&self) -> Option<&str> {
-        self.batch_movements.iter().find(|m| m.dest_zone == "energy")
+        self.batch_movements
+            .iter()
+            .find(|m| m.dest_zone == "energy" || m.dest_zone == "energy_zone")
             .map(|m| m.cause_player_id.as_str())
     }
 

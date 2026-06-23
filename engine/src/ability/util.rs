@@ -1461,6 +1461,10 @@ pub fn place_card_in_zone(
             true
         }
         Some(Zone::SameArea) => {
+            eprintln!(
+                "[TRACE_SAME_AREA] card={} vacated={:?} stage_before={:?}",
+                card_id, vacated_stage_area, player.stage.stage
+            );
             if let Some(pos) = vacated_stage_area {
                 if pos < 3 && player.stage.stage[pos] == -1 {
                     player.stage.stage[pos] = card_id;
@@ -1477,6 +1481,7 @@ pub fn place_card_in_zone(
             } else {
                 player.hand.add_card(card_id);
             }
+            eprintln!("[TRACE_SAME_AREA] stage_after={:?}", player.stage.stage);
             true
         }
         Some(Zone::UnderMember) => {

@@ -661,6 +661,7 @@ impl<'a> ConditionContext<'a> {
                 let has_area_check = condition.self_effect_only.is_some()
                     || condition.movement.as_deref() == Some("moves");
                 let has_energy_check = condition.energy_placed.is_some();
+                eprintln!("[TRACE_MOVES_COND_RESULT] area_ok={} energy_ok={} has_area={} has_energy={} final={}", area_ok, energy_ok, has_area_check, has_energy_check, if !has_area_check && !has_energy_check { true } else if has_area_check && has_energy_check { area_ok || energy_ok } else if has_area_check { area_ok } else { energy_ok });
                 if !has_area_check && !has_energy_check {
                     true
                 } else if has_area_check && has_energy_check {

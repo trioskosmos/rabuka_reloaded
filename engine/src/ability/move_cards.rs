@@ -237,7 +237,12 @@ impl AbilityResolver {
         } else {
             vacated_area
         };
+        eprintln!(
+            "[TRACE_PLACE] dest={} card={} pos_to_use={:?} vacated_area={:?} stage_before={:?}",
+            destination, card_id, pos_to_use, vacated_area, player.stage.stage
+        );
         util::place_card_in_zone(player, card_id, destination, pos_to_use, is_max, count);
+        eprintln!("[TRACE_PLACE] stage_after={:?}", player.stage.stage);
         Ok(false)
     }
 
@@ -1583,15 +1588,19 @@ impl AbilityResolver {
                 .map(|e| e.player_id.clone())
                 .unwrap_or_default();
             let cause_cid = gs.activating_card;
-            for &cid in moved_cards {
-                gs.push_movement_event(
-                    cid,
-                    &source.to_string(),
-                    destination,
-                    cause_cid,
-                    &cause_pid,
-                    true,
-                );
+            // same_area is an internal repositioning mechanic, not a zone transition.
+            // Skip push_movement_event so watcher triggers don't fire for it.
+            if destination != "same_area" {
+                for &cid in moved_cards {
+                    gs.push_movement_event(
+                        cid,
+                        &source.to_string(),
+                        destination,
+                        cause_cid,
+                        &cause_pid,
+                        true,
+                    );
+                }
             }
         }
         log::debug!(

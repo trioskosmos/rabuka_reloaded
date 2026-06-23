@@ -464,6 +464,10 @@ impl AbilityResolver {
 
                     if candidates.len() <= count {
                         for &card_id in &candidates {
+                            eprintln!(
+                                "[TRACE_COST_WAIT] setting card {} to wait, stage before={:?}",
+                                card_id, gs.player1.stage.stage
+                            );
                             gs.mods.add_orientation_modifier(card_id, "wait");
                         }
                     } else {

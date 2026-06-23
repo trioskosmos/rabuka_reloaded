@@ -160,7 +160,7 @@ fn opponent_energy_effect_triggers_hazuki_but_not_sumire() {
 
     let hand_before = game.state.player1.hand.cards.len();
     game.state
-        .push_movement_event(-1, "energy_deck", "energy", None, "player2", true);
+        .push_movement_event(-1, "energy_deck", "energy", None, "p2", true);
 
     trigger_p1_auto_abilities(&mut game);
 

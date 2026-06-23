@@ -50,7 +50,7 @@ fn hazuki_energy_by_own_effect_triggers() {
     let mut v = TestGame::new(db);
     let hazuki = setup_hazuki(&mut v);
     v.state
-        .push_movement_event(-1, "energy_deck", "energy", None, "player1", true);
+        .push_movement_event(-1, "energy_deck", "energy", None, "p1", true);
 
     trigger_auto(&mut v);
 
@@ -69,7 +69,7 @@ fn hazuki_energy_by_opponent_effect_triggers() {
     let mut v = TestGame::new(db);
     let hazuki = setup_hazuki(&mut v);
     v.state
-        .push_movement_event(-1, "energy_deck", "energy", None, "player2", true);
+        .push_movement_event(-1, "energy_deck", "energy", None, "p2", true);
 
     trigger_auto(&mut v);
 

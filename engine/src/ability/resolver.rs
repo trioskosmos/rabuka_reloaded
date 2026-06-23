@@ -787,11 +787,23 @@ impl AbilityResolver {
         }
         if let Some(key) = ability_key {
             if ability.use_limit.is_some() {
-                let can_activate = ability
+                // When cost is already paid (e.g. conditional_on_optional's second entry
+                // after the player accepted), the effect already ran and may have moved
+                // cards around.  Re-checking can_activate_effect would see stale state
+                // (the resolver's moved_cards includes cards moved BY this effect), so
+                // the condition can spuriously fail and the key never gets inserted.
+                // Skip the can_activate_effect guard when cost is already paid AND the
+                // ability is a conditional_on_optional (the player already accepted).
+                let is_cond_opt = ability
                     .effect
                     .as_ref()
-                    .is_none_or(|e| self.can_activate_effect(gs, e));
-                if can_activate {
+                    .is_some_and(|e| e.action == "conditional_on_optional");
+                if (cost_already_paid && is_cond_opt)
+                    || ability
+                        .effect
+                        .as_ref()
+                        .is_none_or(|e| self.can_activate_effect(gs, e))
+                {
                     gs.turn_limited_abilities_used.insert(key);
                 }
             }

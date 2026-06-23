@@ -750,7 +750,9 @@ impl super::TurnEngine {
                     game_state.just_completed_ability_key = None;
                 }
             } else if cost_was_paid {
-                // Record use_limit when ability completes (cost+effect both resolved)
+                // Record use_limit when ability completes (cost+effect both resolved).
+                // Only record for 起動 abilities — auto abilities handle their own
+                // use_limit recording in the resolver.
                 if let Some(entry) = game_state.ability_queue.current_entry() {
                     if let Some(cid) = entry.card_id {
                         let turn = game_state.turn_number;
