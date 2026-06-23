@@ -7773,14 +7773,20 @@ def _normalize_effect_tree(effect, original_text=None):
         # Detect possession pattern (を持つ) in gain_resource heart effects:
         # when the text says "member POSSESSING heartXX", the heart_colors
         # should act as a TARGET FILTER, not just the resource to grant.
+        # Only set the filter when a heart icon appears BEFORE "を持つ"
+        # (e.g. "{{heart_01.png|heart01}}を持つ"), not when the heart is
+        # the thing being gained after "を持つ" (e.g. "グループ名を持つ...heart01を得る").
         if (
             d.get("action") == "gain_resource"
             and d.get("resource") in ("heart", "ハート")
             and d.get("heart_colors")
         ):
             d_text = d.get("text", "") or ""
-            if "を持つ" in d_text:
-                d["filter_targets_by_heart_colors"] = True
+            possess_pos = d_text.find("を持つ")
+            if possess_pos >= 0:
+                before = d_text[:possess_pos]
+                if re.search(r"\{\{heart_\d+\.png\|heart\d+\}\}", before):
+                    d["filter_targets_by_heart_colors"] = True
 
         # Extract heart_colors from the node's own text for look_and_select select_actions.
         # Uses d.get("text") instead of ctx_text to avoid inheriting heart colors

@@ -198,14 +198,11 @@ fn rurino_bp5_live_start_gains_heart_from_discarded_group() {
     let cost_card = game.id("PL!HS-bp6-011-R"); // same group for discard
     let filler = game.id("PL!-sd1-010-SD");
 
-    // Set up stage: Rurino + one other みらくらぱーく member
+    // Set up stage: Rurino + one other みらくらぱーく member + filler
     game.state.player1.stage.stage = [rurino, mirakura_member, filler];
-    // Hand card with matching group name
-    game.state.player1.hand.cards.push(cost_card);
     // Live card in hand for set_live_card
     let live_card = game.id("PL!HS-PR-012-PR"); // みらくらぱーく！ live
-    game.state.player1.hand.cards.push(live_card);
-    // Fill deck
+                                                // Fill deck
     for _ in 0..30 {
         game.state.player1.main_deck.cards.push(filler);
         game.state.player2.main_deck.cards.push(filler);
@@ -216,20 +213,27 @@ fn rurino_bp5_live_start_gains_heart_from_discarded_group() {
     for _ in 0..5 {
         game.pass();
     }
+    // Set hand explicitly to avoid draw-phase card index interference
+    game.state.player1.hand.cards.clear();
+    game.state.player1.hand.cards.push(cost_card);
+    game.state.player1.hand.cards.push(live_card);
     game.set_live_card(live_card);
     // Advance to trigger LiveStart abilities
     game.pass();
     game.pass();
 
-    // LiveStart triggers — optional cost prompt (discard 1 from hand)
+    // LiveStart triggers — optional cost: select 1 card from hand to discard (or skip).
+    // The cost handler directly creates SelectCard zone=hand (not SelectTarget).
     assert!(
         game.has_pending_choice(),
         "Should have optional cost prompt"
     );
-    game.select_option(1); // pay
+    // Select cost_card (index 0) to pay the cost
+    game.select_indices(&[0]);
 
     // After cost is paid, prompts to select 1 member to receive heart01.
-    // Only Rurino matches the discarded card's group, so auto-selects.
+    // Both Rurino and mirakura_member match the みらくらぱーく！ group.
+    // Select Rurino (stage index 0 = first in filtered_indices).
     while game.has_pending_choice() {
         let ct = game.pending_choice_type().unwrap_or_default();
         match ct.as_str() {

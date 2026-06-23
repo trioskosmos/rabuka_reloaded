@@ -423,12 +423,11 @@ pub fn card_matches_group_str(
 /// empty (meaning no group filter). This replaces the repeated pattern:
 ///   `effect.group_names.as_ref().and_then(|gn| gn.first().map(|g| card_matches_group_str(...)))`
 /// across ~35 handler call-sites.
-pub fn card_matches_any_group(
-    card_db: &CardDatabase,
-    card_id: i16,
-    groups: &[String],
-) -> bool {
-    groups.is_empty() || groups.iter().any(|g| card_matches_group_str(card_db, card_id, Some(g)))
+pub fn card_matches_any_group(card_db: &CardDatabase, card_id: i16, groups: &[String]) -> bool {
+    groups.is_empty()
+        || groups
+            .iter()
+            .any(|g| card_matches_group_str(card_db, card_id, Some(g)))
 }
 
 fn card_series_matches_group(series: &str, group: &str) -> bool {
@@ -641,7 +640,12 @@ impl<'a> CardFilter<'a> {
 
     /// Set `cost_limit` (upper bound) and `cost_limit_min` (lower bound) together.
     /// Eliminates the dual-field assignment in range-filter handlers.
-    pub fn with_cost_range(mut self, min: Option<u32>, max: Option<u32>, op: Option<&'a str>) -> Self {
+    pub fn with_cost_range(
+        mut self,
+        min: Option<u32>,
+        max: Option<u32>,
+        op: Option<&'a str>,
+    ) -> Self {
         self.cost_limit = max;
         self.cost_operator = op;
         self.cost_limit_min = min;

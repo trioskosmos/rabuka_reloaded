@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-23T23:52:22.224615",
+  "generated_at": "2026-06-24T01:53:33.837458",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -5125,7 +5125,6 @@
         "heart_colors": [
           "heart01"
         ],
-        "filter_targets_by_heart_colors": true,
         "group_reference": "same_group_name"
       }
     },
@@ -8830,7 +8829,6 @@
           "heart04"
         ],
         "duration": "live_end",
-        "filter_targets_by_heart_colors": true,
         "group_reference": "same_group_name",
         "target": "self"
       }
@@ -10597,7 +10595,6 @@
         "heart_colors": [
           "heart03"
         ],
-        "filter_targets_by_heart_colors": true,
         "position": "center",
         "target": "self"
       }
@@ -21416,7 +21413,6 @@
           "heart06"
         ],
         "duration": "live_end",
-        "filter_targets_by_heart_colors": true,
         "target": "self"
       }
     },
@@ -21451,7 +21447,6 @@
           "heart02"
         ],
         "duration": "live_end",
-        "filter_targets_by_heart_colors": true,
         "target": "self"
       }
     },
@@ -21486,7 +21481,6 @@
           "heart03"
         ],
         "duration": "live_end",
-        "filter_targets_by_heart_colors": true,
         "target": "self"
       }
     },

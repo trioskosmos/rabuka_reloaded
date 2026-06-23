@@ -147,6 +147,8 @@ pub mod rin_test;
 pub mod rina_bp3_debut_test;
 pub mod rina_bp3_test;
 pub mod rina_test;
+pub mod rurino_bp5_test;
+pub mod rurino_pb1_test;
 pub mod rurino_test;
 pub mod sayaka_bp6_test;
 pub mod sayaka_test;

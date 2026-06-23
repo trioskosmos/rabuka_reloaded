@@ -1168,6 +1168,16 @@ impl super::resolver::AbilityResolver {
                     if !hand_idx.is_empty() && count == 0 && allow_skip {
                         log::debug!("[ANY_ENTERED] count={} hand_idx={:?}", count, hand_idx);
                         let target = target_player_id.as_deref().unwrap_or("self").to_string();
+                        // Save old hand state BEFORE the move so we can correctly track
+                        // which cards were just moved (hand_idx refers to OLD positions).
+                        let old_hand_cards: Vec<i16> = {
+                            let p = gs.resolve_target_player(&target);
+                            p.hand.cards.to_vec()
+                        };
+                        let moved_ids: Vec<i16> = hand_idx
+                            .iter()
+                            .filter_map(|&idx| old_hand_cards.get(idx).copied())
+                            .collect();
                         // Move current selection to destination immediately
                         self.execute_selected_cards_from_zone(
                             gs,
@@ -1183,20 +1193,21 @@ impl super::resolver::AbilityResolver {
                             characters.as_ref(),
                             target_player_id.as_deref(),
                         )?;
-                        // Re-read hand state after movement
+                        // Track moved card IDs from the OLD hand state (correct).
+                        for &cid in &moved_ids {
+                            if !self.selected_cards.contains(&cid) {
+                                self.selected_cards.push(cid);
+                            }
+                        }
+                        // Re-read hand state after movement for the re-prompt
                         let hand_cards: Vec<i16> = {
                             let p = gs.resolve_target_player_mut(&target);
                             p.hand.cards.to_vec()
                         };
-                        for &idx in hand_idx {
-                            if idx < hand_cards.len()
-                                && !self.selected_cards.contains(&hand_cards[idx])
-                            {
-                                self.selected_cards.push(hand_cards[idx]);
-                            }
-                        }
-                        let exclude_idxs: Vec<usize> = (0..hand_cards.len())
-                            .filter(|i| !validate_card(hand_cards[*i]))
+                        // Compute which remaining hand cards ARE selectable (match the filter)
+                        // and pass them as filtered_indices (selection-index → hand-position mapping).
+                        let include_idxs: Vec<usize> = (0..hand_cards.len())
+                            .filter(|i| validate_card(hand_cards[*i]))
                             .collect();
                         self.pending_choice = Some(
                             Choice::select_cards(
@@ -1210,10 +1221,10 @@ impl super::resolver::AbilityResolver {
                             .cost_total(cost_total, cost_total_operator.clone())
                             .group(group.clone())
                             .characters(characters.clone())
-                            .filtered_indices(if exclude_idxs.is_empty() {
+                            .filtered_indices(if include_idxs.is_empty() {
                                 None
                             } else {
-                                Some(exclude_idxs)
+                                Some(include_idxs)
                             })
                             .target_player_id(Some(target))
                             .build(),

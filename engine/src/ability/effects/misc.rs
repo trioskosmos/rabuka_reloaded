@@ -559,6 +559,20 @@ impl AbilityResolver {
                     }
                 }
             }
+            // Filter candidates by group_reference: "same_group_name" — use the
+            // cost-discarded card's unit so the target prompt shows only matching members.
+            if effect.group_reference.as_deref() == Some("same_group_name") {
+                let ref_group: Option<String> = self
+                    .moved_cards
+                    .first()
+                    .and_then(|cid| gs.card_database.get_card(*cid))
+                    .and_then(|c| c.unit.clone());
+                if let Some(ref group) = ref_group {
+                    candidates.retain(|&cid| {
+                        util::card_matches_group_str(&gs.card_database, cid, Some(group.as_str()))
+                    });
+                }
+            }
             let tc = effect.target_count.unwrap_or(1) as usize;
             if candidates.len() > tc {
                 let stage_snapshot: Vec<i16> = {
@@ -1098,16 +1112,41 @@ impl AbilityResolver {
         }
 
         // group_reference: "same_group_name" — filter heart targets to only
-        // include cards whose group (unit) matches the activating card's group.
+        // include cards whose group (unit) matches the group of the card that
+        // was discarded as cost (tracked in self.moved_cards), NOT the activating
+        // card's group.
         if effect.group_reference.as_deref() == Some("same_group_name") {
-            let ref_group: Option<String> = gs
-                .activating_card
-                .and_then(|cid| gs.card_database.get_card(cid))
+            eprintln!("[SAME_GROUP] moved_cards={:?}", self.moved_cards);
+            let ref_group: Option<String> = self
+                .moved_cards
+                .first()
+                .and_then(|cid| {
+                    let c = gs.card_database.get_card(*cid);
+                    eprintln!(
+                        "[SAME_GROUP] cid={} card={:?}",
+                        cid,
+                        c.as_ref().map(|c| (&c.name, &c.unit))
+                    );
+                    c
+                })
                 .and_then(|c| c.unit.clone());
+            eprintln!("[SAME_GROUP] ref_group={:?}", ref_group);
             if let Some(ref group) = ref_group {
+                let before = heart_targets.len();
                 heart_targets.retain(|cid: &i16| {
-                    util::card_matches_group_str(&gs.card_database, *cid, Some(group.as_str()))
+                    let matches =
+                        util::card_matches_group_str(&gs.card_database, *cid, Some(group.as_str()));
+                    eprintln!(
+                        "[SAME_GROUP] cid={} matches={} group={}",
+                        cid, matches, group
+                    );
+                    matches
                 });
+                eprintln!(
+                    "[SAME_GROUP] heart_targets: {} -> {}",
+                    before,
+                    heart_targets.len()
+                );
             }
         }
 
