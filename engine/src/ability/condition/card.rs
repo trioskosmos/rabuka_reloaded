@@ -215,12 +215,28 @@ impl<'a> ConditionContext<'a> {
                     .unwrap_or(comparison_default_count(condition))
             }
         } else if condition.comparison_type.as_deref() == Some("cost") {
-            condition.cost_limit.or(condition.count).unwrap_or(0)
+            let entry_choice = self
+                .game_state
+                .ability_queue
+                .current_entry()
+                .and_then(|e| e.conditional_choice.as_ref())
+                .and_then(|s| s.parse::<u32>().ok());
+            condition
+                .cost_limit
+                .or(condition.count)
+                .or(entry_choice)
+                .unwrap_or(0)
         } else if condition.comparison_type.as_deref() == Some("score") {
             condition.count.unwrap_or(0)
         } else {
-            condition
-                .count
+            let entry_choice = self
+                .game_state
+                .ability_queue
+                .current_entry()
+                .and_then(|e| e.conditional_choice.as_ref())
+                .and_then(|s| s.parse::<u32>().ok());
+            entry_choice
+                .or(condition.count)
                 .unwrap_or(comparison_default_count(condition))
         };
 
@@ -3224,6 +3240,43 @@ impl<'a> ConditionContext<'a> {
                 count
             );
             return count;
+        }
+        // Fallback: when revealed_cards was consumed by a preceding move_cards
+        // (Kosuzu pattern: step 2 moves the card from revealed_cards to hand,
+        // then step 3 needs to check the SAME card's cost against the chosen
+        // number). Try moved_cards as a fallback source.
+        if location.is_empty()
+            && self.game_state.revealed_cards.is_empty()
+            && !self.moved_cards.is_empty()
+        {
+            let card_db = &self.game_state.card_database;
+            let total: u32 = self
+                .moved_cards
+                .iter()
+                .filter_map(|&id| {
+                    let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32;
+                    Some((base + self.game_state.mods.get_cost_modifier(id)).max(0) as u32)
+                })
+                .sum();
+            if total > 0 {
+                return total;
+            }
+        }
+        // Fallback for conditions referencing revealed cards without
+        // explicit comparison_type (e.g. "選んだ数以下の場合" in Kosuzu).
+        // Use the cost of revealed cards when available.
+        if location.is_empty() && !self.game_state.revealed_cards.is_empty() {
+            let card_db = &self.game_state.card_database;
+            let total: u32 = self
+                .game_state
+                .revealed_cards
+                .iter()
+                .filter_map(|&id| {
+                    let base = card_db.get_card(id).and_then(|c| c.cost).unwrap_or(0) as i32;
+                    Some((base + self.game_state.mods.get_cost_modifier(id)).max(0) as u32)
+                })
+                .sum();
+            return total;
         }
         let player = self.resolve_condition_player(target);
         self.zone_len(player, location)

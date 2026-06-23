@@ -210,6 +210,9 @@ pub enum ActionType {
     // Player target choice
     ChooseTargetPlayer,
 
+    // Number selection (e.g. Kosuzu: "choose a number")
+    SelectNumber,
+
     // Missing variants from effects/mod.rs dispatch
     PlayBatonTouch,
     ModifyRequiredHeartsGlobal,
@@ -230,6 +233,7 @@ impl ActionType {
             "move_cards" => Some(ActionType::MoveCards),
             "discard_card" => Some(ActionType::DiscardCard),
             "select" => Some(ActionType::Select),
+            "select_number" => Some(ActionType::SelectNumber),
             "select_cards" => Some(ActionType::SelectCards),
             "look_and_select" => Some(ActionType::LookAndSelect),
             "look_at" => Some(ActionType::LookAt),
@@ -300,6 +304,7 @@ impl ActionType {
             ActionType::MoveCards => "move_cards",
             ActionType::DiscardCard => "discard_card",
             ActionType::Select => "select",
+            ActionType::SelectNumber => "select_number",
             ActionType::SelectCards => "select_cards",
             ActionType::LookAndSelect => "look_and_select",
             ActionType::LookAt => "look_at",
@@ -367,6 +372,7 @@ impl ActionType {
             ActionType::MoveCards => "Move Cards",
             ActionType::DiscardCard => "Discard Card",
             ActionType::Select => "Select",
+            ActionType::SelectNumber => "Select Number",
             ActionType::SelectCards => "Select Cards",
             ActionType::LookAndSelect => "Look and Select",
             ActionType::LookAt => "Look At",

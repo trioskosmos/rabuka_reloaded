@@ -3581,6 +3581,11 @@ def parse_action(text: str) -> Dict[str, Any]:
         ),
     )
     R(
+        lambda t: bool(re.search(r"数\d*つを選ぶ", t)),
+        "select_number",
+        None,
+    )
+    R(
         lambda t: "選ぶ" in t or "選び" in t or bool(re.search(r"選ん(?!だ)", t)),
         "select",
         lambda t, a: a.update(

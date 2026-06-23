@@ -547,6 +547,45 @@ impl AbilityResolver {
         });
     }
 
+    pub(crate) fn execute_select_number(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(), String> {
+        let max_cost = gs
+            .card_database
+            .cards
+            .values()
+            .filter_map(|c| c.cost)
+            .max()
+            .unwrap_or(10);
+        let mut options: Vec<String> = (1..=max_cost).map(|n| n.to_string()).collect();
+        options.push("67".to_string());
+        let options_json = serde_json::to_string(&options).unwrap_or_default();
+        if let Some(entry) = gs.ability_queue.current_entry_mut() {
+            entry.choice_card_no = None;
+            entry.conditional_choice = Some(options_json);
+        }
+        self.pending_choice = Some(Choice::SelectTarget {
+            target: "choice_string".to_string(),
+            description: format!(
+                "Choose a number: {}",
+                if options.len() > 10 {
+                    format!(
+                        "{}~{}",
+                        options.first().unwrap_or(&"1".to_string()),
+                        options.last().unwrap_or(&"67".to_string())
+                    )
+                } else {
+                    options.join(", ")
+                }
+            ),
+            allow_skip: effect.optional.unwrap_or(false),
+            options: None,
+        });
+        Ok(())
+    }
+
     pub(crate) fn execute_area_select(
         &mut self,
         gs: &mut GameState,

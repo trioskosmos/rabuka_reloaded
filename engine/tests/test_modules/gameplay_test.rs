@@ -3518,3 +3518,76 @@ fn rise_up_high_turn1_score_and_blade() {
         "虹ヶ咲 member should have gained blade"
     );
 }
+
+// ====================================================================
+// Kosuzu choose number — live_start, reveal top deck, compare cost
+// ====================================================================
+fn setup_kosuzu_test(game: &mut TestGame, top_deck_card: Option<i16>) -> (i16, i16) {
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
+    let kosuzu = game.id("PL!HS-pb1-005-R");
+    if let Some(tc) = top_deck_card {
+        game.state.player1.main_deck.cards.insert(0, tc);
+    }
+    game.give_energy(11);
+    game.state.player1.hand.cards.push(kosuzu);
+    game.play_to_stage(kosuzu, rabuka_engine::zones::MemberArea::Center);
+    (kosuzu, fill)
+}
+
+fn advance_to_live_start_from_main(game: &mut TestGame) {
+    game.pass(); // Main→Active
+    game.pass(); // Active→Energy
+    game.pass(); // Energy→Draw
+    game.pass(); // Draw→Main
+    game.pass(); // Main→LiveCardSet
+    game.pass(); // LiveCardSet→LiveCardSet2
+    game.pass(); // LiveCardSet2→LiveStart
+}
+
+#[test]
+fn kosuzu_choose_number_adds_to_hand() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let top_card = game.id("PL!HS-sd1-013-SD");
+    let (kosuzu, _) = setup_kosuzu_test(&mut game, Some(top_card));
+    advance_to_live_start_from_main(&mut game);
+    assert!(game.has_pending_choice());
+    game.select_option(0);
+    assert!(!game.has_pending_choice());
+    assert!(game.state.player1.hand.cards.contains(&top_card));
+    assert_eq!(game.state.mods.get_blade_modifier(kosuzu), 0);
+}
+
+#[test]
+fn kosuzu_choose_number_gains_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let top_card = game.id("PL!HS-sd1-013-SD");
+    let (kosuzu, _) = setup_kosuzu_test(&mut game, Some(top_card));
+    advance_to_live_start_from_main(&mut game);
+    assert!(game.has_pending_choice());
+    game.select_option(9);
+    assert!(!game.has_pending_choice());
+    assert!(!game.state.player1.hand.cards.contains(&top_card));
+    assert!(game.state.mods.get_blade_modifier(kosuzu) > 0);
+}
+
+#[test]
+fn kosuzu_equal_choice_both_effects() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let top_card = game.id("PL!-sd1-010-SD");
+    let (kosuzu, _) = setup_kosuzu_test(&mut game, Some(top_card));
+    advance_to_live_start_from_main(&mut game);
+    assert!(game.has_pending_choice());
+    game.select_option(3);
+    assert!(!game.has_pending_choice());
+    assert!(game.state.player1.hand.cards.contains(&top_card));
+    assert!(game.state.mods.get_blade_modifier(kosuzu) > 0);
+}

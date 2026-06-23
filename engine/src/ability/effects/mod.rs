@@ -438,6 +438,7 @@ impl AbilityResolver {
             }
             ActionType::Reveal | ActionType::RevealEffect => self.execute_reveal_effect(gs, effect),
             ActionType::Select => self.execute_select_effect(gs, effect),
+            ActionType::SelectNumber => self.execute_select_number(gs, effect),
             ActionType::Look | ActionType::LookAt => {
                 let count = if let Some(ref dc) = effect.dynamic_count {
                     self.resolve_dynamic_count(gs, dc)
