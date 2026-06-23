@@ -1175,9 +1175,9 @@ impl GameState {
         self.ability_queue
             .current_entry()
             .map(|e| {
-                e.snapshot_movements
-                    .iter()
-                    .any(|m| m.dest_zone == "energy" && m.effect_only)
+                e.snapshot_movements.iter().any(|m| {
+                    (m.dest_zone == "energy" || m.dest_zone == "energy_zone") && m.effect_only
+                })
             })
             .unwrap_or(false)
     }
@@ -1188,7 +1188,7 @@ impl GameState {
             .and_then(|e| {
                 e.snapshot_movements
                     .iter()
-                    .find(|m| m.dest_zone == "energy")
+                    .find(|m| m.dest_zone == "energy" || m.dest_zone == "energy_zone")
             })
             .map(|m| m.cause_player_id.clone())
     }

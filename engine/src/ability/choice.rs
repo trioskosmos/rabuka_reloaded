@@ -2248,6 +2248,10 @@ impl super::resolver::AbilityResolver {
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
                         eprintln!("[DECK_DIAG] skip — card stays in waitroom");
                     }
+                    // Mark optional as skipped so the RWC handler doesn't record use_limit.
+                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                        entry.optional_cost_result = Some(false);
+                    }
                     self.clear_choice_state(gs);
                     return self.resume_pending_commands(gs);
                 }

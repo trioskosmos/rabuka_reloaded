@@ -751,25 +751,15 @@ impl super::TurnEngine {
                 }
             } else if cost_was_paid {
                 // Record use_limit when ability completes (cost+effect both resolved).
-                // Only record for 起動 abilities — auto abilities handle their own
-                // use_limit recording in the resolver.
-                if let Some(entry) = game_state.ability_queue.current_entry() {
-                    if let Some(cid) = entry.card_id {
-                        let turn = game_state.turn_number;
-                        for (idx, ab) in game_state
-                            .card_database
-                            .get_card(cid)
-                            .map(|c| &c.abilities)
-                            .into_iter()
-                            .flatten()
-                            .enumerate()
-                        {
-                            if ab.triggers.as_deref() == Some("起動") && ab.use_limit.is_some() {
-                                let key = format!("{}_{}_{}", cid, idx, turn);
-                                if !game_state.turn_limited_abilities_used.contains(&key) {
-                                    game_state.turn_limited_abilities_used.insert(key);
-                                }
-                                break;
+                // Insert for any ability with use_limit, unless the player declined
+                // an optional action (signaled by optional_cost_result == Some(false)).
+                if cost_entry_opt_result != Some(false) {
+                    if let Some(entry) = game_state.ability_queue.current_entry() {
+                        if let Some(cid) = entry.card_id {
+                            let turn = game_state.turn_number;
+                            let key = format!("{}_{}_{}", cid, entry.ability_index, turn);
+                            if !game_state.turn_limited_abilities_used.contains(&key) {
+                                game_state.turn_limited_abilities_used.insert(key);
                             }
                         }
                     }

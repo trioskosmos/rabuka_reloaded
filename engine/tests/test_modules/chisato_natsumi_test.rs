@@ -376,7 +376,8 @@ fn chisato_natsumi_debut_single_baton_one_liella() {
     game.state.player1.hand.cards.push(card);
     game.state.player1.hand.cards.push(filler);
     game.state.player1.hand.cards.push(filler);
-    // Only 1 Liella! on stage
+    // Only 1 Liella! on stage at Left.  Play directly to that area so the
+    // cost-phase baton touch replaces the occupied member.
     game.state.player1.stage.stage = [liella1, -1, -1];
     game.give_energy(20);
 
@@ -387,7 +388,7 @@ fn chisato_natsumi_debut_single_baton_one_liella() {
         &ActionType::PlayMemberToStage,
         Some(card),
         None,
-        Some(MemberArea::Center),
+        Some(MemberArea::LeftSide),
         Some(true),
     )
     .expect("play with single baton");
