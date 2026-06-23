@@ -1112,11 +1112,28 @@ function renderPlayerPanel(playerId, result) {
     
     const isSuccess = result.success;
 
+    // Check cannot_live restriction
+    const playerKey = playerId === 0 ? 'player1' : 'player2';
+    const playerStrId = State.data?.[playerKey]?.id;
+    const cannotLivePlayers = State.data?.cannot_live_players || [];
+    const isCannotLive = playerStrId && cannotLivePlayers.includes(playerStrId);
+
+    let cannotLiveCardName = '';
+    if (isCannotLive) {
+        const entry = (State.data?.prohibition_effects || []).find(e => e.startsWith('const_restriction:cannot_live:'));
+        if (entry) {
+            const nameMatch = entry.match(/cardname=([^,]+?)(?:,|:)/);
+            if (nameMatch) cannotLiveCardName = nameMatch[1];
+        }
+    }
+
     const totalHearts = sumHearts(result.total_hearts);
     const baseLiveScore = sumPassedLiveScores(lives);
     
     let outcome = 'Failed performance';
-    if (isSuccess) {
+    if (isCannotLive) {
+        outcome = 'Live cannot happen';
+    } else if (isSuccess) {
         const winsKey = playerId === 0 ? 'p0_wins' : 'p1_wins';
         const otherWinsKey = playerId === 0 ? 'p1_wins' : 'p0_wins';
         const selfWins = !!result[winsKey];
@@ -1136,10 +1153,16 @@ function renderPlayerPanel(playerId, result) {
                 <div class="perf-panel-header-main">
                     <div class="perf-eyebrow">${escapeHtml(getPlayerName(playerId))}</div>
                     <h2>${escapeHtml(outcome)}</h2>
-                    <div class="perf-panel-subtitle">Judge score ${result?.total_score || 0} with ${passedLives}/${totalLives} live cards passing.</div>
+                    ${isCannotLive
+                        ? `<div class="perf-panel-subtitle cannot-live-subtitle">${cannotLiveCardName ? `Due to ${escapeHtml(cannotLiveCardName)}'s ability` : 'Due to a restriction effect'}</div>`
+                        : `<div class="perf-panel-subtitle">Judge score ${result?.total_score || 0} with ${passedLives}/${totalLives} live cards passing.</div>`
+                    }
                 </div>
                 <div class="perf-panel-statuses">
-                    <div class="perf-status-pill ${isSuccess ? 'success' : 'failure'}">${isSuccess ? 'PASS' : 'FAIL'}</div>
+                    ${isCannotLive
+                        ? '<div class="perf-status-pill blocked">BLOCKED</div>'
+                        : `<div class="perf-status-pill ${isSuccess ? 'success' : 'failure'}">${isSuccess ? 'PASS' : 'FAIL'}</div>`
+                    }
                     <div class="perf-outcome-pill">${escapeHtml(outcome)}</div>
                 </div>
             </header>

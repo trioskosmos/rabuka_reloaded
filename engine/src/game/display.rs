@@ -274,6 +274,8 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub delayed_prohibition_effects: Vec<String>,
     #[serde(default)]
+    pub cannot_live_players: Vec<String>,
+    #[serde(default)]
     pub cannot_activate_members: Vec<String>,
     #[serde(default)]
     pub constant_cannot_activate_members: Vec<String>,
@@ -1307,6 +1309,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         non_stackable_effects: game_state.non_stackable_effects.iter().cloned().collect(),
         prohibition_effects: game_state.prohibition_effects.clone(),
         delayed_prohibition_effects: game_state.delayed_prohibition_effects.clone(),
+        cannot_live_players: game_state.cannot_live_players.clone(),
         cannot_activate_members: game_state.cannot_activate_members.clone(),
         constant_cannot_activate_members: game_state.constant_cannot_activate_members.clone(),
         constant_ability_statuses: game_state.constant_ability_statuses.clone(),

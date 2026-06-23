@@ -284,41 +284,43 @@ export const LogRenderer = {
         flushAbGroup();
         flushSnapshot();
 
-        groupedLogs.forEach(group => {
-            if (group.type === 'snapshot') {
-                const block = LogRenderer.createSnapshotBlock(group, currentLang, showFriendlyAbilities);
-                section.appendChild(block);
-            } else if (group.type === 'ability_debug') {
-                const block = LogRenderer.createAbilityDebugBlock(group, currentLang, showFriendlyAbilities);
-                section.appendChild(block);
-            } else if (group.entries) {
-                const block = LogRenderer.createGroupedLogBlock(group, currentLang, showFriendlyAbilities);
-                section.appendChild(block);
-            } else {
-                const entry = LogRenderer.createStandaloneLogEntry(group, currentLang, showFriendlyAbilities);
-                section.appendChild(entry);
+        // Merge ability_resolution and trigger_evaluation entries with rule_log groups
+        // in turn-descending order (newest turn first), preserving original order within each turn.
+        const structEntries = (state.structured_log || []).filter(
+            e => (e.category === 'ability_resolution' || e.category === 'trigger_evaluation') && e.metadata
+        );
+        const merged = [];
+        groupedLogs.forEach((g, idx) => {
+            const turnMatch = (g.turnPrefix || g.entry || g.header || '').match(/Turn (\d+)/i);
+            merged.push({ turn: turnMatch ? parseInt(turnMatch[1], 10) : 0, order: idx, type: 'rule', data: g });
+        });
+        structEntries.forEach((e, idx) => {
+            merged.push({ turn: e.turn || 0, order: idx, type: e.category, data: e });
+        });
+        merged.sort((a, b) => b.turn - a.turn || a.order - b.order);
+
+        merged.forEach(entry => {
+            if (entry.type === 'rule') {
+                const g = entry.data;
+                if (g.type === 'snapshot') {
+                    section.appendChild(LogRenderer.createSnapshotBlock(g, currentLang, showFriendlyAbilities));
+                } else if (g.type === 'ability_debug') {
+                    section.appendChild(LogRenderer.createAbilityDebugBlock(g, currentLang, showFriendlyAbilities));
+                } else if (g.entries) {
+                    section.appendChild(LogRenderer.createGroupedLogBlock(g, currentLang, showFriendlyAbilities));
+                } else {
+                    section.appendChild(LogRenderer.createStandaloneLogEntry(g, currentLang, showFriendlyAbilities));
+                }
+            } else if (entry.type === 'ability_resolution') {
+                const block = LogRenderer.createAbilityResolutionBlock(entry.data, currentLang, showFriendlyAbilities);
+                if (block) section.appendChild(block);
+            } else if (entry.type === 'trigger_evaluation') {
+                const block = LogRenderer.createTriggerEvaluationBlock(entry.data, currentLang, showFriendlyAbilities);
+                if (block) section.appendChild(block);
             }
         });
 
-        // Render structured ability resolution entries (from structured_log, category=ability_resolution)
-        const abilityResolutions = (state.structured_log || []).filter(
-            e => e.category === 'ability_resolution' && e.metadata
-        ).reverse();
-        abilityResolutions.forEach(entry => {
-            const block = LogRenderer.createAbilityResolutionBlock(entry, currentLang, showFriendlyAbilities);
-            if (block) section.appendChild(block);
-        });
-
-        // Render trigger evaluation entries (from structured_log, category=trigger_evaluation)
-        const triggerEvals = (state.structured_log || []).filter(
-            e => e.category === 'trigger_evaluation' && e.metadata
-        ).reverse();
-        triggerEvals.forEach(entry => {
-            const block = LogRenderer.createTriggerEvaluationBlock(entry, currentLang, showFriendlyAbilities);
-            if (block) section.appendChild(block);
-        });
-
-        PerformanceMonitor.recordEntryCount(groupedLogs.length + abilityResolutions.length);
+        PerformanceMonitor.recordEntryCount(merged.length);
         return section;
     },
 
@@ -666,6 +668,10 @@ export const LogRenderer = {
             document.dispatchEvent(new CustomEvent('opencode:show-performance', {
                 detail: { turn, entry: body }
             }));
+            return;
+        }
+        if (body.match(/reveals?\s+.+?\s+from/i)) {
+            LogRenderer.showRevealedCardsModal();
             return;
         }
         if (entryType === 'effect' || entryType === 'ability_effect' || entryType === 'heart_effect' || entryType === 'generic') {

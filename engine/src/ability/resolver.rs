@@ -551,11 +551,29 @@ impl AbilityResolver {
             .and_then(|id| gs.card_database.get_card(id))
             .map(|c| c.name.clone())
             .unwrap_or_default();
-        let trigger_str = self
+        let raw_trigger = self
             .current_ability
             .as_ref()
             .and_then(|a| a.triggers.as_deref())
             .unwrap_or("?");
+        // Normalize trigger string to match trigger_evaluation metadata format.
+        // ability.triggers is the raw text from cards.json (e.g. "登場", "live_success"),
+        // but the trigger_evaluation entry stores a canonical English key (e.g. "debut", "live_success").
+        let trigger_str = match raw_trigger {
+            s if s.contains(crate::triggers::DEBUT) || s.contains(crate::triggers::DEBUT_EN) => {
+                "debut"
+            }
+            s if s.contains(crate::triggers::LIVE_START) => "live_start",
+            s if s.contains(crate::triggers::LIVE_SUCCESS)
+                || s.contains(crate::triggers::LIVE_SUCCESS_EN) =>
+            {
+                "live_success"
+            }
+            s if s.contains(crate::triggers::ACTIVATION) => "activation",
+            s if s.contains(crate::triggers::CONSTANT) => "constant",
+            s if s.contains(crate::triggers::AUTO) => "auto",
+            _ => raw_trigger,
+        };
         let ability_text = self
             .current_ability
             .as_ref()

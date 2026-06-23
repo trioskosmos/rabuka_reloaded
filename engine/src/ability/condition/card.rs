@@ -1679,19 +1679,50 @@ impl<'a> ConditionContext<'a> {
             // this turn. For the old format (preceding_moved), use the
             // enqueue-time snapshot or recently_moved_cards.
             let source_zone = condition.source.as_deref().unwrap_or("");
+            // Build moved_source: for new format (source=zone+dst), prefer
+            // turn_movements (has zone/player metadata for filtering).  When
+            // turn_movements has any data, trust its filtered result (empty
+            // means no matching events for this player/zone — still correct).
+            // Only fall back to the trigger-context card IDs when
+            // turn_movements is completely empty (e.g. manual test setup).
             let moved_source: Vec<i16> = if is_new_movement {
                 let dest_zone = condition.destination.as_deref().unwrap_or("");
-                self.game_state
+                let target = condition.target.as_deref().unwrap_or("self");
+                let self_pl = self.resolve_condition_player(target);
+                let target_id = self_pl.id.as_str();
+                let from_tm: Vec<i16> = self
+                    .game_state
                     .turn_movements
                     .iter()
                     .filter(|m| {
-                        m.source_zone == source_zone
+                        m.cause_player_id == target_id
+                            && m.source_zone == source_zone
                             && (m.dest_zone == dest_zone
                                 || (dest_zone == "discard" && m.dest_zone == "waitroom")
                                 || (dest_zone == "waitroom" && m.dest_zone == "discard"))
                     })
                     .map(|m| m.moved_card_id)
-                    .collect()
+                    .collect();
+                if !self.game_state.turn_movements.is_empty() {
+                    // Trust turn_movements (filtered or empty — both are correct)
+                    from_tm
+                } else if !self.moved_cards.is_empty() {
+                    self.moved_cards.to_vec()
+                } else if let Some(enq) = self.game_state.entry_trigger_moved_cards() {
+                    if !enq.is_empty() {
+                        enq
+                    } else {
+                        Vec::new()
+                    }
+                } else if let Some(global) = self.game_state.recently_moved_cards.clone() {
+                    if !global.is_empty() {
+                        global
+                    } else {
+                        Vec::new()
+                    }
+                } else {
+                    Vec::new()
+                }
             } else if self.moved_cards.is_empty() {
                 let enqueued = self.game_state.entry_trigger_moved_cards();
                 let global = self.game_state.recently_moved_cards.clone();

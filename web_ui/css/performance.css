@@ -437,6 +437,11 @@
     color: var(--text-dim);
 }
 
+.perf-panel-subtitle.cannot-live-subtitle {
+    color: var(--accent-pink);
+    font-weight: 600;
+}
+
 .perf-status-pill {
     padding: 4px 12px;
     border-radius: var(--radius-full);
@@ -447,6 +452,7 @@
 
 .perf-status-pill.success { background: var(--accent-green); color: #fff; }
 .perf-status-pill.failure { background: var(--accent-pink); color: #fff; }
+.perf-status-pill.blocked { background: #444; color: #ff6b6b; border: 1px solid #ff6b6b; }
 
 .perf-outcome-pill {
     margin-top: 4px;

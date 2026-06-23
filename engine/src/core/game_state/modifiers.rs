@@ -224,7 +224,15 @@ impl GameState {
                             }
                             Some(crate::ability::enums::ActionType::Restriction) => {
                                 if let Some(ref rt) = effect.restriction_type {
-                                    exp_prohibition.push(format!("const_restriction:{}:", rt));
+                                    let card_name = self
+                                        .card_database
+                                        .get_card(*card_id)
+                                        .map(|c| c.name.clone())
+                                        .unwrap_or_default();
+                                    exp_prohibition.push(format!(
+                                        "const_restriction:{},card={},cardname={}:",
+                                        rt, card_id, card_name
+                                    ));
                                     let tgt = effect.target.as_deref().unwrap_or("self");
                                     if rt == "cannot_activate" || rt == "cannot_activate_by_effect"
                                     {
