@@ -147,6 +147,7 @@ pub mod rina_bp3_debut_test;
 pub mod rina_bp3_test;
 pub mod rina_test;
 pub mod rurino_test;
+pub mod sayaka_bp6_test;
 pub mod sayaka_test;
 pub mod score_condition_integration_test;
 pub mod setsuna_bp5_test;
