@@ -1162,7 +1162,6 @@ impl super::TurnEngine {
         let mut cheer_icon_count = 0u32;
         let mut heart_sources: Vec<HeartSource> = Vec::new();
         let mut blade_sources: Vec<BladeSource> = Vec::new();
-        let mut allocations: Vec<Allocation> = Vec::new();
         let mut total_hearts_arr = EMPTY_H8;
 
         // Stage hearts source
@@ -1299,14 +1298,43 @@ impl super::TurnEngine {
             }
         }
 
-        // Build heart allocations (direct fill per live card, using adjusted need_heart).
-        // IMPORTANT: `remaining` is shared across all live cards so that hearts allocated
-        // to earlier cards are not double-allocated to later cards.
         let live_card_ids: Vec<i16> = player.live_card_zone.cards.iter().copied().collect();
+        let allocations =
+            Self::compute_allocations(&owned_hearts, &live_card_ids, card_db, need_heart_modifiers);
+
+        // Return yell-phase data WITHOUT draining resolution_zone or checking hearts.
+        // execute_performance_phase will populate revealed_cards, trigger auto abilities
+        // (8.3.13 check timing), then call check_live_success (8.3.14-8.3.16).
+        let revealed_ids: Vec<i16> = resolution_zone.cards.iter().copied().collect();
+        let draw_effects_occurred = yell_cards.iter().any(|yc| yc.draw_icons > 0);
+        LivePerformanceData {
+            yell_count: total_blade,
+            note_icons: cheer_icon_count,
+            revealed_ids,
+            member_contributions,
+            yell_cards,
+            total_hearts: total_hearts_arr,
+            allocations,
+            heart_sources,
+            blade_sources,
+            draw_effects_occurred,
+            live_card_ids,
+        }
+    }
+
+    /// Build heart allocations for live cards from the available heart pool.
+    /// Shared between the yell phase and check_live_success (which recomputes
+    /// owned_hearts after ability-granted hearts are added at 8.3.13).
+    pub fn compute_allocations(
+        owned_hearts: &BaseHeart,
+        live_card_ids: &[i16],
+        card_db: &CardDatabase,
+        need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
+    ) -> Vec<Allocation> {
         let mut remaining = owned_hearts.clone();
+        let mut allocations = Vec::new();
         for live_idx in 0..live_card_ids.len() {
             if let Some(card) = card_db.get_card(live_card_ids[live_idx]) {
-                // Apply need_heart modifiers (set→absolute, additive→delta)
                 let effective_need = card.need_heart.as_ref().map(|nh| {
                     let has_set = need_heart_modifiers
                         .get(&live_card_ids[live_idx])
@@ -1333,10 +1361,9 @@ impl super::TurnEngine {
                 });
                 let use_need = effective_need.clone().or_else(|| card.need_heart.clone());
                 if let Some(ref nh) = use_need {
-                    // Phase 1: fill specific-color requirements (Heart01-Heart06)
                     for (color, needed) in &nh.hearts {
                         if *color == HeartColor::Heart00 {
-                            continue; // handled in Phase 3
+                            continue;
                         }
                         let c_idx = color.index();
                         let avail = *remaining.hearts.get(color).unwrap_or(&0);
@@ -1356,13 +1383,12 @@ impl super::TurnEngine {
                             *remaining.hearts.entry(*color).or_insert(0) -= used;
                         }
                     }
-                    // Phase 2: fill specific-color deficits with wildcard Heart00
                     let wildcard_avail = *remaining.hearts.get(&HeartColor::Heart00).unwrap_or(&0);
                     if wildcard_avail > 0 {
                         let mut wildcard_used = 0u32;
                         for (color, needed) in &nh.hearts {
                             if *color == HeartColor::Heart00 {
-                                continue; // handled in Phase 3
+                                continue;
                             }
                             let c_idx = color.index();
                             let already_filled = allocations
@@ -1394,12 +1420,9 @@ impl super::TurnEngine {
                                 wildcard_used;
                         }
                     }
-                    // Phase 3: fill Heart00 (Any) requirements from any available hearts
-                    // Heart00 can be satisfied by any colored heart or by Heart00 itself
                     let any_needed = *nh.hearts.get(&HeartColor::Heart00).unwrap_or(&0);
                     if any_needed > 0 {
                         let mut any_filled = 0u32;
-                        // First try colored hearts (1-6)
                         for color_idx in 1..7usize {
                             let hc = HeartColor::from_index(color_idx);
                             let avail = *remaining.hearts.get(&hc).unwrap_or(&0);
@@ -1420,7 +1443,6 @@ impl super::TurnEngine {
                                 any_filled += fill;
                             }
                         }
-                        // Then try remaining Heart00 wildcards
                         if any_filled < any_needed {
                             let avail = *remaining.hearts.get(&HeartColor::Heart00).unwrap_or(&0);
                             let fill = avail.min(any_needed - any_filled);
@@ -1443,37 +1465,24 @@ impl super::TurnEngine {
                 }
             }
         }
-
-        // Return yell-phase data WITHOUT draining resolution_zone or checking hearts.
-        // execute_performance_phase will populate revealed_cards, trigger auto abilities
-        // (8.3.13 check timing), then call check_live_success (8.3.14-8.3.16).
-        let revealed_ids: Vec<i16> = resolution_zone.cards.iter().copied().collect();
-        let draw_effects_occurred = yell_cards.iter().any(|yc| yc.draw_icons > 0);
-        LivePerformanceData {
-            yell_count: total_blade,
-            note_icons: cheer_icon_count,
-            revealed_ids,
-            member_contributions,
-            yell_cards,
-            total_hearts: total_hearts_arr,
-            allocations,
-            heart_sources,
-            blade_sources,
-            draw_effects_occurred,
-            live_card_ids,
-        }
+        allocations
     }
 
     /// Rule 8.3.14-8.3.16: Check heart requirements, determine live success/failure,
     /// drain resolution zone. Called AFTER the 8.3.13 check timing so hearts granted
     /// by "when you yell" abilities are included in the live success check.
+    /// `heart_override`/`heart_modifiers`/`heart_color_multiplier` must come from the
+    /// current game state (post-ability-trigger) so ability-granted hearts are counted.
     pub fn check_live_success(
         player: &mut crate::player::Player,
         resolution_zone: &mut crate::zones::ResolutionZone,
         card_db: &CardDatabase,
         need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
+        heart_override: &HashMap<i16, (HeartColor, u32)>,
+        heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
+        heart_color_multiplier: &HashMap<i16, HeartColor>,
         live_card_ids: &[i16],
-        allocations: &[Allocation],
+        _allocations: &[Allocation],
         yell_cards: &[YellCardResult],
         total_blade: u32,
         cheer_icon_count: u32,
@@ -1482,8 +1491,30 @@ impl super::TurnEngine {
         heart_sources: &[HeartSource],
         blade_sources: &[BladeSource],
     ) -> LivePerformanceData {
+        // Recompute hearts from current state (includes ability-granted hearts
+        // from the 8.3.13 check timing) + yell blade heart hearts.
+        let mut owned_hearts = player.stage.get_available_hearts(
+            card_db,
+            heart_override,
+            heart_modifiers,
+            heart_color_multiplier,
+        );
+        for yc in yell_cards {
+            for i in 0..7 {
+                if yc.blade_hearts[i] > 0 {
+                    *owned_hearts
+                        .hearts
+                        .entry(HeartColor::from_index(i))
+                        .or_insert(0) += yc.blade_hearts[i];
+                }
+            }
+        }
+        // Recompute allocations from the updated pool.
+        let allocations =
+            Self::compute_allocations(&owned_hearts, live_card_ids, card_db, need_heart_modifiers);
+
         let mut per_card_filled: Vec<[u32; 8]> = vec![EMPTY_H8; live_card_ids.len()];
-        for alloc in allocations {
+        for alloc in &allocations {
             if alloc.target_idx < per_card_filled.len() {
                 per_card_filled[alloc.target_idx][alloc.color] += alloc.amount;
             }

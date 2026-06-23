@@ -246,6 +246,20 @@ impl super::TurnEngine {
         game_state.trigger_auto_abilities_for_player(&performer_id);
         game_state.process_pending_auto_abilities(&performer_id);
 
+        // Capture current heart modifiers (includes ability-granted hearts from
+        // the 8.3.13 check timing) before re-borrowing player.
+        let current_ho = game_state.mods.heart_override.clone();
+        let current_hm: std::collections::HashMap<
+            i16,
+            std::collections::HashMap<crate::card::HeartColor, i32>,
+        > = game_state
+            .mods
+            .heart_modifiers
+            .iter()
+            .map(|(&k, colors)| (k, colors.iter().map(|(&c, e)| (c, e.total())).collect()))
+            .collect();
+        let current_hcm = game_state.mods.heart_color_multiplier.clone();
+
         // Rule 8.3.14-8.3.16: Heart calculation + live success check.
         let player = if is_first {
             game_state.first_attacker_mut()
@@ -257,6 +271,9 @@ impl super::TurnEngine {
             &mut resolution_zone,
             &card_db,
             &nhm,
+            &current_ho,
+            &current_hm,
+            &current_hcm,
             &yell_data.live_card_ids,
             &yell_data.allocations,
             &yell_data.yell_cards,

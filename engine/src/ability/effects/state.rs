@@ -888,12 +888,13 @@ impl AbilityResolver {
     pub(crate) fn execute_modify_cost(
         &mut self,
         gs: &mut GameState,
-        operation: &str,
+        effect: &AbilityEffect,
         value: u32,
-        target: &str,
-        card_type: Option<&str>,
-        duration: Option<&str>,
     ) {
+        let operation = effect.operation.as_deref().unwrap_or("add");
+        let target = effect.target_name();
+        let card_type = effect.card_type.as_deref();
+        let duration = effect.duration.as_deref();
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -904,7 +905,7 @@ impl AbilityResolver {
             pp, act_name, operation, value
         ));
         let player = gs.resolve_target_player_mut(target);
-        let card_ids: Vec<i16> = if let Some("live_card") = card_type {
+        let mut card_ids: Vec<i16> = if let Some("live_card") = card_type {
             player.live_card_zone.cards.iter().copied().collect()
         } else if let Some("member_card") = card_type {
             player
@@ -919,6 +920,23 @@ impl AbilityResolver {
         } else {
             player.hand.cards.iter().copied().collect()
         };
+        // Filter by group_names etc. using the effect's CardFilter
+        if effect.group_names.is_some()
+            || effect.exclude_group_names.is_some()
+            || effect.characters.is_some()
+            || effect.exclude_characters.is_some()
+        {
+            let filter = effect.filter_subset();
+            card_ids = util::matching_ids_filtered(
+                &card_ids,
+                &gs.card_database,
+                &filter,
+                true,
+                None,
+                None,
+                None,
+            );
+        }
         let delta = match operation {
             "add" => value as i32,
             "subtract" => -(value as i32),

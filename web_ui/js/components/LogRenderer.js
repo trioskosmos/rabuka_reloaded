@@ -408,9 +408,34 @@ export const LogRenderer = {
         const detailsContainer = document.createElement('div');
         detailsContainer.className = 'log-group-details';
         detailsContainer.style.display = 'block';
-        detailsContainer.innerHTML = `<div class="log-entry effect detail">
-            <span class="ability-cond-text">結果: ${meta.result === 'pending' ? '条件評価待ち' : meta.result}</span>
-        </div>`;
+
+        if (meta.resolved && meta.items && meta.items.length > 0) {
+            // Show ability text if available
+            if (meta.ability_text) {
+                const abilityTextDiv = document.createElement('div');
+                abilityTextDiv.className = 'log-entry effect detail ability-full-text';
+                abilityTextDiv.innerHTML = Tooltips.enrichAbilityText(meta.ability_text);
+                detailsContainer.appendChild(abilityTextDiv);
+            }
+            // Render condition/cost/effect items
+            meta.items.forEach(item => {
+                LogRenderer._renderAbilityLogItem(item, detailsContainer);
+            });
+            // Show final result
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'log-entry effect detail';
+            const resultClass = meta.result === 'success' ? 'ability-pass' : 'ability-fail';
+            const resultIcon = meta.result === 'success' ? '✓' : '✗';
+            resultDiv.innerHTML = `<div class="ability-cond-row">
+                <span class="ability-cond-icon ${resultClass}">${resultIcon}</span>
+                <span class="ability-cond-text"><strong>結果: ${meta.result}</strong></span>
+            </div>`;
+            detailsContainer.appendChild(resultDiv);
+        } else {
+            detailsContainer.innerHTML = `<div class="log-entry effect detail">
+                <span class="ability-cond-text">結果: ${meta.result === 'pending' ? '条件評価待ち' : meta.result}</span>
+            </div>`;
+        }
         blockDiv.appendChild(detailsContainer);
 
         headerDiv.style.cursor = 'pointer';
@@ -1072,15 +1097,6 @@ export const LogRenderer = {
         const content = document.getElementById(DOM_IDS.REVEALED_CONTENT);
         if (!title || !content) return;
 
-        const allRevealed = s.revealed_cards || [];
-        const p1Cheer = s.player1_cheer_revealed_cards || [];
-        const p2Cheer = s.player2_cheer_revealed_cards || [];
-        const costRevealed = s.revealed_cost_cards || [];
-
-        // Live zone cards (公開領域)
-        const p1Live = s.player1?.live_zone?.cards || [];
-        const p2Live = s.player2?.live_zone?.cards || [];
-
         const cardToHtml = (idOrCard) => {
             const card = typeof idOrCard === 'number' ? State.resolveCardData(idOrCard) : idOrCard;
             if (!card) return `<div class="revealed-card chip">ID:${typeof idOrCard === 'number' ? idOrCard : '?'}</div>`;
@@ -1089,25 +1105,114 @@ export const LogRenderer = {
             return `<div class="revealed-card">${img}<span class="revealed-card-name">${card.name}</span></div>`;
         };
 
-        const section = (label, ids) => ids.length > 0
-            ? `<div class="revealed-section"><h4>${label} (${ids.length})</h4><div class="revealed-grid">${ids.map(cardToHtml).join('')}</div></div>`
-            : '';
+        const cardsGrid = (label, items, count) => {
+            if (!items || items.length === 0) return '';
+            return `<div class="revealed-section"><h4>${label} (${count || items.length})</h4><div class="revealed-grid">${items.map(cardToHtml).join('')}</div></div>`;
+        };
 
-        const p1Label = State.perspectivePlayer === 0 ? i18n.t('you') : i18n.t('opponent');
-        const p2Label = State.perspectivePlayer === 1 ? i18n.t('you') : i18n.t('opponent');
+        // Determine card ownership
+        const ownerOf = (cid) => {
+            const p = (pl) => {
+                const cards = [];
+                if (pl.stage) {
+                    (pl.stage.stage || []).forEach(c => { if (c !== -1) cards.push(c); });
+                    Object.values(pl.stage).filter(v => Array.isArray(v)).forEach(arr => arr.forEach(c => { if (typeof c === 'number' && c !== -1) cards.push(c); }));
+                }
+                if (pl.hand?.cards) cards.push(...pl.hand.cards);
+                if (pl.live_zone?.cards) cards.push(...pl.live_zone.cards);
+                if (pl.success_live_card_zone?.cards) cards.push(...pl.success_live_card_zone.cards);
+                if (pl.waitroom?.cards) cards.push(...pl.waitroom.cards);
+                if (pl.energy_zone?.cards) cards.push(...pl.energy_zone.cards);
+                if (pl.energy_deck?.cards) cards.push(...pl.energy_deck.cards);
+                if (pl.main_deck?.cards) cards.push(...pl.main_deck.cards);
+                if (pl.exclusion_zone?.cards) cards.push(...pl.exclusion_zone.cards);
+                return cards;
+            };
+            const p1cards = new Set(p(s.player1));
+            const p2cards = new Set(p(s.player2));
+            if (p1cards.has(cid)) return 0;
+            if (p2cards.has(cid)) return 1;
+            return -1;
+        };
 
-        title.textContent = 'Revealed Cards';
-        content.innerHTML =
-            section('All Revealed Cards', allRevealed) +
-            section(p1Label + ' (yell)', p1Cheer) +
-            section(p2Label + ' (yell)', p2Cheer) +
-            section('Cost Revealed', costRevealed) +
-            section(p1Label + ' (live set)', p1Live) +
-            section(p2Label + ' (live set)', p2Live);
+        const allRevealed = s.revealed_cards || [];
+        const p1Revealed = [];
+        const p2Revealed = [];
+        const sharedRevealed = [];
+        allRevealed.forEach(cid => {
+            const owner = ownerOf(cid);
+            if (owner === 0) p1Revealed.push(cid);
+            else if (owner === 1) p2Revealed.push(cid);
+            else sharedRevealed.push(cid);
+        });
 
-        if (!allRevealed.length && !p1Cheer.length && !p2Cheer.length && !costRevealed.length && !p1Live.length && !p2Live.length) {
+        const p1Stage = s.player1?.stage?.stage?.filter(c => c !== -1) || [];
+        const p2Stage = s.player2?.stage?.stage?.filter(c => c !== -1) || [];
+        const p1Live = s.player1?.live_zone?.cards || [];
+        const p2Live = s.player2?.live_zone?.cards || [];
+        const p1Success = s.player1?.success_live_card_zone?.cards || [];
+        const p2Success = s.player2?.success_live_card_zone?.cards || [];
+        const p1Cheer = s.player1_cheer_revealed_cards || [];
+        const p2Cheer = s.player2_cheer_revealed_cards || [];
+        const costRevealed = s.revealed_cost_cards || [];
+        const lookedCards = s.looked_cards?.cards || [];
+        const p1Looked = [];
+        const p2Looked = [];
+        const sharedLooked = [];
+        lookedCards.forEach(c => {
+            const cid = typeof c === 'number' ? c : (c.id || c.card_id);
+            if (cid === undefined) { sharedLooked.push(c); return; }
+            const owner = ownerOf(cid);
+            if (owner === 0) p1Looked.push(c);
+            else if (owner === 1) p2Looked.push(c);
+            else sharedLooked.push(c);
+        });
+
+        const p1Label = State.perspectivePlayer === 0 ? 'You' : 'Opponent';
+        const p2Label = State.perspectivePlayer === 1 ? 'You' : 'Opponent';
+
+        title.textContent = 'Revealed / Looked Cards';
+
+        const hasP1 = p1Stage.length || p1Live.length || p1Success.length || p1Cheer.length || p1Revealed.length || p1Looked.length;
+        const hasP2 = p2Stage.length || p2Live.length || p2Success.length || p2Cheer.length || p2Revealed.length || p2Looked.length;
+        const hasShared = sharedRevealed.length || sharedLooked.length || costRevealed.length;
+
+        if (!hasP1 && !hasP2 && !hasShared) {
             content.innerHTML = '<div style="opacity:0.5;padding:40px;text-align:center;">No cards have been revealed this game.</div>';
+            ModalManager.show(DOM_IDS.MODAL_REVEALED);
+            return;
         }
+
+        content.innerHTML = `
+        <div class="revealed-two-column">
+            <div class="revealed-column">
+                <h3 class="revealed-player-header">${p1Label}</h3>
+                ${cardsGrid('Stage', p1Stage)}
+                ${cardsGrid('Live Zone', p1Live)}
+                ${cardsGrid('Success Live Zone', p1Success)}
+                ${cardsGrid('Yell', p1Cheer)}
+                ${cardsGrid('Revealed', p1Revealed)}
+                ${cardsGrid('Looked', p1Looked)}
+                ${!hasP1 ? '<div class="revealed-section" style="opacity:0.4">No public cards</div>' : ''}
+            </div>
+            <div class="revealed-column">
+                <h3 class="revealed-player-header">${p2Label}</h3>
+                ${cardsGrid('Stage', p2Stage)}
+                ${cardsGrid('Live Zone', p2Live)}
+                ${cardsGrid('Success Live Zone', p2Success)}
+                ${cardsGrid('Yell', p2Cheer)}
+                ${cardsGrid('Revealed', p2Revealed)}
+                ${cardsGrid('Looked', p2Looked)}
+                ${!hasP2 ? '<div class="revealed-section" style="opacity:0.4">No public cards</div>' : ''}
+            </div>
+        </div>
+        ${sharedRevealed.length || costRevealed.length || sharedLooked.length ? `
+        <div class="revealed-shared">
+            <h3 class="revealed-player-header">Shared</h3>
+            ${cardsGrid('Revealed', sharedRevealed)}
+            ${cardsGrid('Cost Revealed', costRevealed)}
+            ${cardsGrid('Looked', sharedLooked)}
+        </div>` : ''}`;
 
         ModalManager.show(DOM_IDS.MODAL_REVEALED);
     },

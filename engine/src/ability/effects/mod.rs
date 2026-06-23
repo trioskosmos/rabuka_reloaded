@@ -742,14 +742,7 @@ impl AbilityResolver {
                     }
                     value *= units;
                 }
-                self.execute_modify_cost(
-                    gs,
-                    effect.operation.as_deref().unwrap_or("add"),
-                    value,
-                    effect.target_name(),
-                    effect.card_type.as_deref(),
-                    effect.duration.as_deref(),
-                );
+                self.execute_modify_cost(gs, effect, value);
                 Ok(())
             }
             ActionType::RevealUntilLiveCard => {

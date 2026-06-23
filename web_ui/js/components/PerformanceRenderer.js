@@ -237,13 +237,6 @@ function renderAggregateHeartSummary(result) {
         </div>`;
 
     // Reconstruct remaining pool at each step using allocations
-    const totalFilled = [0,0,0,0,0,0,0,0];
-    for (const live of lives) {
-        const fill = live.filled || [0,0,0,0,0,0,0,0];
-        for (let i = 0; i < 7; i++) totalFilled[i] += fill[i];
-    }
-    const surplus = totalAvailable - sumHearts(totalFilled);
-
     let html = `
         <div class="perf-agg-summary ${allPassed ? 'success' : 'failure'}">
             <div class="perf-agg-header">

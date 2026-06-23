@@ -585,6 +585,40 @@ impl AbilityResolver {
             category: "ability_resolution".to_string(),
             metadata: Some(meta),
         });
+
+        // Update the matching trigger_evaluation entry with the resolution result
+        if let Some(cid) = card_id {
+            for entry in gs.structured_log.iter_mut().rev() {
+                if entry.category != "trigger_evaluation" {
+                    continue;
+                }
+                if entry.source_card_id != Some(cid) {
+                    continue;
+                }
+                if entry.turn != gs.turn_number {
+                    continue;
+                }
+                let trigger_match = entry
+                    .metadata
+                    .as_ref()
+                    .and_then(|m| m.get("trigger"))
+                    .and_then(|v| v.as_str())
+                    == Some(trigger_str);
+                if !trigger_match {
+                    continue;
+                }
+                // Found the matching entry — update its metadata
+                if let Some(ref mut meta) = entry.metadata {
+                    if let Some(obj) = meta.as_object_mut() {
+                        obj.insert("result".to_string(), serde_json::json!(result));
+                        obj.insert("items".to_string(), serde_json::json!(items));
+                        obj.insert("ability_text".to_string(), serde_json::json!(ability_text));
+                        obj.insert("resolved".to_string(), serde_json::json!(true));
+                    }
+                }
+                break;
+            }
+        }
     }
 
     pub fn resolve_ability(

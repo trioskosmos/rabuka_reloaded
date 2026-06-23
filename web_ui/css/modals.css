@@ -539,3 +539,25 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/* Two-column revealed modal layout */
+.revealed-two-column {
+    display: flex;
+    gap: 16px;
+}
+.revealed-column {
+    flex: 1;
+    min-width: 0;
+}
+.revealed-player-header {
+    font-size: 1rem;
+    color: var(--accent-gold);
+    margin-bottom: 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+}
+.revealed-shared {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
