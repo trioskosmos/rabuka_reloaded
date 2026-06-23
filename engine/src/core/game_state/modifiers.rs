@@ -799,6 +799,43 @@ impl GameState {
         self.cards_moved_this_turn.insert(card_id);
     }
 
+    /// Push a MovementEvent recording the movement of a card, tracking what caused it.
+    /// Also syncs `recently_moved_cards`/`recently_moved_from_zone` for backward compat.
+    pub fn push_movement_event(
+        &mut self,
+        moved_card_id: i16,
+        source_zone: &str,
+        dest_zone: &str,
+        cause_card_id: Option<i16>,
+        cause_player_id: &str,
+        effect_only: bool,
+    ) {
+        self.movement_event_counter += 1;
+        let event = crate::types::MovementEvent {
+            moved_card_id,
+            source_zone: source_zone.to_string(),
+            dest_zone: dest_zone.to_string(),
+            cause_card_id,
+            cause_player_id: cause_player_id.to_string(),
+            effect_only,
+            timestamp: self.movement_event_counter,
+        };
+        // Track in the current batch + sync old fields (append, don't rebuild
+        // from batch_movements — it accumulates across ability batches).
+        self.batch_movements.push(event.clone());
+        let cards = self.recently_moved_cards.get_or_insert_with(Vec::new);
+        cards.push(moved_card_id);
+        self.recently_moved_from_zone = Some(source_zone.to_string());
+        // Track turn-level area movement (stage-area-to-stage-area)
+        let is_area_move = source_zone == "stage" && dest_zone == "stage";
+        if is_area_move {
+            self.turn_area_movements.push(event);
+            self.position_change_occurred_this_turn = true;
+        }
+        // Track in cards_moved_this_turn for fast O(1) lookups
+        self.cards_moved_this_turn.insert(moved_card_id);
+    }
+
     pub fn has_card_moved_this_turn(&self, card_id: i16) -> bool {
         self.cards_moved_this_turn.contains(&card_id)
     }

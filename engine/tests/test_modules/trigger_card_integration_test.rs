@@ -159,8 +159,8 @@ fn opponent_energy_effect_triggers_hazuki_but_not_sumire() {
     game.state.player1.stage.stage = [sumire, hazuki_watcher, -1];
 
     let hand_before = game.state.player1.hand.cards.len();
-    game.state.last_energy_placed_by_effect = true;
-    game.state.last_energy_placed_by_player = Some(game.state.player2.id.clone());
+    game.state
+        .push_movement_event(-1, "energy_deck", "energy", None, "player2", true);
 
     trigger_p1_auto_abilities(&mut game);
 

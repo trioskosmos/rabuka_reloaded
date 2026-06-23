@@ -10,8 +10,8 @@ use std::sync::Arc;
 pub use crate::types::{
     AbilityApplication, AbilityBonus, AbilityTrigger, Adjustment, Allocation, BladeSource,
     Breakdown, Duration, EffectEntry, GameResult, HeartSource, LiveCardResult, LivePerformanceData,
-    LogEntry, MemberContribution, PerformanceSnapshot, Phase, ReplacementEffect, ScoreLine,
-    TemporaryEffect, TriggeredAbility, TurnPhase, YellCardResult,
+    LogEntry, MemberContribution, MovementEvent, PerformanceSnapshot, Phase, ReplacementEffect,
+    ScoreLine, TemporaryEffect, TriggeredAbility, TurnPhase, YellCardResult,
 };
 
 #[derive(Debug, Clone)]
@@ -61,10 +61,18 @@ pub struct GameState {
     pub player2_cheer_revealed_cards: Vec<i16>,
     pub looked_at_cards: Vec<i16>,
     pub ability_applications: Vec<crate::types::AbilityApplication>,
+    /// Synced from batch_movements by push_movement_event().
     pub recently_moved_cards: Option<Vec<i16>>,
-    /// The zone the cards in `recently_moved_cards` were moved FROM.
-    /// Used to distinguish e.g. hand-to-waitroom from stage-to-waitroom (baton touch).
     pub recently_moved_from_zone: Option<String>,
+    /// Detailed event log for per-batch tracking: cards moved in the current
+    /// cost/effect batch, what caused the move (cause_card_id), etc.
+    /// recently_moved_cards/from_zone are synced from this vec.
+    pub batch_movements: Vec<MovementEvent>,
+    /// Turn-level record of stage-area-to-stage-area movements.
+    /// Used by conditions checking "this member has moved areas this turn".
+    pub turn_area_movements: Vec<MovementEvent>,
+    /// Counter for assigning unique timestamps to MovementEvents within a turn.
+    pub movement_event_counter: u32,
     pub debut_ability_triggers: Vec<(String, i16)>,
     pub last_vacated_stage_area: Option<usize>,
     // --- 4-byte aligned (u32, Option<i32>) ---
@@ -83,14 +91,7 @@ pub struct GameState {
     pub baton_touch_replaced_member_cost: Option<u32>,
     pub baton_touch_replaced_member_id: Option<i16>,
     pub baton_touch_arriving_card_id: Option<i16>,
-    /// Tracking for movement_condition "moves": the card that last moved areas.
-    pub last_area_move_card_id: Option<i16>,
-    /// Which player's effect caused the last area move (player_id string).
-    pub last_area_move_by_player: Option<String>,
-    /// Whether energy was placed by a card effect (vs energy phase draw).
-    pub last_energy_placed_by_effect: bool,
-    /// Which player's effect caused the last energy placement.
-    pub last_energy_placed_by_player: Option<String>,
+
     // --- 2-byte aligned (i16, Option<i16>) ---
     pub activating_card: Option<i16>,
     pub activating_ability_index: Option<usize>,
@@ -217,6 +218,9 @@ impl GameState {
             ability_applications: Vec::new(),
             recently_moved_cards: None,
             recently_moved_from_zone: None,
+            batch_movements: Vec::new(),
+            turn_area_movements: Vec::new(),
+            movement_event_counter: 0,
             debut_ability_triggers: Vec::new(),
             last_vacated_stage_area: None,
             // 4-byte aligned
@@ -235,10 +239,6 @@ impl GameState {
             baton_touch_replaced_member_cost: None,
             baton_touch_replaced_member_id: None,
             baton_touch_arriving_card_id: None,
-            last_area_move_card_id: None,
-            last_area_move_by_player: None,
-            last_energy_placed_by_effect: false,
-            last_energy_placed_by_player: None,
             // 2-byte aligned
             activating_card: None,
             activating_ability_index: None,
@@ -426,14 +426,27 @@ impl GameState {
     }
 
     pub fn clear_effect_tracking(&mut self) {
-        self.last_area_move_card_id = None;
-        self.last_area_move_by_player = None;
-        self.last_energy_placed_by_effect = false;
-        self.last_energy_placed_by_player = None;
-        self.recently_moved_cards = None;
-        self.recently_moved_from_zone = None;
+        self.batch_movements.clear();
         self.mods.last_cost_discard_count = 0;
         self.mods.last_cost_energy_count = 0;
+    }
+
+    /// Backward-compat: the card that last moved areas (from turn_area_movements).
+    pub fn last_area_move_card_id(&self) -> Option<i16> {
+        self.turn_area_movements.last().map(|m| m.moved_card_id)
+    }
+    /// Backward-compat: which player's effect caused the last area move.
+    pub fn last_area_move_by_player(&self) -> Option<&str> {
+        self.turn_area_movements.last().map(|m| m.cause_player_id.as_str())
+    }
+    /// Backward-compat: whether energy was placed by a card effect this batch.
+    pub fn last_energy_placed_by_effect(&self) -> bool {
+        self.batch_movements.iter().any(|m| m.dest_zone == "energy" && m.effect_only)
+    }
+    /// Backward-compat: which player's effect caused the last energy placement.
+    pub fn last_energy_placed_by_player(&self) -> Option<&str> {
+        self.batch_movements.iter().find(|m| m.dest_zone == "energy")
+            .map(|m| m.cause_player_id.as_str())
     }
 
     /// Resolve which player's cheer_revealed_cards to use based on ability master.

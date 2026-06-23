@@ -718,22 +718,8 @@ impl super::TurnEngine {
                     optional_skipped,
                     pending_cleared
                 );
-                let moved_snapshot_opt = game_state.recently_moved_cards.clone();
-                let area_snapshot_opt = game_state.last_area_move_card_id;
-                let area_player_snapshot_opt = game_state.last_area_move_by_player.clone();
-                let energy_snapshot = game_state.last_energy_placed_by_effect;
-                let energy_player_snapshot_opt = game_state.last_energy_placed_by_player.clone();
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
-                if moved_snapshot_opt.is_some()
-                    && game_state.current_phase == crate::types::Phase::Main
-                {
-                    game_state.recently_moved_cards = moved_snapshot_opt;
-                    game_state.last_area_move_card_id = area_snapshot_opt;
-                    game_state.last_area_move_by_player = area_player_snapshot_opt;
-                    game_state.last_energy_placed_by_effect = energy_snapshot;
-                    game_state.last_energy_placed_by_player = energy_player_snapshot_opt;
-                }
                 let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
                 game_state.just_completed_ability_key = just_completed_key.clone();
                 game_state.process_pending_auto_abilities(&player_id);
@@ -813,43 +799,16 @@ impl super::TurnEngine {
                 // erases them (they were set by position_change,
                 // look_and_select discard_remaining, or similar
                 // during this ability's resolution).
-                let moved_snapshot = game_state.recently_moved_cards.clone();
-                let area_snapshot = game_state.last_area_move_card_id;
-                let area_player_snapshot = game_state.last_area_move_by_player.clone();
-                let energy_snapshot = game_state.last_energy_placed_by_effect;
-                let energy_player_snapshot = game_state.last_energy_placed_by_player.clone();
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
-                if moved_snapshot.is_some() && game_state.current_phase == crate::types::Phase::Main
-                {
-                    // Temporarily restore so the trigger scan can see them
-                    game_state.recently_moved_cards = moved_snapshot;
-                    game_state.last_area_move_card_id = area_snapshot;
-                    game_state.last_area_move_by_player = area_player_snapshot;
-                    game_state.last_energy_placed_by_effect = energy_snapshot;
-                    game_state.last_energy_placed_by_player = energy_player_snapshot;
-                }
                 let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
                 game_state.just_completed_ability_key = just_completed_key.clone();
                 game_state.process_pending_auto_abilities(&player_id);
                 game_state.just_completed_ability_key = None;
                 game_state.recently_moved_cards = None;
             } else {
-                let moved_snapshot = game_state.recently_moved_cards.clone();
-                let area_snapshot = game_state.last_area_move_card_id;
-                let area_player_snapshot = game_state.last_area_move_by_player.clone();
-                let energy_snapshot = game_state.last_energy_placed_by_effect;
-                let energy_player_snapshot = game_state.last_energy_placed_by_player.clone();
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
-                if moved_snapshot.is_some() && game_state.current_phase == crate::types::Phase::Main
-                {
-                    game_state.recently_moved_cards = moved_snapshot;
-                    game_state.last_area_move_card_id = area_snapshot;
-                    game_state.last_area_move_by_player = area_player_snapshot;
-                    game_state.last_energy_placed_by_effect = energy_snapshot;
-                    game_state.last_energy_placed_by_player = energy_player_snapshot;
-                }
                 let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
                 game_state.just_completed_ability_key = just_completed_key.clone();
                 game_state.process_pending_auto_abilities(&player_id);

@@ -89,10 +89,9 @@ impl GameState {
             resolver: None,
             trigger_moved_cards,
             triggering_member_id,
-            snapshot_last_energy_placed_by_effect: false,
-            snapshot_last_energy_placed_by_player: None,
-            snapshot_last_area_move_card_id: None,
-            snapshot_last_area_move_by_player: None,
+            snapshot_movements: Vec::new(),
+            snapshot_energy_placed_by_effect: false,
+            snapshot_energy_placed_by_player: None,
             choice_effect_text: None,
         }
     }
@@ -317,7 +316,7 @@ impl GameState {
                                         if condition.condition_type
                                             == Some(crate::ability::enums::ConditionType::ComparisonCondition)
                                             && condition.location.as_deref() == Some("energy_zone")
-                                            && !self.last_energy_placed_by_effect
+                                            && !self.last_energy_placed_by_effect()
                                         {
                                             continue;
                                         }
@@ -410,10 +409,6 @@ impl GameState {
         // trigger at most one batch of each_time abilities.  The snapshot
         // captured in trigger_auto_ability (above) preserves the flag value
         // for abilities that need it during execution (e.g. Sumire's "moves").
-        if !event.energy_placed_by_effect {
-            self.last_energy_placed_by_effect = false;
-            self.last_energy_placed_by_player = None;
-        }
     }
 
     pub fn trigger_auto_ability(
@@ -451,13 +446,11 @@ impl GameState {
                         // "moves" condition can check what triggered it even
                         // after clear_effect_tracking() clears the globals.
                         let mut entry = entry;
-                        entry.snapshot_last_energy_placed_by_effect =
-                            self.last_energy_placed_by_effect;
-                        entry.snapshot_last_energy_placed_by_player =
-                            self.last_energy_placed_by_player.clone();
-                        entry.snapshot_last_area_move_card_id = self.last_area_move_card_id;
-                        entry.snapshot_last_area_move_by_player =
-                            self.last_area_move_by_player.clone();
+                        entry.snapshot_movements = self.batch_movements.clone();
+                        entry.snapshot_energy_placed_by_effect =
+                            self.last_energy_placed_by_effect();
+                        entry.snapshot_energy_placed_by_player =
+                            self.last_energy_placed_by_player().map(|s| s.to_string());
                         if crate::ability::debug::ABILITY_DEBUG
                             .load(std::sync::atomic::Ordering::Relaxed)
                         {
@@ -770,17 +763,18 @@ impl GameState {
         // Trigger types: each_time:discard, each_time:hand_to_discard, each_time:any_to_discard,
         // each_time:energy_placed
         let moved_marker = self.recently_moved_cards.is_some();
-        if (moved_marker || self.last_energy_placed_by_effect)
+        if (moved_marker || self.last_energy_placed_by_effect())
             && self.current_phase == crate::types::Phase::Main
         {
             let event = crate::ability::types::TriggerEvent {
                 moved_cards: Vec::new(),
-                energy_placed_by_effect: self.last_energy_placed_by_effect,
+                energy_placed_by_effect: self.last_energy_placed_by_effect(),
                 ..Default::default()
             };
             self.trigger_auto_abilities_for_player_with_event(player_id, &event);
             self.recently_moved_cards = None;
             self.recently_moved_from_zone = None;
+            self.batch_movements.clear();
             // Re-enter the loop to process any abilities just enqueued
             // by the watcher scan (e.g. Hazuki Ren each_time after discard).
             if !self.has_pending_choice() {
@@ -1068,7 +1062,7 @@ impl GameState {
             // Scan stage watchers (e.g. each_time triggers) BEFORE clearing
             // recently_moved_cards so their preceding_moved conditions pass.
             // Trigger types: each_time:discard, each_time:area_move, each_time:energy_placed
-            if (self.recently_moved_cards.is_some() || self.last_energy_placed_by_effect)
+            if (self.recently_moved_cards.is_some() || self.last_energy_placed_by_effect())
                 && self.current_phase == crate::types::Phase::Main
             {
                 if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
@@ -1080,8 +1074,10 @@ impl GameState {
                 let event = crate::ability::types::TriggerEvent {
                     moved_cards: self.recently_moved_cards.clone().unwrap_or_default(),
                     moved_from_zone: self.recently_moved_from_zone.clone(),
-                    energy_placed_by_effect: self.last_energy_placed_by_effect,
-                    energy_placed_by_player: self.last_energy_placed_by_player.clone(),
+                    energy_placed_by_effect: self.last_energy_placed_by_effect(),
+                    energy_placed_by_player: self
+                        .last_energy_placed_by_player()
+                        .map(|s| s.to_string()),
                     ..Default::default()
                 };
                 self.just_completed_ability_key = just_completed_key;
@@ -1178,26 +1174,47 @@ impl GameState {
     pub fn entry_snapshot_last_energy_placed_by_effect(&self) -> bool {
         self.ability_queue
             .current_entry()
-            .map(|e| e.snapshot_last_energy_placed_by_effect)
+            .map(|e| {
+                e.snapshot_movements
+                    .iter()
+                    .any(|m| m.dest_zone == "energy" && m.effect_only)
+            })
             .unwrap_or(false)
     }
 
     pub fn entry_snapshot_last_energy_placed_by_player(&self) -> Option<String> {
         self.ability_queue
             .current_entry()
-            .and_then(|e| e.snapshot_last_energy_placed_by_player.clone())
+            .and_then(|e| {
+                e.snapshot_movements
+                    .iter()
+                    .find(|m| m.dest_zone == "energy")
+            })
+            .map(|m| m.cause_player_id.clone())
     }
 
     pub fn entry_snapshot_last_area_move_card_id(&self) -> Option<i16> {
         self.ability_queue
             .current_entry()
-            .and_then(|e| e.snapshot_last_area_move_card_id)
+            .and_then(|e| {
+                e.snapshot_movements
+                    .iter()
+                    .rev()
+                    .find(|m| m.source_zone == "stage" && m.dest_zone == "stage")
+            })
+            .map(|m| m.moved_card_id)
     }
 
     pub fn entry_snapshot_last_area_move_by_player(&self) -> Option<String> {
         self.ability_queue
             .current_entry()
-            .and_then(|e| e.snapshot_last_area_move_by_player.clone())
+            .and_then(|e| {
+                e.snapshot_movements
+                    .iter()
+                    .rev()
+                    .find(|m| m.source_zone == "stage" && m.dest_zone == "stage")
+            })
+            .map(|m| m.cause_player_id.clone())
     }
 
     /// Snapshot of recently_moved_cards captured at enqueue time (trigger_moved_cards).

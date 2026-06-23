@@ -414,20 +414,23 @@ impl AbilityResolver {
         target: &str,
         count: u32,
     ) {
-        let player = gs.resolve_target_player_mut(target);
-        for _ in 0..count {
-            if let Some(energy_id) = player.energy_deck.draw() {
-                player.energy_zone.cards.push(energy_id);
-                if state_change == "active" {
-                    player.energy_zone.active_energy_count += 1;
+        let cause_cid = gs.activating_card;
+        let mut placed_energy: Vec<i16> = Vec::new();
+        let player_id = {
+            let player = gs.resolve_target_player_mut(target);
+            for _ in 0..count {
+                if let Some(energy_id) = player.energy_deck.draw() {
+                    player.energy_zone.cards.push(energy_id);
+                    if state_change == "active" {
+                        player.energy_zone.active_energy_count += 1;
+                    }
+                    placed_energy.push(energy_id);
                 }
             }
-        }
-        // Track that energy was placed by a card effect (not energy phase draw)
-        if count > 0 {
-            let player_id = player.id.clone();
-            gs.last_energy_placed_by_effect = true;
-            gs.last_energy_placed_by_player = Some(player_id);
+            player.id.clone()
+        };
+        for &eid in &placed_energy {
+            gs.push_movement_event(eid, "energy_deck", "energy", cause_cid, &player_id, true);
         }
     }
 

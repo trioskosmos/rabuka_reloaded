@@ -635,25 +635,25 @@ impl<'a> ConditionContext<'a> {
                     false
                 } else {
                     condition.self_effect_only.is_none_or(|_| {
-                        let area_id = snapshot_area.or(self.game_state.last_area_move_card_id);
+                        let area_id = snapshot_area.or(self.game_state.last_area_move_card_id());
                         let area_by = snapshot_area_player
-                            .as_ref()
-                            .or_else(|| self.game_state.last_area_move_by_player.as_ref());
-                        area_id.is_some() && area_by == Some(&player.id)
+                            .as_deref()
+                            .or_else(|| self.game_state.last_area_move_by_player());
+                        area_id.is_some() && area_by == Some(player.id.as_str())
                     })
                 };
                 let energy_ok = condition.energy_placed.is_none_or(|_| {
                     let energy_val = if snapshot_energy {
                         true
-                    } else if !self.game_state.last_energy_placed_by_effect {
+                    } else if !self.game_state.last_energy_placed_by_effect() {
                         false
                     } else {
                         // snapshot is false but global is true — use global
                         true
                     };
                     let energy_player = snapshot_energy_player
-                        .as_ref()
-                        .or_else(|| self.game_state.last_energy_placed_by_player.as_ref());
+                        .as_deref()
+                        .or_else(|| self.game_state.last_energy_placed_by_player());
                     energy_val
                         && (!condition.self_effect_only.unwrap_or(false)
                             || energy_player == Some(&player.id))

@@ -62,13 +62,12 @@ pub struct AbilityQueueEntry {
     /// recently_moved_cards at enqueue time). Used by source:"those_cards"
     /// to resolve to only the trigger cards, not the full discard pile.
     pub trigger_moved_cards: Option<Vec<i16>>,
-    /// Snapshot of game-state tracking flags captured at enqueue time.
+    /// Snapshot of the full batch_movements vec captured at enqueue time.
     /// Used by the "moves" condition to check what triggered the ability,
     /// even after clear_effect_tracking() clears the global flags.
-    pub snapshot_last_energy_placed_by_effect: bool,
-    pub snapshot_last_energy_placed_by_player: Option<String>,
-    pub snapshot_last_area_move_card_id: Option<i16>,
-    pub snapshot_last_area_move_by_player: Option<String>,
+    pub snapshot_movements: Vec<crate::types::MovementEvent>,
+    pub snapshot_energy_placed_by_effect: bool,
+    pub snapshot_energy_placed_by_player: Option<String>,
     /// Deferred sequential sub-effects interrupted by a player choice.
     /// When a sequential ability is processing actions [A, B, C] and B pauses for a
     /// choice, the remaining actions [C, ...] are stored here and resumed in
@@ -277,10 +276,9 @@ impl AbilityQueue {
                     resolver: None,
                     trigger_moved_cards: None,
                     triggering_member_id: None,
-                    snapshot_last_energy_placed_by_effect: false,
-                    snapshot_last_energy_placed_by_player: None,
-                    snapshot_last_area_move_card_id: None,
-                    snapshot_last_area_move_by_player: None,
+                    snapshot_movements: Vec::new(),
+                    snapshot_energy_placed_by_effect: false,
+                    snapshot_energy_placed_by_player: None,
                     choice_effect_text: None,
                 };
                 self.entries.push(dummy_entry);

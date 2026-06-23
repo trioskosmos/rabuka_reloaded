@@ -1196,19 +1196,21 @@ impl<'a> ConditionContext<'a> {
                 })
                 .count() as u32
         } else {
-            util::count_matching_with_blade(
-                &cards,
-                card_db,
-                condition.card_type.as_deref(),
-                group,
-                condition.cost_limit,
-                cost_op,
-                |cid| {
-                    self.check_original_blade_filter(condition, cid)
-                        && self.check_original_heart_filter(condition, cid)
-                        && self.check_heart_type_all_per_card(condition, card_db, cid)
-                },
-            )
+            let mut filter = util::CardFilter::default();
+            filter.card_type = condition.card_type.as_deref();
+            filter.group = group;
+            filter.cost_limit = condition.cost_limit;
+            filter.cost_operator = cost_op;
+            cards
+                .iter()
+                .filter(|&&id| {
+                    id != -1
+                        && filter.matches(card_db, id, true)
+                        && self.check_original_blade_filter(condition, id)
+                        && self.check_original_heart_filter(condition, id)
+                        && self.check_heart_type_all_per_card(condition, card_db, id)
+                })
+                .count() as u32
         };
         if condition.all_areas.unwrap_or(false) {
             let areas_ok = if is_both {

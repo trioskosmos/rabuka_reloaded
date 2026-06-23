@@ -15,7 +15,7 @@ use rabuka_engine::card::HeartColor;
 // Condition: compares count of energy cards ≥ 0.
 // Effect: gain_resource(heart06, duration=live_end)
 //
-// The scan gate at abilities.rs checks last_energy_placed_by_effect,
+// The scan gate at abilities.rs checks for push_movement_event energy events,
 // but trigger_auto_abilities_for_player called directly in tests
 // bypasses that gate.  In real gameplay the gate prevents
 // re-enqueue between effects.  Tests must place an energy card
@@ -49,8 +49,8 @@ fn hazuki_energy_by_own_effect_triggers() {
     let db = load_real_database();
     let mut v = TestGame::new(db);
     let hazuki = setup_hazuki(&mut v);
-    v.state.last_energy_placed_by_effect = true;
-    v.state.last_energy_placed_by_player = Some(v.state.player1.id.clone());
+    v.state
+        .push_movement_event(-1, "energy_deck", "energy", None, "player1", true);
 
     trigger_auto(&mut v);
 
@@ -68,8 +68,8 @@ fn hazuki_energy_by_opponent_effect_triggers() {
     let db = load_real_database();
     let mut v = TestGame::new(db);
     let hazuki = setup_hazuki(&mut v);
-    v.state.last_energy_placed_by_effect = true;
-    v.state.last_energy_placed_by_player = Some(v.state.player2.id.clone());
+    v.state
+        .push_movement_event(-1, "energy_deck", "energy", None, "player2", true);
 
     trigger_auto(&mut v);
 
@@ -80,23 +80,22 @@ fn hazuki_energy_by_opponent_effect_triggers() {
     );
 }
 
-/// Energy phase draw — last_energy_placed_by_effect is false.
+/// Energy phase draw — no push_movement_event for energy.
 /// The each_time guard at abilities.rs blocks enqueue when
-/// last_energy_placed_by_effect is false, even though the
+/// batch_movements is clear, even though the
 /// comparison_condition would pass (energy card in zone).
 #[test]
 fn hazuki_energy_phase_no_effect_flag() {
     let db = load_real_database();
     let mut v = TestGame::new(db);
     let hazuki = setup_hazuki(&mut v);
-    v.state.last_energy_placed_by_effect = false;
-    v.state.last_energy_placed_by_player = None;
+    v.state.batch_movements.clear();
 
     trigger_auto(&mut v);
 
     // Energy placed by phase action (not a card effect) — Hazuki should NOT trigger
     // because her text says "カードの効果によって" (by a card effect).
-    // The each_time guard checks last_energy_placed_by_effect for comparison conditions
+    // The each_time guard checks for a push_movement_event energy for comparison conditions
     // on energy_zone.
     assert_eq!(
         heart06_mod(&v, hazuki),

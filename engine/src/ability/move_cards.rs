@@ -1576,21 +1576,22 @@ impl AbilityResolver {
 
         let is_energy = Zone::from_str(destination) == Some(Zone::Energy);
         self.moved_cards.extend(moved_cards);
-        if Zone::from_str(destination) == Some(Zone::Discard)
-            || Zone::from_str(destination) == Some(Zone::Waitroom)
-            || Zone::from_str(destination) == Some(Zone::Hand)
-            || Zone::from_str(destination) == Some(Zone::DeckBottom)
-            || is_energy
         {
-            let acc = gs.recently_moved_cards.get_or_insert_with(Vec::new);
-            acc.extend(moved_cards.iter().copied());
-            gs.recently_moved_from_zone = Some(source.to_string());
-            if is_energy && !moved_cards.is_empty() {
-                gs.last_energy_placed_by_effect = true;
-                gs.last_energy_placed_by_player = gs
-                    .ability_queue
-                    .current_entry()
-                    .map(|e| e.player_id.clone());
+            let cause_pid = gs
+                .ability_queue
+                .current_entry()
+                .map(|e| e.player_id.clone())
+                .unwrap_or_default();
+            let cause_cid = gs.activating_card;
+            for &cid in moved_cards {
+                gs.push_movement_event(
+                    cid,
+                    &source.to_string(),
+                    destination,
+                    cause_cid,
+                    &cause_pid,
+                    true,
+                );
             }
         }
         log::debug!(
@@ -1599,14 +1600,6 @@ impl AbilityResolver {
             moved_cards,
             self.moved_cards
         );
-
-        if !moved_cards.is_empty() {
-            gs.last_area_move_card_id = moved_cards.last().copied();
-            gs.last_area_move_by_player = gs
-                .ability_queue
-                .current_entry()
-                .map(|e| e.player_id.clone());
-        }
 
         // Debut side effects for cards placed directly on stage (single free slot,
         // no position-choice dialog). Each card goes through the unified
@@ -2148,9 +2141,17 @@ impl AbilityResolver {
         }
 
         if !moved.is_empty() {
-            let acc = gs.recently_moved_cards.get_or_insert_with(Vec::new);
-            acc.extend(moved.iter().copied());
-            gs.recently_moved_from_zone = Some(zone.to_string());
+            let cause_cid = gs.activating_card;
+            let cause_pid = gs
+                .ability_queue
+                .current_entry()
+                .map(|e| e.player_id.clone())
+                .unwrap_or_default();
+            for &cid in &moved {
+                if cid != -1 {
+                    gs.push_movement_event(cid, zone, dest, cause_cid, &cause_pid, true);
+                }
+            }
         }
         Ok(())
     }

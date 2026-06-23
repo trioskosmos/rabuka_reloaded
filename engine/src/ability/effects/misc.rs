@@ -1931,6 +1931,13 @@ impl AbilityResolver {
         }
 
         let card_db = self.card_db();
+        let (cause_cid, mover_pid) = (
+            gs.activating_card,
+            gs.ability_queue
+                .current_entry()
+                .map(|e| e.player_id.clone())
+                .unwrap_or_default(),
+        );
         let player = gs.resolve_target_player_mut(target);
         let target_index = util::stage_position_index(position_str)
             .ok_or_else(|| format!("Unknown position: {}", position_str))?;
@@ -1963,17 +1970,9 @@ impl AbilityResolver {
             );
             if player.stage.position_change(from_area, to_area).is_ok() {
                 let moved_ids = [target_id, source_id];
-                {
-                    let moved = gs.recently_moved_cards.get_or_insert_with(Vec::new);
-                    for &cid in &moved_ids {
-                        if cid != -1 {
-                            moved.push(cid);
-                        }
-                    }
-                }
                 for &cid in &moved_ids {
                     if cid != -1 {
-                        gs.record_card_movement(cid);
+                        gs.push_movement_event(cid, "stage", "stage", cause_cid, &mover_pid, true);
                     }
                 }
             } else {
@@ -2137,19 +2136,20 @@ impl AbilityResolver {
             if source_id2 != -1 {
                 gs.record_card_movement(source_id2);
             }
-            gs.position_change_occurred_this_turn = true;
             gs.recalculate_constants();
             let mover_pid = gs
                 .ability_queue
                 .current_entry()
-                .map(|e| e.player_id.clone());
-            gs.last_area_move_card_id = Some(source_id2);
-            gs.last_area_move_by_player = mover_pid;
-            let moved = gs.recently_moved_cards.get_or_insert_with(Vec::new);
-            moved.push(target_id2);
-            if source_id2 != -1 {
-                moved.push(source_id2);
-            }
+                .map(|e| e.player_id.clone())
+                .unwrap_or_default();
+            gs.push_movement_event(
+                source_id2,
+                "stage",
+                "stage",
+                gs.activating_card,
+                &mover_pid,
+                true,
+            );
             return Ok(());
         }
         // Handle specific card_no (for "multiple_targets" each-member pattern)
@@ -2191,19 +2191,20 @@ impl AbilityResolver {
                     if source_id != -1 {
                         gs.record_card_movement(source_id);
                     }
-                    gs.position_change_occurred_this_turn = true;
                     gs.recalculate_constants();
                     let mover_pid = gs
                         .ability_queue
                         .current_entry()
-                        .map(|e| e.player_id.clone());
-                    gs.last_area_move_card_id = Some(source_id);
-                    gs.last_area_move_by_player = mover_pid;
-                    let moved = gs.recently_moved_cards.get_or_insert_with(Vec::new);
-                    moved.push(target_id);
-                    if source_id != -1 {
-                        moved.push(source_id);
-                    }
+                        .map(|e| e.player_id.clone())
+                        .unwrap_or_default();
+                    gs.push_movement_event(
+                        source_id,
+                        "stage",
+                        "stage",
+                        gs.activating_card,
+                        &mover_pid,
+                        true,
+                    );
                     return Ok(());
                 }
             }
@@ -2243,20 +2244,19 @@ impl AbilityResolver {
                     if source_id3 != -1 {
                         gs.record_card_movement(source_id3);
                     }
-                    gs.position_change_occurred_this_turn = true;
                     let mover_pid = gs
                         .ability_queue
                         .current_entry()
-                        .map(|e| e.player_id.clone());
-                    gs.last_area_move_card_id = Some(activating_card_id);
-                    gs.last_area_move_by_player = mover_pid;
-                    // Update recently_moved_cards so the watcher scan fires
-                    // and each_time triggers see the movement event.
-                    let moved = gs.recently_moved_cards.get_or_insert_with(Vec::new);
-                    moved.push(target_id3);
-                    if source_id3 != -1 {
-                        moved.push(source_id3);
-                    }
+                        .map(|e| e.player_id.clone())
+                        .unwrap_or_default();
+                    gs.push_movement_event(
+                        activating_card_id,
+                        "stage",
+                        "stage",
+                        gs.activating_card,
+                        &mover_pid,
+                        true,
+                    );
                 } else {
                     return Err(format!(
                         "Activating card {} not found on stage",

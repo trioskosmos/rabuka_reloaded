@@ -46,8 +46,9 @@ fn test_sumire_energy_effect_triggers() {
     game.give_energy(15);
     game.state.player1.hand.cards.push(sumire);
     game.play_to_stage(sumire, MemberArea::Center);
-    game.state.last_energy_placed_by_effect = true;
-    game.state.last_area_move_card_id = None;
+    game.state
+        .push_movement_event(-1, "energy_deck", "energy", None, "player1", true);
+    game.state.batch_movements.clear();
     let before_hand = game.state.player1.hand.cards.len();
     let player_id = game.state.player1.id.clone();
     let _ = rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
@@ -74,8 +75,7 @@ fn test_sumire_energy_phase_no_trigger() {
     game.give_energy(15);
     game.state.player1.hand.cards.push(sumire);
     game.play_to_stage(sumire, MemberArea::Center);
-    game.state.last_energy_placed_by_effect = false;
-    game.state.last_area_move_card_id = None;
+    game.state.batch_movements.clear();
     game.state.player1.draw_energy();
     let before_hand = game.state.player1.hand.cards.len();
     let player_id = game.state.player1.id.clone();
@@ -103,9 +103,9 @@ fn test_sumire_opponent_no_trigger() {
     game.give_energy(15);
     game.state.player1.hand.cards.push(sumire);
     game.play_to_stage(sumire, MemberArea::Center);
-    game.state.last_area_move_card_id = Some(sumire);
-    game.state.last_area_move_by_player = Some(game.state.player2.id.clone());
-    game.state.last_energy_placed_by_effect = false;
+    game.state
+        .push_movement_event(sumire, "stage", "stage", Some(sumire), "player2", true);
+    game.state.batch_movements.clear();
     let before_hand = game.state.player1.hand.cards.len();
     let player_id = game.state.player1.id.clone();
     let _ = rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(

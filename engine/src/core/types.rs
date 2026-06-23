@@ -237,6 +237,28 @@ pub struct ScoreLine {
     pub value: u32,
 }
 
+/// A structured record of a card movement event, capturing not just what moved
+/// but WHAT CAUSED the move (which card's effect/ability). Replaces the old
+/// pattern of separate tracking fields (recently_moved_cards, last_area_move_card_id,
+/// last_area_move_by_player, etc.) with a unified event log.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MovementEvent {
+    /// The card that physically moved.
+    pub moved_card_id: i16,
+    /// The zone the card moved FROM (e.g. "stage", "hand", "deck").
+    pub source_zone: String,
+    /// The zone the card moved TO (e.g. "waitroom", "hand", "stage").
+    pub dest_zone: String,
+    /// The card whose ability/action caused the move (None = rule/cost with no source card).
+    pub cause_card_id: Option<i16>,
+    /// The player whose effect/action caused the move.
+    pub cause_player_id: String,
+    /// Whether the move was caused by a card effect (true) vs cost/rules (false).
+    pub effect_only: bool,
+    /// Monotonically increasing counter for ordering events.
+    pub timestamp: u32,
+}
+
 /// Records that a specific ability applied a modifier during execution,
 /// so the source can be traced back to the originating card + ability text.
 /// Populated in effect handlers (execute_gain_resource etc.) and consumed

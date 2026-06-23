@@ -652,8 +652,6 @@ impl super::TurnEngine {
             }
 
             log::debug!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
-            game_state.last_area_move_card_id = Some(card_id);
-            game_state.last_area_move_by_player = Some(player_id.clone());
             return Ok(());
         }
 
@@ -679,8 +677,6 @@ impl super::TurnEngine {
 
         // Track area move for movement_condition "moves"
         log::debug!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
-        game_state.last_area_move_card_id = Some(card_id);
-        game_state.last_area_move_by_player = Some(player_id.clone());
 
         Self::trigger_debut_abilities(
             game_state,

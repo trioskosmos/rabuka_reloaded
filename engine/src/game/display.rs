@@ -236,6 +236,8 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub last_energy_placed_by_effect: bool,
     #[serde(default)]
+    pub batch_movements: Vec<crate::types::MovementEvent>,
+    #[serde(default)]
     pub last_energy_placed_by_player: Option<String>,
     #[serde(default)]
     pub position_change_occurred_this_turn: bool,
@@ -1275,10 +1277,13 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .copied()
             .collect(),
         areas_placed_this_turn: game_state.areas_placed_this_turn.iter().cloned().collect(),
-        last_area_move_card_id: game_state.last_area_move_card_id,
-        last_area_move_by_player: game_state.last_area_move_by_player.clone(),
-        last_energy_placed_by_effect: game_state.last_energy_placed_by_effect,
-        last_energy_placed_by_player: game_state.last_energy_placed_by_player.clone(),
+        last_area_move_card_id: game_state.last_area_move_card_id(),
+        last_area_move_by_player: game_state.last_area_move_by_player().map(|s| s.to_string()),
+        last_energy_placed_by_effect: game_state.last_energy_placed_by_effect(),
+        batch_movements: game_state.batch_movements.clone(),
+        last_energy_placed_by_player: game_state
+            .last_energy_placed_by_player()
+            .map(|s| s.to_string()),
         position_change_occurred_this_turn: game_state.position_change_occurred_this_turn,
         formation_change_occurred_this_turn: game_state.formation_change_occurred_this_turn,
         opponent_live_success_this_turn: game_state.opponent_live_success_this_turn,
