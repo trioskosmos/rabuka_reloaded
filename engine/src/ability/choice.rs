@@ -232,6 +232,9 @@ impl super::resolver::AbilityResolver {
                 }),
             ),
             (Some(Choice::SelectCard { .. }), ChoiceResult::Skip) => {
+                // Clear pending commands saved by sequential conditional handlers
+                // so that skipped optional sub-actions don't re-execute as mandatory.
+                gs.ability_queue.take_pending_commands();
                 self.clear_choice_state(gs);
                 self.resume_execution(gs, context)
             }
