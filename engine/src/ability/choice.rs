@@ -1,6 +1,8 @@
 use super::condition::ConditionContext;
 use super::enums::Zone;
-use super::types::{Choice, ChoiceResult, ChoiceRoute, ExecutionContext, LookAndSelectStep};
+use super::types::{
+    Choice, ChoiceBuilder, ChoiceResult, ChoiceRoute, ExecutionContext, LookAndSelectStep,
+};
 use super::util;
 use crate::ability::debug::ABILITY_DEBUG;
 use crate::card::AbilityEffect;
@@ -527,6 +529,25 @@ impl super::resolver::AbilityResolver {
             }
         };
 
+        let common_re = |zone: &str,
+                         count: usize,
+                         desc: String,
+                         skip: bool,
+                         fi: Option<Vec<usize>>,
+                         tpid: Option<String>,
+                         ct: Option<u32>,
+                         cto: Option<String>|
+         -> ChoiceBuilder {
+            Choice::select_cards(zone, count, desc, skip)
+                .card_type(card_type.clone())
+                .cost_limit(cost_limit, cost_limit_operator.clone())
+                .cost_total(ct, cto)
+                .group(group.clone())
+                .characters(characters.clone())
+                .filtered_indices(fi)
+                .target_player_id(tpid)
+        };
+
         // Cost-phase zone handlers — only for actual cost payments (not effect selections).
         // Effect-phase multi-pick is handled by the effect-phase zone handlers below.
         let mut skip_discard_cleanup = false;
@@ -605,24 +626,22 @@ impl super::resolver::AbilityResolver {
                 let available_idxs: Vec<usize> = (0..hand_now.len())
                     .filter(|i| validate_card(hand_now[*i]))
                     .collect();
+                let fi = if available_idxs.is_empty() {
+                    None
+                } else {
+                    Some(available_idxs)
+                };
                 self.pending_choice = Some(
-                    Choice::select_cards(
+                    common_re(
                         Zone::Hand.to_str(),
                         remaining,
                         format!("Select {} more card(s) from hand for cost", remaining),
                         is_any_number || allow_skip,
+                        fi,
+                        Some(target.clone()),
+                        cost_total,
+                        cost_total_operator.clone(),
                     )
-                    .card_type(card_type.clone())
-                    .cost_limit(cost_limit, cost_limit_operator.clone())
-                    .cost_total(cost_total, cost_total_operator.clone())
-                    .group(group.clone())
-                    .characters(characters.clone())
-                    .filtered_indices(if available_idxs.is_empty() {
-                        None
-                    } else {
-                        Some(available_idxs)
-                    })
-                    .target_player_id(Some(target.clone()))
                     .build(),
                 );
                 self.store_pending_choice(gs);
@@ -647,24 +666,22 @@ impl super::resolver::AbilityResolver {
                     self.pending_choice = None;
                     return Ok(());
                 }
+                let fi = if available_idxs.is_empty() {
+                    None
+                } else {
+                    Some(available_idxs)
+                };
                 self.pending_choice = Some(
-                    Choice::select_cards(
+                    common_re(
                         Zone::Hand.to_str(),
                         0,
-                        "Select more card(s) from hand for cost (or skip to finish)",
+                        "Select more card(s) from hand for cost (or skip to finish)".to_string(),
                         true,
+                        fi,
+                        Some(target.clone()),
+                        cost_total,
+                        cost_total_operator.clone(),
                     )
-                    .card_type(card_type.clone())
-                    .cost_limit(cost_limit, cost_limit_operator.clone())
-                    .cost_total(cost_total, cost_total_operator.clone())
-                    .group(group.clone())
-                    .characters(characters.clone())
-                    .filtered_indices(if available_idxs.is_empty() {
-                        None
-                    } else {
-                        Some(available_idxs)
-                    })
-                    .target_player_id(Some(target.clone()))
                     .build(),
                 );
                 self.store_pending_choice(gs);
@@ -700,22 +717,23 @@ impl super::resolver::AbilityResolver {
             };
             if count_paid > 0 && energy_left > 0 {
                 let efi: Vec<usize> = (0..energy_left).collect();
+                let target = target_player_id
+                    .clone()
+                    .unwrap_or_else(|| "self".to_string());
                 self.pending_choice = Some(
-                    Choice::select_cards(
-                        Zone::Energy.to_str().to_string(),
+                    common_re(
+                        Zone::Energy.to_str(),
                         0,
                         format!(
                             "Select energy card to pay (active: {}). Skip when done",
                             energy_left
                         ),
                         true,
+                        Some(efi),
+                        Some(target),
+                        cost_total,
+                        cost_total_operator.clone(),
                     )
-                    .filtered_indices(Some(efi))
-                    .target_player_id(Some(
-                        target_player_id
-                            .clone()
-                            .unwrap_or_else(|| "self".to_string()),
-                    ))
                     .build(),
                 );
                 self.store_pending_choice(gs);
@@ -1092,28 +1110,27 @@ impl super::resolver::AbilityResolver {
                         let available_idxs: Vec<usize> = (0..hand_cards.len())
                             .filter(|i| !all_hand_idxs.contains(i))
                             .collect();
+                        let fi = if available_idxs.is_empty() {
+                            None
+                        } else {
+                            Some(available_idxs)
+                        };
+                        let desc = format!(
+                            "Select {} more card(s) from hand{}",
+                            remaining,
+                            if blind { " (blind)" } else { "" }
+                        );
                         self.pending_choice = Some(
-                            Choice::select_cards(
+                            common_re(
                                 Zone::Hand.to_str(),
                                 remaining,
-                                format!(
-                                    "Select {} more card(s) from hand{}",
-                                    remaining,
-                                    if blind { " (blind)" } else { "" }
-                                ),
+                                desc,
                                 false,
+                                fi,
+                                Some(target.clone()),
+                                cost_total,
+                                cost_total_operator.clone(),
                             )
-                            .card_type(card_type.clone())
-                            .cost_limit(cost_limit, cost_limit_operator.clone())
-                            .cost_total(cost_total, cost_total_operator.clone())
-                            .group(group.clone())
-                            .characters(characters.clone())
-                            .filtered_indices(if available_idxs.is_empty() {
-                                None
-                            } else {
-                                Some(available_idxs)
-                            })
-                            .target_player_id(Some(target.clone()))
                             .blind(blind)
                             .is_reveal(is_reveal)
                             .build(),
@@ -1167,24 +1184,22 @@ impl super::resolver::AbilityResolver {
                         let include_idxs: Vec<usize> = (0..hand_cards.len())
                             .filter(|i| validate_card(hand_cards[*i]))
                             .collect();
+                        let fi = if include_idxs.is_empty() {
+                            None
+                        } else {
+                            Some(include_idxs)
+                        };
                         self.pending_choice = Some(
-                            Choice::select_cards(
+                            common_re(
                                 Zone::Hand.to_str(),
                                 0,
-                                "Select more card(s) from hand (or skip to finish)",
+                                "Select more card(s) from hand (or skip to finish)".to_string(),
                                 true,
+                                fi,
+                                Some(target),
+                                cost_total,
+                                cost_total_operator.clone(),
                             )
-                            .card_type(card_type.clone())
-                            .cost_limit(cost_limit, cost_limit_operator.clone())
-                            .cost_total(cost_total, cost_total_operator.clone())
-                            .group(group.clone())
-                            .characters(characters.clone())
-                            .filtered_indices(if include_idxs.is_empty() {
-                                None
-                            } else {
-                                Some(include_idxs)
-                            })
-                            .target_player_id(Some(target))
                             .build(),
                         );
                         self.store_pending_choice(gs);
@@ -1291,28 +1306,27 @@ impl super::resolver::AbilityResolver {
                         let filtered_idxs: Vec<usize> = (0..waitroom_cards.len())
                             .filter(|&i| !already_selected.contains(&waitroom_cards[i]))
                             .collect();
+                        let remaining_count = filtered_idxs.len();
+                        let fi = if filtered_idxs.is_empty() {
+                            None
+                        } else {
+                            Some(filtered_idxs)
+                        };
+                        let desc = format!(
+                            "Select {} more card(s) from discard from {} remaining",
+                            remaining, remaining_count
+                        );
                         self.pending_choice = Some(
-                            Choice::select_cards(
+                            common_re(
                                 Zone::Discard.to_str(),
                                 remaining,
-                                format!(
-                                    "Select {} more card(s) from discard from {} remaining",
-                                    remaining,
-                                    filtered_idxs.len()
-                                ),
+                                desc,
                                 false,
+                                fi,
+                                Some(target.clone()),
+                                cost_total,
+                                cost_total_operator.clone(),
                             )
-                            .card_type(card_type.clone())
-                            .cost_limit(cost_limit, cost_limit_operator.clone())
-                            .cost_total(cost_total, cost_total_operator.clone())
-                            .group(group.clone())
-                            .characters(characters.clone())
-                            .filtered_indices(if filtered_idxs.is_empty() {
-                                None
-                            } else {
-                                Some(filtered_idxs)
-                            })
-                            .target_player_id(Some(target.clone()))
                             .is_select_action(true)
                             .build(),
                         );
@@ -1413,31 +1427,30 @@ impl super::resolver::AbilityResolver {
                                     (0..waitroom_cards.len()).collect()
                                 };
                                 if !all_idxs.is_empty() || allow_skip {
-                                    let reprompt = Choice::select_cards(
-                                        Zone::Discard.to_str(),
+                                    let desc = format!(
+                                        "Select {} more card(s) from discard{}",
                                         remaining,
-                                        format!(
-                                            "Select {} more card(s) from discard{}",
-                                            remaining,
-                                            if allow_skip {
-                                                " (or skip to finish)"
-                                            } else {
-                                                ""
-                                            }
-                                        ),
-                                        allow_skip,
-                                    )
-                                    .card_type(card_type.clone())
-                                    .cost_limit(cost_limit, cost_limit_operator.clone())
-                                    .cost_total(remaining_budget, Some("<=".to_string()))
-                                    .group(group.clone())
-                                    .characters(characters.clone())
-                                    .filtered_indices(if all_idxs.is_empty() {
+                                        if allow_skip {
+                                            " (or skip to finish)"
+                                        } else {
+                                            ""
+                                        }
+                                    );
+                                    let fi = if all_idxs.is_empty() {
                                         Some(vec![])
                                     } else {
                                         Some(all_idxs)
-                                    })
-                                    .target_player_id(Some(target))
+                                    };
+                                    let reprompt = common_re(
+                                        Zone::Discard.to_str(),
+                                        remaining,
+                                        desc,
+                                        allow_skip,
+                                        fi,
+                                        Some(target),
+                                        remaining_budget,
+                                        Some("<=".to_string()),
+                                    )
                                     .build();
                                     let mut pending = gs.ability_queue.take_pending_actions();
                                     self.pending_reprompt_choice = Some(reprompt);
@@ -1482,32 +1495,31 @@ impl super::resolver::AbilityResolver {
                         // Re-prompt with remaining count, showing only cards within budget.
                         // Pass `allow_skip` through so "up to N" semantics are preserved.
                         let remaining = count - mapped_indices.len();
+                        let desc = format!(
+                            "Select {} more card(s) from discard{}",
+                            remaining,
+                            if allow_skip {
+                                " (or skip to finish)"
+                            } else {
+                                ""
+                            }
+                        );
+                        let fi = if all_idxs.is_empty() {
+                            Some(vec![])
+                        } else {
+                            Some(all_idxs)
+                        };
                         self.pending_choice = Some(
-                            Choice::select_cards(
+                            common_re(
                                 Zone::Discard.to_str(),
                                 remaining,
-                                format!(
-                                    "Select {} more card(s) from discard{}",
-                                    remaining,
-                                    if allow_skip {
-                                        " (or skip to finish)"
-                                    } else {
-                                        ""
-                                    }
-                                ),
+                                desc,
                                 allow_skip,
+                                fi,
+                                Some(target),
+                                remaining_budget,
+                                Some("<=".to_string()),
                             )
-                            .card_type(card_type.clone())
-                            .cost_limit(cost_limit, cost_limit_operator.clone())
-                            .cost_total(remaining_budget, Some("<=".to_string()))
-                            .group(group.clone())
-                            .characters(characters.clone())
-                            .filtered_indices(if all_idxs.is_empty() {
-                                Some(vec![])
-                            } else {
-                                Some(all_idxs)
-                            })
-                            .target_player_id(Some(target))
                             .build(),
                         );
                         self.store_pending_choice(gs);
