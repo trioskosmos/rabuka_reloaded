@@ -610,6 +610,14 @@ impl super::TurnEngine {
             return Err(e);
         }
 
+        // If inner processing (e.g. depth-first trigger scan) created a
+        // pending choice on the game-state level (a different queue entry),
+        // don't touch it — return immediately.
+        if game_state.has_pending_choice() {
+            log::debug!("[RWC] inner processing created pending choice — returning early");
+            return Ok(());
+        }
+
         log::debug!(
             "[RWC] after provide: pending_choice={:?} moved_cards={:?} selected={:?}",
             resolver.pending_choice.is_some(),

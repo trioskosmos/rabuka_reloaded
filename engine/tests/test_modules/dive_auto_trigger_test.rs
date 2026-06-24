@@ -43,27 +43,14 @@ fn ab0_places_dive_ab1_grants_blade() {
     assert!(g.has_pending_choice(), "discard cost expected");
     g.select_indices(&[0]);
 
-    // Setsuna: retrieve DIVE! from waitroom
-    assert!(g.has_pending_choice(), "retrieval expected");
-    g.select_indices(&[0]);
+    // Setsuna retrieves DIVE! (auto-resolve: only 1 Niji live card in waitroom).
+    // Then ab#0 fires and asks: place 1 DIVE! from hand to live zone?
+    assert!(g.has_pending_choice(), "ab#0 optional placement expected");
+    g.select_indices(&[0]); // select the DIVE! in hand
 
-    // DIVE! is now in hand. ab#0 fires with optional placement.
-    // With only one DIVE! in hand, the engine should auto-resolve.
-    // Drain remaining choices (ab#1's target selection from stage).
-    while g.has_pending_choice() {
-        let choice = g.get_pending_choice().clone();
-        if matches!(
-            choice,
-            rabuka_engine::ability::types::Choice::SelectCard {
-                zone: ref z,
-                ..
-            } if z == "stage"
-        ) {
-            g.select_indices(&[0]); // select the Nijigasaki member
-        } else {
-            g.select_indices(&[]); // skip
-        }
-    }
+    // After placement, ab#1 asks which Nijigasaki member gets blade+2.
+    assert!(g.has_pending_choice(), "ab#1 target selection expected");
+    g.select_indices(&[0]); // select the Nijigasaki member
 
     // ab#0 should have placed DIVE! in live zone
     assert!(

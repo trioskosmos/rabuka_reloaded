@@ -397,9 +397,6 @@ impl GameState {
                                     } else if condition.self_target.unwrap_or(false) {
                                         if let Some(ref locs) = condition.locations {
                                             if locs.len() == 2 {
-                                                // self_target + 2 locations = movement-based
-                                                // condition (e.g. discard→hand). Only trigger
-                                                // via trigger_auto_for_discarded_cards, not here.
                                                 continue;
                                             }
                                         }
@@ -423,6 +420,75 @@ impl GameState {
                                 continue;
                             }
                             abilities_to_trigger.push((ability_id, card.card_no.clone(), card_id));
+                        }
+                    }
+                }
+            }
+            // Also scan recently-moved cards for AUTO abilities (replaces
+            // the ad-hoc trigger_auto_for_discarded_cards pattern matching).
+            // Only enqueue for the card's actual owner (not the scanner).
+            // Skip cards already on stage or in live zone (scanned separately).
+            for &moved_card_id in &event.moved_cards {
+                if self.player1.stage.stage.contains(&moved_card_id)
+                    || self.player1.live_card_zone.cards.contains(&moved_card_id)
+                    || self.player2.stage.stage.contains(&moved_card_id)
+                    || self.player2.live_card_zone.cards.contains(&moved_card_id)
+                {
+                    continue;
+                }
+                if let Some(card) = self.card_database.get_card(moved_card_id) {
+                    // Determine card owner by zone membership
+                    let is_p1 = self.player1.stage.stage.contains(&moved_card_id)
+                        || self.player1.hand.cards.contains(&moved_card_id)
+                        || self.player1.live_card_zone.cards.contains(&moved_card_id)
+                        || self.player1.energy_zone.cards.contains(&moved_card_id)
+                        || self.player1.waitroom.cards.contains(&moved_card_id);
+                    let is_p2 = self.player2.stage.stage.contains(&moved_card_id)
+                        || self.player2.hand.cards.contains(&moved_card_id)
+                        || self.player2.live_card_zone.cards.contains(&moved_card_id)
+                        || self.player2.energy_zone.cards.contains(&moved_card_id)
+                        || self.player2.waitroom.cards.contains(&moved_card_id);
+                    let card_owner = if is_p1 {
+                        "p1"
+                    } else if is_p2 {
+                        "p2"
+                    } else {
+                        continue; // can't determine owner, skip
+                    };
+                    if card_owner != player_id_clone {
+                        continue; // card belongs to a different player
+                    }
+                    for ability in &card.abilities {
+                        if ability
+                            .triggers
+                            .as_ref()
+                            .is_some_and(|t| t == crate::triggers::AUTO)
+                        {
+                            if let Some(ref effect) = ability.effect {
+                                if let Some(ref condition) = effect.condition {
+                                    if Self::condition_is_event_based(condition) {
+                                        let saved_activating = self.activating_card;
+                                        self.activating_card = Some(moved_card_id);
+                                        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, &event.moved_cards);
+                                        let passes = ctx.evaluate_condition(condition);
+                                        self.activating_card = saved_activating;
+                                        if !passes {
+                                            continue;
+                                        }
+                                    } else {
+                                        continue;
+                                    }
+                                }
+                            }
+                            let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                            if skip_this_card_auto_key.as_deref() == Some(&ability_id) {
+                                continue;
+                            }
+                            abilities_to_trigger.push((
+                                ability_id,
+                                card.card_no.clone(),
+                                moved_card_id,
+                            ));
                         }
                     }
                 }
@@ -853,112 +919,6 @@ impl GameState {
         }
     }
 
-    pub(crate) fn trigger_auto_for_discarded_cards(&mut self, player_id: &str) {
-        eprintln!(
-            "[DISCARD_TRIGGER] entered moved={:?}",
-            self.recently_moved_cards
-        );
-        let trigger_data: Vec<(String, String, i16)> = if let Some(ref moved_cards) =
-            self.recently_moved_cards.clone()
-        {
-            moved_cards
-                .iter()
-                .filter_map(|&moved_id| {
-                    let card = self.card_database.get_card(moved_id)?;
-                    let mut results = Vec::new();
-                    for ability in &card.abilities {
-                        let is_auto = ability.triggers.as_deref() == Some(crate::triggers::AUTO);
-                        let has_discard_condition = ability
-                            .effect
-                            .as_ref()
-                            .and_then(|e| e.condition.as_ref())
-                            .map(|c| {
-                                // Direct discard-location condition
-                                let direct_discard = matches!(
-                                    Zone::from_str(c.location.as_deref().unwrap_or("")),
-                                    Some(Zone::Discard | Zone::Waitroom)
-                                );
-                                // Helper: checks if a zone name matches discard/waitroom
-                                let is_discard_dest = |z: &str| -> bool {
-                                    matches!(
-                                        Zone::from_str(z),
-                                        Some(Zone::Discard | Zone::Waitroom)
-                                    )
-                                };
-                                // Movement from stage to discard (old pattern: preceding_moved + locations)
-                                let movement_to_discard_old = c.source.as_deref()
-                                    == Some("preceding_moved")
-                                    && c.location.as_deref() == Some("stage")
-                                    && c.locations.as_ref().is_some_and(|locs| {
-                                        locs.iter().any(|loc| is_discard_dest(loc))
-                                    });
-                                // Movement from stage to discard (new pattern: source + destination)
-                                let movement_to_discard_new = c.source.as_deref() == Some("stage")
-                                    && c.destination
-                                        .as_deref()
-                                        .map_or(false, |d| is_discard_dest(d));
-                                let movement_to_discard =
-                                    movement_to_discard_old || movement_to_discard_new;
-                                // Movement from live_card_zone to discard (old pattern)
-                                let movement_from_live_old = c.source.as_deref()
-                                    == Some("preceding_moved")
-                                    && c.location.as_deref() == Some("live_card_zone")
-                                    && c.locations.as_ref().is_some_and(|locs| {
-                                        locs.iter().any(|loc| is_discard_dest(loc))
-                                    });
-                                // Movement from live_card_zone to discard (new pattern)
-                                let movement_from_live_new = c.source.as_deref()
-                                    == Some("live_card_zone")
-                                    && c.destination
-                                        .as_deref()
-                                        .map_or(false, |d| is_discard_dest(d));
-                                let movement_from_live =
-                                    movement_from_live_old || movement_from_live_new;
-                                // Movement from discard to hand (e.g. DIVE! — retrieved
-                                // from waitroom→hand via card effect, then places itself
-                                // in the live zone).
-                                let movement_from_discard_to_hand = c.source.as_deref()
-                                    == Some("discard")
-                                    && c.destination.as_deref() == Some("hand");
-                                direct_discard
-                                    || movement_to_discard
-                                    || movement_from_live
-                                    || movement_from_discard_to_hand
-                            })
-                            .unwrap_or(false);
-                        if is_auto && has_discard_condition {
-                            results.push((
-                                format!("{}_{}", card.card_no, ability.full_text),
-                                card.card_no.clone(),
-                                moved_id,
-                            ));
-                        }
-                    }
-                    Some(results)
-                })
-                .flatten()
-                .collect()
-        } else {
-            Vec::new()
-        };
-        eprintln!(
-            "[DISCARD_TRIGGER] found {} triggers to enqueue: {:?}",
-            trigger_data.len(),
-            trigger_data.iter().map(|(_, cn, _)| cn).collect::<Vec<_>>()
-        );
-        for (ability_id, card_no, moved_id) in trigger_data {
-            self.trigger_auto_ability(
-                ability_id,
-                AbilityTrigger::Auto,
-                player_id.to_string(),
-                Some(card_no),
-                Some(moved_id),
-                None,
-                None,
-            );
-        }
-    }
-
     pub(crate) fn process_current_ability(&mut self) {
         eprintln!(
             "[PCA_ENTER] has_resolver={}",
@@ -1188,29 +1148,6 @@ impl GameState {
             // uses it to prevent re-enqueueing the just-completed ability).
             self.activating_card = None;
             self.activating_ability_index = None;
-            // Trigger discarded card abilities BEFORE process_pending_auto_abilities
-            // so recently_moved_cards is still populated.
-            eprintln!(
-                "[DISCARD_GATE] phase={:?} moved={:?}",
-                self.current_phase, self.recently_moved_cards
-            );
-            if let Some(ref moved) = self.recently_moved_cards {
-                if !moved.is_empty() {
-                    eprintln!(
-                        "[DISCARD_GATE] CALLING trigger_auto_for_discarded_cards for pid={}",
-                        current_pid
-                    );
-                    self.trigger_auto_for_discarded_cards(&current_pid);
-                    eprintln!("[DISCARD_GATE] RETURNED from trigger_auto_for_discarded_cards");
-                } else {
-                    eprintln!("[DISCARD_GATE] skipped — empty vec marker");
-                }
-            } else {
-                eprintln!("[DISCARD_GATE] skipped — None");
-            }
-            if let Some(pid) = self.ability_master_id() {
-                self.process_pending_auto_abilities(&pid);
-            }
             // Post-resolution each_time trigger for LiveStart/LiveSuccess.
             // Only fires if the effect was actually executed (cost was paid
             // or no optional cost was declined).

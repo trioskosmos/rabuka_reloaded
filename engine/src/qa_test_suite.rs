@@ -2281,8 +2281,8 @@ fn test_baton_touch_discard_ability_triggers() {
     let initial_energy_active = game_state.player1.energy_zone.active_count();
     println!("Initial active energy count: {}", initial_energy_active);
 
-    // Trigger discard auto abilities for the replaced card
-    game_state.trigger_auto_for_discarded_cards("p1");
+    // Trigger auto abilities for the replaced card
+    game_state.trigger_auto_abilities_for_player("p1");
     game_state.process_pending_auto_abilities("p1");
 
     let final_energy_active = game_state.player1.energy_zone.active_count();
@@ -2356,7 +2356,7 @@ fn test_baton_touch_discard_ability_skipped_low_cost() {
 
     let initial_energy_active = game_state.player1.energy_zone.active_count();
 
-    game_state.trigger_auto_for_discarded_cards("p1");
+    game_state.trigger_auto_abilities_for_player("p1");
     game_state.process_pending_auto_abilities("p1");
 
     let final_energy_active = game_state.player1.energy_zone.active_count();

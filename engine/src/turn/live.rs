@@ -838,8 +838,6 @@ impl super::TurnEngine {
             game_state.recently_moved_from_zone = Some("live_card_zone".to_string());
 
             // Scan and queue triggers for both players
-            game_state.trigger_auto_for_discarded_cards(&p1_id);
-            game_state.trigger_auto_for_discarded_cards(&p2_id);
             Self::trigger_auto_abilities_for_player(game_state, &p1_id);
             Self::trigger_auto_abilities_for_player(game_state, &p2_id);
 

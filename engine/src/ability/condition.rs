@@ -39,12 +39,14 @@ impl<'a> ConditionContext<'a> {
                 || p1.hand.cards.contains(&cid)
                 || p1.live_card_zone.cards.contains(&cid)
                 || p1.energy_zone.cards.contains(&cid)
+                || p1.waitroom.cards.contains(&cid)
             {
                 Some(p1)
             } else if p2.stage.stage.contains(&cid)
                 || p2.hand.cards.contains(&cid)
                 || p2.live_card_zone.cards.contains(&cid)
                 || p2.energy_zone.cards.contains(&cid)
+                || p2.waitroom.cards.contains(&cid)
             {
                 Some(p2)
             } else {
