@@ -42,7 +42,7 @@ fn maki_bp6_cost_discard_works() {
     drain_cost_and_color(&mut game);
 
     assert_eq!(game.state.player1.hand.cards.len(), hand_before - 1);
-    assert_eq!(game.state.player1.energy_zone.active_energy_count, 10);
+    assert_eq!(game.state.player1.energy_zone.active_count(), 10);
 }
 
 /// Maki full flow with actual μ's cards in deck.

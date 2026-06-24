@@ -30,7 +30,7 @@ fn konata_q77_debuted_this_turn_activates_energy() {
     // Record a debut (simulating a 虹ヶ咲 member played to stage this turn)
     game.state.player1.debut_count_this_turn = 1;
 
-    let active_before = game.state.player1.energy_zone.active_energy_count;
+    let active_before = game.state.player1.energy_zone.active_count();
 
     game.activate_ability(konata);
 
@@ -40,7 +40,7 @@ fn konata_q77_debuted_this_turn_activates_energy() {
 
     // The engine activates the first matching ability (ab#1: 2E → draw 1).
     // Net active change: -2E (ab#1 cost) = -2.
-    let active_after = game.state.player1.energy_zone.active_energy_count;
+    let active_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
         active_after,
         active_before - 2,
@@ -65,7 +65,7 @@ fn konata_no_debut_condition_fails() {
     game.state.player1.hand.cards.push(niji_member);
     game.give_energy(4);
 
-    let active_before = game.state.player1.energy_zone.active_energy_count;
+    let active_before = game.state.player1.energy_zone.active_count();
 
     game.activate_ability(konata);
 
@@ -75,7 +75,7 @@ fn konata_no_debut_condition_fails() {
 
     // No member debuted → debut_count_this_turn = 0, but ab#1 fires first:
     // Cost: 2E paid (active drops by 2). Draw 1 card.
-    let active_after = game.state.player1.energy_zone.active_energy_count;
+    let active_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
         active_before - active_after,
         2,

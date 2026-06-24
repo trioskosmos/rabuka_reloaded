@@ -370,7 +370,7 @@ pub fn player_to_display(
         .iter()
         .enumerate()
         .map(|(i, &card_id)| {
-            let orientation = if i < player.energy_zone.active_energy_count {
+            let orientation = if i < player.energy_zone.active_count() {
                 Some(Orientation::Active)
             } else {
                 Some(Orientation::Wait)

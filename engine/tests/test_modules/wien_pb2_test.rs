@@ -47,7 +47,7 @@ fn wien_q262_empty_hand_triggers_energy_move() {
     // Set it as the live card — after this hand is empty
     game.set_live_card(live_card);
 
-    let energy_zone_before = game.state.player1.energy_zone.active_energy_count;
+    let energy_zone_before = game.state.player1.energy_zone.active_count();
     let energy_deck_before = game.state.player1.energy_deck.cards.len();
 
     advance_to_live_start(&mut game);
@@ -57,11 +57,29 @@ fn wien_q262_empty_hand_triggers_energy_move() {
         game.has_pending_choice(),
         "Q262: Engine should present Skip/Pay choice"
     );
+    game.select_option(0); // Option 0 = Skip → queues move_cards effect
+
+    // Q262: Engine now asks which energy card to move from the energy zone.
+    assert!(
+        game.has_pending_choice(),
+        "Q262: Engine should ask which energy card to move"
+    );
+    game.select_indices(&[0]); // Pick the first energy card — it moves to energy_deck
+
+    // Q262: Energy card should have moved from energy zone to energy deck
+    assert!(
+        game.state.player1.energy_zone.active_count() < energy_zone_before,
+        "Q262: An energy card should have left the energy zone"
+    );
+    assert!(
+        game.state.player1.energy_deck.cards.len() > energy_deck_before,
+        "Q262: Energy deck should have gained a card"
+    );
     game.select_option(0); // Option 0 = Skip → handles energy_zone→energy_deck inline
 
     // Q262: Energy card should have moved from energy zone to energy deck directly
     assert!(
-        game.state.player1.energy_zone.active_energy_count < energy_zone_before,
+        game.state.player1.energy_zone.active_count() < energy_zone_before,
         "Q262: An energy card should have left the energy zone"
     );
     assert!(

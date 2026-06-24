@@ -1550,10 +1550,7 @@ impl AbilityResolver {
         if energy_cards.is_empty() {
             return;
         }
-        player.energy_zone.active_energy_count = player
-            .energy_zone
-            .active_energy_count
-            .saturating_sub(energy_cards.len());
+        player.energy_zone.sub_active(energy_cards.len());
         let target_index = match position.and_then(|p| p.get_position()) {
             Some("center") | Some("中央") => 1,
             Some("left") | Some("左側") => 0,

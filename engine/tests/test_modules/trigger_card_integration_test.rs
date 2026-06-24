@@ -15,7 +15,7 @@ fn fill_deck_and_energy(game: &mut TestGame) {
     for _ in 0..15 {
         game.state.player1.energy_zone.cards.push(filler);
     }
-    game.state.player1.energy_zone.active_energy_count = 15;
+    game.state.player1.energy_zone.set_active_count(15);
 }
 
 fn drain_auto_choices(game: &mut TestGame) {

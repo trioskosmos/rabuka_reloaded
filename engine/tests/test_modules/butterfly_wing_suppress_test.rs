@@ -38,7 +38,7 @@ fn butterfly_wing_suppresses_live_start() {
     game.add_to_stage(MemberArea::Center, mei_p);
     game.add_to_stage(MemberArea::RightSide, mei_r);
 
-    let energy_before = game.state.player1.energy_zone.active_energy_count;
+    let energy_before = game.state.player1.energy_zone.active_count();
 
     setup_p1_deck(&mut game, &[]);
     advance_to_live_card_set_p1(&mut game);
@@ -57,7 +57,7 @@ fn butterfly_wing_suppresses_live_start() {
     }
 
     // Both Meis' live_start should be suppressed — energy should NOT have increased
-    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    let energy_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
         energy_after, energy_before,
         "Butterfly Wing should suppress live_start: energy should not increase (was {}, got {})",

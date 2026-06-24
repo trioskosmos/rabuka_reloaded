@@ -66,9 +66,9 @@ fn kanon_ab1_live_success_fires_but_live_fails_no_hearts() {
             .cards
             .push(game.id("LL-E-001-SD"));
     }
-    game.state.player1.energy_zone.active_energy_count = 6;
+    game.state.player1.energy_zone.set_active_count(6);
 
-    let energy_before = game.state.player1.energy_zone.active_energy_count;
+    let energy_before = game.state.player1.energy_zone.active_count();
     game.pass();
     game.pass();
     game.pass();
@@ -79,7 +79,7 @@ fn kanon_ab1_live_success_fires_but_live_fails_no_hearts() {
         !game.has_pending_choice(),
         "Q92: LiveSuccess must NOT fire when the live card's need_heart is unmet"
     );
-    let energy_spent = energy_before - game.state.player1.energy_zone.active_energy_count;
+    let energy_spent = energy_before - game.state.player1.energy_zone.active_count();
     assert_eq!(
         energy_spent, 0,
         "Q92: no energy deducted when LiveSuccess does not fire"

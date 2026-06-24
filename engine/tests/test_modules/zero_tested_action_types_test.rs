@@ -345,7 +345,7 @@ fn natsumi_sunshine_pay_any_energy_for_score() {
         "8 energy paid -> +2 score"
     );
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 2,
+        game.state.player1.energy_zone.active_count(), 2,
         "10 - 8 = 2 active energy remaining"
     );
 }

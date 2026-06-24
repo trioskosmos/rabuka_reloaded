@@ -103,7 +103,7 @@ fn baton_touch_hanaho_auto_ability_triggers() {
     game.state.player1.stage.stage[1] = hanaho;
 
     game.give_energy(25);
-    let before = game.state.player1.energy_zone.active_energy_count;
+    let before = game.state.player1.energy_zone.active_count();
 
     game.state.player1.hand.cards.push(arriver);
     game.state.player1.hand.cards.push(filler);
@@ -117,7 +117,7 @@ fn baton_touch_hanaho_auto_ability_triggers() {
         "花帆 should be in waitroom after baton touch"
     );
 
-    let after = game.state.player1.energy_zone.active_energy_count;
+    let after = game.state.player1.energy_zone.active_count();
     // Baton touch cost = arriver.cost - hanaho.cost = 15 - 9 = 6
     // Auto ability activates 2 → net -4
     assert!(

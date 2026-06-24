@@ -39,7 +39,7 @@ fn fuyumari_q63_effect_debut_no_cost_payment() {
     );
 
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 0,
+        game.state.player1.energy_zone.active_count(), 0,
         "All 13 energy spent on 鬼塚冬毬 (Q63)"
     );
 

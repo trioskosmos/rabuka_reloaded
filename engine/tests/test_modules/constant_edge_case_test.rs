@@ -340,8 +340,8 @@ fn hanayo_combined_energy_exactly_fifteen() {
     game.add_to_stage(MemberArea::Center, hanayo);
 
     // P1: 10 energy, P2: 5 energy = 15 total
-    let e1 = game.state.player1.energy_zone.active_energy_count;
-    game.state.player1.energy_zone.active_energy_count = e1.min(10);
+    let e1 = game.state.player1.energy_zone.active_count();
+    game.state.player1.energy_zone.set_active_count(e1.min(10));
     for _ in 0..10 {
         game.state.player1.energy_zone.cards.push(energy);
     }

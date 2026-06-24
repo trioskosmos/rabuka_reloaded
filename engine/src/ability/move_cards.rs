@@ -2402,6 +2402,50 @@ impl AbilityResolver {
         Ok(())
     }
 
+    /// Execute energy zone selection: optionally move cards to a destination.
+    pub fn handle_energy_zone_selection(
+        &mut self,
+        gs: &mut GameState,
+        indices: &[usize],
+        count: usize,
+        destination: Option<String>,
+        validate_card: &mut impl FnMut(i16) -> bool,
+    ) -> Result<(), String> {
+        if let Some(ref dst) = destination {
+            let cids: Vec<i16> = {
+                let player = gs.resolve_target_player_mut("self");
+                let mut removed = Vec::new();
+                for &i in indices.iter().rev() {
+                    if i < player.energy_zone.cards.len()
+                        && validate_card(player.energy_zone.cards[i])
+                    {
+                        removed.push(player.energy_zone.cards.remove(i));
+                    }
+                }
+                removed.reverse();
+                player.energy_zone.active_energy_count = player
+                    .energy_zone
+                    .active_energy_count
+                    .saturating_sub(removed.len());
+                removed
+            };
+            {
+                let player = gs.resolve_target_player_mut("self");
+                for &cid in &cids {
+                    crate::ability::util::place_card_in_zone(player, cid, dst, None, false, 1);
+                }
+            }
+            for &cid in &cids {
+                gs.mods.clear_all_for_card(cid);
+                gs.record_card_movement(cid);
+            }
+            self.moved_cards = cids;
+        } else {
+            self.execute_selected_energy_zone_cards(gs, indices, count)?;
+        }
+        Ok(())
+    }
+
     /// Execute energy zone cards: move to wait state.
     pub fn execute_selected_energy_zone_cards(
         &mut self,

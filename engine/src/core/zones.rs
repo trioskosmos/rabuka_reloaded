@@ -605,8 +605,8 @@ use crate::constants::{MAX_ENERGY_CARDS, MAX_LIVE_CARDS};
 pub struct EnergyZone {
     // Rule 5.1: Energy Zone - Where energy cards are placed and activated
     // Q15: Energy deck cards are face-down; energy zone cards are face-up.
-    pub cards: SmallVec<[i16; MAX_ENERGY_CARDS]>, // Card IDs - stack-allocated for up to MAX_ENERGY_CARDS energy cards
-    pub active_energy_count: usize, // Simple count of active energy cards (simpler than HashSet)
+    pub cards: SmallVec<[i16; MAX_ENERGY_CARDS]>,
+    pub(crate) active_energy_count: usize,
 }
 
 impl Default for EnergyZone {
@@ -649,6 +649,18 @@ impl EnergyZone {
 
     pub fn active_count(&self) -> usize {
         self.active_energy_count
+    }
+
+    pub fn set_active_count(&mut self, count: usize) {
+        self.active_energy_count = count;
+    }
+
+    pub fn add_active(&mut self, delta: usize) {
+        self.active_energy_count = self.active_energy_count.saturating_add(delta);
+    }
+
+    pub fn sub_active(&mut self, delta: usize) {
+        self.active_energy_count = self.active_energy_count.saturating_sub(delta);
     }
 
     // Q56/Q138: Cost payment — full amount required; under-member energy cannot pay costs.

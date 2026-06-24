@@ -28,7 +28,7 @@ fn setup_player_with_hand(player: &mut Player, card_ids: Vec<i16>) {
 fn setup_player_with_energy(player: &mut Player, card_ids: Vec<i16>) {
     let count = card_ids.len();
     player.energy_zone.cards = card_ids.into_iter().collect();
-    player.energy_zone.active_energy_count = count;
+    player.energy_zone.set_active_count(count);
 }
 
 fn get_card_id(card: &Card, card_db: &CardDatabase) -> i16 {

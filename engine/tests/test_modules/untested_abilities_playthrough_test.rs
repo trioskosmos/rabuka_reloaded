@@ -60,7 +60,7 @@ fn n_pb1_006_wait_self_activates_one_energy() {
         game.select_indices(&[0]);
     }
 
-    let energy_before = game.state.player1.energy_zone.active_energy_count;
+    let energy_before = game.state.player1.energy_zone.active_count();
 
     // 5. Activate ability via UseAbility action
     game.activate_ability(card);
@@ -73,7 +73,7 @@ fn n_pb1_006_wait_self_activates_one_energy() {
         "Cost: card must be in wait state after activation"
     );
     // Effect: energy increased by exactly 1
-    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    let energy_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
         energy_after,
         energy_before + 1,
@@ -110,9 +110,9 @@ fn n_pb1_006_activates_wait_energy_to_active() {
     }
 
     // Convert all active energy to wait, so we have only wait-energy
-    game.state.player1.energy_zone.active_energy_count = 0;
+    game.state.player1.energy_zone.set_active_count(0);
 
-    let active_before = game.state.player1.energy_zone.active_energy_count;
+    let active_before = game.state.player1.energy_zone.active_count();
     let total_before = game.state.player1.energy_zone.cards.len();
 
     game.activate_ability(card);
@@ -124,7 +124,7 @@ fn n_pb1_006_activates_wait_energy_to_active() {
         "Cost paid: card must be wait"
     );
     // Effect: one wait-energy card activated
-    let active_after = game.state.player1.energy_zone.active_energy_count;
+    let active_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
         active_after,
         active_before + 1,
@@ -166,13 +166,13 @@ fn n_pb1_006_can_activate_multiple_times() {
         game.select_indices(&[0]);
     }
 
-    let energy_before = game.state.player1.energy_zone.active_energy_count;
+    let energy_before = game.state.player1.energy_zone.active_count();
 
     // Activate 3 times
     for i in 0..3 {
         game.activate_ability(card);
         assert_eq!(
-            game.state.player1.energy_zone.active_energy_count,
+            game.state.player1.energy_zone.active_count(),
             energy_before + i + 1,
             "Activation {} should give 1 energy",
             i + 1
@@ -217,7 +217,7 @@ fn sp_bp5_016_energy_ge_10_grants_heart06_x2() {
     // Give 4 more to reach 10.
     game.give_energy(4);
     assert!(
-        game.state.player1.energy_zone.active_energy_count >= 10,
+        game.state.player1.energy_zone.active_count() >= 10,
         "Precondition: energy >= 10"
     );
 
@@ -257,7 +257,7 @@ fn sp_bp5_016_energy_lt_10_grants_no_heart06() {
     // (play cost 9 consumed 9 energy, but give_energy just adds)
     // Remove enough cards to drop below 10
     game.state.player1.energy_zone.cards.truncate(5);
-    game.state.player1.energy_zone.active_energy_count = 5;
+    game.state.player1.energy_zone.set_active_count(5);
     assert!(
         game.state.player1.energy_zone.cards.len() < 10,
         "Precondition: total energy cards < 10 (got {})",

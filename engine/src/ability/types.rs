@@ -673,8 +673,8 @@ impl ZoneSnapshot {
                 + p2.stage.stage.iter().filter(|&&id| id != -1).count(),
             waitroom_count: p1.waitroom.len() + p2.waitroom.len(),
             energy_count: p1.energy_zone.cards.len() + p2.energy_zone.cards.len(),
-            active_energy_count: p1.energy_zone.active_energy_count
-                + p2.energy_zone.active_energy_count,
+            active_energy_count: p1.energy_zone.active_count()
+                + p2.energy_zone.active_count(),
             deck_count: p1.main_deck.cards.len() + p2.main_deck.cards.len(),
         }
     }

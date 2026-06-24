@@ -270,10 +270,10 @@ fn chika_q218_no_ability_cost_reduced() {
     }
 
     // Now play filler (no abilities, cost 4). Chika's permanent should reduce cost by 1.
-    let energy_before = game.state.player1.energy_zone.active_energy_count;
+    let energy_before = game.state.player1.energy_zone.active_count();
     game.state.player1.hand.cards.push(filler);
     game.play_to_stage(filler, rabuka_engine::zones::MemberArea::LeftSide);
-    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    let energy_after = game.state.player1.energy_zone.active_count();
 
     // Cost reduced from 4 to 3 by Chika's permanent
     let expected_consumed = filler_cost as i32 - 1; // 3

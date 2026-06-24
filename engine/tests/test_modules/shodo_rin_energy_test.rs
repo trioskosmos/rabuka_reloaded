@@ -30,7 +30,7 @@ fn rin_activate_places_energy_under_draws_heart() {
 
     let hand_before = game.state.player1.hand.cards.len();
     let energy_total_before = game.state.player1.energy_zone.cards.len();
-    let active_before = game.state.player1.energy_zone.active_energy_count;
+    let active_before = game.state.player1.energy_zone.active_count();
 
     game.activate_ability(rin);
 
@@ -41,7 +41,7 @@ fn rin_activate_places_energy_under_draws_heart() {
         "1 energy card removed from energy zone"
     );
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count,
+        game.state.player1.energy_zone.active_count(),
         active_before - 1,
         "active_energy_count decremented by 1"
     );

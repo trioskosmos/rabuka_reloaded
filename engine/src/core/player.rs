@@ -473,7 +473,7 @@ impl Player {
         self.energy_deck.draw().inspect(|&card_id| {
             self.energy_zone.cards.push(card_id);
 
-            self.energy_zone.active_energy_count += 1;
+            self.energy_zone.add_active( 1);
         })
     }
 

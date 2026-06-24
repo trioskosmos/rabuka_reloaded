@@ -567,7 +567,7 @@ fn daydream_mermaid_niji_in_success_pick_both() {
         "Recovered member is in hand"
     );
     assert!(
-        game.state.player1.energy_zone.active_energy_count > 0
+        game.state.player1.energy_zone.active_count() > 0
             || !game.state.player1.energy_zone.cards.is_empty(),
         "Energy card was placed"
     );

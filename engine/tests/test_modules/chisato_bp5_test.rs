@@ -35,7 +35,7 @@ fn chisato_bp5_q219_cost_10_needs_10_energy() {
         "Member on stage"
     );
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 0,
+        game.state.player1.energy_zone.active_count(), 0,
         "Spent 10"
     );
 }
@@ -97,7 +97,7 @@ fn chisato_bp5_q219_cross_card_reduction_8_works() {
         "Liella! on stage after cost reduction"
     );
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 0,
+        game.state.player1.energy_zone.active_count(), 0,
         "Spent 8 (reduced from 10)"
     );
 }
@@ -205,7 +205,7 @@ fn chisato_promo_ab0_cross_card_reduction() {
         "Liella! on stage after cost reduction"
     );
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 0,
+        game.state.player1.energy_zone.active_count(), 0,
         "Spent 8 (reduced from 10)"
     );
 }
@@ -235,7 +235,7 @@ fn chisato_promo_ab1_live_start() {
 
     // Give 3 energy, but make them all rested
     game.give_energy(3);
-    game.state.player1.energy_zone.active_energy_count = 0;
+    game.state.player1.energy_zone.set_active_count(0);
 
     // Set up deck and live card to trigger LiveStart phase
     let live_card = game.id("PL!-sd1-019-SD"); // Valid live card
@@ -268,7 +268,7 @@ fn chisato_promo_ab1_live_start() {
         "Chisato should be active"
     );
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 3,
+        game.state.player1.energy_zone.active_count(), 3,
         "All 3 energy should be active"
     );
 }

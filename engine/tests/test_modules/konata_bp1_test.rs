@@ -27,7 +27,7 @@ fn konata_q77_self_appearance_activates_energy() {
     // Mark konata as "appeared this turn" — she's a 虹ヶ咲 member herself
     game.state.cards_moved_this_turn.insert(konata);
 
-    let active_before = game.state.player1.energy_zone.active_energy_count;
+    let active_before = game.state.player1.energy_zone.active_count();
 
     game.activate_ability(konata);
 
@@ -37,7 +37,7 @@ fn konata_q77_self_appearance_activates_energy() {
 
     // ab#0 should fire: discard 1 from hand → activate 2 energy
     // Net active change: +2
-    let active_after = game.state.player1.energy_zone.active_energy_count;
+    let active_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
         active_after,
         active_before + 2,
@@ -64,7 +64,7 @@ fn konata_no_appearance_condition_fails() {
     game.state.player1.hand.cards.push(filler);
     game.give_energy(4);
 
-    let active_before = game.state.player1.energy_zone.active_energy_count;
+    let active_before = game.state.player1.energy_zone.active_count();
 
     game.activate_ability(konata);
 
@@ -73,7 +73,7 @@ fn konata_no_appearance_condition_fails() {
     }
 
     // No member appeared this turn → condition fails, nothing happens
-    let active_after = game.state.player1.energy_zone.active_energy_count;
+    let active_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
         active_after, active_before,
         "No energy change when no 虹ヶ咲 member appeared this turn"
@@ -102,7 +102,7 @@ fn konata_use_limit_blocks_second_activation() {
         game.select_indices(&[0]);
     }
 
-    let active_after_first = game.state.player1.energy_zone.active_energy_count;
+    let active_after_first = game.state.player1.energy_zone.active_count();
     assert_eq!(
         active_after_first, 2,
         "First activation should activate 2 energy"

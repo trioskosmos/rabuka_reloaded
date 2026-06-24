@@ -108,7 +108,7 @@ fn test_hand_size_cost_reduction_kotori() {
     game.state.player1.hand.cards.push(filler);
 
     game.state.player1.energy_zone.cards.clear();
-    game.state.player1.energy_zone.active_energy_count = 0;
+    game.state.player1.energy_zone.set_active_count(0);
     game.give_energy(17); // 1 short of the expected cost of 18
 
     // Attempt to play Kotori. Should fail.
@@ -142,7 +142,7 @@ fn test_hand_size_cost_reduction_kotori() {
         game2.state.player1.hand.cards.push(filler);
     }
     game2.state.player1.energy_zone.cards.clear();
-    game2.state.player1.energy_zone.active_energy_count = 0;
+    game2.state.player1.energy_zone.set_active_count(0);
     // No energy given. Cost should be 0.
     let res = game2.try_play_to_stage(kotori, MemberArea::Center);
     assert!(

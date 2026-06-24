@@ -18,7 +18,7 @@ fn wien_low_energy_no_cost_modifier() {
 
     game.play_to_stage(wien, rabuka_engine::zones::MemberArea::Center);
 
-    let remaining = game.state.player1.energy_zone.active_energy_count;
+    let remaining = game.state.player1.energy_zone.active_count();
     assert_eq!(remaining, 5, "spent 4 energy (base cost)");
 
     // Recalc should NOT add cost mod (9 < 10)
@@ -45,7 +45,7 @@ fn wien_high_energy_cost_modifier_applied() {
     game.play_to_stage(wien, rabuka_engine::zones::MemberArea::Center);
 
     // Play cost is base 4 (modifier is on-stage only)
-    let remaining = game.state.player1.energy_zone.active_energy_count;
+    let remaining = game.state.player1.energy_zone.active_count();
     assert_eq!(
         remaining, 6,
         "spent 4 energy (base cost, modifier on-stage only)"
@@ -82,7 +82,7 @@ fn wien_cost_modifier_dynamic() {
 
     // Add 1 more → 10 energy
     game.state.player1.energy_zone.cards.push(energy_id);
-    game.state.player1.energy_zone.active_energy_count += 1;
+    game.state.player1.energy_zone.add_active( 1);
     game.state.recalculate_constant_blade_modifiers();
     assert_eq!(
         game.state.mods.get_cost_modifier(wien),
@@ -92,7 +92,7 @@ fn wien_cost_modifier_dynamic() {
 
     // Remove 1 → back to 9
     game.state.player1.energy_zone.cards.pop();
-    game.state.player1.energy_zone.active_energy_count -= 1;
+    game.state.player1.energy_zone.sub_active( 1);
     game.state.recalculate_constant_blade_modifiers();
     assert_eq!(
         game.state.mods.get_cost_modifier(wien),

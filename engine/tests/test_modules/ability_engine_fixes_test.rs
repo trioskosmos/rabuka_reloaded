@@ -201,14 +201,14 @@ fn wakana_bp2_008_activate_move_to_empty_area() {
     game.state.player1.stage.stage = [wakana, -1, -1];
     game.give_energy(1);
 
-    let energy_before = game.state.player1.energy_zone.active_energy_count;
+    let energy_before = game.state.player1.energy_zone.active_count();
 
     // Activate ability
     game.activate_ability(wakana);
 
     // Cost is paid first (1 energy)
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count,
+        game.state.player1.energy_zone.active_count(),
         energy_before - 1,
         "1 energy should be consumed"
     );
@@ -329,7 +329,7 @@ fn wakana_bp2_008_use_limit_blocks_second_activation() {
     );
     game.select_option(0); // Center
     assert!(
-        game.state.player1.energy_zone.active_energy_count == 2,
+        game.state.player1.energy_zone.active_count() == 2,
         "1 energy spent, 2 remaining"
     );
 
@@ -881,7 +881,7 @@ fn kanon_unless_pay_pay_avoids_discard() {
         hand_before,
         hand_after
     );
-    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    let energy_after = game.state.player1.energy_zone.active_count();
     assert!(
         energy_after < 11,
         "2 energy should be consumed (had 11 after playing kanon, now {})",
@@ -950,7 +950,7 @@ fn kanon_unless_pay_skip_triggers_discard() {
         hand_before - 1
     );
     // Energy should NOT be consumed (we skipped payment)
-    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    let energy_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
         energy_after, 2,
         "Energy should remain 2 when skipping payment (was 2, now {})",
@@ -960,7 +960,7 @@ fn kanon_unless_pay_skip_triggers_discard() {
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
-    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    let energy_after = game.state.player1.energy_zone.active_count();
     assert!(
         energy_after < 11,
         "2 energy should be consumed (had 11 after playing kanon, now {})",

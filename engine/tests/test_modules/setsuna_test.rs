@@ -33,7 +33,7 @@ fn setsuna_q157_wait_energy_can_be_placed_under_member() {
         .push(game.id("LL-E-001-SD"));
 
     let total_before = game.state.player1.energy_zone.cards.len();
-    let active_before = game.state.player1.energy_zone.active_energy_count;
+    let active_before = game.state.player1.energy_zone.active_count();
 
     game.activate_ability(setsuna);
     if game.has_pending_choice() {
@@ -41,7 +41,7 @@ fn setsuna_q157_wait_energy_can_be_placed_under_member() {
     }
 
     let total_after = game.state.player1.energy_zone.cards.len();
-    let active_after = game.state.player1.energy_zone.active_energy_count;
+    let active_after = game.state.player1.energy_zone.active_count();
 
     assert_eq!(
         active_before - active_after,
@@ -79,7 +79,7 @@ fn setsuna_q184_energy_under_member_not_counted() {
         "Q184: 1 card removed for placement, 2 remain (inactive)"
     );
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 0,
+        game.state.player1.energy_zone.active_count(), 0,
         "Q184: 2 active consumed for cost, 1 removed for placement → 0 remaining"
     );
 }

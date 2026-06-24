@@ -832,7 +832,22 @@ impl super::resolver::AbilityResolver {
                     return self.resume_pending_commands(gs);
                 }
                 Some(Zone::Energy) => {
-                    self.mark_energy_as_wait(gs, indices, &mut validate_card);
+                    let dst = if let Choice::SelectCard { destination, .. } = choice {
+                        destination.clone()
+                    } else {
+                        None
+                    };
+                    self.handle_energy_zone_selection(
+                        gs,
+                        indices,
+                        count,
+                        dst.clone(),
+                        &mut validate_card,
+                    )?;
+                    if dst.is_some() {
+                        self.clear_choice_state(gs);
+                        return self.resume_pending_commands(gs);
+                    }
                 }
                 Some(Zone::Discard) => {
                     // When effect has started, skip cost handling so the effect
@@ -1704,18 +1719,12 @@ impl super::resolver::AbilityResolver {
                 }
             }
             Some(Zone::Energy) => {
-                let filtered: Vec<usize> = {
-                    let player = gs.active_player();
-                    indices
-                        .iter()
-                        .filter(|&&i| {
-                            i < player.energy_zone.cards.len()
-                                && validate_card(player.energy_zone.cards[i])
-                        })
-                        .copied()
-                        .collect()
+                let dst = if let Choice::SelectCard { destination, .. } = choice {
+                    destination.clone()
+                } else {
+                    None
                 };
-                self.execute_selected_energy_zone_cards(gs, &filtered, count)?;
+                self.handle_energy_zone_selection(gs, indices, count, dst, &mut validate_card)?;
             }
             Some(Zone::SelectedCards) => {
                 log::debug!(

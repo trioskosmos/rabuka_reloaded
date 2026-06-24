@@ -469,7 +469,7 @@ impl AbilityResolver {
                 if let Some(energy_id) = player.energy_deck.draw() {
                     player.energy_zone.cards.push(energy_id);
                     if state_change == "active" {
-                        player.energy_zone.active_energy_count += 1;
+                        player.energy_zone.add_active(1);
                     }
                     placed_energy.push(energy_id);
                 }
@@ -522,8 +522,8 @@ impl AbilityResolver {
                         .energy_zone
                         .cards
                         .len()
-                        .saturating_sub(player.energy_zone.active_energy_count),
-                    _ => player.energy_zone.active_energy_count,
+                        .saturating_sub(player.energy_zone.active_count()),
+                    _ => player.energy_zone.active_count(),
                 };
                 let capped = (count as usize).min(available) as u32;
                 log::debug!(
@@ -539,8 +539,8 @@ impl AbilityResolver {
                         .energy_zone
                         .cards
                         .len()
-                        .saturating_sub(player.energy_zone.active_energy_count),
-                    _ => player.energy_zone.active_energy_count,
+                        .saturating_sub(player.energy_zone.active_count()),
+                    _ => player.energy_zone.active_count(),
                 };
                 log::debug!("[ENERGY] count=0 (all): effective={}", val);
                 val as u32
@@ -633,8 +633,7 @@ impl AbilityResolver {
                 }
                 for _ in 0..deactivate_count {
                     let player = gs.resolve_target_player_mut(target);
-                    player.energy_zone.active_energy_count =
-                        player.energy_zone.active_energy_count.saturating_sub(1);
+                    player.energy_zone.sub_active(1);
                 }
             }
             "active" | "アクティブ" => {
@@ -642,7 +641,7 @@ impl AbilityResolver {
                     gs.mods.add_orientation_modifier(*card_id, "active");
                 }
                 let player = gs.resolve_target_player_mut(target);
-                player.energy_zone.active_energy_count += active_cards.len();
+                player.energy_zone.add_active(active_cards.len());
             }
             _ => {}
         }

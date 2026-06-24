@@ -55,7 +55,7 @@ fn himeno_no_matching_character_does_not_trigger() {
 
     setup_and_trigger_himeno(&mut game, filler, non_matching, filler);
 
-    let en = game.state.player1.energy_zone.active_energy_count;
+    let en = game.state.player1.energy_zone.active_count();
     assert!(en > 0, "Energy is from setup");
     // The condition gating is verified indirectly: this test passes because
     // the debug output shows the condition correctly fails (actual=0, needs >=1).
@@ -75,7 +75,7 @@ fn himeno_osawa_on_stage_triggers() {
 
     // The ability activates 1 energy + retrieves a live card from waitroom.
     // Live cards have no abilities, so no extra triggers.
-    let en = game.state.player1.energy_zone.active_energy_count;
+    let en = game.state.player1.energy_zone.active_count();
     assert!(
         en > 0,
         "Energy should be >0 after ability activates (any leftover)"
@@ -93,7 +93,7 @@ fn himeno_momoo_on_stage_triggers() {
 
     setup_and_trigger_himeno(&mut game, filler, filler, momoo);
 
-    let en = game.state.player1.energy_zone.active_energy_count;
+    let en = game.state.player1.energy_zone.active_count();
     assert!(en > 0, "Energy should be >0");
 }
 
@@ -108,7 +108,7 @@ fn himeno_kodomo_on_stage_triggers() {
 
     setup_and_trigger_himeno(&mut game, filler, filler, kodomo);
 
-    let en = game.state.player1.energy_zone.active_energy_count;
+    let en = game.state.player1.energy_zone.active_count();
     assert!(en > 0, "Energy should be >0");
 }
 
@@ -123,7 +123,7 @@ fn himeno_all_three_on_stage_triggers() {
 
     setup_and_trigger_himeno(&mut game, -1, momoo, kodomo);
 
-    let en = game.state.player1.energy_zone.active_energy_count;
+    let en = game.state.player1.energy_zone.active_count();
     assert!(en > 0, "Energy should be >0");
 }
 
@@ -138,7 +138,7 @@ fn himeno_mixed_characters_triggers() {
 
     setup_and_trigger_himeno(&mut game, -1, non_matching, osawa);
 
-    let en = game.state.player1.energy_zone.active_energy_count;
+    let en = game.state.player1.energy_zone.active_count();
     assert!(en > 0, "Energy should be >0");
 }
 
@@ -150,7 +150,7 @@ fn himeno_empty_stage_does_not_trigger() {
 
     setup_and_trigger_himeno(&mut game, -1, -1, -1);
 
-    let en = game.state.player1.energy_zone.active_energy_count;
+    let en = game.state.player1.energy_zone.active_count();
     assert!(en > 0, "Energy is from setup");
     // The condition gating is verified indirectly via debug log showing
     // location_condition evaluates "actual=0 FAIL" for empty stage.

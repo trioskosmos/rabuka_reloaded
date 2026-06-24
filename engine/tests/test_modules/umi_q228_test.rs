@@ -20,7 +20,7 @@ fn umi_q228_four_unique_groups_cost_zero() {
         game.select_indices(&[]);
     }
 
-    let active = game.state.player1.energy_zone.active_energy_count;
+    let active = game.state.player1.energy_zone.active_count();
     eprintln!("[UMI] active energy consumed: {} (expected 0)", active);
     assert_eq!(active, 0, "Cost=0, no active energy consumed");
 }
@@ -44,7 +44,7 @@ fn umi_q228_two_groups_cost_2() {
         game.select_indices(&[]);
     }
 
-    let active = game.state.player1.energy_zone.active_energy_count;
+    let active = game.state.player1.energy_zone.active_count();
     eprintln!(
         "[UMI] active energy remaining: {} (expected 0 — spent 2)",
         active
@@ -70,7 +70,7 @@ fn umi_q228_insufficient_energy_fails() {
         game.select_indices(&[]);
     }
 
-    let active = game.state.player1.energy_zone.active_energy_count;
+    let active = game.state.player1.energy_zone.active_count();
     eprintln!("[UMI] active energy remaining: {} (expected 1)", active);
     assert_eq!(active, 1, "No active energy spent — cost=2 > 1 available");
 }

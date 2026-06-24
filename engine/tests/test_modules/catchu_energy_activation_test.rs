@@ -65,14 +65,14 @@ fn catchu_basic_two_distinct_activate_2() {
     game.state.player1.stage.stage[2] = filler;
 
     game.give_energy(3);
-    assert_eq!(game.state.player1.energy_zone.active_energy_count, 3);
+    assert_eq!(game.state.player1.energy_zone.active_count(), 3);
 
     advance_to_live_card_set_p1(&mut game);
     advance_to_live_start(&mut game);
 
     assert!(!game.has_pending_choice(), "No pending choices expected");
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 5,
+        game.state.player1.energy_zone.active_count(), 5,
         "2 distinct CatChu names on stage → activate 2: 3→5"
     );
 }
@@ -99,7 +99,7 @@ fn catchu_zero_members_nothing_activates() {
 
     assert!(!game.has_pending_choice(), "No pending choices expected");
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 3,
+        game.state.player1.energy_zone.active_count(), 3,
         "No CatChu members → no activation"
     );
 }
@@ -121,7 +121,7 @@ fn catchu_three_distinct_activate_3() {
     game.state.player1.stage.stage[2] = catchu_b;
 
     game.give_energy(3);
-    assert_eq!(game.state.player1.energy_zone.active_energy_count, 3);
+    assert_eq!(game.state.player1.energy_zone.active_count(), 3);
 
     advance_to_live_card_set_p1(&mut game);
     advance_to_live_start(&mut game);
@@ -147,14 +147,14 @@ fn catchu_duplicate_names_dedup_to_1() {
     game.state.player1.stage.stage[2] = catchu_dup;
 
     game.give_energy(3);
-    assert_eq!(game.state.player1.energy_zone.active_energy_count, 3);
+    assert_eq!(game.state.player1.energy_zone.active_count(), 3);
 
     advance_to_live_card_set_p1(&mut game);
     advance_to_live_start(&mut game);
 
     assert!(!game.has_pending_choice(), "No pending choices expected");
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 5,
+        game.state.player1.energy_zone.active_count(), 5,
         "2 distinct names (mei + kanon) → activate 2: 3→5"
     );
 }
@@ -173,14 +173,14 @@ fn catchu_single_member_activate_1() {
     game.state.player1.stage.stage[1] = filler;
 
     game.give_energy(3);
-    assert_eq!(game.state.player1.energy_zone.active_energy_count, 3);
+    assert_eq!(game.state.player1.energy_zone.active_count(), 3);
 
     advance_to_live_card_set_p1(&mut game);
     advance_to_live_start(&mut game);
 
     assert!(!game.has_pending_choice(), "No pending choices expected");
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 4,
+        game.state.player1.energy_zone.active_count(), 4,
         "1 CatChu member → activate 1 energy: 3→4"
     );
 }
@@ -206,7 +206,7 @@ fn catchu_only_non_catchu_on_stage() {
     assert!(!game.has_pending_choice(), "No pending choices expected");
 
     // No CatChu members on stage at all → no abilities fire → energy unchanged
-    assert_eq!(game.state.player1.energy_zone.active_energy_count, 3);
+    assert_eq!(game.state.player1.energy_zone.active_count(), 3);
 }
 
 /// Self as member on stage + 1 other CatChu → activates 2
@@ -225,14 +225,14 @@ fn catchu_self_as_member_on_stage_plus_one_other() {
     game.state.player1.stage.stage[2] = filler;
 
     game.give_energy(3);
-    assert_eq!(game.state.player1.energy_zone.active_energy_count, 3);
+    assert_eq!(game.state.player1.energy_zone.active_count(), 3);
 
     advance_to_live_card_set_p1(&mut game);
     advance_to_live_start(&mut game);
 
     assert!(!game.has_pending_choice(), "No pending choices expected");
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 5,
+        game.state.player1.energy_zone.active_count(), 5,
         "2 unique CatChu names on stage → activate 2: 3→5"
     );
 }

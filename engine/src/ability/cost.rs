@@ -503,7 +503,7 @@ impl AbilityResolver {
 
                 if any_number && (optional || !is_activation) {
                     let player = gs.resolve_target_player_mut(target);
-                    let active_count = player.energy_zone.active_energy_count;
+                    let active_count = player.energy_zone.active_count();
                     if active_count == 0 {
                         // No energy to pay — treat as skip
                         if let Some(entry) = gs.ability_queue.current_entry_mut() {
@@ -578,8 +578,7 @@ impl AbilityResolver {
                         player.energy_deck.cards.push(card);
                     }
                 }
-                player.energy_zone.active_energy_count =
-                    player.energy_zone.active_energy_count.saturating_sub(count);
+                player.energy_zone.sub_active(count);
                 Ok(())
             }
             "reveal" => {
@@ -735,7 +734,7 @@ impl AbilityResolver {
         if let Some(count) = self.pending_energy_payment {
             self.pending_energy_payment = None;
             let player = gs.resolve_target_player_mut("self");
-            if player.energy_zone.active_energy_count >= count as usize {
+            if player.energy_zone.active_count() >= count as usize {
                 player.energy_zone.pay_energy(count as usize)?;
             } else {
                 // Insufficient energy: clear remaining commands and return

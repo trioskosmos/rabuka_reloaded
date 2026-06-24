@@ -215,7 +215,7 @@ fn hanaho_played_to_stage_no_baton_touch_does_not_trigger() {
     game.add_to_hand(filler);
     game.give_energy(9);
 
-    let energy_before = game.state.player1.energy_zone.active_energy_count;
+    let energy_before = game.state.player1.energy_zone.active_count();
 
     game.play_to_stage(hanaho, MemberArea::Center);
 
@@ -223,7 +223,7 @@ fn hanaho_played_to_stage_no_baton_touch_does_not_trigger() {
         game.select_indices(&[]);
     }
 
-    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    let energy_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
         energy_after,
         energy_before - 9,
@@ -274,7 +274,7 @@ fn hanaho_baton_touch_triggers_activates_energy() {
     game.state.player1.stage.stage[1] = hanaho;
     game.give_energy(25);
 
-    let energy_before = game.state.player1.energy_zone.active_energy_count;
+    let energy_before = game.state.player1.energy_zone.active_count();
     assert!(energy_before >= 20, "Must have enough energy for the test");
 
     game.state.player1.hand.cards.push(arriver);
@@ -293,7 +293,7 @@ fn hanaho_baton_touch_triggers_activates_energy() {
         "Arriver must occupy center after baton touch"
     );
 
-    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    let energy_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
         energy_after,
         energy_before - (15 - 9) + 2,
@@ -315,7 +315,7 @@ fn hanaho_baton_touch_low_cost_no_trigger() {
     game.state.player1.stage.stage[1] = hanaho;
     game.give_energy(20);
 
-    let energy_before = game.state.player1.energy_zone.active_energy_count;
+    let energy_before = game.state.player1.energy_zone.active_count();
 
     game.state.player1.hand.cards.push(low_cost);
     game.state.player1.hand.cards.push(filler);
@@ -324,7 +324,7 @@ fn hanaho_baton_touch_low_cost_no_trigger() {
         game.select_indices(&[]);
     }
 
-    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    let energy_after = game.state.player1.energy_zone.active_count();
     // low_cost = 4, hanaho = 9. Since cost < 4, the engine pays 0 (cost wraps).
     // The actual cost is card_cost - replaced_cost = 4 - 9 = 0 (saturating).
     // Ability should NOT fire (cost 4 < 10).
@@ -347,7 +347,7 @@ fn hanaho_baton_touch_wrong_group_no_trigger() {
     game.state.player1.stage.stage[1] = hanaho;
     game.give_energy(20);
 
-    let energy_before = game.state.player1.energy_zone.active_energy_count;
+    let energy_before = game.state.player1.energy_zone.active_count();
 
     game.state.player1.hand.cards.push(wrong_group);
     game.state.player1.hand.cards.push(filler);
@@ -357,7 +357,7 @@ fn hanaho_baton_touch_wrong_group_no_trigger() {
         game.select_indices(&[]);
     }
 
-    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    let energy_after = game.state.player1.energy_zone.active_count();
     // wrong_group cost = 9, hanaho cost = 9, baton cost = 0
     // Group check: wrong_group is NOT 蓮ノ空 → ability must not activate
     assert!(
@@ -378,7 +378,7 @@ fn hanaho_baton_touch_triggers_exactly_once() {
     game.state.player1.stage.stage[1] = hanaho;
     game.give_energy(25);
 
-    let energy_before = game.state.player1.energy_zone.active_energy_count;
+    let energy_before = game.state.player1.energy_zone.active_count();
 
     game.state.player1.hand.cards.push(arriver);
     game.state.player1.hand.cards.push(filler);
@@ -387,7 +387,7 @@ fn hanaho_baton_touch_triggers_exactly_once() {
         game.select_indices(&[]);
     }
 
-    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    let energy_after = game.state.player1.energy_zone.active_count();
     // - If fires once:  -6 + 2 = -4
     // - If fires twice: -6 + 4 = -2
     // - If zero:        -6
@@ -440,7 +440,7 @@ fn baton_touch_cleared_between_actions() {
 
     // Action 2: play a plain card to an empty area (no baton touch)
     game.add_to_hand(fresh_card);
-    let energy_before = game.state.player1.energy_zone.active_energy_count;
+    let energy_before = game.state.player1.energy_zone.active_count();
     game.play_to_stage(fresh_card, MemberArea::LeftSide);
     while game.has_pending_choice() {
         game.select_indices(&[]);
@@ -452,7 +452,7 @@ fn baton_touch_cleared_between_actions() {
         .get_card(fresh_card)
         .and_then(|c| c.cost)
         .unwrap_or(0) as usize;
-    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    let energy_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
         energy_after,
         energy_before - cost,

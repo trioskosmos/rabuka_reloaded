@@ -691,7 +691,7 @@ pub fn player_to_display(
         .iter()
         .enumerate()
         .map(|(i, &card_id)| {
-            let orientation = if i < player.energy_zone.active_energy_count {
+            let orientation = if i < player.energy_zone.active_count() {
                 Some(Orientation::Active)
             } else {
                 Some(Orientation::Wait)
@@ -969,7 +969,7 @@ pub fn player_to_display(
         name: player.name.clone(),
         is_first_attacker: player.is_first_attacker,
         exclusion_zone: zone_to_display(&player.exclusion_zone.cards, card_db),
-        energy_active_count: player.energy_zone.active_energy_count,
+        energy_active_count: player.energy_zone.active_count(),
         stage_hearts: stage_hearts_display,
     }
 }

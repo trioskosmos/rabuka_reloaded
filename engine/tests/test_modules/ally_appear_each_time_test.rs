@@ -23,7 +23,7 @@ fn setup_each_time_test(game: &mut TestGame, card_id: i16, position: usize, ally
     for _ in 0..10 {
         game.state.player1.energy_zone.cards.push(e_card);
     }
-    game.state.player1.energy_zone.active_energy_count = 10;
+    game.state.player1.energy_zone.set_active_count(10);
     game.state.player1.stage.stage[position] = card_id;
     if let Some(a) = ally {
         // Place ally on an adjacent stage position

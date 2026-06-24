@@ -68,7 +68,7 @@ fn hanamaru_constant_cost_per_success_card() {
     // Base + 1 should be consumed
     let expected_cost = base_cost + 1;
     assert!(
-        game.state.player1.energy_zone.active_energy_count
+        game.state.player1.energy_zone.active_count()
             <= (base_cost as usize + 5) - expected_cost as usize,
         "Should consume base + 1 energy (success_live_zone card increases cost)"
     );
@@ -161,7 +161,7 @@ fn music_start_reduces_high_cost_mus_member() {
     game.play_to_stage(maki, MemberArea::Center);
 
     // Should have paid 17 - 2 = 15 energy
-    let remaining = game.state.player1.energy_zone.active_energy_count;
+    let remaining = game.state.player1.energy_zone.active_count();
     assert_eq!(
         remaining,
         20 - (17 - 2),
@@ -193,7 +193,7 @@ fn music_start_does_not_reduce_low_cost_mus_member() {
     game.play_to_stage(honoka, MemberArea::Center);
 
     // Should have paid full cost 4 (no reduction)
-    let remaining = game.state.player1.energy_zone.active_energy_count;
+    let remaining = game.state.player1.energy_zone.active_count();
     assert_eq!(
         remaining,
         10 - 4,
@@ -225,7 +225,7 @@ fn music_start_does_not_reduce_non_mus_member() {
     game.play_to_stage(mari, MemberArea::Center);
 
     // Should have paid full cost 17 (not μ's group)
-    let remaining = game.state.player1.energy_zone.active_energy_count;
+    let remaining = game.state.player1.energy_zone.active_count();
     assert_eq!(
         remaining,
         20 - 17,
@@ -261,7 +261,7 @@ fn music_start_removed_from_success_zone_stops_reduction() {
     game.play_to_stage(maki, MemberArea::Center);
 
     // Should have paid full cost 17 (no Music S.T.A.R.T!! in zone)
-    let remaining = game.state.player1.energy_zone.active_energy_count;
+    let remaining = game.state.player1.energy_zone.active_count();
     assert_eq!(
         remaining,
         20 - 17,
@@ -375,7 +375,10 @@ fn wien_energy_setup(energy_count: usize) -> (TestGame, i16) {
     for _ in 0..energy_count {
         game.state.player1.energy_zone.cards.push(energy);
     }
-    game.state.player1.energy_zone.active_energy_count = energy_count;
+    game.state
+        .player1
+        .energy_zone
+        .set_active_count(energy_count);
 
     (game, wien)
 }
@@ -472,7 +475,7 @@ fn wien_energy_changes_dynamically() {
     for _ in 0..5 {
         game.state.player1.energy_zone.cards.push(energy);
     }
-    game.state.player1.energy_zone.active_energy_count = 5;
+    game.state.player1.energy_zone.set_active_count(5);
     game.state.recalculate_constants();
 
     let h06 = game.state.mods.get_heart_modifier(wien, H06);
@@ -487,7 +490,7 @@ fn wien_energy_changes_dynamically() {
     for _ in 0..7 {
         game.state.player1.energy_zone.cards.push(energy);
     }
-    game.state.player1.energy_zone.active_energy_count = 7;
+    game.state.player1.energy_zone.set_active_count(7);
     game.state.recalculate_constants();
 
     let h06 = game.state.mods.get_heart_modifier(wien, H06);

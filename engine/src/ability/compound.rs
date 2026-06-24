@@ -65,7 +65,9 @@ impl AbilityResolver {
                 .last()
                 .is_some_and(|a| a.action == "repeat_procedure");
             let repeat_max = if has_repeat {
-                actions.last().and_then(|a| a.repeat_limit).unwrap_or(1)
+                // repeat_limit = max additional iterations (e.g. 4 = 4 more times)
+                // Total iterations = initial + max_repeats
+                actions.last().and_then(|a| a.repeat_limit).unwrap_or(1) + 1
             } else {
                 1
             };
@@ -333,7 +335,51 @@ impl AbilityResolver {
                                             == Some(crate::ability::enums::ConditionType::OtherwiseCondition))
                                     });
                                 }
-                                // Preserve remaining repeats in the pending state
+                                // If the outer sequential has an optional repeat_procedure,
+                                // insert the "Repeat?" choice prompt before the remaining
+                                // repeats so the player can stop or continue.
+                                if repeats_remaining > 0 && has_repeat {
+                                    if let Some(ref repeat_action) = actions.last() {
+                                        if repeat_action.action == "repeat_procedure"
+                                            && repeat_action.optional.unwrap_or(false)
+                                        {
+                                            let mut cmds: Vec<Command> = remaining
+                                                .into_iter()
+                                                .map(Command::Effect)
+                                                .collect();
+                                            cmds.push(Command::Choice(Choice::SelectTarget {
+                                                target: "pay_optional_cost:skip_optional_cost"
+                                                    .to_string(),
+                                                description: "Repeat effect?".to_string(),
+                                                allow_skip: true,
+                                                options: Some(vec![
+                                                    "Stop".to_string(),
+                                                    "Continue".to_string(),
+                                                ]),
+                                            }));
+                                            // Only add remaining repeats on the FIRST sequential
+                                            // save (initial execution). Subsequent saves via RPC
+                                            // get them from the original pending batch merge.
+                                            if self.first_seq_save {
+                                                self.first_seq_save = false;
+                                                for _ in 0..repeats_remaining {
+                                                    cmds.extend(
+                                                        repeat_actions
+                                                            .iter()
+                                                            .cloned()
+                                                            .map(Command::Effect),
+                                                    );
+                                                }
+                                            }
+                                            let mut existing =
+                                                gs.ability_queue.take_pending_commands();
+                                            existing.extend(cmds);
+                                            gs.ability_queue.set_pending_commands(existing);
+                                            return Ok(());
+                                        }
+                                    }
+                                }
+                                // Preserve remaining repeats in the pending state (no repeat prompt needed)
                                 for _ in 0..repeats_remaining {
                                     remaining.extend_from_slice(repeat_actions);
                                 }
@@ -607,7 +653,7 @@ impl AbilityResolver {
                 if need > 0 {
                     let player =
                         gs.resolve_target_player_mut(opt.target.as_deref().unwrap_or("self"));
-                    if (player.energy_zone.active_energy_count as usize) < need {
+                    if (player.energy_zone.active_count() as usize) < need {
                         let cmd = if is_negation {
                             Command::Effect(*cond.clone())
                         } else {

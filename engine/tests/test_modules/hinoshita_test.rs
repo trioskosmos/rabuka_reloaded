@@ -49,7 +49,7 @@ fn hinoshita_q236_name_contains_all_matches() {
 
     // Energy: 2 for activation cost
     game.give_energy(2);
-    let energy_before = game.state.player1.energy_zone.active_energy_count;
+    let energy_before = game.state.player1.energy_zone.active_count();
 
     game.activate_ability(hino);
 
@@ -74,7 +74,7 @@ fn hinoshita_q236_name_contains_all_matches() {
 
     // 2 energy consumed
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count,
+        game.state.player1.energy_zone.active_count(),
         energy_before - 2,
         "Q236: 2 energy should be consumed"
     );
@@ -101,7 +101,7 @@ fn hinoshita_q237_name_contains_all_no_match() {
     game.state.player1.hand.cards.push(reveal_live);
     game.state.player1.waitroom.cards.push(target_live);
     game.give_energy(2);
-    let energy_before = game.state.player1.energy_zone.active_energy_count;
+    let energy_before = game.state.player1.energy_zone.active_count();
 
     game.activate_ability(hino);
 
@@ -129,7 +129,7 @@ fn hinoshita_q237_name_contains_all_no_match() {
 
     // 2 energy consumed
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count,
+        game.state.player1.energy_zone.active_count(),
         energy_before - 2,
         "Q237: 2 energy should be consumed"
     );
@@ -154,7 +154,7 @@ fn hinoshita_no_matching_live_in_discard_fails() {
     game.state.player1.hand.cards.push(reveal_live);
     game.state.player1.waitroom.cards.push(wrong_live);
     game.give_energy(2);
-    let energy_before = game.state.player1.energy_zone.active_energy_count;
+    let energy_before = game.state.player1.energy_zone.active_count();
 
     game.activate_ability(hino);
 
@@ -182,7 +182,7 @@ fn hinoshita_no_matching_live_in_discard_fails() {
 
     // 2 energy consumed
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count,
+        game.state.player1.energy_zone.active_count(),
         energy_before - 2,
         "2 energy should be consumed"
     );

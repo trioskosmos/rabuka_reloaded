@@ -328,16 +328,16 @@ impl<'a> ConditionContext<'a> {
             match state {
                 "active" => {
                     if all_cards {
-                        player.energy_zone.active_energy_count == player.energy_zone.cards.len()
+                        player.energy_zone.active_count() == player.energy_zone.cards.len()
                     } else {
-                        player.energy_zone.active_energy_count > 0
+                        player.energy_zone.active_count() > 0
                     }
                 }
                 "wait" => {
                     if all_cards {
-                        player.energy_zone.active_energy_count == 0
+                        player.energy_zone.active_count() == 0
                     } else {
-                        player.energy_zone.active_energy_count < player.energy_zone.cards.len()
+                        player.energy_zone.active_count() < player.energy_zone.cards.len()
                     }
                 }
                 _ => true,

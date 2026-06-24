@@ -198,7 +198,7 @@ impl TestGame {
             let energy_card = self.id("LL-E-001-SD");
             self.state.player1.energy_zone.cards.push(energy_card);
         }
-        self.state.player1.energy_zone.active_energy_count += count;
+        self.state.player1.energy_zone.add_active(count);
     }
 
     // ---- Actions ----
@@ -834,7 +834,7 @@ impl TestGame {
 
     /// Assert energy count equals expected value.
     pub fn assert_energy(&self, expected: u32, msg: &str) {
-        let actual = self.state.player1.energy_zone.active_energy_count;
+        let actual = self.state.player1.energy_zone.active_count();
         assert_eq!(
             actual, expected as usize,
             "{}: expected {} energy, got {}",

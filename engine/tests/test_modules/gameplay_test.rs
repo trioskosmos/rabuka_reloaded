@@ -86,7 +86,7 @@ fn assert_score(game: &TestGame, expected: i32) {
 }
 
 fn assert_energy(game: &TestGame, active: usize, total: usize) {
-    assert_eq!(game.state.player1.energy_zone.active_energy_count, active);
+    assert_eq!(game.state.player1.energy_zone.active_count(), active);
     assert_eq!(game.state.player1.energy_zone.cards.len(), total);
 }
 
@@ -407,8 +407,7 @@ fn distortion_q96_score_permanent_after_energy_used() {
     game.state.player1.energy_zone.cards.push(energy_id);
     // active_energy_count stays at 3, cards.len() = 4, so not all active anymore
     assert!(
-        game.state.player1.energy_zone.active_energy_count
-            < game.state.player1.energy_zone.cards.len(),
+        game.state.player1.energy_zone.active_count() < game.state.player1.energy_zone.cards.len(),
         "Energy should not be all-active anymore"
     );
 
@@ -451,9 +450,10 @@ fn distortion_basic_energy_refresh_with_catchu() {
         game.state.player1.energy_zone.cards.push(energy_id);
     }
     assert_eq!(game.state.player1.energy_zone.cards.len(), 7);
-    assert_eq!(game.state.player1.energy_zone.active_energy_count, 3);
+    assert_eq!(game.state.player1.energy_zone.active_count(), 3);
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 3,
+        game.state.player1.energy_zone.active_count(),
+        3,
         "3 active, 4 wait — not all active"
     );
 
@@ -466,7 +466,8 @@ fn distortion_basic_energy_refresh_with_catchu() {
 
     // 4 wait cards should now be active
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 7,
+        game.state.player1.energy_zone.active_count(),
+        7,
         "All 7 energy should be active after refresh of 4 wait cards"
     );
 
@@ -552,7 +553,8 @@ fn distortion_max_cap_8_wait_refresh_6_only() {
     advance_to_live_start(&mut game);
     assert!(!game.has_pending_choice());
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 6,
+        game.state.player1.energy_zone.active_count(),
+        6,
         "Only 6 of 8 wait cards should be refreshed (capped by max)"
     );
     assert_eq!(game.state.player1.energy_zone.cards.len(), 8);
@@ -674,7 +676,7 @@ fn distortion_q103_two_triggers_only_one_plus_1() {
     advance_to_live_start(&mut game);
     game.drain_auto_ability_choices();
     assert!(!game.has_pending_choice());
-    assert_eq!(game.state.player1.energy_zone.active_energy_count, 7);
+    assert_eq!(game.state.player1.energy_zone.active_count(), 7);
     let total_score: i32 = game
         .state
         .player1
@@ -724,7 +726,8 @@ fn distortion_two_same_one_diff_catchu_condition_met() {
     assert!(!game.has_pending_choice());
     // 2 distinct CatChu! names → condition met → 4 wait activated
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 4,
+        game.state.player1.energy_zone.active_count(),
+        4,
         "All 4 wait energy activated — distinct condition met (Kanon + Keke)"
     );
     assert_eq!(
@@ -765,7 +768,8 @@ fn distortion_same_name_catchu_all_active_score_plus_1() {
     assert!(!game.has_pending_choice());
     // Distinct condition fails (only 1 unique name) → no energy activation
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 4,
+        game.state.player1.energy_zone.active_count(),
+        4,
         "No wait energy added — distinct condition not met"
     );
     // But all energy active → score +1 (Q97 logic)
@@ -2069,7 +2073,7 @@ fn you_q186_cost_reduced_playable() {
         "You should be playable with 4 energy (cost 20-16 reduction)"
     );
     // Verify cost was actually reduced — remaining energy should be 0 (4-4=0)
-    let spent = 4 - game.state.player1.energy_zone.active_energy_count;
+    let spent = 4 - game.state.player1.energy_zone.active_count();
     assert_eq!(
         spent, 4,
         "Should have spent exactly 4 energy (cost reduction worked)"
@@ -2719,12 +2723,7 @@ fn energy_zone_capacity_handled() {
     );
 
     // Spend energy (simulate paying a cost)
-    game.state.player1.energy_zone.active_energy_count = game
-        .state
-        .player1
-        .energy_zone
-        .active_energy_count
-        .saturating_sub(5);
+    game.state.player1.energy_zone.sub_active(5);
     assert_eq!(
         game.state.player1.energy_zone.active_count(),
         15,
@@ -2737,12 +2736,7 @@ fn energy_zone_capacity_handled() {
     );
 
     // Spend all remaining
-    game.state.player1.energy_zone.active_energy_count = game
-        .state
-        .player1
-        .energy_zone
-        .active_energy_count
-        .saturating_sub(15);
+    game.state.player1.energy_zone.sub_active(15);
     assert_eq!(
         game.state.player1.energy_zone.active_count(),
         0,
@@ -2750,12 +2744,7 @@ fn energy_zone_capacity_handled() {
     );
 
     // Try to spend below 0 (should not crash, saturating)
-    game.state.player1.energy_zone.active_energy_count = game
-        .state
-        .player1
-        .energy_zone
-        .active_energy_count
-        .saturating_sub(1);
+    game.state.player1.energy_zone.sub_active(1);
     assert_eq!(
         game.state.player1.energy_zone.active_count(),
         0,
@@ -2802,7 +2791,7 @@ fn umi_pr014_appear_reveal_and_draw_when_no_live_card() {
     }
 
     // Umi cost is 2, we had 3 energy
-    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    let energy_after = game.state.player1.energy_zone.active_count();
     assert_eq!(
         energy_after, 1,
         "Should have 1 active energy after paying cost 2"
@@ -3223,7 +3212,7 @@ fn kanon_activation_choice_condition_discard_flow() {
 
     // Put wait energy — make 5 of 15 wait
     game.give_energy(15);
-    game.state.player1.energy_zone.active_energy_count = 10;
+    game.state.player1.energy_zone.set_active_count(10);
 
     // Manually place kanon on stage to avoid triggering debut ability
     game.state.player1.stage.stage[0] = kanon;
@@ -3274,7 +3263,8 @@ fn kanon_activation_choice_condition_discard_flow() {
         "Effect should resolve after discard"
     );
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 11,
+        game.state.player1.energy_zone.active_count(),
+        11,
         "One wait energy should be activated"
     );
     // The selected card should be in discard (waitroom)
@@ -3293,7 +3283,7 @@ fn kanon_activation_choice_condition_wait_option() {
 
     game.state.player1.hand.cards.push(kanon);
     game.give_energy(15);
-    game.state.player1.energy_zone.active_energy_count = 10;
+    game.state.player1.energy_zone.set_active_count(10);
 
     // Manually place kanon on stage without triggering debut ability
     game.state.player1.stage.stage[0] = kanon;
@@ -3311,7 +3301,8 @@ fn kanon_activation_choice_condition_wait_option() {
         "Effect should resolve after paying wait cost"
     );
     assert_eq!(
-        game.state.player1.energy_zone.active_energy_count, 11,
+        game.state.player1.energy_zone.active_count(),
+        11,
         "One wait energy should be activated"
     );
     // Kanon should be in wait state
