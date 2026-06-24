@@ -247,8 +247,11 @@ impl super::TurnEngine {
 
         // Rule 8.3.13: Check timing — auto abilities fire here.
         // "When you yell" abilities grant hearts that feed into 8.3.14.
+        // Set flag so on_yell abilities know a yell actually happened.
+        game_state.yell_occurred = !revealed_ids.is_empty();
         game_state.trigger_auto_abilities_for_player(&performer_id);
         game_state.process_pending_auto_abilities(&performer_id);
+        game_state.yell_occurred = false;
 
         // Capture current heart modifiers (includes ability-granted hearts from
         // the 8.3.13 check timing) before re-borrowing player.

@@ -125,6 +125,7 @@ impl AbilityResolver {
                     effect.target.clone().unwrap_or_else(|| "self".to_string()),
                 ))
                 .filtered_indices(filtered_indices)
+                .destination(effect.destination.clone())
                 .build(),
         );
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
@@ -267,6 +268,7 @@ impl AbilityResolver {
     ) -> Result<Option<Vec<i16>>, String> {
         let cards = util::zone_card_ids(player, zone_name);
         let filtered_indices = util::matching_indices(&cards, card_db, filter, false);
+
         match util::resolve_selection(
             &cards,
             card_db,

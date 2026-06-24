@@ -1595,6 +1595,11 @@ def _try_revealed(text):
         "target": "self",
         "text": text,
     }
+    # "エールしたとき" (when you yell) vs "エールにより公開された" (when cards revealed by yell).
+    # "エールしたとき" requires that a yell actually occurred (total_blade > 0 after modifiers).
+    # If no yell was performed (e.g. all members wait), the ability should not trigger (Q264).
+    if "エールしたとき" in text and "エールにより公開された" not in text:
+        result["yell_trigger"] = True
     if has_negation:
         result["negation"] = True
     if "ブレードハートを持つ" in text or "ブレードハートを持たない" in text:
@@ -6839,7 +6844,14 @@ def _try_unless_effect(text):
     E.g. "{{E}}{{E}}支払わないかぎり、自分の手札を2枚控え室に置く。"
     → optional_action: pay 2 energy to AVOID the effect
     → conditional_action: discard 2 from hand (fires when cost NOT paid)
+
+    Also handles non-energy unless effects like:
+    "手札を1枚控え室に置かないかぎり、自分のエネルギー1枚をエネルギーデッキに置く。"
+    → optional_action: discard 1 from hand
+    → conditional_action: place 1 energy to energy deck
     """
+    import re
+
     if "しないかぎり" not in text and "ないかぎり" not in text:
         return None
     kw = "しないかぎり" if "しないかぎり" in text else "ないかぎり"
@@ -6848,18 +6860,50 @@ def _try_unless_effect(text):
         return None
     unless_text = parts[0].strip()
     eff_text = parts[1].strip()
-    if "{{icon_energy.png|E}}" not in unless_text:
-        return None
-    ec = unless_text.count("{{icon_energy.png|E}}")
-    fa = {"action": "pay_energy", "energy": ec, "count": ec, "target": "self"}
-    aa = parse_effect(eff_text)
-    return {
-        "text": text,
-        "action": "conditional_on_optional",
-        "optional_action": fa,
-        "conditional_action": aa,
-        "conditional_negation": True,
-    }
+
+    # Energy-based unless (existing): pay energy to avoid effect
+    if "{{icon_energy.png|E}}" in unless_text:
+        ec = unless_text.count("{{icon_energy.png|E}}")
+        fa = {"action": "pay_energy", "energy": ec, "count": ec, "target": "self"}
+        aa = parse_effect(eff_text)
+        return {
+            "text": text,
+            "action": "conditional_on_optional",
+            "optional_action": fa,
+            "conditional_action": aa,
+            "conditional_negation": True,
+        }
+
+    # Non-energy unless: detect "手札をN枚控え室に置かないかぎり" pattern
+    # (unless you discard N from hand to waitroom). The split leaves the
+    # imperfective stem (e.g. "置か" from 置かない), so we reconstruct
+    # the action manually.
+    m = re.search(r"手札を(\d+)枚控え室に置", unless_text)
+    if m:
+        count = int(m.group(1))
+        fa = {
+            "action": "move_cards",
+            "source": "hand",
+            "destination": "discard",
+            "count": count,
+            "target": "self",
+        }
+        aa = parse_effect(eff_text)
+        # When the conditional action is "place energy to energy deck", fix both
+        # the source (energy_zone, not hand) and the destination (energy_deck, not deck).
+        if aa.get("card_type") == "energy_card" and aa.get("destination") == "deck":
+            aa["source"] = "energy_zone"
+            aa["destination"] = "energy_deck"
+        if aa.get("action") != "custom":
+            return {
+                "text": text,
+                "action": "conditional_on_optional",
+                "optional_action": fa,
+                "conditional_action": aa,
+                "conditional_negation": True,
+            }
+
+    return None
 
 
 def _try_shi_sequential(text):

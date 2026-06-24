@@ -1403,6 +1403,11 @@ pub struct Condition {
     /// Used when ability_filter is "no_ability_type"
     #[serde(default)]
     pub ability_filter_triggers: Option<Vec<String>>,
+    /// True when this condition represents "エールしたとき" (when you yell)
+    /// as opposed to "エールにより公開された" (when cards are revealed by yell).
+    /// The engine checks this against the yell_occurred flag on GameState.
+    #[serde(default)]
+    pub yell_trigger: Option<bool>,
     /// Sum-total cost comparison value (e.g. "コストの合計がN")
     #[serde(default)]
     pub cost_total: Option<u32>,

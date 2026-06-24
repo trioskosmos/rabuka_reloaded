@@ -77,6 +77,8 @@ pub enum Choice {
         blind: bool,
         #[serde(default)]
         is_reveal: bool,
+        #[serde(default)]
+        destination: Option<String>,
     },
     SelectTarget {
         target: String,
@@ -207,6 +209,7 @@ pub struct ChoiceBuilder {
     target_player_id: Option<String>,
     blind: bool,
     is_reveal: bool,
+    destination: Option<String>,
 }
 
 impl ChoiceBuilder {
@@ -230,6 +233,7 @@ impl ChoiceBuilder {
             target_player_id: self.target_player_id,
             blind: self.blind,
             is_reveal: self.is_reveal,
+            destination: self.destination,
         }
     }
 
@@ -265,6 +269,10 @@ impl ChoiceBuilder {
     }
     pub fn filtered_indices(mut self, v: Option<Vec<usize>>) -> Self {
         self.filtered_indices = v;
+        self
+    }
+    pub fn destination(mut self, v: Option<String>) -> Self {
+        self.destination = v;
         self
     }
     pub fn is_select_action(mut self, v: bool) -> Self {
@@ -338,6 +346,7 @@ impl Choice {
             target_player_id: None,
             blind: false,
             is_reveal: false,
+            destination: None,
         }
     }
 

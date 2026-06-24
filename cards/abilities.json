@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-25T01:50:01.044784",
+  "generated_at": "2026-06-25T03:00:35.984336",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -4270,7 +4270,8 @@
           "type": "location_condition",
           "location": "revealed_cards",
           "target": "self",
-          "text": "自分がエールしたとき"
+          "text": "自分がエールしたとき",
+          "yell_trigger": true
         }
       }
     },
@@ -18863,27 +18864,26 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のエネルギー1枚をエネルギーデッキに置く",
-        "condition": {
-          "text": "手札を1枚控え室に置かないかぎり",
-          "location": "discard",
-          "locations": [
-            "discard",
-            "hand"
-          ],
+        "text": "手札を1枚控え室に置かないかぎり、自分のエネルギー1枚をエネルギーデッキに置く",
+        "action": "conditional_on_optional",
+        "optional_action": {
+          "action": "move_cards",
+          "source": "hand",
+          "destination": "discard",
           "count": 1,
-          "operator": ">=",
           "target": "self",
-          "type": "comparison_condition"
+          "text": "手札を1枚控え室に置かないかぎり、自分のエネルギー1枚をエネルギーデッキに置く"
         },
-        "duration": "as_long_as",
-        "conditional": true,
-        "destination": "deck",
-        "count": 1,
-        "target": "self",
-        "action": "move_cards",
-        "source": "hand",
-        "card_type": "energy_card"
+        "conditional_action": {
+          "text": "自分のエネルギー1枚をエネルギーデッキに置く",
+          "destination": "energy_deck",
+          "count": 1,
+          "target": "self",
+          "action": "move_cards",
+          "source": "energy_zone",
+          "card_type": "energy_card"
+        },
+        "conditional_negation": true
       }
     },
     {
@@ -19230,7 +19230,8 @@
           "type": "location_condition",
           "location": "revealed_cards",
           "target": "self",
-          "text": "自分がエールしたとき"
+          "text": "自分がエールしたとき",
+          "yell_trigger": true
         },
         "group_names": [
           "Liella!"
@@ -28335,6 +28336,7 @@
           "location": "revealed_cards",
           "target": "self",
           "text": "自分がエールしたとき",
+          "yell_trigger": true,
           "heart_colors": [
             "heart02"
           ]
@@ -30105,7 +30107,8 @@
           "type": "location_condition",
           "location": "revealed_cards",
           "target": "self",
-          "text": "自分がエールしたとき"
+          "text": "自分がエールしたとき",
+          "yell_trigger": true
         },
         "group_names": [
           "Aqours"
@@ -30835,7 +30838,8 @@
           "type": "location_condition",
           "location": "revealed_cards",
           "target": "self",
-          "text": "自分がエールしたとき"
+          "text": "自分がエールしたとき",
+          "yell_trigger": true
         },
         "group_names": [
           "蓮ノ空"

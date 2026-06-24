@@ -190,6 +190,7 @@ pub mod wao_wao_test;
 pub mod wien_bp5_test;
 pub mod wien_cost_mod_test;
 pub mod wien_n_test;
+pub mod wien_pb2_test;
 pub mod yoshiko_card_check_test;
 pub mod yoshiko_center_ability_test;
 pub mod yoshiko_debug_move_test;

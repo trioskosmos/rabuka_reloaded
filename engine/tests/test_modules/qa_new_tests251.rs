@@ -27,6 +27,7 @@ fn setup_with_revealed(game: &mut TestGame, revealed: &[i16], mitsuki_id: i16) {
         game.state.revealed_cards.push(cid);
     }
     game.state.player1.live_card_zone.cards.push(mitsuki_id);
+    game.state.yell_occurred = true;
     let filler = game.new_id("PL!-sd1-010-SD");
     for _ in 0..20 {
         game.state.player1.main_deck.cards.push(filler);

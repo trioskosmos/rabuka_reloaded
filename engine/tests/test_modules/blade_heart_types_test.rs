@@ -28,6 +28,7 @@ fn setup(game: &mut TestGame, revealed_card_ids: &[i16]) -> i16 {
         game.state.revealed_cards.push(id);
         game.state.player1.waitroom.cards.push(id);
     }
+    game.state.yell_occurred = true;
     ability_card
 }
 

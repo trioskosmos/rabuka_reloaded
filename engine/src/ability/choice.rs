@@ -2515,10 +2515,58 @@ impl super::resolver::AbilityResolver {
                     .conditional_action
                     .map(|a| Command::Effect(*a)),
                 // no + negation → conditional_action fires (the penalty)
-                (false, true) => effect
-                    .compound
-                    .conditional_action
-                    .map(|a| Command::Effect(*a)),
+                (false, true) => {
+                    eprintln!(">>>> COND_OPT (false, true) ENTERED");
+                    // Inline energy_zone → energy_deck: handle directly without sub-choice.
+                    if let Some(ref cond) = effect.compound.conditional_action {
+                        eprintln!(
+                            ">>>> cond action={:?} source={:?} dest={:?}",
+                            cond.action, cond.source, cond.destination
+                        );
+                        if cond.source.as_deref() == Some("energy_zone")
+                            && cond.destination.as_deref() == Some("energy_deck")
+                        {
+                            eprintln!(">>>> MATCHED energy_zone → energy_deck");
+                            let count = cond.count.unwrap_or(1) as usize;
+                            let taken: Vec<i16> = {
+                                let player = gs.resolve_target_player_mut("self");
+                                (0..count)
+                                    .filter_map(|_| player.energy_zone.cards.pop())
+                                    .collect()
+                            };
+                            {
+                                let player = gs.resolve_target_player_mut("self");
+                                player.energy_zone.active_energy_count = player
+                                    .energy_zone
+                                    .active_energy_count
+                                    .saturating_sub(taken.len());
+                                for &cid in &taken {
+                                    crate::ability::util::place_card_in_zone(
+                                        player,
+                                        cid,
+                                        "energy_deck",
+                                        None,
+                                        false,
+                                        1,
+                                    );
+                                }
+                            }
+                            for cid in &taken {
+                                gs.mods.clear_all_for_card(*cid);
+                                gs.record_card_movement(*cid);
+                            }
+                            self.moved_cards = taken;
+                            None
+                        } else {
+                            effect
+                                .compound
+                                .conditional_action
+                                .map(|a| Command::Effect(*a))
+                        }
+                    } else {
+                        None
+                    }
+                }
                 // no + no negation → nothing fires
                 (false, false) => None,
             };
