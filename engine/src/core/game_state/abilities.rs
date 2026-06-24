@@ -466,16 +466,22 @@ impl GameState {
                         {
                             if let Some(ref effect) = ability.effect {
                                 if let Some(ref condition) = effect.condition {
-                                    if Self::condition_is_event_based(condition) {
-                                        let saved_activating = self.activating_card;
-                                        self.activating_card = Some(moved_card_id);
-                                        let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, &event.moved_cards);
-                                        let passes = ctx.evaluate_condition(condition);
-                                        self.activating_card = saved_activating;
-                                        if !passes {
-                                            continue;
-                                        }
-                                    } else {
+                                    // Appearance conditions are for cards ON stage
+                                    // (scanned by the stage loop).  Skip them in the
+                                    // moved-cards scan so that cards removed from
+                                    // stage (e.g. by baton touch) don't falsely fire.
+                                    if matches!(
+                                        condition.condition_type,
+                                        Some(crate::ability::enums::ConditionType::AppearanceCondition)
+                                    ) {
+                                        continue;
+                                    }
+                                    let saved_activating = self.activating_card;
+                                    self.activating_card = Some(moved_card_id);
+                                    let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, &event.moved_cards);
+                                    let passes = ctx.evaluate_condition(condition);
+                                    self.activating_card = saved_activating;
+                                    if !passes {
                                         continue;
                                     }
                                 }
