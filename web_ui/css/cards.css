@@ -298,7 +298,8 @@
 
 /* --- Energy & Misc --- */
 .energy-row-hud {
-    padding: 0;
+    flex-shrink: 0;
+    height: calc(var(--card-h-compact) + 10px);
     background: rgba(0, 0, 0, 0.2);
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
@@ -311,7 +312,7 @@
     gap: 6px;
     justify-content: flex-start;
     align-items: center;
-    min-height: calc(var(--card-h-compact) + 8px);
+    height: calc(var(--card-h-compact) + 8px);
 }
 
 .energy-area-container.horizontal {

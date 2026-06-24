@@ -1877,8 +1877,11 @@ impl<'a> ConditionContext<'a> {
                         .turn_movements
                         .iter()
                         .filter(|m| {
-                            m.cause_player_id == target_id
-                                && m.source_zone == source_zone
+                            let src_ok = m.source_zone == source_zone
+                                || (source_zone == "discard" && m.source_zone == "waitroom")
+                                || (source_zone == "waitroom" && m.source_zone == "discard");
+                            src_ok
+                                && m.cause_player_id == target_id
                                 && (m.dest_zone == dest_zone
                                     || (dest_zone == "discard" && m.dest_zone == "waitroom")
                                     || (dest_zone == "waitroom" && m.dest_zone == "discard"))
@@ -1886,18 +1889,39 @@ impl<'a> ConditionContext<'a> {
                         })
                         .map(|m| m.moved_card_id)
                         .collect();
+                    // For each event card, check if turn_movements has zone
+                    // data for it.  If yes, apply the zone/player filter.  If
+                    // no (movement path skipped push_movement_event), include
+                    // the card directly.
+                    let result: Vec<i16> = event_cards
+                        .iter()
+                        .filter(|&&cid| {
+                            let tm: Vec<_> = self
+                                .game_state
+                                .turn_movements
+                                .iter()
+                                .filter(|m| m.moved_card_id == cid)
+                                .collect();
+                            if tm.is_empty() {
+                                return true; // no zone data → assume match
+                            }
+                            tm.iter().any(|m| {
+                                let src_ok = m.source_zone == source_zone
+                                    || (source_zone == "discard" && m.source_zone == "waitroom")
+                                    || (source_zone == "waitroom" && m.source_zone == "discard");
+                                src_ok
+                                    && m.cause_player_id == target_id
+                                    && (m.dest_zone == dest_zone
+                                        || (dest_zone == "discard" && m.dest_zone == "waitroom")
+                                        || (dest_zone == "waitroom" && m.dest_zone == "discard"))
+                            })
+                        })
+                        .copied()
+                        .collect();
                     if !from_tm.is_empty() {
                         from_tm
-                    } else if self.game_state.turn_movements.is_empty() {
-                        // No turn_movements at all — this path doesn't log
-                        // movements via push_movement_event (e.g. live-cleanup
-                        // path which moves cards directly). Use event_cards.
-                        event_cards
                     } else {
-                        // turn_movements exists but has no matching entries
-                        // for this zone/player filter — the movement doesn't
-                        // match the condition → return empty.
-                        Vec::new()
+                        result
                     }
                 } else if !self.game_state.turn_movements.is_empty() {
                     // No event data — use turn_movements directly (original behavior)
@@ -1905,8 +1929,11 @@ impl<'a> ConditionContext<'a> {
                         .turn_movements
                         .iter()
                         .filter(|m| {
-                            m.cause_player_id == target_id
-                                && m.source_zone == source_zone
+                            let src_ok = m.source_zone == source_zone
+                                || (source_zone == "discard" && m.source_zone == "waitroom")
+                                || (source_zone == "waitroom" && m.source_zone == "discard");
+                            src_ok
+                                && m.cause_player_id == target_id
                                 && (m.dest_zone == dest_zone
                                     || (dest_zone == "discard" && m.dest_zone == "waitroom")
                                     || (dest_zone == "waitroom" && m.dest_zone == "discard"))

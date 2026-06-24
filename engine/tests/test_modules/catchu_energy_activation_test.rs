@@ -83,7 +83,7 @@ fn catchu_zero_members_nothing_activates() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let mei = game.id("PL!SP-pb2-018-R");
+    let _mei = game.id("PL!SP-pb2-018-R");
     let filler = game.id("PL!-sd1-010-SD");
 
     fill_decks(&mut game);
@@ -113,7 +113,7 @@ fn catchu_three_distinct_activate_3() {
     let mei = game.id("PL!SP-pb2-018-R");
     let catchu_a = game.id("PL!SP-sd1-001-SD");
     let catchu_b = game.id("PL!SP-sd1-004-SD");
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
 
     fill_decks(&mut game);
     game.state.player1.stage.stage[0] = mei;
@@ -138,7 +138,7 @@ fn catchu_duplicate_names_dedup_to_1() {
     let mei = game.id("PL!SP-pb2-018-R");
     let catchu_a = game.id("PL!SP-sd1-001-SD");
     let catchu_dup = game.new_id("PL!SP-sd1-001-SD");
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
 
     fill_decks(&mut game);
     // 2 same-name CatChu (かのん x2) + Mei (米女メイ) = 2 distinct names

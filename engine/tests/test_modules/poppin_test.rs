@@ -22,20 +22,6 @@ fn advance_to_live_start(game: &mut TestGame) {
     game.pass();
 }
 
-fn deck_push(game: &mut TestGame, cards: &[i16]) -> i16 {
-    let filler = game.id("PL!-sd1-010-SD");
-    for &c in cards {
-        game.state.player1.main_deck.cards.push(c);
-    }
-    for _ in 0..20 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-    for _ in 0..10 {
-        game.state.player2.main_deck.cards.push(filler);
-    }
-    filler
-}
-
 /// Test 4: P1 score > P2 score → condition passes → 虹ヶ咲 added to hand
 #[test]
 fn poppin_q66_has_cards_beats_no_cards() {

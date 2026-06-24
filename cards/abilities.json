@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-24T17:52:36.994402",
+  "generated_at": "2026-06-24T19:47:47.197097",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -24215,15 +24215,14 @@
         ],
         "conditional": true,
         "condition": {
+          "type": "card_count_condition",
+          "count": 1,
+          "operator": ">=",
           "text": "自分のメインフェイズにこのカードが控え室から手札に加えられたとき",
           "target": "self",
-          "location": "discard",
-          "locations": [
-            "discard",
-            "hand"
-          ],
           "self_target": true,
-          "type": "location_condition"
+          "source": "discard",
+          "destination": "hand"
         },
         "characters": [
           "DIVE!"

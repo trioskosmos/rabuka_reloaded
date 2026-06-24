@@ -273,3 +273,4 @@ pub mod keke_pb2_013_debut_test;
 
 // CatChu! per-unit energy activation (PL!SP-pb2-018-R)
 pub mod catchu_energy_activation_test;
+pub mod live_cards_disappear_test;

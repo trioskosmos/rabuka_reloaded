@@ -3,16 +3,6 @@ use rabuka_engine::game_setup::ActionType;
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
 
-fn drain_auto(v: &mut TestGame) {
-    while v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectAutoAbility") => v.select_indices(&[0]),
-            s => eprintln!("  draining: {:?}", s),
-        }
-    }
-    // After draining, if there's still a choice (like yes/no or select card), don't loop
-}
-
 /// Keke's debut: place a Liella! cost≤4 from hand into an EMPTY slot
 #[test]
 fn keke_place_in_empty_slot() {

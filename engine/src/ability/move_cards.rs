@@ -1585,7 +1585,6 @@ impl AbilityResolver {
             gs.record_card_movement(*card_id);
         }
 
-        let is_energy = Zone::from_str(destination) == Some(Zone::Energy);
         self.moved_cards.extend(moved_cards);
         {
             let cause_pid = gs

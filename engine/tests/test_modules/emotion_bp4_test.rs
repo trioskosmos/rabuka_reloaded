@@ -53,16 +53,6 @@ fn snapshot_adjustments<'a>(game: &'a TestGame) -> Vec<(&'a str, i32, usize)> {
     items
 }
 
-fn snapshot_score_bonuses<'a>(game: &'a TestGame) -> Vec<(&'a str, u32)> {
-    let mut items = Vec::new();
-    for snap in &game.state.performance_snapshots {
-        for sline in &snap.breakdown.scores {
-            items.push((sline.source.as_str(), sline.value));
-        }
-    }
-    items
-}
-
 fn score_bonus(game: &TestGame, cid: i16) -> i32 {
     game.state.mods.get_score_modifier(cid)
 }

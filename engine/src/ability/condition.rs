@@ -524,14 +524,6 @@ impl<'a> ConditionContext<'a> {
             Some(ConditionType::ResourceCondition) => {
                 format!("資源={}", condition.resource_type.as_deref().unwrap_or("?"))
             }
-            Some(ConditionType::BothCondition) => {
-                let vals = condition
-                    .values
-                    .as_ref()
-                    .map(|v| format!("{:?}", v))
-                    .unwrap_or_default();
-                format!("両方持つ? values={}", vals)
-            }
             _ => String::new(),
         }
     }

@@ -32,8 +32,8 @@ fn chisato_q126_area_move_triggers_energy_placement() {
     let energy_deck_before = game.state.player1.energy_deck.cards.len();
 
     // Perform position change via the stage API
-    let chisato_id = game.state.player1.stage.stage[0];
-    let filler_id = game.state.player1.stage.stage[2];
+    let _chisato_id = game.state.player1.stage.stage[0];
+    let _filler_id = game.state.player1.stage.stage[2];
 
     // Snapshot positions BEFORE the move so the TAS scan can
     // detect the position change by comparing pre vs post state.

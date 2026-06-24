@@ -345,8 +345,14 @@
 /* Energy compact */
 .game-board.both-mode .energy-row-hud {
     flex-shrink: 1;
+    height: auto;
     max-height: 8%;
     overflow: hidden;
+}
+
+.game-board.both-mode .energy-area-container {
+    height: auto;
+    min-height: calc(var(--card-h-compact) + 6px);
 }
 
 .game-board.both-mode .energy-row-hud .card.energy {

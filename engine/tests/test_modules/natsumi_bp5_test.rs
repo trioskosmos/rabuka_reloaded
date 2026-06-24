@@ -39,7 +39,7 @@ fn advance_to_live_start(game: &mut TestGame) {
 
 fn base_setup() -> (TestGame, i16, i16, i16) {
     let db = load_real_database();
-    let mut game = TestGame::new(db);
+    let game = TestGame::new(db);
     let natsumi = game.id("PL!SP-bp5-009-R");
     let live_card = game.id("PL!-sd1-019-SD");
     let filler_live = game.id("PL!-sd1-020-SD");

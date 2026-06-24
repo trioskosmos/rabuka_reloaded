@@ -26,9 +26,8 @@
 }
 
 .btn:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
     border-color: var(--accent-blue);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 /* Actions should override general hover blue */
@@ -68,8 +67,7 @@
 }
 
 .btn-primary:hover {
-    background: linear-gradient(135deg, var(--accent-blue-dark), var(--accent-blue));
-    box-shadow: 0 0 20px rgba(74, 158, 255, 0.6);
+    background: var(--accent-blue);
 }
 
 .btn-secondary {
@@ -87,7 +85,7 @@
 }
 
 .btn-accent:hover {
-    box-shadow: var(--glow-gold);
+    background: rgba(255, 215, 0, 0.15);
 }
 
 .btn-accent-pink {
@@ -97,8 +95,7 @@
 }
 
 .btn-accent-pink:hover {
-    background: rgba(255, 85, 170, 0.2);
-    box-shadow: 0 0 15px rgba(255, 85, 170, 0.4);
+    background: rgba(255, 85, 170, 0.15);
 }
 
 /* --- Cheat Section Styles --- */
@@ -176,55 +173,6 @@
 
 .btn-accent-blue:hover {
     background: rgba(74, 158, 255, 0.25);
-    box-shadow: 0 0 15px rgba(74, 158, 255, 0.4);
-}
-
-.btn-accent-green {
-    background: rgba(85, 255, 85, 0.15);
-    border-color: #55ff55;
-    color: #55ff55;
-}
-
-.btn-accent-green:hover {
-    background: rgba(85, 255, 85, 0.25);
-    box-shadow: 0 0 15px rgba(85, 255, 85, 0.4);
-}
-
-.btn-accent-pink:hover {
-    background: var(--accent-pink);
-    color: white;
-    box-shadow: var(--glow-pink);
-}
-
-/* --- Action Button Interaction System --- */
-.action-btn:hover,
-.action-btn.hover-highlight,
-.action-btn.selected {
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.1));
-    border-color: var(--accent-gold) !important;
-    border-width: 2px !important;
-    box-shadow: var(--glow-gold-strong), inset 0 0 10px rgba(245, 158, 11, 0.15) !important;
-    z-index: 10;
-}
-
-.action-btn:hover {
-    animation: action-btn-pulse 1.5s infinite ease-in-out;
-}
-
-.action-btn.hover-highlight {
-    animation: action-btn-pulse 1.5s infinite ease-in-out;
-}
-
-.action-btn .action-title,
-.action-btn .action-cost,
-.action-btn .inline-icon {
-    pointer-events: none;
-}
-
-@keyframes action-btn-pulse {
-    0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.02); opacity: 0.95; }
-    100% { transform: scale(1); opacity: 1; }
 }
 
 .btn-accent-green {
@@ -234,9 +182,26 @@
 }
 
 .btn-accent-green:hover {
-    background: var(--accent-green);
-    color: white;
-    box-shadow: var(--glow-green);
+    background: rgba(46, 204, 113, 0.25);
+}
+
+.btn-accent-pink:hover {
+    background: rgba(255, 85, 170, 0.2);
+}
+
+/* --- Action Button Interaction System --- */
+.action-btn:hover,
+.action-btn.hover-highlight,
+.action-btn.selected {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: var(--accent-gold) !important;
+    z-index: 10;
+}
+
+.action-btn .action-title,
+.action-btn .action-cost,
+.action-btn .inline-icon {
+    pointer-events: none;
 }
 
 .btn-accent-purple {
@@ -246,9 +211,7 @@
 }
 
 .btn-accent-purple:hover {
-    background: var(--accent-purple);
-    color: white;
-    box-shadow: var(--glow-purple);
+    background: rgba(155, 89, 182, 0.25);
 }
 
 .btn-accent-red {
@@ -258,9 +221,7 @@
 }
 
 .btn-accent-red:hover {
-    background: var(--accent-red);
-    color: white;
-    box-shadow: var(--glow-red);
+    background: rgba(239, 68, 68, 0.25);
 }
 
 .btn-accent-gray {

@@ -78,6 +78,11 @@ function renderCardSlot(slot, prefix, state) {
     </div>`;
 }
 
+let _conditionsCache = null;
+let _conditionsLoading = false;
+let _conditionsError = null;
+let _conditionsLoaded = false;
+
 export const GameStateModal = {
     _currentTab: 'global',
 
@@ -88,7 +93,7 @@ export const GameStateModal = {
     close: () => { ModalManager.hide('game-state-modal'); },
 
     showTab: (tab) => {
-        ['global', 'player', 'zones', 'tracking'].forEach(t => {
+        ['global', 'player', 'zones', 'tracking', 'conditions'].forEach(t => {
             const p = document.getElementById(`gs-tab-${t}`);
             const b = document.querySelector(`.gs-modal-tabs [data-tab="${t}"]`);
             if (p) p.style.display = t === tab ? 'block' : 'none';
@@ -96,6 +101,7 @@ export const GameStateModal = {
         });
         GameStateModal._currentTab = tab;
         GameStateModal.renderAll();
+        if (tab === 'conditions') GameStateModal.renderConditionsTab();
     },
 
     renderAll: () => {
@@ -105,6 +111,94 @@ export const GameStateModal = {
         GameStateModal.renderPlayerTab(s);
         GameStateModal.renderZonesTab(s);
         GameStateModal.renderTrackingTab(s);
+        if (GameStateModal._currentTab === 'conditions') GameStateModal.renderConditionsTab();
+    },
+
+    fetchAndCacheConditions: async () => {
+        if (_conditionsLoading || _conditionsLoaded) return _conditionsCache;
+        _conditionsLoading = true;
+        _conditionsError = null;
+        try {
+            const res = await fetch('/api/debug/conditions');
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            _conditionsCache = await res.json();
+            _conditionsLoaded = true;
+        } catch (e) {
+            _conditionsError = e.message;
+            _conditionsCache = [];
+        } finally {
+            _conditionsLoading = false;
+        }
+        return _conditionsCache;
+    },
+
+    renderConditionsTab: () => {
+        const c = document.getElementById('gs-tab-conditions');
+        if (!c) return;
+
+        c.innerHTML = '<div style="padding:12px;font-size:0.85rem;opacity:0.6;">Evaluating all card conditions...</div>';
+
+        GameStateModal.fetchAndCacheConditions().then(conditions => {
+            if (_conditionsError) {
+                c.innerHTML = `<div style="padding:12px;color:var(--accent-pink);">Error fetching conditions: ${_conditionsError}</div>`;
+                return;
+            }
+            if (!conditions || conditions.length === 0) {
+                c.innerHTML = '<div style="padding:12px;opacity:0.6;">No conditions found on any card. Conditions are ability activation guards that are evaluated on-the-fly during ability resolution. This panel evaluates EVERY condition on EVERY card in EVERY zone — purely read-only, does not affect game state.</div>';
+                return;
+            }
+
+            const trueCount = conditions.filter(c => c.result).length;
+            const falseCount = conditions.filter(c => !c.result).length;
+
+            const rows = conditions.map((cond, i) => {
+                const rCls = cond.result ? 'color:#4ade80;background:rgba(34,197,94,0.15);' : 'color:#f87171;background:rgba(239,68,68,0.12);';
+                const rLbl = cond.result ? 'PASS' : 'FAIL';
+                return `<tr style="vertical-align:top;${i%2===1?'background:rgba(255,255,255,0.015);':''}">
+                    <td style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.65rem;"><span style="display:inline-block;padding:1px 5px;border-radius:3px;font-weight:bold;font-size:0.6rem;${rCls}">${rLbl}</span></td>
+                    <td style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.65rem;white-space:nowrap;">P${cond.player+1}</td>
+                    <td style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.65rem;white-space:nowrap;">${esc(cond.zone)}</td>
+                    <td style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.65rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(cond.card_name)}">${esc(cond.card_name)}</td>
+                    <td style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.65rem;white-space:nowrap;">${esc(cond.condition_type||cond.field||'')}</td>
+                    <td style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.65rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(cond.condition_text||'')}">${esc(cond.condition_text||'-')}</td>
+                </tr>`;
+            }).join('');
+
+            c.innerHTML = `
+                <div style="margin:6px;font-size:0.65rem;opacity:0.5;">All conditions are evaluated read-only — no game state modification.</div>
+                <div style="margin:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                    <strong style="font-size:0.75rem;">Condition Evaluation (${conditions.length} total)</strong>
+                    <span style="font-size:0.7rem;">
+                        <span style="color:#4ade80;">${trueCount} PASS</span>
+                        <span style="opacity:0.4;"> / </span>
+                        <span style="color:#f87171;">${falseCount} FAIL</span>
+                    </span>
+                    <button class="btn btn-sm btn-secondary" id="gs-reeval-conds" style="font-size:0.65rem;">Re-evaluate</button>
+                </div>
+                <div style="overflow:auto;border:1px solid rgba(255,255,255,0.06);border-radius:4px;max-height:55vh;">
+                    <table style="width:100%;border-collapse:collapse;font-size:0.65rem;min-width:600px;">
+                        <thead><tr style="background:rgba(15,23,42,0.95);text-transform:uppercase;position:sticky;top:0;">
+                            <th style="padding:6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);">Result</th>
+                            <th style="padding:6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);">P</th>
+                            <th style="padding:6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);">Zone</th>
+                            <th style="padding:6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);">Card</th>
+                            <th style="padding:6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);">Type</th>
+                            <th style="padding:6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);">Text / Value</th>
+                        </tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+                <details style="margin:6px;">
+                    <summary style="cursor:pointer;opacity:0.5;font-size:0.65rem;">Raw JSON</summary>
+                    <pre style="margin:4px 0 0;padding:6px;background:#05070d;border-radius:3px;font-size:0.55rem;line-height:1.3;color:#dbeafe;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto;">${esc(JSON.stringify(conditions,null,2))}</pre>
+                </details>`;
+
+            document.getElementById('gs-reeval-conds')?.addEventListener('click', () => {
+                _conditionsLoaded = false;
+                _conditionsCache = null;
+                GameStateModal.renderConditionsTab();
+            });
+        });
     },
 
     // ─── Global Tab ──────────────────────────────────────────
@@ -590,8 +684,10 @@ export const GameStateModal = {
             Object.keys(constBlade).length > 0 ? trackKV(Object.entries(constBlade).map(([id, v]) => [`#${id} (${cardName(parseInt(id))})`, v])) : '<div class="gs-track-item">none</div>'));
 
         const constCost = s.constant_cost_bonuses || {};
+        const constCostTotal = Object.values(constCost).reduce((s, v) => s + v, 0);
         gridDiv.insertAdjacentHTML('beforeend', mkBox('Constant Cost Bonuses',
-            Object.keys(constCost).length > 0 ? trackKV(Object.entries(constCost).map(([id, v]) => [`#${id} (${cardName(parseInt(id))})`, v])) : '<div class="gs-track-item">none</div>'));
+            `<div class="gs-track-item"><b>Total cost bonus:</b> ${constCostTotal}</div>` + 
+            (Object.keys(constCost).length > 0 ? trackKV(Object.entries(constCost).map(([id, v]) => [`#${id} (${cardName(parseInt(id))})`, v])) : '')));
 
         const constScore = s.constant_score_bonuses || {};
         gridDiv.insertAdjacentHTML('beforeend', mkBox('Constant Score Bonuses',

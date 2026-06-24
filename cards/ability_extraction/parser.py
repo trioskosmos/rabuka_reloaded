@@ -1241,7 +1241,10 @@ def _try_movement(text):
 
 
 def _try_zone_placement(text):
-    if not re.search(r"から.*?に置かれ", text) or "バトンタッチ" in text:
+    if (
+        not re.search(r"から.*?に(?:置かれ|加えられ|加わる|移され|送られ)", text)
+        or "バトンタッチ" in text
+    ):
         return None
     result = {
         "type": "card_count_condition",
@@ -1254,7 +1257,9 @@ def _try_zone_placement(text):
     m_from = re.search(r"から", text)
     if m_from:
         source_text = text[: m_from.start()]
-        if "ライブカード置き場" in source_text:
+        if "控え室" in source_text:
+            result["source"] = "discard"
+        elif "ライブカード置き場" in source_text:
             result["source"] = "live_card_zone"
         elif "エネルギー置き場" in source_text:
             result["source"] = "energy_zone"
@@ -1262,8 +1267,8 @@ def _try_zone_placement(text):
             result["source"] = "hand"
         elif "ステージ" in source_text:
             result["source"] = "stage"
-    # Extract destination zone (between から and に置かれ) into `destination`
-    dest_match = re.search(r"から(.+?)に置かれ", text)
+    # Extract destination zone (between から and the verb) into `destination`
+    dest_match = re.search(r"から(.+?)に(?:置かれ|加えられ|加わる|移され|送られ)", text)
     if dest_match:
         dest_text = dest_match.group(1)
         if "控え室" in dest_text:

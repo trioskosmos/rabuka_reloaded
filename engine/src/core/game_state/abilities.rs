@@ -854,6 +854,10 @@ impl GameState {
     }
 
     pub(crate) fn trigger_auto_for_discarded_cards(&mut self, player_id: &str) {
+        eprintln!(
+            "[DISCARD_TRIGGER] entered moved={:?}",
+            self.recently_moved_cards
+        );
         let trigger_data: Vec<(String, String, i16)> = if let Some(ref moved_cards) =
             self.recently_moved_cards.clone()
         {
@@ -910,7 +914,16 @@ impl GameState {
                                         .map_or(false, |d| is_discard_dest(d));
                                 let movement_from_live =
                                     movement_from_live_old || movement_from_live_new;
-                                direct_discard || movement_to_discard || movement_from_live
+                                // Movement from discard to hand (e.g. DIVE! — retrieved
+                                // from waitroom→hand via card effect, then places itself
+                                // in the live zone).
+                                let movement_from_discard_to_hand = c.source.as_deref()
+                                    == Some("discard")
+                                    && c.destination.as_deref() == Some("hand");
+                                direct_discard
+                                    || movement_to_discard
+                                    || movement_from_live
+                                    || movement_from_discard_to_hand
                             })
                             .unwrap_or(false);
                         if is_auto && has_discard_condition {
@@ -928,6 +941,11 @@ impl GameState {
         } else {
             Vec::new()
         };
+        eprintln!(
+            "[DISCARD_TRIGGER] found {} triggers to enqueue: {:?}",
+            trigger_data.len(),
+            trigger_data.iter().map(|(_, cn, _)| cn).collect::<Vec<_>>()
+        );
         for (ability_id, card_no, moved_id) in trigger_data {
             self.trigger_auto_ability(
                 ability_id,
@@ -1171,13 +1189,24 @@ impl GameState {
             self.activating_card = None;
             self.activating_ability_index = None;
             // Trigger discarded card abilities BEFORE process_pending_auto_abilities
-            // so recently_moved_cards is still populated.  If we process pending
-            // auto abilities first, the inner loop may clear recently_moved_cards
-            // (line 710) and discard→hand triggers never fire.
-            // Use current_pid (captured before complete_current) instead of
-            // ability_master_id which returns None after state becomes Idle.
-            if self.recently_moved_cards.is_some() {
-                self.trigger_auto_for_discarded_cards(&current_pid);
+            // so recently_moved_cards is still populated.
+            eprintln!(
+                "[DISCARD_GATE] phase={:?} moved={:?}",
+                self.current_phase, self.recently_moved_cards
+            );
+            if let Some(ref moved) = self.recently_moved_cards {
+                if !moved.is_empty() {
+                    eprintln!(
+                        "[DISCARD_GATE] CALLING trigger_auto_for_discarded_cards for pid={}",
+                        current_pid
+                    );
+                    self.trigger_auto_for_discarded_cards(&current_pid);
+                    eprintln!("[DISCARD_GATE] RETURNED from trigger_auto_for_discarded_cards");
+                } else {
+                    eprintln!("[DISCARD_GATE] skipped — empty vec marker");
+                }
+            } else {
+                eprintln!("[DISCARD_GATE] skipped — None");
             }
             if let Some(pid) = self.ability_master_id() {
                 self.process_pending_auto_abilities(&pid);
