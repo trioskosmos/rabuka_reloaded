@@ -213,9 +213,9 @@ impl AbilityResolver {
             let mut for_opponent = effect.clone();
             for_opponent.target = Some("opponent".to_string());
             // Preserve any existing pending commands (e.g. remaining sequential actions)
-            let mut existing = gs.ability_queue.take_pending_commands();
-            existing.push(crate::ability::types::Command::Effect(for_opponent));
-            gs.ability_queue.set_pending_commands(existing);
+            let mut existing = gs.ability_queue.take_pending_actions();
+            existing.push(for_opponent);
+            gs.ability_queue.set_pending_actions(existing);
             return Ok(true);
         }
 
@@ -595,11 +595,11 @@ impl AbilityResolver {
                 let mut saved = effect.clone();
                 saved.target_count = None;
                 self.selected_count_at_save = Some(self.selected_cards.len());
-                let mut pending = gs.ability_queue.take_pending_commands();
-                pending.insert(0, crate::ability::types::Command::Effect(saved));
-                gs.ability_queue.set_pending_commands(pending);
+                let mut pending = gs.ability_queue.take_pending_actions();
+                pending.insert(0, saved);
+                gs.ability_queue.set_pending_actions(pending);
                 self.pending_choice = Some(
-                    crate::ability::types::Choice::select_cards(
+                    Choice::select_cards(
                         Zone::Stage.to_str().to_string(),
                         tc,
                         format!("Select {} card(s) to receive {} {}", tc, count, resource),
@@ -1414,7 +1414,7 @@ impl AbilityResolver {
                     options.push(format!("{},{}", name1, name2));
                 }
             }
-            self.pending_choice = Some(crate::ability::types::Choice::SelectTarget {
+            self.pending_choice = Some(Choice::SelectTarget {
                 target: "double_baton_touch".to_string(),
                 description: "Choose 2 occupied areas for double baton touch".to_string(),
                 allow_skip: true,
@@ -1734,9 +1734,7 @@ impl AbilityResolver {
             if self.pending_choice.is_some() {
                 let mut self_effect = effect.clone();
                 self_effect.target = Some("self".to_string());
-                gs.ability_queue.set_pending_commands(vec![
-                    crate::ability::types::Command::Effect(self_effect),
-                ]);
+                gs.ability_queue.set_pending_actions(vec![self_effect]);
             } else {
                 let mut self_effect = effect.clone();
                 self_effect.target = Some("self".to_string());
@@ -1835,12 +1833,7 @@ impl AbilityResolver {
                         sub.optional = effect.optional;
                         remaining.push(sub);
                     }
-                    gs.ability_queue.set_pending_commands(
-                        remaining
-                            .into_iter()
-                            .map(crate::ability::types::Command::Effect)
-                            .collect(),
-                    );
+                    gs.ability_queue.set_pending_actions(remaining);
                 }
                 return Ok(());
             }

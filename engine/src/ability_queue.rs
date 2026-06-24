@@ -1,6 +1,6 @@
 use crate::ability::resolver::AbilityResolver;
-use crate::ability::types::{Choice, Command};
-use crate::card::Ability;
+use crate::ability::types::Choice;
+use crate::card::{Ability, AbilityEffect};
 use crate::game_state::AbilityTrigger;
 
 /// Unique identifier for an ability instance in the queue
@@ -73,11 +73,8 @@ pub struct AbilityQueueEntry {
     /// position changes, even after a new process_current_ability call
     /// overwrites the GameState-wide snapshot.
     pub snapshot_stage_positions: Option<std::collections::HashMap<i16, usize>>,
-    /// Deferred sequential sub-effects interrupted by a player choice.
-    /// When a sequential ability is processing actions [A, B, C] and B pauses for a
-    /// choice, the remaining actions [C, ...] are stored here and resumed in
-    /// `finalize_choice` after the player responds.
-    pub pending_commands: Vec<Command>,
+    /// Actions queued for sequential execution after a choice round-trip.
+    pub pending_actions: Vec<AbilityEffect>,
     /// Persistent ability resolver — stays alive across choice round-trips
     /// instead of being destroyed and recreated. Eliminates manual save/restore.
     pub resolver: Option<AbilityResolver>,
@@ -277,7 +274,7 @@ impl AbilityQueue {
                     effect_started: false,
                     optional_cost_result: None,
                     choice_player_id: None,
-                    pending_commands: Vec::new(),
+                    pending_actions: Vec::new(),
                     resolver: None,
                     trigger_moved_cards: None,
                     triggering_member_id: None,
@@ -358,45 +355,36 @@ impl AbilityQueue {
     }
 
     /// Store deferred sequential commands on the current entry.
-    /// Called by `compound.rs` when a sequential ability is interrupted by a player choice.
-    /// Only stores if there are remaining actions to run.
-    pub fn set_pending_commands(&mut self, commands: Vec<Command>) {
-        if commands.is_empty() {
-            return;
-        }
+    /// Replace pending actions on the current entry.
+    pub fn set_pending_actions(&mut self, actions: Vec<AbilityEffect>) {
         if let Some(entry) = self.current_entry_mut() {
-            entry.pending_commands = commands;
+            entry.pending_actions = actions;
         }
     }
 
-    /// Append commands to the existing pending commands on the current entry.
-    /// Unlike `set_pending_commands` which replaces, this preserves existing commands.
-    /// Used when a sequential conditional effect needs to park followup actions
-    /// alongside already-pending commands.
-    pub fn save_pending_sequential_actions(&mut self, commands: Vec<Command>) {
-        if commands.is_empty() {
+    /// Append actions to the existing pending actions.
+    pub fn save_pending_actions(&mut self, actions: Vec<AbilityEffect>) {
+        if actions.is_empty() {
             return;
         }
         if let Some(entry) = self.current_entry_mut() {
-            entry.pending_commands.extend(commands);
+            entry.pending_actions.extend(actions);
         }
     }
 
-    /// Drain and return deferred sequential commands from the current entry.
-    /// Returns empty vec if no entry or no pending commands.
-    /// Called by `finalize_choice` to resume execution after a player responds.
-    pub fn take_pending_commands(&mut self) -> Vec<Command> {
+    /// Drain and return pending actions from the current entry.
+    pub fn take_pending_actions(&mut self) -> Vec<AbilityEffect> {
         if let Some(entry) = self.current_entry_mut() {
-            std::mem::take(&mut entry.pending_commands)
+            std::mem::take(&mut entry.pending_actions)
         } else {
             Vec::new()
         }
     }
 
-    /// Check if the current entry has any pending commands waiting to run.
-    pub fn has_pending_commands(&self) -> bool {
+    /// Check if the current entry has pending actions.
+    pub fn has_pending_actions(&self) -> bool {
         self.current_entry()
-            .is_some_and(|e| !e.pending_commands.is_empty())
+            .is_some_and(|e| !e.pending_actions.is_empty())
     }
 
     /// Move the entry at `from_index` to the front of the queue (position 0).
@@ -479,8 +467,8 @@ impl AbilityQueue {
         s.push('\n');
         for (i, entry) in self.entries.iter().enumerate() {
             s.push_str(&format!(
-                "  [{}] card={} ab#{} player={} completed={} cost_paid={} effect_started={} optional_cost_result={:?} pending_commands={}\n",
-                i,
+                "  [{}] card={} ab#{} player={} completed={} cost_paid={} effect_started={} optional_cost_result={:?} pending_actions={}\n",
+                entry.ability_index,
                 entry.card_no,
                 entry.ability_index,
                 entry.player_id,
@@ -488,7 +476,7 @@ impl AbilityQueue {
                 entry.cost_paid,
                 entry.effect_started,
                 entry.optional_cost_result,
-                entry.pending_commands.len(),
+                entry.pending_actions.len(),
             ));
         }
         s

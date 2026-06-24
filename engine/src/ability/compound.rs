@@ -3,7 +3,6 @@ use super::enums::ConditionType;
 use super::resolver::AbilityResolver;
 use super::types::{AbilityTraceNode, Choice, ExecutionContext, StepOutput, ZoneSnapshot};
 use crate::ability::debug::ABILITY_DEBUG;
-use crate::ability::types::Command;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 use std::sync::atomic::Ordering;
@@ -247,9 +246,9 @@ impl AbilityResolver {
                         remaining: Vec<AbilityEffect>,
                     ) {
                         if !remaining.is_empty() {
-                            let mut existing = gs.ability_queue.take_pending_commands();
-                            existing.extend(remaining.into_iter().map(Command::Effect));
-                            gs.ability_queue.set_pending_commands(existing);
+                            let mut existing = gs.ability_queue.take_pending_actions();
+                            existing.extend(remaining);
+                            gs.ability_queue.set_pending_actions(existing);
                         }
                     }
 
@@ -575,8 +574,7 @@ impl AbilityResolver {
             if self.pending_choice.is_some() {
                 let mut finish = effect.clone();
                 finish.compound.primary_effect = None;
-                gs.ability_queue
-                    .save_pending_sequential_actions(vec![Command::Effect(finish)]);
+                gs.ability_queue.save_pending_actions(vec![finish]);
                 return Ok(());
             }
         }
@@ -618,11 +616,11 @@ impl AbilityResolver {
                         gs.resolve_target_player_mut(opt.target.as_deref().unwrap_or("self"));
                     if (player.energy_zone.active_count() as usize) < need {
                         let cmd = if is_negation {
-                            Command::Effect(*cond.clone())
+                            *cond.clone()
                         } else {
-                            Command::Effect(effect.clone())
+                            effect.clone()
                         };
-                        gs.ability_queue.set_pending_commands(vec![cmd]);
+                        gs.ability_queue.set_pending_actions(vec![cmd]);
                         return self.resume_pending_commands(gs);
                     }
                 }
@@ -645,19 +643,13 @@ impl AbilityResolver {
                 let chose_yes = cost_was_paid;
                 let effect = effect.clone();
                 let cmd = match (chose_yes, is_negation) {
-                    (true, true) => effect.compound.optional_action.map(|a| Command::Effect(*a)),
-                    (true, false) => effect
-                        .compound
-                        .conditional_action
-                        .map(|a| Command::Effect(*a)),
-                    (false, true) => effect
-                        .compound
-                        .conditional_action
-                        .map(|a| Command::Effect(*a)),
+                    (true, true) => effect.compound.optional_action.map(|a| *a),
+                    (true, false) => effect.compound.conditional_action.map(|a| *a),
+                    (false, true) => effect.compound.conditional_action.map(|a| *a),
                     (false, false) => None,
                 };
                 if let Some(cmd) = cmd {
-                    gs.ability_queue.set_pending_commands(vec![cmd]);
+                    gs.ability_queue.set_pending_actions(vec![cmd]);
                 }
                 return self.resume_pending_commands(gs);
             }

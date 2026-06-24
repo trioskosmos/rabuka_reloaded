@@ -719,12 +719,9 @@ impl AbilityResolver {
                 entry.effect_started = false;
                 entry.optional_cost_result = Some(false);
                 if let Some(alt_effect) = alt {
-                    entry.pending_commands =
-                        vec![crate::ability::types::Command::Effect(*alt_effect)];
+                    entry.pending_actions = vec![*alt_effect];
                 } else {
-                    // No alternative effect: clear any pending sequential commands
-                    // (e.g. optional draw followed by conditional actions).
-                    entry.pending_commands.clear();
+                    entry.pending_actions.clear();
                 }
             }
             return self.resume_pending_commands(gs);
@@ -740,7 +737,7 @@ impl AbilityResolver {
                 // Insufficient energy: clear remaining commands and return
                 self.cancel_remaining_commands = true;
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.pending_commands.clear();
+                    entry.pending_actions.clear();
                 }
                 return self.resume_pending_commands(gs);
             }
@@ -870,7 +867,7 @@ impl AbilityResolver {
                         entry.effect_started = true;
                     }
                 }
-            } else if gs.ability_queue.has_pending_commands() {
+            } else if gs.ability_queue.has_pending_actions() {
                 if let Err(e) = self.resume_pending_commands(gs) {
                     log::debug!("Failed to execute action after optional: {}", e);
                 }

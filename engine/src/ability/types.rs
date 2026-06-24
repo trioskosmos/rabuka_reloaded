@@ -36,14 +36,8 @@ pub enum ChoiceRoute {
     Raw(String),
 }
 
-/// Commands queued for sequential execution after a choice resolves.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Command {
-    /// Raw effect to execute
-    Effect(crate::card::AbilityEffect),
-    /// Inline choice (for re-prompting or intermediate decisions)
-    Choice(Choice),
-}
+/// Actions queued for sequential execution after a choice resolves.
+/// Plain AbilityEffect list — no Command enum wrapper needed.
 
 impl fmt::Display for ChoiceRoute {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

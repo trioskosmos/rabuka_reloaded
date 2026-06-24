@@ -388,11 +388,11 @@ impl AbilityResolver {
                             .collect();
                         let mut saved = effect.clone();
                         saved.target_count = None;
-                        let mut pending = gs.ability_queue.take_pending_commands();
-                        pending.insert(0, crate::ability::types::Command::Effect(saved));
-                        gs.ability_queue.set_pending_commands(pending);
+                        let mut pending = gs.ability_queue.take_pending_actions();
+                        pending.insert(0, saved);
+                        gs.ability_queue.set_pending_actions(pending);
                         self.pending_choice = Some(
-                            crate::ability::types::Choice::select_cards(
+                            Choice::select_cards(
                                 Zone::Stage.to_str().to_string(),
                                 tc,
                                 format!("Select {} member(s) for heart type conversion", tc),
@@ -589,12 +589,12 @@ impl AbilityResolver {
                         // Insufficient energy: skip payment and clear remaining actions
                         self.cancel_remaining_commands = true;
                         if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                            entry.pending_commands.clear();
+                            entry.pending_actions.clear();
                         }
                         return Ok(());
                     }
                     self.pending_energy_payment = Some(count);
-                    self.pending_choice = Some(crate::ability::types::Choice::select_target(
+                    self.pending_choice = Some(Choice::select_target(
                         "pay_optional_cost:skip_optional_cost",
                         format!("Pay {} energy?", count),
                         false,

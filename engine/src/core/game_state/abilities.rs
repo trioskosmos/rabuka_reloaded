@@ -85,7 +85,7 @@ impl GameState {
             effect_started: false,
             optional_cost_result: None,
             choice_player_id: None,
-            pending_commands: Vec::new(),
+            pending_actions: Vec::new(),
             resolver: None,
             trigger_moved_cards,
             triggering_member_id,

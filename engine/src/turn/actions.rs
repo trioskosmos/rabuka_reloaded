@@ -583,7 +583,7 @@ impl super::TurnEngine {
         }
 
         game_state.ability_queue.resume_with_choice(result.clone());
-        let had_pending_sequential = game_state.ability_queue.has_pending_commands();
+        let had_pending_sequential = game_state.ability_queue.has_pending_actions();
 
         // Take the persistent resolver from the queue entry
         let mut resolver = match game_state.ability_queue.take_resolver() {
@@ -725,7 +725,7 @@ impl super::TurnEngine {
             let pending_cleared = cost_was_paid
                 && !effect_started
                 && had_pending_sequential
-                && !game_state.ability_queue.has_pending_commands();
+                && !game_state.ability_queue.has_pending_actions();
             let effect_ready = cost_was_paid && !had_pending_sequential && !effect_started;
             eprintln!("[RWC_BRANCH] cost_was_paid={} effect_started={} had_pending={} optional_skipped={} pending_cleared={} effect_ready={}",
                 cost_was_paid, effect_started, had_pending_sequential,

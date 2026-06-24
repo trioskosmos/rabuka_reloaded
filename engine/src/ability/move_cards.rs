@@ -2490,8 +2490,7 @@ impl AbilityResolver {
             log::debug!("[MOVE_BOTH] Queueing self effect for later.");
             let mut self_eff = effect.clone();
             self_eff.target = Some("self".to_string());
-            gs.ability_queue
-                .set_pending_commands(vec![crate::ability::types::Command::Effect(self_eff)]);
+            gs.ability_queue.set_pending_actions(vec![self_eff]);
             return Ok(());
         }
         log::debug!("[MOVE_BOTH] No choice created. Processing self now.");

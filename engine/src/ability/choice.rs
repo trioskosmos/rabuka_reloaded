@@ -3,7 +3,6 @@ use super::enums::Zone;
 use super::types::{Choice, ChoiceResult, ChoiceRoute, ExecutionContext, LookAndSelectStep};
 use super::util;
 use crate::ability::debug::ABILITY_DEBUG;
-use crate::ability::types::Command;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 use std::sync::atomic::Ordering;
@@ -27,26 +26,20 @@ impl super::resolver::AbilityResolver {
     /// Resumes executing sequential commands parked on the current queue entry.
     /// If another choice interrupts execution, the remaining actions are safely parked back.
     pub fn resume_pending_commands(&mut self, gs: &mut GameState) -> Result<(), String> {
-        let pending = gs.ability_queue.take_pending_commands();
-        for (idx, command) in pending.iter().enumerate() {
-            match command {
-                Command::Effect(effect) => {
-                    self.spawn_context.target = effect.target.clone();
-                    self.execute_effect(gs, effect)?;
-                }
-                Command::Choice(choice) => {
-                    self.pending_choice = Some(choice.clone());
-                }
-            }
-
+        let pending = gs.ability_queue.take_pending_actions();
+        for (idx, effect) in pending.iter().enumerate() {
+            self.spawn_context.target = effect.target.clone();
+            self.execute_effect(gs, effect)?;
             if self.pending_choice.is_some() {
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
                     entry.effect_started = true;
                 }
+                // Merge remaining actions from the original batch so they
+                // aren't lost when a sub-action creates its own pending_choice.
                 if idx + 1 < pending.len() {
-                    let mut existing = gs.ability_queue.take_pending_commands();
+                    let mut existing = gs.ability_queue.take_pending_actions();
                     existing.extend(pending[idx + 1..].to_vec());
-                    gs.ability_queue.set_pending_commands(existing);
+                    gs.ability_queue.set_pending_actions(existing);
                 }
                 return Ok(());
             }
@@ -72,14 +65,19 @@ impl super::resolver::AbilityResolver {
         // Feed the next repeat action + "Repeat?" prompt, one at a time.
         if !self.pending_repeat_actions.is_empty() && self.pending_choice.is_none() {
             let next = self.pending_repeat_actions.remove(0);
-            gs.ability_queue
-                .set_pending_commands(vec![Command::Effect(next)]);
+            gs.ability_queue.set_pending_actions(vec![next]);
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "pay_optional_cost:skip_optional_cost".to_string(),
                 description: "Repeat effect?".to_string(),
                 allow_skip: true,
                 options: Some(vec!["Stop".to_string(), "Continue".to_string()]),
             });
+        }
+        // Set re-prompt choice if one is pending and no other choice was created.
+        if let Some(reprompt) = self.pending_reprompt_choice.take() {
+            if self.pending_choice.is_none() {
+                self.pending_choice = Some(reprompt);
+            }
         }
         Ok(())
     }
@@ -106,7 +104,7 @@ impl super::resolver::AbilityResolver {
             .map(|choice| matches!(choice, Choice::SelectCard { zone, .. } if Zone::from_str(zone) == Some(Zone::LookedAt)))
             .unwrap_or(false);
 
-        let has_pending_sequential = gs.ability_queue.has_pending_commands();
+        let has_pending_sequential = gs.ability_queue.has_pending_actions();
 
         // Only preserve if this is the initial looked_at selection (not a sub-action choice).
         // Sub-choices created by pending_sequential_actions should NOT be preserved,
@@ -230,7 +228,7 @@ impl super::resolver::AbilityResolver {
             (Some(Choice::SelectCard { .. }), ChoiceResult::Skip) => {
                 // Clear pending commands saved by sequential conditional handlers
                 // so that skipped optional sub-actions don't re-execute as mandatory.
-                gs.ability_queue.take_pending_commands();
+                gs.ability_queue.take_pending_actions();
                 self.clear_choice_state(gs);
                 self.resume_execution(gs, context)
             }
@@ -1067,7 +1065,7 @@ impl super::resolver::AbilityResolver {
                 };
                 if !needs_fallthrough && !effect_started {
                     self.clear_choice_state(gs);
-                    if gs.ability_queue.has_pending_commands() {
+                    if gs.ability_queue.has_pending_actions() {
                         return self.resume_pending_commands(gs);
                     }
                     return Ok(());
@@ -1080,7 +1078,7 @@ impl super::resolver::AbilityResolver {
                 "[OUTER_MATCH] zone={} effect_started={} pending_commands={}",
                 zone,
                 effect_started,
-                gs.ability_queue.has_pending_commands()
+                gs.ability_queue.has_pending_actions()
             );
         }
         match Zone::from_str(zone) {
@@ -1299,7 +1297,7 @@ impl super::resolver::AbilityResolver {
                         && !is_opponent_action
                         && self.moved_cards.is_empty()
                     {
-                        gs.ability_queue.take_pending_commands();
+                        gs.ability_queue.take_pending_actions();
                     }
                 }
             }
@@ -1504,9 +1502,9 @@ impl super::resolver::AbilityResolver {
                                     })
                                     .target_player_id(Some(target))
                                     .build();
-                                    let mut pending = gs.ability_queue.take_pending_commands();
-                                    pending.insert(0, Command::Choice(reprompt));
-                                    gs.ability_queue.set_pending_commands(pending);
+                                    let mut pending = gs.ability_queue.take_pending_actions();
+                                    self.pending_choice = Some(reprompt);
+                                    gs.ability_queue.set_pending_actions(pending);
                                 }
                             }
                             return Ok(());
@@ -1748,7 +1746,7 @@ impl super::resolver::AbilityResolver {
                     // discard pending re-apply commands to avoid re-prompting
                     // in an infinite loop and to prevent the effect from firing.
                     if indices.is_empty() {
-                        gs.ability_queue.take_pending_commands();
+                        gs.ability_queue.take_pending_actions();
                         self.selected_cards = vec![];
                         log::debug!("[SELECT_STAGE] no selection: cleared pending commands");
                     }
@@ -1867,15 +1865,12 @@ impl super::resolver::AbilityResolver {
                     }
                 }
                 self.clear_choice_state(gs);
-                let pending = gs.ability_queue.take_pending_commands();
-                let filtered: Vec<Command> = pending
+                let pending = gs.ability_queue.take_pending_actions();
+                let filtered: Vec<AbilityEffect> = pending
                     .into_iter()
-                    .filter(|cmd| match cmd {
-                        Command::Effect(e) => e.source.as_deref() != Some("success_live_zone"),
-                        _ => true,
-                    })
+                    .filter(|cmd| cmd.source.as_deref() != Some("success_live_zone"))
                     .collect();
-                gs.ability_queue.set_pending_commands(filtered);
+                gs.ability_queue.set_pending_actions(filtered);
                 return self.resume_pending_commands(gs);
             }
             _ => log::debug!("Card selection from zone '{}' not yet implemented", zone),
@@ -1918,7 +1913,7 @@ impl super::resolver::AbilityResolver {
                             // execute_choice which sees the updated conditional_choice
                             // JSON array and creates a new SelectTarget for the
                             // remaining options.
-                            let mut commands = vec![Command::Effect(selected_effect)];
+                            let mut commands = vec![selected_effect];
                             let wants_re_prompt = !remaining.is_empty()
                                 && gs.entry_effect().map_or(false, |eff| {
                                     if eff.any_number.unwrap_or(false) {
@@ -1950,19 +1945,22 @@ impl super::resolver::AbilityResolver {
                                             .unwrap_or_else(|| o.text.clone())
                                     })
                                     .collect();
-                                commands.push(Command::Choice(Choice::SelectTarget {
+                                self.pending_reprompt_choice = Some(Choice::SelectTarget {
                                     target: "choice".to_string(),
                                     description: desc.join(" / "),
                                     allow_skip: true,
                                     options: None,
-                                }));
+                                });
                             }
                             let _n_cmds = commands.len();
-                            gs.ability_queue.set_pending_commands(commands);
+                            gs.ability_queue.set_pending_actions(commands);
+                            self.pending_choice = None; // clear stale
+                            return self.resume_pending_commands(gs);
                         }
                     }
+                } else if self.pending_choice.is_some() {
+                    self.pending_choice = None;
                 }
-                self.pending_choice = None;
                 return self.resume_pending_commands(gs);
             }
             Some(ChoiceRoute::ChoiceString) => {
@@ -2055,8 +2053,7 @@ impl super::resolver::AbilityResolver {
                                 modified.compound.select_action.is_some()
                             );
                             self.pending_choice = None;
-                            gs.ability_queue
-                                .set_pending_commands(vec![Command::Effect(modified)]);
+                            gs.ability_queue.set_pending_actions(vec![modified]);
                             let res = self.resume_pending_commands(gs);
                             eprintln!(
                                 "[SELFOR] after resume: pending={:?} res={:?}",
@@ -2250,8 +2247,7 @@ impl super::resolver::AbilityResolver {
         self.clear_choice_state(gs);
         if let Some(mut effect) = gs.entry_effect().cloned() {
             modifier(&mut effect);
-            gs.ability_queue
-                .set_pending_commands(vec![Command::Effect(effect)]);
+            gs.ability_queue.set_pending_actions(vec![effect]);
         }
         self.resume_pending_commands(gs)?;
         Ok(())
@@ -2513,22 +2509,16 @@ impl super::resolver::AbilityResolver {
             }
             let cmd = match (chose_yes, is_negation) {
                 // yes + negation → optional_action fires, conditional skipped
-                (true, true) => effect.compound.optional_action.map(|a| Command::Effect(*a)),
+                (true, true) => effect.compound.optional_action.map(|a| *a),
                 // yes + no negation → conditional_action fires (the follow-up)
-                (true, false) => effect
-                    .compound
-                    .conditional_action
-                    .map(|a| Command::Effect(*a)),
+                (true, false) => effect.compound.conditional_action.map(|a| *a),
                 // no + negation → conditional_action fires (the penalty)
-                (false, true) => effect
-                    .compound
-                    .conditional_action
-                    .map(|a| Command::Effect(*a)),
+                (false, true) => effect.compound.conditional_action.map(|a| *a),
                 // no + no negation → nothing fires
                 (false, false) => None,
             };
             if let Some(cmd) = cmd {
-                gs.ability_queue.set_pending_commands(vec![cmd]);
+                gs.ability_queue.set_pending_actions(vec![cmd]);
             }
         }
         self.resume_pending_commands(gs)?;

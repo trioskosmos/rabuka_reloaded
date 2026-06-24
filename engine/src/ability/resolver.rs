@@ -40,14 +40,11 @@ pub struct AbilityResolver {
     pub step_state: StepState,
     pub pending_energy_payment: Option<u32>,
     pub cancel_remaining_commands: bool,
-    /// One repeat action (a single `AbilityEffect`) queued for execution after
-    /// the current pending_commands batch finishes.  Each call to the repeat
-    /// helper stages one effect; when it completes the next is staged, with a
-    /// "Repeat?" prompt shown between batches.
+    /// Repeat actions fed one-at-a-time after each iteration completes.
     pub pending_repeat_actions: Vec<AbilityEffect>,
+    /// Re-prompt choice (any_number / re-select) set after pending actions finish.
+    pub pending_reprompt_choice: Option<Choice>,
     /// Buffer for structured ability resolution log items.
-    /// Items are pushed during resolution and flushed as a single LogEntry
-    /// with metadata at the end of `resolve_ability()`.
     pub log_items: Vec<AbilityLogItem>,
 }
 
@@ -75,6 +72,7 @@ impl AbilityResolver {
             pending_energy_payment: None,
             cancel_remaining_commands: false,
             pending_repeat_actions: Vec::new(),
+            pending_reprompt_choice: None,
             log_items: Vec::new(),
         }
     }

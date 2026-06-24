@@ -131,11 +131,9 @@ impl AbilityResolver {
             // This enables the "その後" (afterwards) pattern where a separate effect runs
             // after the look_and_select finishes (e.g. wait opponent members based on revealed card).
             if let Some(ref followup) = effect.compound.followup_action {
-                let mut existing = gs.ability_queue.take_pending_commands();
-                existing.push(crate::ability::types::Command::Effect(
-                    followup.as_ref().clone(),
-                ));
-                gs.ability_queue.set_pending_commands(existing);
+                let mut existing = gs.ability_queue.take_pending_actions();
+                existing.push(followup.as_ref().clone());
+                gs.ability_queue.set_pending_actions(existing);
             }
             println!(
                 "DEBUG: Choice created and stored - pending_choice.is_some(): {}",

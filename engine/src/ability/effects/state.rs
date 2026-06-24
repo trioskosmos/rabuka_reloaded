@@ -279,8 +279,8 @@ impl AbilityResolver {
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 // Store a re-apply effect so finalize_choice applies the state
                 // change to the selected target after the choice is resolved.
-                gs.ability_queue.set_pending_commands(vec![
-                    crate::ability::types::Command::Effect(crate::card::AbilityEffect {
+                gs.ability_queue
+                    .set_pending_actions(vec![crate::card::AbilityEffect {
                         action: "change_state".to_string(),
                         state_change: Some(state_change.clone()),
                         // Preserve the state filter (e.g. "active" for
@@ -296,8 +296,7 @@ impl AbilityResolver {
                         self_cost: Some(self_cost),
                         cost_limit_operator,
                         ..Default::default()
-                    }),
-                ]);
+                    }]);
                 return Ok(());
             }
 
