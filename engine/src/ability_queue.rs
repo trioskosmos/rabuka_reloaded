@@ -465,7 +465,7 @@ impl AbilityQueue {
         s.push('\n');
         s.push_str(&format!("entries={}", self.entries.len()));
         s.push('\n');
-        for (i, entry) in self.entries.iter().enumerate() {
+        for (_i, entry) in self.entries.iter().enumerate() {
             s.push_str(&format!(
                 "  [{}] card={} ab#{} player={} completed={} cost_paid={} effect_started={} optional_cost_result={:?} pending_actions={}\n",
                 entry.ability_index,
