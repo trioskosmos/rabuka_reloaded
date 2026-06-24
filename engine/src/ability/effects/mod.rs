@@ -337,6 +337,7 @@ impl AbilityResolver {
                         heart_type,
                         effect.target_name(),
                         effect.count_or(1) as i32,
+                        effect.duration.as_deref(),
                     );
                 } else if self.selected_cards.is_empty() {
                     // Need target selection: find eligible stage members
@@ -372,6 +373,7 @@ impl AbilityResolver {
                             heart_type,
                             effect.target_name(),
                             effect.count_or(1) as i32,
+                            effect.duration.as_deref(),
                         );
                     } else {
                         // Multiple eligible: create SelectCard choice
@@ -413,6 +415,7 @@ impl AbilityResolver {
                         heart_type,
                         effect.target_name(),
                         effect.count_or(1) as i32,
+                        effect.duration.as_deref(),
                     );
                 }
                 Ok(())

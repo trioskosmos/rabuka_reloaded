@@ -449,10 +449,18 @@ fn kowareyasuki_opponent_loses_2plus_hearts_gets_score_bonus() {
     }
 
     // Opponent had surplus hearts (from p2_member on stage, ≥2), so score bonus +1
+    // Check via performance snapshot (modifiers with live_end duration are cleaned up
+    // after the live ends)
+    let live_score = game
+        .state
+        .performance_snapshots
+        .first()
+        .and_then(|snap| snap.lives.iter().find(|l| l.card_id == koware))
+        .map(|l| l.score)
+        .unwrap_or(0);
     assert_eq!(
-        game.state.mods.get_score_modifier(koware),
-        1,
-        "Kowareyasuki should gain +1 score bonus when opponent loses 2+ surplus hearts"
+        live_score, 6,
+        "Kowareyasuki score should be base 5 + bonus 1"
     );
 }
 
@@ -498,10 +506,18 @@ fn kowareyasuki_opponent_loses_exactly_2_gets_bonus() {
         game.select_indices(&[]);
     }
 
+    // Check via performance snapshot (modifiers with live_end duration are cleaned up
+    // after the live ends)
+    let live_score = game
+        .state
+        .performance_snapshots
+        .first()
+        .and_then(|snap| snap.lives.iter().find(|l| l.card_id == koware))
+        .map(|l| l.score)
+        .unwrap_or(0);
     assert_eq!(
-        game.state.mods.get_score_modifier(koware),
-        1,
-        "Score +1 for exactly 2 surplus hearts"
+        live_score, 6,
+        "Kowareyasuki score should be base 5 + bonus 1"
     );
 }
 

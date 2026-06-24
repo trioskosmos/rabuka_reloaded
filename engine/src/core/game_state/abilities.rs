@@ -2111,6 +2111,61 @@ impl GameState {
                         }
                     }
                 }
+                "set_heart_type" => {
+                    if let Some(ref data) = effect.effect_data {
+                        if let Some(card_id) = data.get("card_id").and_then(|v| v.as_i64()) {
+                            self.mods.heart_color_multiplier.remove(&(card_id as i16));
+                            log::debug!("Removed heart color multiplier for card {}", card_id);
+                        }
+                    }
+                }
+                s if s.starts_with("set_blade_type:") => {
+                    if let Some(ref data) = effect.effect_data {
+                        if let Some(card_id) = data.get("card_id").and_then(|v| v.as_i64()) {
+                            self.mods.clear_blade_type_modifier(card_id as i16);
+                            log::debug!("Cleared blade type modifier for card {}", card_id);
+                        }
+                    }
+                }
+                s if s.starts_with("modify_score_") => {
+                    if s == "modify_score_set" {
+                        if let Some(ref data) = effect.effect_data {
+                            if let Some(cards) = data.as_array() {
+                                for card_data in cards {
+                                    if let Some(card_id) =
+                                        card_data.get("card_id").and_then(|v| v.as_i64())
+                                    {
+                                        self.mods.clear_score_set_modifier(card_id as i16);
+                                        log::debug!(
+                                            "Cleared score set modifier for card {}",
+                                            card_id
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    } else if let Some(ref data) = effect.effect_data {
+                        if let Some(cards) = data.as_array() {
+                            for card_data in cards {
+                                if let Some(card_id) =
+                                    card_data.get("card_id").and_then(|v| v.as_i64())
+                                {
+                                    if let Some(amount) =
+                                        card_data.get("amount").and_then(|v| v.as_i64())
+                                    {
+                                        self.mods
+                                            .remove_score_modifier(card_id as i16, amount as i32);
+                                        log::debug!(
+                                            "Removed score modifier {} from card {}",
+                                            amount,
+                                            card_id
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 _ => {
                     log::debug!("Expired effect: {}", effect.description);
                 }

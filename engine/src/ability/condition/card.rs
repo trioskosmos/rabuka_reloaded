@@ -4,7 +4,14 @@ use crate::ability::debug::AbDebug;
 use crate::ability::enums::Zone;
 use crate::ability::util;
 use crate::ability::util::compare_counts;
-use crate::card::Condition;
+use crate::card::{Condition, HeartColor};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HeartTotal {
+    None,
+    All,
+    Value(u32),
+}
 
 impl<'a> ConditionContext<'a> {
     pub(crate) fn resolve_condition_player(&self, target: &str) -> &crate::player::Player {
@@ -1121,6 +1128,15 @@ impl<'a> ConditionContext<'a> {
             return false;
         }
 
+        // all=true with no operator/count → "more hearts than all others" comparison
+        if condition.all.unwrap_or(false)
+            && condition.operator.is_none()
+            && condition.count.is_none()
+            && location == "stage"
+        {
+            return self.evaluate_heart_greater_than_all(condition, is_both);
+        }
+
         // NOTE: Movement gating for "was placed" (置かれた) triggers
         // is handled at the TAS enqueue level — see the pre-filter
         // in trigger_auto_abilities_for_player_with_event. At this
@@ -1309,6 +1325,114 @@ impl<'a> ConditionContext<'a> {
             _ => op,
         };
         compare_counts(effective_op, count, thresh)
+    }
+
+    fn get_card_total_hearts(&self, card_id: i16) -> HeartTotal {
+        let card = match self.game_state.card_database.get_card(card_id) {
+            Some(c) => c,
+            None => return HeartTotal::None,
+        };
+        let base = match card.base_heart.as_ref() {
+            Some(b) => b,
+            None => return HeartTotal::None,
+        };
+
+        if base.hearts.contains_key(&HeartColor::Heart00)
+            || base.hearts.contains_key(&HeartColor::All)
+        {
+            return HeartTotal::All;
+        }
+
+        let base_sum: u32 = base.hearts.values().sum();
+
+        let modifier_total: i32 = self
+            .game_state
+            .mods
+            .heart_modifiers
+            .get(&card_id)
+            .map(|hm| hm.values().map(|e| e.set + e.additive).sum::<i32>())
+            .unwrap_or(0);
+
+        HeartTotal::Value((base_sum as i32 + modifier_total).max(0) as u32)
+    }
+
+    fn evaluate_heart_greater_than_all(&self, condition: &Condition, is_both: bool) -> bool {
+        let activating_id = match self.activating_card_id {
+            Some(id) => id,
+            None => return false,
+        };
+
+        let self_hearts = self.get_card_total_hearts(activating_id);
+        if self_hearts == HeartTotal::None {
+            return false;
+        }
+
+        let card_db = &self.game_state.card_database;
+        let card_type = condition.card_type.as_deref();
+        let excl_self = condition.exclude_self.unwrap_or(false);
+
+        let self_player = self.resolve_condition_player("self");
+        let mut other_ids: Vec<i16> = self_player
+            .stage
+            .stage
+            .iter()
+            .filter(|&&cid| {
+                if cid == -1 {
+                    return false;
+                }
+                if excl_self && Some(cid) == self.activating_card_id {
+                    return false;
+                }
+                if !util::card_matches_type(card_db, cid, card_type) {
+                    return false;
+                }
+                true
+            })
+            .copied()
+            .collect();
+
+        if is_both {
+            let opp_player = self.resolve_condition_player("opponent");
+            let opp_ids: Vec<i16> = opp_player
+                .stage
+                .stage
+                .iter()
+                .filter(|&&cid| {
+                    if cid == -1 {
+                        return false;
+                    }
+                    if excl_self && Some(cid) == self.activating_card_id {
+                        return false;
+                    }
+                    if !util::card_matches_type(card_db, cid, card_type) {
+                        return false;
+                    }
+                    true
+                })
+                .copied()
+                .collect();
+            other_ids.extend(opp_ids);
+        }
+
+        if other_ids.is_empty() {
+            return true;
+        }
+
+        for &other_id in &other_ids {
+            let other_hearts = self.get_card_total_hearts(other_id);
+            let self_wins = match (&self_hearts, &other_hearts) {
+                (HeartTotal::All, HeartTotal::All) => false,
+                (HeartTotal::All, _) => true,
+                (_, HeartTotal::All) => false,
+                (HeartTotal::Value(sh), HeartTotal::Value(oh)) => *sh > *oh,
+                _ => false,
+            };
+            if !self_wins {
+                return false;
+            }
+        }
+
+        true
     }
 
     /// "元々持つブレード" — checks base/printed blade (card.blade from DB).
@@ -3074,8 +3198,72 @@ impl<'a> ConditionContext<'a> {
         location: &str,
         comparison_type: Option<&str>,
     ) -> u32 {
+        let zone = Zone::from_str(location);
         match comparison_type {
             Some("score") => {
+                let is_live_zone = zone.map_or(true, |z| {
+                    matches!(z, Zone::LiveCardZone | Zone::SuccessLiveZone)
+                });
+
+                if is_live_zone {
+                    let is_p1 = player.id == self.game_state.player1.id;
+                    let cheer_blade = if is_p1 {
+                        self.game_state.player1_cheer_blade_heart_count
+                    } else {
+                        self.game_state.player2_cheer_blade_heart_count
+                    };
+                    let constant_bonus = if is_p1 {
+                        self.game_state.mods.p1_constant_total_score_bonus
+                    } else {
+                        self.game_state.mods.p2_constant_total_score_bonus
+                    };
+
+                    let score_flat: std::collections::HashMap<i16, i32> = self
+                        .game_state
+                        .mods
+                        .score_modifiers
+                        .iter()
+                        .map(|(&k, e)| (k, e.total()))
+                        .collect();
+
+                    let live_score = player.live_card_zone.calculate_live_score(
+                        &self.game_state.card_database,
+                        0,
+                        player.stage_hearts.as_ref(),
+                        Some(&self.game_state.mods.need_heart_modifiers),
+                        Some(&score_flat),
+                        0,
+                    );
+
+                    let success_score = {
+                        let mut total = 0u32;
+                        for &card_id in player.success_live_card_zone.cards.iter() {
+                            if let Some(card) = self.game_state.card_database.get_card(card_id) {
+                                let base = card.get_score() as i32;
+                                let modifier = score_flat.get(&card_id).copied().unwrap_or(0);
+                                total += (base + modifier).max(0) as u32;
+                            }
+                        }
+                        total
+                    };
+
+                    return match zone {
+                        Some(Zone::LiveCardZone) => player.live_card_zone.calculate_live_score(
+                            &self.game_state.card_database,
+                            cheer_blade,
+                            player.stage_hearts.as_ref(),
+                            Some(&self.game_state.mods.need_heart_modifiers),
+                            Some(&score_flat),
+                            constant_bonus,
+                        ),
+                        Some(Zone::SuccessLiveZone) => success_score,
+                        None => {
+                            live_score + success_score + cheer_blade + constant_bonus.max(0) as u32
+                        }
+                        _ => 0,
+                    };
+                }
+
                 let mut total_score = 0;
                 let cards: Vec<i16> = match Zone::from_str(location) {
                     Some(Zone::SuccessLiveZone) => player.success_live_card_zone.cards.to_vec(),

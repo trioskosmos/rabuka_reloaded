@@ -192,6 +192,13 @@ impl AbilityResolver {
             count_applied += 1;
         }
 
+        let effect_data = {
+            let data: Vec<serde_json::Value> = live_card_ids
+                .iter()
+                .map(|(card_id, delta)| serde_json::json!({"card_id": card_id, "amount": delta}))
+                .collect();
+            Some(serde_json::Value::Array(data))
+        };
         util::push_temporary_effect(
             gs,
             &format!("modify_score_{}", operation),
@@ -201,7 +208,7 @@ impl AbilityResolver {
                 "Modify score by {} {} (applied to {} cards)",
                 operation, final_value, count_applied
             ),
-            None,
+            effect_data,
         );
         Ok(())
     }

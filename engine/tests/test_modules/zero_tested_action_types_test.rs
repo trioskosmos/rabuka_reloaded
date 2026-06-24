@@ -147,18 +147,20 @@ fn vivid_world_live_phase_blade_and_success() {
     game.set_live_card(live_card);
     game.pass();
     game.pass();
+
+    // ab#0: set_blade_type applies 青ブレード to stage members during FirstAttackerPerformance.
+    // Check BEFORE the live ends (LiveEnd effects expire when check_expired_effects fires).
+    assert!(
+        !game.state.mods.blade_type_modifiers.is_empty(),
+        "VIVID WORLD ab#0: blade_type_modifiers set on stage"
+    );
+
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
     game.pass();
     game.pass();
     game.pass();
-
-    // ab#0: set_blade_type applies 青ブレード to stage members
-    assert!(
-        !game.state.mods.blade_type_modifiers.is_empty(),
-        "VIVID WORLD ab#0: blade_type_modifiers set on stage"
-    );
 
     // ab#1: score_mod depends on yell cards — the test setup uses cards
     // without blade_hearts, so the condition isn't met. That's OK; this

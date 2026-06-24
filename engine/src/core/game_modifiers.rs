@@ -263,6 +263,15 @@ impl GameModifiers {
         self.score_modifiers.entry(card_id).or_default().set = value;
     }
 
+    pub fn clear_score_set_modifier(&mut self, card_id: i16) {
+        if let Some(entry) = self.score_modifiers.get_mut(&card_id) {
+            entry.set = 0;
+            if entry.additive == 0 {
+                self.score_modifiers.remove(&card_id);
+            }
+        }
+    }
+
     // ============== NEED HEART ==============
 
     pub fn add_need_heart_modifier(&mut self, card_id: i16, color: HeartColor, delta: i32) {

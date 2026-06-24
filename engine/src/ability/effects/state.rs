@@ -718,6 +718,7 @@ impl AbilityResolver {
             if let Some(color) = blade_color {
                 gs.mods.set_blade_type_modifier(card_id, color);
             }
+            let ed = serde_json::json!({"card_id": card_id});
             util::push_temporary_effect(
                 gs,
                 &format!("set_blade_type:{}", blade_type.unwrap_or("")),
@@ -731,7 +732,7 @@ impl AbilityResolver {
                         .map(|c| c.name.as_str())
                         .unwrap_or("unknown")
                 ),
-                None,
+                Some(ed),
             );
         }
     }
@@ -742,6 +743,7 @@ impl AbilityResolver {
         heart_type: Option<&str>,
         _target: &str,
         _count: i32,
+        duration: Option<&str>,
     ) {
         let pp = self.player_prefix(gs);
         let act_name = gs
@@ -757,7 +759,7 @@ impl AbilityResolver {
                 .and_then(|e| e.conditional_choice.as_deref()),
             other => other,
         };
-        let ht = resolved_heart_type.unwrap_or("heart00");
+        let ht = resolved_heart_type.unwrap_or("heart00").to_string();
         gs.rule_log
             .push(format!("{} {}: ハート種類を{}に設定", pp, act_name, ht));
         // Use selected_target from self.selected_cards if available (member-targeting
@@ -772,7 +774,7 @@ impl AbilityResolver {
         if card_id == -1 {
             return;
         }
-        let color = crate::zones::parse_heart_color(ht);
+        let color = crate::zones::parse_heart_color(&ht);
         gs.mods.heart_color_multiplier.insert(card_id, color);
         gs.record_ability_application(
             card_id,
@@ -781,6 +783,15 @@ impl AbilityResolver {
             card_id,
             Some(color.index()),
             0,
+        );
+        let ed = serde_json::json!({"card_id": card_id});
+        util::push_temporary_effect(
+            gs,
+            "set_heart_type",
+            duration,
+            "self",
+            &format!("Set heart type to {} for card {}", ht, card_id),
+            Some(ed),
         );
     }
 
