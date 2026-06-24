@@ -293,7 +293,7 @@ def extract_blade_limit(text: str) -> Optional[Dict[str, Any]]:
     if not m:
         m = re.search(r"ブレード[の]数[がは]ちょうど(\d+)[つ個]", normalized)
     if not m:
-        m = re.search(r"ブレード[の]数[がは](\d+)[つ個]", normalized)
+        m = re.search(r"ブレード[の]数[がは](\d+)[つ個](?!になる)", normalized)
     if m:
         result: Dict[str, Any] = {"blade_limit": int(m.group(1))}
         if len(m.groups()) >= 2 and m.group(2) and m.group(2) != "ちょうど":

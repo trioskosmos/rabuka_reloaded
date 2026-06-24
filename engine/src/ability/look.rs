@@ -433,6 +433,13 @@ impl AbilityResolver {
         if gs.looked_at_cards.is_empty() {
             return Ok(());
         }
+        // Q118: If distinct filter reduced available cards below the required count,
+        // bail out so conditional sequential effects can detect the failure.
+        // Only applies when distinct constraint is active — regular selects
+        // (e.g. "pick up to N" where N > available) should still proceed.
+        if effect.distinct.is_some() && gs.looked_at_cards.len() < count as usize {
+            return Ok(());
+        }
         let count = count.min(gs.looked_at_cards.len() as u32);
 
         let filtered_indices: Option<Vec<usize>> = if Zone::from_str(source) == Some(Zone::Stage) {

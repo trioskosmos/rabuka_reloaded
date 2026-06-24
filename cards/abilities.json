@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-25T07:00:32.253760",
+  "generated_at": "2026-06-25T08:04:54.122152",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -14489,9 +14489,7 @@
           "Liella!"
         ],
         "action": "set_blade_count",
-        "original_value": true,
-        "blade_limit": 3,
-        "blade_limit_operator": "=="
+        "original_value": true
       }
     },
     {

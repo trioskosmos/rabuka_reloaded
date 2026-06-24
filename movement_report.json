@@ -1,0 +1,404 @@
+[
+  {
+    "full_text": "{{toujyou.png|登場}}バトンタッチして登場した場合、このバトンタッチで控え室に置かれた『Liella!』のメンバーカードを1枚手札に加える。",
+    "effect_action": "move_cards",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "baton_touch",
+      "target": "self",
+      "baton_touch_trigger": true,
+      "text": "バトンタッチして登場した場合",
+      "location": "stage"
+    }
+  },
+  {
+    "full_text": "{{toujyou.png|登場}}このメンバーよりコストが低い『スリーズブーケ』のメンバーからバトンタッチして登場した場合、自分の控え室から『蓮ノ空』のライブカードを1枚手札に加える。",
+    "effect_action": "move_cards",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "baton_touch",
+      "target": "self",
+      "baton_touch_trigger": true,
+      "text": "このメンバーよりコストが低い『スリーズブーケ』のメンバーからバトンタッチして登場した場合",
+      "location": "stage",
+      "group_names": [
+        "スリーズブーケ"
+      ],
+      "comparison_type": "cost",
+      "operator": "<"
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}このメンバーが登場か、エリアを移動したとき、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバー1人をウェイトにする。",
+    "effect_action": "",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "moves",
+      "text": "このメンバーが登場か、エリアを移動したとき"
+    }
+  },
+  {
+    "full_text": "{{toujyou.png|登場}}能力を持たないメンバーからバトンタッチして登場した場合、カードを1枚引く。",
+    "effect_action": "draw_card",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "baton_touch",
+      "target": "self",
+      "baton_touch_trigger": true,
+      "text": "能力を持たないメンバーからバトンタッチして登場した場合",
+      "location": "stage",
+      "ability_filter": "no_ability",
+      "card_type": "member_card"
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のカードの効果によって、このメンバーがエリアを移動するか自分のエネルギー置き場にエネルギーが置かれたとき、カードを1枚引き、ライブ終了時まで、{{heart_02.png|heart02}}を得る。",
+    "effect_action": "sequential",
+    "condition": {
+      "type": "movement_condition",
+      "text": "自分のカードの効果によって、このメンバーがエリアを移動するか自分のエネルギー置き場にエネルギーが置かれたとき",
+      "movement": "moves",
+      "self_effect_only": true,
+      "energy_placed": true
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}このメンバーがエリアを移動したとき、ライブ終了時まで、{{heart_06.png|heart06}}を得る。\n(対戦相手のカードの効果でも発動する。)",
+    "effect_action": "gain_resource",
+    "condition": {
+      "type": "movement_condition",
+      "text": "このメンバーがエリアを移動したとき",
+      "movement": "moved",
+      "movement_state": "has_moved"
+    }
+  },
+  {
+    "full_text": "{{toujyou.png|登場}}このメンバーよりコストが低いメンバーからバトンタッチして登場した場合、自分の手札からコスト4以下のメンバーカードを1枚ステージに登場させてもよい。",
+    "effect_action": "move_cards",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "baton_touch",
+      "target": "self",
+      "baton_touch_trigger": true,
+      "text": "このメンバーよりコストが低いメンバーからバトンタッチして登場した場合",
+      "location": "stage",
+      "comparison_type": "cost",
+      "operator": "<"
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}このメンバーが登場か、エリアを移動するたび、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。\n(対戦相手のカードの効果でも発動する。)",
+    "effect_action": "",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "moves",
+      "text": "このメンバーが登場か、エリアを移動する"
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}このメンバーがエリアを移動したとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
+    "effect_action": "move_cards",
+    "condition": {
+      "type": "movement_condition",
+      "text": "このメンバーがエリアを移動したとき",
+      "movement": "moved",
+      "movement_state": "has_moved"
+    }
+  },
+  {
+    "full_text": "{{toujyou.png|登場}}このメンバーよりコストが低い『DOLLCHESTRA』のメンバーからバトンタッチして登場した場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+    "effect_action": "gain_resource",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "baton_touch",
+      "target": "self",
+      "baton_touch_trigger": true,
+      "text": "このメンバーよりコストが低い『DOLLCHESTRA』のメンバーからバトンタッチして登場した場合",
+      "location": "stage",
+      "group_names": [
+        "DOLLCHESTRA"
+      ],
+      "comparison_type": "cost",
+      "operator": "<"
+    }
+  },
+  {
+    "full_text": "{{toujyou.png|登場}}{{icon_energy.png|E}}支払ってもよい：このメンバーよりコストが低い『みらくらぱーく！』のメンバーからバトンタッチして登場した場合、ライブ終了時まで、{{heart_01.png|heart01}}{{heart_01.png|heart01}}を得る。",
+    "effect_action": "gain_resource",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "baton_touch",
+      "target": "self",
+      "baton_touch_trigger": true,
+      "text": "このメンバーよりコストが低い『みらくらぱーく！』のメンバーからバトンタッチして登場した場合",
+      "location": "stage",
+      "group_names": [
+        "みらくらぱーく！"
+      ],
+      "comparison_type": "cost",
+      "operator": "<"
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}このメンバーがエリアを移動したとき、自分の控え室から、スコア3以下の『Liella!』のライブカードを1枚手札に加える。",
+    "effect_action": "move_cards",
+    "condition": {
+      "type": "movement_condition",
+      "text": "このメンバーがエリアを移動したとき",
+      "movement": "moved",
+      "movement_state": "has_moved"
+    }
+  },
+  {
+    "full_text": "{{toujyou.png|登場}}「中須かすみ」からバトンタッチして登場した場合、カードを2枚引き、手札を1枚控え室に置く。",
+    "effect_action": "sequential",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "baton_touch",
+      "target": "self",
+      "baton_touch_trigger": true,
+      "text": "「中須かすみ」からバトンタッチして登場した場合",
+      "location": "stage",
+      "baton_touch_source": "中須かすみ",
+      "characters": [
+        "中須かすみ"
+      ]
+    }
+  },
+  {
+    "full_text": "{{toujyou.png|登場}}「優木せつ菜」からバトンタッチして登場した場合、カードを2枚引き、手札を2枚控え室に置く。",
+    "effect_action": "sequential",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "baton_touch",
+      "target": "self",
+      "baton_touch_trigger": true,
+      "text": "「優木せつ菜」からバトンタッチして登場した場合",
+      "location": "stage",
+      "baton_touch_source": "優木せつ菜",
+      "characters": [
+        "優木せつ菜"
+      ]
+    }
+  },
+  {
+    "full_text": "{{toujyou.png|登場}}「エマ・ヴェルデ」からバトンタッチして登場した場合、カードを2枚引き、手札を2枚控え室に置く。",
+    "effect_action": "sequential",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "baton_touch",
+      "target": "self",
+      "baton_touch_trigger": true,
+      "text": "「エマ・ヴェルデ」からバトンタッチして登場した場合",
+      "location": "stage",
+      "baton_touch_source": "エマ・ヴェルデ",
+      "characters": [
+        "エマ・ヴェルデ"
+      ]
+    }
+  },
+  {
+    "full_text": "{{toujyou.png|登場}}「三船栞子」からバトンタッチして登場した場合、カードを2枚引き、手札を1枚控え室に置く。",
+    "effect_action": "sequential",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "baton_touch",
+      "target": "self",
+      "baton_touch_trigger": true,
+      "text": "「三船栞子」からバトンタッチして登場した場合",
+      "location": "stage",
+      "baton_touch_source": "三船栞子",
+      "characters": [
+        "三船栞子"
+      ]
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}このメンバーがエリアを移動したとき、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。",
+    "effect_action": "change_state",
+    "condition": {
+      "type": "movement_condition",
+      "text": "このメンバーがエリアを移動したとき",
+      "movement": "moved",
+      "movement_state": "has_moved"
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}このメンバーがエリアを移動したとき、エネルギーを2枚アクティブにする。",
+    "effect_action": "change_state",
+    "condition": {
+      "type": "movement_condition",
+      "text": "このメンバーがエリアを移動したとき",
+      "movement": "moved",
+      "movement_state": "has_moved"
+    }
+  },
+  {
+    "full_text": "{{toujyou.png|登場}}バトンタッチして登場した場合、このバトンタッチによって控え室に置かれた『Liella!』のメンバーカード1枚につき、カードを1枚引く。ブレードハートを持たない『Liella!』のメンバーカード1枚につき、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+    "effect_action": "sequential",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "baton_touch",
+      "target": "self",
+      "baton_touch_trigger": true,
+      "text": "バトンタッチして登場した場合",
+      "location": "stage"
+    }
+  },
+  {
+    "full_text": "{{toujyou.png|登場}}バトンタッチして登場した場合、このバトンタッチで控え室に置かれた『Liella!』のメンバーカードを1枚、このメンバーの下に置く。",
+    "effect_action": "sequential",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "baton_touch",
+      "target": "self",
+      "baton_touch_trigger": true,
+      "text": "バトンタッチして登場した場合",
+      "location": "stage"
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のライブが成功するか、このメンバーがエリアを移動したとき、自分の控え室にある『Liella!』のメンバーカードを1枚、このメンバーの下に置く。",
+    "effect_action": "move_cards",
+    "condition": {
+      "type": "movement_condition",
+      "text": "自分のライブが成功するか、このメンバーがエリアを移動したとき",
+      "movement": "moved",
+      "movement_state": "has_moved"
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のステージのセンターエリアにいるメンバーがエリアを移動したとき、以下から1つを選ぶ。\n・ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。\n・相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。\n・カードを1枚引く。",
+    "effect_action": "choice",
+    "condition": {
+      "type": "movement_condition",
+      "text": "自分のステージのセンターエリアにいるメンバーがエリアを移動したとき",
+      "movement": "moved",
+      "movement_state": "has_moved",
+      "position": "center"
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のステージにいる『5yncri5e!』のメンバーがセンターエリアに移動したとき、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+    "effect_action": "gain_resource",
+    "condition": {
+      "type": "movement_condition",
+      "text": "自分のステージにいる『5yncri5e!』のメンバーがセンターエリアに移動したとき",
+      "movement": "moved",
+      "movement_state": "has_moved",
+      "position": "center",
+      "group_names": [
+        "5yncri5e!"
+      ]
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}{{turn2.png|ターン2回}}自分のステージに、このメンバーか、ほかのメンバーがバトンタッチして登場したとき、カードを1枚引く。",
+    "effect_action": "draw_card",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "baton_touch",
+      "target": "self",
+      "baton_touch_trigger": true,
+      "text": "自分のステージに、このメンバーか、ほかのメンバーがバトンタッチして登場したとき",
+      "location": "stage",
+      "exclude_self": true
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}このメンバーがエリアを移動するたび、カードを1枚引く。\n(対戦相手のカードの効果でも発動する。)",
+    "effect_action": "draw_card",
+    "condition": {
+      "type": "movement_condition",
+      "text": "このメンバーがエリアを移動する",
+      "movement": "moves"
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}このメンバーがエリアを移動したとき、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
+    "effect_action": "gain_resource",
+    "condition": {
+      "type": "movement_condition",
+      "text": "このメンバーがエリアを移動したとき",
+      "movement": "moved",
+      "movement_state": "has_moved"
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}このメンバーがコスト10以上の『蓮ノ空』のメンバーとバトンタッチして控え室に置かれたとき、エネルギーを2枚アクティブにする。",
+    "effect_action": "change_state",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "baton_touch",
+      "target": "self",
+      "baton_touch_trigger": true,
+      "text": "このメンバーがコスト10以上の『蓮ノ空』のメンバーとバトンタッチして控え室に置かれたとき",
+      "location": "discard",
+      "cost_limit": 10,
+      "cost_limit_operator": ">=",
+      "group_names": [
+        "蓮ノ空"
+      ]
+    }
+  },
+  {
+    "full_text": "{{toujyou.png|登場}}「徒町小鈴」以外の『蓮ノ空』のメンバーからバトンタッチして登場した場合、自分の控え室からライブカードを1枚手札に加える。",
+    "effect_action": "move_cards",
+    "condition": {
+      "type": "movement_condition",
+      "movement": "baton_touch",
+      "target": "self",
+      "baton_touch_trigger": true,
+      "text": "「徒町小鈴」以外の『蓮ノ空』のメンバーからバトンタッチして登場した場合",
+      "location": "stage",
+      "exclude_characters": [
+        "徒町小鈴"
+      ],
+      "group_names": [
+        "蓮ノ空"
+      ]
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}このメンバーがエリアを移動したとき、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。\n(対戦相手のカードの効果でも発動する。)",
+    "effect_action": "gain_resource",
+    "condition": {
+      "type": "movement_condition",
+      "text": "このメンバーがエリアを移動したとき",
+      "movement": "moved",
+      "movement_state": "has_moved"
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}このメンバーがエリアを移動したとき、ライブ終了時まで、{{heart_02.png|heart02}}を得る。\n(対戦相手のカードの効果でも発動する。)",
+    "effect_action": "gain_resource",
+    "condition": {
+      "type": "movement_condition",
+      "text": "このメンバーがエリアを移動したとき",
+      "movement": "moved",
+      "movement_state": "has_moved"
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}このメンバーがエリアを移動したとき、ライブ終了時まで、{{heart_03.png|heart03}}を得る。\n(対戦相手のカードの効果でも発動する。)",
+    "effect_action": "gain_resource",
+    "condition": {
+      "type": "movement_condition",
+      "text": "このメンバーがエリアを移動したとき",
+      "movement": "moved",
+      "movement_state": "has_moved"
+    }
+  },
+  {
+    "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のメインフェイズの間、このメンバーがエリアを移動したとき、エネルギーを2枚アクティブにする。",
+    "effect_action": "change_state",
+    "condition": {
+      "type": "movement_condition",
+      "text": "自分のメインフェイズの間、このメンバーがエリアを移動したとき",
+      "movement": "moved",
+      "movement_state": "has_moved",
+      "phase": "main",
+      "phase_target": "self"
+    }
+  }
+]

@@ -927,10 +927,23 @@ impl AbilityResolver {
                 None,
             );
         }
+        if let Some(ref pos) = effect.position {
+            if let Some(p) = pos.get_position() {
+                if let Some(stage_idx) = util::stage_position_index(p) {
+                    let player = gs.resolve_target_player(target);
+                    let expected = player.stage.stage[stage_idx];
+                    stage_cards.retain(|&cid| expected == -1 || cid == expected);
+                }
+            }
+        }
+        let card_db = gs.card_database.clone();
         for &card_id in &stage_cards {
-            let current = gs.mods.get_blade_modifier(card_id);
-            let delta = (value as i32) - current;
-            gs.mods.add_blade_modifier(card_id, delta);
+            let original_blade = card_db
+                .get_card(card_id)
+                .map(|c| c.blade as i32)
+                .unwrap_or(0);
+            gs.mods
+                .set_blade_modifier(card_id, (value as i32) - original_blade);
         }
     }
 

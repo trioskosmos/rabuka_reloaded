@@ -365,8 +365,7 @@
     margin-top: 1px;
 }
 .perf-contrib-card.perf-total-row {
-    border-color: var(--accent-gold);
-    border-style: dashed;
+    border: none;
     background: rgba(255, 215, 0, 0.03);
 }
 .perf-panel-body-grid {

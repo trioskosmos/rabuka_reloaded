@@ -103,6 +103,10 @@ fn toubatsu_q118_1_live_card_fails() {
 
     // Debut fires: select 2 distinct live cards — only 1 available
     // Engine returns early (no choice created) since distinct filter fails
+    assert!(
+        !game.has_pending_choice(),
+        "Q118: No choice should be created — insufficient distinct cards"
+    );
 
     // Q118: Live card should NOT be in hand (effect required 2 distinct)
     assert!(
