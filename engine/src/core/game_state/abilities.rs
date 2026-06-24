@@ -1160,15 +1160,17 @@ impl GameState {
             // uses it to prevent re-enqueueing the just-completed ability).
             self.activating_card = None;
             self.activating_ability_index = None;
-            if let Some(pid) = self.ability_master_id() {
-                self.process_pending_auto_abilities(&pid);
-            }
-            // Trigger discarded card abilities BEFORE clearing tracking data,
-            // so recently_moved_cards is still populated.
+            // Trigger discarded card abilities BEFORE process_pending_auto_abilities
+            // so recently_moved_cards is still populated.  If we process pending
+            // auto abilities first, the inner loop may clear recently_moved_cards
+            // (line 710) and discard→hand triggers never fire.
             // Use current_pid (captured before complete_current) instead of
             // ability_master_id which returns None after state becomes Idle.
             if self.recently_moved_cards.is_some() {
                 self.trigger_auto_for_discarded_cards(&current_pid);
+            }
+            if let Some(pid) = self.ability_master_id() {
+                self.process_pending_auto_abilities(&pid);
             }
             // Post-resolution each_time trigger for LiveStart/LiveSuccess.
             // Only fires if the effect was actually executed (cost was paid

@@ -230,6 +230,12 @@ impl AbilityResolver {
             activating_card
                 .and_then(|cid| player.stage.stage.iter().position(|&id| id == cid))
                 .or(vacated_area)
+                .or_else(|| {
+                    self.moved_cards
+                        .iter()
+                        .rev()
+                        .find_map(|&cid| player.stage.stage.iter().position(|&id| id == cid))
+                })
         } else if Zone::from_str(destination) == Some(Zone::Deck)
             || Zone::from_str(destination) == Some(Zone::DeckTop)
         {

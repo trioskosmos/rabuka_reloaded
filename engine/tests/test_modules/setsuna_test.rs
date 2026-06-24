@@ -9,6 +9,8 @@
 /// Q157: Wait-energy can be placed under member (any energy state works)
 /// Q184: Energy under member does NOT count toward energy count
 use crate::helpers::*;
+use rabuka_engine::zones::MemberArea;
+
 /// Q157: Wait-energy can be placed under the member.
 /// Cost paid with active energy; placement pops wait-energy from zone.
 #[test]
@@ -117,5 +119,62 @@ fn setsuna_debuts_to_vacated_area_not_stage_first_empty() {
     assert!(
         game.state.player1.waitroom.cards.contains(&setsuna),
         "Original setsuna should be in waitroom"
+    );
+}
+
+/// Energy placed under member should go to the CORRECT area (same as where
+/// the new card debuts), not default to center.
+/// Regression test for the bug where place_energy_under_member always
+/// defaulted to center when the activating card was removed from stage as cost.
+#[test]
+fn setsuna_energy_placed_under_vacated_area_not_center() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let setsuna = game.id("PL!N-bp3-007-R");
+    let target = game.id("PL!N-PR-009-PR");
+
+    // Setsuna on the RIGHT side
+    game.state.player1.stage.stage = [-1, -1, setsuna];
+    game.state.player1.hand.cards.push(target);
+    game.give_energy(3);
+
+    game.activate_ability(setsuna);
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    // New card should be on the right side
+    assert_eq!(
+        game.state.player1.stage.stage[2], target,
+        "New card should debut to RightSide"
+    );
+    // Energy should be under the member on the RIGHT side, not center
+    assert_eq!(
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::RightSide)
+            .len(),
+        1,
+        "Energy should be under the member on the RightSide"
+    );
+    assert_eq!(
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .len(),
+        0,
+        "Center should have no energy under it"
+    );
+    assert_eq!(
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::LeftSide)
+            .len(),
+        0,
+        "LeftSide should have no energy under it"
     );
 }

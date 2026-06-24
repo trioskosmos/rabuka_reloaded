@@ -153,11 +153,6 @@ const actionHandlers = {
         window.Actions.execCode(`player_idx=0; amount=15; draw_energy`);
         window.Actions.execCode(`player_idx=1; amount=15; draw_energy`);
     },
-    'cheat-add-card': ({ player }) => {
-        const cardId = document.getElementById('cheat-card-id')?.value || '';
-        if (!cardId) { alert('Enter a card ID'); return; }
-        window.Actions.execCode(`player_idx=${player}; card_no=${cardId}; add_card`);
-    },
     'cheat-draw-card': ({ player }) => {
         const amount = document.getElementById('cheat-draw-amount')?.value || '1';
         window.Actions.execCode(`player_idx=${player}; amount=${amount}; draw_card`);
@@ -165,34 +160,29 @@ const actionHandlers = {
     'cheat-clear-hand': ({ player }) => {
         window.Actions.execCode(`player_idx=${player}; clear_hand`);
     },
-    'cheat-add-stage': ({ player }) => {
-        const cardId = document.getElementById('cheat-stage-id')?.value || '';
-        if (!cardId) { alert('Enter a card ID'); return; }
-        window.Actions.execCode(`player_idx=${player}; card_no=${cardId}; add_stage`);
-    },
-    'cheat-add-live': ({ player }) => {
-        const cardId = document.getElementById('cheat-live-id')?.value || '';
-        if (!cardId) { alert('Enter a card ID'); return; }
-        window.Actions.execCode(`player_idx=${player}; card_no=${cardId}; add_live_to_zone`);
-    },
-    'cheat-force-win': () => {
-        window.Actions.execCode(`force_win`);
-    },
     'cheat-reshuffle': ({ player }) => {
         window.Actions.execCode(`player_idx=${player}; reshuffle_deck`);
     },
     'cheat-negative-energy': ({ player }) => {
         window.Actions.execCode(`player_idx=${player}; negative_energy`);
     },
-    'cheat-to-success': ({ player }) => {
-        const cardId = document.getElementById('cheat-util-id')?.value || '';
-        if (!cardId) { alert('Enter a card ID'); return; }
-        window.Actions.execCode(`player_idx=${player}; card_no=${cardId}; to_success`);
+    'cheat-remove-success': ({ player }) => {
+        window.Actions.execCode(`player_idx=${player}; remove_success`);
     },
-    'cheat-to-discard': ({ player }) => {
-        const cardId = document.getElementById('cheat-util-id')?.value || '';
+    'cheat-move': ({ player, zone }) => {
+        const cardId = document.getElementById('cheat-card-id')?.value?.trim();
         if (!cardId) { alert('Enter a card ID'); return; }
-        window.Actions.execCode(`player_idx=${player}; card_no=${cardId}; to_discard`);
+        const execMap = {
+            hand: 'add_card',
+            stage: 'add_stage',
+            live: 'add_live_to_zone',
+            discard: 'to_discard',
+            success: 'to_success',
+            deck_top: 'add_to_deck_top',
+        };
+        const exec = execMap[zone];
+        if (!exec) { alert(`Unknown zone: ${zone}`); return; }
+        window.Actions.execCode(`player_idx=${player}; card_no=${cardId}; ${exec}`);
     },
 };
 
@@ -217,6 +207,7 @@ function handleDelegatedClick(event) {
             targetId: button.getAttribute('data-target-id'),
             href: button.getAttribute('data-href'),
             player: button.getAttribute('data-player'),
+            zone: button.getAttribute('data-zone'),
         };
         handler(params);
     }

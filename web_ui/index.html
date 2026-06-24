@@ -342,45 +342,37 @@
                         <button class="btn btn-accent-red btn-sm" data-action="cheat-clear-hand" data-player="0">P1</button>
                         <button class="btn btn-accent-red btn-sm" data-action="cheat-clear-hand" data-player="1">P2</button>
                     </div>
-                    <!-- Add Card -->
+                    <!-- Single textbox for card ID, zone buttons per player -->
                     <div class="cheat-row">
-                        <label>Add Card:</label>
+                        <label>Card ID:</label>
                         <input type="text" id="cheat-card-id" placeholder="PL!S-PR-026-PR" class="cheat-input-text">
-                        <button class="btn btn-accent-green btn-sm" data-action="cheat-add-card" data-player="0">P1</button>
-                        <button class="btn btn-accent-green btn-sm" data-action="cheat-add-card" data-player="1">P2</button>
                     </div>
-                    <!-- Add to Stage -->
                     <div class="cheat-row">
-                        <label>To Stage:</label>
-                        <input type="text" id="cheat-stage-id" placeholder="PL!S-PR-026-PR" class="cheat-input-text">
-                        <button class="btn btn-accent-green btn-sm" data-action="cheat-add-stage" data-player="0">P1</button>
-                        <button class="btn btn-accent-green btn-sm" data-action="cheat-add-stage" data-player="1">P2</button>
+                        <label>P1 zones:</label>
+                        <button class="btn btn-accent-green btn-sm" data-action="cheat-move" data-player="0" data-zone="hand">To Hand</button>
+                        <button class="btn btn-accent-green btn-sm" data-action="cheat-move" data-player="0" data-zone="stage">To Stage</button>
+                        <button class="btn btn-accent-pink btn-sm" data-action="cheat-move" data-player="0" data-zone="live">To Live</button>
+                        <button class="btn btn-accent-red btn-sm" data-action="cheat-move" data-player="0" data-zone="discard">Discard</button>
+                        <button class="btn btn-accent-pink btn-sm" data-action="cheat-move" data-player="0" data-zone="success">Success</button>
+                        <button class="btn btn-accent-blue btn-sm" data-action="cheat-move" data-player="0" data-zone="deck_top">Top of Deck</button>
                     </div>
-                    <!-- Add Live -->
                     <div class="cheat-row">
-                        <label>To Live:</label>
-                        <input type="text" id="cheat-live-id" placeholder="PL!S-PR-026-PR" class="cheat-input-text">
-                        <button class="btn btn-accent-pink btn-sm" data-action="cheat-add-live" data-player="0">P1</button>
-                        <button class="btn btn-accent-pink btn-sm" data-action="cheat-add-live" data-player="1">P2</button>
+                        <label>P2 zones:</label>
+                        <button class="btn btn-accent-green btn-sm" data-action="cheat-move" data-player="1" data-zone="hand">To Hand</button>
+                        <button class="btn btn-accent-green btn-sm" data-action="cheat-move" data-player="1" data-zone="stage">To Stage</button>
+                        <button class="btn btn-accent-pink btn-sm" data-action="cheat-move" data-player="1" data-zone="live">To Live</button>
+                        <button class="btn btn-accent-red btn-sm" data-action="cheat-move" data-player="1" data-zone="discard">Discard</button>
+                        <button class="btn btn-accent-pink btn-sm" data-action="cheat-move" data-player="1" data-zone="success">Success</button>
+                        <button class="btn btn-accent-blue btn-sm" data-action="cheat-move" data-player="1" data-zone="deck_top">Top of Deck</button>
                     </div>
-                    <!-- Negative Energy / Discard / Success -->
+                    <!-- Zone management (no card ID needed) -->
                     <div class="cheat-row">
                         <label>Neg Energy:</label>
                         <button class="btn btn-accent-red btn-sm" data-action="cheat-negative-energy" data-player="0">P1</button>
                         <button class="btn btn-accent-red btn-sm" data-action="cheat-negative-energy" data-player="1">P2</button>
-                    </div>
-                    <div class="cheat-row">
-                        <label>Card Utils:</label>
-                        <input type="text" id="cheat-util-id" placeholder="PL!S-PR-026-PR" class="cheat-input-text">
-                        <button class="btn btn-accent-pink btn-sm" data-action="cheat-to-success" data-player="0">Success</button>
-                        <button class="btn btn-accent-pink btn-sm" data-action="cheat-to-success" data-player="1">P2</button>
-                        <button class="btn btn-accent-red btn-sm" data-action="cheat-to-discard" data-player="0">Discard</button>
-                        <button class="btn btn-accent-red btn-sm" data-action="cheat-to-discard" data-player="1">P2</button>
-                    </div>
-                    <!-- Force Win -->
-                    <div class="cheat-row">
-                        <label>Force Win (P1):</label>
-                        <button class="btn btn-accent-gold btn-sm" data-action="cheat-force-win">Go</button>
+                        <span style="margin-left:8px;">Remove Success:</span>
+                        <button class="btn btn-accent-red btn-sm" data-action="cheat-remove-success" data-player="0">P1</button>
+                        <button class="btn btn-accent-red btn-sm" data-action="cheat-remove-success" data-player="1">P2</button>
                     </div>
                     <!-- Reshuffle -->
                     <div class="cheat-row">

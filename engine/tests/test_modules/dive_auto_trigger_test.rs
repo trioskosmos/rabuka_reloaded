@@ -9,11 +9,11 @@ fn blade_mod(g: &TestGame, cid: i16) -> i32 {
         .map_or(0, |e| e.total())
 }
 
-/// ab#0 triggers when DIVE! moves from waitroom to hand during main phase.
-/// Uses Setsuna's 登場 ability which discards 1 then retrieves a 虹ヶ咲 live.
-/// After the chain resolves, DIVE! should be in the live card zone
-/// (ab#0 placed it from hand) and a Nijigasaki member should have blade+2
-/// (ab#1 fired from the live zone placement).
+/// Real-game simulation: DIVE! in discard, Gets retrieved to hand by Setsuna's
+/// debut, then ab#0 fires and places it in the live zone, then ab#1 grants
+/// blade+2 to a Nijigasaki member.
+///
+/// No cheating: DIVE! starts in exactly ONE zone (waitroom), not two.
 #[test]
 fn ab0_places_dive_ab1_grants_blade() {
     let db = load_real_database();
@@ -23,11 +23,11 @@ fn ab0_places_dive_ab1_grants_blade() {
     let niji = g.id("PL!N-PR-003-PR");
     let filler = g.id("PL!-sd1-010-SD");
 
+    // DIVE! only in waitroom — NOT also in hand (real-game state)
     g.state.player1.waitroom.cards.push(dive);
     g.state.player1.hand.cards.push(setsuna);
     g.state.player1.hand.cards.push(filler);
     g.state.player1.hand.cards.push(filler);
-    g.state.player1.hand.cards.push(dive);
     g.state.player1.stage.stage = [niji, -1, -1];
     for _ in 0..10 {
         g.state.player1.main_deck.cards.push(filler);
@@ -39,19 +39,17 @@ fn ab0_places_dive_ab1_grants_blade() {
     g.give_energy(10);
     g.play_to_stage(setsuna, MemberArea::Center);
 
-    // Setsuna: optional discard cost
+    // Setsuna: optional discard cost (discard filler)
     assert!(g.has_pending_choice(), "discard cost expected");
     g.select_indices(&[0]);
 
-    // Setsuna: retrieve a live from waitroom
+    // Setsuna: retrieve DIVE! from waitroom
     assert!(g.has_pending_choice(), "retrieval expected");
-    g.select_indices(&[0]); // selects DIVE! from waitroom
+    g.select_indices(&[0]);
 
-    // At this point DIVE! ab#0 fires. The optional placement choice
-    // may or may not have been auto-resolved by the engine.
-    // Drain remaining pending choices:
-    // - stage selection = ab#1 target, select index 0
-    // - everything else = skip
+    // DIVE! is now in hand. ab#0 fires with optional placement.
+    // With only one DIVE! in hand, the engine should auto-resolve.
+    // Drain remaining choices (ab#1's target selection from stage).
     while g.has_pending_choice() {
         let choice = g.get_pending_choice().clone();
         if matches!(

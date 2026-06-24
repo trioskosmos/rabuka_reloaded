@@ -1568,17 +1568,29 @@ impl AbilityResolver {
                         }
                         return;
                     }
-                } else if player.stage.stage[1] != -1 {
-                    1
-                } else if player.stage.stage[0] != -1 {
-                    0
-                } else if player.stage.stage[2] != -1 {
-                    2
                 } else {
-                    for card in energy_cards {
-                        player.energy_deck.cards.push(card);
+                    // Activating card not on stage (e.g. moved to discard as cost).
+                    // Search moved_cards for the most recent card placed on stage
+                    // (e.g. by a preceding same_area move in a sequential compound).
+                    if let Some(idx) = self
+                        .moved_cards
+                        .iter()
+                        .rev()
+                        .find_map(|&cid| player.stage.stage.iter().position(|&id| id == cid))
+                    {
+                        idx
+                    } else if player.stage.stage[1] != -1 {
+                        1
+                    } else if player.stage.stage[0] != -1 {
+                        0
+                    } else if player.stage.stage[2] != -1 {
+                        2
+                    } else {
+                        for card in energy_cards {
+                            player.energy_deck.cards.push(card);
+                        }
+                        return;
                     }
-                    return;
                 }
             }
             _ => 1,

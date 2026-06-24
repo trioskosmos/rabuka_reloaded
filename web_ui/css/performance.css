@@ -183,28 +183,30 @@
 }
 
 .perf-yell-card-modern {
-    height: 52px;
-    width: auto;
-    aspect-ratio: 512 / 720;
+    width: 64px;
     flex-shrink: 0;
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
 }
 
 .perf-yell-card-modern img {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
+    height: auto;
     display: block;
+    object-fit: contain;
+    background: var(--bg-secondary);
 }
 
 .perf-yell-icons {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    font-size: 0.65rem;
+    gap: 1px;
+    padding: 2px 3px;
+    font-size: 0.6rem;
 }
 
 .perf-badge {
