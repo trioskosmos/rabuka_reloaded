@@ -1546,6 +1546,9 @@ impl<'a> ConditionContext<'a> {
         if is_distinct {
             let distinct_type = match condition.distinct.as_ref() {
                 Some(crate::core::card::DistinctInfo::String(s)) => s.as_str(),
+                _ if condition.group_reference.as_deref() == Some("different_group_names") => {
+                    "group_name"
+                }
                 _ => "card_name",
             };
             match distinct_type {
@@ -1809,7 +1812,8 @@ impl<'a> ConditionContext<'a> {
         }
 
         let count_filtered = |zone_source: &[i16], ct: &str| -> usize {
-            let is_distinct = condition.distinct.as_ref().is_some_and(|d| d.is_distinct());
+            let is_distinct = condition.distinct.as_ref().is_some_and(|d| d.is_distinct())
+                || condition.group_reference.as_deref() == Some("different_group_names");
             if is_distinct {
                 self.count_distinct_in_cards(
                     zone_source,
@@ -3190,6 +3194,9 @@ impl<'a> ConditionContext<'a> {
             .collect();
         let distinct_type = match condition.distinct.as_ref() {
             Some(crate::core::card::DistinctInfo::String(s)) => s.as_str(),
+            _ if condition.group_reference.as_deref() == Some("different_group_names") => {
+                "group_name"
+            }
             _ => "card_name",
         };
         match distinct_type {
@@ -3209,9 +3216,7 @@ impl<'a> ConditionContext<'a> {
                 let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
                 for &cid in &matching {
                     if let Some(card) = card_db.get_card(cid) {
-                        if let Some(ref unit) = card.unit {
-                            seen.insert(unit.clone());
-                        }
+                        seen.insert(card.group.clone());
                     }
                 }
                 seen.len() as u32

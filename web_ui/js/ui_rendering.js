@@ -22,6 +22,7 @@ import { DOMUtils } from './utils/DOMUtils.js';
 import { ViewState } from './view_state.js';
 
 let _lastActivePlayer = -1;
+let _viewInitialized = false;
 
 // Cached DOM element references for performance
 const DOM_CACHE = {
@@ -178,8 +179,8 @@ export const Rendering = {
         if (oppBtn) oppBtn.textContent = `${ui.opponent || 'Opponent'}${oppSuffix}`;
         if (bothBtn) bothBtn.textContent = `Both (${selfLabel} + ${oppLabel})`;
 
-        // In non-PvP (sandbox), default to both-mode view on first render
-        if (state.mode !== 'pvp' && bothBtn && !bothBtn.classList.contains('active')) {
+        // In non-PvP (sandbox), default to both-mode view on first render only
+        if (!_viewInitialized && state.mode !== 'pvp' && bothBtn && !bothBtn.classList.contains('active')) {
             switchBoard('both');
         }
 
@@ -187,6 +188,7 @@ export const Rendering = {
         if (_lastActivePlayer === -1 && state.active_player !== undefined) {
             _lastActivePlayer = activePlayerNum;
         }
+        _viewInitialized = true;
 
         // Auto-switch board tab when active player changes (skip initial render)
         const gb = document.getElementById('game-board');

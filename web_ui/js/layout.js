@@ -213,8 +213,18 @@ export function closeSidebar() {
  */
 export function switchBoard(side) {
     if (side === 'both' && document.getElementById('btn-show-both')?.classList.contains('active')) {
-        _bothFlipped = !_bothFlipped;
-        document.getElementById('game-board').classList.toggle('both-mode-flipped', _bothFlipped);
+        const gb = document.getElementById('game-board');
+        const isFlipped = gb?.classList.contains('both-mode-flipped');
+        // Get current active player from state
+        const state = window.State?.data;
+        const activePlayerNum = state?.active_player === 'player2' || state?.active_player === '1' || state?.active_player === 1 ? 1 : 0;
+        const perspectivePlayer = window.State?.perspectivePlayer ?? 0;
+        const activeOnBottom = isFlipped ? activePlayerNum !== perspectivePlayer : activePlayerNum === perspectivePlayer;
+        // Only flip if the active player isn't already on the bottom
+        if (!activeOnBottom) {
+            _bothFlipped = !_bothFlipped;
+            gb?.classList.toggle('both-mode-flipped', _bothFlipped);
+        }
     }
     setBoardMode(side);
 }

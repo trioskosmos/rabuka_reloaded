@@ -986,9 +986,121 @@ fn wien_less_energy_no_heart() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let wien_id = setup_wien(&mut game, 2, 2, 14);
-    // P1 total = 11+2 = 13, P2 total = 14 → 13 > 14 is FALSE
     assert!(
         !wien_has_heart06(&game.state, wien_id),
         "no heart06 when P1=13 < P2=14"
     );
+}
+
+// ====================================================================
+//  ミア・テイラー (PL!N-bp5-011) — 登場 choice with different group names condition
+// ====================================================================
+// 登場: 以下から1つを選ぶ。
+// ・自分の控え室にカード名が異なるライブカードが3枚以上ある場合、自分の控え室からライブカードを1枚手札に加える。
+// ・自分の控え室にグループ名が異なるライブカードが3枚以上ある場合、自分の控え室からライブカードを2枚手札に加える。
+
+fn setup_mia_board(game: &mut TestGame, mia_id: i16) {
+    game.add_to_hand(mia_id);
+    game.give_energy(11);
+    game.state.player1.stage.stage = [-1, -1, -1];
+    let other = game.id("PL!-sd1-010-SD");
+    game.add_to_stage(rabuka_engine::zones::MemberArea::LeftSide, other);
+}
+
+fn play_mia_select_option(game: &mut TestGame, mia_id: i16, option_index: usize) {
+    game.play_to_stage(mia_id, rabuka_engine::zones::MemberArea::Center);
+    let mut safety = 0;
+    while game.has_pending_choice() && safety < 10 {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectAutoAbility") => game.select_indices(&[0]),
+            Some("SelectTarget") => game.select_option(option_index as i16),
+            Some("SelectCard") => game.select_indices(&[0]),
+            _ => break,
+        }
+        safety += 1;
+    }
+}
+
+/// Option 2: 3 live cards with 3 DIFFERENT GROUPS → returns 2 live cards.
+#[test]
+fn mia_bp5_different_groups_3_distinct_groups_returns_2() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let mia = game.id("PL!N-bp5-011-R");
+
+    setup_mia_board(&mut game, mia);
+    let hand_before = game.state.player1.hand.cards.len();
+
+    game.add_to_discard(game.new_id("PL!-sd1-019-SD")); // group=μ's
+    game.add_to_discard(game.new_id("PL!S-bp2-020-L")); // group=Aqours
+    game.add_to_discard(game.new_id("PL!N-bp1-026-L")); // group=虹ヶ咲
+    let discard_before = game.state.player1.waitroom.cards.len();
+
+    play_mia_select_option(&mut game, mia, 1);
+
+    // 2 live cards recovered → hand +1 net
+    assert_eq!(game.state.player1.hand.cards.len(), hand_before + 1);
+    assert_eq!(game.state.player1.waitroom.cards.len(), discard_before - 2);
+}
+
+/// Option 2: 3 live cards with only 2 DISTINCT GROUPS → condition NOT met.
+#[test]
+fn mia_bp5_different_groups_2_distinct_groups_no_effect() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let mia = game.id("PL!N-bp5-011-R");
+
+    setup_mia_board(&mut game, mia);
+    let hand_before = game.state.player1.hand.cards.len();
+
+    game.add_to_discard(game.new_id("PL!-sd1-019-SD")); // group=μ's
+    game.add_to_discard(game.new_id("PL!-sd1-020-SD")); // group=μ's
+    game.add_to_discard(game.new_id("PL!S-bp2-020-L")); // group=Aqours
+    let discard_before = game.state.player1.waitroom.cards.len();
+
+    play_mia_select_option(&mut game, mia, 1);
+
+    assert_eq!(game.state.player1.hand.cards.len(), hand_before - 1);
+    assert_eq!(game.state.player1.waitroom.cards.len(), discard_before);
+}
+
+/// Option 2: 3 live cards ALL SAME GROUP → condition NOT met.
+#[test]
+fn mia_bp5_different_groups_all_same_group_no_effect() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let mia = game.id("PL!N-bp5-011-R");
+
+    setup_mia_board(&mut game, mia);
+    let hand_before = game.state.player1.hand.cards.len();
+
+    game.add_to_discard(game.new_id("PL!-sd1-019-SD")); // group=μ's
+    game.add_to_discard(game.new_id("PL!-sd1-020-SD")); // group=μ's
+    game.add_to_discard(game.new_id("PL!-bp3-025-L")); // group=μ's
+    let discard_before = game.state.player1.waitroom.cards.len();
+
+    play_mia_select_option(&mut game, mia, 1);
+
+    assert_eq!(game.state.player1.hand.cards.len(), hand_before - 1);
+    assert_eq!(game.state.player1.waitroom.cards.len(), discard_before);
+}
+
+/// Option 2: ONLY 2 live cards total → condition NOT met.
+#[test]
+fn mia_bp5_different_groups_2_cards_total_no_effect() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let mia = game.id("PL!N-bp5-011-R");
+
+    setup_mia_board(&mut game, mia);
+    let hand_before = game.state.player1.hand.cards.len();
+
+    game.add_to_discard(game.new_id("PL!-sd1-019-SD")); // group=μ's
+    game.add_to_discard(game.new_id("PL!S-bp2-020-L")); // group=Aqours
+    let discard_before = game.state.player1.waitroom.cards.len();
+
+    play_mia_select_option(&mut game, mia, 1);
+
+    assert_eq!(game.state.player1.hand.cards.len(), hand_before - 1);
+    assert_eq!(game.state.player1.waitroom.cards.len(), discard_before);
 }
