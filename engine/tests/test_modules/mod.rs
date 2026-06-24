@@ -13,6 +13,7 @@ pub mod b9_more_test;
 pub mod batch5_test;
 pub mod batch_nico_bp4_hanayo_test;
 pub mod baton_touch_test;
+pub mod blade_heart_types_test;
 pub mod blade_per_discard_test;
 pub mod bloom_hs_test;
 pub mod bring_love_test;
