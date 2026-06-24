@@ -1324,6 +1324,8 @@
 }
 
 .ability-cond-type {
+    display: block;
+    margin-left: 22px;
     font-size: 0.7rem;
     color: var(--text-dim, #999);
     font-style: italic;

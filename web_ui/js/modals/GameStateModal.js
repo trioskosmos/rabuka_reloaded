@@ -234,13 +234,15 @@ export const GameStateModal = {
             title.innerHTML = `<span>${isMe ? 'You' : 'Opponent'} ${esc(p.id || `P${idx + 1}`)}${p.is_first_attacker ? ' ★' : ''}</span> <span class="gs-badge">${p.main_deck_count ?? '?'} deck</span>`;
             panel.appendChild(title);
 
-            // Stats grid
+            // Stats grid — includes all values conditions may check
             const tLines = [
                 ['Cost Reduction', p.cost_reduction ?? 0],
                 ['Prevent Baton', bool(!!(p.prevent_baton_touch || p.prevent_baton))],
                 ['Debut Count', p.debut_count_this_turn ?? 0],
                 ['Areas Locked', (p.areas_locked_this_turn || []).join(', ') || 'none'],
                 ['Energy Active', `${p.energy_active_count ?? 0}/${(p.energy?.cards || []).length}`],
+                ['Blade Buffs', (p.blade_buffs || []).join(', ') || 'none'],
+                ['Heart Buffs', (p.heart_buffs || []).map(h => `[${h.join(',')}]`).join(' ') || 'none'],
             ];
             if (p.total_hearts) {
                 p.total_hearts.forEach((h, ci) => { if (h > 0) tLines.push([`Hearts ${HEART_NAMES[ci] || ci}`, h]); });
@@ -248,10 +250,27 @@ export const GameStateModal = {
             if (p.live_card_scores) {
                 Object.entries(p.live_card_scores).forEach(([no, sc]) => tLines.push([`Score ${no}`, sc]));
             }
+            if (p.score_modifiers) {
+                Object.entries(p.score_modifiers).forEach(([cid, v]) => tLines.push([`Score mod #${cid}`, v]));
+            }
             // Stage hearts
             if (p.stage_hearts) {
                 Object.entries(p.stage_hearts).forEach(([col, h]) => { if (h > 0) tLines.push([`Stage ${col}`, h]); });
             }
+            // Global game state values indexed by this player
+            const playerId = p.id || (idx === 0 ? s.player1?.id : s.player2?.id);
+            const isP1 = playerId === s.player1?.id;
+            if (s.live_success_total_score != null) tLines.push(['Last Live Total Score', s.live_success_total_score]);
+            if (s.last_cost_discard_count != null) tLines.push(['Last Cost Discard', s.last_cost_discard_count]);
+            if (s.last_cost_energy_count != null) tLines.push(['Last Cost Energy', s.last_cost_energy_count]);
+            tLines.push(['Self No Excess Heart', bool(s.self_no_excess_heart_this_turn)]);
+            const mySurplus = isP1 ? s.self_live_surplus_count : s.opponent_live_surplus_count;
+            const oppSurplus = isP1 ? s.opponent_live_surplus_count : s.self_live_surplus_count;
+            tLines.push(['My Surplus Count', mySurplus ?? 0]);
+            tLines.push(['Opp Surplus Count', oppSurplus ?? 0]);
+            tLines.push(['Live Success Triggered', bool(s.live_success_triggered_this_turn)]);
+            tLines.push(['Surplus Ready', bool(s.live_surplus_ready_this_turn)]);
+            tLines.push(['Cheer Checks', `${s.cheer_checks_done ?? 0}/${s.cheer_checks_required ?? 0}`]);
             panel.insertAdjacentHTML('beforeend', grid(tLines));
             panel.appendChild(document.createElement('hr'));
 
@@ -527,6 +546,13 @@ export const GameStateModal = {
         gridDiv.insertAdjacentHTML('beforeend', mkBox('Card Instance Mapping',
             Object.keys(cim).length > 0 ? trackKV(Object.entries(cim).map(([id, inst]) => [`#${id} (${cardName(parseInt(id))})`, inst])) : '<div class="gs-track-item">none</div>'));
 
+        // Constant ability statuses
+        const cas = s.constant_ability_statuses || [];
+        if (cas.length > 0) {
+            gridDiv.insertAdjacentHTML('beforeend', mkBox('Constant Ability Statuses',
+                cas.map(a => `<div class="gs-track-item">${esc(a.card_no || '?')} — ${esc(a.ability_text || '')} → ${a.enabled ? '✓ ENABLED' : '✗ DISABLED'}</div>`).join('')));
+        }
+
         // Live owned hearts
         const loh = s.live_owned_hearts || {};
         let lohHtml = Object.keys(loh).length > 0
@@ -534,6 +560,16 @@ export const GameStateModal = {
                 `<div class="gs-track-item"><b>${esc(pid)}</b>: ${pairs.map(([c, v]) => `${c}:${v}`).join(', ')}</div>`).join('')
             : '<div class="gs-track-item">none</div>';
         gridDiv.insertAdjacentHTML('beforeend', mkBox('Live Owned Hearts', lohHtml));
+
+        // Card movement tracking
+        const moved = s.recently_moved_cards || [];
+        if (moved.length > 0) {
+            gridDiv.insertAdjacentHTML('beforeend', mkBox('Recent Card Movement', trackKV([
+                ['From Zone', s.recently_moved_from_zone || '?'],
+                ['Last Vacated Stage', s.last_vacated_stage_area || '?'],
+                ['Cards', moved.map(c => cardName(c)).join(', ')],
+            ])));
+        }
 
         // Pending success replacement
         const psr = [];
@@ -585,6 +621,18 @@ export const GameStateModal = {
             ? Object.entries(ho).map(([id, arr]) => `<div class="gs-track-item">#${id} (${cardName(parseInt(id))}): ${arr[0]} × ${arr[1]}</div>`).join('')
             : '<div class="gs-track-item">none</div>';
         gridDiv.insertAdjacentHTML('beforeend', mkBox('Heart Override', hoHtml));
+
+        // Heart color decision phase
+        if (s.heart_color_decision_phase) {
+            gridDiv.insertAdjacentHTML('beforeend', mkBox('Heart Color Phase',
+                `<div class="gs-track-item">${esc(s.heart_color_decision_phase)}</div>`));
+        }
+
+        // Opponent choice declined
+        if (s.opponent_choice_declined) {
+            gridDiv.insertAdjacentHTML('beforeend', mkBox('Opponent Choice',
+                `<div class="gs-track-item" style="color:var(--accent-pink);">Opponent choice was declined</div>`));
+        }
 
         const dca = s.delayed_cannot_active || {};
         gridDiv.insertAdjacentHTML('beforeend', mkBox('Delayed Cannot Activate',

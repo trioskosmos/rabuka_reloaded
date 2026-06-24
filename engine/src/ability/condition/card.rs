@@ -1859,36 +1859,60 @@ impl<'a> ConditionContext<'a> {
                 let target = condition.target.as_deref().unwrap_or("self");
                 let self_pl = self.resolve_condition_player(target);
                 let target_id = self_pl.id.as_str();
-                let from_tm: Vec<i16> = self
-                    .game_state
-                    .turn_movements
-                    .iter()
-                    .filter(|m| {
-                        m.cause_player_id == target_id
-                            && m.source_zone == source_zone
-                            && (m.dest_zone == dest_zone
-                                || (dest_zone == "discard" && m.dest_zone == "waitroom")
-                                || (dest_zone == "waitroom" && m.dest_zone == "discard"))
-                    })
-                    .map(|m| m.moved_card_id)
-                    .collect();
-                if !self.game_state.turn_movements.is_empty() {
-                    // Trust turn_movements (filtered or empty — both are correct)
-                    from_tm
-                } else if !self.moved_cards.is_empty() {
+                let event_cards: Vec<i16> = if !self.moved_cards.is_empty() {
                     self.moved_cards.to_vec()
                 } else if let Some(enq) = self.game_state.entry_trigger_moved_cards() {
-                    if !enq.is_empty() {
-                        enq
-                    } else {
-                        Vec::new()
-                    }
+                    enq
                 } else if let Some(global) = self.game_state.recently_moved_cards.clone() {
-                    if !global.is_empty() {
-                        global
+                    global
+                } else {
+                    Vec::new()
+                };
+                if !event_cards.is_empty() {
+                    // Cross-reference event cards with turn_movements for zone-
+                    // transition filtering. This ensures we only count cards
+                    // from the current event/trigger, not ALL movements this turn.
+                    let from_tm: Vec<i16> = self
+                        .game_state
+                        .turn_movements
+                        .iter()
+                        .filter(|m| {
+                            m.cause_player_id == target_id
+                                && m.source_zone == source_zone
+                                && (m.dest_zone == dest_zone
+                                    || (dest_zone == "discard" && m.dest_zone == "waitroom")
+                                    || (dest_zone == "waitroom" && m.dest_zone == "discard"))
+                                && event_cards.contains(&m.moved_card_id)
+                        })
+                        .map(|m| m.moved_card_id)
+                        .collect();
+                    if !from_tm.is_empty() {
+                        from_tm
+                    } else if self.game_state.turn_movements.is_empty() {
+                        // No turn_movements at all — this path doesn't log
+                        // movements via push_movement_event (e.g. live-cleanup
+                        // path which moves cards directly). Use event_cards.
+                        event_cards
                     } else {
+                        // turn_movements exists but has no matching entries
+                        // for this zone/player filter — the movement doesn't
+                        // match the condition → return empty.
                         Vec::new()
                     }
+                } else if !self.game_state.turn_movements.is_empty() {
+                    // No event data — use turn_movements directly (original behavior)
+                    self.game_state
+                        .turn_movements
+                        .iter()
+                        .filter(|m| {
+                            m.cause_player_id == target_id
+                                && m.source_zone == source_zone
+                                && (m.dest_zone == dest_zone
+                                    || (dest_zone == "discard" && m.dest_zone == "waitroom")
+                                    || (dest_zone == "waitroom" && m.dest_zone == "discard"))
+                        })
+                        .map(|m| m.moved_card_id)
+                        .collect()
                 } else {
                     Vec::new()
                 }
@@ -1909,11 +1933,9 @@ impl<'a> ConditionContext<'a> {
             } else {
                 self.moved_cards.to_vec()
             };
-            // When self_target and source=preceding_moved, restrict to the
-            // activating card only — don't check ALL moved cards.
-            let moved_source = if condition.self_target.unwrap_or(false)
-                && condition.source.as_deref() == Some("preceding_moved")
-            {
+            // When self_target, restrict to the activating card only —
+            // don't check ALL moved cards. Applies to all source formats.
+            let moved_source = if condition.self_target.unwrap_or(false) {
                 self.activating_card_id
                     .filter(|id| moved_source.contains(id))
                     .map_or(vec![], |id| vec![id])

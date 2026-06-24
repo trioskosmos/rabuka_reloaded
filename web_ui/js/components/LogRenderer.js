@@ -336,7 +336,10 @@ export const LogRenderer = {
         headerDiv.className = 'log-entry ability group-header';
         const resultClass = meta.result === 'success' ? 'ability-pass' : 'ability-fail';
         const resultIcon = meta.result === 'success' ? '✓' : '✗';
+        const TRIGGER_ICONS = { debut: 'toujyou', live_start: 'live_start', live_success: 'live_success', activation: 'kidou', auto: 'jidou', constant: 'jyouji' };
         const triggerText = meta.trigger || '?';
+        const triggerIcon = TRIGGER_ICONS[triggerText] || '';
+        const triggerImg = triggerIcon ? `<img src="img/texticon/${triggerIcon}.png" class="heart-mini-icon" title="${triggerText}" style="width:14px;height:14px;vertical-align:middle;">` : '';
         const zoneLabel = meta.zone === 'stage' ? 'ステージ' : meta.zone === 'live_card_zone' ? 'ライブ置場' : meta.zone === 'success_live_card_zone' ? '成功ライブ置場' : meta.zone || '';
         const cardName = entry.source_card_name || meta.card_name || '';
         const playerLabel = entry.player_label || '';
@@ -346,8 +349,8 @@ export const LogRenderer = {
                 <span class="${resultClass}">${resultIcon}</span>
                 <strong>${cardName}</strong>
                 <span class="ability-player">${playerLabel}</span>
-                ${zoneLabel ? `<span class="ability-zone">[${zoneLabel}]</span>` : ''}:
-                <span class="ability-trigger">${triggerText}</span>
+                ${zoneLabel ? `<span class="ability-zone">[${zoneLabel}]</span>` : ''}
+                ${triggerImg}
             </div>
             <div class="log-group-toggle">▼</div>
         `;
@@ -392,7 +395,10 @@ export const LogRenderer = {
 
         const headerDiv = document.createElement('div');
         headerDiv.className = 'log-entry ability group-header';
+        const TRIGGER_ICONS = { debut: 'toujyou', live_start: 'live_start', live_success: 'live_success', activation: 'kidou', auto: 'jidou', constant: 'jyouji' };
         const triggerText = meta.trigger || '?';
+        const triggerIcon = TRIGGER_ICONS[triggerText] || '';
+        const triggerImg = triggerIcon ? `<img src="img/texticon/${triggerIcon}.png" class="heart-mini-icon" title="${triggerText}" style="width:14px;height:14px;vertical-align:middle;">` : '';
         const zoneLabel = meta.zone === 'stage' ? 'ステージ' : meta.zone === 'live_card_zone' ? 'ライブ置場' : meta.zone || '?';
         headerDiv.innerHTML = `
             <div class="log-entry-icon"> </div>
@@ -400,8 +406,8 @@ export const LogRenderer = {
                 <span class="ability-scan">🔍</span>
                 <strong>${entry.source_card_name || ''}</strong>
                 <span class="ability-player">${entry.player_label || ''}</span>
-                <span class="ability-zone">[${zoneLabel}]</span>:
-                能力確認 [${triggerText}]
+                <span class="ability-zone">[${zoneLabel}]</span>
+                ${triggerImg}
             </div>
             <div class="log-group-toggle">▼</div>
         `;
@@ -463,8 +469,8 @@ export const LogRenderer = {
                 let html = `<div class="ability-cond-row">
                     <span class="ability-cond-icon">${iconChar}</span>
                     <span class="ability-cond-text">${e(item.text)}</span>
-                    <span class="ability-cond-type">[${item.type || ''}]</span>
-                </div>`;
+                </div>
+                ${item.type ? `<div class="ability-cond-type">${item.type}</div>` : ''}`;
                 if (item.expectation || item.actual) {
                     html += `<div class="ability-cond-detail">
                         <span class="ability-label">期待:</span>
