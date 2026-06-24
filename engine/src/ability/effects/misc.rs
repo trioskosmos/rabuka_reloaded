@@ -533,11 +533,6 @@ impl AbilityResolver {
             };
             let mut prelim_filter = effect.filter_subset();
             prelim_filter.exclude_self = exclude_self_id;
-            if effect.filter_targets_by_heart_colors.unwrap_or(false)
-                && !effect.heart_colors.is_empty()
-            {
-                prelim_filter.heart_colors = &effect.heart_colors;
-            }
             let choice_exclude = if (effect.target_count.is_some() || effect.distinct.is_some())
                 && !all_selected.is_empty()
             {

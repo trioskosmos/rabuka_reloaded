@@ -390,3 +390,279 @@ fn hinoshita_no_live_card_in_hand_fails() {
         "No cards should be in hand — no live card to reveal"
     );
 }
+
+// ============================
+// Cross-card name matching: Butterfly / Butterfly Wing
+// ============================
+
+/// Reveal "Butterfly" (short name) → should recover "Butterfly Wing"
+/// because "Butterfly Wing" contains "Butterfly".
+#[test]
+fn butterfly_to_butterfly_wing_matches() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let hino = game.id("PL!HS-bp5-001-P");
+    let reveal = game.id("PL!N-bp1-028-L"); // "Butterfly"
+    let target = game.id("PL!SP-pb2-046-L"); // "Butterfly Wing"
+
+    game.state.player1.stage.stage[1] = hino;
+    game.state.player1.hand.cards.push(reveal);
+    game.state.player1.waitroom.cards.push(target);
+    game.give_energy(2);
+
+    game.activate_ability(hino);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert!(
+        game.state.player1.hand.cards.contains(&target),
+        "Butterfly Wing should be recoverable — 'Butterfly Wing' contains 'Butterfly'"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&reveal),
+        "Revealed 'Butterfly' must stay in hand"
+    );
+}
+
+/// Reveal "Butterfly Wing" (longer name) → should NOT recover "Butterfly"
+/// because "Butterfly" does NOT contain "Butterfly Wing".
+#[test]
+fn butterfly_wing_to_butterfly_no_match() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let hino = game.id("PL!HS-bp5-001-P");
+    let reveal = game.id("PL!SP-pb2-046-L"); // "Butterfly Wing"
+    let target = game.id("PL!N-bp1-028-L"); // "Butterfly"
+
+    game.state.player1.stage.stage[1] = hino;
+    game.state.player1.hand.cards.push(reveal);
+    game.state.player1.waitroom.cards.push(target);
+    game.give_energy(2);
+
+    game.activate_ability(hino);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert!(
+        !game.state.player1.hand.cards.contains(&target),
+        "'Butterfly' should NOT be recoverable — 'Butterfly' does not contain 'Butterfly Wing'"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&target),
+        "'Butterfly' should remain in waitroom"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&reveal),
+        "Revealed 'Butterfly Wing' must stay in hand"
+    );
+}
+
+// ============================
+// Cross-card name matching: Dream Believers + (105期Ver.)
+// ============================
+
+/// Q236 variant: Reveal "Dream Believers" → recover "Dream Believers（105期Ver.）"
+#[test]
+fn dream_believers_to_105_matches() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let hino = game.id("PL!HS-bp5-001-P");
+    let reveal = game.id("PL!HS-bp1-019-L"); // "Dream Believers"
+    let target = game.id("PL!HS-sd1-018-SD"); // "Dream Believers（105期Ver.）"
+
+    game.state.player1.stage.stage[1] = hino;
+    game.state.player1.hand.cards.push(reveal);
+    game.state.player1.waitroom.cards.push(target);
+    game.give_energy(2);
+
+    game.activate_ability(hino);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert!(
+        game.state.player1.hand.cards.contains(&target),
+        "'Dream Believers（105期Ver.）' should be recoverable — contains 'Dream Believers'"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&reveal),
+        "Revealed 'Dream Believers' must stay in hand"
+    );
+}
+
+/// Q237 variant: Reveal "Dream Believers（105期Ver.）" → cannot recover "Dream Believers"
+#[test]
+fn dream_believers_105_to_base_no_match() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let hino = game.id("PL!HS-bp5-001-P");
+    let reveal = game.id("PL!HS-sd1-018-SD"); // "Dream Believers（105期Ver.）"
+    let target = game.id("PL!HS-bp1-019-L"); // "Dream Believers"
+
+    game.state.player1.stage.stage[1] = hino;
+    game.state.player1.hand.cards.push(reveal);
+    game.state.player1.waitroom.cards.push(target);
+    game.give_energy(2);
+
+    game.activate_ability(hino);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert!(
+        !game.state.player1.hand.cards.contains(&target),
+        "'Dream Believers' should NOT be recoverable — does not contain suffix"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&target),
+        "'Dream Believers' should remain in waitroom"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&reveal),
+        "Revealed 'Dream Believers（105期Ver.）' must stay in hand"
+    );
+}
+
+/// Cross-variant: Reveal "Dream Believers（104期Ver.）" → cannot recover
+/// "Dream Believers（105期Ver.）" because neither suffix contains the other.
+#[test]
+fn dream_believers_104_to_105_no_match() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let hino = game.id("PL!HS-bp5-001-P");
+    let reveal = game.id("PL!HS-bp5-017-L"); // "Dream Believers（104期Ver.）"
+    let target = game.id("PL!HS-sd1-018-SD"); // "Dream Believers（105期Ver.）"
+
+    game.state.player1.stage.stage[1] = hino;
+    game.state.player1.hand.cards.push(reveal);
+    game.state.player1.waitroom.cards.push(target);
+    game.give_energy(2);
+
+    game.activate_ability(hino);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert!(
+        !game.state.player1.hand.cards.contains(&target),
+        "'Dream Believers（105期Ver.）' should NOT be recoverable from '104期Ver.' reveal"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&target),
+        "'Dream Believers（105期Ver.）' should remain in waitroom"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&reveal),
+        "Revealed 'Dream Believers（104期Ver.）' must stay in hand"
+    );
+}
+
+/// Cross-variant reverse: Reveal "Dream Believers（105期Ver.）" → cannot recover
+/// "Dream Believers（104期Ver.）".
+#[test]
+fn dream_believers_105_to_104_no_match() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let hino = game.id("PL!HS-bp5-001-P");
+    let reveal = game.id("PL!HS-sd1-018-SD"); // "Dream Believers（105期Ver.）"
+    let target = game.id("PL!HS-bp5-017-L"); // "Dream Believers（104期Ver.）"
+
+    game.state.player1.stage.stage[1] = hino;
+    game.state.player1.hand.cards.push(reveal);
+    game.state.player1.waitroom.cards.push(target);
+    game.give_energy(2);
+
+    game.activate_ability(hino);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert!(
+        !game.state.player1.hand.cards.contains(&target),
+        "'Dream Believers（104期Ver.）' should NOT be recoverable from '105期Ver.' reveal"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&target),
+        "'Dream Believers（104期Ver.）' should remain in waitroom"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&reveal),
+        "Revealed 'Dream Believers（105期Ver.）' must stay in hand"
+    );
+}
+
+// ============================
+// Cross-card name matching: Link to the FUTURE
+// ============================
+
+/// Reveal "Link to the FUTURE" → recover "Link to the FUTURE（104期Ver.）"
+#[test]
+fn link_to_the_future_to_104_matches() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let hino = game.id("PL!HS-bp5-001-P");
+    let reveal = game.id("PL!HS-bp2-020-L"); // "Link to the FUTURE"
+    let target = game.id("PL!HS-sd1-020-SD"); // "Link to the FUTURE（104期Ver.）"
+
+    game.state.player1.stage.stage[1] = hino;
+    game.state.player1.hand.cards.push(reveal);
+    game.state.player1.waitroom.cards.push(target);
+    game.give_energy(2);
+
+    game.activate_ability(hino);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert!(
+        game.state.player1.hand.cards.contains(&target),
+        "'Link to the FUTURE（104期Ver.）' should be recoverable — contains 'Link to the FUTURE'"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&reveal),
+        "Revealed 'Link to the FUTURE' must stay in hand"
+    );
+}
+
+/// Reveal "Link to the FUTURE（104期Ver.）" → cannot recover "Link to the FUTURE"
+#[test]
+fn link_to_the_future_104_to_base_no_match() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let hino = game.id("PL!HS-bp5-001-P");
+    let reveal = game.id("PL!HS-sd1-020-SD"); // "Link to the FUTURE（104期Ver.）"
+    let target = game.id("PL!HS-bp2-020-L"); // "Link to the FUTURE"
+
+    game.state.player1.stage.stage[1] = hino;
+    game.state.player1.hand.cards.push(reveal);
+    game.state.player1.waitroom.cards.push(target);
+    game.give_energy(2);
+
+    game.activate_ability(hino);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert!(
+        !game.state.player1.hand.cards.contains(&target),
+        "'Link to the FUTURE' should NOT be recoverable — does not contain suffix"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&target),
+        "'Link to the FUTURE' should remain in waitroom"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&reveal),
+        "Revealed 'Link to the FUTURE（104期Ver.）' must stay in hand"
+    );
+}

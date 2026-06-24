@@ -79,9 +79,7 @@ function renderCardSlot(slot, prefix, state) {
 }
 
 let _conditionsCache = null;
-let _conditionsLoading = false;
 let _conditionsError = null;
-let _conditionsLoaded = false;
 
 export const GameStateModal = {
     _currentTab: 'global',
@@ -115,19 +113,18 @@ export const GameStateModal = {
     },
 
     fetchAndCacheConditions: async () => {
-        if (_conditionsLoading || _conditionsLoaded) return _conditionsCache;
-        _conditionsLoading = true;
         _conditionsError = null;
+        _conditionsCache = null;
         try {
-            const res = await fetch('/api/debug/conditions');
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000);
+            const res = await fetch('/api/debug/conditions', { signal: controller.signal });
+            clearTimeout(timeout);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             _conditionsCache = await res.json();
-            _conditionsLoaded = true;
         } catch (e) {
-            _conditionsError = e.message;
+            _conditionsError = e.name === 'AbortError' ? 'Request timed out' : e.message;
             _conditionsCache = [];
-        } finally {
-            _conditionsLoading = false;
         }
         return _conditionsCache;
     },
@@ -136,15 +133,15 @@ export const GameStateModal = {
         const c = document.getElementById('gs-tab-conditions');
         if (!c) return;
 
-        c.innerHTML = '<div style="padding:12px;font-size:0.85rem;opacity:0.6;">Evaluating all card conditions...</div>';
+        c.innerHTML = '<div style="padding:12px;font-size:0.85rem;opacity:0.6;">Fetching conditions...</div>';
 
         GameStateModal.fetchAndCacheConditions().then(conditions => {
             if (_conditionsError) {
-                c.innerHTML = `<div style="padding:12px;color:var(--accent-pink);">Error fetching conditions: ${_conditionsError}</div>`;
+                c.innerHTML = `<div style="padding:12px;color:var(--accent-pink);"><b>Error:</b> ${_conditionsError}</div>`;
                 return;
             }
             if (!conditions || conditions.length === 0) {
-                c.innerHTML = '<div style="padding:12px;opacity:0.6;">No conditions found on any card. Conditions are ability activation guards that are evaluated on-the-fly during ability resolution. This panel evaluates EVERY condition on EVERY card in EVERY zone — purely read-only, does not affect game state.</div>';
+                c.innerHTML = '<div style="padding:12px;opacity:0.6;">Engine returned no conditions for any card in any zone. This iterates all abilities on all cards currently in play (stage, hand, energy, waitroom, live_zone, success_live_zone). If cards with ability conditions exist, check that the condition is parsed into one of: <code>activation_condition_parsed</code>, <code>condition</code>, <code>alternative_condition</code>, <code>result_condition</code>.</div>';
                 return;
             }
 
@@ -199,8 +196,8 @@ export const GameStateModal = {
                 </details>`;
 
             document.getElementById('gs-reeval-conds')?.addEventListener('click', () => {
-                _conditionsLoaded = false;
                 _conditionsCache = null;
+                _conditionsError = null;
                 GameStateModal.renderConditionsTab();
             });
         });

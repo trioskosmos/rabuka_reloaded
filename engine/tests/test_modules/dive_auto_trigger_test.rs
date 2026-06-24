@@ -66,6 +66,79 @@ fn ab0_places_dive_ab1_grants_blade() {
     );
 }
 
+/// ab#0 triggers for P2 during P2's own main phase (phase gate allows).
+#[test]
+fn ab0_triggers_for_p2_during_p2_main_phase() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let dive = g.id("PL!N-bp4-026-L");
+    let niji = g.id("PL!N-PR-003-PR");
+    let filler = g.id("PL!-sd1-010-SD");
+
+    // P2's main phase
+    g.state.current_turn_phase = rabuka_engine::types::TurnPhase::SecondAttackerNormal;
+
+    // DIVE! in P2's waitroom, retrieve to P2's hand
+    g.state.player2.waitroom.cards.push(dive);
+    g.state.player2.hand.cards.push(filler);
+    g.state.player2.waitroom.cards.retain(|c| *c != dive);
+    g.state.player2.hand.cards.push(dive);
+    g.state.recently_moved_cards = Some(vec![dive]); // simulate movement tracking
+
+    // P2 has a Nijigasaki member on stage
+    g.state.player2.stage.stage = [-1, niji, -1];
+
+    // Trigger auto abilities for P2 (must fire because P2 owns DIVE! and it's P2's main phase)
+    let pid = g.state.player2.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
+    g.state.process_pending_auto_abilities(&pid);
+
+    // ab#0 presents optional placement choice; ab#1 then asks for stage target
+    while g.has_pending_choice() {
+        g.select_indices(&[0]);
+    }
+
+    assert!(
+        g.state.player2.live_card_zone.cards.contains(&dive),
+        "DIVE! should be in P2's live zone during P2's main phase"
+    );
+}
+
+/// ab#0 does NOT trigger for P2 during P1's main phase (phase_target: self).
+#[test]
+fn ab0_no_trigger_for_p2_during_p1_main_phase() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let dive = g.id("PL!N-bp4-026-L");
+    let niji = g.id("PL!N-PR-003-PR");
+    let filler = g.id("PL!-sd1-010-SD");
+
+    // P1's main phase (default: FirstAttackerNormal)
+
+    // DIVE! in P2's waitroom, retrieve to P2's hand
+    g.state.player2.waitroom.cards.push(dive);
+    g.state.player2.hand.cards.push(filler);
+    g.state.player2.waitroom.cards.retain(|c| *c != dive);
+    g.state.player2.hand.cards.push(dive);
+    g.state.recently_moved_cards = Some(vec![dive]); // simulate movement tracking
+
+    // P2 has a Nijigasaki member on stage
+    g.state.player2.stage.stage = [-1, niji, -1];
+
+    // Trigger auto abilities for P2 (should NOT fire: P2's main phase hasn't started)
+    let pid = g.state.player2.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
+    g.state.process_pending_auto_abilities(&pid);
+    while g.has_pending_choice() {
+        g.select_indices(&[]);
+    }
+
+    assert!(
+        !g.state.player2.live_card_zone.cards.contains(&dive),
+        "DIVE! should not fire for P2 during P1's main phase"
+    );
+}
+
 /// ab#0 does NOT trigger outside main phase.
 #[test]
 fn ab0_no_trigger_outside_main_phase() {

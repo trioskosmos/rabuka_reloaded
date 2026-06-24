@@ -1070,6 +1070,13 @@ impl AbilityEffect {
             },
             card_property: self.card_property.as_deref(),
             negation: self.negation.unwrap_or(false),
+            heart_colors: if self.filter_targets_by_heart_colors.unwrap_or(false)
+                && !self.heart_colors.is_empty()
+            {
+                &self.heart_colors
+            } else {
+                &[]
+            },
             ..Default::default()
         }
     }
