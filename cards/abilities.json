@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-25T08:04:54.122152",
+  "generated_at": "2026-06-25T08:10:13.445124",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1775,7 +1775,9 @@
           "baton_touch_trigger": true,
           "text": "バトンタッチして登場した場合",
           "trigger_event": {
-            "type": "baton_touch"
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "stage"
           },
           "location": "stage"
         },
@@ -2132,7 +2134,13 @@
           "baton_touch_trigger": true,
           "text": "このメンバーよりコストが低い『スリーズブーケ』のメンバーからバトンタッチして登場した場合",
           "trigger_event": {
-            "type": "baton_touch"
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "stage",
+            "cost_comparison": {
+              "operator": "<",
+              "relative_to": "activating"
+            }
           },
           "location": "stage",
           "group_names": [
@@ -3549,7 +3557,9 @@
               "baton_touch_trigger": true,
               "text": "『Liella!』のメンバーからバトンタッチして登場しており、",
               "trigger_event": {
-                "type": "baton_touch"
+                "type": "baton_touch",
+                "tense": "past",
+                "location": "discard"
               },
               "location": "discard",
               "group_names": [
@@ -3741,16 +3751,22 @@
               "movement": "moves",
               "text": "このメンバーが登場か、エリアを移動したとき",
               "trigger_event": {
-                "type": "area_move"
+                "type": "area_move",
+                "tense": "past"
               }
             }
           ],
           "text": "このメンバーが登場か、エリアを移動したとき",
           "trigger_event": {
-            "type": "appear_or_move",
-            "or_event_types": [
-              "appearance",
-              "area_move"
+            "type": "or",
+            "events": [
+              {
+                "type": "appearance"
+              },
+              {
+                "type": "area_move",
+                "tense": "past"
+              }
             ]
           }
         },
@@ -4042,7 +4058,9 @@
           "baton_touch_trigger": true,
           "text": "能力を持たないメンバーからバトンタッチして登場した場合",
           "trigger_event": {
-            "type": "baton_touch"
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "stage"
           },
           "location": "stage",
           "ability_filter": "no_ability",
@@ -4824,7 +4842,10 @@
           "type": "movement_condition",
           "text": "自分のカードの効果によって、このメンバーがエリアを移動するか自分のエネルギー置き場にエネルギーが置かれたとき",
           "trigger_event": {
-            "type": "area_move"
+            "type": "area_move",
+            "tense": "nonpast",
+            "self_effect_only": true,
+            "energy_placed": true
           },
           "movement": "moves",
           "self_effect_only": true,
@@ -7216,7 +7237,13 @@
               "baton_touch_trigger": true,
               "text": "このメンバーよりコストが低いメンバーからバトンタッチして登場した場合",
               "trigger_event": {
-                "type": "baton_touch"
+                "type": "baton_touch",
+                "tense": "past",
+                "location": "stage",
+                "cost_comparison": {
+                  "operator": "<",
+                  "relative_to": "activating"
+                }
               },
               "location": "stage",
               "comparison_type": "cost",
@@ -8646,10 +8673,10 @@
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
           "trigger_event": {
-            "type": "area_move"
+            "type": "area_move",
+            "tense": "past"
           },
-          "movement": "moved",
-          "movement_state": "has_moved"
+          "movement": "moved"
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -8720,7 +8747,13 @@
           "baton_touch_trigger": true,
           "text": "このメンバーよりコストが低いメンバーからバトンタッチして登場した場合",
           "trigger_event": {
-            "type": "baton_touch"
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "stage",
+            "cost_comparison": {
+              "operator": "<",
+              "relative_to": "activating"
+            }
           },
           "location": "stage",
           "comparison_type": "cost",
@@ -10013,16 +10046,22 @@
               "movement": "moves",
               "text": "このメンバーが登場か、エリアを移動する",
               "trigger_event": {
-                "type": "area_move"
+                "type": "area_move",
+                "tense": "nonpast"
               }
             }
           ],
           "text": "このメンバーが登場か、エリアを移動する",
           "trigger_event": {
-            "type": "appear_or_move",
-            "or_event_types": [
-              "appearance",
-              "area_move"
+            "type": "or",
+            "events": [
+              {
+                "type": "appearance"
+              },
+              {
+                "type": "area_move",
+                "tense": "nonpast"
+              }
             ]
           }
         },
@@ -10645,10 +10684,10 @@
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
           "trigger_event": {
-            "type": "area_move"
+            "type": "area_move",
+            "tense": "past"
           },
-          "movement": "moved",
-          "movement_state": "has_moved"
+          "movement": "moved"
         },
         "source": "energy_deck",
         "destination": "energy_zone",
@@ -11058,7 +11097,13 @@
           "baton_touch_trigger": true,
           "text": "このメンバーよりコストが低い『DOLLCHESTRA』のメンバーからバトンタッチして登場した場合",
           "trigger_event": {
-            "type": "baton_touch"
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "stage",
+            "cost_comparison": {
+              "operator": "<",
+              "relative_to": "activating"
+            }
           },
           "location": "stage",
           "group_names": [
@@ -11102,7 +11147,13 @@
           "baton_touch_trigger": true,
           "text": "このメンバーよりコストが低い『みらくらぱーく！』のメンバーからバトンタッチして登場した場合",
           "trigger_event": {
-            "type": "baton_touch"
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "stage",
+            "cost_comparison": {
+              "operator": "<",
+              "relative_to": "activating"
+            }
           },
           "location": "stage",
           "group_names": [
@@ -14299,10 +14350,10 @@
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
           "trigger_event": {
-            "type": "area_move"
+            "type": "area_move",
+            "tense": "past"
           },
-          "movement": "moved",
-          "movement_state": "has_moved"
+          "movement": "moved"
         },
         "source": "discard",
         "destination": "hand",
@@ -15418,7 +15469,10 @@
           "baton_touch_trigger": true,
           "text": "「中須かすみ」からバトンタッチして登場した場合",
           "trigger_event": {
-            "type": "baton_touch"
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "stage",
+            "source_character": "中須かすみ"
           },
           "location": "stage",
           "baton_touch_source": "中須かすみ",
@@ -15617,7 +15671,10 @@
           "baton_touch_trigger": true,
           "text": "「優木せつ菜」からバトンタッチして登場した場合",
           "trigger_event": {
-            "type": "baton_touch"
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "stage",
+            "source_character": "優木せつ菜"
           },
           "location": "stage",
           "baton_touch_source": "優木せつ菜",
@@ -15666,7 +15723,10 @@
           "baton_touch_trigger": true,
           "text": "「エマ・ヴェルデ」からバトンタッチして登場した場合",
           "trigger_event": {
-            "type": "baton_touch"
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "stage",
+            "source_character": "エマ・ヴェルデ"
           },
           "location": "stage",
           "baton_touch_source": "エマ・ヴェルデ",
@@ -15753,7 +15813,10 @@
           "baton_touch_trigger": true,
           "text": "「三船栞子」からバトンタッチして登場した場合",
           "trigger_event": {
-            "type": "baton_touch"
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "stage",
+            "source_character": "三船栞子"
           },
           "location": "stage",
           "baton_touch_source": "三船栞子",
@@ -16125,10 +16188,10 @@
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
           "trigger_event": {
-            "type": "area_move"
+            "type": "area_move",
+            "tense": "past"
           },
-          "movement": "moved",
-          "movement_state": "has_moved"
+          "movement": "moved"
         },
         "source": "stage",
         "state_change": "wait",
@@ -16159,10 +16222,10 @@
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
           "trigger_event": {
-            "type": "area_move"
+            "type": "area_move",
+            "tense": "past"
           },
-          "movement": "moved",
-          "movement_state": "has_moved"
+          "movement": "moved"
         },
         "state_change": "active",
         "count": 2,
@@ -18414,7 +18477,9 @@
           "baton_touch_trigger": true,
           "text": "バトンタッチして登場した場合",
           "trigger_event": {
-            "type": "baton_touch"
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "stage"
           },
           "location": "stage"
         }
@@ -18635,7 +18700,9 @@
           "baton_touch_trigger": true,
           "text": "バトンタッチして登場した場合",
           "trigger_event": {
-            "type": "baton_touch"
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "stage"
           },
           "location": "stage"
         },
@@ -18736,10 +18803,10 @@
           "type": "movement_condition",
           "text": "自分のライブが成功するか、このメンバーがエリアを移動したとき",
           "trigger_event": {
-            "type": "area_move"
+            "type": "area_move",
+            "tense": "past"
           },
-          "movement": "moved",
-          "movement_state": "has_moved"
+          "movement": "moved"
         },
         "source": "discard",
         "destination": "under_member",
@@ -18939,10 +19006,10 @@
           "type": "movement_condition",
           "text": "自分のステージのセンターエリアにいるメンバーがエリアを移動したとき",
           "trigger_event": {
-            "type": "area_move"
+            "type": "area_move",
+            "tense": "past"
           },
           "movement": "moved",
-          "movement_state": "has_moved",
           "position": "center"
         },
         "action": "choice",
@@ -19287,10 +19354,10 @@
           "type": "movement_condition",
           "text": "自分のステージにいる『5yncri5e!』のメンバーがセンターエリアに移動したとき",
           "trigger_event": {
-            "type": "area_move"
+            "type": "area_move",
+            "tense": "past"
           },
           "movement": "moved",
-          "movement_state": "has_moved",
           "position": "center",
           "group_names": [
             "5yncri5e!"
@@ -19997,7 +20064,9 @@
           "baton_touch_trigger": true,
           "text": "自分のステージに、このメンバーか、ほかのメンバーがバトンタッチして登場したとき",
           "trigger_event": {
-            "type": "baton_touch"
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "stage"
           },
           "location": "stage",
           "exclude_self": true
@@ -21453,7 +21522,8 @@
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動する",
           "trigger_event": {
-            "type": "area_move"
+            "type": "area_move",
+            "tense": "nonpast"
           },
           "movement": "moves"
         },
@@ -27060,10 +27130,10 @@
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
           "trigger_event": {
-            "type": "area_move"
+            "type": "area_move",
+            "tense": "past"
           },
-          "movement": "moved",
-          "movement_state": "has_moved"
+          "movement": "moved"
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -27784,7 +27854,9 @@
           "baton_touch_trigger": true,
           "text": "このメンバーがコスト10以上の『蓮ノ空』のメンバーとバトンタッチして控え室に置かれたとき",
           "trigger_event": {
-            "type": "baton_touch"
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "discard"
           },
           "location": "discard",
           "cost_limit": 10,
@@ -27976,7 +28048,12 @@
           "baton_touch_trigger": true,
           "text": "「徒町小鈴」以外の『蓮ノ空』のメンバーからバトンタッチして登場した場合",
           "trigger_event": {
-            "type": "baton_touch"
+            "type": "baton_touch",
+            "tense": "past",
+            "location": "stage",
+            "exclude_characters": [
+              "徒町小鈴"
+            ]
           },
           "location": "stage",
           "exclude_characters": [
@@ -31686,10 +31763,10 @@
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
           "trigger_event": {
-            "type": "area_move"
+            "type": "area_move",
+            "tense": "past"
           },
-          "movement": "moved",
-          "movement_state": "has_moved"
+          "movement": "moved"
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -31717,10 +31794,10 @@
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
           "trigger_event": {
-            "type": "area_move"
+            "type": "area_move",
+            "tense": "past"
           },
-          "movement": "moved",
-          "movement_state": "has_moved"
+          "movement": "moved"
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -31802,10 +31879,10 @@
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
           "trigger_event": {
-            "type": "area_move"
+            "type": "area_move",
+            "tense": "past"
           },
-          "movement": "moved",
-          "movement_state": "has_moved"
+          "movement": "moved"
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -32066,10 +32143,12 @@
           "type": "movement_condition",
           "text": "自分のメインフェイズの間、このメンバーがエリアを移動したとき",
           "trigger_event": {
-            "type": "area_move"
+            "type": "area_move",
+            "tense": "past",
+            "phase": "main",
+            "phase_target": "self"
           },
           "movement": "moved",
-          "movement_state": "has_moved",
           "phase": "main",
           "phase_target": "self"
         },

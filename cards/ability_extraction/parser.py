@@ -1133,35 +1133,43 @@ def _try_baton_touch(text):
     ):
         return None
     is_to_stage = "バトンタッチして登場した" in text
+    te_data = {"type": "baton_touch", "tense": "past"}
     result = {
         "type": "movement_condition",
         "movement": "baton_touch",
         "target": "self",
         "baton_touch_trigger": True,
         "text": text,
-        "trigger_event": {"type": "baton_touch"},
+        "trigger_event": te_data,
     }
     if is_to_stage:
         result["location"] = "stage"
+        te_data["location"] = "stage"
     else:
         result["location"] = "discard"
+        te_data["location"] = "discard"
     m = re.search(r"「([^」]+)」からバトンタッチ", text)
     if m:
         result["baton_touch_source"] = m.group(1)
         result["characters"] = [m.group(1)]
+        te_data["source_character"] = m.group(1)
     # 「名」以外の...からバトンタッチ — exclude this character
     m = re.search(r"「([^」]+)」以外の.*からバトンタッチ", text)
     if m:
         result["exclude_characters"] = [m.group(1)]
+        if "source_character" not in te_data:
+            te_data["exclude_characters"] = [m.group(1)]
     m = re.search(r"『([^』」]+)』からバトンタッチ", text)
     if m:
         result["baton_touch_group"] = m.group(1)
+        te_data["source_group"] = m.group(1)
         # Also add to characters if not yet set
         if "characters" not in result:
             result["characters"] = [m.group(1)]
     count_m = re.search(r"(\d+)人からバトンタッチ", text)
     if count_m:
         result["min_baton_touch_count"] = int(count_m.group(1))
+        te_data["min_count"] = int(count_m.group(1))
     # Extract cost limit (e.g., "コスト10以上" → cost_limit=10, operator=">=")
     cm = re.search(r"コスト(\d+)(以上|以下|より大きい|より小さい|未満)", text)
     if cm:
@@ -1181,6 +1189,10 @@ def _try_baton_touch(text):
     if "コスト" in text and ("低い" in text or "高い" in text):
         result["comparison_type"] = "cost"
         result["operator"] = "<" if "低い" in text else ">"
+        te_data["cost_comparison"] = {
+            "operator": result["operator"],
+            "relative_to": "activating",
+        }
     if "このメンバー以外" in text or bool(re.search(r"ほかの.*?メンバー", text)):
         result["exclude_self"] = True
     if "能力を持たない" in text or "能力も持たない" in text:
@@ -1224,8 +1236,6 @@ def _try_temporal_count(text):
         result["target"] = tgt
     if "エリアすべて" in text:
         result["all_areas"] = True
-    if "移動している" in text:
-        result["movement_state"] = "has_moved"
     gns = extract_group_names(text)
     if gns:
         result["group_names"] = gns
@@ -1314,31 +1324,40 @@ def _try_movement(text):
     """
     if "移動した" not in text and "移動している" not in text and "移動する" not in text:
         return None
+    tense = "past" if ("移動した" in text or "移動している" in text) else "nonpast"
+    te_data = {"type": "area_move", "tense": tense}
+    if "たび" in text:
+        te_data["recurrence"] = "each_time"
     result = {
         "type": "movement_condition",
         "text": text,
-        "trigger_event": {"type": "area_move"},
+        "trigger_event": te_data,
+        "movement": "moves"
+        if (
+            "移動する" in text and "移動した" not in text and "移動している" not in text
+        )
+        else "moved",
     }
-    if "移動する" in text and "移動した" not in text and "移動している" not in text:
-        result["movement"] = "moves"
-    else:
-        result["movement"] = "moved"
-        result["movement_state"] = "has_moved"
     if "移動していない" in text:
         result["negation"] = True
     # Extract "自分のカードの効果" (own card effect) constraint
     if "自分のカードの効果" in text:
         result["self_effect_only"] = True
+        te_data["self_effect_only"] = True
     # Extract "エネルギーが置かれ" (energy placed) trigger
     if "エネルギーが置かれ" in text:
         result["energy_placed"] = True
+        te_data["energy_placed"] = True
     # Phase restriction: 自分のメインフェイズ / 相手のメインフェイズ
     if "メインフェイズ" in text:
         result["phase"] = "main"
+        te_data["phase"] = "main"
         if "自分の" in text:
             result["phase_target"] = "self"
+            te_data["phase_target"] = "self"
         elif "相手の" in text:
             result["phase_target"] = "opponent"
+            te_data["phase_target"] = "opponent"
     return result
 
 
@@ -1416,6 +1435,7 @@ def _try_zone_placement(text):
 def _try_appear_or_move(text):
     if "登場か、エリアを移動" not in text:
         return None
+    tense = "past" if "移動した" in text else "nonpast"
     return {
         "type": "or_condition",
         "conditions": [
@@ -1430,13 +1450,16 @@ def _try_appear_or_move(text):
                 "type": "movement_condition",
                 "movement": "moves",
                 "text": text,
-                "trigger_event": {"type": "area_move"},
+                "trigger_event": {"type": "area_move", "tense": tense},
             },
         ],
         "text": text,
         "trigger_event": {
-            "type": "appear_or_move",
-            "or_event_types": ["appearance", "area_move"],
+            "type": "or",
+            "events": [
+                {"type": "appearance"},
+                {"type": "area_move", "tense": tense},
+            ],
         },
     }
 
@@ -2095,8 +2118,6 @@ def _extract_generic_fields(condition, text):
     # 2-locations mechanism and should NOT get movement:"moved")
     if "置かれた" in text and "locations" not in condition:
         condition["movement"] = "moved"
-    if "移動している" in text:
-        condition["movement_state"] = "has_moved"
 
     # Temporal scope
     for kw, tmp in [("このターン", "this_turn"), ("このライブ", "this_live")]:
@@ -4314,8 +4335,6 @@ def _extract_basic_cost_fields(cost, text):
         cost["optional"] = True
     if "シャッフルする" in text or "シャッフルして" in text:
         cost["shuffle"] = True
-    if "移動している" in text:
-        cost["movement_state"] = "has_moved"
     # Baton touch
     if "バトンタッチ" in text:
         qm = re.search(r"「([^」]+)」からバトンタッチ", text)
