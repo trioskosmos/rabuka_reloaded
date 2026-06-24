@@ -2,6 +2,7 @@ use super::debug::AbDebug;
 use crate::ability::enums::ConditionType;
 use crate::ability::enums::Zone;
 use crate::card::Condition;
+use crate::game_state::Phase;
 use serde_json::json;
 
 pub(crate) fn comparison_default_count(condition: &Condition) -> u32 {
@@ -234,6 +235,35 @@ pub fn push_cond_verdict(
 }
 
 impl<'a> ConditionContext<'a> {
+    /// Phase gate: checks whether the condition's phase restriction (if any) is
+    /// satisfied.  Handles "自分のメインフェイズ" (self's main phase),
+    /// "相手のメインフェイズ" (opponent's main phase), and plain
+    /// "メインフェイズ" (any main phase).
+    pub fn check_phase_gate(&self, condition: &Condition) -> bool {
+        let Some(phase) = &condition.phase else {
+            return true; // no phase restriction
+        };
+        match phase.as_str() {
+            "main" | "main_phase" => {
+                if self.game_state.current_phase != Phase::Main {
+                    return false;
+                }
+                match condition.phase_target.as_deref() {
+                    Some("self") => self
+                        .self_player
+                        .map(|p| p.id == self.game_state.active_player().id)
+                        .unwrap_or(true),
+                    Some("opponent") => self
+                        .self_player
+                        .map(|p| p.id != self.game_state.active_player().id)
+                        .unwrap_or(true),
+                    _ => true,
+                }
+            }
+            _ => true,
+        }
+    }
+
     pub fn evaluate_condition(&self, condition: &Condition) -> bool {
         // Handle aggregate total with heart_colors — runs before type dispatch.
         // Skip early return for TemporalCondition so the phase gate is checked too.
@@ -268,6 +298,13 @@ impl<'a> ConditionContext<'a> {
                 return r;
             }
             _ => {}
+        }
+        // Phase gate: check phase/phase_target restrictions. This must run
+        // BEFORE individual type evaluators so the gate applies universally.
+        // Compound/or conditions handle phase internally via sub-condition
+        // gates — the top-level gate is skipped for them above.
+        if !self.check_phase_gate(condition) {
+            return false;
         }
         // For all other types: run evaluator, then push generic verdict
         let result: bool = match ct {

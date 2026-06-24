@@ -1344,6 +1344,7 @@ pub struct Condition {
     pub movement: Option<String>,
     pub temporal: Option<String>,
     pub phase: Option<String>,
+    pub phase_target: Option<String>,
     pub comparison_type: Option<String>,
     pub appearance: Option<bool>,
     #[serde(default)]
