@@ -1,0 +1,1 @@
+C:\Users\trios\AppData\Local\Microsoft\WindowsApps\python.exe: can't open file 'C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\engine\\cards\\ability_extraction\\extract_card_abilities.py': [Errno 2] No such file or directory

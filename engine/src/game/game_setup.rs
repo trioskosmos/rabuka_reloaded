@@ -566,6 +566,15 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                 .collect()
                         }
                     }
+                    Some(Zone::SelectedCards) => game_state
+                        .ability_queue
+                        .current_entry()
+                        .and_then(|e| e.resolver.as_ref())
+                        .map(|r| r.selected_cards.clone())
+                        .unwrap_or_default()
+                        .into_iter()
+                        .enumerate()
+                        .collect(),
                     _ => Vec::new(),
                 }
             };

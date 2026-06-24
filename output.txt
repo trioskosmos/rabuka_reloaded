@@ -8,10 +8,6 @@ Extracting abilities from C:\Users\trios\OneDrive\Documents\rabuka_reloaded\card
 Found 1727 abilities across 1373 cards
 Unique abilities: 800
 Output written to C:\Users\trios\OneDrive\Documents\rabuka_reloaded\cards\abilities.json
-
-  GAPS DETECTED:
-    state_change:wait: 16 cards
-    baton_touch: 4 cards
-    These should be fixed in parser.py before committing.
+    No gaps detected -- all known patterns handled.
     All bracketed names have matching filter fields.
 Validation complete.

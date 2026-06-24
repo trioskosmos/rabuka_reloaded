@@ -1320,16 +1320,59 @@ impl super::resolver::AbilityResolver {
                     indices.to_vec()
                 };
                 if is_select_action {
-                    // Just store card IDs without moving
-                    let target = target_player_id.as_deref().unwrap_or("self");
-                    let player = gs.resolve_target_player_mut(target);
+                    let target = target_player_id.as_deref().unwrap_or("self").to_string();
+                    // Store current selection in selected_cards (preventing duplicates)
+                    let player = gs.resolve_target_player_mut(&target);
                     let mut cards: Vec<i16> = Vec::new();
                     for &i in mapped_indices.iter() {
                         if i < player.waitroom.cards.len() {
-                            cards.push(player.waitroom.cards[i]);
+                            let cid = player.waitroom.cards[i];
+                            if !self.selected_cards.contains(&cid) {
+                                self.selected_cards.push(cid);
+                                cards.push(cid);
+                            }
                         }
                     }
-                    self.selected_cards = cards;
+                    // Re-prompt if fewer than count cards have been selected so far
+                    let selected_so_far = self.selected_cards.len();
+                    if count > 0 && !mapped_indices.is_empty() && selected_so_far < count {
+                        let remaining = count - selected_so_far;
+                        let waitroom_cards: Vec<i16> = {
+                            let p = gs.resolve_target_player_mut(&target);
+                            p.waitroom.cards.to_vec()
+                        };
+                        let already_selected = self.selected_cards.clone();
+                        let filtered_idxs: Vec<usize> = (0..waitroom_cards.len())
+                            .filter(|&i| !already_selected.contains(&waitroom_cards[i]))
+                            .collect();
+                        self.pending_choice = Some(
+                            Choice::select_cards(
+                                Zone::Discard.to_str(),
+                                remaining,
+                                format!(
+                                    "Select {} more card(s) from discard from {} remaining",
+                                    remaining,
+                                    filtered_idxs.len()
+                                ),
+                                false,
+                            )
+                            .card_type(card_type.clone())
+                            .cost_limit(cost_limit, cost_limit_operator.clone())
+                            .cost_total(cost_total, cost_total_operator.clone())
+                            .group(group.clone())
+                            .characters(characters.clone())
+                            .filtered_indices(if filtered_idxs.is_empty() {
+                                None
+                            } else {
+                                Some(filtered_idxs)
+                            })
+                            .target_player_id(Some(target.clone()))
+                            .is_select_action(true)
+                            .build(),
+                        );
+                        self.store_pending_choice(gs);
+                        return Ok(());
+                    }
                     // Finalize to process pending sequential actions
                     return self.finalize_choice(gs, &context);
                 } else {

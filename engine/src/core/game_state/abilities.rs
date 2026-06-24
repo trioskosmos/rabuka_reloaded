@@ -1394,7 +1394,9 @@ impl GameState {
                         let player = self.resolve_target_player(target);
                         let card_ids: Vec<i16> = match Zone::from_str(zone) {
                             Some(Zone::Hand) => player.hand.cards.iter().copied().collect(),
-                            Some(Zone::Discard) => player.waitroom.cards.iter().copied().collect(),
+                            Some(Zone::Discard) | Some(Zone::Waitroom) => {
+                                player.waitroom.cards.iter().copied().collect()
+                            }
                             Some(Zone::Stage) => player
                                 .stage
                                 .stage
@@ -1405,6 +1407,9 @@ impl GameState {
                             Some(Zone::Energy) | Some(Zone::EnergyZone) => {
                                 player.energy_zone.cards.iter().copied().collect()
                             }
+                            Some(Zone::LookedAt) => self.looked_at_cards.clone(),
+                            Some(Zone::RevealedCards) => self.revealed_cards.clone(),
+                            Some(Zone::Deck) => player.main_deck.cards.iter().copied().collect(),
                             Some(Zone::SelectedCards) => entry
                                 .resolver
                                 .as_ref()

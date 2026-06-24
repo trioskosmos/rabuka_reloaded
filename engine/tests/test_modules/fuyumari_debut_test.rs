@@ -38,6 +38,16 @@ fn fuyumari_q118_opponent_picks_first_card() {
 
     // Step 1: Player selects 2 distinct live cards from discard (indices 0 and 1)
     assert!(game.has_pending_choice(), "Should have select choice");
+    // First choice should be routed to self (no choice_player_id override or = p1)
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .as_ref()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p1"),
+        "First select choice should be routed to activator (self)"
+    );
     game.try_select_indices(&[0, 1]).unwrap();
 
     // Step 2: Opponent picks a card from the selected ones
@@ -56,6 +66,13 @@ fn fuyumari_q118_opponent_picks_first_card() {
             .and_then(|e| e.choice_player_id.as_deref()),
         Some("p2"),
         "Opponent-select choice should be routed to opponent"
+    );
+    // Verify generated_actions returns non-empty for opponent's selected_cards choice
+    let actions = game.generated_actions();
+    assert!(
+        actions.len() >= 2,
+        "Opponent should see at least 2 action options (got {})",
+        actions.len()
     );
     game.select_option(0);
 
@@ -98,6 +115,16 @@ fn fuyumari_q118_opponent_picks_second_card() {
     game.play_to_stage(fuyumari, rabuka_engine::zones::MemberArea::LeftSide);
 
     // Step 1: Player selects both
+    assert!(game.has_pending_choice(), "Should have select choice");
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .as_ref()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p1"),
+        "First select choice should be routed to activator (self)"
+    );
     game.try_select_indices(&[0, 1]).unwrap();
 
     // Step 2: Opponent picks the SECOND card (index 1 = live_b)
@@ -105,11 +132,20 @@ fn fuyumari_q118_opponent_picks_second_card() {
         game.has_pending_choice(),
         "Should have opponent select choice"
     );
-    let entry = game.state.ability_queue.current_entry();
-    assert_eq!(
-        entry.as_ref().and_then(|e| e.choice_player_id.as_deref()),
-        Some("p2"),
-        "Opponent-select choice should be routed to opponent"
+    {
+        let entry = game.state.ability_queue.current_entry();
+        assert_eq!(
+            entry.as_ref().and_then(|e| e.choice_player_id.as_deref()),
+            Some("p2"),
+            "Opponent-select choice should be routed to opponent"
+        );
+    }
+    // Verify generated_actions returns non-empty for opponent
+    let actions = game.generated_actions();
+    assert!(
+        actions.len() >= 2,
+        "Opponent should see at least 2 action options (got {})",
+        actions.len()
     );
     game.select_option(1);
 
@@ -194,6 +230,141 @@ fn fuyumari_q118_card_count_integrity() {
     assert_eq!(
         total_after, total_before,
         "Total card count unchanged for player1"
+    );
+}
+
+/// Three distinct live cards in discard. Player picks 2 → opponent picks 1 → correct card in hand.
+#[test]
+fn fuyumari_q118_three_distinct_cards_opponent_picks_middle() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let fuyumari = game.id("PL!SP-bp2-011-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    let live_a = game.id("PL!-sd1-019-SD");
+    let live_b = game.id("PL!-sd1-020-SD");
+    let live_c = game.id("PL!N-sd1-028-SD"); // third distinct live card
+
+    game.state.player1.hand.cards.push(fuyumari);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.waitroom.cards.push(live_a);
+    game.state.player1.waitroom.cards.push(live_b);
+    game.state.player1.waitroom.cards.push(live_c);
+
+    game.give_energy(11);
+    game.state.player1.stage.stage[0] = -1;
+    game.play_to_stage(fuyumari, rabuka_engine::zones::MemberArea::LeftSide);
+
+    // Step 1: Player selects 2 of 3 distinct cards (indices 0 and 2 = live_a and live_c)
+    assert!(game.has_pending_choice(), "Should have select choice");
+    game.try_select_indices(&[0, 2]).unwrap();
+
+    // Step 2: Opponent picks index 1 from selected_cards = live_c
+    assert!(
+        game.has_pending_choice(),
+        "Should have opponent select choice"
+    );
+    {
+        let entry = game.state.ability_queue.current_entry();
+        assert_eq!(
+            entry.as_ref().and_then(|e| e.choice_player_id.as_deref()),
+            Some("p2"),
+            "Opponent-select choice should be routed to opponent"
+        );
+    }
+    let actions = game.generated_actions();
+    assert!(
+        actions.len() >= 2,
+        "Opponent should see at least 2 action options (got {})",
+        actions.len()
+    );
+    game.select_option(1);
+
+    // Step 3: Opponent-chosen card (live_c) goes to hand
+    assert!(
+        game.state.player1.hand.cards.contains(&live_c),
+        "Opponent-chosen card (live_c) should be in hand"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live_a),
+        "Unchosen live_a stays in discard"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live_b),
+        "Unchosen live_b stays in discard"
+    );
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&live_c),
+        "live_c should be removed from discard"
+    );
+}
+
+/// Two duplicate-named + one distinct: distinct filter means only 2 selectable (the distinct + 1 of dups).
+/// Player picks the distinct + the first dup → opponent picks → correct card in hand.
+#[test]
+fn fuyumari_q118_duplicate_names_distinct_filter_works() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let fuyumari = game.id("PL!SP-bp2-011-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    // live_a and live_a2 are the SAME card name (START:DASH!!)
+    let live_a = game.id("PL!-sd1-019-SD"); // START:DASH!!
+    let live_a2 = game.id("PL!-sd1-019-SD"); // same card, different copy
+    let live_c = game.id("PL!-sd1-020-SD"); // different name
+
+    game.state.player1.hand.cards.push(fuyumari);
+    game.state.player1.hand.cards.push(filler);
+    // Discard: [live_a (idx0), live_a2 (idx1), live_c (idx2)]
+    // distinct filter should only show live_a and live_c as valid choices
+    game.state.player1.waitroom.cards.push(live_a);
+    game.state.player1.waitroom.cards.push(live_a2);
+    game.state.player1.waitroom.cards.push(live_c);
+
+    game.give_energy(11);
+    game.state.player1.stage.stage[0] = -1;
+    game.play_to_stage(fuyumari, rabuka_engine::zones::MemberArea::LeftSide);
+
+    // Step 1: Player should have a choice
+    // The choice only offers 2 distinct-named cards (live_a and live_c).
+    // player picks both by their actual waitroom indices 0 and 2.
+    assert!(game.has_pending_choice(), "Should have select choice");
+    game.try_select_indices(&[0, 2]).unwrap();
+
+    // Step 2: Opponent picks from the 2 selected cards
+    assert!(
+        game.has_pending_choice(),
+        "Should have opponent select choice"
+    );
+    {
+        let entry = game.state.ability_queue.current_entry();
+        assert_eq!(
+            entry.as_ref().and_then(|e| e.choice_player_id.as_deref()),
+            Some("p2"),
+            "Opponent-select choice should be routed to opponent"
+        );
+    }
+    let actions = game.generated_actions();
+    assert_eq!(
+        actions.len(),
+        2,
+        "Opponent should see exactly 2 action options (selected_cards instead of wrong card)"
+    );
+    game.select_option(0);
+
+    // Step 3: Opponent-chosen card (live_a) goes to hand
+    assert!(
+        game.state.player1.hand.cards.contains(&live_a),
+        "Opponent-chosen card (live_a) should be in hand"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live_c),
+        "Unchosen live_c stays in discard"
+    );
+    // live_a2 should be unaffected
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live_a2),
+        "live_a2 (duplicate name, unchosen) stays in discard"
     );
 }
 

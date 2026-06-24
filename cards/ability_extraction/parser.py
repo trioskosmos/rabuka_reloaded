@@ -796,6 +796,31 @@ def _infer_heart_source(cond, text):
             cond["heart_source"] = "blade"
 
 
+def _infer_baton_touch(obj, text):
+    """Detect バトンタッチして登場した in condition or action text and
+    set baton_touch_trigger and optionally min_baton_touch_count.
+    Does NOT set baton_touch_source — that field is only set by the
+    existing _try_baton_touch handler which correctly distinguishes
+    「X」から (character name source) vs 『X』から (group name).
+    Returns True if baton_touch_trigger was added.
+    """
+    if "バトンタッチして登場" not in text:
+        return False
+    if not isinstance(obj, dict):
+        return False
+    # Skip compound action types — baton_touch belongs on leaf nodes only
+    if obj.get("action") in ("choice", "sequential", "compound"):
+        return False
+    obj["baton_touch_trigger"] = True
+    # Only set min_baton_touch_count on condition nodes (where count = threshold),
+    # not on action nodes (where count = how many to select/target).
+    if obj.get("type") in ("card_count_condition", "movement_condition", "appearance"):
+        count = obj.get("count")
+        if count and count > 0:
+            obj["min_baton_touch_count"] = count
+    return True
+
+
 def _enrich_card_count_condition(result, text):
     """Post-match enrichment for card_count_condition: extracts all filter fields
     from the raw text (exclude_self, negation, character names, cost limits,
@@ -918,6 +943,8 @@ def _enrich_card_count_condition(result, text):
         del result["heart_colors"]
     # Heart source: blade (ブレードハート) vs base (default)
     _infer_heart_source(result, text)
+    # Baton touch trigger (ターンにバトンタッチして登場した)
+    _infer_baton_touch(result, text)
     # State (wait/active)
     if "ウェイト状態" in text:
         result["state"] = "wait"
@@ -8711,6 +8738,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     cond["card_property"] = "has_score_icon"
                     fix_stats["card_property"] += 1
                 _infer_heart_source(cond, ct)
+                _infer_baton_touch(cond, ct)
 
             # 8d: Enrich temporal_condition with aggregate
             if cond.get("type") == "temporal_condition":
@@ -8781,6 +8809,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 rc["card_property"] = "has_score_icon"
                 fix_stats["result_cond"] += 1
             _infer_heart_source(rc, rct)
+            _infer_baton_touch(rc, rct)
 
         # FIX 10: Primary effect fixes — negation condition
         pe = eff.get("primary_effect")
@@ -9346,11 +9375,16 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                         if f not in ch and f in ctx:
                             ch[f] = ctx[f]
 
-            for ak in ("actions",):
+            for ak in ("actions", "options"):
                 arr = node.get(ak, [])
                 if isinstance(arr, list):
                     for item in arr:
                         _propagate_context(item, new_ctx)
+
+            # Baton touch trigger on action nodes (e.g. gain_resource with
+            # "このターンにバトンタッチして登場した" in a choice option)
+            node_text = node.get("text", "") or ""
+            _infer_baton_touch(node, node_text)
 
             # heart_type:all for gain_resource actions
             if action == "gain_resource" and node.get("resource") == "heart":
@@ -9371,6 +9405,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 ):
                     nc["card_property"] = "has_score_icon"
                 _infer_heart_source(nc, nct)
+                _infer_baton_touch(nc, nct)
                 # Strip heart_colors from preceding_moved conditions that have a
                 # specific location — the move already filtered by heart color.
                 if (
@@ -9391,6 +9426,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 ):
                     node["card_property"] = "has_score_icon"
                 _infer_heart_source(node, nct)
+                _infer_baton_touch(node, nct)
 
             # Strip parenthetical from sub-conditions of compound conditions
             if node.get("type") == "compound" and "conditions" in node:

@@ -1,7 +1,7 @@
 /// PL!SP-bp2-011-R (鬼塚冬毬) Q118
 ///
 /// {{toujyou.png|登場}}自分の控え室にある、カード名の異なるライブカードを2枚選ぶ。
-/// 選べなかった場合、このカードのうち1枚を選ぶ。これにより相手に選ばれたカードを
+/// 選択した場合、相手はそのカードのうち1枚を選ぶ。相手に選ばれたカードを
 /// 自分の手札に加える。
 ///
 /// Q118: If you can't select 2 different-named live cards (e.g. only 1 in discard),
@@ -32,33 +32,33 @@ fn toubatsu_q118_2_distinct_live_cards_works() {
     game.play_to_stage(toubatsu, MemberArea::Center);
 
     // Debut fires: select 2 distinct live cards from discard
-    if game.has_pending_choice() {
-        // First choice: select which 2 distinct live cards
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(game.has_pending_choice(), "First select choice expected");
+    // First choice should be routed to self
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .as_ref()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p1"),
+        "First select choice should be routed to activator (self)"
+    );
+    // Select both cards at once
+    game.try_select_indices(&[0, 1]).unwrap();
 
-    // After selection, the opponent chooses 1 → it goes to opponent's hand
-    // Handle opponent choice if present
-    if game.has_pending_choice() {
+    // Opponent chooses 1 of the 2 selected cards
+    assert!(game.has_pending_choice(), "Opponent select choice expected");
+    {
         let entry = game.state.ability_queue.current_entry();
         assert_eq!(
             entry.as_ref().and_then(|e| e.choice_player_id.as_deref()),
             Some("p2"),
             "Opponent-select choice should be routed to opponent"
         );
-        game.select_indices(&[0]); // opponent selects first card (index in selected_cards)
     }
+    game.select_option(0); // opponent selects first card (index in selected_cards)
 
-    // After selection, the opponent chooses 1 → it goes to opponent's hand
-    // Handle opponent choice if present
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // opponent selects first card (index in selected_cards)
-    }
-
-    // One card should be in player1's hand (the opponent's chosen card goes to the player)
+    // Opponent's chosen card goes to player1's hand
     let in_hand = game.state.player1.hand.cards.contains(&live_a)
         || game.state.player1.hand.cards.contains(&live_b);
     assert!(
@@ -69,6 +69,15 @@ fn toubatsu_q118_2_distinct_live_cards_works() {
         !game.state.player1.waitroom.cards.contains(&live_a)
             || !game.state.player1.waitroom.cards.contains(&live_b),
         "At least one live card should have moved out of discard"
+    );
+    // Player2 should NOT have the card in hand
+    assert!(
+        !game.state.player2.hand.cards.contains(&live_a),
+        "Card should not go to opponent's hand"
+    );
+    assert!(
+        !game.state.player2.hand.cards.contains(&live_b),
+        "Card should not go to opponent's hand"
     );
 }
 

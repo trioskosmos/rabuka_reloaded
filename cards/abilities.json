@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-25T00:09:27.698647",
+  "generated_at": "2026-06-25T00:28:02.793003",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1786,7 +1786,8 @@
         "group_names": [
           "Liella!"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "baton_touch_trigger": true
       }
     },
     {
@@ -2148,7 +2149,8 @@
         "group_names": [
           "蓮ノ空"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "baton_touch_trigger": true
       }
     },
     {
@@ -3568,7 +3570,8 @@
           "card_type": "member_card",
           "group_names": [
             "Liella!"
-          ]
+          ],
+          "baton_touch_trigger": true
         },
         "source": "energy_deck",
         "destination": "energy_zone",
@@ -3579,7 +3582,8 @@
         "action": "move_cards",
         "group_names": [
           "Liella!"
-        ]
+        ],
+        "baton_touch_trigger": true
       }
     },
     {
@@ -4047,7 +4051,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "baton_touch_trigger": true
       }
     },
     {
@@ -7222,7 +7227,8 @@
             "target": "both",
             "multiple_targets": true,
             "action": "discard_until_count",
-            "target_count": 3
+            "target_count": 3,
+            "baton_touch_trigger": true
           },
           {
             "text": "自分と相手はそれぞれカードを3枚引く",
@@ -8727,7 +8733,8 @@
         "target": "self",
         "optional": true,
         "action": "move_cards",
-        "destination": "stage"
+        "destination": "stage",
+        "baton_touch_trigger": true
       }
     },
     {
@@ -11062,7 +11069,8 @@
         "action": "gain_resource",
         "resource": "blade",
         "count": 2,
-        "duration": "live_end"
+        "duration": "live_end",
+        "baton_touch_trigger": true
       }
     },
     {
@@ -11109,7 +11117,8 @@
           "heart01"
         ],
         "duration": "live_end",
-        "target": "self"
+        "target": "self",
+        "baton_touch_trigger": true
       }
     },
     {
@@ -19998,7 +20007,8 @@
         "action": "draw_card",
         "source": "deck",
         "destination": "hand",
-        "exclude_self": true
+        "exclude_self": true,
+        "baton_touch_trigger": true
       }
     },
     {
@@ -22090,7 +22100,9 @@
           "target": "self",
           "group_names": [
             "蓮ノ空"
-          ]
+          ],
+          "baton_touch_trigger": true,
+          "min_baton_touch_count": 2
         },
         "action": "modify_required_hearts",
         "heart_colors": [
@@ -22102,7 +22114,8 @@
         "group_names": [
           "蓮ノ空"
         ],
-        "value": 1
+        "value": 1,
+        "baton_touch_trigger": true
       }
     },
     {
@@ -22129,7 +22142,9 @@
           "target": "self",
           "group_names": [
             "蓮ノ空"
-          ]
+          ],
+          "baton_touch_trigger": true,
+          "min_baton_touch_count": 2
         },
         "action": "modify_required_hearts",
         "heart_colors": [
@@ -22141,7 +22156,8 @@
         "group_names": [
           "蓮ノ空"
         ],
-        "value": 1
+        "value": 1,
+        "baton_touch_trigger": true
       }
     },
     {
@@ -22168,7 +22184,9 @@
           "target": "self",
           "group_names": [
             "蓮ノ空"
-          ]
+          ],
+          "baton_touch_trigger": true,
+          "min_baton_touch_count": 2
         },
         "action": "modify_required_hearts",
         "heart_colors": [
@@ -22180,7 +22198,8 @@
         "group_names": [
           "蓮ノ空"
         ],
-        "value": 1
+        "value": 1,
+        "baton_touch_trigger": true
       }
     },
     {
@@ -27976,7 +27995,8 @@
         "action": "move_cards",
         "group_names": [
           "蓮ノ空"
-        ]
+        ],
+        "baton_touch_trigger": true
       }
     },
     {
@@ -30002,7 +30022,8 @@
             "resource": "heart",
             "heart_colors": [
               "heart02"
-            ]
+            ],
+            "baton_touch_trigger": true
           },
           {
             "text": "自分の成功ライブカード置き場にカードが2枚以上ある場合、このカードのスコアを+1する",
