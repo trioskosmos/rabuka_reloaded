@@ -53,15 +53,15 @@ fn multi_color_heart_condition_not_met_does_not_queue() {
     );
 }
 
-/// Condition NOT met: 3 members from a DIFFERENT group (not AZALEA) in revealed_cards.
+/// Condition NOT met: 3 members from a DIFFERENT group (μ's) in revealed_cards.
 /// The group_reference: "same_group_name" must reject wrong-group cards.
 #[test]
 fn multi_color_heart_wrong_group_does_not_trigger() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let wrong1 = game.id("PL!S-sd1-001-SD");
-    let wrong2 = game.id("PL!S-sd1-002-SD");
-    let wrong3 = game.id("PL!S-sd1-003-SD");
+    let wrong1 = game.id("PL!-sd1-001-SD");
+    let wrong2 = game.id("PL!-sd1-003-SD");
+    let wrong3 = game.id("PL!-sd1-008-SD");
     let ability_card = game.id(ABILITY_CARD);
 
     game.state.player1.stage.stage = [-1, ability_card, -1];

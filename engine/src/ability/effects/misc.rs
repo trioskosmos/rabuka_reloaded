@@ -573,13 +573,14 @@ impl AbilityResolver {
                 }
             }
             // Filter candidates by group_reference: "same_group_name" — use the
-            // cost-discarded card's unit so the target prompt shows only matching members.
+            // cost-discarded card's group (c.group, card position ②) so the target
+            // prompt shows only members matching that group name.
             if effect.group_reference.as_deref() == Some("same_group_name") {
                 let ref_group: Option<String> = self
                     .moved_cards
                     .first()
                     .and_then(|cid| gs.card_database.get_card(*cid))
-                    .and_then(|c| c.unit.clone());
+                    .map(|c| c.group.clone());
                 if let Some(ref group) = ref_group {
                     candidates.retain(|&cid| {
                         util::card_matches_group_str(&gs.card_database, cid, Some(group.as_str()))
@@ -1125,9 +1126,8 @@ impl AbilityResolver {
         }
 
         // group_reference: "same_group_name" — filter heart targets to only
-        // include cards whose group (unit) matches the group of the card that
-        // was discarded as cost (tracked in self.moved_cards), NOT the activating
-        // card's group.
+        // include cards whose group name (c.group, card position ②) matches the
+        // group of the card that was discarded as cost (tracked in self.moved_cards).
         if effect.group_reference.as_deref() == Some("same_group_name") {
             eprintln!("[SAME_GROUP] moved_cards={:?}", self.moved_cards);
             let ref_group: Option<String> = self
@@ -1138,11 +1138,11 @@ impl AbilityResolver {
                     eprintln!(
                         "[SAME_GROUP] cid={} card={:?}",
                         cid,
-                        c.as_ref().map(|c| (&c.name, &c.unit))
+                        c.as_ref().map(|c| (&c.name, &c.group))
                     );
                     c
                 })
-                .and_then(|c| c.unit.clone());
+                .map(|c| c.group.clone());
             eprintln!("[SAME_GROUP] ref_group={:?}", ref_group);
             if let Some(ref group) = ref_group {
                 let before = heart_targets.len();

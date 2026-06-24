@@ -1203,7 +1203,7 @@ impl<'a> ConditionContext<'a> {
                 if condition.group_reference.as_deref() == Some("same_group_name") {
                     self.activating_card_id
                         .and_then(|cid| self.game_state.card_database.get_card(cid))
-                        .and_then(|c| c.unit.as_deref())
+                        .map(|c| c.group.as_str())
                 } else {
                     None
                 }
@@ -1794,8 +1794,8 @@ impl<'a> ConditionContext<'a> {
             if condition.group_reference.as_deref() == Some("same_group_name") {
                 self.activating_card_id
                     .and_then(|cid| self.game_state.card_database.get_card(cid))
-                    .and_then(|c| c.unit.clone())
-                    .map(|u| vec![u])
+                    .map(|c| c.group.clone())
+                    .map(|g| vec![g])
             } else {
                 None
             }

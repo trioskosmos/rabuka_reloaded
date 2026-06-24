@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-24T21:44:20.314598",
+  "generated_at": "2026-06-24T21:56:48.169011",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -4912,6 +4912,8 @@
           "text": "自分のメインフェイズの間、自分のカードが1枚以上いずれかの領域から控え室に置かれる",
           "location": "discard",
           "target": "self",
+          "phase": "main",
+          "phase_target": "self",
           "source": "preceding_moved"
         },
         "optional_action": {
@@ -24266,6 +24268,7 @@
           "from_state": "active",
           "to_state": "wait",
           "phase": "main",
+          "phase_target": "self",
           "target": "self",
           "card_type": "member_card",
           "self_target": true
@@ -24478,7 +24481,8 @@
           "self_target": true,
           "source": "discard",
           "destination": "hand",
-          "phase": "main"
+          "phase": "main",
+          "phase_target": "self"
         }
       }
     },
@@ -32041,7 +32045,9 @@
             "type": "area_move"
           },
           "movement": "moved",
-          "movement_state": "has_moved"
+          "movement_state": "has_moved",
+          "phase": "main",
+          "phase_target": "self"
         },
         "state_change": "active",
         "count": 2,

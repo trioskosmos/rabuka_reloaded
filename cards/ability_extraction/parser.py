@@ -923,6 +923,13 @@ def _enrich_card_count_condition(result, text):
         result["state"] = "wait"
     elif "アクティブ状態" in text:
         result["state"] = "active"
+    # Phase restriction: 自分のメインフェイズ / 相手のメインフェイズ
+    if "メインフェイズ" in text:
+        result["phase"] = "main"
+        if "自分の" in text:
+            result["phase_target"] = "self"
+        elif "相手の" in text:
+            result["phase_target"] = "opponent"
 
 
 def _try_hand_count_compound(result, text):
@@ -1175,6 +1182,10 @@ def _try_temporal_count(text):
         result["phase"] = "live_phase"
     elif "メインフェイズ" in text:
         result["phase"] = "main_phase"
+        if "自分の" in text:
+            result["phase_target"] = "self"
+        elif "相手の" in text:
+            result["phase_target"] = "opponent"
     loc = extract_location(text)
     if loc:
         result["location"] = loc
@@ -1294,6 +1305,13 @@ def _try_movement(text):
     # Extract "エネルギーが置かれ" (energy placed) trigger
     if "エネルギーが置かれ" in text:
         result["energy_placed"] = True
+    # Phase restriction: 自分のメインフェイズ / 相手のメインフェイズ
+    if "メインフェイズ" in text:
+        result["phase"] = "main"
+        if "自分の" in text:
+            result["phase_target"] = "self"
+        elif "相手の" in text:
+            result["phase_target"] = "opponent"
     return result
 
 
@@ -1358,6 +1376,10 @@ def _try_zone_placement(text):
     # Phase restriction: 自分のメインフェイズに / 相手のメインフェイズに
     if "メインフェイズ" in text:
         result["phase"] = "main"
+        if "自分の" in text:
+            result["phase_target"] = "self"
+        elif "相手の" in text:
+            result["phase_target"] = "opponent"
     # Remove location/locations — source+destination carry the zone info
     result.pop("location", None)
     result.pop("locations", None)
@@ -1708,8 +1730,12 @@ def _try_state_change(text):
         result["trigger_event"]["from_state"] = "wait"
         result["trigger_event"]["to_state"] = "active"
 
-    if "メインフェイズの間" in text:
+    if "メインフェイズ" in text:
         result["phase"] = "main"
+        if "自分の" in text:
+            result["phase_target"] = "self"
+        elif "相手の" in text:
+            result["phase_target"] = "opponent"
 
     # Extract target (self/opponent/both)
     tgt = extract_target(text)
