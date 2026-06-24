@@ -928,6 +928,7 @@ impl<'a> CardFilter<'a> {
             let has_property = match prop {
                 "has_blade_heart" => db.get_card(id).is_some_and(|c| c.has_blade_heart()),
                 "has_score_icon" => db.get_card(id).is_some_and(|c| c.has_score_icon()),
+                "has_all_blade" => db.get_card(id).is_some_and(|c| c.has_all_blade()),
                 _ => false,
             };
             let passes = if self.negation {

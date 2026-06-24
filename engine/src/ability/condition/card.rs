@@ -605,6 +605,7 @@ impl<'a> ConditionContext<'a> {
         let prop = match condition.card_property.as_deref() {
             Some("has_blade_heart") => "has_blade_heart",
             Some("has_score_icon") => "has_score_icon",
+            Some("has_all_blade") => "has_all_blade",
             _ => return true,
         };
         let card_db = &self.game_state.card_database;
@@ -627,6 +628,7 @@ impl<'a> ConditionContext<'a> {
             match prop {
                 "has_blade_heart" => c.is_some_and(|c| c.has_blade_heart()),
                 "has_score_icon" => c.is_some_and(|c| c.has_score_icon()),
+                "has_all_blade" => c.is_some_and(|c| c.has_all_blade()),
                 _ => false,
             }
         };

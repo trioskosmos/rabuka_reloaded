@@ -23,31 +23,32 @@ fn advance_to_live_success(game: &mut TestGame) {
     game.pass();
 }
 
-/// Q192: LiveSuccess triggers. The parser should produce card_property: has_all_blade
-/// and location: revealed_cards in the condition.
+/// Q192: LiveSuccess triggers. With a b_all card among yell-revealed cards,
+/// the condition should pass and the score should be +1.
 #[test]
-fn love_u_q192_live_success_condition_evaluated() {
+fn love_u_q192_live_success_all_blade_score_up() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
     let love_u = game.id("PL!N-bp3-030-L");
     let filler = game.id("PL!-sd1-010-SD"); // blade_heart: b_heart03
-    let aqours_member = game.id("PL!S-sd1-003-SD"); // base_heart: {heart02, heart04, heart05}
-    let yell_h01 = game.id("PL!-sd1-013-SD"); // blade_heart: b_heart01
+    let aqours_member = game.id("PL!S-sd1-003-SD"); // blade: 3, blade_heart: b_heart04, base_heart: {heart02, heart04, heart05}
     let yell_h06 = game.id("PL!-sd1-002-SD"); // blade_heart: b_heart06
+    let b_all_card = game.id("PL!-sd1-020-SD"); // blade_heart: {b_all: 1}
 
     // One member on stage (so live can succeed)
     game.state.player1.stage.stage = [aqours_member, -1, -1];
     game.state.player1.hand.cards.push(love_u);
 
     // Phase transitions before yell (Pass 4 in Draw phase draws 1 card from
-    // top of deck index 0).  Yell draws from remaining top 3 cards.
+    // top of deck index 0).  Yell draws from remaining top 3 cards (blade=3).
     // Push order: index 0 = drawn to hand, indices 1-3 = yell reveals.
     // Stage hearts (aqours_member): heart02=1, heart04=2, heart05=1
     // Yell must provide heart01, heart03, heart06 to meet Love U's need_heart.
+    // The b_all card provides a wildcard heart00 that can cover heart01.
     game.state.player1.main_deck.cards.push(filler); // index 0 → drawn to hand
     game.state.player1.main_deck.cards.push(yell_h06); // index 1 → yell #1 → b_heart06 → heart06
-    game.state.player1.main_deck.cards.push(yell_h01); // index 2 → yell #2 → b_heart01 → heart01
+    game.state.player1.main_deck.cards.push(b_all_card); // index 2 → yell #2 → b_all → heart00
     game.state.player1.main_deck.cards.push(filler); // index 3 → yell #3 → b_heart03 → heart03
     for _ in 4..10 {
         game.state.player1.main_deck.cards.push(filler);
@@ -61,12 +62,15 @@ fn love_u_q192_live_success_condition_evaluated() {
     game.set_live_card(love_u);
     advance_to_live_success(&mut game);
 
-    // LiveSuccess fires — condition evaluated. With card_property has_all_blade
-    // and revealed_cards location, the condition check runs through the
-    // card_count_condition evaluator.
-    // Verify the live card survived LiveSuccess without crashing
+    // LiveSuccess fires — condition evaluated. A b_all card was among yell-revealed
+    // cards, so has_all_blade condition should pass and score should be +1.
     assert!(
         !game.state.player1.success_live_card_zone.cards.is_empty(),
         "Live card should have reached success_live_card_zone after LiveSuccess"
+    );
+    let score_mod = game.state.mods.get_score_modifier(love_u);
+    assert_eq!(
+        score_mod, 1,
+        "Score should be +1 when a b_all card is among yell-revealed cards"
     );
 }

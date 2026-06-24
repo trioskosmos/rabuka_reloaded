@@ -1382,24 +1382,46 @@ impl super::TurnEngine {
                             });
                             *remaining.hearts.entry(*color).or_insert(0) -= used;
                         }
-                        // Phase 1 also accepts icon_all (HeartColor::All) hearts as wildcards
+                        // Phase 1 also accepts Heart00 and icon_all hearts as wildcards
                         let still_needed = needed.saturating_sub(used);
                         if still_needed > 0 {
-                            let all_avail = *remaining.hearts.get(&HeartColor::All).unwrap_or(&0);
-                            if all_avail > 0 {
-                                let fill = all_avail.min(still_needed);
+                            let h00_avail =
+                                *remaining.hearts.get(&HeartColor::Heart00).unwrap_or(&0);
+                            let h00_use = h00_avail.min(still_needed);
+                            if h00_use > 0 {
                                 allocations.push(Allocation {
                                     target_idx: live_idx,
                                     target_name: card.name.clone(),
                                     source_type: "stage".into(),
-                                    source_name: "All heart (icon_all)".into(),
+                                    source_name: "Wildcard (Heart00)".into(),
                                     source_slot: None,
                                     wildcard: true,
                                     color: c_idx,
-                                    amount: fill,
+                                    amount: h00_use,
                                     is_bonus: false,
                                 });
-                                *remaining.hearts.entry(HeartColor::All).or_insert(0) -= fill;
+                                *remaining.hearts.entry(HeartColor::Heart00).or_insert(0) -=
+                                    h00_use;
+                            }
+                            let still = still_needed.saturating_sub(h00_use);
+                            if still > 0 {
+                                let all_avail =
+                                    *remaining.hearts.get(&HeartColor::All).unwrap_or(&0);
+                                if all_avail > 0 {
+                                    let fill = all_avail.min(still);
+                                    allocations.push(Allocation {
+                                        target_idx: live_idx,
+                                        target_name: card.name.clone(),
+                                        source_type: "stage".into(),
+                                        source_name: "All heart (icon_all)".into(),
+                                        source_slot: None,
+                                        wildcard: true,
+                                        color: c_idx,
+                                        amount: fill,
+                                        is_bonus: false,
+                                    });
+                                    *remaining.hearts.entry(HeartColor::All).or_insert(0) -= fill;
+                                }
                             }
                         }
                     }
