@@ -1666,8 +1666,11 @@ impl super::TurnEngine {
             })
         });
         if any_requirement_failed {
-            log::debug!("[LIVE] Heart requirement not met — discarding all live cards");
-            player.live_card_zone.cards.clear();
+            log::debug!("[LIVE] Heart requirement not met — sending all live cards to waitroom");
+            while !player.live_card_zone.cards.is_empty() {
+                let card_id = player.live_card_zone.cards.remove(0);
+                player.waitroom.cards.push(card_id);
+            }
         }
 
         let revealed_ids: Vec<i16> = resolution_zone.cards.iter().copied().collect();
