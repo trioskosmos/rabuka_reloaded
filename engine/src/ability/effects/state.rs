@@ -307,7 +307,19 @@ impl AbilityResolver {
                 count.min(candidates.len() as u32) as usize
             };
 
-            let actual_targets = candidates.iter().take(change_count).collect::<Vec<_>>();
+            let actual_targets: Vec<_> = if is_self_target {
+                if let Some(act_id) = gs.activating_card {
+                    candidates
+                        .iter()
+                        .filter(|(_, cid)| *cid == act_id)
+                        .take(change_count)
+                        .collect()
+                } else {
+                    candidates.iter().take(change_count).collect()
+                }
+            } else {
+                candidates.iter().take(change_count).collect()
+            };
 
             log::debug!(
                 "[EXEC_CHANGE_STATE] targets={:?} state_change={}",

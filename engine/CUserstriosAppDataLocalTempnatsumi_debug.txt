@@ -1,0 +1,16 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test test_modules::natsumi_bp5_test::natsumi_bp5_stop_after_two_iterations ... FAILED
+
+failures:
+
+failures:
+    test_modules::natsumi_bp5_test::natsumi_bp5_stop_after_two_iterations
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1292 filtered out; finished in 0.47s
+

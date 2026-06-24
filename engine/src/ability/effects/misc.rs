@@ -348,13 +348,20 @@ impl AbilityResolver {
                         .iter()
                         .map(|c| format!("{:?}", c).to_lowercase())
                         .collect();
+                    let cards_json: Vec<serde_json::Value> = distinct_colors
+                        .iter()
+                        .map(|color| {
+                            serde_json::json!({"card_id": card_id, "amount": 1, "color": color.to_string()})
+                        })
+                        .collect();
+                    let effect_data = Some(serde_json::Value::Array(cards_json));
                     util::push_temporary_effect(
                         gs,
                         "gain_heart",
                         duration.as_deref(),
                         &target,
                         &format!("Gain 1 heart of each color: {}", color_names.join(", ")),
-                        None,
+                        effect_data,
                     );
                 }
             }
