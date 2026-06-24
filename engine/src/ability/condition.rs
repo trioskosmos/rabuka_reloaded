@@ -242,15 +242,24 @@ impl<'a> ConditionContext<'a> {
     /// "相手のメインフェイズ" (opponent's main phase), and plain
     /// "メインフェイズ" (any main phase).
     pub fn check_phase_gate(&self, condition: &Condition) -> bool {
-        let Some(phase) = &condition.phase else {
+        let te = condition.trigger_event.as_ref();
+        let Some(phase) = condition
+            .phase
+            .as_deref()
+            .or_else(|| te.and_then(|t| t.phase.as_deref()))
+        else {
             return true; // no phase restriction
         };
-        match phase.as_str() {
+        match phase {
             "main" | "main_phase" => {
                 if self.game_state.current_phase != Phase::Main {
                     return false;
                 }
-                match condition.phase_target.as_deref() {
+                let pt = condition
+                    .phase_target
+                    .as_deref()
+                    .or_else(|| te.and_then(|t| t.phase_target.as_deref()));
+                match pt {
                     Some("self") => self
                         .self_player
                         .map(|p| p.id == self.game_state.active_player().id)

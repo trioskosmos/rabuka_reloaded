@@ -139,6 +139,15 @@ impl GameModifiers {
         self.blade_modifiers.entry(card_id).or_default().set = value;
     }
 
+    pub fn clear_blade_set_modifier(&mut self, card_id: i16) {
+        if let Some(entry) = self.blade_modifiers.get_mut(&card_id) {
+            entry.set = 0;
+            if entry.additive == 0 && entry.set == 0 {
+                self.blade_modifiers.remove(&card_id);
+            }
+        }
+    }
+
     pub fn set_blade_type_modifier(&mut self, card_id: i16, blade_color: BladeColor) {
         self.blade_type_modifiers.insert(card_id, blade_color);
     }

@@ -109,7 +109,6 @@ export const GameStateModal = {
         GameStateModal.renderPlayerTab(s);
         GameStateModal.renderZonesTab(s);
         GameStateModal.renderTrackingTab(s);
-        if (GameStateModal._currentTab === 'conditions') GameStateModal.renderConditionsTab();
     },
 
     fetchAndCacheConditions: async () => {
@@ -140,6 +139,7 @@ export const GameStateModal = {
                 c.innerHTML = `<div style="padding:12px;color:var(--accent-pink);"><b>Error:</b> ${_conditionsError}</div>`;
                 return;
             }
+            if (!Array.isArray(conditions)) conditions = conditions?.conditions ?? [];
             if (!conditions || conditions.length === 0) {
                 c.innerHTML = '<div style="padding:12px;opacity:0.6;">Engine returned no conditions for any card in any zone. This iterates all abilities on all cards currently in play (stage, hand, energy, waitroom, live_zone, success_live_zone). If cards with ability conditions exist, check that the condition is parsed into one of: <code>activation_condition_parsed</code>, <code>condition</code>, <code>alternative_condition</code>, <code>result_condition</code>.</div>';
                 return;
@@ -200,6 +200,8 @@ export const GameStateModal = {
                 _conditionsError = null;
                 GameStateModal.renderConditionsTab();
             });
+        }).catch(e => {
+            c.innerHTML = `<div style="padding:12px;color:var(--accent-pink);"><b>Render error:</b> ${e?.message ?? 'Unknown error'}</div>`;
         });
     },
 

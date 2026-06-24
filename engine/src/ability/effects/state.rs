@@ -942,8 +942,24 @@ impl AbilityResolver {
                 .get_card(card_id)
                 .map(|c| c.blade as i32)
                 .unwrap_or(0);
-            gs.mods
-                .set_blade_modifier(card_id, (value as i32) - original_blade);
+            let set_value = (value as i32) - original_blade;
+            gs.mods.set_blade_modifier(card_id, set_value);
+            // Register for cleanup at live end / duration expiry
+            if effect.duration.is_some() {
+                let mut data = serde_json::Map::new();
+                data.insert(
+                    "card_id".to_string(),
+                    serde_json::Value::Number(card_id.into()),
+                );
+                util::push_temporary_effect(
+                    gs,
+                    "set_blade_count",
+                    effect.duration.as_deref(),
+                    target,
+                    &format!("set blade count to {} for card {}", value, card_id),
+                    Some(serde_json::Value::Object(data)),
+                );
+            }
         }
     }
 

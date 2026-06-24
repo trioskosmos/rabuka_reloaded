@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-25T08:10:13.445124",
+  "generated_at": "2026-06-25T08:26:09.684401",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1778,8 +1778,7 @@
             "type": "baton_touch",
             "tense": "past",
             "location": "stage"
-          },
-          "location": "stage"
+          }
         },
         "source": "recently_moved",
         "destination": "hand",
@@ -2142,12 +2141,9 @@
               "relative_to": "activating"
             }
           },
-          "location": "stage",
           "group_names": [
             "スリーズブーケ"
-          ],
-          "comparison_type": "cost",
-          "operator": "<"
+          ]
         },
         "source": "discard",
         "destination": "hand",
@@ -3561,7 +3557,6 @@
                 "tense": "past",
                 "location": "discard"
               },
-              "location": "discard",
               "group_names": [
                 "Liella!"
               ]
@@ -4062,7 +4057,6 @@
             "tense": "past",
             "location": "stage"
           },
-          "location": "stage",
           "ability_filter": "no_ability",
           "card_type": "member_card"
         },
@@ -4847,9 +4841,7 @@
             "self_effect_only": true,
             "energy_placed": true
           },
-          "movement": "moves",
-          "self_effect_only": true,
-          "energy_placed": true
+          "movement": "moves"
         },
         "action": "sequential",
         "actions": [
@@ -7244,10 +7236,7 @@
                   "operator": "<",
                   "relative_to": "activating"
                 }
-              },
-              "location": "stage",
-              "comparison_type": "cost",
-              "operator": "<"
+              }
             },
             "source": "hand",
             "destination": "discard",
@@ -8754,10 +8743,7 @@
               "operator": "<",
               "relative_to": "activating"
             }
-          },
-          "location": "stage",
-          "comparison_type": "cost",
-          "operator": "<"
+          }
         },
         "source": "hand",
         "cost_limit": 4,
@@ -11105,12 +11091,9 @@
               "relative_to": "activating"
             }
           },
-          "location": "stage",
           "group_names": [
             "DOLLCHESTRA"
-          ],
-          "comparison_type": "cost",
-          "operator": "<"
+          ]
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -11155,12 +11138,9 @@
               "relative_to": "activating"
             }
           },
-          "location": "stage",
           "group_names": [
             "みらくらぱーく！"
-          ],
-          "comparison_type": "cost",
-          "operator": "<"
+          ]
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -15474,8 +15454,6 @@
             "location": "stage",
             "source_character": "中須かすみ"
           },
-          "location": "stage",
-          "baton_touch_source": "中須かすみ",
           "characters": [
             "中須かすみ"
           ]
@@ -15676,8 +15654,6 @@
             "location": "stage",
             "source_character": "優木せつ菜"
           },
-          "location": "stage",
-          "baton_touch_source": "優木せつ菜",
           "characters": [
             "優木せつ菜"
           ]
@@ -15728,8 +15704,6 @@
             "location": "stage",
             "source_character": "エマ・ヴェルデ"
           },
-          "location": "stage",
-          "baton_touch_source": "エマ・ヴェルデ",
           "characters": [
             "エマ・ヴェルデ"
           ]
@@ -15818,8 +15792,6 @@
             "location": "stage",
             "source_character": "三船栞子"
           },
-          "location": "stage",
-          "baton_touch_source": "三船栞子",
           "characters": [
             "三船栞子"
           ]
@@ -18480,8 +18452,7 @@
             "type": "baton_touch",
             "tense": "past",
             "location": "stage"
-          },
-          "location": "stage"
+          }
         }
       }
     },
@@ -18703,8 +18674,7 @@
             "type": "baton_touch",
             "tense": "past",
             "location": "stage"
-          },
-          "location": "stage"
+          }
         },
         "action": "sequential",
         "actions": [
@@ -20068,7 +20038,6 @@
             "tense": "past",
             "location": "stage"
           },
-          "location": "stage",
           "exclude_self": true
         },
         "count": 1,
@@ -27858,7 +27827,6 @@
             "tense": "past",
             "location": "discard"
           },
-          "location": "discard",
           "cost_limit": 10,
           "cost_limit_operator": ">=",
           "group_names": [
@@ -28055,7 +28023,6 @@
               "徒町小鈴"
             ]
           },
-          "location": "stage",
           "exclude_characters": [
             "徒町小鈴"
           ],
@@ -32148,9 +32115,7 @@
             "phase": "main",
             "phase_target": "self"
           },
-          "movement": "moved",
-          "phase": "main",
-          "phase_target": "self"
+          "movement": "moved"
         },
         "state_change": "active",
         "count": 2,

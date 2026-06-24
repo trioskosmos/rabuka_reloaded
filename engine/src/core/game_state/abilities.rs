@@ -1938,6 +1938,14 @@ impl GameState {
                     self.prohibition_effects
                         .retain(|p| !p.contains(&effect.effect_type));
                 }
+                "set_blade_count" => {
+                    if let Some(ref data) = effect.effect_data {
+                        if let Some(card_id) = data.get("card_id").and_then(|v| v.as_i64()) {
+                            self.mods.clear_blade_set_modifier(card_id as i16);
+                            log::debug!("Cleared set_blade_count modifier for card {}", card_id);
+                        }
+                    }
+                }
                 s if s.starts_with("gain_blade") => {
                     if let Some(ref data) = effect.effect_data {
                         if let Some(cards) = data.as_array() {

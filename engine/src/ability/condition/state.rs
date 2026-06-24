@@ -406,28 +406,18 @@ impl<'a> ConditionContext<'a> {
     ///   on_appear_or_move ("登場か、エリアを移動するたび") → movement: "moves" + appearance check
     pub(crate) fn evaluate_movement_condition(&self, condition: &Condition) -> bool {
         let movement = condition.movement.as_deref().unwrap_or("");
-        let movement_state = condition.movement_state.as_deref();
-        let location = condition.location.as_deref().unwrap_or("");
+        let te = condition.trigger_event.as_ref();
+        let location = condition
+            .location
+            .as_deref()
+            .or_else(|| te.and_then(|t| t.location.as_deref()))
+            .unwrap_or("");
         let target = condition.target.as_deref().unwrap_or("self");
         let player = self.resolve_condition_player(target);
 
         match movement {
             "moved" => {
-                let base_check = if let Some(state) = movement_state {
-                    match state {
-                        "to_stage" => {
-                            player.stage.stage[0] != -1
-                                || player.stage.stage[1] != -1
-                                || player.stage.stage[2] != -1
-                        }
-                        "from_stage" => !player.waitroom.cards.is_empty(),
-                        "to_discard" => !player.waitroom.cards.is_empty(),
-                        "has_moved" => self.evaluate_has_moved(condition, &player),
-                        _ => true,
-                    }
-                } else {
-                    self.evaluate_has_moved(condition, &player)
-                };
+                let base_check = self.evaluate_has_moved(condition, &player);
                 if !base_check {
                     return false;
                 }
@@ -461,7 +451,10 @@ impl<'a> ConditionContext<'a> {
                 if self.game_state.baton_touch_count == 0 {
                     return false;
                 }
-                if let Some(min_count) = condition.min_baton_touch_count {
+                if let Some(min_count) = condition
+                    .min_baton_touch_count
+                    .or_else(|| te.and_then(|t| t.min_count))
+                {
                     if self.game_state.baton_touch_count < min_count {
                         return false;
                     }
@@ -470,9 +463,9 @@ impl<'a> ConditionContext<'a> {
                     Some(id) => id,
                     None => return false,
                 };
-                if let Some(ref loc) = condition.location {
-                    if Zone::from_str(loc.as_str()) == Some(Zone::Discard)
-                        || Zone::from_str(loc.as_str()) == Some(Zone::Waitroom)
+                if !location.is_empty() {
+                    if Zone::from_str(location) == Some(Zone::Discard)
+                        || Zone::from_str(location) == Some(Zone::Waitroom)
                     {
                         let in_discard = self
                             .game_state
@@ -505,7 +498,7 @@ impl<'a> ConditionContext<'a> {
                 // member, so group/cost describe the REPLACED member.
                 let arriving_id = self.game_state.baton_touch_arriving_card_id;
                 let loc_discard = matches!(
-                    Zone::from_str(condition.location.as_deref().unwrap_or("")),
+                    Zone::from_str(location),
                     Some(Zone::Discard | Zone::Waitroom)
                 );
                 let check_id_for_group = if loc_discard {
@@ -533,7 +526,11 @@ impl<'a> ConditionContext<'a> {
                         }
                     }
                 }
-                if let Some(source_name) = condition.baton_touch_source.as_deref() {
+                let bt_source = condition
+                    .baton_touch_source
+                    .as_deref()
+                    .or_else(|| te.and_then(|t| t.source_character.as_deref()));
+                if let Some(source_name) = bt_source {
                     if let Some(card) = self.game_state.card_database.get_card(replaced_id) {
                         let norm_name = crate::card::CardDatabase::normalize_name(&card.name);
                         let norm_source = crate::card::CardDatabase::normalize_name(source_name);
@@ -561,18 +558,23 @@ impl<'a> ConditionContext<'a> {
                         return false;
                     }
                 }
-                if condition.comparison_type.as_deref() == Some("cost") {
+                let has_cost_comparison = condition.comparison_type.as_deref() == Some("cost")
+                    || te.is_some_and(|t| t.cost_comparison.is_some());
+                if has_cost_comparison {
                     if let Some(replaced_cost) = self.game_state.baton_touch_replaced_member_cost {
                         if let Some(activating_id) = self.game_state.activating_card {
                             if let Some(card) =
                                 self.game_state.card_database.get_card(activating_id)
                             {
                                 if let Some(current_cost) = card.cost {
-                                    if !compare_counts(
-                                        condition.operator.as_deref(),
-                                        replaced_cost,
-                                        current_cost,
-                                    ) {
+                                    let op = condition.operator.as_deref().or_else(|| {
+                                        te.and_then(|t| {
+                                            t.cost_comparison
+                                                .as_ref()
+                                                .and_then(|cc| cc.operator.as_deref())
+                                        })
+                                    });
+                                    if !compare_counts(op, replaced_cost, current_cost) {
                                         return false;
                                     }
                                 }
@@ -583,10 +585,13 @@ impl<'a> ConditionContext<'a> {
                 true
             }
             "moves" => {
-                // Use the snapshot captured at enqueue time in preference to
-                // the global flags (which clear_effect_tracking() may have
-                // already wiped before the ability executes).  Fall back to
-                // the global state for abilities enqueued without a snapshot.
+                let self_effect_only = condition
+                    .self_effect_only
+                    .or_else(|| te.and_then(|t| t.self_effect_only));
+                let energy_placed = condition
+                    .energy_placed
+                    .or_else(|| te.and_then(|t| t.energy_placed));
+
                 let snapshot_energy = self
                     .game_state
                     .entry_snapshot_last_energy_placed_by_effect();
@@ -606,7 +611,7 @@ impl<'a> ConditionContext<'a> {
                     // because a different card moving does not satisfy "this member".
                     false
                 } else {
-                    condition.self_effect_only.is_none_or(|_| {
+                    self_effect_only.is_none_or(|_| {
                         let area_id = snapshot_area.or(self.game_state.last_area_move_card_id());
                         let area_by = snapshot_area_player
                             .as_deref()
@@ -614,7 +619,7 @@ impl<'a> ConditionContext<'a> {
                         area_id.is_some() && area_by == Some(player.id.as_str())
                     })
                 };
-                let energy_ok = condition.energy_placed.is_none_or(|_| {
+                let energy_ok = energy_placed.is_none_or(|_| {
                     let energy_val = if snapshot_energy {
                         true
                     } else if !self.game_state.last_energy_placed_by_effect() {
@@ -627,12 +632,11 @@ impl<'a> ConditionContext<'a> {
                         .as_deref()
                         .or_else(|| self.game_state.last_energy_placed_by_player());
                     energy_val
-                        && (!condition.self_effect_only.unwrap_or(false)
-                            || energy_player == Some(&player.id))
+                        && (!self_effect_only.unwrap_or(false) || energy_player == Some(&player.id))
                 });
-                let has_area_check = condition.self_effect_only.is_some()
-                    || condition.movement.as_deref() == Some("moves");
-                let has_energy_check = condition.energy_placed.is_some();
+                let has_area_check =
+                    self_effect_only.is_some() || condition.movement.as_deref() == Some("moves");
+                let has_energy_check = energy_placed.is_some();
                 eprintln!("[TRACE_MOVES_COND_RESULT] area_ok={} energy_ok={} has_area={} has_energy={} final={}", area_ok, energy_ok, has_area_check, has_energy_check, if !has_area_check && !has_energy_check { true } else if has_area_check && has_energy_check { area_ok || energy_ok } else if has_area_check { area_ok } else { energy_ok });
                 if !has_area_check && !has_energy_check {
                     true

@@ -1461,6 +1461,45 @@ pub struct Condition {
     /// self_target: condition refers to this specific card ("このメンバーが" / "このカードが").
     #[serde(default)]
     pub self_target: Option<bool>,
+    /// Rich trigger event metadata: describes what event triggers this condition.
+    /// Populated by the parser alongside the flat engine fields. The engine
+    /// reads from `trigger_event` when the corresponding flat field is absent.
+    #[serde(default)]
+    pub trigger_event: Option<TriggerEvent>,
+}
+
+/// Rich description of what event triggers a condition.
+/// Parser-produced documentary field. The engine reads from this when
+/// the corresponding flat Condition field is absent.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct TriggerEvent {
+    #[serde(rename = "type")]
+    pub event_type: Option<String>,
+    pub tense: Option<String>,
+    pub location: Option<String>,
+    pub source_character: Option<String>,
+    pub source_group: Option<String>,
+    pub cost_comparison: Option<CostComparison>,
+    pub min_count: Option<u32>,
+    pub exclude_characters: Option<Vec<String>>,
+    pub ability_filter: Option<String>,
+    pub self_effect_only: Option<bool>,
+    pub energy_placed: Option<bool>,
+    pub phase: Option<String>,
+    pub phase_target: Option<String>,
+    pub recurrence: Option<String>,
+    pub events: Option<Vec<TriggerEvent>>,
+}
+
+/// Cost comparison for baton touch: e.g. "このメンバーよりコストが低い" (cost < activating).
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct CostComparison {
+    pub operator: Option<String>,
+    pub relative_to: Option<String>,
+    pub cost_limit: Option<u32>,
+    pub cost_limit_operator: Option<String>,
 }
 
 impl Condition {
