@@ -321,7 +321,7 @@ impl super::TurnEngine {
                         // to fill required_arr[0]; those show up in filled[1..6] (colored)
                         // and filled[0] (Heart00 wildcard).
                         let passed = {
-                            let mut wildcard = filled[0];
+                            let mut wildcard = filled[0] + filled[7];
                             let mut ok = true;
                             // Rule 2.11.3 bullet 2: total provided >= total required
                             let total_filled: u32 = filled.iter().sum();
@@ -1382,8 +1382,29 @@ impl super::TurnEngine {
                             });
                             *remaining.hearts.entry(*color).or_insert(0) -= used;
                         }
+                        // Phase 1 also accepts icon_all (HeartColor::All) hearts as wildcards
+                        let still_needed = needed.saturating_sub(used);
+                        if still_needed > 0 {
+                            let all_avail = *remaining.hearts.get(&HeartColor::All).unwrap_or(&0);
+                            if all_avail > 0 {
+                                let fill = all_avail.min(still_needed);
+                                allocations.push(Allocation {
+                                    target_idx: live_idx,
+                                    target_name: card.name.clone(),
+                                    source_type: "stage".into(),
+                                    source_name: "All heart (icon_all)".into(),
+                                    source_slot: None,
+                                    wildcard: true,
+                                    color: c_idx,
+                                    amount: fill,
+                                    is_bonus: false,
+                                });
+                                *remaining.hearts.entry(HeartColor::All).or_insert(0) -= fill;
+                            }
+                        }
                     }
-                    let wildcard_avail = *remaining.hearts.get(&HeartColor::Heart00).unwrap_or(&0);
+                    let wildcard_avail = *remaining.hearts.get(&HeartColor::Heart00).unwrap_or(&0)
+                        + *remaining.hearts.get(&HeartColor::All).unwrap_or(&0);
                     if wildcard_avail > 0 {
                         let mut wildcard_used = 0u32;
                         for (color, needed) in &nh.hearts {
@@ -1416,8 +1437,18 @@ impl super::TurnEngine {
                             }
                         }
                         if wildcard_used > 0 {
-                            *remaining.hearts.entry(HeartColor::Heart00).or_insert(0) -=
-                                wildcard_used;
+                            let h00 = remaining.hearts.entry(HeartColor::Heart00).or_insert(0);
+                            let deduct_from_h00 = (*h00).min(wildcard_used);
+                            *h00 -= deduct_from_h00;
+                            let remaining_wild = wildcard_used - deduct_from_h00;
+                            if remaining_wild > 0 {
+                                *remaining.hearts.entry(HeartColor::All).or_insert(0) = remaining
+                                    .hearts
+                                    .get(&HeartColor::All)
+                                    .copied()
+                                    .unwrap_or(0)
+                                    .saturating_sub(remaining_wild);
+                            }
                         }
                     }
                     let any_needed = *nh.hearts.get(&HeartColor::Heart00).unwrap_or(&0);
@@ -1444,21 +1475,44 @@ impl super::TurnEngine {
                             }
                         }
                         if any_filled < any_needed {
-                            let avail = *remaining.hearts.get(&HeartColor::Heart00).unwrap_or(&0);
+                            let h00_avail =
+                                *remaining.hearts.get(&HeartColor::Heart00).unwrap_or(&0);
+                            let all_avail = *remaining.hearts.get(&HeartColor::All).unwrap_or(&0);
+                            let avail = h00_avail + all_avail;
                             let fill = avail.min(any_needed - any_filled);
                             if fill > 0 {
-                                allocations.push(Allocation {
-                                    target_idx: live_idx,
-                                    target_name: card.name.clone(),
-                                    source_type: "stage".into(),
-                                    source_name: "Stage hearts".into(),
-                                    source_slot: None,
-                                    wildcard: false,
-                                    color: 0,
-                                    amount: fill,
-                                    is_bonus: false,
-                                });
-                                *remaining.hearts.entry(HeartColor::Heart00).or_insert(0) -= fill;
+                                let h00_use = h00_avail.min(fill);
+                                if h00_use > 0 {
+                                    allocations.push(Allocation {
+                                        target_idx: live_idx,
+                                        target_name: card.name.clone(),
+                                        source_type: "stage".into(),
+                                        source_name: "Stage hearts".into(),
+                                        source_slot: None,
+                                        wildcard: false,
+                                        color: 0,
+                                        amount: h00_use,
+                                        is_bonus: false,
+                                    });
+                                    *remaining.hearts.entry(HeartColor::Heart00).or_insert(0) -=
+                                        h00_use;
+                                }
+                                let all_use = fill - h00_use;
+                                if all_use > 0 {
+                                    allocations.push(Allocation {
+                                        target_idx: live_idx,
+                                        target_name: card.name.clone(),
+                                        source_type: "stage".into(),
+                                        source_name: "All heart (icon_all)".into(),
+                                        source_slot: None,
+                                        wildcard: false,
+                                        color: 7,
+                                        amount: all_use,
+                                        is_bonus: false,
+                                    });
+                                    *remaining.hearts.entry(HeartColor::All).or_insert(0) -=
+                                        all_use;
+                                }
                             }
                         }
                     }
@@ -1557,7 +1611,7 @@ impl super::TurnEngine {
                     required_arr[color.index()] = *needed;
                 }
                 let filled = per_card_filled[live_idx];
-                let mut wildcard = filled[0];
+                let mut wildcard = filled[0] + filled[7];
                 let mut ok = true;
                 let total_filled: u32 = filled.iter().sum();
                 let total_required: u32 = required_arr.iter().sum();

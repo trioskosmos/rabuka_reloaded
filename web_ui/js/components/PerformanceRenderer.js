@@ -240,7 +240,7 @@ function renderAggregateHeartSummary(result) {
     let html = `
         <div class="perf-agg-summary ${allPassed ? 'success' : 'failure'}">
             <div class="perf-agg-header">
-                <img src="img/texticon/icon_heart.png" class="heart-mini-icon" alt="">
+                <img src="img/texticon/heart_00.png" class="heart-mini-icon" alt="">
                 Heart Allocation — sequential per live card
             </div>
             <div class="perf-agg-table">
@@ -445,8 +445,9 @@ function renderPerfSteps(result) {
 
     const H = ['h00','h01','h02','h03','h04','h05','h06'];
     const fmtH = (arr) => arr ? H.map((h,i) => arr[i] > 0 ? `${h}:${arr[i]}` : null).filter(Boolean).join(' ') : 'none';
-    const fmtHShortReq = (arr) => arr ? arr.map((v,i) => v > 0 ? `<img src="${i === 0 ? 'img/texticon/heart_00.png' : `img/texticon/heart_0${i}.png`}" class="heart-mini-icon">${v}` : '').join('') : '';
-    const fmtHShortSrc = (arr) => arr ? arr.map((v,i) => v > 0 ? `<img src="img/texticon/heart_0${i}.png" class="heart-mini-icon">${v}` : '').join('') : '';
+    const fmtHeartIcon = (i) => i === 0 ? 'img/texticon/heart_00.png' : i === 7 ? 'img/texticon/icon_all.png' : `img/texticon/heart_0${i}.png`;
+    const fmtHShortReq = (arr) => arr ? arr.map((v,i) => v > 0 ? `<img src="${fmtHeartIcon(i)}" class="heart-mini-icon">${v}` : '').join('') : '';
+    const fmtHShortSrc = (arr) => arr ? arr.map((v,i) => v > 0 ? `<img src="${fmtHeartIcon(i)}" class="heart-mini-icon">${v}` : '').join('') : '';
 
     const totalBlades = (result.member_contributions || []).reduce((s, m) => m.is_wait ? s : s + m.base_blades + m.bonus_blades, 0);
     const passedLives = (result.lives || []).filter(l => l.passed).length;
@@ -1060,9 +1061,7 @@ function renderYellSection(result) {
                     const rawText = Tooltips.getEffectiveRawText(card);
                     return `
                         <article class="perf-yell-card-modern" ${card?.id !== undefined ? `data-card-id="${card.id}"` : ''} ${rawText ? `data-text="${escapeHtml(rawText)}"` : ''}>
-                            <div class="perf-yell-card-art-wrap">
-                                ${card?.card_no ? `<img src="${resolveCardImagePath(card.card_no)}" alt="Yell card">` : ''}
-                            </div>
+                            ${card?.card_no ? `<img src="${resolveCardImagePath(card.card_no)}" alt="Yell card">` : ''}
                             <div class="perf-yell-icons">
                                 ${renderHeartsCompact(card?.blade_hearts || [])}
                                 ${(card?.note_icons || 0) > 0 ? `<span class="perf-badge note"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> ${card.note_icons}</span>` : ''}
