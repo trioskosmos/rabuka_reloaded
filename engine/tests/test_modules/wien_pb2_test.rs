@@ -75,15 +75,4 @@ fn wien_q262_empty_hand_triggers_energy_move() {
         game.state.player1.energy_deck.cards.len() > energy_deck_before,
         "Q262: Energy deck should have gained a card"
     );
-    game.select_option(0); // Option 0 = Skip → handles energy_zone→energy_deck inline
-
-    // Q262: Energy card should have moved from energy zone to energy deck directly
-    assert!(
-        game.state.player1.energy_zone.active_count() < energy_zone_before,
-        "Q262: An energy card should have left the energy zone"
-    );
-    assert!(
-        game.state.player1.energy_deck.cards.len() > energy_deck_before,
-        "Q262: Energy deck should have gained a card"
-    );
 }

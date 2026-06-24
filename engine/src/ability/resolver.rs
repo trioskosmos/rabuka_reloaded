@@ -40,10 +40,11 @@ pub struct AbilityResolver {
     pub step_state: StepState,
     pub pending_energy_payment: Option<u32>,
     pub cancel_remaining_commands: bool,
-    /// Whether this is the first save of the outer sequential (true initially).
-    /// Only the first save adds remaining repeats to the pending commands;
-    /// subsequent saves (triggered by RPC) rely on the original batch merge.
-    pub first_seq_save: bool,
+    /// One repeat action (a single `AbilityEffect`) queued for execution after
+    /// the current pending_commands batch finishes.  Each call to the repeat
+    /// helper stages one effect; when it completes the next is staged, with a
+    /// "Repeat?" prompt shown between batches.
+    pub pending_repeat_actions: Vec<AbilityEffect>,
     /// Buffer for structured ability resolution log items.
     /// Items are pushed during resolution and flushed as a single LogEntry
     /// with metadata at the end of `resolve_ability()`.
@@ -73,7 +74,7 @@ impl AbilityResolver {
             step_state: StepState::new(),
             pending_energy_payment: None,
             cancel_remaining_commands: false,
-            first_seq_save: true,
+            pending_repeat_actions: Vec::new(),
             log_items: Vec::new(),
         }
     }

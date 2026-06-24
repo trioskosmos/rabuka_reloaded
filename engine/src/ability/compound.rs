@@ -335,70 +335,21 @@ impl AbilityResolver {
                                             == Some(crate::ability::enums::ConditionType::OtherwiseCondition))
                                     });
                                 }
-                                // If the outer sequential has an optional repeat_procedure,
-                                // insert the "Repeat?" choice prompt before the remaining
-                                // repeats so the player can stop or continue.
+                                // Store remaining repeats on the resolver for
+                                // one-at-a-time feeding after each iteration completes.
+                                // We DON'T pre-load them into pending_commands — that
+                                // causes duplication with RPC's merge logic.
                                 if repeats_remaining > 0 && has_repeat {
                                     if let Some(ref repeat_action) = actions.last() {
                                         if repeat_action.action == "repeat_procedure"
                                             && repeat_action.optional.unwrap_or(false)
                                         {
-                                            let mut cmds: Vec<Command> = remaining
-                                                .into_iter()
-                                                .map(Command::Effect)
-                                                .collect();
-                                            cmds.push(Command::Choice(Choice::SelectTarget {
-                                                target: "pay_optional_cost:skip_optional_cost"
-                                                    .to_string(),
-                                                description: "Repeat effect?".to_string(),
-                                                allow_skip: true,
-                                                options: Some(vec![
-                                                    "Stop".to_string(),
-                                                    "Continue".to_string(),
-                                                ]),
-                                            }));
-                                            // Interleave repeat_choice BETWEEN each remaining
-                                            // repeat action so RPC hits it naturally when
-                                            // processing the pending batch sequentially.
-                                            // Format: cor, repeat, cor, repeat, ..., cor(max)
-                                            // (no repeat after the last cor — repeats_remaining
-                                            //  counts the number of ADDITIONAL iterations left).
-                                            if self.first_seq_save {
-                                                self.first_seq_save = false;
-                                            }
                                             for _ in 0..repeats_remaining {
-                                                cmds.extend(
-                                                    repeat_actions
-                                                        .iter()
-                                                        .cloned()
-                                                        .map(Command::Effect),
-                                                );
-                                                cmds.push(Command::Choice(Choice::SelectTarget {
-                                                    target: "pay_optional_cost:skip_optional_cost"
-                                                        .to_string(),
-                                                    description: "Repeat effect?".to_string(),
-                                                    allow_skip: true,
-                                                    options: Some(vec![
-                                                        "Stop".to_string(),
-                                                        "Continue".to_string(),
-                                                    ]),
-                                                }));
+                                                self.pending_repeat_actions
+                                                    .extend(repeat_actions.iter().cloned());
                                             }
-                                            let mut existing =
-                                                gs.ability_queue.take_pending_commands();
-                                            existing.extend(cmds);
-                                            gs.ability_queue.set_pending_commands(existing);
-                                            // first_seq_save is set to false above — this
-                                            // prevents the outer seq from adding duplicates
-                                            // during the *current* iteration's inner execution
-                                            // (which saves before this code runs).
-                                            return Ok(());
                                         }
                                     }
-                                }
-                                // Preserve remaining repeats in the pending state (no repeat prompt needed)
-                                for _ in 0..repeats_remaining {
-                                    remaining.extend_from_slice(repeat_actions);
                                 }
                                 save_remaining(gs, remaining);
                                 return Ok(());

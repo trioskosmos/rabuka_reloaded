@@ -28,20 +28,11 @@ impl super::resolver::AbilityResolver {
     /// If another choice interrupts execution, the remaining actions are safely parked back.
     pub fn resume_pending_commands(&mut self, gs: &mut GameState) -> Result<(), String> {
         let pending = gs.ability_queue.take_pending_commands();
-        eprintln!("[RPC] pending_commands_count={}", pending.len());
         for (idx, command) in pending.iter().enumerate() {
             match command {
                 Command::Effect(effect) => {
                     self.spawn_context.target = effect.target.clone();
-                    eprintln!(
-                        "[RPC] executing effect action={} target={:?}",
-                        effect.action, effect.target
-                    );
                     self.execute_effect(gs, effect)?;
-                    eprintln!(
-                        "[RPC] after execute: pending={}",
-                        self.pending_choice.is_some()
-                    );
                 }
                 Command::MoveCard {
                     card_id,
@@ -72,25 +63,41 @@ impl super::resolver::AbilityResolver {
                 }
                 if idx + 1 < pending.len() {
                     let mut existing = gs.ability_queue.take_pending_commands();
-                    eprintln!(
-                        "[DEBUG_RPC_MERGE] idx={} pending.len={} existing.len={} remaining={}",
-                        idx,
-                        pending.len(),
-                        existing.len(),
-                        pending[idx + 1..].len()
-                    );
                     existing.extend(pending[idx + 1..].to_vec());
                     gs.ability_queue.set_pending_commands(existing);
                 }
                 return Ok(());
             }
             if self.cancel_remaining_commands {
-                // An optional sub-action (e.g. insufficient pay_energy) has flagged
-                // that remaining commands should be dropped.
                 self.cancel_remaining_commands = false;
-                eprintln!("[RPC] cancel_remaining_commands set — aborting pending commands");
                 return Ok(());
             }
+        }
+        // All pending commands consumed without creating a new choice.
+        // Check if the player just chose "Stop" for a repeat prompt.
+        let was_stopped = gs
+            .ability_queue
+            .current_entry()
+            .is_some_and(|e| e.optional_cost_result == Some(false));
+        if was_stopped {
+            self.pending_repeat_actions.clear();
+            // Mark effect as started so RWC goes to cost_was_paid
+            // (not effect_ready which restarts from scratch).
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.effect_started = true;
+            }
+        }
+        // Feed the next repeat action + "Repeat?" prompt, one at a time.
+        if !self.pending_repeat_actions.is_empty() && self.pending_choice.is_none() {
+            let next = self.pending_repeat_actions.remove(0);
+            gs.ability_queue
+                .set_pending_commands(vec![Command::Effect(next)]);
+            self.pending_choice = Some(Choice::SelectTarget {
+                target: "pay_optional_cost:skip_optional_cost".to_string(),
+                description: "Repeat effect?".to_string(),
+                allow_skip: true,
+                options: Some(vec!["Stop".to_string(), "Continue".to_string()]),
+            });
         }
         Ok(())
     }
@@ -2531,58 +2538,10 @@ impl super::resolver::AbilityResolver {
                     .conditional_action
                     .map(|a| Command::Effect(*a)),
                 // no + negation → conditional_action fires (the penalty)
-                (false, true) => {
-                    eprintln!(">>>> COND_OPT (false, true) ENTERED");
-                    // Inline energy_zone → energy_deck: handle directly without sub-choice.
-                    if let Some(ref cond) = effect.compound.conditional_action {
-                        eprintln!(
-                            ">>>> cond action={:?} source={:?} dest={:?}",
-                            cond.action, cond.source, cond.destination
-                        );
-                        if cond.source.as_deref() == Some("energy_zone")
-                            && cond.destination.as_deref() == Some("energy_deck")
-                        {
-                            eprintln!(">>>> MATCHED energy_zone → energy_deck");
-                            let count = cond.count.unwrap_or(1) as usize;
-                            let taken: Vec<i16> = {
-                                let player = gs.resolve_target_player_mut("self");
-                                (0..count)
-                                    .filter_map(|_| player.energy_zone.cards.pop())
-                                    .collect()
-                            };
-                            {
-                                let player = gs.resolve_target_player_mut("self");
-                                player.energy_zone.active_energy_count = player
-                                    .energy_zone
-                                    .active_energy_count
-                                    .saturating_sub(taken.len());
-                                for &cid in &taken {
-                                    crate::ability::util::place_card_in_zone(
-                                        player,
-                                        cid,
-                                        "energy_deck",
-                                        None,
-                                        false,
-                                        1,
-                                    );
-                                }
-                            }
-                            for cid in &taken {
-                                gs.mods.clear_all_for_card(*cid);
-                                gs.record_card_movement(*cid);
-                            }
-                            self.moved_cards = taken;
-                            None
-                        } else {
-                            effect
-                                .compound
-                                .conditional_action
-                                .map(|a| Command::Effect(*a))
-                        }
-                    } else {
-                        None
-                    }
-                }
+                (false, true) => effect
+                    .compound
+                    .conditional_action
+                    .map(|a| Command::Effect(*a)),
                 // no + no negation → nothing fires
                 (false, false) => None,
             };

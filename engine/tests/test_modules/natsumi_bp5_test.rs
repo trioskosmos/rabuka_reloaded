@@ -180,10 +180,13 @@ fn natsumi_bp5_mill_non_live_then_live_stop() {
     // iter 0 mill → Yes (mill non-live, blade=1, no wait)
     game.select_option(1);
     game.drain_auto_ability_choices();
+    // repeat → Continue
+    game.select_option(1);
+    game.drain_auto_ability_choices();
     // iter 1 mill → Yes (mill live, blade=2, wait)
     game.select_option(1);
     game.drain_auto_ability_choices();
-    // iter 2 mill → No (stop)
+    // repeat → Stop
     game.select_option(0);
     game.drain_auto_ability_choices();
 
@@ -421,10 +424,10 @@ fn natsumi_bp5_stop_after_two_iterations() {
         2,
         "2 blades gained"
     );
-    let orientation = game.state.mods.get_orientation_modifier(natsumi);
-    assert!(
-        orientation.is_none_or(|o| o != "wait"),
-        "No wait state (iter 1 milled non-live, not live)"
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(natsumi),
+        Some(&"wait".to_string()),
+        "Natsumi still in wait from iter 0 live mill"
     );
 }
 
