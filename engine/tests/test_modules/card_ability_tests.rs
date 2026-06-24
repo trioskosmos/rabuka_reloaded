@@ -1104,3 +1104,221 @@ fn mia_bp5_different_groups_2_cards_total_no_effect() {
     assert_eq!(game.state.player1.hand.cards.len(), hand_before - 1);
     assert_eq!(game.state.player1.waitroom.cards.len(), discard_before);
 }
+
+
+// --------------------------------------------------------------------
+//  Option 1: distinct card names
+// --------------------------------------------------------------------
+
+/// Option 1: 3 distinct names -> returns 1.
+#[test]
+fn mia_bp5_distinct_names_3_names_returns_1() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let mia = game.id("PL!N-bp5-011-R");
+    setup_mia_board(&mut game, mia);
+    let hand_before = game.state.player1.hand.cards.len();
+    game.add_to_discard(game.new_id("PL!-sd1-019-SD"));
+    game.add_to_discard(game.new_id("PL!S-bp2-020-L"));
+    game.add_to_discard(game.new_id("PL!N-bp1-026-L"));
+    let discard_before = game.state.player1.waitroom.cards.len();
+    play_mia_select_option(&mut game, mia, 0);
+    assert_eq!(game.state.player1.hand.cards.len(), hand_before);
+    assert_eq!(game.state.player1.waitroom.cards.len(), discard_before - 1);
+}
+
+/// Option 1: 3 cards, 2 distinct names -> fail.
+#[test]
+fn mia_bp5_distinct_names_2_names_no_effect() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let mia = game.id("PL!N-bp5-011-R");
+    setup_mia_board(&mut game, mia);
+    let hand_before = game.state.player1.hand.cards.len();
+    game.add_to_discard(game.new_id("PL!-sd1-019-SD"));
+    game.add_to_discard(game.new_id("PL!S-bp2-020-L"));
+    game.add_to_discard(game.new_id("PL!-sd1-019-SD"));
+    let discard_before = game.state.player1.waitroom.cards.len();
+    play_mia_select_option(&mut game, mia, 0);
+    assert_eq!(game.state.player1.hand.cards.len(), hand_before - 1);
+    assert_eq!(game.state.player1.waitroom.cards.len(), discard_before);
+}
+
+/// Option 1: 3 cards all same name -> fail.
+#[test]
+fn mia_bp5_distinct_names_all_same_name_no_effect() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let mia = game.id("PL!N-bp5-011-R");
+    setup_mia_board(&mut game, mia);
+    let hand_before = game.state.player1.hand.cards.len();
+    game.add_to_discard(game.new_id("PL!-sd1-019-SD"));
+    game.add_to_discard(game.new_id("PL!-sd1-019-SD"));
+    game.add_to_discard(game.new_id("PL!-sd1-019-SD"));
+    let discard_before = game.state.player1.waitroom.cards.len();
+    play_mia_select_option(&mut game, mia, 0);
+    assert_eq!(game.state.player1.hand.cards.len(), hand_before - 1);
+    assert_eq!(game.state.player1.waitroom.cards.len(), discard_before);
+}
+
+/// Option 1: only 2 cards total -> fail.
+#[test]
+fn mia_bp5_distinct_names_2_cards_no_effect() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let mia = game.id("PL!N-bp5-011-R");
+    setup_mia_board(&mut game, mia);
+    let hand_before = game.state.player1.hand.cards.len();
+    game.add_to_discard(game.new_id("PL!-sd1-019-SD"));
+    game.add_to_discard(game.new_id("PL!S-bp2-020-L"));
+    let discard_before = game.state.player1.waitroom.cards.len();
+    play_mia_select_option(&mut game, mia, 0);
+    assert_eq!(game.state.player1.hand.cards.len(), hand_before - 1);
+    assert_eq!(game.state.player1.waitroom.cards.len(), discard_before);
+}
+
+// --------------------------------------------------------------------
+//  Option 2: many cards, few groups (distinct vs raw count)
+// --------------------------------------------------------------------
+
+/// Option 2: 4 cards, only 2 groups -> fail.
+#[test]
+fn mia_bp5_different_groups_4_cards_2_groups_no_effect() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let mia = game.id("PL!N-bp5-011-R");
+    setup_mia_board(&mut game, mia);
+    let hand_before = game.state.player1.hand.cards.len();
+    game.add_to_discard(game.new_id("PL!-sd1-019-SD"));
+    game.add_to_discard(game.new_id("PL!-sd1-020-SD"));
+    game.add_to_discard(game.new_id("PL!-bp3-025-L"));
+    game.add_to_discard(game.new_id("PL!S-bp2-020-L"));
+    let discard_before = game.state.player1.waitroom.cards.len();
+    play_mia_select_option(&mut game, mia, 1);
+    assert_eq!(game.state.player1.hand.cards.len(), hand_before - 1);
+    assert_eq!(game.state.player1.waitroom.cards.len(), discard_before);
+}
+
+/// Option 2: 5 cards, 3 groups -> returns 2.
+#[test]
+fn mia_bp5_different_groups_5_cards_3_groups_returns_2() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let mia = game.id("PL!N-bp5-011-R");
+    setup_mia_board(&mut game, mia);
+    let hand_before = game.state.player1.hand.cards.len();
+    game.add_to_discard(game.new_id("PL!-sd1-019-SD"));
+    game.add_to_discard(game.new_id("PL!-sd1-020-SD"));
+    game.add_to_discard(game.new_id("PL!S-bp2-020-L"));
+    game.add_to_discard(game.new_id("PL!N-bp1-026-L"));
+    game.add_to_discard(game.new_id("PL!N-bp1-027-L"));
+    let discard_before = game.state.player1.waitroom.cards.len();
+    play_mia_select_option(&mut game, mia, 1);
+    assert_eq!(game.state.player1.hand.cards.len(), hand_before + 1);
+    assert_eq!(game.state.player1.waitroom.cards.len(), discard_before - 2);
+}
+
+
+// ====================================================================
+//  桂城 泉 (PL!HS-pb1-016-R) — debut: give heart06 to another member with heart06
+//  Tests filter_targets_by_heart_colors auto-resolve without prompting
+
+
+
+// ====================================================================
+//  桂城 泉 (PL!HS-pb1-016-R) — debut: give heart06 to another member with heart06
+//  Tests filter_targets_by_heart_colors auto-resolve (target_count=1, only 1 match)
+// ====================================================================
+// 登場: 自分のステージにいるこのメンバー以外のheart06を持つメンバー1人は、heart06を得る。
+
+fn setup_fu_board(game: &mut TestGame, fu_id: i16) {
+    game.add_to_hand(fu_id);
+    game.give_energy(10);
+    game.state.player1.stage.stage = [-1, -1, -1];
+}
+
+/// Fu played; one other member has heart06, one doesn''t.
+/// Only 1 match, so filter_targets_by_heart_colors auto-targets without prompt.
+#[test]
+fn fu_pb1_debut_heart06_member_auto_gains_heart06() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let fu = game.id("PL!HS-pb1-016-R");
+    let has_heart06 = game.id("PL!-sd1-001-SD");   // base_heart has heart06
+    let no_heart06 = game.id("PL!-sd1-010-SD");    // no heart06
+
+    setup_fu_board(&mut game, fu);
+    game.add_to_stage(rabuka_engine::zones::MemberArea::LeftSide, has_heart06);
+    game.add_to_stage(rabuka_engine::zones::MemberArea::RightSide, no_heart06);
+
+    game.play_to_stage(fu, rabuka_engine::zones::MemberArea::Center);
+
+    // Auto-ability resolves, then auto-targets has_heart06 (only match)
+    // has_heart06 should now have +1 heart06 modifier
+    assert_eq!(
+        game.state.mods.get_heart_modifier(has_heart06, rabuka_engine::card::HeartColor::Heart06),
+        1,
+        "member with base heart06 should receive +1 heart06 modifier"
+    );
+    // no_heart06 should NOT get heart06
+    assert_eq!(
+        game.state.mods.get_heart_modifier(no_heart06, rabuka_engine::card::HeartColor::Heart06),
+        0,
+        "member without heart06 should NOT receive heart06"
+    );
+    // Fu itself should NOT get heart06 (exclude_self)
+    assert_eq!(
+        game.state.mods.get_heart_modifier(fu, rabuka_engine::card::HeartColor::Heart06),
+        0,
+        "Fu (activating card) should NOT receive heart06 (exclude_self)"
+    );
+    assert!(!game.has_pending_choice(), "no pending choices after auto-resolve");
+}
+
+/// Fu played; TWO other members have heart06 -> player must choose one.
+#[test]
+fn fu_pb1_debut_two_heart06_members_prompts_choice() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let fu = game.id("PL!HS-pb1-016-R");
+    let has_heart06a = game.id("PL!-sd1-001-SD");  // heart06
+    let has_heart06b = game.id("PL!-sd1-003-SD");  // heart06
+
+    setup_fu_board(&mut game, fu);
+    game.add_to_stage(rabuka_engine::zones::MemberArea::LeftSide, has_heart06a);
+    game.add_to_stage(rabuka_engine::zones::MemberArea::RightSide, has_heart06b);
+
+    game.play_to_stage(fu, rabuka_engine::zones::MemberArea::Center);
+
+    // Both have heart06, target_count=1 -> player must choose
+    assert!(game.has_pending_choice(), "should prompt for which member");
+    game.select_indices(&[0]);
+    // Selected member gets +1 heart06, other gets nothing
+    assert!(
+        game.state.mods.get_heart_modifier(has_heart06a, rabuka_engine::card::HeartColor::Heart06)
+        + game.state.mods.get_heart_modifier(has_heart06b, rabuka_engine::card::HeartColor::Heart06)
+        == 1,
+        "exactly one member should receive +1 heart06"
+    );
+}
+
+/// Fu played; NO other members have heart06 -> nothing happens.
+#[test]
+fn fu_pb1_debut_no_heart06_member_no_effect() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let fu = game.id("PL!HS-pb1-016-R");
+    let no_heart06 = game.id("PL!-sd1-010-SD");
+
+    setup_fu_board(&mut game, fu);
+    game.add_to_stage(rabuka_engine::zones::MemberArea::RightSide, no_heart06);
+
+    game.play_to_stage(fu, rabuka_engine::zones::MemberArea::Center);
+
+    assert!(!game.has_pending_choice(), "no choice when no target has heart06");
+    assert_eq!(
+        game.state.mods.get_heart_modifier(no_heart06, rabuka_engine::card::HeartColor::Heart06),
+        0,
+        "member without heart06 should not receive heart06"
+    );
+}

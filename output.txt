@@ -1,0 +1,17 @@
+=== Test Parsing ===
+Original: {{kidou.png|起動}}このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。
+Triggers: ['起動']
+Use Limit: None
+Effect: このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。
+
+Extracting abilities from C:\Users\trios\OneDrive\Documents\rabuka_reloaded\cards\cards.json...
+Found 1727 abilities across 1373 cards
+Unique abilities: 800
+Output written to C:\Users\trios\OneDrive\Documents\rabuka_reloaded\cards\abilities.json
+
+  GAPS DETECTED:
+    state_change:wait: 16 cards
+    baton_touch: 4 cards
+    These should be fixed in parser.py before committing.
+    All bracketed names have matching filter fields.
+Validation complete.

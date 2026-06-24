@@ -817,7 +817,7 @@ def _enrich_card_count_condition(result, text):
     if "ない" in text or "いない" in text or re.search(r"がなく", text):
         result["negation"] = True
     # Detect distinct card name constraint
-    if "カード名の異なる" in text:
+    if "カード名の異なる" in text or "カード名が異なる" in text:
         result["distinct"] = "card_name"
     # Extract character names
     char_m = re.search(r"「([^」]+)」の(?:メンバーカード|ライブカード)", text)

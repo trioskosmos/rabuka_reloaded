@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-24T23:44:50.076811",
+  "generated_at": "2026-06-25T00:09:27.698647",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -7975,6 +7975,7 @@
               "count": 3,
               "operator": ">=",
               "text": "自分の控え室にカード名が異なるライブカードが3枚以上ある場合",
+              "distinct": "card_name",
               "card_type": "live_card",
               "location": "discard",
               "target": "self"

@@ -10,9 +10,23 @@ Source: data/cards.json
 import json
 import re
 import sys
+import io
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
+
+# Ensure stdout can handle Unicode (cp932 is the default on Windows Japanese)
+try:
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+except (AttributeError, io.UnsupportedOperation):
+    pass
+
+
+def _encode_safe(text):
+    """Encode text safely for the terminal encoding."""
+    enc = sys.stdout.encoding or "utf-8"
+    return text.encode(enc, errors="replace").decode(enc, errors="replace")
+
 
 # Add parent directory to path for imports
 sys.path.append(str(Path(__file__).parent.parent))
@@ -375,7 +389,11 @@ def extract_all_abilities(cards_file: Path) -> dict:
             # pipeline. This eliminates per-shape code paths.
             effect = _collapse_to_effect_steps(effect)
             # Check if effect has empty actions array
-            if "actions" in effect and not effect["actions"]:
+            if (
+                isinstance(effect, dict)
+                and "actions" in effect
+                and not effect.get("actions")
+            ):
                 print(f"Warning: Effect parsed with empty actions: {effect_text[:100]}")
                 print(f"Effect dict: {effect}")
             _enrich_effect_type(effect, triggerless=sample["triggerless_text"])
@@ -520,10 +538,159 @@ def _validate_output(result):
             if len(locs) < 2:
                 gaps["or_location"] += 1
 
-        # heart_content
+        # heart_content — walk nested conditions because the actual
+        # heart_colors/count may be in a sub-condition of a sequential action.
         if re.search(r"必要ハートに含まれる\{\{heart_\d+\.png\|heart\d+\}\}が\d+", t):
-            if not cond.get("heart_colors") or not cond.get("count"):
+
+            def _find_heart_content(obj, depth=0):
+                if depth > 10 or not isinstance(obj, dict):
+                    return False
+                if obj.get("heart_colors") and obj.get("count"):
+                    return True
+                for v in obj.values():
+                    if isinstance(v, dict):
+                        if _find_heart_content(v, depth + 1):
+                            return True
+                    elif isinstance(v, list):
+                        for item in v:
+                            if isinstance(item, dict) and _find_heart_content(
+                                item, depth + 1
+                            ):
+                                return True
+                return False
+
+            if not _find_heart_content(eff):
                 gaps["heart_content"] += 1
+
+        # lose_resource — "失う" should have sign: negative
+        if "失う" in t:
+
+            def _find_sign_negative(obj, depth=0):
+                if depth > 10 or not isinstance(obj, dict):
+                    return False
+                if obj.get("sign") == "negative":
+                    return True
+                for v in obj.values():
+                    if isinstance(v, dict):
+                        if _find_sign_negative(v, depth + 1):
+                            return True
+                    elif isinstance(v, list):
+                        for item in v:
+                            if isinstance(item, dict) and _find_sign_negative(
+                                item, depth + 1
+                            ):
+                                return True
+                return False
+
+            if not _find_sign_negative(eff):
+                gaps["lose_resource"] += 1
+
+        # per_group — "各グループ" should have per_group or per_group_count
+        if "各グループ" in t:
+
+            def _find_per_group(obj, depth=0):
+                if depth > 10 or not isinstance(obj, dict):
+                    return False
+                if "per_group" in obj or "per_group_count" in obj:
+                    return True
+                if obj.get("per_unit_type") == "group_name":
+                    return True
+                for v in obj.values():
+                    if isinstance(v, dict):
+                        if _find_per_group(v, depth + 1):
+                            return True
+                    elif isinstance(v, list):
+                        for item in v:
+                            if isinstance(item, dict) and _find_per_group(
+                                item, depth + 1
+                            ):
+                                return True
+                return False
+
+            if not _find_per_group(eff):
+                gaps["per_group"] += 1
+
+        # baton_touch — "バトンタッチして登場" should have baton_touch condition
+        if "バトンタッチ" in t and "登場" in t:
+
+            def _find_baton_touch(obj, depth=0):
+                if depth > 10 or not isinstance(obj, dict):
+                    return False
+                cond = obj.get("condition")
+                if isinstance(cond, dict) and cond.get("baton_touch_trigger"):
+                    return True
+                if obj.get("baton_touch_trigger"):
+                    return True
+                if obj.get("baton_touch_source"):
+                    return True
+                for v in obj.values():
+                    if isinstance(v, dict):
+                        if _find_baton_touch(v, depth + 1):
+                            return True
+                    elif isinstance(v, list):
+                        for item in v:
+                            if isinstance(item, dict) and _find_baton_touch(
+                                item, depth + 1
+                            ):
+                                return True
+                return False
+
+            if not _find_baton_touch(eff):
+                gaps["baton_touch"] += 1
+
+        # non_stackable — "重複しない" should have non_stackable flag
+        if "重複しない" in t:
+
+            def _find_non_stackable(obj, depth=0):
+                if depth > 10 or not isinstance(obj, dict):
+                    return False
+                if obj.get("non_stackable"):
+                    return True
+                for v in obj.values():
+                    if isinstance(v, dict):
+                        if _find_non_stackable(v, depth + 1):
+                            return True
+                    elif isinstance(v, list):
+                        for item in v:
+                            if isinstance(item, dict) and _find_non_stackable(
+                                item, depth + 1
+                            ):
+                                return True
+                return False
+
+            if not _find_non_stackable(eff):
+                gaps["non_stackable"] += 1
+
+        # state_change — only flag when text says にする/にできる (change TO a state),
+        # not 状態の/状態を (describing current state which is a targeting filter).
+        state_match = re.search(
+            r"(ウェイト|レスト|スタンド)(状態)?(にす|にで)(る|き)", t
+        )
+        if state_match:
+            expected = {"ウェイト": "wait", "レスト": "rest", "スタンド": "stand"}[
+                state_match.group(1)
+            ]
+            cost_obj = a.get("cost") or {}
+
+            def _find_state_change(obj, depth=0):
+                if depth > 10 or not isinstance(obj, dict):
+                    return False
+                if obj.get("state_change") == expected:
+                    return True
+                for v in obj.values():
+                    if isinstance(v, dict):
+                        if _find_state_change(v, depth + 1):
+                            return True
+                    elif isinstance(v, list):
+                        for item in v:
+                            if isinstance(item, dict) and _find_state_change(
+                                item, depth + 1
+                            ):
+                                return True
+                return False
+
+            if not _find_state_change(eff) and not _find_state_change(cost_obj):
+                gaps[f"state_change:{expected}"] += 1
 
     if gaps:
         print("\n  GAPS DETECTED:")
@@ -596,6 +763,13 @@ def _validate_group_filters(abilities):
         for name in bracketed:
             if "{{" in name:
                 continue  # skip template/ability text, not a card/group name
+            # Skip card names introduced with カード名が/カード名は — they're not group/character filters
+            # Both 『』 and 「」 bracket styles are used in card texts
+            card_name_ctx = re.search(
+                rf"カード名(?:が|は)[『「]{re.escape(name)}[』」]", text
+            )
+            if card_name_ctx:
+                continue
             if not (variants(name) & filter_values):
                 card_list = a.get("cards", [])
                 text_preview = a.get("full_text", "")[:80]
@@ -609,8 +783,7 @@ def _validate_group_filters(abilities):
             f"\n  GROUP FILTER ISSUES ({len(issues)} abilities with missing group_names):"
         )
         for issue in issues:
-            safe = issue.encode("utf-8", errors="replace").decode("utf-8")
-            print(safe)
+            print(_encode_safe(issue))
     else:
         print("    All bracketed names have matching filter fields.")
 
