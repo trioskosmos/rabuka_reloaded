@@ -1355,6 +1355,9 @@ def _try_zone_placement(text):
         elif "デッキ" in dest_text:
             result["destination"] = "deck"
             result["trigger_event"]["destination"] = "deck"
+    # Phase restriction: 自分のメインフェイズに / 相手のメインフェイズに
+    if "メインフェイズ" in text:
+        result["phase"] = "main"
     # Remove location/locations — source+destination carry the zone info
     result.pop("location", None)
     result.pop("locations", None)
@@ -8068,10 +8071,10 @@ def _normalize_effect_tree(effect, original_text=None):
 
         # Infer operator for comparison conditions when counts are present
         ct = d.get("condition_type") or d.get("type")
-        if ct in ("comparison_condition", "card_count_condition"):
+        if ct in ("comparison_condition", "card_count_condition", "location_condition"):
             # Always override for "以上"/"以下" even if operator was pre-set
             _text = d.get("text", "")
-            if d.get("count") and not d.get("comparison_target"):
+            if d.get("count") is not None and not d.get("comparison_target"):
                 if "以上" in _text:
                     d["operator"] = ">="
                 elif "以下" in _text:
@@ -9168,9 +9171,13 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             ct = node.get("condition_type") or node.get("type")
 
             # Apply operator inference for condition-type nodes
-            if ct in ("comparison_condition", "card_count_condition"):
+            if ct in (
+                "comparison_condition",
+                "card_count_condition",
+                "location_condition",
+            ):
                 _text = node.get("text", "")
-                if node.get("count") and not node.get("comparison_target"):
+                if node.get("count") is not None and not node.get("comparison_target"):
                     if "以上" in _text:
                         node["operator"] = ">="
                     elif "以下" in _text:

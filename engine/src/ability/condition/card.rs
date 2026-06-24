@@ -1320,10 +1320,7 @@ impl<'a> ConditionContext<'a> {
             }
         }
         let thresh = condition.count.unwrap_or(1);
-        let effective_op = match op {
-            None if thresh > 0 => Some(">="),
-            _ => op,
-        };
+        let effective_op = op.or_else(|| if thresh == 0 { Some("==") } else { Some(">=") });
         compare_counts(effective_op, count, thresh)
     }
 
@@ -2347,7 +2344,17 @@ impl<'a> ConditionContext<'a> {
                 _ => 0,
             },
         } as u32;
-        let mut passed = compare_counts(condition.operator.as_deref(), actual, count);
+        let count_op =
+            condition.operator.as_deref().or_else(
+                || {
+                    if count == 0 {
+                        Some("==")
+                    } else {
+                        Some(">=")
+                    }
+                },
+            );
+        let mut passed = compare_counts(count_op, actual, count);
         // Same-name constraint: if set, ensure at least 2 counted cards share a name
         if passed && condition.same_name.unwrap_or(false) {
             let stage_cards: Vec<i16> = if is_both {

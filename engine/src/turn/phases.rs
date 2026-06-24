@@ -134,16 +134,6 @@ impl super::TurnEngine {
                 Phase::SecondAttackerPerformance => {
                     Self::execute_performance_phase(game_state, false);
                 }
-                Phase::SecondAttackerPerformance => {
-                    eprintln!(
-                        "[PHASE_DEBUG] About to call execute_performance_phase(is_first=false)"
-                    );
-                    Self::execute_performance_phase(game_state, false);
-                    eprintln!(
-                        "[PHASE_DEBUG] After execute_performance_phase, phase={:?}",
-                        game_state.current_phase
-                    );
-                }
                 Phase::LiveVictoryDetermination => {
                     Self::execute_live_victory_determination(game_state);
                     if game_state.has_pending_choice() {

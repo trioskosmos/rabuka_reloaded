@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-24T21:23:54.175819",
+  "generated_at": "2026-06-24T21:44:20.314598",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -10355,7 +10355,8 @@
               "location": "success_live_card_zone",
               "card_type": "live_card",
               "count": 0,
-              "type": "location_condition"
+              "type": "location_condition",
+              "operator": "="
             },
             {
               "type": "card_count_condition",
@@ -17517,7 +17518,8 @@
           "position_compare": "right_side",
           "type": "location_condition",
           "activation_position": "center",
-          "original_value": true
+          "original_value": true,
+          "operator": "="
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -19905,7 +19907,8 @@
           "heart_colors": [
             "heart02",
             "heart04"
-          ]
+          ],
+          "operator": "="
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -20073,7 +20076,8 @@
           "heart_colors": [
             "heart02",
             "heart05"
-          ]
+          ],
+          "operator": "="
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -20181,7 +20185,8 @@
           "heart_colors": [
             "heart02",
             "heart03"
-          ]
+          ],
+          "operator": "="
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -23628,7 +23633,8 @@
               "location": "success_live_card_zone",
               "card_type": "live_card",
               "count": 0,
-              "type": "location_condition"
+              "type": "location_condition",
+              "operator": "="
             },
             {
               "text": "自分のステージにいるメンバーが『lilywhite』のみの場合",
@@ -24471,7 +24477,8 @@
           "target": "self",
           "self_target": true,
           "source": "discard",
-          "destination": "hand"
+          "destination": "hand",
+          "phase": "main"
         }
       }
     },
