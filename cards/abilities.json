@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-24T20:36:16.705857",
+  "generated_at": "2026-06-24T20:51:50.320357",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -968,6 +968,9 @@
           "type": "temporal_condition",
           "temporal": "this_turn",
           "text": "このターン、自分のステージに『虹ヶ咲』のメンバーが登場している場合",
+          "trigger_event": {
+            "type": "temporal_count"
+          },
           "count": 1,
           "location": "stage",
           "card_type": "member_card",
@@ -1771,6 +1774,9 @@
           "target": "self",
           "baton_touch_trigger": true,
           "text": "バトンタッチして登場した場合",
+          "trigger_event": {
+            "type": "baton_touch"
+          },
           "location": "stage"
         },
         "source": "recently_moved",
@@ -2124,6 +2130,9 @@
           "target": "self",
           "baton_touch_trigger": true,
           "text": "このメンバーよりコストが低い『スリーズブーケ』のメンバーからバトンタッチして登場した場合",
+          "trigger_event": {
+            "type": "baton_touch"
+          },
           "location": "stage",
           "group_names": [
             "スリーズブーケ"
@@ -2710,6 +2719,9 @@
           "type": "temporal_condition",
           "temporal": "this_turn",
           "text": "このターン、自分のステージにメンバーが3回登場したとき",
+          "trigger_event": {
+            "type": "temporal_count"
+          },
           "count": 3,
           "location": "stage",
           "card_type": "member_card",
@@ -2742,6 +2754,9 @@
           "type": "temporal_condition",
           "temporal": "this_turn",
           "text": "このターン、自分のステージにメンバーが2回以上登場している場合",
+          "trigger_event": {
+            "type": "temporal_count"
+          },
           "count": 2,
           "location": "stage",
           "card_type": "member_card",
@@ -3531,6 +3546,9 @@
               "target": "self",
               "baton_touch_trigger": true,
               "text": "『Liella!』のメンバーからバトンタッチして登場しており、",
+              "trigger_event": {
+                "type": "baton_touch"
+              },
               "location": "discard",
               "group_names": [
                 "Liella!"
@@ -3709,15 +3727,28 @@
               "type": "appearance_condition",
               "appearance": true,
               "location": "stage",
-              "text": "このメンバーが登場か、エリアを移動したとき"
+              "text": "このメンバーが登場か、エリアを移動したとき",
+              "trigger_event": {
+                "type": "appearance"
+              }
             },
             {
               "type": "movement_condition",
               "movement": "moves",
-              "text": "このメンバーが登場か、エリアを移動したとき"
+              "text": "このメンバーが登場か、エリアを移動したとき",
+              "trigger_event": {
+                "type": "area_move"
+              }
             }
           ],
-          "text": "このメンバーが登場か、エリアを移動したとき"
+          "text": "このメンバーが登場か、エリアを移動したとき",
+          "trigger_event": {
+            "type": "appear_or_move",
+            "or_event_types": [
+              "appearance",
+              "area_move"
+            ]
+          }
         },
         "source": "stage",
         "state_change": "wait",
@@ -4006,6 +4037,9 @@
           "target": "self",
           "baton_touch_trigger": true,
           "text": "能力を持たないメンバーからバトンタッチして登場した場合",
+          "trigger_event": {
+            "type": "baton_touch"
+          },
           "location": "stage",
           "ability_filter": "no_ability",
           "card_type": "member_card"
@@ -6358,9 +6392,6 @@
         ],
         "parenthetical": [
           "メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。"
-        ],
-        "characters": [
-          "優木せつ菜"
         ]
       }
     },
@@ -7175,6 +7206,9 @@
               "target": "self",
               "baton_touch_trigger": true,
               "text": "このメンバーよりコストが低いメンバーからバトンタッチして登場した場合",
+              "trigger_event": {
+                "type": "baton_touch"
+              },
               "location": "stage",
               "comparison_type": "cost",
               "operator": "<"
@@ -8674,6 +8708,9 @@
           "target": "self",
           "baton_touch_trigger": true,
           "text": "このメンバーよりコストが低いメンバーからバトンタッチして登場した場合",
+          "trigger_event": {
+            "type": "baton_touch"
+          },
           "location": "stage",
           "comparison_type": "cost",
           "operator": "<"
@@ -9954,15 +9991,28 @@
               "type": "appearance_condition",
               "appearance": true,
               "location": "stage",
-              "text": "このメンバーが登場か、エリアを移動する"
+              "text": "このメンバーが登場か、エリアを移動する",
+              "trigger_event": {
+                "type": "appearance"
+              }
             },
             {
               "type": "movement_condition",
               "movement": "moves",
-              "text": "このメンバーが登場か、エリアを移動する"
+              "text": "このメンバーが登場か、エリアを移動する",
+              "trigger_event": {
+                "type": "area_move"
+              }
             }
           ],
-          "text": "このメンバーが登場か、エリアを移動する"
+          "text": "このメンバーが登場か、エリアを移動する",
+          "trigger_event": {
+            "type": "appear_or_move",
+            "or_event_types": [
+              "appearance",
+              "area_move"
+            ]
+          }
         },
         "parenthetical": [
           "対戦相手のカードの効果でも発動する。"
@@ -10994,6 +11044,9 @@
           "target": "self",
           "baton_touch_trigger": true,
           "text": "このメンバーよりコストが低い『DOLLCHESTRA』のメンバーからバトンタッチして登場した場合",
+          "trigger_event": {
+            "type": "baton_touch"
+          },
           "location": "stage",
           "group_names": [
             "DOLLCHESTRA"
@@ -11034,6 +11087,9 @@
           "target": "self",
           "baton_touch_trigger": true,
           "text": "このメンバーよりコストが低い『みらくらぱーく！』のメンバーからバトンタッチして登場した場合",
+          "trigger_event": {
+            "type": "baton_touch"
+          },
           "location": "stage",
           "group_names": [
             "みらくらぱーく！"
@@ -13264,6 +13320,11 @@
         "condition": {
           "type": "state_change_condition",
           "text": "自分のカードの効果によって、相手のステージにいるアクティブ状態のコスト4以下のメンバーがウェイト状態になったとき",
+          "trigger_event": {
+            "type": "state_change",
+            "from_state": "active",
+            "to_state": "wait"
+          },
           "from_state": "active",
           "to_state": "wait",
           "target": "opponent",
@@ -14444,6 +14505,10 @@
             "position": "center"
           },
           "text": "自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合",
+          "trigger_event": {
+            "type": "temporal",
+            "event_type": "has_moved"
+          },
           "card_type": "member_card",
           "group_names": [
             "Liella!"
@@ -14807,6 +14872,10 @@
             "text": "このターンにこのメンバーが移動していないかぎり"
           },
           "text": "このターンにこのメンバーが移動していないかぎり",
+          "trigger_event": {
+            "type": "temporal",
+            "event_type": "not_moved"
+          },
           "card_type": "member_card"
         },
         "duration": "as_long_as",
@@ -15335,6 +15404,9 @@
           "target": "self",
           "baton_touch_trigger": true,
           "text": "「中須かすみ」からバトンタッチして登場した場合",
+          "trigger_event": {
+            "type": "baton_touch"
+          },
           "location": "stage",
           "baton_touch_source": "中須かすみ",
           "characters": [
@@ -15531,6 +15603,9 @@
           "target": "self",
           "baton_touch_trigger": true,
           "text": "「優木せつ菜」からバトンタッチして登場した場合",
+          "trigger_event": {
+            "type": "baton_touch"
+          },
           "location": "stage",
           "baton_touch_source": "優木せつ菜",
           "characters": [
@@ -15577,6 +15652,9 @@
           "target": "self",
           "baton_touch_trigger": true,
           "text": "「エマ・ヴェルデ」からバトンタッチして登場した場合",
+          "trigger_event": {
+            "type": "baton_touch"
+          },
           "location": "stage",
           "baton_touch_source": "エマ・ヴェルデ",
           "characters": [
@@ -15661,6 +15739,9 @@
           "target": "self",
           "baton_touch_trigger": true,
           "text": "「三船栞子」からバトンタッチして登場した場合",
+          "trigger_event": {
+            "type": "baton_touch"
+          },
           "location": "stage",
           "baton_touch_source": "三船栞子",
           "characters": [
@@ -17955,9 +18036,6 @@
         "text": "{{icon_blade.png|ブレード}}を得る。これにより「百生吟子」のメンバーカードを控え室に置いた場合、さらに{{icon_blade.png|ブレード}}を得る",
         "action": "conditional_on_result",
         "duration": "live_end",
-        "characters": [
-          "百生吟子"
-        ],
         "primary_effect": {
           "text": "{{icon_blade.png|ブレード}}を得る",
           "action": "gain_resource",
@@ -18321,6 +18399,9 @@
           "target": "self",
           "baton_touch_trigger": true,
           "text": "バトンタッチして登場した場合",
+          "trigger_event": {
+            "type": "baton_touch"
+          },
           "location": "stage"
         }
       }
@@ -18539,6 +18620,9 @@
           "target": "self",
           "baton_touch_trigger": true,
           "text": "バトンタッチして登場した場合",
+          "trigger_event": {
+            "type": "baton_touch"
+          },
           "location": "stage"
         },
         "action": "sequential",
@@ -19897,6 +19981,9 @@
           "target": "self",
           "baton_touch_trigger": true,
           "text": "自分のステージに、このメンバーか、ほかのメンバーがバトンタッチして登場したとき",
+          "trigger_event": {
+            "type": "baton_touch"
+          },
           "location": "stage",
           "exclude_self": true
         },
@@ -22469,7 +22556,11 @@
                 "text": "このターン、相手が余剰のハートを持たずにライブを成功させていた場合",
                 "location": "stage"
               },
-              "text": "このターン、相手が余剰のハートを持たずにライブを成功させていた場合"
+              "text": "このターン、相手が余剰のハートを持たずにライブを成功させていた場合",
+              "trigger_event": {
+                "type": "temporal",
+                "event_type": "opponent_live_success"
+              }
             }
           ],
           "text": "自分のステージにいる『Aqours』のメンバーが持つハートに、{{heart_05.png|heart05}}が合計4個以上あり、このターン、相手が余剰のハートを持たずにライブを成功させていた場合",
@@ -22736,7 +22827,11 @@
             "no_excess_heart": true,
             "text": "このターン、自分が余剰ハートを持たない場合"
           },
-          "text": "このターン、自分が余剰ハートを持たない場合"
+          "text": "このターン、自分が余剰ハートを持たない場合",
+          "trigger_event": {
+            "type": "temporal",
+            "event_type": "no_excess_heart"
+          }
         },
         "action": "modify_score",
         "value": 1,
@@ -23485,6 +23580,11 @@
         "result_condition": {
           "type": "state_change_condition",
           "text": "これによりウェイト状態のメンバーが3人以上アクティブ状態になったとき",
+          "trigger_event": {
+            "type": "state_change",
+            "from_state": "wait",
+            "to_state": "active"
+          },
           "from_state": "wait",
           "to_state": "active",
           "count": 3,
@@ -24151,6 +24251,11 @@
         "condition": {
           "type": "state_change_condition",
           "text": "自分のメインフェイズの間、このメンバーがアクティブ状態からウェイト状態になったとき",
+          "trigger_event": {
+            "type": "state_change",
+            "from_state": "active",
+            "to_state": "wait"
+          },
           "from_state": "active",
           "to_state": "wait",
           "phase": "main",
@@ -24366,13 +24471,7 @@
           "self_target": true,
           "source": "discard",
           "destination": "hand"
-        },
-        "characters": [
-          "DIVE!"
-        ],
-        "card_names": [
-          "DIVE!"
-        ]
+        }
       }
     },
     {
@@ -24450,9 +24549,6 @@
             "target": "self",
             "value": 3
           }
-        ],
-        "card_names": [
-          "EMOTION"
         ],
         "heart_colors": [
           "heart00"
@@ -24795,6 +24891,10 @@
             "position": "left_side"
           },
           "text": "このターン、このメンバーがエリアを移動している場合",
+          "trigger_event": {
+            "type": "temporal",
+            "event_type": "has_moved"
+          },
           "card_type": "member_card",
           "position": "left_side",
           "activation_position": "left_side"
@@ -24871,6 +24971,10 @@
             "position": "right_side"
           },
           "text": "このターン、このメンバーがエリアを移動している場合",
+          "trigger_event": {
+            "type": "temporal",
+            "event_type": "has_moved"
+          },
           "card_type": "member_card",
           "position": "right_side",
           "activation_position": "right_side"
@@ -26485,6 +26589,10 @@
             "exclude_self": true
           },
           "text": "このターン、自分のステージにいるほかのメンバーがエリアを移動している場合",
+          "trigger_event": {
+            "type": "temporal",
+            "event_type": "has_moved"
+          },
           "card_type": "member_card",
           "exclude_self": true
         },
@@ -26573,6 +26681,10 @@
             "location": "hand"
           },
           "text": "自分のステージにいる『Liella!』のメンバーがこのターンにエリアを移動しているかぎり",
+          "trigger_event": {
+            "type": "temporal",
+            "event_type": "has_moved"
+          },
           "card_type": "member_card",
           "group_names": [
             "Liella!"
@@ -27336,6 +27448,10 @@
                 "text": "このターンに自分のステージにいるメンバーがエリアを移動している場合"
               },
               "text": "このターンに自分のステージにいるメンバーがエリアを移動している場合",
+              "trigger_event": {
+                "type": "temporal",
+                "event_type": "has_moved"
+              },
               "card_type": "member_card"
             }
           ],
@@ -27636,6 +27752,9 @@
           "target": "self",
           "baton_touch_trigger": true,
           "text": "このメンバーがコスト10以上の『蓮ノ空』のメンバーとバトンタッチして控え室に置かれたとき",
+          "trigger_event": {
+            "type": "baton_touch"
+          },
           "location": "discard",
           "cost_limit": 10,
           "cost_limit_operator": ">=",
@@ -27825,6 +27944,9 @@
           "target": "self",
           "baton_touch_trigger": true,
           "text": "「徒町小鈴」以外の『蓮ノ空』のメンバーからバトンタッチして登場した場合",
+          "trigger_event": {
+            "type": "baton_touch"
+          },
           "location": "stage",
           "exclude_characters": [
             "徒町小鈴"
@@ -29412,6 +29534,10 @@
             "position": "center"
           },
           "text": "自分のステージのセンターエリアにいる『μ's』のメンバーの{{live_success.png|ライブ成功時}}能力が解決したとき、そのメンバーがこのターン中に移動している場合",
+          "trigger_event": {
+            "type": "temporal",
+            "event_type": "has_moved"
+          },
           "card_type": "member_card",
           "group_names": [
             "μ's"
@@ -31394,6 +31520,10 @@
                 "text": "このターン、このメンバーがエリアを移動している場合"
               },
               "text": "このターン、このメンバーがエリアを移動している場合",
+              "trigger_event": {
+                "type": "temporal",
+                "event_type": "has_moved"
+              },
               "card_type": "member_card"
             },
             "count": 1,
