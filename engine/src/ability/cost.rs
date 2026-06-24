@@ -724,7 +724,7 @@ impl AbilityResolver {
                     entry.pending_actions.clear();
                 }
             }
-            return self.resume_pending_commands(gs);
+            return self.resume_pending_actions(gs);
         }
         // "pay_optional_cost" or "1" from select_option(1)
         self.pending_choice = None;
@@ -739,7 +739,7 @@ impl AbilityResolver {
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
                     entry.pending_actions.clear();
                 }
-                return self.resume_pending_commands(gs);
+                return self.resume_pending_actions(gs);
             }
         }
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
@@ -868,7 +868,7 @@ impl AbilityResolver {
                     }
                 }
             } else if gs.ability_queue.has_pending_actions() {
-                if let Err(e) = self.resume_pending_commands(gs) {
+                if let Err(e) = self.resume_pending_actions(gs) {
                     log::debug!("Failed to execute action after optional: {}", e);
                 }
             } else if is_effect_optional {

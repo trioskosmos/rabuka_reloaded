@@ -1484,68 +1484,37 @@ impl AbilityResolver {
         // position choices before the re-prompt (if any).
         if !self.pending_stage_cards.is_empty() {
             let remaining = std::mem::take(&mut self.pending_stage_cards);
-            for (cid, tgt) in remaining.clone() {
-                let p = gs.resolve_target_player_mut(&tgt);
-                if let Some(pos) = p.waitroom.cards.iter().position(|&id| id == cid) {
-                    p.waitroom.cards.remove(pos);
-                }
-                let empty_slots: Vec<usize> = (0..3).filter(|&i| p.stage.stage[i] == -1).collect();
-                if empty_slots.len() > 1 {
-                    // More than 1 empty slot → prompt for position.
-                    // Defer remaining cards and return pending.
-                    let pos_target = tgt.clone();
-                    let remaining = remaining.into_iter().skip(1).collect::<Vec<_>>();
-                    if !remaining.is_empty() {
-                        self.pending_stage_cards = remaining;
+            for (i, (cid, tgt)) in remaining.iter().enumerate() {
+                let source = self.spawn_context.source.clone().unwrap_or_default();
+                match self.place_card_with_stage_choice(
+                    gs,
+                    tgt,
+                    *cid,
+                    Zone::Stage.to_str(),
+                    None,
+                    false,
+                    1,
+                    None,
+                    None,
+                    &source,
+                    false,
+                ) {
+                    Ok(true) => {
+                        if i + 1 < remaining.len() {
+                            self.pending_stage_cards = remaining[i + 1..].to_vec();
+                        }
+                        return Ok(());
                     }
-                    let pos_str = empty_slots
-                        .iter()
-                        .map(|&i| match i {
-                            0 => "left_side",
-                            1 => "center",
-                            _ => "right_side",
-                        })
-                        .collect::<Vec<_>>()
-                        .join(",");
-                    self.pending_choice = Some(Choice::SelectPosition {
-                        position: pos_str,
-                        description: format!(
-                            "Choose position for {}",
-                            gs.card_database
-                                .get_card(cid)
-                                .map_or("card", |c| c.name.as_str())
-                        ),
-                        allow_skip: false,
-                    });
-                    self.execution_context = ExecutionContext::MoveCardsPosition {
-                        card_id: cid,
-                        state_change: None,
-                        target: pos_target,
-                        source_zone: self.spawn_context.source.clone().unwrap_or_default(),
-                    };
-                    return Ok(());
-                } else if empty_slots.len() == 1 {
-                    let slot = empty_slots[0];
-                    let lock_area =
-                        self.spawn_context.source.as_deref() != Some(Zone::Stage.to_str());
-                    p.stage.stage[slot] = cid;
-                    if lock_area {
-                        p.areas_locked_this_turn.insert(match slot {
-                            0 => crate::zones::MemberArea::LeftSide,
-                            1 => crate::zones::MemberArea::Center,
-                            _ => crate::zones::MemberArea::RightSide,
-                        });
+                    Ok(false) => {
+                        self.fire_debut_side_effects(gs, *cid, tgt);
+                        gs.mods.clear_all_for_card(*cid);
+                        gs.record_card_movement(*cid);
                     }
-                    let _ = p;
-                    self.fire_debut_side_effects(gs, cid, &tgt);
-                } else {
-                    continue;
+                    Err(_) => {}
                 }
-                gs.mods.clear_all_for_card(cid);
-                gs.record_card_movement(cid);
             }
         }
-        self.resume_pending_commands(gs)?;
+        self.resume_pending_actions(gs)?;
         Ok(())
     }
 

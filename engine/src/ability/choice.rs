@@ -25,7 +25,7 @@ impl super::resolver::AbilityResolver {
 
     /// Resumes executing sequential commands parked on the current queue entry.
     /// If another choice interrupts execution, the remaining actions are safely parked back.
-    pub fn resume_pending_commands(&mut self, gs: &mut GameState) -> Result<(), String> {
+    pub fn resume_pending_actions(&mut self, gs: &mut GameState) -> Result<(), String> {
         let pending = gs.ability_queue.take_pending_actions();
         for (idx, effect) in pending.iter().enumerate() {
             self.spawn_context.target = effect.target.clone();
@@ -125,7 +125,7 @@ impl super::resolver::AbilityResolver {
         }
         self.resume_execution(gs, context.clone())?;
         if !sub_choice {
-            self.resume_pending_commands(gs)?;
+            self.resume_pending_actions(gs)?;
         }
         log::debug!(
             "[FINALIZE_CHOICE] pending={} selected={:?} context={:?}",
@@ -247,11 +247,11 @@ impl super::resolver::AbilityResolver {
                     let opt = opts.get(idx).map(|s| s.as_str()).unwrap_or("left");
                     self.selected_area = Some(opt.to_string());
                     self.clear_choice_state(gs);
-                    return self.resume_pending_commands(gs);
+                    return self.resume_pending_actions(gs);
                 }
                 self.selected_area = Some(selected.clone());
                 self.clear_choice_state(gs);
-                self.resume_pending_commands(gs)
+                self.resume_pending_actions(gs)
             }
             (
                 Some(Choice::SelectTarget { target, .. }),
@@ -441,7 +441,7 @@ impl super::resolver::AbilityResolver {
             }
 
             self.clear_choice_state(gs);
-            return self.resume_pending_commands(gs);
+            return self.resume_pending_actions(gs);
         }
 
         if !effect_started && gs.entry_cost().map(|c| c.action.as_str()) == Some("reveal") {
@@ -754,7 +754,7 @@ impl super::resolver::AbilityResolver {
                         return Ok(());
                     }
                     self.clear_choice_state(gs);
-                    return self.resume_pending_commands(gs);
+                    return self.resume_pending_actions(gs);
                 }
                 Some(Zone::Stage) => {
                     // Effect phase: move selected stage card(s) to destination zone.
@@ -786,7 +786,7 @@ impl super::resolver::AbilityResolver {
                         if stage_indices.is_empty() {
                             return Ok(());
                         }
-                        return self.resume_pending_commands(gs);
+                        return self.resume_pending_actions(gs);
                     }
                     // Non-is_select_action: actually move the card(s) to destination.
                     // Same logic as the OUTER_MATCH Stage handler.
@@ -823,7 +823,7 @@ impl super::resolver::AbilityResolver {
                         gs.recently_moved_from_zone = Some("stage".to_string());
                     }
                     self.clear_choice_state(gs);
-                    return self.resume_pending_commands(gs);
+                    return self.resume_pending_actions(gs);
                 }
                 Some(Zone::Energy) => {
                     let dst = if let Choice::SelectCard { destination, .. } = choice {
@@ -840,7 +840,7 @@ impl super::resolver::AbilityResolver {
                     )?;
                     if dst.is_some() {
                         self.clear_choice_state(gs);
-                        return self.resume_pending_commands(gs);
+                        return self.resume_pending_actions(gs);
                     }
                 }
                 Some(Zone::Discard) => {
@@ -1047,7 +1047,7 @@ impl super::resolver::AbilityResolver {
                     // to OUTER_MATCH where effect-phase zone handlers live.
                     if !effect_started {
                         self.clear_choice_state(gs);
-                        return self.resume_pending_commands(gs);
+                        return self.resume_pending_actions(gs);
                     }
                 }
             }
@@ -1066,7 +1066,7 @@ impl super::resolver::AbilityResolver {
                 if !needs_fallthrough && !effect_started {
                     self.clear_choice_state(gs);
                     if gs.ability_queue.has_pending_actions() {
-                        return self.resume_pending_commands(gs);
+                        return self.resume_pending_actions(gs);
                     }
                     return Ok(());
                 }
@@ -1871,7 +1871,7 @@ impl super::resolver::AbilityResolver {
                     .filter(|cmd| cmd.source.as_deref() != Some("success_live_zone"))
                     .collect();
                 gs.ability_queue.set_pending_actions(filtered);
-                return self.resume_pending_commands(gs);
+                return self.resume_pending_actions(gs);
             }
             _ => log::debug!("Card selection from zone '{}' not yet implemented", zone),
         }
@@ -1955,13 +1955,13 @@ impl super::resolver::AbilityResolver {
                             let _n_cmds = commands.len();
                             gs.ability_queue.set_pending_actions(commands);
                             self.pending_choice = None; // clear stale
-                            return self.resume_pending_commands(gs);
+                            return self.resume_pending_actions(gs);
                         }
                     }
                 } else if self.pending_choice.is_some() {
                     self.pending_choice = None;
                 }
-                return self.resume_pending_commands(gs);
+                return self.resume_pending_actions(gs);
             }
             Some(ChoiceRoute::ChoiceString) => {
                 return self.handle_choice_string_selection(gs, selected, conditional_choice);
@@ -2054,7 +2054,7 @@ impl super::resolver::AbilityResolver {
                             );
                             self.pending_choice = None;
                             gs.ability_queue.set_pending_actions(vec![modified]);
-                            let res = self.resume_pending_commands(gs);
+                            let res = self.resume_pending_actions(gs);
                             eprintln!(
                                 "[SELFOR] after resume: pending={:?} res={:?}",
                                 self.pending_choice.is_some(),
@@ -2249,7 +2249,7 @@ impl super::resolver::AbilityResolver {
             modifier(&mut effect);
             gs.ability_queue.set_pending_actions(vec![effect]);
         }
-        self.resume_pending_commands(gs)?;
+        self.resume_pending_actions(gs)?;
         Ok(())
     }
 
@@ -2322,7 +2322,7 @@ impl super::resolver::AbilityResolver {
                         entry.optional_cost_result = Some(false);
                     }
                     self.clear_choice_state(gs);
-                    return self.resume_pending_commands(gs);
+                    return self.resume_pending_actions(gs);
                 }
                 if ABILITY_DEBUG.load(Ordering::Relaxed) {
                     eprintln!("[DECK_DIAG] handle_position_destination ctx=MoveCardsPosition card_id={} dest={} src={}", card_id, destination, source_zone);
@@ -2384,7 +2384,7 @@ impl super::resolver::AbilityResolver {
                     }
                 }
                 self.clear_choice_state(gs);
-                self.resume_pending_commands(gs)
+                self.resume_pending_actions(gs)
             }
             _ => {
                 // Fall back to effect modification for non-card-specific position choices
@@ -2454,7 +2454,7 @@ impl super::resolver::AbilityResolver {
         // For now, the baton touch replacements and lock are recorded so debut abilities
         // see baton_touch_count > 0 and can trigger correctly.
         self.clear_choice_state(gs);
-        self.resume_pending_commands(gs)
+        self.resume_pending_actions(gs)
     }
 
     fn handle_conditional_optional(
@@ -2521,7 +2521,7 @@ impl super::resolver::AbilityResolver {
                 gs.ability_queue.set_pending_actions(vec![cmd]);
             }
         }
-        self.resume_pending_commands(gs)?;
+        self.resume_pending_actions(gs)?;
         Ok(())
     }
 
@@ -2543,7 +2543,7 @@ impl super::resolver::AbilityResolver {
             }
         }
         self.clear_choice_state(gs);
-        self.resume_pending_commands(gs)
+        self.resume_pending_actions(gs)
     }
 
     fn handle_choice_condition(
@@ -2632,7 +2632,7 @@ impl super::resolver::AbilityResolver {
 
     fn clear_choice_state_and_resume(&mut self, gs: &mut GameState) -> Result<(), String> {
         self.clear_choice_state(gs);
-        self.resume_pending_commands(gs)
+        self.resume_pending_actions(gs)
     }
 
     /// Recursively set target on all sub-effects that don't have an explicit target.

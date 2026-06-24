@@ -621,7 +621,7 @@ impl AbilityResolver {
                             effect.clone()
                         };
                         gs.ability_queue.set_pending_actions(vec![cmd]);
-                        return self.resume_pending_commands(gs);
+                        return self.resume_pending_actions(gs);
                     }
                 }
             }
@@ -651,7 +651,7 @@ impl AbilityResolver {
                 if let Some(cmd) = cmd {
                     gs.ability_queue.set_pending_actions(vec![cmd]);
                 }
-                return self.resume_pending_commands(gs);
+                return self.resume_pending_actions(gs);
             }
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 if let Ok(json) = serde_json::to_string(&effect) {
@@ -704,7 +704,7 @@ impl AbilityResolver {
         }
         self.pending_choice = None;
         self.clear_choice_meta(gs);
-        self.resume_pending_commands(gs)?;
+        self.resume_pending_actions(gs)?;
         Ok(())
     }
 
@@ -730,7 +730,7 @@ impl AbilityResolver {
                 .map(|e| e.conditional_choice = Some(s));
         }
         self.pending_choice = None;
-        self.resume_pending_commands(gs)?;
+        self.resume_pending_actions(gs)?;
         Ok(())
     }
 }
