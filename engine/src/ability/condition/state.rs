@@ -747,45 +747,31 @@ impl<'a> ConditionContext<'a> {
                     return actual >= target_count;
                 }
             }
-            let target = condition.target.as_deref().unwrap_or("self");
-            let is_opponent = target == "opponent" || condition.text.contains("相手");
-            let player = if is_opponent {
+            let is_opponent = condition.target.as_deref().unwrap_or("self") == "opponent"
+                || condition.text.contains("相手");
+            // First pass: check recently_state_changed for actual transitions.
+            // This is the primary source — only cards that actually changed state
+            // should satisfy the condition.
+            let target_player = if is_opponent {
                 self.resolve_condition_player("opponent")
             } else {
                 self.resolve_condition_player("self")
             };
-            for &card_id in &player.stage.stage {
-                if card_id == -1 {
+            let stage_set: std::collections::HashSet<i16> =
+                target_player.stage.stage.iter().copied().collect();
+            for (cid, cfrom, cto) in &self.game_state.recently_state_changed {
+                if !stage_set.contains(cid) {
                     continue;
                 }
-                let ori = self.game_state.mods.get_orientation_modifier(card_id);
-                let orientation_ok = match (from, to) {
-                    ("active", "wait") => ori.is_some_and(|s| s == "wait"),
-                    ("wait", "active") => ori.is_none_or(|s| s == "active"),
-                    _ => false,
-                };
-                log::debug!(
-                    "[STATE_CHANGE_COND] card_id={} from={:?} to={:?} ori={:?} orientation_ok={}",
-                    card_id,
-                    from,
-                    to,
-                    ori,
-                    orientation_ok
-                );
-                if !orientation_ok {
+                if cfrom != from || cto != to {
                     continue;
                 }
+                // Apply extra filters (cost_limit, etc.)
                 if let Some(cl) = condition.cost_limit {
                     let card_db = &self.game_state.card_database;
-                    let cost_ok = card_db.get_card(card_id).is_some_and(|c| {
+                    let cost_ok = card_db.get_card(*cid).is_some_and(|c| {
                         let card_cost = c.cost.unwrap_or(0);
                         let op = condition.cost_limit_operator.as_deref().unwrap_or("<=");
-                        log::debug!(
-                            "[STATE_CHANGE_COND] cost_limit={} card_cost={} op={:?}",
-                            cl,
-                            card_cost,
-                            op
-                        );
                         match op {
                             "<=" => card_cost <= cl,
                             "<" => card_cost < cl,
@@ -796,14 +782,20 @@ impl<'a> ConditionContext<'a> {
                         }
                     });
                     if !cost_ok {
-                        log::debug!("[STATE_CHANGE_COND] cost check failed");
                         continue;
                     }
                 }
-                log::debug!("[STATE_CHANGE_COND] ALL CHECKS PASSED, returning true");
+                log::debug!(
+                    "[STATE_CHANGE_COND] card={} transition {}→{} matches (recently_state_changed)",
+                    cid,
+                    cfrom,
+                    cto
+                );
                 return true;
             }
-            log::debug!("[STATE_CHANGE_COND] no matching card found, returning false");
+            log::debug!(
+                "[STATE_CHANGE_COND] no matching transition found in recently_state_changed"
+            );
             return false;
         }
         true

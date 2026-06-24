@@ -192,6 +192,14 @@ impl GameState {
         ) {
             return true;
         }
+        // State change (active↔wait) — pre-filter so the condition only
+        // fires when a recorded transition is available.
+        if matches!(
+            condition.condition_type,
+            Some(crate::ability::enums::ConditionType::StateChangeCondition)
+        ) {
+            return true;
+        }
         // Recurse into compound conditions — if any child is event-based,
         // the whole compound is pre-filtered.
         if let Some(ref children) = condition.conditions {
@@ -741,6 +749,7 @@ impl GameState {
             self.process_current_ability();
             let had_recent_moves = self.recently_moved_cards.is_some();
             self.recently_moved_cards = None;
+            self.recently_state_changed.clear();
             self.recently_moved_from_zone = None;
             // Save flag for the post-loop batch scan below;
             // process_current_ability's internal scan (line 742) already ran
@@ -806,6 +815,7 @@ impl GameState {
             };
             self.trigger_auto_abilities_for_player_with_event(player_id, &event);
             self.recently_moved_cards = None;
+            self.recently_state_changed.clear();
             self.recently_moved_from_zone = None;
             self.batch_movements.clear();
             // Re-enter the loop to process any abilities just enqueued
@@ -2230,6 +2240,7 @@ impl GameState {
         self.live_success_p1_extra = 0;
         self.live_success_p2_extra = 0;
         self.last_state_change_wait_to_active_count = 0;
+        self.recently_state_changed.clear();
         self.self_no_excess_heart_this_turn = false;
     }
 

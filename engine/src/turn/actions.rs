@@ -539,6 +539,7 @@ impl super::TurnEngine {
                 if game_state.ability_queue.start_next() {
                     game_state.recently_moved_cards = None;
                     game_state.recently_moved_from_zone = None;
+                    game_state.recently_state_changed.clear();
                     game_state.process_current_ability();
                 }
                 // If the ability completed without pausing, drain newly-queued
@@ -739,6 +740,7 @@ impl super::TurnEngine {
                 game_state.process_pending_auto_abilities(&player_id);
                 game_state.just_completed_ability_key = None;
                 game_state.recently_moved_cards = None;
+                game_state.recently_state_changed.clear();
             } else if effect_ready {
                 log::debug!("RWC: calling process_current_ability");
                 eprintln!("[RWC_EFFECT_READY] storing resolver and calling PCA");
@@ -829,6 +831,7 @@ impl super::TurnEngine {
                 game_state.process_pending_auto_abilities(&player_id);
                 game_state.just_completed_ability_key = None;
                 game_state.recently_moved_cards = None;
+                game_state.recently_state_changed.clear();
             } else {
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
@@ -854,6 +857,7 @@ impl super::TurnEngine {
                 game_state.process_pending_auto_abilities(&player_id);
                 game_state.just_completed_ability_key = None;
                 game_state.recently_moved_cards = None;
+                game_state.recently_state_changed.clear();
             }
         }
         Ok(())

@@ -330,6 +330,19 @@ impl AbilityResolver {
                 state_change
             );
 
+            // Snapshot orientations BEFORE applying any changes (for active→wait
+            // and wait→active transition detection).
+            let snapshots: std::collections::HashMap<i16, Option<String>> = actual_targets
+                .iter()
+                .map(|(_, card_id)| {
+                    (
+                        *card_id,
+                        gs.mods.get_orientation_modifier(*card_id).cloned(),
+                    )
+                })
+                .collect();
+            gs.state_snapshot_before_change = Some(snapshots);
+
             // Count how many are in wait state before changing (for wait→active tracking)
             let wait_before_count = actual_targets
                 .iter()
@@ -371,6 +384,28 @@ impl AbilityResolver {
                     wait_before_count as u32
                 };
                 gs.last_state_change_wait_to_active_count = actual_count;
+            }
+
+            // Compare snapshot with current state to detect actual transitions.
+            if let Some(before) = gs.state_snapshot_before_change.take() {
+                for (card_id, before_ori) in &before {
+                    let after_ori = gs.mods.get_orientation_modifier(*card_id).cloned();
+                    if before_ori != &after_ori {
+                        let from_str = before_ori.as_deref().unwrap_or("active").to_string();
+                        let to_str = after_ori.as_deref().unwrap_or("active").to_string();
+                        gs.recently_state_changed.push((
+                            *card_id,
+                            from_str.clone(),
+                            to_str.clone(),
+                        ));
+                        log::debug!(
+                            "[STATE_CHANGE] detected: card={} {}→{}",
+                            card_id,
+                            from_str,
+                            to_str
+                        );
+                    }
+                }
             }
 
             // Re-trigger auto abilities for both players — a member's state

@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-24T17:40:35.959170",
+  "generated_at": "2026-06-24T17:52:36.994402",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -2435,7 +2435,6 @@
         "state_change": "wait",
         "count": 1,
         "card_type": "member_card",
-        "position": "center",
         "type": "change_state"
       },
       "effect": {
@@ -2551,7 +2550,6 @@
             "state_change": "wait",
             "card_type": "member_card",
             "self_cost": true,
-            "position": "center",
             "type": "change_state"
           },
           {
@@ -2562,8 +2560,7 @@
             "count": 1,
             "type": "move_cards"
           }
-        ],
-        "position": "center"
+        ]
       },
       "effect": {
         "text": "このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室から、そのメンバーのコストに2を足した数に等しいコストの『Aqours』のメンバーカードを1枚、そのメンバーがいたエリアに登場させる",
@@ -4602,7 +4599,6 @@
         "state_change": "wait",
         "card_type": "member_card",
         "self_cost": true,
-        "position": "left_side",
         "type": "change_state"
       },
       "effect": {
@@ -12467,7 +12463,6 @@
             "state_change": "wait",
             "card_type": "member_card",
             "self_cost": true,
-            "position": "center",
             "type": "change_state"
           },
           {
@@ -12478,8 +12473,7 @@
             "count": 1,
             "type": "move_cards"
           }
-        ],
-        "position": "center"
+        ]
       },
       "effect": {
         "text": "ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを1枚ずつ公開する。そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く",
@@ -13162,7 +13156,6 @@
           "BiBi"
         ],
         "optional": true,
-        "position": "center",
         "type": "change_state"
       },
       "effect": {

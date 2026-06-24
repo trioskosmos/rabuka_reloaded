@@ -4166,9 +4166,14 @@ def _extract_basic_cost_fields(cost, text):
     if exclude_chars:
         cost["exclude_characters"] = exclude_chars
 
-    # Extract position restrictions (e.g., "センター", "左サイド")
+    # Extract position restrictions (e.g., "センター", "左サイド").
+    # Skip keywords that only appear inside icon templates {{...}} — those
+    # are activation-requirement positions (e.g. {{center.png|センター}}),
+    # already captured as activation_position on the effect. Only set cost
+    # position from bare (non-icon) keywords which indicate target filtering.
     if "position" not in cost:
-        matched = {pos for kw, pos in POSITION_KEYWORDS.items() if kw in text}
+        clean_text = re.sub(r"\{\{[^}]+?\}\}", "", text)
+        matched = {pos for kw, pos in POSITION_KEYWORDS.items() if kw in clean_text}
         if "left_side" in matched and "right_side" in matched:
             cost["position"] = "left_side"
             cost["position_compare"] = "right_side"

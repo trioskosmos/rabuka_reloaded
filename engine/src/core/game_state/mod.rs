@@ -88,6 +88,13 @@ pub struct GameState {
     pub turn_movements: Vec<MovementEvent>,
     /// Counter for assigning unique timestamps to MovementEvents within a turn.
     pub movement_event_counter: u32,
+    /// Snapshot of target cards' orientations taken before a change_state
+    /// effect executes. Compared after the effect to detect actual transitions.
+    /// None = no snapshot active.
+    pub state_snapshot_before_change: Option<std::collections::HashMap<i16, Option<String>>>,
+    /// After a change_state effect executes, records what actually changed:
+    /// (card_id, from_state, to_state). Cleared after post-resolution TAS scan.
+    pub recently_state_changed: Vec<(i16, String, String)>,
     pub debut_ability_triggers: Vec<(String, i16)>,
     pub last_vacated_stage_area: Option<usize>,
     // --- 4-byte aligned (u32, Option<i32>) ---
@@ -239,6 +246,8 @@ impl GameState {
             turn_area_movements: Vec::new(),
             turn_movements: Vec::new(),
             movement_event_counter: 0,
+            state_snapshot_before_change: None,
+            recently_state_changed: Vec::new(),
             debut_ability_triggers: Vec::new(),
             last_vacated_stage_area: None,
             // 4-byte aligned

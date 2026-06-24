@@ -22,6 +22,7 @@ use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
 /// Maki debut at center: pay optional cost → opponent waits 1 member.
+/// ab#1 (auto-draw on state change) triggers after the effect resolves.
 #[test]
 fn maki_debut_pay_cost_opponent_waits_one() {
     let db = load_real_database();
@@ -39,16 +40,15 @@ fn maki_debut_pay_cost_opponent_waits_one() {
 
     game.play_to_stage(maki, MemberArea::Center);
 
-    // 1. SelectAutoAbility: pick ability to process. option(1) = auto (index 1)
-    game.select_option(1);
-    // auto fails (no wait yet). ab#0 runs → optional cost choice created.
+    // ab#1 is pre-filtered out (no state change yet). ab#0 auto-resolves.
 
-    // 2. Pay optional cost (card_id=1 → "pay_optional_cost")
+    // 1. Pay optional cost (card_id=1 → "pay_optional_cost")
     game.select_option(1);
 
-    // 3. Opponent choice: select which of their 2 members to wait
+    // 2. Opponent choice: select which of their 2 members to wait
     game.select_indices(&[0]);
 
+    // 3. ab#1 triggers (state change detected) and auto-resolves
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
@@ -86,7 +86,7 @@ fn maki_debut_skip_cost_no_effect() {
 
     game.play_to_stage(maki, MemberArea::Center);
 
-    game.select_option(1); // SelectAutoAbility: pick auto (fails), then debut runs
+    // ab#1 is pre-filtered out (no state change yet). ab#0 auto-resolves.
 
     // Skip the optional cost (card_id != Some(1) → "skip_optional_cost")
     game.select_option(0);
@@ -123,8 +123,9 @@ fn maki_ab1_draws_on_cost4_or_less_opponent_waited() {
     // hand = [maki, filler] = 2. deck = [extra] = 1.
     game.play_to_stage(maki, MemberArea::Center);
     // hand = [filler] = 1 (maki removed). deck unchanged.
-    game.select_option(1); // SelectAutoAbility: auto (fails) → debut → optional cost
-    game.select_option(1); // Pay optional cost → effect waits opponent → ab#1 draws from deck
+
+    // ab#1 is pre-filtered out (no state change yet). ab#0 auto-resolves.
+    game.select_option(1); // Pay optional cost → effect waits opponent → ab#1 triggers (state change detected) and draws from deck
                            // hand = [filler, extra] = 2. deck = [].
     while game.has_pending_choice() {
         game.select_indices(&[]);
@@ -157,11 +158,11 @@ fn maki_ab1_no_draw_on_cost_over4_opponent_waited() {
     game.give_energy(11);
 
     // hand_before = 2 (maki + filler). After play_to_stage: hand=1 (maki removed).
-    // ab#1 condition FAILS for cost 13 > 4 → no draw.
+    // ab#1 pre-filtered out (no state change yet). ab#0 auto-resolves.
     game.play_to_stage(maki, MemberArea::Center);
 
-    game.select_option(1); // SelectAutoAbility: auto (fails) → debut → optional cost
     game.select_option(1); // Pay optional cost
+                           // Opponent wait happens, but ab#1 condition fails for cost 13 > 4 → no draw.
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
@@ -196,7 +197,8 @@ fn maki_ab1_use_limit_once_per_turn() {
 
     // hand = [maki, filler] = 2
     game.play_to_stage(maki, MemberArea::Center);
-    game.select_option(1); // SelectAutoAbility → auto (fails) → debut
+
+    // ab#1 pre-filtered out (no state change yet). ab#0 auto-resolves.
     game.select_option(1); // Pay optional cost
     let entry = game.state.ability_queue.current_entry();
     assert_eq!(
@@ -255,7 +257,8 @@ fn maki_ab0_plus_ab1_end_to_end() {
 
     // hand = [maki, filler] = 2. play maki → hand=1. draw → hand=2.
     game.play_to_stage(maki, MemberArea::Center);
-    game.select_option(1); // SelectAutoAbility: auto → debut
+
+    // ab#1 pre-filtered out (no state change yet). ab#0 auto-resolves.
     game.select_option(1); // Pay optional cost
     while game.has_pending_choice() {
         game.select_indices(&[]);
