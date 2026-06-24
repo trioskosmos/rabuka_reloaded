@@ -8,6 +8,7 @@
 /// can you still select 1 and add it to hand? A: No — the effect requires 2 distinct
 /// names to proceed.
 use crate::helpers::*;
+use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
 
 /// Positive: 2 distinct live cards in discard → ability proceeds.
@@ -107,5 +108,45 @@ fn toubatsu_q118_1_live_card_fails() {
     assert!(
         !game.state.player1.hand.cards.contains(&live_a),
         "Live card should not be added: effect needs 2 distinct cards"
+    );
+}
+
+/// Q263: Auto ability triggers when member moves from center area to another area.
+/// The auto ability offers a choice of 3 options: +2 blades until live end,
+/// weigh 1 opponent member with ≤2 blades, or draw 1 card.
+#[test]
+fn toubatsu_q263_center_to_area_move_triggers_auto() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let toubatsu = game.id("PL!SP-pb2-011-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // Place on center (index 1)
+    game.state.player1.stage.stage[1] = toubatsu;
+
+    // Set stage position snapshot to record old position (center)
+    let mut snapshot = std::collections::HashMap::new();
+    snapshot.insert(toubatsu, 1usize);
+    game.state.stage_position_snapshot = Some(snapshot);
+
+    // Simulate area move: center → left (index 0)
+    game.state.player1.stage.stage[1] = -1;
+    game.state.player1.stage.stage[0] = toubatsu;
+    game.state.record_card_movement(toubatsu);
+    game.state.position_change_occurred_this_turn = true;
+
+    let pid = game.state.player1.id.clone();
+    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    game.state.process_pending_auto_abilities(&pid);
+
+    // Auto should fire with a 3-option choice (blades / wait / draw)
+    assert!(
+        game.has_pending_choice(),
+        "Q263: Auto ability should create a choice on center→area move"
     );
 }

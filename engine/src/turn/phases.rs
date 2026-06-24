@@ -23,6 +23,7 @@ impl super::TurnEngine {
                 Phase::Active => {
                     game_state.reset_keyword_tracking();
                     game_state.recalculate_constants();
+                    // Q135: Weighed members become active during the active phase (7.4.1).
                     // Rule 7.4.1: Only the turn player activates their wait cards
                     // Check if the turn player's activation is restricted
                     let turn_player_id = &game_state.active_player().id.clone();
@@ -99,9 +100,12 @@ impl super::TurnEngine {
             }
         } else if game_state.current_turn_phase == crate::game_state::TurnPhase::Live {
             match game_state.current_phase {
+                // Q72: Live card set phase can be done even with no members on stage.
                 Phase::LiveCardSetFirstAttacker => {
                     game_state.current_phase = Phase::LiveCardSetSecondAttacker;
                 }
+                // Q104: When discarding N from top of deck with fewer than N cards,
+                // refresh in between (handled by draw/peek functions automatically).
                 Phase::LiveCardSetSecondAttacker => {
                     game_state.player1.live_card_set_limit_reduction = 0;
                     game_state.player2.live_card_set_limit_reduction = 0;
@@ -419,6 +423,8 @@ impl super::TurnEngine {
         };
     }
 
+    // Q16: First player determined by RPS. Q17: First player mulligans first.
+    // Q18: Only one mulligan per player. Q19: Mulligan is optional (can skip).
     pub(crate) fn handle_mulligan_selection(
         game_state: &mut GameState,
         card_id: Option<i16>,
@@ -530,6 +536,11 @@ impl super::TurnEngine {
     }
 
     #[allow(clippy::too_many_arguments)]
+    // Q70: An area that had a member placed in it this turn cannot have another
+    // member placed in it by any means. Q71: If the member leaves the area,
+    // the now-empty area can receive a new member the same turn.
+    // Q87: Baton touch can be performed multiple times per turn, but a member
+    // who entered via baton touch cannot baton touch again that turn.
     pub fn handle_play_member_to_stage(
         game_state: &mut GameState,
         card_id: Option<i16>,

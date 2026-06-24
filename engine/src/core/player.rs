@@ -479,11 +479,13 @@ impl Player {
 
     // ... (rest of the code remains the same)
 
+    // Q53: Refresh procedure — when main deck reaches 0, shuffle waitroom into a new deck.
     pub fn refresh(&mut self) {
         // Rule 10.2: Refresh when main deck is empty and waitroom has cards
 
         // Rule 10.2.1: Condition - main deck is empty AND waitroom has cards
 
+        // Q85/Q86: Look-at-N-cards with insufficient deck triggers refresh in between.
         // Rule 10.2.2: Shuffle waitroom cards and place them on top of main deck
 
         // Rule 10.2.3: This happens automatically during check timing

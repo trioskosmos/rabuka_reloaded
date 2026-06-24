@@ -113,6 +113,8 @@ impl super::TurnEngine {
             .iter()
             .map(|(&k, e)| (k, e.total()))
             .collect();
+        // Q48: A live can be won even with total score 0 or less
+        // (score comparison determines the winner regardless of absolute value).
         let p1_extra: u32;
         let p2_extra: u32;
         if game_state.live_success_triggered_this_turn && game_state.live_success_p2_fired {
@@ -1118,7 +1120,8 @@ impl super::TurnEngine {
             });
         }
 
-        // Yell cards
+        // Q40: Yell must complete ALL checks — even if hearts are already satisfied,
+        // the full blade-count of yell cards is always revealed.
         let mut yell_cards = Vec::new();
         for _ in 0..total_blade {
             if let Some(card_id) = player.main_deck.draw() {
@@ -1203,12 +1206,15 @@ impl super::TurnEngine {
                 if let Some(ref bh) = card.blade_heart {
                     for (color, count) in &bh.hearts {
                         let effective_color = override_color.unwrap_or(*color);
+                        // Q45: ALL-blade (BAll) can be treated as any color heart
+                        // during heart requirement check (mapped to Heart00 wildcard).
                         if effective_color == HeartColor::BAll {
                             *owned_hearts.hearts.entry(HeartColor::Heart00).or_insert(0) += count;
                             bh_arr[0] += count;
                             total_hearts_arr[0] += count;
                         } else if effective_color == HeartColor::Draw {
                             draw_icons += count;
+                        // Q44: Each score icon revealed during yell adds 1 to total score.
                         } else if effective_color == HeartColor::Score {
                             note_icons += count;
                             cheer_icon_count += count;
@@ -1250,6 +1256,7 @@ impl super::TurnEngine {
             }
         }
 
+        // Q43: Each draw icon revealed during yell draws 1 card.
         // Process all deferred draw effects after all yell cards are revealed (Q42).
         for _ in 0..total_draw_icons {
             if let Some(new_card) = player.main_deck.draw() {
@@ -1594,6 +1601,8 @@ impl super::TurnEngine {
             }
         }
 
+        // Q259: Required heart check is only performed at live success judgment timing.
+        // Subsequent changes do NOT retroactively fail a live.
         let any_requirement_failed = live_card_ids.iter().enumerate().any(|(live_idx, &lc_id)| {
             card_db.get_card(lc_id).is_some_and(|card| {
                 let nh = match card.need_heart.as_ref() {
@@ -1610,6 +1619,7 @@ impl super::TurnEngine {
                         };
                         if let Some(card_mods) = need_heart_modifiers.get(&lc_id) {
                             for (color, me) in card_mods {
+                                // Q115: Set-to-X applies first, then add/subtract modifiers stack.
                                 if me.set != 0 {
                                     adjusted.hearts.insert(*color, me.set as u32);
                                 }
@@ -1673,6 +1683,8 @@ impl super::TurnEngine {
 
         let revealed_ids: Vec<i16> = resolution_zone.cards.iter().copied().collect();
         player.last_resolution_cards = revealed_ids.clone();
+        // Q41: Yell-revealed cards go to waitroom during live victory determination,
+        // after successful cards are placed in the success zone (Rule 8.4.7).
         for card_id in resolution_zone.cards.drain(..) {
             player.waitroom.add_card(card_id);
         }

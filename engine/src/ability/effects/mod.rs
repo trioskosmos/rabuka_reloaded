@@ -15,6 +15,7 @@ use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 
 impl AbilityResolver {
+    // Q55: Effects resolve as much as possible; partial resolution required when full is impossible.
     pub fn execute_effect(
         &mut self,
         gs: &mut GameState,
@@ -611,6 +612,7 @@ impl AbilityResolver {
                 effect.target_count.unwrap_or(0),
                 effect.target_name(),
             ),
+            // Q57: A "cannot do X" effect takes priority over an effect that would do X.
             ActionType::Restriction => self.execute_restriction(
                 gs,
                 effect.restriction_type.as_deref(),

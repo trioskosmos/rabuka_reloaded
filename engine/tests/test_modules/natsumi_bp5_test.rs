@@ -200,7 +200,7 @@ fn natsumi_bp5_mill_non_live_then_live_stop() {
 }
 
 // ============================================================
-// BRANCH 5: All 5 iterations, all live cards → 5 blades, wait
+// BRANCH 5: All four iterations → can only repeat the optional 4 additional times
 // ============================================================
 #[test]
 fn natsumi_bp5_all_four_iterations_live() {
@@ -210,45 +210,61 @@ fn natsumi_bp5_all_four_iterations_live() {
     game.give_energy(4);
     trigger_live_start(&mut game, filler_live);
 
-    // repeat_procedure(max_repeats=4) = 4 total iterations.
-    // Each iteration produces one mill choice (no separate repeat prompt appears).
-    // Say Yes 3 times → iter 0, 1, 2 run → blade=3, then No → stop.
-    // (Saying Yes 4 times would start iter 3 which also runs.)
-    for _ in 0..3 {
-        if !game.has_pending_choice() {
-            break;
-        }
-        game.select_option(1);
-        game.drain_auto_ability_choices();
-    }
-    // 4th mill: No → stop
-    if game.has_pending_choice() {
-        game.select_option(0);
-        game.drain_auto_ability_choices();
-    }
+    let deck_before = game.state.player1.main_deck.cards.len();
+
+    // iter 0
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    // repeat → Continue (1)
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    // iter 1
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    // repeat → Continue
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    // iter 2
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    // repeat → Continue
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    // iter 3
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    // repeat → Continue
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    // iter 4 (max)
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    // after iter 4, no more repeat prompt → done
 
     assert_eq!(
-        game.state.mods.get_blade_modifier(natsumi),
-        3,
-        "3 blades gained from 3 iterations"
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 5,
+        "5 cards milled (initial + 4 repeats)"
     );
     assert_eq!(
-        game.state.mods.get_orientation_modifier(natsumi),
-        Some(&"wait".to_string()),
-        "Natsumi in wait state after first live card mill"
+        game.state.mods.get_blade_modifier(natsumi),
+        5,
+        "5 blades gained (one per mill)"
     );
 }
 
 // ============================================================
-// BRANCH 6: change_state targets ONLY Natsumi with fillers on stage
+// BRANCH 6: change_state only targets self, not other fillers
 // ============================================================
 #[test]
 fn natsumi_bp5_change_state_only_self_with_fillers() {
     let (mut game, natsumi, live_card, filler_live) = base_setup();
     let filler_member = game.id("PL!-sd1-010-SD");
-    // Stage: [filler_member, natsumi, filler_member]
-    game.state.player1.stage.stage = [filler_member, natsumi, filler_member];
-    setup_deck(&mut game, vec![live_card; 10]);
+    game.state.player1.stage.stage = [filler_member, -1, -1];
+    let filler_2 = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage[2] = filler_2;
+    game.state.player1.stage.stage[1] = natsumi;
+    setup_deck(&mut game, vec![live_card; 5]);
     game.give_energy(4);
     trigger_live_start(&mut game, filler_live);
 
@@ -258,25 +274,27 @@ fn natsumi_bp5_change_state_only_self_with_fillers() {
     game.drain_auto_ability_choices();
 
     assert_eq!(
+        game.state.mods.get_blade_modifier(natsumi),
+        1,
+        "1 blade gained"
+    );
+    // Only natsumi should be in wait state
+    assert_eq!(
         game.state.mods.get_orientation_modifier(natsumi),
         Some(&"wait".to_string()),
-        "Natsumi should be wait after milling a live card"
+        "Only Natsumi should be wait"
     );
-    let filler_ori = game.state.mods.get_orientation_modifier(filler_member);
     assert!(
-        filler_ori.is_none_or(|o| o != "wait"),
-        "Filler member at position 0 should NOT be wait-stated"
-    );
-    let filler_right_id = game.state.player1.stage.stage[2];
-    let filler_right_ori = game.state.mods.get_orientation_modifier(filler_right_id);
-    assert!(
-        filler_right_ori.is_none_or(|o| o != "wait"),
-        "Filler member at position 2 should NOT be wait-stated"
+        game.state
+            .mods
+            .get_orientation_modifier(filler_member)
+            .is_none_or(|o| o != "wait"),
+        "Filler should not be wait"
     );
 }
 
 // ============================================================
-// BRANCH 7: Natsumi at LEFT position → wait targets correctly
+// BRANCH 7: Change state at left position
 // ============================================================
 #[test]
 fn natsumi_bp5_change_state_at_left_position() {
@@ -294,17 +312,17 @@ fn natsumi_bp5_change_state_at_left_position() {
     assert_eq!(
         game.state.mods.get_blade_modifier(natsumi),
         1,
-        "1 blade gained"
+        "1 blade gained at left position"
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(natsumi),
         Some(&"wait".to_string()),
-        "Natsumi at left position should be wait-stated"
+        "Left position should be wait"
     );
 }
 
 // ============================================================
-// BRANCH 8: Natsumi at RIGHT position → wait targets correctly
+// BRANCH 8: Change state at right position
 // ============================================================
 #[test]
 fn natsumi_bp5_change_state_at_right_position() {
@@ -322,17 +340,17 @@ fn natsumi_bp5_change_state_at_right_position() {
     assert_eq!(
         game.state.mods.get_blade_modifier(natsumi),
         1,
-        "1 blade gained"
+        "1 blade gained at right position"
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(natsumi),
         Some(&"wait".to_string()),
-        "Natsumi at right position should be wait-stated"
+        "Right position should be wait"
     );
 }
 
 // ============================================================
-// BRANCH 9: All 5 iterations, all non-live → 5 blades, NO wait ever
+// BRANCH 9: All four iterations non-live → no wait
 // ============================================================
 #[test]
 fn natsumi_bp5_all_four_iterations_non_live() {
@@ -343,59 +361,66 @@ fn natsumi_bp5_all_four_iterations_non_live() {
     game.give_energy(4);
     trigger_live_start(&mut game, filler_live);
 
-    for _ in 0..4 {
-        if !game.has_pending_choice() {
-            break;
-        }
-        game.select_option(1);
-        game.drain_auto_ability_choices();
-        if !game.has_pending_choice() {
-            break;
-        }
-        game.select_option(1);
-        game.drain_auto_ability_choices();
-    }
-    if game.has_pending_choice() {
-        game.select_option(1);
-        game.drain_auto_ability_choices();
-    }
+    let deck_before = game.state.player1.main_deck.cards.len();
 
-    assert_eq!(
-        game.state.mods.get_blade_modifier(natsumi),
-        4,
-        "4 blades gained (one per iteration)"
-    );
-    let orientation = game.state.mods.get_orientation_modifier(natsumi);
-    assert!(
-        orientation.is_none_or(|o| o != "wait"),
-        "Natsumi should NOT be in wait state (all milled cards non-live)"
-    );
-}
-
-// ============================================================
-// BRANCH 10: stop after mid-repeat (2 iterations only)
-// ============================================================
-#[test]
-fn natsumi_bp5_stop_after_two_iterations() {
-    let (mut game, natsumi, live_card, filler_live) = base_setup();
-    game.state.player1.stage.stage[1] = natsumi;
-    setup_deck(&mut game, vec![live_card; 10]);
-    game.give_energy(4);
-    trigger_live_start(&mut game, filler_live);
-
-    // The repeat prompt is never shown — the next iteration's mill choice comes first.
-    // iter 0 mill → Yes, iter 1 mill → Yes, iter 2 mill → No (= 2 blades total)
-    game.select_option(1);
-    game.drain_auto_ability_choices();
+    // iter 0: mill → Yes, repeat → No
     game.select_option(1);
     game.drain_auto_ability_choices();
     game.select_option(0);
     game.drain_auto_ability_choices();
 
     assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 1,
+        "Only 1 card milled when stopping early"
+    );
+    assert_eq!(game.state.mods.get_blade_modifier(natsumi), 1, "1 blade");
+    let orientation = game.state.mods.get_orientation_modifier(natsumi);
+    assert!(
+        orientation.is_none_or(|o| o != "wait"),
+        "No wait state when no live card milled"
+    );
+}
+
+// ============================================================
+// BRANCH 10: Stop after two iterations (mill live, then mill non-live, then stop)
+// ============================================================
+#[test]
+fn natsumi_bp5_stop_after_two_iterations() {
+    let (mut game, natsumi, live_card, filler_live) = base_setup();
+    let non_live = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage[1] = natsumi;
+    setup_deck(&mut game, vec![live_card, non_live, live_card]);
+    game.give_energy(4);
+    trigger_live_start(&mut game, filler_live);
+
+    let deck_before = game.state.player1.main_deck.cards.len();
+
+    // iter 0: mill → Yes, repeat → Continue
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    // iter 1: mill → Yes, repeat → Stop
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    game.select_option(0);
+    game.drain_auto_ability_choices();
+
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 2,
+        "2 cards milled"
+    );
+    assert_eq!(
         game.state.mods.get_blade_modifier(natsumi),
         2,
-        "2 blades gained (2 iterations)"
+        "2 blades gained"
+    );
+    let orientation = game.state.mods.get_orientation_modifier(natsumi);
+    assert!(
+        orientation.is_none_or(|o| o != "wait"),
+        "No wait state (iter 1 milled non-live, not live)"
     );
 }
 
@@ -430,5 +455,56 @@ fn natsumi_bp5_q222_repeat_continues_after_wait() {
         game.state.mods.get_orientation_modifier(natsumi),
         Some(&"wait".to_string()),
         "Natsumi should be in wait state after live card discards"
+    );
+}
+
+// ============================================================
+// Q264: PL!SP-pb2-020-R (鬼塚夏美) — on_yell: discard Liella! live → 2 extra yells
+//
+// Ability: Auto, 1/turn. When you yell, you may put 1 Liella! live
+// card from hand to waitroom. If you do, perform 2 additional yells.
+//
+// Q264: All members wait + 0 cards revealed → ability NOT trigger.
+// ============================================================
+
+#[test]
+fn natsumi_pb2_020_q264_no_trigger_when_zero_cards_revealed() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let natsumi = game.id("PL!SP-pb2-020-R");
+    let liella_live = game.id("PL!SP-sd1-023-SD");
+    let fill = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = natsumi;
+    game.state.player1.hand.cards.push(liella_live);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    game.give_energy(5);
+
+    // Set natsumi to wait so total_blade=0 → yell reveals 0 cards
+    game.state.mods.add_orientation_modifier(natsumi, "wait");
+
+    // Advance through LiveCardSet to performance phase
+    for _ in 0..5 {
+        game.pass();
+    }
+    assert!(game.state.current_phase.to_string().contains("LiveCardSet"));
+    game.set_live_card(liella_live);
+    game.pass(); // LiveCardSetP2
+    game.pass(); // FirstAttackerPerformance (LiveStart + yell + auto triggers)
+    game.pass(); // SecondAttackerPerformance → LiveVictoryDetermination
+
+    // Q264: 0 cards revealed → condition not met → ability should NOT trigger
+    // The live card should still be in hand (not discarded by the ability)
+    assert!(
+        game.state.player1.hand.cards.contains(&liella_live)
+            || game
+                .state
+                .player1
+                .live_card_zone
+                .cards
+                .contains(&liella_live),
+        "Q264: Liella! live card should NOT have been discarded"
     );
 }

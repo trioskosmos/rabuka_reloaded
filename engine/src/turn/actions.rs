@@ -872,6 +872,8 @@ impl super::TurnEngine {
     }
 
     pub fn check_timing(game_state: &mut GameState) {
+        // Q100: Yell-revealed cards are NOT included in refresh when deck hits 0 during yell.
+        // Q101: Full refresh procedure during mid-effect resolution.
         game_state.player1.refresh();
         game_state.player2.refresh();
         let p1_needs_refresh = game_state.player1.main_deck.cards.is_empty()
@@ -888,9 +890,12 @@ impl super::TurnEngine {
             game_state.player2.main_deck.cards.append(&mut waitroom);
             game_state.player2.main_deck.shuffle();
         }
+        // Q48: Can win with score 0 or less (score comparison, not absolute value).
         // Rule 10.4: Duplicate member processing
         Self::check_duplicate_members(&mut game_state.player1, &game_state.card_database);
         Self::check_duplicate_members(&mut game_state.player2, &game_state.card_database);
+        // Q84: When multiple auto abilities trigger simultaneously,
+        // active player resolves all theirs first, then non-active player.
         Self::check_victory_condition(game_state);
         // Rule 10.5: Invalid card processing
         let p1_id = game_state.player1.id.clone();
@@ -916,6 +921,10 @@ impl super::TurnEngine {
         let p1_success_count = game_state.player1.success_live_card_zone.cards.len();
         let p2_success_count = game_state.player2.success_live_card_zone.cards.len();
 
+        // Q54: If 3+ cards end up in success zone simultaneously, game is a draw.
+        // Q49: Turn order stays same if no player won. Q50: Same if both placed.
+        // Q51: Turn order swaps to the player who placed (if only one did).
+        // Q52: Turn order stays same if both had 2+ already and neither could place.
         // Rule 1.2.1.1: Player wins with 3+ cards when opponent has 2- cards
         // Rule 1.2.1.2: Draw if both players have 3+ cards simultaneously
         if p1_success_count >= crate::constants::VICTORY_CARD_COUNT
@@ -945,6 +954,8 @@ impl super::TurnEngine {
         }
     }
 
+    // Q88: Players cannot voluntarily discard, retire members, move members,
+    // or weigh active cards without an effect or cost.
     /// Rule 10.4: Duplicate member processing.
     /// If the stage area itself somehow has more than one top-level member,
     /// keep only the most recent one. This is a safety check — under-card members

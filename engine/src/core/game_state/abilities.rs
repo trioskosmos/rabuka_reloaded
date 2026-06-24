@@ -220,6 +220,10 @@ impl GameState {
         self.trigger_auto_abilities_for_player_with_event(player_id, &event);
     }
 
+    // Q58: Two copies of the same member with "once per turn" can each use the ability once per turn.
+    // Q59: A card that changes zones (except stage-to-stage) is treated as new; its once-per-turn resets.
+    // Q60: A non-once-per-turn auto ability that triggers must be used (cannot opt out).
+    // Q61: A once-per-turn auto ability can be skipped at one trigger timing to save it for later.
     /// Core TAS implementation that takes an explicit TriggerEvent.
     /// Callers should construct and pass the event so the scan has
     /// accurate context about what triggered it.
@@ -1739,6 +1743,8 @@ impl GameState {
         false
     }
 
+    // Q89: Multi-name cards (e.g. "A&B&C") have each constituent name
+    // but do NOT have unit/group names not written on the card.
     pub fn can_place_card_in_zone(&self, card_id: i16, zone: &str, _player_id: &str) -> bool {
         if let Some(card) = self.card_database.get_card(card_id) {
             for ability in &card.abilities {

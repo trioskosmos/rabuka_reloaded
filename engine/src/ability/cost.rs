@@ -73,6 +73,7 @@ impl AbilityResolver {
                     return Ok(());
                 }
                 let available = util::get_zone_card_count(player, source);
+                // Q56: Costs must be paid in full — partial payment does not count.
                 if available < count {
                     return Err(format!(
                         "Not enough cards in {}: need {}, have {}",

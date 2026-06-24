@@ -53,6 +53,7 @@ impl std::str::FromStr for MemberArea {
     }
 }
 
+// Q143: Center symbol means the ability is only effective when the member is in the center area.
 /// Check if a card at the given stage position can activate an ability
 /// whose trigger string contains position requirements (左サイド/右サイド/センター).
 pub fn check_trigger_position(triggers: Option<&str>, card_position: MemberArea) -> bool {
@@ -175,6 +176,13 @@ impl Stage {
         debug_assert!(self.invariant(), "Stage invariant violated after set");
     }
 
+    // Q138: Energy under a member cannot be used to pay costs
+    // (under-cards have no active/wait state).
+    // Q139: Energy under a member moves with them when changing areas on stage.
+    // Q140: When member with energy underneath moves to waitroom/hand,
+    // the energy goes to the energy deck.
+    // Q141: When baton-touching with a member that has energy underneath,
+    // the energy goes to the energy deck.
     /// Place a card (energy or member) under the member at the given area.
     /// Rule 4.5.5: Cards can be stacked beneath member cards.
     /// Swap the contents (member card + under-cards) of two stage slots by index.
@@ -206,6 +214,7 @@ impl Stage {
         &self.under_cards[index]
     }
 
+    // Q140/Q141: Energy under a member goes to energy deck when the member leaves stage.
     /// Rule 10.5.3-10.5.4: When a member leaves its area, recycle under-cards:
     /// - Member cards under → go to waitroom
     /// - Energy cards under → go to energy deck
@@ -233,6 +242,8 @@ impl Stage {
         (waitroom, energy_deck)
     }
 
+    // Q137: A member already weighed cannot be "weighed" again as a cost
+    // (weigh means changing from active to weighed state).
     pub fn clear_area(&mut self, area: MemberArea) {
         debug_assert!(self.invariant(), "Stage invariant violated before clear");
         let index = match area {
@@ -324,6 +335,9 @@ impl Stage {
         Ok(())
     }
 
+    // Q133: Weighed members' blades do NOT count toward yell reveal count.
+    // Q134: Baton touch with a weighed member is allowed; the new member enters active.
+    // Q136: A weighed member moving areas remains weighed.
     pub fn total_blades(
         &self,
         card_db: &CardDatabase,
@@ -590,6 +604,7 @@ use crate::constants::{MAX_ENERGY_CARDS, MAX_LIVE_CARDS};
 #[derive(Debug, Clone)]
 pub struct EnergyZone {
     // Rule 5.1: Energy Zone - Where energy cards are placed and activated
+    // Q15: Energy deck cards are face-down; energy zone cards are face-up.
     pub cards: SmallVec<[i16; MAX_ENERGY_CARDS]>, // Card IDs - stack-allocated for up to MAX_ENERGY_CARDS energy cards
     pub active_energy_count: usize, // Simple count of active energy cards (simpler than HashSet)
 }
@@ -636,6 +651,7 @@ impl EnergyZone {
         self.active_energy_count
     }
 
+    // Q56/Q138: Cost payment — full amount required; under-member energy cannot pay costs.
     pub fn can_pay_energy(&self, amount: usize) -> bool {
         // Rule 5.9: Check if player has enough active energy cards
         self.active_energy_count >= amount
