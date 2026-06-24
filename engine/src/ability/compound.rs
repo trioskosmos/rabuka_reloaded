@@ -357,24 +357,41 @@ impl AbilityResolver {
                                                     "Continue".to_string(),
                                                 ]),
                                             }));
-                                            // Only add remaining repeats on the FIRST sequential
-                                            // save (initial execution). Subsequent saves via RPC
-                                            // get them from the original pending batch merge.
+                                            // Interleave repeat_choice BETWEEN each remaining
+                                            // repeat action so RPC hits it naturally when
+                                            // processing the pending batch sequentially.
+                                            // Format: cor, repeat, cor, repeat, ..., cor(max)
+                                            // (no repeat after the last cor — repeats_remaining
+                                            //  counts the number of ADDITIONAL iterations left).
                                             if self.first_seq_save {
                                                 self.first_seq_save = false;
-                                                for _ in 0..repeats_remaining {
-                                                    cmds.extend(
-                                                        repeat_actions
-                                                            .iter()
-                                                            .cloned()
-                                                            .map(Command::Effect),
-                                                    );
-                                                }
+                                            }
+                                            for _ in 0..repeats_remaining {
+                                                cmds.extend(
+                                                    repeat_actions
+                                                        .iter()
+                                                        .cloned()
+                                                        .map(Command::Effect),
+                                                );
+                                                cmds.push(Command::Choice(Choice::SelectTarget {
+                                                    target: "pay_optional_cost:skip_optional_cost"
+                                                        .to_string(),
+                                                    description: "Repeat effect?".to_string(),
+                                                    allow_skip: true,
+                                                    options: Some(vec![
+                                                        "Stop".to_string(),
+                                                        "Continue".to_string(),
+                                                    ]),
+                                                }));
                                             }
                                             let mut existing =
                                                 gs.ability_queue.take_pending_commands();
                                             existing.extend(cmds);
                                             gs.ability_queue.set_pending_commands(existing);
+                                            // first_seq_save is set to false above — this
+                                            // prevents the outer seq from adding duplicates
+                                            // during the *current* iteration's inner execution
+                                            // (which saves before this code runs).
                                             return Ok(());
                                         }
                                     }

@@ -72,6 +72,13 @@ impl super::resolver::AbilityResolver {
                 }
                 if idx + 1 < pending.len() {
                     let mut existing = gs.ability_queue.take_pending_commands();
+                    eprintln!(
+                        "[DEBUG_RPC_MERGE] idx={} pending.len={} existing.len={} remaining={}",
+                        idx,
+                        pending.len(),
+                        existing.len(),
+                        pending[idx + 1..].len()
+                    );
                     existing.extend(pending[idx + 1..].to_vec());
                     gs.ability_queue.set_pending_commands(existing);
                 }
