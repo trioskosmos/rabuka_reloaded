@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-24T20:13:29.981595",
+  "generated_at": "2026-06-24T20:36:16.705857",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1076,6 +1076,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "ステージの左サイドエリアに登場しているなら",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "position": "left_side"
         },
@@ -1214,6 +1217,9 @@
               "type": "appearance_condition",
               "appearance": true,
               "text": "自分のステージのエリアすべてに『蓮ノ空』のメンバーが登場しており、",
+              "trigger_event": {
+                "type": "appearance"
+              },
               "location": "stage",
               "all_areas": true,
               "group_names": [
@@ -1628,6 +1634,9 @@
               "type": "appearance_condition",
               "appearance": true,
               "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、",
+              "trigger_event": {
+                "type": "appearance"
+              },
               "location": "stage",
               "all_areas": true,
               "group_names": [
@@ -2079,6 +2088,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "自分のステージのエリアすべてにメンバーが登場している場合",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "all_areas": true,
           "target": "self",
@@ -2450,6 +2462,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "この能力はセンターエリアに登場している場合のみ起動できる。",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "position": "center"
         },
@@ -2605,6 +2620,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "この能力はセンターエリアに登場している場合のみ起動できる。",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "position": "center"
         },
@@ -3436,6 +3454,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "『Liella!』のメンバー2人からバトンタッチして登場している場合",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "group_names": [
             "Liella!"
@@ -4279,6 +4300,11 @@
           "count": 1,
           "operator": ">=",
           "text": "このメンバーがステージから控え室に置かれたとき",
+          "trigger_event": {
+            "type": "zone_change",
+            "source": "stage",
+            "destination": "discard"
+          },
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -4756,6 +4782,9 @@
         "condition": {
           "type": "movement_condition",
           "text": "自分のカードの効果によって、このメンバーがエリアを移動するか自分のエネルギー置き場にエネルギーが置かれたとき",
+          "trigger_event": {
+            "type": "area_move"
+          },
           "movement": "moves",
           "self_effect_only": true,
           "energy_placed": true
@@ -5067,6 +5096,11 @@
           "count": 1,
           "operator": ">=",
           "text": "このメンバーがステージから控え室に置かれたとき",
+          "trigger_event": {
+            "type": "zone_change",
+            "source": "stage",
+            "destination": "discard"
+          },
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -5520,6 +5554,11 @@
           "count": 1,
           "operator": ">=",
           "text": "『Aqours』のライブカードが自分のライブカード置き場から控え室に置かれたとき",
+          "trigger_event": {
+            "type": "zone_change",
+            "source": "live_card_zone",
+            "destination": "discard"
+          },
           "group_names": [
             "Aqours"
           ],
@@ -8561,6 +8600,9 @@
         "condition": {
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
+          "trigger_event": {
+            "type": "area_move"
+          },
           "movement": "moved",
           "movement_state": "has_moved"
         },
@@ -8595,6 +8637,11 @@
           "count": 1,
           "operator": ">=",
           "text": "このメンバーがステージから控え室に置かれたとき",
+          "trigger_event": {
+            "type": "zone_change",
+            "source": "stage",
+            "destination": "discard"
+          },
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -10322,6 +10369,11 @@
           "count": 1,
           "operator": ">=",
           "text": "このメンバーがステージから控え室に置かれたとき",
+          "trigger_event": {
+            "type": "zone_change",
+            "source": "stage",
+            "destination": "discard"
+          },
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -10529,6 +10581,9 @@
         "condition": {
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
+          "trigger_event": {
+            "type": "area_move"
+          },
           "movement": "moved",
           "movement_state": "has_moved"
         },
@@ -11086,6 +11141,9 @@
               "type": "appearance_condition",
               "appearance": true,
               "text": "自分のステージに「徒町小鈴」が登場しており、",
+              "trigger_event": {
+                "type": "appearance"
+              },
               "location": "stage",
               "characters": [
                 "徒町小鈴"
@@ -11096,6 +11154,9 @@
               "type": "appearance_condition",
               "appearance": true,
               "text": "「徒町小鈴」よりコストの大きい「村野さやか」が登場している場合",
+              "trigger_event": {
+                "type": "appearance"
+              },
               "location": "stage",
               "cost_reference_character": "徒町小鈴",
               "cost_reference_operator": ">",
@@ -11136,6 +11197,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "自分のステージの右サイドエリアに「大沢瑠璃乃」が、左サイドエリアに「安養寺姫芽」が、センターエリアに「藤島慈」がそれぞれ登場している場合",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "positions_characters": [
             {
@@ -12714,6 +12778,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "この能力はセンターエリアに登場した場合のみ発動する。",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "position": "center"
         },
@@ -13304,6 +13371,9 @@
               "type": "appearance_condition",
               "appearance": true,
               "text": "このメンバーが『Printemps』のメンバーからバトンタッチして登場していない",
+              "trigger_event": {
+                "type": "appearance"
+              },
               "location": "stage",
               "group_names": [
                 "Printemps"
@@ -13784,6 +13854,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "これにより登場したメンバーがブレードハートを持つ場合",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "card_type": "member_card"
         },
@@ -14058,6 +14131,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "この能力は左サイドエリアか右サイドエリアに登場した場合のみ発動する。",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "position": "left_side",
           "position_compare": "right_side"
@@ -14146,6 +14222,9 @@
         "condition": {
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
+          "trigger_event": {
+            "type": "area_move"
+          },
           "movement": "moved",
           "movement_state": "has_moved"
         },
@@ -14834,6 +14913,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "自分のステージにコスト10のメンバーが登場したとき",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "target": "self",
           "cost_limit": 10,
@@ -14985,6 +15067,11 @@
           "count": 1,
           "operator": ">=",
           "text": "このターン、ブレードハートを持たないメンバーカードが自分のライブカード置き場から控え室に置かれている場合",
+          "trigger_event": {
+            "type": "zone_change",
+            "source": "live_card_zone",
+            "destination": "discard"
+          },
           "target": "self",
           "card_type": "member_card",
           "negation": true,
@@ -15144,6 +15231,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "自分のステージにこのメンバー以外のコスト11のメンバーが登場したとき",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "exclude_self": true,
           "target": "self",
@@ -15940,6 +16030,9 @@
         "condition": {
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
+          "trigger_event": {
+            "type": "area_move"
+          },
           "movement": "moved",
           "movement_state": "has_moved"
         },
@@ -15971,6 +16064,9 @@
         "condition": {
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
+          "trigger_event": {
+            "type": "area_move"
+          },
           "movement": "moved",
           "movement_state": "has_moved"
         },
@@ -16123,6 +16219,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "自分のステージにほかの『スリーズブーケ』のメンバーが登場する",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "exclude_self": true,
           "group_names": [
@@ -16782,6 +16881,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "自分のステージに『蓮ノ空』のメンバーが登場する",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "group_names": [
             "蓮ノ空"
@@ -17361,6 +17463,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "控え室から登場している場合",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "appearance_source": "discard"
         },
@@ -17521,6 +17626,9 @@
               "type": "appearance_condition",
               "appearance": true,
               "text": "控え室から登場している場合",
+              "trigger_event": {
+                "type": "appearance"
+              },
               "location": "stage",
               "appearance_source": "discard"
             },
@@ -17897,6 +18005,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "自分のステージに『EdelNote』のメンバーが登場したとき",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "group_names": [
             "EdelNote"
@@ -18526,6 +18637,9 @@
         "condition": {
           "type": "movement_condition",
           "text": "自分のライブが成功するか、このメンバーがエリアを移動したとき",
+          "trigger_event": {
+            "type": "area_move"
+          },
           "movement": "moved",
           "movement_state": "has_moved"
         },
@@ -18727,6 +18841,9 @@
         "condition": {
           "type": "movement_condition",
           "text": "自分のステージのセンターエリアにいるメンバーがエリアを移動したとき",
+          "trigger_event": {
+            "type": "area_move"
+          },
           "movement": "moved",
           "movement_state": "has_moved",
           "position": "center"
@@ -19071,6 +19188,9 @@
         "condition": {
           "type": "movement_condition",
           "text": "自分のステージにいる『5yncri5e!』のメンバーがセンターエリアに移動したとき",
+          "trigger_event": {
+            "type": "area_move"
+          },
           "movement": "moved",
           "movement_state": "has_moved",
           "position": "center",
@@ -21227,6 +21347,9 @@
         "condition": {
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動する",
+          "trigger_event": {
+            "type": "area_move"
+          },
           "movement": "moves"
         },
         "parenthetical": [
@@ -21472,6 +21595,11 @@
           "count": 1,
           "operator": ">=",
           "text": "このメンバーがステージから控え室に置かれたとき",
+          "trigger_event": {
+            "type": "zone_change",
+            "source": "stage",
+            "destination": "discard"
+          },
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -21515,6 +21643,11 @@
           "count": 1,
           "operator": ">=",
           "text": "このメンバーがステージから控え室に置かれたとき",
+          "trigger_event": {
+            "type": "zone_change",
+            "source": "stage",
+            "destination": "discard"
+          },
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -21590,6 +21723,11 @@
           "count": 1,
           "operator": ">=",
           "text": "このメンバーがステージから控え室に置かれたとき",
+          "trigger_event": {
+            "type": "zone_change",
+            "source": "stage",
+            "destination": "discard"
+          },
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -24219,6 +24357,11 @@
           "count": 1,
           "operator": ">=",
           "text": "自分のメインフェイズにこのカードが控え室から手札に加えられたとき",
+          "trigger_event": {
+            "type": "zone_change",
+            "source": "discard",
+            "destination": "hand"
+          },
           "target": "self",
           "self_target": true,
           "source": "discard",
@@ -26773,6 +26916,9 @@
         "condition": {
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
+          "trigger_event": {
+            "type": "area_move"
+          },
           "movement": "moved",
           "movement_state": "has_moved"
         },
@@ -29522,6 +29668,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "控え室から登場している場合",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "appearance_source": "discard"
         },
@@ -29582,6 +29731,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "控え室から登場している場合",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "appearance_source": "discard"
         },
@@ -30159,6 +30311,9 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "このメンバーが手札以外からステージに登場している場合",
+          "trigger_event": {
+            "type": "appearance"
+          },
           "location": "stage",
           "card_type": "member_card"
         },
@@ -30279,6 +30434,11 @@
           "count": 1,
           "operator": ">=",
           "text": "このメンバーがステージから控え室に置かれたとき",
+          "trigger_event": {
+            "type": "zone_change",
+            "source": "stage",
+            "destination": "discard"
+          },
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -30330,6 +30490,11 @@
           "count": 1,
           "operator": ">=",
           "text": "このメンバーがステージから控え室に置かれたとき",
+          "trigger_event": {
+            "type": "zone_change",
+            "source": "stage",
+            "destination": "discard"
+          },
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -30358,6 +30523,11 @@
           "count": 1,
           "operator": ">=",
           "text": "このメンバーがステージから控え室に置かれたとき",
+          "trigger_event": {
+            "type": "zone_change",
+            "source": "stage",
+            "destination": "discard"
+          },
           "card_type": "member_card",
           "self_target": true,
           "source": "stage",
@@ -31349,6 +31519,9 @@
         "condition": {
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
+          "trigger_event": {
+            "type": "area_move"
+          },
           "movement": "moved",
           "movement_state": "has_moved"
         },
@@ -31377,6 +31550,9 @@
         "condition": {
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
+          "trigger_event": {
+            "type": "area_move"
+          },
           "movement": "moved",
           "movement_state": "has_moved"
         },
@@ -31459,6 +31635,9 @@
         "condition": {
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動したとき",
+          "trigger_event": {
+            "type": "area_move"
+          },
           "movement": "moved",
           "movement_state": "has_moved"
         },
@@ -31720,6 +31899,9 @@
         "condition": {
           "type": "movement_condition",
           "text": "自分のメインフェイズの間、このメンバーがエリアを移動したとき",
+          "trigger_event": {
+            "type": "area_move"
+          },
           "movement": "moved",
           "movement_state": "has_moved"
         },

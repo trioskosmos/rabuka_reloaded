@@ -1,4 +1,17 @@
-"""Parser for ability extraction - structural approach based on actual data analysis."""
+"""
+Parser for ability extraction -- converts raw Japanese card ability text into
+structured JSON consumed by the Rust engine and analysis tooling.
+
+Architecture overview:
+  cards.json (raw text)
+    → extract_card_abilities.py (splits by newline, extracts trigger icons)
+      → parser.py (this file):
+          1. parse_cost()     - cost before colon (：)
+          2. parse_effect()   - effect after colon, dispatched through handler cascade
+          3. parse_condition()- trigger conditions (場合/とき/たび)
+          4. parse_action()   - individual actions (move, gain, etc.)
+      → abilities.json (structured output consumed by Rust engine)
+"""
 
 import json
 import re
@@ -129,7 +142,12 @@ REGEX_QUOTED_TEXT = r"「([^」]+)」"
 REGEX_GROUP_NAME = r"『([^』]+)』"
 REGEX_DECK_POSITION = r"(\d+)枚目"
 
-# ============== UTILITY FUNCTIONS ==============
+# ====================================================================
+# UTILITY FUNCTIONS
+# ====================================================================
+# Zone/type/target extraction helpers used throughout the parser.
+# These extract single fields from raw Japanese text via pattern matching.
+# ====================================================================
 
 
 def extract_by_pattern(text: str, patterns: List[Tuple[str, str]]) -> Optional[str]:
@@ -447,7 +465,12 @@ def extract_cost_modification(text: str) -> Optional[Dict[str, Any]]:
     return result if result else None
 
 
-# ============== STRUCTURAL PARSING ==============
+# ====================================================================
+# STRUCTURAL PARSING
+# ====================================================================
+# split_cost_effect, split_condition_action, and related helpers that
+# break raw ability text into structural segments before parsing.
+# ====================================================================
 
 
 def split_cost_effect(text: str) -> Tuple[str, str]:
@@ -552,9 +575,20 @@ def parse_complex_condition(text: str) -> Optional[Dict[str, Any]]:
     return None  # type: ignore[return-value]
 
 
-# ============== COMPONENT PARSING ==============
+# ====================================================================
+# COMPONENT PARSING: CONDITION HANDLER CASCADE
+# ====================================================================
+# The condition parser (parse_condition) dispatches through ~25+ handlers
+# in priority order. Each handler tries to match a specific Japanese pattern
+# (e.g. "N枚以上" → card_count_condition, "エリアを移動" → movement_condition).
+# The first match wins. If no handler matches, generic field extraction
+# runs and _infer_condition_type assigns the most likely type.
+#
+# Priority ordering is CRITICAL — more specific patterns must come first
+# to prevent generic matchers from catching them incorrectly.
+# ====================================================================
 
-# ============== CONDITION HANDLER CASCADE ==============
+
 #
 # Priority order is CRITICAL — each handler checks a text pattern and returns
 # the parsed condition dict if it matches. The first match wins. Handlers are
@@ -1221,9 +1255,16 @@ def _try_either_target(text):
 
 
 def _try_movement(text):
+    """Area movement event: member moved between areas on stage.
+    E.g. このメンバーがエリアを移動したとき (this member moved areas).
+    """
     if "移動した" not in text and "移動している" not in text and "移動する" not in text:
         return None
-    result = {"type": "movement_condition", "text": text}
+    result = {
+        "type": "movement_condition",
+        "text": text,
+        "trigger_event": {"type": "area_move"},
+    }
     if "移動する" in text and "移動した" not in text and "移動している" not in text:
         result["movement"] = "moves"
     else:
@@ -1241,6 +1282,13 @@ def _try_movement(text):
 
 
 def _try_zone_placement(text):
+    """Zone change event: card moves from one zone to another.
+    E.g. このカードが控え室から手札に加えられた (this card added from discard to hand).
+
+    NOTE: Returns card_count_condition type for engine backward compatibility.
+    The engine evaluates this via evaluate_card_count_condition with source/destination.
+    A dedicated trigger_event field is also set for future engine migration.
+    """
     if (
         not re.search(r"から.*?に(?:置かれ|加えられ|加わる|移され|送られ)", text)
         or "バトンタッチ" in text
@@ -1251,6 +1299,9 @@ def _try_zone_placement(text):
         "count": 1,
         "operator": ">=",
         "text": text,
+        "trigger_event": {
+            "type": "zone_change",
+        },
     }
     _extract_generic_fields(result, text)
     # Extract source zone (before から) into `source`
@@ -1259,26 +1310,35 @@ def _try_zone_placement(text):
         source_text = text[: m_from.start()]
         if "控え室" in source_text:
             result["source"] = "discard"
+            result["trigger_event"]["source"] = "discard"
         elif "ライブカード置き場" in source_text:
             result["source"] = "live_card_zone"
+            result["trigger_event"]["source"] = "live_card_zone"
         elif "エネルギー置き場" in source_text:
             result["source"] = "energy_zone"
+            result["trigger_event"]["source"] = "energy_zone"
         elif "手札" in source_text or "手元" in source_text:
             result["source"] = "hand"
+            result["trigger_event"]["source"] = "hand"
         elif "ステージ" in source_text:
             result["source"] = "stage"
+            result["trigger_event"]["source"] = "stage"
     # Extract destination zone (between から and the verb) into `destination`
     dest_match = re.search(r"から(.+?)に(?:置かれ|加えられ|加わる|移され|送られ)", text)
     if dest_match:
         dest_text = dest_match.group(1)
         if "控え室" in dest_text:
             result["destination"] = "discard"
+            result["trigger_event"]["destination"] = "discard"
         elif "手札" in dest_text or "手元" in dest_text:
             result["destination"] = "hand"
+            result["trigger_event"]["destination"] = "hand"
         elif "ステージ" in dest_text:
             result["destination"] = "stage"
+            result["trigger_event"]["destination"] = "stage"
         elif "デッキ" in dest_text:
             result["destination"] = "deck"
+            result["trigger_event"]["destination"] = "deck"
     # Remove location/locations — source+destination carry the zone info
     result.pop("location", None)
     result.pop("locations", None)
@@ -1306,7 +1366,12 @@ def _try_appear_or_move(text):
 def _try_appearance(text):
     if "登場" not in text:
         return None
-    result = {"type": "appearance_condition", "appearance": True, "text": text}
+    result = {
+        "type": "appearance_condition",
+        "appearance": True,
+        "text": text,
+        "trigger_event": {"type": "appearance"},
+    }
     # Default to stage since abilities almost always check member appearance
     result["location"] = "stage"
     # Detect "appeared from waiting room" (控え室から登場)
@@ -2279,12 +2344,17 @@ def _enrich_heart_content(cond, text):
             cond["group_names"] = [gn_m.group(1)]
 
 
-# ============== CONSOLIDATED NORMALIZATION ==============
-
-
-def normalize_action(obj, original_text=None):
-    """DEPRECATED: No-op stub. Normalization is now inline in parse_action."""
-    return obj
+# ====================================================================
+# CONSOLIDATED NORMALIZATION
+# ====================================================================
+# parse_action() and _fill_defaults() — the main action parser.
+# This is the fallback when no effect handler matches. It extracts
+# source, destination, card_type, count and other fields from text,
+# then _fill_defaults normalizes/validates the result.
+# ====================================================================
+# This section handles post-dispatch normalization of parsed actions,
+# including card type inference, resource inference, and default filling.
+#
 
 
 def _infer_card_type(text, action=None):
@@ -4406,7 +4476,16 @@ def parse_cost(text: str) -> Dict[str, Any]:
     return cost
 
 
-# ============== EFFECT HANDLER CASCADE ==============
+# ====================================================================
+# EFFECT HANDLER CASCADE
+# ====================================================================
+# Each handler checks a text pattern and returns a parsed effect dict.
+# The first match wins. Priority ordering is CRITICAL — specific/compound
+# patterns must come before generic ones.
+#
+# See the _EFFECT_HANDLERS list at the end of this section for the
+# full priority-ordered cascade with tier grouping.
+# ====================================================================
 #
 # Priority order is CRITICAL — each handler checks a text pattern and returns
 # the parsed effect dict if it matches. The first match wins.
@@ -7046,7 +7125,18 @@ def _try_heart_choice(text):
     return result
 
 
-# ============== FALLTHROUGH PATTERN MATCHERS ==============
+# ====================================================================
+# EFFECT HANDLER DEFINITIONS & DISPATCH
+# ====================================================================
+# The _EFFECT_HANDLERS list defines the priority-ordered cascade.
+# Each function takes raw effect text and returns a parsed dict or None.
+# The first match wins — ordering is CRITICAL.
+#
+# Key constraints:
+#   - Per-unit (につき) must be checked early because it restructures text
+#   - Conditional shapes (場合/そうした場合) must be checked before single actions
+#   - Sequential patterns (その後) must be checked before _try_conditional
+# ====================================================================
 
 
 def _try_timing_condition_gain(text):
@@ -7079,51 +7169,56 @@ def _try_timing_condition_gain(text):
 
 
 _EFFECT_HANDLERS = [
-    _try_timing_condition_gain,
-    _try_self_and_other,
-    _try_per_unit,
-    _try_conditional_alternative,
-    _try_character_specific,
-    _try_activation_suffix,
-    _try_cost_modification,
-    _try_kore_niyori_case,
-    _try_heart_select_reveal,
-    _try_choose_self_opponent,
-    _try_look_and_select,
-    _try_answer_choice,
-    _try_each_time,
-    _try_unless_effect,
-    _try_opponent_action,
-    _try_opponent_after_conditional,
-    _try_reveal_until_chosen_card,
-    _try_reveal_until_live,
-    _try_furthermore,
-    _try_kore_niyori_result,
-    _try_sequential_duration,
-    _try_conditional_sequential,
-    _try_same_action,
-    _try_sequential,
-    _try_duration_effect,
-    _try_sou_shinakatta,
-    _try_period_conditional,
-    _try_compound_select,
-    _try_shi_sequential,
-    _try_te_sequential,
-    _try_implicit_sequential,
-    _try_conditional,
-    _try_ability_activation,
-    _try_heart_choice,
-    _try_choice,
-    _try_kore_niyori_cascade,
-    _try_baton_touch_effect,
-    _try_global_modifier,
-    _try_play_baton_touch,
-    _try_energy_under_member,
-    _try_blade_actions,
-    _try_both_discard_until,
-    _try_lose_resource,
-    _try_re_yell,
-    _try_restriction_effect,
+    # Tier 1: Very specific patterns that must be checked first.
+    # These would be misparsed by any generic handler.
+    _try_timing_condition_gain,  # このターン中にエリアを移動した全てのX...
+    _try_self_and_other,  # XとYを得る (two different targets)
+    _try_per_unit,  # XにつきY (per-unit gain — restructures text)
+    _try_conditional_alternative,  # X場合Y、そうでない場合Z (if/else)
+    _try_character_specific,  # 「X」のキャラ specific effect
+    _try_activation_suffix,  # （この能力は...） activation conditions
+    _try_cost_modification,  # Cost modification patterns
+    _try_kore_niyori_case,  # これによりX場合、Y (conditional on prior result)
+    _try_heart_select_reveal,  # Heart selection + reveal combo
+    _try_choose_self_opponent,  # 自分か相手を選ぶ (choose self or opponent)
+    _try_look_and_select,  # Look at N cards, select some
+    _try_answer_choice,  # 回答がXの場合 (answer-based choice)
+    _try_each_time,  # Xたび (each-time trigger + effect)
+    # Tier 2: Conditional/optional effect shapes
+    _try_unless_effect,  # しないかぎり (unless-pay)
+    _try_opponent_action,  # 相手は... (opponent action)
+    _try_opponent_after_conditional,  # 相手はX場合、Y (opponent conditional)
+    _try_reveal_until_chosen_card,  # Reveal until condition met
+    _try_reveal_until_live,  # Reveal until live card found
+    _try_furthermore,  # さらに (furthermore/additional effect)
+    _try_kore_niyori_result,  # これによりX場合 (result-based conditional)
+    _try_sequential_duration,  # Duration + sequential
+    _try_conditional_sequential,  # そうした場合X場合 (nested conditional-on-optional)
+    # Tier 3: Sequential and compound patterns
+    _try_same_action,  # そうした場合 (if you do, then...)
+    _try_sequential,  # その後、 (then)
+    _try_duration_effect,  # Duration-bounded effect
+    _try_sou_shinakatta,  # そうしなかった場合 (if you don't)
+    _try_period_conditional,  # 。場合 (period-separated conditional)
+    _try_compound_select,  # Compound select + action
+    _try_shi_sequential,  # Aし、B (te-form sequential)
+    _try_te_sequential,  # Xを得て、Yを得る (sequential gains)
+    _try_implicit_sequential,  # Implicit sequential (two actions fused)
+    # Tier 4: Single-action patterns (most general)
+    _try_conditional,  # X場合、Y (generic conditional)
+    _try_ability_activation,  # 能力を発動させる (activate ability)
+    _try_heart_choice,  # ハートをXつ選ぶ (heart choice)
+    _try_choice,  # 以下から1つを選ぶ (generic choice)
+    _try_kore_niyori_cascade,  # により cascade
+    _try_baton_touch_effect,  # バトンタッチ (baton touch)
+    _try_global_modifier,  # Global effect modifiers
+    _try_play_baton_touch,  # Play + baton touch combo
+    _try_energy_under_member,  # Energy under member
+    _try_blade_actions,  # Blade-specific actions
+    _try_both_discard_until,  # Both players discard until
+    _try_lose_resource,  # Lose resource
+    _try_re_yell,  # Re-yell
+    _try_restriction_effect,  # Restriction effects
 ]
 
 
@@ -7429,61 +7524,28 @@ def parse_effect(text: str) -> Dict[str, Any]:
     return effect
 
 
-# ============== POST-PROCESSING NORMALIZER ==============
+# ====================================================================
+# POST-PROCESSING NORMALIZERS
+# ====================================================================
+# These run AFTER the initial parsing to normalize effect trees:
+#   _normalize_effect_tree  — fixes artifacts, propagates fields
+#   _collapse_to_effect_steps — STUB (engine handles legacy shapes)
+#   _validate_effect        — sanity checks
+# ====================================================================
 
 
 def _collapse_to_effect_steps(effect):
-    """Convert the 4 specialized compound action shapes into the unified
-    `effect_steps` form. The engine treats any effect with `effect_steps`
-    as a sequential pipeline. This is a destructive transformation — the
-    legacy fields (look_action/select_action/primary_effect/...) are
-    removed once converted.
+    """STUB: All 4 specialized compound shapes (look_and_select,
+    conditional_alternative, conditional_on_result, conditional_on_optional)
+    still have dedicated handlers in the Rust engine. Until those handlers
+    are migrated to the unified sequential pipeline, this function is a no-op.
 
-    Conversion rules:
-      look_and_select:        [look_action, select_action]
-      conditional_alternative:[alternative (with alt_condition if set), primary]
-      conditional_on_result:  [primary, followup (with result_condition if set)]
-      conditional_on_optional:[single "conditional_optional" step carrying
-                               optional_action + conditional_action]
+    When the engine is ready, this should convert:
+      look_and_select        → [look_action, select_action]
+      conditional_alternative→ [alternative (with alt_condition), primary]
+      conditional_on_result  → [primary, followup (with result_condition)]
+      conditional_on_optional→ [single conditional_optional step]
     """
-    if not effect or not isinstance(effect, dict):
-        return effect
-    action = effect.get("action")
-
-    if action == "look_and_select":
-        # look_and_select keeps its legacy compound form. The engine's
-        # `execute_look_and_select` handler still has the select_cards
-        # logic embedded (not yet split into a standalone step). The
-        # other 3 compound shapes below are pure dispatch reductions and
-        # DO collapse to effect_steps.
-        return effect
-
-    if action == "conditional_alternative":
-        # Keep the legacy form. The engine's `execute_conditional_alternative`
-        # handler has condition-evaluation logic that reads from
-        # `compound.alternative_effect` / `compound.primary_effect` directly,
-        # and the negated-condition approach didn't replicate the legacy
-        # behavior (location_condition doesn't honor the negation flag, and
-        # the "ask the player" path is not modeled). Until that is fixed,
-        # this shape stays legacy — same as look_and_select /
-        # conditional_on_result / conditional_on_optional.
-        return effect
-
-    if action == "conditional_on_result":
-        # conditional_on_result keeps its legacy compound form. The engine's
-        # `execute_conditional_on_result` handler has stateful resume logic
-        # (cost_was_paid gate, save_pending_sequential_actions for the
-        # followup) that is not yet replicated by the generic sequential
-        # pipeline. Until it is, this shape stays legacy.
-        return effect
-
-    if action == "conditional_on_optional":
-        # Keep the legacy form — the engine still has a dedicated handler
-        # for this, and the yes/no choice creation is non-trivial to inline
-        # as a step. The dispatcher in the engine only checks for
-        # `effect_steps` for the 4 other compound types, so this is safe.
-        return effect
-
     return effect
 
 
@@ -8358,7 +8420,13 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
     return ability
 
 
-# ============== PROCESSING ==============
+# ====================================================================
+# PROCESSING: process_abilities() & parse_ability()
+# ====================================================================
+# Top-level orchestration: loads abilities.json, runs post-processing
+# fixes, semantic validation, and targeted patches for known parser gaps.
+# Also handles gain_ability text re-parsing and the main entry point.
+# ====================================================================
 
 
 def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -8439,7 +8507,14 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 else:
                     prev_was_select = False
 
-    # ============== TARGETED FIXES ==============
+    # ====================================================================
+    # TARGETED FIXES
+    # ====================================================================
+    # Known parser gap patches applied during parse_ability():
+    # - gain_ability text re-parsing into structured gained_effect
+    # - Fix trigger_condition → condition field naming
+    # - Card reference validation
+    # ====================================================================
     import re
 
     fix_stats = {
@@ -8797,7 +8872,14 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
 
     _fix_heart_colors_per_unit(data["unique_abilities"])
 
-    # ============== POST-PROCESSING ==============
+    # ====================================================================
+    # POST-PROCESSING: action inference & engine compat fixes
+    # ====================================================================
+    # After all abilities are parsed, this section:
+    #   1. Infers action types for effects with empty actions
+    #   2. Propagates card_type to sub-actions in sequential effects
+    #   3. Fixes known engine compatibility gaps
+    # ====================================================================
 
     for ability in data["unique_abilities"]:
         eff = ability.get("effect")
@@ -9264,7 +9346,13 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
 
         _propagate_context(eff)
 
-    # ============== allow_occupied_stage ==============
+    # ====================================================================
+    # POST-HOC FIXES & MAIN
+    # ====================================================================
+    # _fix_mari_gain_ability — targeted fix for a known parser gap
+    # _validate_semantic — validates parsed JSON against text patterns
+    # Main entry point for standalone parser.py execution
+    # ====================================================================
     # Q76 rule: self-revival from discard to stage can place on occupied areas
     for ability in data["unique_abilities"]:
         eff = ability.get("effect")
