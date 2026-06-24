@@ -2,6 +2,7 @@ use super::debug::AbDebug;
 use crate::ability::enums::ConditionType;
 use crate::ability::enums::Zone;
 use crate::card::Condition;
+use serde_json::json;
 
 pub(crate) fn comparison_default_count(condition: &Condition) -> u32 {
     if condition.location.is_some() || condition.card_type.is_some() {
@@ -365,6 +366,32 @@ impl<'a> ConditionContext<'a> {
         }
 
         final_result
+    }
+
+    /// Evaluate condition and return structured actual value for debug display.
+    /// Same as evaluate_condition but also returns the measured runtime value
+    /// (count, score, bool, etc.) that was compared against the condition threshold.
+    /// Used by the /api/debug/conditions endpoint — purely read-only.
+    pub fn evaluate_condition_debug(&self, condition: &Condition) -> (bool, serde_json::Value) {
+        let passed = self.evaluate_condition(condition);
+        let actual_str = self.describe_condition_actual(condition);
+        let count = self.get_count_for_condition(condition);
+        let ct = condition.condition_type;
+        let threshold = match ct {
+            Some(ConditionType::ComparisonCondition) => condition.count.unwrap_or(0),
+            Some(ConditionType::ScoreThresholdCondition) => condition.count.unwrap_or(0),
+            Some(ConditionType::CardCountCondition) => condition.count.unwrap_or(1),
+            Some(ConditionType::CardBladeCondition) => condition.count.unwrap_or(1),
+            _ => condition.count.unwrap_or(0),
+        };
+        (
+            passed,
+            json!({
+                "measure": actual_str,
+                "threshold": threshold,
+                "count": count,
+            }),
+        )
     }
 
     /// Query game state to produce a human-readable "actual" string for this condition.

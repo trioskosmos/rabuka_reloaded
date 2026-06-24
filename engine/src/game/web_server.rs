@@ -1488,30 +1488,20 @@ async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
         .into_iter()
         .map(
             |(player_idx, zone_name, card_id, card_name, ability_idx, field_name, condition)| {
-                let result = ctx.evaluate_condition(&condition);
+                let (result, actual_value) = ctx.evaluate_condition_debug(&condition);
 
                 serde_json::json!({
-
                     "player": player_idx,
-
                     "zone": zone_name,
-
                     "card_id": card_id,
-
                     "card_name": card_name,
-
                     "ability_index": ability_idx,
-
                     "field": field_name,
-
                     "condition_type": condition.condition_type,
-
                     "condition_text": condition.text,
-
                     "condition_data": serde_json::to_value(&condition).unwrap_or_default(),
-
                     "result": result,
-
+                    "actual_value": actual_value,
                 })
             },
         )

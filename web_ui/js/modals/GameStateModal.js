@@ -154,13 +154,17 @@ export const GameStateModal = {
             const rows = conditions.map((cond, i) => {
                 const rCls = cond.result ? 'color:#4ade80;background:rgba(34,197,94,0.15);' : 'color:#f87171;background:rgba(239,68,68,0.12);';
                 const rLbl = cond.result ? 'PASS' : 'FAIL';
+                const av = cond.actual_value || {};
+                const actualStr = av.measure ? `${esc(av.measure)}` : '-';
+                const thresh = av.threshold != null ? ` [need ≥ ${av.threshold}]` : '';
                 return `<tr style="vertical-align:top;${i%2===1?'background:rgba(255,255,255,0.015);':''}">
                     <td style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.65rem;"><span style="display:inline-block;padding:1px 5px;border-radius:3px;font-weight:bold;font-size:0.6rem;${rCls}">${rLbl}</span></td>
                     <td style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.65rem;white-space:nowrap;">P${cond.player+1}</td>
                     <td style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.65rem;white-space:nowrap;">${esc(cond.zone)}</td>
-                    <td style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.65rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(cond.card_name)}">${esc(cond.card_name)}</td>
+                    <td style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.65rem;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(cond.card_name)}">${esc(cond.card_name)}</td>
                     <td style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.65rem;white-space:nowrap;">${esc(cond.condition_type||cond.field||'')}</td>
-                    <td style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.65rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(cond.condition_text||'')}">${esc(cond.condition_text||'-')}</td>
+                    <td style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.65rem;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(cond.condition_text||'')}">${esc(cond.condition_text||'-')}</td>
+                    <td style="padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.65rem;white-space:nowrap;">${actualStr}${thresh}</td>
                 </tr>`;
             }).join('');
 
@@ -176,14 +180,15 @@ export const GameStateModal = {
                     <button class="btn btn-sm btn-secondary" id="gs-reeval-conds" style="font-size:0.65rem;">Re-evaluate</button>
                 </div>
                 <div style="overflow:auto;border:1px solid rgba(255,255,255,0.06);border-radius:4px;max-height:55vh;">
-                    <table style="width:100%;border-collapse:collapse;font-size:0.65rem;min-width:600px;">
+                    <table style="width:100%;border-collapse:collapse;font-size:0.65rem;min-width:700px;">
                         <thead><tr style="background:rgba(15,23,42,0.95);text-transform:uppercase;position:sticky;top:0;">
                             <th style="padding:6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);">Result</th>
                             <th style="padding:6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);">P</th>
                             <th style="padding:6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);">Zone</th>
                             <th style="padding:6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);">Card</th>
                             <th style="padding:6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);">Type</th>
-                            <th style="padding:6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);">Text / Value</th>
+                            <th style="padding:6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);">Condition</th>
+                            <th style="padding:6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);">Actual</th>
                         </tr></thead>
                         <tbody>${rows}</tbody>
                     </table>
