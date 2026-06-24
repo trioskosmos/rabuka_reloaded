@@ -9,6 +9,34 @@ use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 use std::sync::atomic::Ordering;
 
+pub(crate) struct SelectionContext {
+    pub zone: String,
+    pub card_type: Option<String>,
+    pub count: usize,
+    pub allow_skip: bool,
+    pub indices: Vec<usize>,
+    pub cost_limit: Option<u32>,
+    pub cost_limit_operator: Option<String>,
+    pub cost_total: Option<u32>,
+    pub cost_total_operator: Option<String>,
+    pub group: Option<String>,
+    pub characters: Option<Vec<String>>,
+    pub filtered_indices: Option<Vec<usize>>,
+    pub is_select_action: bool,
+    pub target_player_id: Option<String>,
+    pub blind: bool,
+    pub is_reveal: bool,
+}
+
+impl SelectionContext {
+    pub fn mfi(&self, indices: &[usize]) -> Vec<usize> {
+        match &self.filtered_indices {
+            Some(fi) => indices.iter().filter_map(|&i| fi.get(i).copied()).collect(),
+            None => indices.to_vec(),
+        }
+    }
+}
+
 impl super::resolver::AbilityResolver {
     pub fn resume_execution(
         &mut self,
@@ -522,6 +550,25 @@ impl super::resolver::AbilityResolver {
         let mut validate_card =
             |cid: i16| -> bool { validate_filter.matches(&card_db, cid, false) };
 
+        let ctx = SelectionContext {
+            zone: zone.to_string(),
+            card_type: card_type.clone(),
+            count,
+            allow_skip,
+            indices: indices.to_vec(),
+            cost_limit,
+            cost_limit_operator: cost_limit_operator.clone(),
+            cost_total,
+            cost_total_operator: cost_total_operator.clone(),
+            group: group.clone(),
+            characters: characters.clone(),
+            filtered_indices: filtered_indices.clone(),
+            is_select_action,
+            target_player_id: target_player_id.clone(),
+            blind,
+            is_reveal,
+        };
+
         let mfi = |indices: &[usize]| -> Vec<usize> {
             match &filtered_indices {
                 Some(fi) => indices.iter().filter_map(|&i| fi.get(i).copied()).collect(),
@@ -749,213 +796,7 @@ impl super::resolver::AbilityResolver {
         }
         match Zone::from_str(zone) {
             Some(Zone::Hand) => {
-                log::debug!("[HAND_START] entering effect-phase Hand handler");
-                let mapped_indices = mfi(indices);
-                let hand_idx = if mapped_indices.is_empty() && !allow_skip && count > 0 {
-                    return Err("No cards selected from hand for required selection".to_string());
-                } else {
-                    &mapped_indices
-                };
-                log::debug!(
-                    "[HAND_HANDLER] hand_idx={:?} count={} allow_skip={}",
-                    hand_idx,
-                    count,
-                    allow_skip
-                );
-                if !hand_idx.is_empty() || allow_skip {
-                    if !hand_idx.is_empty() && count > 0 && hand_idx.len() < count {
-                        log::debug!("[COUNT_PROMPT] count={} len={}", count, hand_idx.len());
-                        // Sequential selection: store selected HAND INDICES and re-prompt
-                        // Read target player's hand and build index list (no gs borrow after this)
-                        let target = target_player_id.as_deref().unwrap_or("self").to_string();
-                        let hand_cards: Vec<i16> = {
-                            let p = gs.resolve_target_player_mut(&target);
-                            p.hand.cards.to_vec()
-                        };
-                        let mut all_hand_idxs = hand_idx.to_vec();
-                        // Restore previously accumulated indices from resolver
-                        let prev_ids: Vec<i16> = self.selected_cards.clone();
-                        if !prev_ids.is_empty() {
-                            for (hidx, cid) in hand_cards.iter().enumerate() {
-                                if prev_ids.contains(cid) && !all_hand_idxs.contains(&hidx) {
-                                    all_hand_idxs.push(hidx);
-                                }
-                            }
-                        }
-                        // Store all accumulated card IDs
-                        let new_card_ids: Vec<i16> = all_hand_idxs
-                            .iter()
-                            .filter_map(|&idx| {
-                                if idx < hand_cards.len() {
-                                    Some(hand_cards[idx])
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-                        for cid in new_card_ids {
-                            if !self.selected_cards.contains(&cid) {
-                                self.selected_cards.push(cid);
-                            }
-                        }
-                        // Re-prompt with remaining count, excluding already-selected indices
-                        // and preserving target, blind, and is_reveal for cross-player/opponent hand.
-                        let remaining = count - hand_idx.len();
-                        // Compute available indices (all valid indices minus already-selected).
-                        // filtered_indices maps selection index → actual hand index, so providing
-                        // only the not-yet-selected indices prevents re-picking the same card.
-                        let available_idxs: Vec<usize> = (0..hand_cards.len())
-                            .filter(|i| !all_hand_idxs.contains(i))
-                            .collect();
-                        let fi = if available_idxs.is_empty() {
-                            None
-                        } else {
-                            Some(available_idxs)
-                        };
-                        let desc = format!(
-                            "Select {} more card(s) from hand{}",
-                            remaining,
-                            if blind { " (blind)" } else { "" }
-                        );
-                        self.pending_choice = Some(
-                            common_re(
-                                Zone::Hand.to_str(),
-                                remaining,
-                                desc,
-                                false,
-                                fi,
-                                Some(target.clone()),
-                                cost_total,
-                                cost_total_operator.clone(),
-                            )
-                            .blind(blind)
-                            .is_reveal(is_reveal)
-                            .build(),
-                        );
-                        self.store_pending_choice(gs);
-                        return Ok(());
-                    }
-                    // any_number re-prompt: after each non-empty selection, user can pick more or skip.
-                    // Move current selection to destination immediately, then re-prompt.
-                    if !hand_idx.is_empty() && count == 0 && allow_skip {
-                        log::debug!("[ANY_ENTERED] count={} hand_idx={:?}", count, hand_idx);
-                        let target = target_player_id.as_deref().unwrap_or("self").to_string();
-                        // Save old hand state BEFORE the move so we can correctly track
-                        // which cards were just moved (hand_idx refers to OLD positions).
-                        let old_hand_cards: Vec<i16> = {
-                            let p = gs.resolve_target_player(&target);
-                            p.hand.cards.to_vec()
-                        };
-                        let moved_ids: Vec<i16> = hand_idx
-                            .iter()
-                            .filter_map(|&idx| old_hand_cards.get(idx).copied())
-                            .collect();
-                        // Move current selection to destination immediately
-                        self.execute_selected_cards_from_zone(
-                            gs,
-                            Zone::Hand.to_str(),
-                            hand_idx,
-                            count,
-                            card_type.as_deref(),
-                            cost_limit,
-                            cost_limit_operator.as_deref(),
-                            cost_total,
-                            cost_total_operator.as_deref(),
-                            group.as_deref(),
-                            characters.as_ref(),
-                            target_player_id.as_deref(),
-                        )?;
-                        // Track moved card IDs from the OLD hand state (correct).
-                        for &cid in &moved_ids {
-                            if !self.selected_cards.contains(&cid) {
-                                self.selected_cards.push(cid);
-                            }
-                        }
-                        // Re-read hand state after movement for the re-prompt
-                        let hand_cards: Vec<i16> = {
-                            let p = gs.resolve_target_player_mut(&target);
-                            p.hand.cards.to_vec()
-                        };
-                        // Compute which remaining hand cards ARE selectable (match the filter)
-                        // and pass them as filtered_indices (selection-index → hand-position mapping).
-                        let include_idxs: Vec<usize> = (0..hand_cards.len())
-                            .filter(|i| validate_card(hand_cards[*i]))
-                            .collect();
-                        let fi = if include_idxs.is_empty() {
-                            None
-                        } else {
-                            Some(include_idxs)
-                        };
-                        self.pending_choice = Some(
-                            common_re(
-                                Zone::Hand.to_str(),
-                                0,
-                                "Select more card(s) from hand (or skip to finish)".to_string(),
-                                true,
-                                fi,
-                                Some(target),
-                                cost_total,
-                                cost_total_operator.clone(),
-                            )
-                            .build(),
-                        );
-                        self.store_pending_choice(gs);
-                        return Ok(());
-                    }
-                    // Final batch: accumulate with any previously selected cards
-                    let mut all_idxs = hand_idx.to_vec();
-                    let selected_ids = self.selected_cards.clone();
-                    if !selected_ids.is_empty() {
-                        let target = target_player_id.as_deref().unwrap_or("self").to_string();
-                        let hand_cards: Vec<i16> = {
-                            let p = gs.resolve_target_player_mut(&target);
-                            p.hand.cards.to_vec()
-                        };
-                        for (hidx, cid) in hand_cards.iter().enumerate() {
-                            if selected_ids.contains(cid) && !all_idxs.contains(&hidx) {
-                                all_idxs.push(hidx);
-                            }
-                        }
-                    }
-                    self.execute_selected_cards_from_zone(
-                        gs,
-                        Zone::Hand.to_str(),
-                        &all_idxs,
-                        count,
-                        card_type.as_deref(),
-                        cost_limit,
-                        cost_limit_operator.as_deref(),
-                        cost_total,
-                        cost_total_operator.as_deref(),
-                        group.as_deref(),
-                        characters.as_ref(),
-                        target_player_id.as_deref(),
-                    )?;
-                    self.selected_cards.clear();
-                }
-                // Track whether optional cost was actually paid.
-                // `self.moved_cards` is set by finalize_card_movement when cards
-                // are actually moved, covering the skip-with-accumulated case.
-                if allow_skip {
-                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                        entry.optional_cost_result =
-                            Some(!indices.is_empty() || !self.moved_cards.is_empty());
-                    }
-                    // When optional cost is skipped (count > 0), discard pending "そうした場合" actions.
-                    // These were saved by execute_sequential_effect and should NOT run
-                    // when the user chose not to pay the optional cost.
-                    // Effect any_number selections (count == 0) should NOT drain — sequential continues.
-                    // EXCEPTION: opponent actions — when opponent skips, the conditional_on_optional
-                    // MUST fire (it has the "if you didn't do so" effect like blade gain).
-                    let is_opponent_action = target_player_id.as_deref() == Some("opponent");
-                    if indices.is_empty()
-                        && count > 0
-                        && !is_opponent_action
-                        && self.moved_cards.is_empty()
-                    {
-                        gs.ability_queue.take_pending_actions();
-                    }
-                }
+                return self.handle_hand_selection(gs, &ctx, &context, &mut validate_card);
             }
             Some(Zone::Deck) => self.execute_selected_cards_from_zone(
                 gs,
@@ -972,292 +813,7 @@ impl super::resolver::AbilityResolver {
                 target_player_id.as_deref(),
             )?,
             Some(Zone::Discard) => {
-                // Map user's filtered-relative indices to actual waitroom indices.
-                // The frontend sends indices relative to filtered_indices (0 = first
-                // selectable card). Without this mapping, selecting a non-trivial
-                // filtered set (e.g. after budget filtering) picks the wrong card.
-                let mapped_indices = mfi(indices);
-                if is_select_action {
-                    let target = target_player_id.as_deref().unwrap_or("self").to_string();
-                    // Store current selection in selected_cards (preventing duplicates)
-                    let player = gs.resolve_target_player_mut(&target);
-                    let mut cards: Vec<i16> = Vec::new();
-                    for &i in mapped_indices.iter() {
-                        if i < player.waitroom.cards.len() {
-                            let cid = player.waitroom.cards[i];
-                            if !self.selected_cards.contains(&cid) {
-                                self.selected_cards.push(cid);
-                                cards.push(cid);
-                            }
-                        }
-                    }
-                    // Re-prompt if fewer than count cards have been selected so far
-                    let selected_so_far = self.selected_cards.len();
-                    if count > 0 && !mapped_indices.is_empty() && selected_so_far < count {
-                        let remaining = count - selected_so_far;
-                        let waitroom_cards: Vec<i16> = {
-                            let p = gs.resolve_target_player_mut(&target);
-                            p.waitroom.cards.to_vec()
-                        };
-                        let already_selected = self.selected_cards.clone();
-                        let filtered_idxs: Vec<usize> = (0..waitroom_cards.len())
-                            .filter(|&i| !already_selected.contains(&waitroom_cards[i]))
-                            .collect();
-                        let remaining_count = filtered_idxs.len();
-                        let fi = if filtered_idxs.is_empty() {
-                            None
-                        } else {
-                            Some(filtered_idxs)
-                        };
-                        let desc = format!(
-                            "Select {} more card(s) from discard from {} remaining",
-                            remaining, remaining_count
-                        );
-                        self.pending_choice = Some(
-                            common_re(
-                                Zone::Discard.to_str(),
-                                remaining,
-                                desc,
-                                false,
-                                fi,
-                                Some(target.clone()),
-                                cost_total,
-                                cost_total_operator.clone(),
-                            )
-                            .is_select_action(true)
-                            .build(),
-                        );
-                        self.store_pending_choice(gs);
-                        return Ok(());
-                    }
-                    // Finalize to process pending sequential actions
-                    return self.finalize_choice(gs, &context);
-                } else {
-                    // Sequential multi-pick: if fewer indices than count, re-prompt
-                    if !mapped_indices.is_empty() && count > 0 && mapped_indices.len() < count {
-                        let target = target_player_id.as_deref().unwrap_or("self").to_string();
-                        let waitroom_cards: Vec<i16> = {
-                            let p = gs.resolve_target_player_mut(&target);
-                            p.waitroom.cards.to_vec()
-                        };
-                        // Build filtered indices for re-prompt display (exclude already-selected).
-                        let mut filtered_idxs: Vec<usize> = Vec::new();
-                        let prev_ids = self.selected_cards.clone();
-                        if !prev_ids.is_empty() {
-                            for (idx, cid) in waitroom_cards.iter().enumerate() {
-                                if prev_ids.contains(cid) && !filtered_idxs.contains(&idx) {
-                                    filtered_idxs.push(idx);
-                                }
-                            }
-                        }
-                        // Track current selection as accumulated card IDs
-                        let current_card_ids: Vec<i16> = mapped_indices
-                            .iter()
-                            .filter_map(|&idx| {
-                                if idx < waitroom_cards.len() {
-                                    Some(waitroom_cards[idx])
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-                        for &cid in &current_card_ids {
-                            if !self.selected_cards.contains(&cid) {
-                                self.selected_cards.push(cid);
-                            }
-                        }
-                        // Move current selection to destination immediately
-                        // (same pattern as hand handler re-prompt for discard zone).
-                        self.execute_selected_cards_from_zone(
-                            gs,
-                            Zone::Discard.to_str(),
-                            &mapped_indices,
-                            count,
-                            card_type.as_deref(),
-                            cost_limit,
-                            cost_limit_operator.as_deref(),
-                            cost_total,
-                            cost_total_operator.as_deref(),
-                            group.as_deref(),
-                            characters.as_ref(),
-                            target_player_id.as_deref(),
-                        )?;
-                        // If a sub-choice was created (e.g. SelectPosition for stage),
-                        // save the re-prompt as a pending command instead of overwriting
-                        // the sub-choice. The sub-choice must be resolved first.
-                        if self.sub_choice_created {
-                            self.sub_choice_created = false;
-                            let remaining = count - mapped_indices.len();
-                            if remaining > 0 {
-                                let waitroom_cards: Vec<i16> = {
-                                    let p = gs.resolve_target_player_mut(&target);
-                                    p.waitroom.cards.to_vec()
-                                };
-                                let spent: u32 = self
-                                    .selected_cards
-                                    .iter()
-                                    .filter_map(|&cid| {
-                                        gs.card_database.get_card(cid).and_then(|c| c.cost)
-                                    })
-                                    .sum();
-                                let remaining_budget =
-                                    cost_total.map(|tb| tb.saturating_sub(spent));
-                                let use_budget_filter = match cost_total_operator.as_deref() {
-                                    Some(op) => op == "<=",
-                                    None => cost_total.is_some(),
-                                };
-                                let all_idxs: Vec<usize> = if use_budget_filter {
-                                    let rb = remaining_budget.unwrap_or(0);
-                                    waitroom_cards
-                                        .iter()
-                                        .enumerate()
-                                        .filter(|(_, &cid)| {
-                                            gs.card_database
-                                                .get_card(cid)
-                                                .and_then(|c| c.cost)
-                                                .unwrap_or(99)
-                                                <= rb
-                                        })
-                                        .map(|(idx, _)| idx)
-                                        .collect()
-                                } else {
-                                    (0..waitroom_cards.len()).collect()
-                                };
-                                if !all_idxs.is_empty() || allow_skip {
-                                    let desc = format!(
-                                        "Select {} more card(s) from discard{}",
-                                        remaining,
-                                        if allow_skip {
-                                            " (or skip to finish)"
-                                        } else {
-                                            ""
-                                        }
-                                    );
-                                    let fi = if all_idxs.is_empty() {
-                                        Some(vec![])
-                                    } else {
-                                        Some(all_idxs)
-                                    };
-                                    let reprompt = common_re(
-                                        Zone::Discard.to_str(),
-                                        remaining,
-                                        desc,
-                                        allow_skip,
-                                        fi,
-                                        Some(target),
-                                        remaining_budget,
-                                        Some("<=".to_string()),
-                                    )
-                                    .build();
-                                    let mut pending = gs.ability_queue.take_pending_actions();
-                                    self.pending_reprompt_choice = Some(reprompt);
-                                    gs.ability_queue.set_pending_actions(pending);
-                                }
-                            }
-                            return Ok(());
-                        }
-                        // Re-read waitroom for budget retainer (zone shifted after movement)
-                        let waitroom_cards: Vec<i16> = {
-                            let p = gs.resolve_target_player_mut(&target);
-                            p.waitroom.cards.to_vec()
-                        };
-                        // Build whitelist from the current waitroom state, filtered by remaining budget.
-                        let spent: u32 = self
-                            .selected_cards
-                            .iter()
-                            .filter_map(|&cid| gs.card_database.get_card(cid).and_then(|c| c.cost))
-                            .sum();
-                        let remaining_budget = cost_total.map(|tb| tb.saturating_sub(spent));
-                        let use_budget_filter = match cost_total_operator.as_deref() {
-                            Some(op) => op == "<=",
-                            None => cost_total.is_some(),
-                        };
-                        let all_idxs: Vec<usize> = if use_budget_filter {
-                            let rb = remaining_budget.unwrap_or(0);
-                            waitroom_cards
-                                .iter()
-                                .enumerate()
-                                .filter(|(_, &cid)| {
-                                    gs.card_database
-                                        .get_card(cid)
-                                        .and_then(|c| c.cost)
-                                        .unwrap_or(99)
-                                        <= rb
-                                })
-                                .map(|(idx, _)| idx)
-                                .collect()
-                        } else {
-                            (0..waitroom_cards.len()).collect()
-                        };
-                        // Re-prompt with remaining count, showing only cards within budget.
-                        // Pass `allow_skip` through so "up to N" semantics are preserved.
-                        let remaining = count - mapped_indices.len();
-                        let desc = format!(
-                            "Select {} more card(s) from discard{}",
-                            remaining,
-                            if allow_skip {
-                                " (or skip to finish)"
-                            } else {
-                                ""
-                            }
-                        );
-                        let fi = if all_idxs.is_empty() {
-                            Some(vec![])
-                        } else {
-                            Some(all_idxs)
-                        };
-                        self.pending_choice = Some(
-                            common_re(
-                                Zone::Discard.to_str(),
-                                remaining,
-                                desc,
-                                allow_skip,
-                                fi,
-                                Some(target),
-                                remaining_budget,
-                                Some("<=".to_string()),
-                            )
-                            .build(),
-                        );
-                        self.store_pending_choice(gs);
-                        return Ok(());
-                    }
-                    // Final batch: merge accumulated cards with current indices and execute
-                    let target = target_player_id.as_deref().unwrap_or("self").to_string();
-                    let mut all_idxs: Vec<usize> = mapped_indices.to_vec();
-                    let prev_ids = self.selected_cards.clone();
-                    if !prev_ids.is_empty() {
-                        let waitroom_cards: Vec<i16> = {
-                            let p = gs.resolve_target_player_mut(&target);
-                            p.waitroom.cards.to_vec()
-                        };
-                        for (idx, cid) in waitroom_cards.iter().enumerate() {
-                            if prev_ids.contains(cid) && !all_idxs.contains(&idx) {
-                                all_idxs.push(idx);
-                            }
-                        }
-                        self.selected_cards.clear();
-                    }
-                    self.execute_selected_cards_from_zone(
-                        gs,
-                        Zone::Discard.to_str(),
-                        &all_idxs,
-                        count,
-                        card_type.as_deref(),
-                        cost_limit,
-                        cost_limit_operator.as_deref(),
-                        cost_total,
-                        cost_total_operator.as_deref(),
-                        group.as_deref(),
-                        characters.as_ref(),
-                        target_player_id.as_deref(),
-                    )?;
-                    // Persist sub-choice (e.g. SelectPosition).
-                    // finalize_choice preserves pending_choice when sub_choice_created is true.
-                    if self.sub_choice_created {
-                        self.store_pending_choice(gs);
-                    }
-                }
+                return self.handle_discard_selection(gs, &ctx, &context, &mut validate_card);
             }
             Some(Zone::LookedAt) => {
                 let valid = mfi(indices);
@@ -1514,6 +1070,517 @@ impl super::resolver::AbilityResolver {
             return self.resume_pending_actions(gs);
         }
         self.finalize_choice(gs, &context)
+    }
+
+    fn build_reprompt(
+        &self,
+        ctx: &SelectionContext,
+        zone: &str,
+        count: usize,
+        desc: String,
+        skip: bool,
+        fi: Option<Vec<usize>>,
+        tpid: Option<String>,
+        ct: Option<u32>,
+        cto: Option<String>,
+    ) -> ChoiceBuilder {
+        Choice::select_cards(zone, count, desc, skip)
+            .card_type(ctx.card_type.clone())
+            .cost_limit(ctx.cost_limit, ctx.cost_limit_operator.clone())
+            .cost_total(ct, cto)
+            .group(ctx.group.clone())
+            .characters(ctx.characters.clone())
+            .filtered_indices(fi)
+            .target_player_id(tpid)
+    }
+
+    fn handle_hand_selection(
+        &mut self,
+        gs: &mut GameState,
+        ctx: &SelectionContext,
+        _context: &ExecutionContext,
+        validate_card: &mut impl FnMut(i16) -> bool,
+    ) -> Result<(), String> {
+        let mapped_indices = ctx.mfi(&ctx.indices);
+        let hand_idx = if mapped_indices.is_empty() && !ctx.allow_skip && ctx.count > 0 {
+            return Err("No cards selected from hand for required selection".to_string());
+        } else {
+            &mapped_indices
+        };
+        if !hand_idx.is_empty() || ctx.allow_skip {
+            if !hand_idx.is_empty() && ctx.count > 0 && hand_idx.len() < ctx.count {
+                let target = ctx
+                    .target_player_id
+                    .as_deref()
+                    .unwrap_or("self")
+                    .to_string();
+                let hand_cards: Vec<i16> = {
+                    let p = gs.resolve_target_player_mut(&target);
+                    p.hand.cards.to_vec()
+                };
+                let mut all_hand_idxs = hand_idx.to_vec();
+                let prev_ids: Vec<i16> = self.selected_cards.clone();
+                if !prev_ids.is_empty() {
+                    for (hidx, cid) in hand_cards.iter().enumerate() {
+                        if prev_ids.contains(cid) && !all_hand_idxs.contains(&hidx) {
+                            all_hand_idxs.push(hidx);
+                        }
+                    }
+                }
+                let new_card_ids: Vec<i16> = all_hand_idxs
+                    .iter()
+                    .filter_map(|&idx| {
+                        if idx < hand_cards.len() {
+                            Some(hand_cards[idx])
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                for cid in new_card_ids {
+                    if !self.selected_cards.contains(&cid) {
+                        self.selected_cards.push(cid);
+                    }
+                }
+                let remaining = ctx.count - hand_idx.len();
+                let available_idxs: Vec<usize> = (0..hand_cards.len())
+                    .filter(|i| !all_hand_idxs.contains(i))
+                    .collect();
+                let fi = if available_idxs.is_empty() {
+                    None
+                } else {
+                    Some(available_idxs)
+                };
+                let desc = format!(
+                    "Select {} more card(s) from hand{}",
+                    remaining,
+                    if ctx.blind { " (blind)" } else { "" }
+                );
+                self.pending_choice = Some(
+                    self.build_reprompt(
+                        ctx,
+                        Zone::Hand.to_str(),
+                        remaining,
+                        desc,
+                        false,
+                        fi,
+                        Some(target.clone()),
+                        ctx.cost_total,
+                        ctx.cost_total_operator.clone(),
+                    )
+                    .blind(ctx.blind)
+                    .is_reveal(ctx.is_reveal)
+                    .build(),
+                );
+                self.store_pending_choice(gs);
+                return Ok(());
+            }
+            if !hand_idx.is_empty() && ctx.count == 0 && ctx.allow_skip {
+                let target = ctx
+                    .target_player_id
+                    .as_deref()
+                    .unwrap_or("self")
+                    .to_string();
+                let old_hand_cards: Vec<i16> = {
+                    let p = gs.resolve_target_player(&target);
+                    p.hand.cards.to_vec()
+                };
+                let moved_ids: Vec<i16> = hand_idx
+                    .iter()
+                    .filter_map(|&idx| old_hand_cards.get(idx).copied())
+                    .collect();
+                self.execute_selected_cards_from_zone(
+                    gs,
+                    Zone::Hand.to_str(),
+                    hand_idx,
+                    ctx.count,
+                    ctx.card_type.as_deref(),
+                    ctx.cost_limit,
+                    ctx.cost_limit_operator.as_deref(),
+                    ctx.cost_total,
+                    ctx.cost_total_operator.as_deref(),
+                    ctx.group.as_deref(),
+                    ctx.characters.as_ref(),
+                    ctx.target_player_id.as_deref(),
+                )?;
+                for &cid in &moved_ids {
+                    if !self.selected_cards.contains(&cid) {
+                        self.selected_cards.push(cid);
+                    }
+                }
+                let hand_cards: Vec<i16> = {
+                    let p = gs.resolve_target_player_mut(&target);
+                    p.hand.cards.to_vec()
+                };
+                let include_idxs: Vec<usize> = (0..hand_cards.len())
+                    .filter(|i| validate_card(hand_cards[*i]))
+                    .collect();
+                let fi = if include_idxs.is_empty() {
+                    None
+                } else {
+                    Some(include_idxs)
+                };
+                self.pending_choice = Some(
+                    self.build_reprompt(
+                        ctx,
+                        Zone::Hand.to_str(),
+                        0,
+                        "Select more card(s) from hand (or skip to finish)".to_string(),
+                        true,
+                        fi,
+                        Some(target),
+                        ctx.cost_total,
+                        ctx.cost_total_operator.clone(),
+                    )
+                    .build(),
+                );
+                self.store_pending_choice(gs);
+                return Ok(());
+            }
+            let mut all_idxs = hand_idx.to_vec();
+            let selected_ids = self.selected_cards.clone();
+            if !selected_ids.is_empty() {
+                let target = ctx
+                    .target_player_id
+                    .as_deref()
+                    .unwrap_or("self")
+                    .to_string();
+                let hand_cards: Vec<i16> = {
+                    let p = gs.resolve_target_player_mut(&target);
+                    p.hand.cards.to_vec()
+                };
+                for (hidx, cid) in hand_cards.iter().enumerate() {
+                    if selected_ids.contains(cid) && !all_idxs.contains(&hidx) {
+                        all_idxs.push(hidx);
+                    }
+                }
+            }
+            self.execute_selected_cards_from_zone(
+                gs,
+                Zone::Hand.to_str(),
+                &all_idxs,
+                ctx.count,
+                ctx.card_type.as_deref(),
+                ctx.cost_limit,
+                ctx.cost_limit_operator.as_deref(),
+                ctx.cost_total,
+                ctx.cost_total_operator.as_deref(),
+                ctx.group.as_deref(),
+                ctx.characters.as_ref(),
+                ctx.target_player_id.as_deref(),
+            )?;
+            self.selected_cards.clear();
+        }
+        if ctx.allow_skip {
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.optional_cost_result =
+                    Some(!ctx.indices.is_empty() || !self.moved_cards.is_empty());
+            }
+            let is_opponent_action = ctx.target_player_id.as_deref() == Some("opponent");
+            if ctx.indices.is_empty()
+                && ctx.count > 0
+                && !is_opponent_action
+                && self.moved_cards.is_empty()
+            {
+                gs.ability_queue.take_pending_actions();
+            }
+        }
+        if gs.ability_queue.has_pending_actions() && self.pending_choice.is_none() {
+            self.clear_choice_state(gs);
+            return self.resume_pending_actions(gs);
+        }
+        self.finalize_choice(gs, _context)
+    }
+
+    fn handle_discard_selection(
+        &mut self,
+        gs: &mut GameState,
+        ctx: &SelectionContext,
+        context: &ExecutionContext,
+        validate_card: &mut impl FnMut(i16) -> bool,
+    ) -> Result<(), String> {
+        let mapped_indices = ctx.mfi(&ctx.indices);
+        if ctx.is_select_action {
+            let target = ctx
+                .target_player_id
+                .as_deref()
+                .unwrap_or("self")
+                .to_string();
+            let player = gs.resolve_target_player_mut(&target);
+            let mut cards: Vec<i16> = Vec::new();
+            for &i in mapped_indices.iter() {
+                if i < player.waitroom.cards.len() {
+                    let cid = player.waitroom.cards[i];
+                    if !self.selected_cards.contains(&cid) {
+                        self.selected_cards.push(cid);
+                        cards.push(cid);
+                    }
+                }
+            }
+            let selected_so_far = self.selected_cards.len();
+            if ctx.count > 0 && !mapped_indices.is_empty() && selected_so_far < ctx.count {
+                let remaining = ctx.count - selected_so_far;
+                let waitroom_cards: Vec<i16> = {
+                    let p = gs.resolve_target_player_mut(&target);
+                    p.waitroom.cards.to_vec()
+                };
+                let already_selected = self.selected_cards.clone();
+                let filtered_idxs: Vec<usize> = (0..waitroom_cards.len())
+                    .filter(|&i| !already_selected.contains(&waitroom_cards[i]))
+                    .collect();
+                let remaining_count = filtered_idxs.len();
+                let fi = if filtered_idxs.is_empty() {
+                    None
+                } else {
+                    Some(filtered_idxs)
+                };
+                let desc = format!(
+                    "Select {} more card(s) from discard from {} remaining",
+                    remaining, remaining_count
+                );
+                self.pending_choice = Some(
+                    self.build_reprompt(
+                        ctx,
+                        Zone::Discard.to_str(),
+                        remaining,
+                        desc,
+                        false,
+                        fi,
+                        Some(target.clone()),
+                        ctx.cost_total,
+                        ctx.cost_total_operator.clone(),
+                    )
+                    .is_select_action(true)
+                    .build(),
+                );
+                self.store_pending_choice(gs);
+                return Ok(());
+            }
+            return self.finalize_choice(gs, &context);
+        } else {
+            if !mapped_indices.is_empty() && ctx.count > 0 && mapped_indices.len() < ctx.count {
+                let target = ctx
+                    .target_player_id
+                    .as_deref()
+                    .unwrap_or("self")
+                    .to_string();
+                let waitroom_cards: Vec<i16> = {
+                    let p = gs.resolve_target_player_mut(&target);
+                    p.waitroom.cards.to_vec()
+                };
+                let mut filtered_idxs: Vec<usize> = Vec::new();
+                let prev_ids = self.selected_cards.clone();
+                if !prev_ids.is_empty() {
+                    for (idx, cid) in waitroom_cards.iter().enumerate() {
+                        if prev_ids.contains(cid) && !filtered_idxs.contains(&idx) {
+                            filtered_idxs.push(idx);
+                        }
+                    }
+                }
+                let current_card_ids: Vec<i16> = mapped_indices
+                    .iter()
+                    .filter_map(|&idx| {
+                        if idx < waitroom_cards.len() {
+                            Some(waitroom_cards[idx])
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                for &cid in &current_card_ids {
+                    if !self.selected_cards.contains(&cid) {
+                        self.selected_cards.push(cid);
+                    }
+                }
+                self.execute_selected_cards_from_zone(
+                    gs,
+                    Zone::Discard.to_str(),
+                    &mapped_indices,
+                    ctx.count,
+                    ctx.card_type.as_deref(),
+                    ctx.cost_limit,
+                    ctx.cost_limit_operator.as_deref(),
+                    ctx.cost_total,
+                    ctx.cost_total_operator.as_deref(),
+                    ctx.group.as_deref(),
+                    ctx.characters.as_ref(),
+                    ctx.target_player_id.as_deref(),
+                )?;
+                if self.sub_choice_created {
+                    self.sub_choice_created = false;
+                    let remaining = ctx.count - mapped_indices.len();
+                    if remaining > 0 {
+                        let waitroom_cards: Vec<i16> = {
+                            let p = gs.resolve_target_player_mut(&target);
+                            p.waitroom.cards.to_vec()
+                        };
+                        let spent: u32 = self
+                            .selected_cards
+                            .iter()
+                            .filter_map(|&cid| gs.card_database.get_card(cid).and_then(|c| c.cost))
+                            .sum();
+                        let remaining_budget = ctx.cost_total.map(|tb| tb.saturating_sub(spent));
+                        let use_budget_filter = match ctx.cost_total_operator.as_deref() {
+                            Some(op) => op == "<=",
+                            None => ctx.cost_total.is_some(),
+                        };
+                        let all_idxs: Vec<usize> = if use_budget_filter {
+                            let rb = remaining_budget.unwrap_or(0);
+                            waitroom_cards
+                                .iter()
+                                .enumerate()
+                                .filter(|(_, &cid)| {
+                                    gs.card_database
+                                        .get_card(cid)
+                                        .and_then(|c| c.cost)
+                                        .unwrap_or(99)
+                                        <= rb
+                                })
+                                .map(|(idx, _)| idx)
+                                .collect()
+                        } else {
+                            (0..waitroom_cards.len()).collect()
+                        };
+                        if !all_idxs.is_empty() || ctx.allow_skip {
+                            let desc = format!(
+                                "Select {} more card(s) from discard{}",
+                                remaining,
+                                if ctx.allow_skip {
+                                    " (or skip to finish)"
+                                } else {
+                                    ""
+                                }
+                            );
+                            let fi = if all_idxs.is_empty() {
+                                Some(vec![])
+                            } else {
+                                Some(all_idxs)
+                            };
+                            let reprompt = self
+                                .build_reprompt(
+                                    ctx,
+                                    Zone::Discard.to_str(),
+                                    remaining,
+                                    desc,
+                                    ctx.allow_skip,
+                                    fi,
+                                    Some(target),
+                                    remaining_budget,
+                                    Some("<=".to_string()),
+                                )
+                                .build();
+                            let mut pending = gs.ability_queue.take_pending_actions();
+                            self.pending_reprompt_choice = Some(reprompt);
+                            gs.ability_queue.set_pending_actions(pending);
+                        }
+                    }
+                    return Ok(());
+                }
+                let waitroom_cards: Vec<i16> = {
+                    let p = gs.resolve_target_player_mut(&target);
+                    p.waitroom.cards.to_vec()
+                };
+                let spent: u32 = self
+                    .selected_cards
+                    .iter()
+                    .filter_map(|&cid| gs.card_database.get_card(cid).and_then(|c| c.cost))
+                    .sum();
+                let remaining_budget = ctx.cost_total.map(|tb| tb.saturating_sub(spent));
+                let use_budget_filter = match ctx.cost_total_operator.as_deref() {
+                    Some(op) => op == "<=",
+                    None => ctx.cost_total.is_some(),
+                };
+                let all_idxs: Vec<usize> = if use_budget_filter {
+                    let rb = remaining_budget.unwrap_or(0);
+                    waitroom_cards
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, &cid)| {
+                            gs.card_database
+                                .get_card(cid)
+                                .and_then(|c| c.cost)
+                                .unwrap_or(99)
+                                <= rb
+                        })
+                        .map(|(idx, _)| idx)
+                        .collect()
+                } else {
+                    (0..waitroom_cards.len()).collect()
+                };
+                let remaining = ctx.count - mapped_indices.len();
+                let desc = format!(
+                    "Select {} more card(s) from discard{}",
+                    remaining,
+                    if ctx.allow_skip {
+                        " (or skip to finish)"
+                    } else {
+                        ""
+                    }
+                );
+                let fi = if all_idxs.is_empty() {
+                    Some(vec![])
+                } else {
+                    Some(all_idxs)
+                };
+                self.pending_choice = Some(
+                    self.build_reprompt(
+                        ctx,
+                        Zone::Discard.to_str(),
+                        remaining,
+                        desc,
+                        ctx.allow_skip,
+                        fi,
+                        Some(target),
+                        remaining_budget,
+                        Some("<=".to_string()),
+                    )
+                    .build(),
+                );
+                self.store_pending_choice(gs);
+                return Ok(());
+            }
+            let target = ctx
+                .target_player_id
+                .as_deref()
+                .unwrap_or("self")
+                .to_string();
+            let mut all_idxs: Vec<usize> = mapped_indices.to_vec();
+            let prev_ids = self.selected_cards.clone();
+            if !prev_ids.is_empty() {
+                let waitroom_cards: Vec<i16> = {
+                    let p = gs.resolve_target_player_mut(&target);
+                    p.waitroom.cards.to_vec()
+                };
+                for (idx, cid) in waitroom_cards.iter().enumerate() {
+                    if prev_ids.contains(cid) && !all_idxs.contains(&idx) {
+                        all_idxs.push(idx);
+                    }
+                }
+                self.selected_cards.clear();
+            }
+            self.execute_selected_cards_from_zone(
+                gs,
+                Zone::Discard.to_str(),
+                &all_idxs,
+                ctx.count,
+                ctx.card_type.as_deref(),
+                ctx.cost_limit,
+                ctx.cost_limit_operator.as_deref(),
+                ctx.cost_total,
+                ctx.cost_total_operator.as_deref(),
+                ctx.group.as_deref(),
+                ctx.characters.as_ref(),
+                ctx.target_player_id.as_deref(),
+            )?;
+            if self.sub_choice_created {
+                self.store_pending_choice(gs);
+            }
+        }
+        if gs.ability_queue.has_pending_actions() && self.pending_choice.is_none() {
+            self.clear_choice_state(gs);
+            return self.resume_pending_actions(gs);
+        }
+        self.finalize_choice(gs, context)
     }
 
     fn handle_select_target(
