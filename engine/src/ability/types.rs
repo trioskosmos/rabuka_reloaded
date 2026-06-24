@@ -36,6 +36,15 @@ pub enum ChoiceRoute {
     Raw(String),
 }
 
+/// Commands queued for sequential execution after a choice resolves.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Command {
+    /// Raw effect to execute
+    Effect(crate::card::AbilityEffect),
+    /// Inline choice (for re-prompting or intermediate decisions)
+    Choice(Choice),
+}
+
 impl fmt::Display for ChoiceRoute {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -173,21 +182,6 @@ pub enum LookAndSelectStep {
         destination: String,
         source_zone: String,
     },
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Command {
-    /// Raw effect (fallback for types that don't have a compile method yet)
-    Effect(crate::card::AbilityEffect),
-    /// Move a specific card that was selected by a previous SelectCards
-    MoveCard {
-        card_id: i16,
-        destination: String,
-        target: String,
-        state_change: Option<String>,
-    },
-    /// Inline choice (for the rare case of creating a choice mid-command)
-    Choice(Choice),
 }
 
 pub struct ChoiceBuilder {
@@ -673,8 +667,7 @@ impl ZoneSnapshot {
                 + p2.stage.stage.iter().filter(|&&id| id != -1).count(),
             waitroom_count: p1.waitroom.len() + p2.waitroom.len(),
             energy_count: p1.energy_zone.cards.len() + p2.energy_zone.cards.len(),
-            active_energy_count: p1.energy_zone.active_count()
-                + p2.energy_zone.active_count(),
+            active_energy_count: p1.energy_zone.active_count() + p2.energy_zone.active_count(),
             deck_count: p1.main_deck.cards.len() + p2.main_deck.cards.len(),
         }
     }

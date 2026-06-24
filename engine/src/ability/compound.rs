@@ -387,21 +387,16 @@ impl AbilityResolver {
                         if repeat_action.action == "repeat_procedure"
                             && repeat_action.optional.unwrap_or(false)
                         {
+                            for _ in 0..repeats_remaining {
+                                self.pending_repeat_actions
+                                    .extend(repeat_actions.iter().cloned());
+                            }
                             self.pending_choice = Some(Choice::SelectTarget {
                                 target: "pay_optional_cost:skip_optional_cost".to_string(),
                                 description: "Repeat effect?".to_string(),
                                 allow_skip: true,
                                 options: Some(vec!["Stop".to_string(), "Continue".to_string()]),
                             });
-                            let mut remaining: Vec<AbilityEffect> = Vec::new();
-                            for _ in 0..repeats_remaining {
-                                remaining.extend_from_slice(repeat_actions);
-                            }
-                            if !remaining.is_empty() {
-                                let mut existing = gs.ability_queue.take_pending_commands();
-                                existing.extend(remaining.into_iter().map(Command::Effect));
-                                gs.ability_queue.set_pending_commands(existing);
-                            }
                             return Ok(());
                         }
                     }

@@ -34,24 +34,6 @@ impl super::resolver::AbilityResolver {
                     self.spawn_context.target = effect.target.clone();
                     self.execute_effect(gs, effect)?;
                 }
-                Command::MoveCard {
-                    card_id,
-                    destination,
-                    target,
-                    state_change,
-                } => {
-                    let card_id = *card_id;
-                    let target = target.clone();
-                    let destination = destination.clone();
-                    let state_change = state_change.clone();
-                    let player = gs.resolve_target_player_mut(&target);
-                    super::util::place_card_in_zone(player, card_id, &destination, None, false, 1);
-                    gs.mods.clear_all_for_card(card_id);
-                    gs.record_card_movement(card_id);
-                    if state_change.as_deref() == Some("wait") {
-                        gs.mods.add_orientation_modifier(card_id, "wait");
-                    }
-                }
                 Command::Choice(choice) => {
                     self.pending_choice = Some(choice.clone());
                 }
