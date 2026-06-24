@@ -1746,10 +1746,13 @@ impl<'a> ConditionContext<'a> {
                     }
                 }
                 if let Some(card) = card_db.get_card(cid) {
-                    if let Some(ref bh) = card.base_heart {
-                        for color in bh.hearts.keys() {
-                            if required_colors.contains(color) {
-                                present.insert(*color);
+                    let is_blade = condition.heart_source.as_deref() == Some("blade");
+                    if !is_blade {
+                        if let Some(ref bh) = card.base_heart {
+                            for color in bh.hearts.keys() {
+                                if required_colors.contains(color) {
+                                    present.insert(*color);
+                                }
                             }
                         }
                     }
@@ -2086,7 +2089,50 @@ impl<'a> ConditionContext<'a> {
         }
 
         let actual = match Zone::from_str(location) {
-            Some(Zone::RevealedCards) => count_filtered(&self.game_state.revealed_cards, card_type),
+            Some(Zone::RevealedCards) => {
+                if condition.unit.as_deref() == Some("types") && !hc.is_empty() {
+                    let required_colors: Vec<crate::card::HeartColor> = hc
+                        .iter()
+                        .map(|s| crate::zones::parse_heart_color(s))
+                        .collect();
+                    let mut present = std::collections::HashSet::new();
+                    let is_blade = condition.heart_source.as_deref() == Some("blade");
+                    for &cid in &self.game_state.revealed_cards {
+                        if cid == -1 {
+                            continue;
+                        }
+                        if let Some(card) = card_db.get_card(cid) {
+                            if !is_blade {
+                                if let Some(ref bh) = card.base_heart {
+                                    for color in bh.hearts.keys() {
+                                        if required_colors.contains(color) {
+                                            present.insert(*color);
+                                        }
+                                    }
+                                }
+                            }
+                            if let Some(ref bld) = card.blade_heart {
+                                for color in bld.hearts.keys() {
+                                    if required_colors.contains(color) {
+                                        present.insert(*color);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    let actual = present.len();
+                    log::debug!(
+                        "[REVEALED_TYPES] heart_source={:?} required={:?} present={:?} count={}",
+                        condition.heart_source,
+                        required_colors,
+                        present,
+                        actual,
+                    );
+                    actual as usize
+                } else {
+                    count_filtered(&self.game_state.revealed_cards, card_type)
+                }
+            }
             Some(Zone::Stage) => {
                 let stage_cards: Vec<i16> = if is_both {
                     let opp = self.resolve_condition_player("opponent");
@@ -2140,13 +2186,23 @@ impl<'a> ConditionContext<'a> {
                         .map(|s| crate::zones::parse_heart_color(s))
                         .collect();
                     let mut present = std::collections::HashSet::new();
+                    let is_blade = condition.heart_source.as_deref() == Some("blade");
                     for &cid in &stage_cards {
                         if cid == -1 {
                             continue;
                         }
                         if let Some(card) = card_db.get_card(cid) {
-                            if let Some(ref bh) = card.base_heart {
-                                for color in bh.hearts.keys() {
+                            if !is_blade {
+                                if let Some(ref bh) = card.base_heart {
+                                    for color in bh.hearts.keys() {
+                                        if required_colors.contains(color) {
+                                            present.insert(*color);
+                                        }
+                                    }
+                                }
+                            }
+                            if let Some(ref bld) = card.blade_heart {
+                                for color in bld.hearts.keys() {
                                     if required_colors.contains(color) {
                                         present.insert(*color);
                                     }

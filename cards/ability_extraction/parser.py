@@ -787,6 +787,15 @@ def _try_blade_count(text):
     return None
 
 
+def _infer_heart_source(cond, text):
+    """Set heart_source on a card_count_condition based on text mentioning
+    ブレードハート in a heart-color-checking context (not 持たない/がない).
+    """
+    if cond.get("heart_colors") and "ブレードハート" in text:
+        if "持たない" not in text and "がない" not in text:
+            cond["heart_source"] = "blade"
+
+
 def _enrich_card_count_condition(result, text):
     """Post-match enrichment for card_count_condition: extracts all filter fields
     from the raw text (exclude_self, negation, character names, cost limits,
@@ -907,6 +916,8 @@ def _enrich_card_count_condition(result, text):
                 result["heart_colors"] = colors
     elif "heart_colors" in result:
         del result["heart_colors"]
+    # Heart source: blade (ブレードハート) vs base (default)
+    _infer_heart_source(result, text)
     # State (wait/active)
     if "ウェイト状態" in text:
         result["state"] = "wait"
@@ -8670,6 +8681,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 ):
                     cond["card_property"] = "has_score_icon"
                     fix_stats["card_property"] += 1
+                _infer_heart_source(cond, ct)
 
             # 8d: Enrich temporal_condition with aggregate
             if cond.get("type") == "temporal_condition":
@@ -8739,6 +8751,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             if "{{icon_score.png|スコア}}を持つ" in rct and not rc.get("card_property"):
                 rc["card_property"] = "has_score_icon"
                 fix_stats["result_cond"] += 1
+            _infer_heart_source(rc, rct)
 
         # FIX 10: Primary effect fixes — negation condition
         pe = eff.get("primary_effect")
@@ -9324,6 +9337,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     "card_property"
                 ):
                     nc["card_property"] = "has_score_icon"
+                _infer_heart_source(nc, nct)
                 # Strip heart_colors from preceding_moved conditions that have a
                 # specific location — the move already filtered by heart color.
                 if (
@@ -9343,6 +9357,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     "card_property"
                 ):
                     node["card_property"] = "has_score_icon"
+                _infer_heart_source(node, nct)
 
             # Strip parenthetical from sub-conditions of compound conditions
             if node.get("type") == "compound" and "conditions" in node:

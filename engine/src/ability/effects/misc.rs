@@ -397,18 +397,22 @@ impl AbilityResolver {
                 && effect.distinct.is_none());
 
         if resource == "surplus_heart" {
-            if sign == Some("negative") && is_all {
-                let old = match target.as_str() {
+            let surplus_target = target.clone();
+            let old = if sign == Some("negative") && is_all {
+                let v = match surplus_target.as_str() {
                     "opponent" => gs.opponent_live_surplus_count,
                     _ => gs.self_live_surplus_count,
                 };
-                gs.mods.last_surplus_loss_count = old;
-                if target == "opponent" {
+                gs.mods.last_surplus_loss_count = v;
+                if surplus_target == "opponent" {
                     gs.opponent_live_surplus_count = 0;
                 } else {
                     gs.self_live_surplus_count = 0;
                 }
-            }
+                Some(v)
+            } else {
+                None
+            };
             if is_temporary {
                 let desc = format!(
                     "{} all surplus hearts",
@@ -418,13 +422,15 @@ impl AbilityResolver {
                         "Gain"
                     }
                 );
+                let effect_data =
+                    old.map(|v| serde_json::json!({"target": surplus_target, "old_value": v}));
                 util::push_temporary_effect(
                     gs,
-                    &format!("gain_{}", resource),
+                    "gain_surplus_heart",
                     duration.as_deref(),
                     &target,
                     &desc,
-                    None,
+                    effect_data,
                 );
             }
             return Ok(());

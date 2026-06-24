@@ -2018,6 +2018,19 @@ impl GameState {
                         }
                     }
                 }
+                "gain_surplus_heart" => {
+                    if let Some(ref data) = effect.effect_data {
+                        if let Some(target_str) = data.get("target").and_then(|v| v.as_str()) {
+                            if let Some(old) = data.get("old_value").and_then(|v| v.as_u64()) {
+                                match target_str {
+                                    "opponent" => self.opponent_live_surplus_count = old as u32,
+                                    _ => self.self_live_surplus_count = old as u32,
+                                }
+                                log::debug!("Restored surplus count for {} to {}", target_str, old);
+                            }
+                        }
+                    }
+                }
                 s if s.starts_with("gain_heart") => {
                     if let Some(ref data) = effect.effect_data {
                         if let Some(cards) = data.as_array() {

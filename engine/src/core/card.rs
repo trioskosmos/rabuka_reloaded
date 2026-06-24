@@ -1382,6 +1382,10 @@ pub struct Condition {
     /// Heart colors required collectively from stage members (e.g. all 6 colors)
     #[serde(default)]
     pub heart_colors: Option<Vec<String>>,
+    /// Heart source for heart color checks: "blade" means check blade_heart (ブレードハート),
+    /// absent or other value means check base_heart (printed/natural hearts).
+    #[serde(default)]
+    pub heart_source: Option<String>,
     /// ability_filter: "no_ability" for "能力を持たない" (card does not have abilities)
     /// or "has_ability" for "能力を持つ" (card has abilities)
     /// or "no_ability_type" for "能力も...能力も持たない" (card has neither type)
