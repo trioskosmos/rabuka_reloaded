@@ -1503,7 +1503,7 @@ impl super::resolver::AbilityResolver {
                                     .target_player_id(Some(target))
                                     .build();
                                     let mut pending = gs.ability_queue.take_pending_actions();
-                                    self.pending_choice = Some(reprompt);
+                                    self.pending_reprompt_choice = Some(reprompt);
                                     gs.ability_queue.set_pending_actions(pending);
                                 }
                             }
