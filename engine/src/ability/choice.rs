@@ -548,10 +548,6 @@ impl super::resolver::AbilityResolver {
                 .target_player_id(tpid)
         };
 
-        // Cost-phase zone handlers — only for actual cost payments (not effect selections).
-        // Effect-phase multi-pick is handled by the effect-phase zone handlers below.
-        let mut skip_discard_cleanup = false;
-
         if Zone::from_str(zone) == Some(Zone::Hand) && gs.entry_cost().is_some() && !effect_started
         {
             if !indices.is_empty() {
@@ -741,305 +737,6 @@ impl super::resolver::AbilityResolver {
             }
             self.clear_choice_state(gs);
             return self.resume_pending_actions(gs);
-        }
-
-        // Enter cost-phase when: ability has a cost, and we're handling a hand choice
-        // (either with picks, or with skip when allow_skip is true).
-        if gs.entry_cost().is_some() && (!effect_started || allow_skip || !indices.is_empty()) {
-            if !indices.is_empty() {
-                if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.optional_cost_result = Some(true);
-                }
-            }
-            log::debug!("[ZONE_MATCH] zone={} about to match effect-phase", zone);
-            match Zone::from_str(zone) {
-                Some(Zone::Stage) => {
-                    // Effect phase: move selected stage card(s) to destination zone.
-                    // When is_select_action is true, store card IDs without moving
-                    // (the actual move will be handled by a subsequent effect).
-                    if is_select_action {
-                        let stage_indices = mfi(indices);
-                        let player = gs.resolve_target_player_mut(
-                            target_player_id.as_deref().unwrap_or("self"),
-                        );
-                        for &idx in &stage_indices {
-                            if idx < 3 && player.stage.stage[idx] != -1 {
-                                let cid = player.stage.stage[idx];
-                                if validate_card(cid) && !self.selected_cards.contains(&cid) {
-                                    self.selected_cards.push(cid);
-                                }
-                            }
-                        }
-                        self.clear_choice_state(gs);
-                        // If no valid targets were selected, don't execute the
-                        // pending command — the effect is effectively cancelled.
-                        if stage_indices.is_empty() {
-                            return Ok(());
-                        }
-                        return self.resume_pending_actions(gs);
-                    }
-                    // Non-is_select_action: actually move the card(s) to destination.
-                    // Same logic as the OUTER_MATCH Stage handler.
-                    let dst = gs.entry_destination().map(|s| s.to_string());
-                    let dst_str = dst.as_deref().unwrap_or(Zone::Discard.to_str()).to_string();
-                    let player = gs.active_player_mut();
-                    let card_ids =
-                        util::resolve_indices_to_ids(player, Zone::Stage.to_str(), indices);
-                    let valid_ids: Vec<i16> = card_ids
-                        .into_iter()
-                        .filter(|&cid| validate_card(cid))
-                        .collect();
-                    let mut last_vacated = None;
-                    for &cid in &valid_ids {
-                        if let Some(pos) = player.stage.stage.iter().position(|&x| x == cid) {
-                            last_vacated = Some(pos);
-                        }
-                    }
-                    let moved_count = util::move_cards(
-                        player,
-                        &valid_ids,
-                        Zone::Stage.to_str(),
-                        &dst_str,
-                        None,
-                        &card_db,
-                    );
-                    if moved_count > 0 {
-                        if let Some(pos) = last_vacated {
-                            gs.last_vacated_stage_area = Some(pos);
-                        }
-                        self.selected_cards = valid_ids.clone();
-                        self.moved_cards = valid_ids.clone();
-                        gs.recently_moved_cards = Some(valid_ids);
-                        gs.recently_moved_from_zone = Some("stage".to_string());
-                    }
-                    self.clear_choice_state(gs);
-                    return self.resume_pending_actions(gs);
-                }
-                Some(Zone::Energy) => {
-                    let dst = if let Choice::SelectCard { destination, .. } = choice {
-                        destination.clone()
-                    } else {
-                        None
-                    };
-                    self.handle_energy_zone_selection(
-                        gs,
-                        indices,
-                        count,
-                        dst.clone(),
-                        &mut validate_card,
-                    )?;
-                    if dst.is_some() {
-                        self.clear_choice_state(gs);
-                        return self.resume_pending_actions(gs);
-                    }
-                }
-                Some(Zone::Discard) => {
-                    // When effect has started, skip cost handling so the effect
-                    // handler's discard arm (with position choice persistence) runs instead.
-                    if effect_started {
-                        skip_discard_cleanup = true;
-                    } else if is_select_action {
-                        let mapped_indices = mfi(indices);
-                        let player = gs.active_player_mut();
-                        let mut cards: Vec<i16> = Vec::new();
-                        for &i in mapped_indices.iter() {
-                            if i < player.waitroom.cards.len() {
-                                let cid = player.waitroom.cards[i];
-                                if validate_card(cid) {
-                                    cards.push(cid);
-                                }
-                            }
-                        }
-                        for &cid in &cards {
-                            if !self.selected_cards.contains(&cid) {
-                                self.selected_cards.push(cid);
-                            }
-                        }
-                    } else {
-                        let mapped_indices = mfi(indices);
-                        self.execute_selected_cards_from_zone(
-                            gs,
-                            Zone::Discard.to_str(),
-                            &mapped_indices,
-                            count,
-                            card_type.as_deref(),
-                            cost_limit,
-                            cost_limit_operator.as_deref(),
-                            cost_total,
-                            cost_total_operator.as_deref(),
-                            group.as_deref(),
-                            characters.as_ref(),
-                            target_player_id.as_deref(),
-                        )?;
-                        // Persist sub-choice (e.g. SelectPosition for empty_area placement)
-                        if self.pending_choice.is_some() {
-                            self.store_pending_choice(gs);
-                        }
-                        return self.finalize_choice(gs, &context);
-                    }
-                }
-                Some(Zone::Deck) => self.execute_selected_cards_from_zone(
-                    gs,
-                    Zone::Deck.to_str(),
-                    indices,
-                    count,
-                    card_type.as_deref(),
-                    cost_limit,
-                    cost_limit_operator.as_deref(),
-                    cost_total,
-                    cost_total_operator.as_deref(),
-                    group.as_deref(),
-                    characters.as_ref(),
-                    target_player_id.as_deref(),
-                )?,
-                Some(Zone::LookedAt) => {
-                    log::debug!("[HSC1_LOOKED_AT] START: looked_cards.len()={}, indices={:?}, filtered_indices={:?}, is_select_cards={}",
-                        gs.looked_at_cards.len(), indices, filtered_indices, gs.ability_queue.current_entry()
-                            .and_then(|e| e.ability.effect.as_ref())
-                            .and_then(|ef| ef.compound.select_action.as_ref())
-                            .map(|sa| {
-                                log::debug!("[HSC1_SA] sa.action={:?}, compound.actions.len={:?}", sa.action, sa.compound.actions.as_ref().map(|a| a.len()));
-                                sa.action == "select_cards"
-                            })
-                            .unwrap_or(false));
-                    let mapped_indices = mfi(indices);
-                    let select_action_entry = gs
-                        .ability_queue
-                        .current_entry()
-                        .and_then(|e| e.ability.effect.as_ref())
-                        .and_then(|ef| ef.compound.select_action.clone());
-                    // Only reveal when select_action has reveal:true
-                    // (parser emits this for "公開して手札に加える" / reveal and add to hand)
-                    if select_action_entry
-                        .as_ref()
-                        .and_then(|sa| sa.reveal)
-                        .unwrap_or(false)
-                    {
-                        self.reveal_selected_looked_at(gs, &mapped_indices);
-                    }
-                    let is_select_cards = select_action_entry
-                        .as_ref()
-                        .map(|sa| sa.action == "select_cards")
-                        .unwrap_or(false);
-
-                    if is_select_cards {
-                        self.handle_select_cards_looked_at(gs, &mapped_indices)?;
-                        if matches!(self.pending_choice, Some(Choice::SelectTarget { ref target, .. }) if super::enums::SelectTargetKind::from_str(target) == Some(super::enums::SelectTargetKind::Order))
-                        {
-                            return Ok(());
-                        }
-                    } else if let ExecutionContext::LookAndSelect { .. } = self.execution_context {
-                        let _ = select_action_entry.is_some();
-                        self.handle_select_cards_looked_at(gs, &mapped_indices)?;
-                    } else {
-                        self.handle_select_cards_looked_at(gs, &mapped_indices)?;
-                    }
-
-                    // Check if we can select more cards (for round-based "up to X" abilities).
-                    if is_select_cards && !mapped_indices.is_empty() {
-                        let sa = select_action_entry.as_ref();
-                        let any_number = sa.and_then(|s| s.any_number).unwrap_or(false);
-                        let is_max = sa.and_then(|s| s.max).unwrap_or(false);
-                        let is_optional = sa.and_then(|s| s.optional).unwrap_or(false);
-                        let json_count = sa.and_then(|s| s.count).unwrap_or(1) as usize;
-                        let max_count = count;
-                        let selected_count = mapped_indices.len();
-                        let remaining = gs.looked_at_cards.len();
-
-                        let can_reprompt =
-                            is_max || is_optional || any_number || json_count > selected_count;
-                        if can_reprompt && max_count > selected_count && remaining > 0 {
-                            let remaining_max = max_count - selected_count;
-                            let card_type = card_type.clone();
-                            self.pending_choice = Some(Choice::select_cards(
-                                Zone::LookedAt.to_str(),
-                                remaining_max,
-                                format!("Select up to {} more card(s) from the {} remaining looked-at cards", remaining_max, remaining),
-                                is_optional || any_number,
-                            )
-                            .card_type(card_type)
-                            .cost_limit(
-                                sa.and_then(|s| s.cost_limit),
-                                sa.and_then(|s| s.cost_limit_operator.clone()),
-                            )
-                            .group(sa.and_then(|s| s.group_names.as_ref()).and_then(|v| v.first().cloned()))
-                            .characters(sa.and_then(|s| s.characters.clone()))
-                            .build());
-                            self.execution_context = context.clone();
-                            return Ok(());
-                        }
-                    }
-
-                    return self.finalize_choice(gs, &context);
-                }
-                Some(Zone::RevealedCards) => {
-                    let dst = gs.entry_destination().map(|s| s.to_string());
-                    let dst_str = dst.as_deref().unwrap_or(Zone::Hand.to_str());
-                    let moved = self.move_from_revealed(gs, indices, &mut validate_card, dst_str);
-                    // If discard_remaining is set, move non-selected revealed cards to discard.
-                    // Check self.current_effect (the inner sub-action effect) rather than
-                    // gs.entry_effect() (the outer ability effect) — discard_remaining is
-                    // on the select_cards sub-action, not the outer sequential.
-                    if self
-                        .current_effect
-                        .as_ref()
-                        .is_some_and(|e| e.discard_remaining.unwrap_or(false))
-                    {
-                        let remaining: Vec<i16> = gs
-                            .revealed_cards
-                            .iter()
-                            .filter(|&&cid| !moved.contains(&cid))
-                            .copied()
-                            .collect();
-                        let player = gs.resolve_target_player_mut("self");
-                        for &cid in &remaining {
-                            player.waitroom.add_card(cid);
-                        }
-                        gs.revealed_cards.clear();
-                    }
-                    return self.finalize_choice(gs, &context);
-                }
-                Some(Zone::UnderMember) => {
-                    let dst = gs.entry_destination().map(|s| s.to_string());
-                    let dst_str = dst
-                        .as_deref()
-                        .unwrap_or(Zone::EnergyDeck.to_str())
-                        .to_string();
-                    let tgt = target_player_id
-                        .clone()
-                        .unwrap_or_else(|| "self".to_string());
-                    self.move_from_under_member(gs, indices, &mut validate_card, &dst_str, &tgt)?;
-                    return self.finalize_choice(gs, &context);
-                }
-                _ => {
-                    // When effect has started, don't early-return — fall through
-                    // to OUTER_MATCH where effect-phase zone handlers live.
-                    if !effect_started {
-                        self.clear_choice_state(gs);
-                        return self.resume_pending_actions(gs);
-                    }
-                }
-            }
-            if !skip_discard_cleanup {
-                // Don't early-return for zones with accumulated cards on skip:
-                // we need to fall through to execute them.
-                let has_accumulated = !self.selected_cards.is_empty();
-                let needs_fallthrough = match zone {
-                    "hand" => true,
-                    "discard" => has_accumulated || effect_started,
-                    "looked_at" => effect_started,
-                    "stage" => effect_started,
-                    "under_member" => effect_started,
-                    _ => effect_started,
-                };
-                if !needs_fallthrough && !effect_started {
-                    self.clear_choice_state(gs);
-                    if gs.ability_queue.has_pending_actions() {
-                        return self.resume_pending_actions(gs);
-                    }
-                    return Ok(());
-                }
-            }
         }
 
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
@@ -1563,14 +1260,7 @@ impl super::resolver::AbilityResolver {
                 }
             }
             Some(Zone::LookedAt) => {
-                let valid: Vec<usize> = indices
-                    .iter()
-                    .filter(|&&i| {
-                        let cid = gs.looked_at_cards.get(i).copied().unwrap_or(-1);
-                        cid != -1 && validate_card(cid)
-                    })
-                    .copied()
-                    .collect();
+                let valid = mfi(indices);
 
                 let select_action_entry = gs
                     .ability_queue
@@ -1643,22 +1333,25 @@ impl super::resolver::AbilityResolver {
                 return self.finalize_choice(gs, &context);
             }
             Some(Zone::RevealedCards) => {
-                let mut cards = Vec::new();
-                for &i in indices.iter().rev() {
-                    if i < gs.revealed_cards.len() {
-                        let cid = gs.revealed_cards.remove(i);
-                        if validate_card(cid) {
-                            cards.push(cid);
-                        }
-                    }
-                }
-                self.selected_cards = cards;
-                // Move selected cards to destination
                 let dst = gs.entry_destination().map(|s| s.to_string());
                 let dst_str = dst.as_deref().unwrap_or(Zone::Hand.to_str());
-                let player = gs.active_player_mut();
-                for &cid in &self.selected_cards.clone() {
-                    crate::ability::util::place_card_in_zone(player, cid, dst_str, None, false, 1);
+                let moved = self.move_from_revealed(gs, indices, &mut validate_card, dst_str);
+                if self
+                    .current_effect
+                    .as_ref()
+                    .is_some_and(|e| e.discard_remaining.unwrap_or(false))
+                {
+                    let remaining: Vec<i16> = gs
+                        .revealed_cards
+                        .iter()
+                        .filter(|&&cid| !moved.contains(&cid))
+                        .copied()
+                        .collect();
+                    let player = gs.resolve_target_player_mut("self");
+                    for &cid in &remaining {
+                        player.waitroom.add_card(cid);
+                    }
+                    gs.revealed_cards.clear();
                 }
             }
             Some(Zone::Energy) => {
@@ -1816,6 +1509,10 @@ impl super::resolver::AbilityResolver {
             zone,
             self.fmt_ids(&self.selected_cards)
         );
+        if gs.ability_queue.has_pending_actions() && self.pending_choice.is_none() {
+            self.clear_choice_state(gs);
+            return self.resume_pending_actions(gs);
+        }
         self.finalize_choice(gs, &context)
     }
 
