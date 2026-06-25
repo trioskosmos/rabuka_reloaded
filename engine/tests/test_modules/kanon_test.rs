@@ -32,6 +32,10 @@ fn advance_to_live_start(game: &mut TestGame) {
 /// Q93: Partial resolution with insufficient hand cards
 //=====================================================================
 use crate::helpers::*;
+use rabuka_engine::card::{BaseHeart, HeartColor};
+use rabuka_engine::game_state::Phase;
+use rabuka_engine::turn::TurnEngine;
+use std::collections::HashMap;
 
 #[test]
 fn kanon_ab1_live_success_fires_but_live_fails_no_hearts() {
@@ -161,5 +165,134 @@ fn kanon_q93_partial_resolution_zero_cards() {
     assert!(
         game.state.player1.stage.stage[1] != -1,
         "Kanon should still be on stage after LiveStart"
+    );
+}
+
+/// Test that Kanon's ab#1 (LiveSuccess — optional pay 6E → +1 score)
+/// actually resolves without freezing.
+///
+/// This test triggers LiveSuccess directly (bypasses the full live phase)
+/// and verifies that:
+///   1. A pending choice appears (pay or skip)
+///   2. Selecting "pay" deducts 6 energy and applies +1 score
+///   3. The ability completes without infinite looping
+#[test]
+fn kanon_ab1_live_success_pay_optional_cost() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
+    let kanon = game.id("PL!SP-pb1-001-R");
+    game.state.player1.stage.stage[1] = kanon;
+
+    // Put live card in live_card_zone so modify_score has a target
+    let live = game.id("PL!-sd1-020-SD");
+    game.state.player1.live_card_zone.cards.push(live);
+
+    // Inject Heart00 to force live success (like vivid_world tests)
+    let mut h = BaseHeart {
+        hearts: HashMap::new(),
+    };
+    h.hearts.insert(HeartColor::Heart00, 20);
+    game.state.player1.stage_hearts = Some(h);
+
+    // Give 6 active energy for the optional cost
+    game.give_energy(6);
+
+    let energy_before = game.state.player1.energy_zone.active_count();
+
+    // Set phase and trigger LiveSuccess abilities
+    game.state.current_phase = Phase::LiveVictoryDetermination;
+    TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
+    game.state.process_pending_auto_abilities("p1");
+
+    // LiveSuccess should have fired → pending choice (optional cost)
+    assert!(
+        game.has_pending_choice(),
+        "LiveSuccess should create pending choice (pay 6E or skip)"
+    );
+
+    // Select to pay (card_id = Some(1) → "pay_optional_cost")
+    game.select_option(1);
+
+    // After paying, the ability should complete without freezing.
+    // Verify the score modifier was applied.
+    assert_eq!(
+        game.state.mods.get_score_modifier(live),
+        1,
+        "Score should be +1 after paying 6E"
+    );
+
+    // Verify 6 energy was deducted.
+    let energy_spent = energy_before - game.state.player1.energy_zone.active_count();
+    assert_eq!(energy_spent, 6, "6 energy should be deducted");
+
+    // The ability should be fully resolved — no more pending choices
+    // (if there IS a pending choice, the ability got stuck).
+    assert!(
+        !game.has_pending_choice(),
+        "Ability should complete without leaving a pending choice"
+    );
+}
+
+/// Test that the SKIP path of Kanon's ab#1 also completes without freezing.
+#[test]
+fn kanon_ab1_live_success_skip_optional_cost() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
+    let kanon = game.id("PL!SP-pb1-001-R");
+    game.state.player1.stage.stage[1] = kanon;
+
+    let live = game.id("PL!-sd1-020-SD");
+    game.state.player1.live_card_zone.cards.push(live);
+
+    let mut h = BaseHeart {
+        hearts: HashMap::new(),
+    };
+    h.hearts.insert(HeartColor::Heart00, 20);
+    game.state.player1.stage_hearts = Some(h);
+
+    game.give_energy(6);
+    let energy_before = game.state.player1.energy_zone.active_count();
+
+    game.state.current_phase = Phase::LiveVictoryDetermination;
+    TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
+    game.state.process_pending_auto_abilities("p1");
+
+    assert!(
+        game.has_pending_choice(),
+        "LiveSuccess should create pending choice"
+    );
+
+    // Select to skip (card_id = Some(0) → "skip_optional_cost")
+    game.select_option(0);
+
+    // No score modifier should have been applied
+    assert_eq!(
+        game.state.mods.get_score_modifier(live),
+        0,
+        "Score should NOT change when skipping"
+    );
+
+    // No energy should have been deducted
+    let energy_spent = energy_before - game.state.player1.energy_zone.active_count();
+    assert_eq!(energy_spent, 0, "No energy should be deducted on skip");
+
+    // Ability should complete without freezing
+    assert!(
+        !game.has_pending_choice(),
+        "Ability should complete without leaving a pending choice"
     );
 }
