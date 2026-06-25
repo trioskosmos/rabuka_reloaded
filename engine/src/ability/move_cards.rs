@@ -1700,6 +1700,7 @@ impl AbilityResolver {
                 util::place_card_in_zone(player, *card_id, dst, None, false, 1);
             }
         }
+        gs.recalculate_constants();
         self.selected_cards = selected_ids;
         Ok(cards_to_move.iter().map(|&(_, cid)| cid).collect())
     }

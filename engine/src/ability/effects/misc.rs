@@ -1635,6 +1635,7 @@ impl AbilityResolver {
         for card in energy_cards {
             player.stage.place_under_card(area, card);
         }
+        gs.recalculate_constants();
     }
 
     pub fn execute_position_change(
@@ -2179,6 +2180,7 @@ impl AbilityResolver {
             gs.push_movement_event(*member_id, "stage", "stage", cause_cid, &mover_pid, true);
         }
         gs.position_change_occurred_this_turn = true;
+        gs.recalculate_constants();
         self.formation_plan.clear();
         Ok(())
     }

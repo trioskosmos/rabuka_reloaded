@@ -915,6 +915,7 @@ impl super::TurnEngine {
         // Rule 10.5.3-4: Orphaned under-member cards
         Self::check_orphaned_under_cards(&mut game_state.player1, &game_state.card_database);
         Self::check_orphaned_under_cards(&mut game_state.player2, &game_state.card_database);
+        game_state.recalculate_constants();
         Self::check_invalid_resolution_zone(game_state);
         if game_state.check_permanent_loop() {
             game_state.game_result = crate::game_state::GameResult::Draw;
