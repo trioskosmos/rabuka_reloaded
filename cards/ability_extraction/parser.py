@@ -1132,10 +1132,12 @@ def _try_temporal_turn_phase(text):
 
 
 def _try_baton_touch(text):
-    if (
-        "バトンタッチして登場した" not in text
-        and "バトンタッチして登場しており" not in text
-        and "バトンタッチして控え室に置か" not in text
+    is_teita = "とバトンタッチしていた" in text or "とバトンタッチしていて" in text
+    if not (
+        "バトンタッチして登場した" in text
+        or "バトンタッチして登場しており" in text
+        or "バトンタッチして控え室に置か" in text
+        or is_teita
     ):
         return None
     is_to_stage = "バトンタッチして登場した" in text
@@ -1152,22 +1154,32 @@ def _try_baton_touch(text):
         te_data["location"] = "stage"
     else:
         te_data["location"] = "discard"
-    m = re.search(r"「([^」]+)」からバトンタッチ", text)
+    # から-form: used with "baton touch FROM" (arriving member's perspective)
+    # と-form: used with "baton touch WITH" (departing member's perspective)
+    sep = "と" if is_teita else "から"
+    m = re.search(rf"「([^」]+)」{sep}バトンタッチ", text)
     if m:
         result["characters"] = [m.group(1)]
         te_data["source_character"] = m.group(1)
-    # 「名」以外の...からバトンタッチ — exclude this character
-    m = re.search(r"「([^」]+)」以外の.*からバトンタッチ", text)
+    # 「名」以外の...から/とバトンタッチ — exclude this character
+    m = re.search(rf"「([^」]+)」以外の.*{sep}バトンタッチ", text)
     if m:
         result["exclude_characters"] = [m.group(1)]
         te_data["exclude_characters"] = [m.group(1)]
-    m = re.search(r"『([^』」]+)』からバトンタッチ", text)
+    m = re.search(rf"『([^』」]+)』{sep}バトンタッチ", text)
     if m:
         te_data["source_group"] = m.group(1)
         # Also add to characters if not yet set
         if "characters" not in result:
             result["characters"] = [m.group(1)]
-    count_m = re.search(r"(\d+)人からバトンタッチ", text)
+    # と-form: also try 『X』のメンバーとバトンタッチ (group name before の)
+    if is_teita:
+        gns = extract_group_names(text)
+        if gns:
+            result["group_names"] = gns
+            if "characters" not in result:
+                result["characters"] = gns[:1]
+    count_m = re.search(rf"(\d+)人{sep}バトンタッチ", text)
     if count_m:
         te_data["min_count"] = int(count_m.group(1))
     # Extract cost limit (e.g., "コスト10以上" → cost_limit=10, operator=">=")
@@ -1182,9 +1194,14 @@ def _try_baton_touch(text):
             "未満": "<",
         }
         result["cost_limit_operator"] = op_map.get(cm.group(2), ">=")
+    # Extract group_names (for から-form, this is handled below)
     gns = extract_group_names(text)
     if gns:
         result["group_names"] = gns
+    # Extract card_property: "ブレードハートを持たない" → has_blade_heart + negation
+    if "ブレードハートを持たない" in text or "ブレードハートがない" in text:
+        result["card_property"] = "has_blade_heart"
+        result["negation"] = True
     # Extract cost comparison (e.g. "コストが低い" → comparison_type=cost, operator=<)
     if "コスト" in text and ("低い" in text or "高い" in text):
         te_data["cost_comparison"] = {
@@ -2108,6 +2125,23 @@ def _extract_generic_fields(condition, text):
     if "置かれた" in text and "locations" not in condition:
         condition["movement"] = "moved"
 
+    # Cost limit (e.g., "コスト10以上" → cost_limit=10, operator=">=")
+    cm = re.search(r"コスト(\d+)(以上|以下|より大きい|より小さい|未満)", text)
+    if cm:
+        condition["cost_limit"] = int(cm.group(1))
+        op_map = {
+            "以上": ">=",
+            "以下": "<=",
+            "より大きい": ">",
+            "より小さい": "<",
+            "未満": "<",
+        }
+        condition["cost_limit_operator"] = op_map.get(cm.group(2), ">=")
+
+    # Card property: "ブレードハートを持たない" → has_blade_heart + negation
+    if "ブレードハートを持たない" in text or "ブレードハートがない" in text:
+        condition["card_property"] = "has_blade_heart"
+
     # Temporal scope
     for kw, tmp in [("このターン", "this_turn"), ("このライブ", "this_live")]:
         if kw in text:
@@ -2365,6 +2399,28 @@ def parse_condition(text: str) -> Dict[str, Any]:
     ]:
         result = handler(text)
         if result is not None:
+            # Extract cost_limit and card_property from text for handlers
+            # that don't set these fields themselves (e.g. _try_heart_possession).
+            # Only extract when the key is truly absent (not just None) to avoid
+            # interfering with handlers that intentionally omit these fields.
+            if "cost_limit" not in result and "cost_limit_operator" not in result:
+                cm = re.search(
+                    r"コスト(\d+)(以上|以下|より大きい|より小さい|未満)", text
+                )
+                if cm:
+                    result["cost_limit"] = int(cm.group(1))
+                    op_map = {
+                        "以上": ">=",
+                        "以下": "<=",
+                        "より大きい": ">",
+                        "より小さい": "<",
+                        "未満": "<",
+                    }
+                    result["cost_limit_operator"] = op_map.get(cm.group(2), ">=")
+            if "card_property" not in result and (
+                "ブレードハートを持たない" in text or "ブレードハートがない" in text
+            ):
+                result["card_property"] = "has_blade_heart"
             # Add scope/aggregate fields for "自分と相手" conditions
             if "scope" not in result and "自分と相手" in text:
                 result["scope"] = "both"

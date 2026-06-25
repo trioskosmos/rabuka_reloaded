@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-25T17:35:55.716133",
+  "generated_at": "2026-06-25T18:00:15.367532",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -2395,6 +2395,7 @@
           "operator": ">=",
           "comparison_type": "cost",
           "cost_limit": 13,
+          "cost_limit_operator": ">=",
           "type": "comparison_condition"
         },
         "count": 1,
@@ -4328,15 +4329,26 @@
           {
             "text": "このメンバーがステージから控え室に置かれたとき、このメンバーがコスト10以上のブレードハートを持たない『虹ヶ咲』のメンバーとバトンタッチしていた場合、エネルギーを2枚アクティブにする",
             "condition": {
-              "type": "location_condition",
-              "card_type": "member_card",
-              "location": "stage",
+              "type": "movement_condition",
+              "movement": "baton_touch",
+              "target": "self",
+              "baton_touch_trigger": true,
               "text": "このメンバーがステージから控え室に置かれたとき、このメンバーがコスト10以上のブレードハートを持たない『虹ヶ咲』のメンバーとバトンタッチしていた場合",
-              "negation": true,
+              "trigger_event": {
+                "type": "baton_touch",
+                "tense": "past",
+                "location": "discard"
+              },
               "group_names": [
                 "虹ヶ咲"
               ],
-              "target": "self"
+              "characters": [
+                "虹ヶ咲"
+              ],
+              "cost_limit": 10,
+              "cost_limit_operator": ">=",
+              "card_property": "has_blade_heart",
+              "negation": true
             },
             "state_change": "active",
             "count": 2,
@@ -4351,6 +4363,9 @@
               "location": "stage",
               "text": "コスト15以上のブレードハートを持たない『虹ヶ咲』のメンバーの場合",
               "negation": true,
+              "cost_limit": 15,
+              "cost_limit_operator": ">=",
+              "card_property": "has_blade_heart",
               "group_names": [
                 "虹ヶ咲"
               ],
@@ -4733,9 +4748,9 @@
           "text": "これにより控え室に置いたカードの中にブレードハートを持たないメンバーカードが1枚以上ある場合",
           "negation": true,
           "card_type": "member_card",
+          "card_property": "has_blade_heart",
           "source": "preceding_moved",
-          "activation_position": "left_side",
-          "card_property": "has_blade_heart"
+          "activation_position": "left_side"
         },
         "followup_action": {
           "text": "このメンバーをアクティブにする。2枚ある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -4759,8 +4774,8 @@
                 "source": "preceding_moved",
                 "card_type": "member_card",
                 "negation": true,
-                "activation_position": "left_side",
-                "card_property": "has_blade_heart"
+                "card_property": "has_blade_heart",
+                "activation_position": "left_side"
               },
               "action": "gain_resource",
               "resource": "blade",
@@ -5596,6 +5611,7 @@
               "location": "stage",
               "text": "それがブレードハートを持たないメンバーカードの場合",
               "negation": true,
+              "card_property": "has_blade_heart",
               "target": "self"
             },
             "action": "modify_score",
@@ -13395,7 +13411,8 @@
           "card_type": "member_card",
           "operator": "<=",
           "comparison_type": "cost",
-          "cost_limit": 4
+          "cost_limit": 4,
+          "cost_limit_operator": "<="
         },
         "count": 1,
         "action": "draw_card",
@@ -14993,6 +15010,7 @@
               "operator": "<=",
               "comparison_type": "cost",
               "cost_limit": 9,
+              "cost_limit_operator": "<=",
               "type": "comparison_condition"
             }
           },
@@ -15008,6 +15026,7 @@
               "operator": "<=",
               "comparison_type": "cost",
               "cost_limit": 9,
+              "cost_limit_operator": "<=",
               "type": "comparison_condition"
             }
           },
@@ -15212,9 +15231,9 @@
           "target": "self",
           "card_type": "member_card",
           "negation": true,
+          "card_property": "has_blade_heart",
           "temporal": "this_turn",
-          "temporal_scope": "this_turn",
-          "card_property": "has_blade_heart"
+          "temporal_scope": "this_turn"
         },
         "action": "sequential",
         "actions": [
@@ -17116,6 +17135,7 @@
           "operator": ">=",
           "comparison_type": "cost",
           "cost_limit": 10,
+          "cost_limit_operator": ">=",
           "type": "comparison_condition"
         },
         "source": "stage",
@@ -18569,8 +18589,8 @@
           "card_type": "member_card",
           "text": "これにより控え室に置いたカードがブレードハートを持たないメンバーカードの場合",
           "negation": true,
-          "source": "preceding_moved",
-          "card_property": "has_blade_heart"
+          "card_property": "has_blade_heart",
+          "source": "preceding_moved"
         },
         "followup_action": {
           "text": "代わりに1つ以上を選ぶ。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n・ライブ終了時まで、自分のステージにいるこのメンバー以外の『Liella!』のメンバー1人は、{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る",
@@ -19109,8 +19129,8 @@
           "card_type": "member_card",
           "text": "これにより控え室に置いたカードがブレードハートを持たない場合",
           "negation": true,
-          "source": "preceding_moved",
-          "card_property": "has_blade_heart"
+          "card_property": "has_blade_heart",
+          "source": "preceding_moved"
         },
         "followup_action": {
           "text": "カードを1枚引く",
@@ -23169,6 +23189,7 @@
           "operator": ">=",
           "comparison_type": "cost",
           "cost_limit": 9,
+          "cost_limit_operator": ">=",
           "position": "center",
           "type": "comparison_condition"
         },
@@ -27453,6 +27474,7 @@
           "operator": ">=",
           "comparison_type": "cost",
           "cost_limit": 9,
+          "cost_limit_operator": ">=",
           "type": "comparison_condition"
         },
         "action": "choice",
@@ -31729,6 +31751,7 @@
           "operator": ">=",
           "comparison_type": "cost",
           "cost_limit": 13,
+          "cost_limit_operator": ">=",
           "type": "comparison_condition"
         },
         "duration": "as_long_as",

@@ -558,6 +558,21 @@ impl<'a> ConditionContext<'a> {
                         return false;
                     }
                 }
+                if let Some(ref prop) = condition.card_property {
+                    if let Some(check_card) = check_id_for_group {
+                        let has_prop = match prop.as_str() {
+                            "has_blade_heart" => self
+                                .game_state
+                                .card_database
+                                .get_card(check_card)
+                                .is_some_and(|c| c.has_blade_heart()),
+                            _ => false,
+                        };
+                        if condition.negation.unwrap_or(false) == has_prop {
+                            return false;
+                        }
+                    }
+                }
                 let has_cost_comparison = condition.comparison_type.as_deref() == Some("cost")
                     || te.is_some_and(|t| t.cost_comparison.is_some());
                 if has_cost_comparison {
