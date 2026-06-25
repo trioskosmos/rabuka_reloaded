@@ -3716,6 +3716,37 @@ impl<'a> ConditionContext<'a> {
             );
             return count;
         }
+        // For preceding_moved conditions, count matching cards in moved_cards
+        // rather than summing costs (fixes wrong log display for card_count_condition).
+        if location.is_empty()
+            && (condition.get_source() == Some("preceding_moved")
+                || condition.get_source() == Some("previous_moved_cards"))
+            && !self.moved_cards.is_empty()
+        {
+            let ct = condition.card_type.as_deref();
+            let hc: &[String] = condition.heart_colors.as_deref().unwrap_or(&[]);
+            let card_db = &self.game_state.card_database;
+            let count: u32 = self
+                .moved_cards
+                .iter()
+                .filter(|&&cid| {
+                    if cid == -1 {
+                        return false;
+                    }
+                    if let Some(card_type) = ct {
+                        if !util::card_matches_type(card_db, cid, Some(card_type)) {
+                            return false;
+                        }
+                    }
+                    if !hc.is_empty() && !util::card_matches_heart_colors(card_db, cid, hc) {
+                        return false;
+                    }
+                    true
+                })
+                .count() as u32;
+            return count;
+        }
+
         // Fallback: when revealed_cards was consumed by a preceding move_cards
         // (Kosuzu pattern: step 2 moves the card from revealed_cards to hand,
         // then step 3 needs to check the SAME card's cost against the chosen

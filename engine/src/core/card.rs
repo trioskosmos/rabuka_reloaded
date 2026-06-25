@@ -724,6 +724,8 @@ pub struct AbilityEffect {
     pub resource_icon_count: Option<u32>,
     pub ability_gain: Option<String>,
     #[serde(default)]
+    pub ability_gain_trigger: Option<String>,
+    #[serde(default)]
     pub gained_effect: Option<Box<AbilityEffect>>,
     pub quoted_text: Option<QuotedText>,
     pub per_unit: Option<bool>,

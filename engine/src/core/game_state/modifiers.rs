@@ -255,6 +255,10 @@ impl GameState {
                                         .ability_gain
                                         .as_deref()
                                         .is_some_and(|t| t.contains("ALL"))
+                                    || effect
+                                        .ability_gain
+                                        .as_deref()
+                                        .is_some_and(|t| t.contains("【ハート】"))
                                 {
                                     // All-heart: store as single "all" entry (HeartColor::All)
                                     *exp_heart

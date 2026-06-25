@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-25T15:22:37.586814",
+  "generated_at": "2026-06-25T16:41:19.969834",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1134,10 +1134,11 @@
           "cost_total": 10
         },
         "action": "gain_ability",
-        "ability_gain": "ライブの合計スコアを+1する。",
+        "ability_gain_trigger": "常時",
+        "ability_gain": "【常時】ライブの合計スコアを+1する。",
         "duration": "live_end",
         "gained_effect": {
-          "text": "ライブの合計スコアを+1する",
+          "text": "【常時】ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add"
@@ -1255,12 +1256,13 @@
           ]
         },
         "action": "gain_ability",
-        "ability_gain": "ライブの合計スコアを+1する。",
+        "ability_gain_trigger": "常時",
+        "ability_gain": "【常時】ライブの合計スコアを+1する。",
         "group_names": [
           "蓮ノ空"
         ],
         "gained_effect": {
-          "text": "ライブの合計スコアを+1する",
+          "text": "【常時】ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add"
@@ -1631,7 +1633,8 @@
           "Aqours"
         ],
         "action": "gain_ability",
-        "ability_gain": "エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを＋１する。ライブカードが3枚以上ある場合、代わりに合計スコアを＋２する。",
+        "ability_gain_trigger": "ライブ成功時",
+        "ability_gain": "【ライブ成功時】エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを＋１する。ライブカードが3枚以上ある場合、代わりに合計スコアを＋２する。",
         "condition": {
           "type": "compound",
           "operator": "and",
@@ -1667,7 +1670,7 @@
           "distinct": "card_name"
         },
         "gained_effect": {
-          "text": "エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを+1する。ライブカードが3枚以上ある場合、代わりに合計スコアを+2する",
+          "text": "【ライブ成功時】エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを+1する。ライブカードが3枚以上ある場合、代わりに合計スコアを+2する",
           "action": "conditional_alternative",
           "alternative_effect": {
             "text": "合計スコアを+2する",
@@ -1679,7 +1682,7 @@
             "type": "card_count_condition",
             "count": 1,
             "operator": ">=",
-            "text": "エールにより公開された自分のカードの中にライブカードが1枚以上ある場合",
+            "text": "【ライブ成功時】エールにより公開された自分のカードの中にライブカードが1枚以上ある場合",
             "location": "revealed_cards",
             "card_type": "live_card",
             "target": "self"
@@ -2474,7 +2477,8 @@
         "duration": "live_end",
         "card_type": "member_card",
         "action": "gain_ability",
-        "ability_gain": "ライブの合計スコアを+1する。",
+        "ability_gain_trigger": "常時",
+        "ability_gain": "【常時】ライブの合計スコアを+1する。",
         "parenthetical": [
           "この能力はセンターエリアに登場している場合のみ起動できる。"
         ],
@@ -2492,7 +2496,7 @@
         },
         "activation_position": "center",
         "gained_effect": {
-          "text": "ライブの合計スコアを+1する",
+          "text": "【常時】ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add"
@@ -2780,10 +2784,11 @@
           "target": "self"
         },
         "action": "gain_ability",
-        "ability_gain": "ライブの合計スコアを+1する。",
+        "ability_gain_trigger": "常時",
+        "ability_gain": "【常時】ライブの合計スコアを+1する。",
         "duration": "live_end",
         "gained_effect": {
-          "text": "ライブの合計スコアを+1する",
+          "text": "【常時】ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add"
@@ -4274,10 +4279,11 @@
               "location": "revealed_cards"
             },
             "action": "gain_ability",
-            "ability_gain": "ライブの合計スコアを+1する。",
+            "ability_gain_trigger": "常時",
+            "ability_gain": "【常時】ライブの合計スコアを+1する。",
             "duration": "live_end",
             "gained_effect": {
-              "text": "ライブの合計スコアを+1する",
+              "text": "【常時】ライブの合計スコアを+1する",
               "action": "modify_score",
               "value": 1,
               "operation": "add"
@@ -11407,9 +11413,10 @@
               "text": "「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
               "duration": "live_end",
               "action": "gain_ability",
-              "ability_gain": "ライブの合計スコアを+1する。",
+              "ability_gain_trigger": "常時",
+              "ability_gain": "【常時】ライブの合計スコアを+1する。",
               "gained_effect": {
-                "text": "ライブの合計スコアを+1する",
+                "text": "【常時】ライブの合計スコアを+1する",
                 "action": "modify_score",
                 "value": 1,
                 "operation": "add"
@@ -12830,10 +12837,11 @@
         "alternative_effect": {
           "text": "「{{jyouji.png|常時}}ライブの合計スコアを+2する。」を得る",
           "action": "gain_ability",
-          "ability_gain": "ライブの合計スコアを+2する。",
+          "ability_gain_trigger": "常時",
+          "ability_gain": "【常時】ライブの合計スコアを+2する。",
           "activation_position": "center",
           "gained_effect": {
-            "text": "ライブの合計スコアを+2する",
+            "text": "【常時】ライブの合計スコアを+2する",
             "action": "modify_score",
             "value": 2,
             "operation": "add"
@@ -12870,10 +12878,11 @@
           "text": "「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
           "duration": "live_end",
           "action": "gain_ability",
-          "ability_gain": "ライブの合計スコアを+1する。",
+          "ability_gain_trigger": "常時",
+          "ability_gain": "【常時】ライブの合計スコアを+1する。",
           "activation_position": "center",
           "gained_effect": {
-            "text": "ライブの合計スコアを+1する",
+            "text": "【常時】ライブの合計スコアを+1する",
             "action": "modify_score",
             "value": 1,
             "operation": "add"
@@ -13271,9 +13280,10 @@
           "duration": "live_end",
           "card_type": "member_card",
           "action": "gain_ability",
-          "ability_gain": "ライブの合計スコアを+1する。",
+          "ability_gain_trigger": "常時",
+          "ability_gain": "【常時】ライブの合計スコアを+1する。",
           "gained_effect": {
-            "text": "ライブの合計スコアを+1する",
+            "text": "【常時】ライブの合計スコアを+1する",
             "action": "modify_score",
             "value": 1,
             "operation": "add"
@@ -13690,10 +13700,11 @@
           "aggregate": "total"
         },
         "action": "gain_ability",
-        "ability_gain": "ライブの合計スコアを+1する。",
+        "ability_gain_trigger": "常時",
+        "ability_gain": "【常時】ライブの合計スコアを+1する。",
         "duration": "live_end",
         "gained_effect": {
-          "text": "ライブの合計スコアを+1する",
+          "text": "【常時】ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add"
@@ -17858,11 +17869,12 @@
           "Aqours"
         ],
         "action": "gain_ability",
-        "ability_gain": "ライブの合計スコアを+1する。",
+        "ability_gain_trigger": "常時",
+        "ability_gain": "【常時】ライブの合計スコアを+1する。",
         "max": true,
         "duration": "live_end",
         "gained_effect": {
-          "text": "ライブの合計スコアを+1する",
+          "text": "【常時】ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add"
@@ -19669,13 +19681,14 @@
           ]
         },
         "action": "gain_ability",
-        "ability_gain": "ライブの合計スコアを+1する。",
+        "ability_gain_trigger": "常時",
+        "ability_gain": "【常時】ライブの合計スコアを+1する。",
         "duration": "live_end",
         "group_names": [
           "μ's"
         ],
         "gained_effect": {
-          "text": "ライブの合計スコアを+1する",
+          "text": "【常時】ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add"
@@ -20535,12 +20548,13 @@
         "text": "「{{jyouji.png|常時}}ライブの合計スコアを+3する。」を得る",
         "duration": "live_end",
         "action": "gain_ability",
-        "ability_gain": "ライブの合計スコアを+3する。",
+        "ability_gain_trigger": "常時",
+        "ability_gain": "【常時】ライブの合計スコアを+3する。",
         "parenthetical": [
           "手札のこのカードもこの効果で控え室に置ける。"
         ],
         "gained_effect": {
-          "text": "ライブの合計スコアを+3する",
+          "text": "【常時】ライブの合計スコアを+3する",
           "action": "modify_score",
           "value": 3,
           "operation": "add"
@@ -21233,9 +21247,10 @@
         "text": "「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
         "duration": "live_end",
         "action": "gain_ability",
-        "ability_gain": "ライブの合計スコアを+1する。",
+        "ability_gain_trigger": "常時",
+        "ability_gain": "【常時】ライブの合計スコアを+1する。",
         "gained_effect": {
-          "text": "ライブの合計スコアを+1する",
+          "text": "【常時】ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add"
@@ -30061,10 +30076,11 @@
             "text": "このカードは「{{live_success.png|ライブ成功時}}カードを1枚引く。」を得る。",
             "count": 1,
             "action": "gain_ability",
-            "ability_gain": "カードを1枚引く。",
+            "ability_gain_trigger": "ライブ成功時",
+            "ability_gain": "【ライブ成功時】カードを1枚引く。",
             "self_target": true,
             "gained_effect": {
-              "text": "カードを1枚引く",
+              "text": "【ライブ成功時】カードを1枚引く",
               "count": 1,
               "action": "draw_card",
               "source": "deck",

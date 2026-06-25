@@ -854,6 +854,17 @@ impl AbilityResolver {
                         } else {
                             selected_for_current
                         }
+                    } else if effect.card_type.is_none()
+                        && effect.group_names.is_none()
+                        && effect.characters.is_none()
+                        && effect.target_count.is_none()
+                        && effect.distinct.is_none()
+                        && !is_all
+                    {
+                        // No targeting info: default to activating card only.
+                        // Prevents heart from leaking to all stage members when
+                        // no card_type/group/characters/target_count filter is set.
+                        activating_card_id.map_or(vec![], |id| vec![id])
                     } else {
                         util::matching_ids_filtered(
                             util::zone_cards(player, Zone::Stage.to_str()),
@@ -968,21 +979,32 @@ impl AbilityResolver {
                     }
                 }
                 if resource == "heart" || resource == "ハート" {
-                    gs.mods.add_heart_modifier_with_trace(
-                        card_id,
-                        heart_color_val,
-                        heart_to_add,
-                        &mut gs.ability_applications,
-                        gs.activating_card.unwrap_or(-1),
-                        &effect.text,
-                    );
-                    if is_temporary && effect_data.is_none() {
-                        let color_name = heart_color_str.as_deref().unwrap_or("heart01");
-                        effect_data = Some(Self::make_card_effect_data(
+                    for (color, color_amount) in &heart_distribution {
+                        let amount = if is_negative {
+                            -(*color_amount as i32)
+                        } else {
+                            *color_amount as i32
+                        };
+                        gs.mods.add_heart_modifier_with_trace(
                             card_id,
-                            heart_to_add,
-                            Some(color_name),
-                        ));
+                            *color,
+                            amount,
+                            &mut gs.ability_applications,
+                            gs.activating_card.unwrap_or(-1),
+                            &effect.text,
+                        );
+                    }
+                    if is_temporary && effect_data.is_none() {
+                        let mut data_list: Vec<serde_json::Value> = Vec::new();
+                        for (color, color_amount) in &heart_distribution {
+                            let color_name = format!("{:?}", color).to_lowercase();
+                            data_list.push(Self::make_card_effect_data(
+                                card_id,
+                                *color_amount as i32,
+                                Some(&color_name),
+                            ));
+                        }
+                        effect_data = Some(serde_json::Value::Array(data_list));
                     }
                 }
                 if is_temporary {

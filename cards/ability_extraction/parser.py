@@ -3417,8 +3417,17 @@ def parse_action(text: str) -> Dict[str, Any]:
         if quoted_text:
             categorized = categorize_quoted_text(quoted_text)
             if categorized["abilities"]:
+                trigger_match = re.search(
+                    r"\{\{[^|]+\|([^}]+)\}\}", categorized["abilities"][0]
+                )
+                if trigger_match:
+                    action["ability_gain_trigger"] = trigger_match.group(1)
                 action["ability_gain"] = (
-                    re.sub(r"\{\{[^}]+\}\}", "", categorized["abilities"][0])
+                    re.sub(
+                        r"\{\{([^|]+)\|([^}]+)\}\}",
+                        r"【\2】",
+                        categorized["abilities"][0],
+                    )
                     .replace("「", "")
                     .replace("」", "")
                     .strip()
@@ -4135,7 +4144,8 @@ def parse_action(text: str) -> Dict[str, Any]:
         "gain_ability",
         lambda t, a: a.update(
             {
-                "ability_gain": t.replace("を失う", "")
+                "ability_gain": re.sub(r"\{\{([^|]+)\|([^}]+)\}\}", r"【\2】", t)
+                .replace("を失う", "")
                 .replace("を得る", "")
                 .replace("をえる", "")
                 .replace("「", "")
