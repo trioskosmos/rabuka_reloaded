@@ -236,8 +236,8 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-            eprintln!("[GR_ENTER] resource={:?} count={:?} target_count={:?} source={:?} card_type={:?} target={:?} exclude_self={:?}",
-                effect.resource, effect.count, effect.target_count, effect.source, effect.card_type, effect.target, effect.exclude_self);
+            eprintln!("[GR_ENTER] resource={:?} count={:?} target_count={:?} source={:?} card_type={:?} target={:?} exclude_self={:?} target_from_sel={:?}",
+                effect.resource, effect.count, effect.target_count, effect.source, effect.card_type, effect.target, effect.exclude_self, effect.target_from_selection);
         }
         if effect.resource.as_deref() == Some("heart")
             && effect.heart_type.as_deref() == Some("all")
@@ -838,6 +838,10 @@ impl AbilityResolver {
             let mut heart_targets: Vec<i16> = if effect.target_from_selection.unwrap_or(false) {
                 // Explicitly target only the cards selected by the preceding
                 // sequential action (e.g. a change_state that activated a member).
+                log::debug!(
+                    "[TARGET_FROM_SEL] heart: selected_cards={:?} selected_for_current={:?} all_selected={:?}",
+                    self.selected_cards, selected_for_current, all_selected
+                );
                 selected_for_current
             } else if use_raw && !selected_for_current.is_empty() && effect.distinct.is_none() {
                 selected_for_current
@@ -1280,7 +1284,8 @@ impl AbilityResolver {
                 || (target == "self"
                     && activating_card_id.is_some()
                     && effect.source.is_none()
-                    && effect.card_type.is_none())
+                    && effect.card_type.is_none()
+                    && !effect.target_from_selection.unwrap_or(false))
             {
                 if let Some(card_id) = activating_card_id {
                     for &(color, dist_count) in &heart_distribution {
@@ -1327,7 +1332,22 @@ impl AbilityResolver {
                         .take(final_count as usize)
                         .collect()
                 };
+                eprintln!(
+                    "[HEART_APPLY] targets={:?} is_all={} final_count={}",
+                    targets, is_all, final_count
+                );
                 for &card_id in &targets {
+                    eprintln!(
+                        "[HEART_APPLY] adding heart04 to card_id={}, activating={:?}",
+                        card_id, gs.activating_card
+                    );
+                    for &(color, _) in &heart_distribution {
+                        eprintln!(
+                            "[HEART_APPLY]   color={:?} current_mod={}",
+                            color,
+                            gs.mods.get_heart_modifier(card_id, color)
+                        );
+                    }
                     for &(color, dist_count) in &heart_distribution {
                         let dist_amount = if is_negative {
                             -(dist_count as i32)

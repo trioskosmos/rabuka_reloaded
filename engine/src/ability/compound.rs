@@ -121,7 +121,9 @@ impl AbilityResolver {
                             None => {}
                         }
                     } else if condition_failed == Some(true) && action.condition.is_none() {
-                        condition_failed = None;
+                        // Don't reset condition_failed — keep it so ALL subsequent
+                        // conditionless actions in this conditional sequential are
+                        // skipped, not just the very next one.
                         continue 'action_loop;
                     } else if action.condition.is_some() && !is_otherwise {
                         // Evaluate explicit condition — when it fails, skip the
@@ -261,6 +263,7 @@ impl AbilityResolver {
                     }
 
                     let moved_before = self.moved_cards.len();
+                    let selected_before = self.selected_cards.len();
                     match self.execute_effect(gs, &action_to_execute) {
                         Ok(_) => {
                             if ABILITY_DEBUG.load(Ordering::Relaxed) {
@@ -376,18 +379,30 @@ impl AbilityResolver {
                                     }
                                 }
                                 // Parent-conditional sequential: track implicit
-                                // condition via was_moved (old behavior).
-                                if conditional && action.condition.is_none() {
-                                    condition_failed = Some(was_moved == 0);
+                                // condition via was_moved (old behavior) or
+                                // was_selected (state changes that don't move cards
+                                // but do select a card to modify, e.g. change_state).
+                                // Only set when condition_failed is still None (first
+                                // gating action only) — subsequent actions should NOT
+                                // overwrite the gate result.
+                                if conditional
+                                    && action.condition.is_none()
+                                    && condition_failed.is_none()
+                                {
+                                    let was_moved = self.moved_cards.len() - moved_before;
+                                    let was_selected = self.selected_cards.len() - selected_before;
+                                    condition_failed = Some(was_moved == 0 && was_selected == 0);
                                 }
-                            } else if !self.pending_choice.is_some()
+                            } else if condition_failed.is_none()
+                                && !self.pending_choice.is_some()
                                 && conditional
                                 && action.condition.is_none()
                             {
                                 // Parent-conditional sequential: track implicit
                                 // condition via was_moved (old behavior).
                                 let was_moved = self.moved_cards.len() - moved_before;
-                                condition_failed = Some(was_moved == 0);
+                                let was_selected = self.selected_cards.len() - selected_before;
+                                condition_failed = Some(was_moved == 0 && was_selected == 0);
                             }
                         }
                         Err(e) => return Err(e),
