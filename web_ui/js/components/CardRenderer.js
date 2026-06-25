@@ -619,6 +619,8 @@ export const CardRenderer = {
                 area = document.createElement('div');
                 area.className = 'member-area board-slot-container';
                 slotDiv = document.createElement('div');
+                const isTapped = slot && slot.orientation === 'Wait';
+                slotDiv.className = `member-slot${slot && slot.card_no ? ' filled' : ''}${isTapped ? ' tapped' : ''}`;
                 area.appendChild(slotDiv);
                 el.appendChild(area);
             }
@@ -691,10 +693,8 @@ export const CardRenderer = {
                 Tooltips.attachCardData(area, slot, isValid ? action.index : undefined);
                 Tooltips.attachCardData(slotDiv, slot, isValid ? action.index : undefined);
                 if (isValid) {
-                    area.setAttribute('data-action-id', action.index);
                     slotDiv.setAttribute('data-action-id', action.index);
                 } else {
-                    area.removeAttribute('data-action-id');
                     slotDiv.removeAttribute('data-action-id');
                 }
                 CardRenderer.renderCardBonuses(slotDiv, slot);
@@ -704,7 +704,6 @@ export const CardRenderer = {
                 if (underContainer) {
                     underContainer.style.display = 'none';
                 }
-                area.removeAttribute('data-action-id');
                 slotDiv.removeAttribute('data-action-id');
             }
 

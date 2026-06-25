@@ -73,7 +73,9 @@ impl AbilityResolver {
                     return Ok(());
                 }
                 let available = util::get_zone_card_count(player, source);
-                // Q56: Costs must be paid in full — partial payment does not count.
+                // Rule 9.4.2.3 / Q56: Costs must be paid in full.
+                // If even one sub-cost cannot be fully paid, the entire
+                // cost is impossible and the ability cannot be activated.
                 if available < count {
                     return Err(format!(
                         "Not enough cards in {}: need {}, have {}",
@@ -102,6 +104,14 @@ impl AbilityResolver {
         let mut dbg = AbDebug::new();
         dbg.cost_pay(cost, true);
         match cost.action.as_str() {
+            // Rule 9.4.2 / Q234: Sequential cost — each sub-cost is paid in order.
+            // Sub-costs are validated first (ALL must be payable), then paid one
+            // by one. If any sub-cost creates a pending_choice, we yield and resume
+            // from cost_paid_index on the next invocation.
+            //
+            // Q234: "Deck has only 2 cards, can I pay this cost?" → No.
+            //   The cost requires drawing 3+ cards from deck. If the resource
+            //   is insufficient, validate_cost rejects the entire cost.
             "sequential_cost" => {
                 if let Some(ref costs) = cost.compound.actions {
                     let start_idx = gs
@@ -398,6 +408,23 @@ impl AbilityResolver {
                 };
                 self.execute_move_cards(gs, &effect)
             }
+            // Q144 / Q145 / Q183 / Q257: Change state cost (wait/rest)
+            //
+            // Q144: "Can I wait 1 member when only 1 eligible exists even
+            //   though the ability says 'up to 2'?" → Yes. "Up to N" allows
+            //   choosing any number ≤ N.
+            //
+            // Q145: "Can I activate an ability that waits a member when
+            //   there are no eligible targets?" → Yes, as long as the cost
+            //   is optional. The ability proceeds without effect.
+            //
+            // Q183: "Does change_state target my member or the opponent's?"
+            //   → Always your own stage. "Select a member" without qualifier
+            //   means your own stage.
+            //
+            // Q257: "Do I have to wait the member even if target is gone?"
+            //   → Yes, if the cost is mandatory. Costs are paid regardless
+            //   of whether the effect can resolve (Rule 9.4.2).
             "change_state" => {
                 let state_change = cost.state_change.as_deref().unwrap_or("");
                 let target = cost.target.as_deref().unwrap_or("self");
@@ -490,6 +517,18 @@ impl AbilityResolver {
                 }
                 Ok(())
             }
+            // Rule 5.9 / Rule 9.4.2 / Q215: Pay energy cost
+            //
+            // Rule 5.9: Paying N energy means tapping N active energy cards
+            //   (changing them from active to wait state).
+            //
+            // Rule 9.4.2.3: If the required energy can't be paid (not enough
+            //   active energy), the entire cost is impossible and the ability
+            //   cannot activate. For optional costs, this means auto-skip.
+            //
+            // Q215: "Can I place wait-state energy under a member as cost?"
+            //   → Yes, energy state (active/wait) doesn't restrict placement.
+            //   However, pay_energy specifically only taps ACTIVE energy.
             "pay_energy" => {
                 let energy = cost.energy_count.unwrap_or(0);
                 let target = cost.target.as_deref().unwrap_or("self");

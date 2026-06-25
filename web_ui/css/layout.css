@@ -347,7 +347,8 @@
     flex-shrink: 1;
     height: auto;
     max-height: 8%;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
 .game-board.both-mode .energy-area-container {
@@ -363,6 +364,11 @@
 .game-board.both-mode .field-row {
     flex: 1;
     min-height: 0;
+}
+
+/* Mirror opponent stage so their left is on the right side (real-life perspective) */
+.game-board.both-mode #opp-stage {
+    flex-direction: row-reverse;
 }
 
 /* Flip perspective: put player on top */

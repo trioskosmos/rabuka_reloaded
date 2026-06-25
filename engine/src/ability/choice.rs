@@ -1261,6 +1261,20 @@ impl super::resolver::AbilityResolver {
         self.finalize_choice(gs, context)
     }
 
+    // Q86 / Q122: Handle user's selection from looked_at_cards
+    //
+    // After the user selects which cards to take, this method:
+    //   1. Reveals selected cards if the effect requires it (reveal flag)
+    //   2. Delegates to handle_select_cards_looked_at (move_cards.rs)
+    //      which moves selected to destination, remainder to discard
+    //   3. If max/optional/any_number and more cards can be selected,
+    //      re-prompts the user with remaining looked_at_cards
+    //
+    // Q86: If the selection empties the looked_at set AND the source deck
+    //   becomes empty, refresh (Rule 10.2.2.1) fires at next check timing.
+    //
+    // Q122: If the effect is a rearrangement (look + rearrange on deck),
+    //   no refresh happens until cards actually leave the deck zone.
     fn handle_looked_at_selection(
         &mut self,
         gs: &mut GameState,

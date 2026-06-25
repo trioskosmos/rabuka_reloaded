@@ -152,13 +152,38 @@ impl AbilityResolver {
             }
         }
 
-        // Handle target="both" generically: execute once for self, then opponent.
-        // position_change handles "both" internally (opponent choice first, then self).
+        // Rule 9.8 / Q158: Handle target="both" generically
+        //   execute once for self, then opponent.
+        //   position_change handles "both" internally (opponent first, then self).
+        //
+        // Q158: "Does blade+2 from the effect apply to all members on stage?"
+        //   → Yes. "自分のステージにいるメンバー" means all members.
         if self.handle_both_targets(gs, effect)? {
             return Ok(());
         }
 
-        // Convert string action to typed enum for stronger dispatch
+        // Rule 9.2.1: Effect dispatch
+        //
+        // Convert string action to typed enum for stronger dispatch.
+        // Each ActionType variant maps to a dedicated handler:
+        //
+        //   Sequential           → execute_sequential_effect (compound.rs)
+        //   ConditionalAlternative → execute_conditional_alternative (compound.rs)
+        //   LookAndSelect        → execute_look_and_select (look.rs)
+        //   SelectCards          → execute_select_cards (look.rs)
+        //   Draw/DrawCard        → execute_draw_wrapper
+        //   MoveCards/DiscardCard→ execute_move_cards (move_cards.rs)
+        //   PayEnergy            → execute_pay_energy (effects/misc.rs)
+        //   ...and many more
+        //
+        // Compound routing: Sequential and LookAndSelect both route through
+        // the generic sequential pipeline when they carry `effect_steps`.
+        // LookAndSelect is collapsed by the parser into:
+        //   [look_step, select_cards_step, move_selected_step]
+        // The sequential pipeline executes them in order, creating a pending
+        // choice on the select_cards step and resuming naturally when the
+        // player responds. Legacy dedicated handlers remain as fallback
+        // for the case where effect_steps is absent.
         let action_type = ActionType::from_str(&action_str).unwrap_or(ActionType::Custom);
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
             eprintln!(
@@ -169,14 +194,14 @@ impl AbilityResolver {
             );
         }
 
-        // Sequential and LookAndSelect both route through the generic
-        // sequential pipeline when they carry `effect_steps`. LookAndSelect
-        // is collapsed by the parser into [look_step, select_cards_step,
-        // move_selected_step]; the sequential pipeline executes them in
-        // order, creating a pending choice on the select_cards step and
-        // resuming naturally when the player responds. The legacy dedicated
-        // handlers remain as a fallback for the (increasingly rare) case
-        // where effect_steps is absent.
+        // Rule 9.8.1 / Q85 / Q86: Sequential/LookAndSelect routing
+        //
+        // Q85: LookAndSelect with insufficient deck → refresh mid-look
+        //   (handled inside execute_look_at, which implements the 4-step
+        //   procedure: look available → refresh → look remaining → resolve)
+        //
+        // Q86: LookAndSelect with exactly enough cards → no refresh during
+        //   look. After resolution, if deck is 0, refresh on next check timing.
         if action_type == ActionType::Sequential || action_type == ActionType::LookAndSelect {
             let steps = effect.normalized_steps();
             if !steps.is_empty() {

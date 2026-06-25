@@ -922,6 +922,12 @@ impl GameState {
         self.heart_color_decision_phase == "live_start"
     }
 
+    // Rule 10.2 / Q85 / Q86 / Q104: Deck refresh pending flag
+    //
+    // `deck_refresh_pending` is set when a mid-effect refresh condition is
+    // detected (Rule 10.2.2.1 or 10.2.2.2) but the actual refresh couldn't
+    // be performed inline. The flag is checked at the next safe opportunity
+    // (usually in process_player_abilities or check_timing).
     pub fn set_deck_refresh_pending(&mut self, pending: bool) {
         self.deck_refresh_pending = pending;
     }
@@ -930,6 +936,31 @@ impl GameState {
         self.deck_refresh_pending
     }
 
+    // Rule 10.2.3 / Q85 / Q86 / Q104: Perform deck refresh
+    //
+    // Takes ALL cards from the player's waitroom, shuffles them,
+    // and places them as the new main deck.
+    //
+    // Rule 10.2.3 specifies that refreshed cards go UNDER any existing
+    // deck cards. This implementation assumes the deck is empty when
+    // refresh is called (which is the common case: refresh is triggered
+    // when deck = 0). If there ARE existing deck cards, they would be
+    // on top and the refreshed cards below.
+    //
+    // Q85: During look-at-N with insufficient deck:
+    //   The already-looked-at cards stay above the refreshed cards.
+    //   This is correct because looked_at cards were REMOVED from deck
+    //   (via draw), so the deck is empty when refresh fires.
+    //
+    // Q86: When deck has exactly N cards during look-at-N:
+    //   No refresh during look. If the effect discards looked cards,
+    //   deck might become 0, triggering refresh AFTER the effect.
+    //
+    // Q104: During mill-N with insufficient deck:
+    //   The just-milled cards go to waitroom, then refresh moves them
+    //   back to deck. The remaining N - milled cards are then milled
+    //   from the refreshed deck. This is correct because the milled
+    //   cards reached the waitroom before refresh was checked.
     pub fn perform_deck_refresh(&mut self, player_id: &str) {
         let player = if player_id == "player1" {
             &mut self.player1
@@ -937,8 +968,11 @@ impl GameState {
             &mut self.player2
         };
 
+        // Rule 10.2.3: Take all waitroom cards
         let waitroom_cards: Vec<i16> = player.waitroom.cards.iter().copied().collect();
         player.waitroom.cards.clear();
+        // Place as new deck (if deck had existing cards, these go under)
+        // But per Q85/Q104, deck should be empty at this point.
         for card_id in waitroom_cards {
             player.main_deck.cards.push(card_id);
         }

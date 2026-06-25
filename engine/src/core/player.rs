@@ -152,6 +152,25 @@ impl Player {
         Some(card_id)
     }
 
+    // Rule 9.6.2 / Q206 / Q219 / Q225 / Q235: Play member card to stage
+    //
+    // Rule 9.6.2.1: Specify card and target area
+    // Rule 9.6.2.3: Determine and pay cost
+    //   Cost = card.cost - cost_reduction + cost_increase
+    //   Cost reduction: 常時 abilities (modify_cost/subtract/hand)
+    //   Cost increase: 常時 abilities (success_live_zone → +cost)
+    // Rule 9.6.2.3.2: Baton touch — replace member in target area,
+    //   subtract replaced member's cost from payment
+    //
+    // Q206: "Baton touch target is wait → can I still play?"
+    //   → Yes. Wait-state members still occupy the area for baton touch.
+    //
+    // Q219: "Does 常時 cost reduction apply during baton touch?"
+    //   → Yes. Cost modifiers are evaluated before baton touch reduction.
+    //
+    // Q225 / Q235: "How does &-name (multi-member) cards count?"
+    //   → One card = one member. For group checks, they count as one
+    //   member under ANY of their names (player's choice).
     pub fn move_card_from_hand_to_stage(
         &mut self,
         hand_index: usize,
@@ -473,45 +492,65 @@ impl Player {
         self.energy_deck.draw().inspect(|&card_id| {
             self.energy_zone.cards.push(card_id);
 
-            self.energy_zone.add_active( 1);
+            self.energy_zone.add_active(1);
         })
     }
 
     // ... (rest of the code remains the same)
 
-    // Q53: Refresh procedure — when main deck reaches 0, shuffle waitroom into a new deck.
+    // Rule 10.2 / Q53 / Q85 / Q86 / Q100 / Q101 / Q104: Refresh procedure
+    //
+    // Rule 10.2.1: Refresh is NOT limited to check timing — it can interrupt
+    //   mid-effect processing (e.g. during look_at, draw, mill). The interrupted
+    //   processing resumes after the refresh completes.
+    //
+    // Rule 10.2.2: Two independent triggers:
+    //   10.2.2.1: Main deck is empty AND waitroom has ≥1 card
+    //   10.2.2.2: "Look at N from top of deck" instruction, but deck has < N cards
+    //
+    // Rule 10.2.3: Procedure:
+    //   1. Take ALL waitroom cards (face-down, shuffled)
+    //   2. Place them UNDER any existing deck cards
+    //   This matters when refresh is triggered mid-effect (Q85): the cards
+    //   already drawn/looked-at from the deck stay above the refreshed cards.
+    //
+    // Q85: "Look at 5 from deck, deck has 4"
+    //   ① Look 4 from deck → ② deck < 5 triggers 10.2.2.2 refresh →
+    //      shuffle discard UNDER those 4 → ③ look 1 more (total 5) → ④ resolve
+    //
+    // Q86: "Look at 5 from deck, deck has exactly 5"
+    //   No refresh during look. If resolution empties the deck, refresh happens
+    //   after (including just-discarded looked cards if they went to waitroom).
+    //
+    // Q104: "Mill 5 from deck, deck has 4"
+    //   ① Mill 4 → deck = 0, waitroom ≥1 → refresh (10.2.2.1) → ② mill 1 more
+    //   The 4 just-milled cards ARE included in the refresh.
+    //
+    // Q100: Yell — revealed cards in resolution area are NOT in waitroom yet,
+    //   so they are NOT included in the refresh when deck hits 0 during yell.
+    //
+    // Q101: Yell — if BOTH deck AND waitroom become 0 during processing,
+    //   the effect stops. A new refresh triggers later when waitroom gets cards.
+    //
+    // Q122: "Look at 3 from deck, deck has exactly 3" (rearrange type):
+    //   No refresh during look because cards haven't left the deck.
+    //   If all 3 are then discarded, refresh happens after.
+    //
+    // Energy deck: does NOT refresh. Energy cards are recycled via:
+    //   Rule 10.5.3 — member underneath without a member above → waitroom
+    //   Rule 10.5.4 — energy card in waitroom → energy deck instead
     pub fn refresh(&mut self) {
-        // Rule 10.2: Refresh when main deck is empty and waitroom has cards
-
-        // Rule 10.2.1: Condition - main deck is empty AND waitroom has cards
-
-        // Q85/Q86: Look-at-N-cards with insufficient deck triggers refresh in between.
-        // Rule 10.2.2: Shuffle waitroom cards and place them on top of main deck
-
-        // Rule 10.2.3: This happens automatically during check timing
-
+        // Rule 10.2.2.1: Deck empty AND waitroom has cards
         if self.main_deck.is_empty() && !self.waitroom.cards.is_empty() {
             let mut waitroom_cards = self.waitroom.take_all();
-
             waitroom_cards.shuffle(&mut rand::thread_rng());
-
+            // Rule 10.2.3: Refreshed cards go to the bottom
+            // (existing deck cards stay on top)
             for card in waitroom_cards {
                 self.main_deck.cards.push(card);
             }
         }
-
-        // Rule 10.2.2.2: Refresh when looking at top cards and deck is too small
-
-        // If deck has fewer cards than needed to look at, refresh first
-
-        // This would be called before look_at_top operations
-
-        // Energy deck does NOT refresh like main deck
-
-        // Energy cards are recycled via Rule 10.5.3 (energy without member above -> energy deck)
-
-        // and Rule 10.5.4 (energy going to waitroom -> energy deck instead)
-
-        // These are handled in check_timing/check_invalid_cards in turn.rs
+        // Rule 10.2.2.2: Handled by the caller before look_at operations
+        // (see execute_look_at in look.rs which implements the Q85 multi-step)
     }
 }

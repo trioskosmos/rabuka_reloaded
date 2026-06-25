@@ -8,6 +8,32 @@ use crate::game_state::GameState;
 use std::sync::atomic::Ordering;
 
 impl AbilityResolver {
+    // Rule 9.2.1.1 / Q94 / Q107 / Q217: Sequential effect execution
+    //
+    // Executes a list of sub-actions in order (Rule 9.2.1.1: single effects
+    // resolve completely before the next begins). Supports:
+    //
+    //   • Conditions on individual steps (if-then-else routing)
+    //   • "otherwise_condition" steps that fire only when previous cond failed
+    //   • "repeat_procedure" for looping sub-actions
+    //   • Optional steps that gate subsequent actions ("そうした場合")
+    //   • per_unit inheritance from parent to sub-actions
+    //
+    // Q94 / Q255 / Q263: Area-move + sequential
+    //   Each area move is a separate trigger. Sequential effects run once
+    //   per trigger invocation, not once per area move within one trigger.
+    //
+    // Q107: Re-yell after sequential discard
+    //   The sequential pipeline's step_output tracking allows downstream
+    //   conditions to reference upstream results (e.g. "if revealed cards
+    //   had no live → discard → re-yell").
+    //
+    // Q217: "any_number" cost paid as 0 → still counts as "paid" for
+    //   sequential gating (was_moved = 0 but optional_cost_result = true
+    //   because the player affirmatively chose to pay 0).
+    //
+    // Rule 9.6.2.4.2: Even if the card bearing the ability leaves its
+    //   original zone mid-resolution, the remaining steps still resolve.
     pub fn execute_sequential_effect(
         &mut self,
         gs: &mut GameState,
@@ -443,6 +469,33 @@ impl AbilityResolver {
         Ok(())
     }
 
+    // Rule 1.3.2 / Q235 / Q236 / Q237: Conditional alternative effect
+    //
+    // Implements "if X → effect A, otherwise → effect B" pattern from card text.
+    // The condition refers to `preceding_moved` — the card moved by the cost's
+    // `move_cards` sub-action (e.g. discarding from hand to waitroom).
+    //
+    // Tiered evaluation (when both alternative_condition and condition exist):
+    //   1. Check alternative_condition first (stricter)
+    //   2. If met → execute alternative_effect, skip primary
+    //   3. If not met → check base condition
+    //   4. If base met → execute primary_effect
+    //   5. If neither → do nothing (Rule 1.3.2: impossible actions aren't done)
+    //
+    // Legacy (single condition): condition=true → alternative_effect,
+    //   condition=false → primary_effect. Note: the condition's `negation` field
+    //   determines which branch fires — if negation=false, condition=true fires
+    //   alternative_effect; if negation=true, condition=true fires primary_effect.
+    //
+    // Example (the μ's ability from the user's question):
+    //   Cost: sequential_cost[pay_energy(2), move_cards(hand→discard, 1)]
+    //   Effect: conditional_alternative
+    //     condition: group_condition(μ's, source=preceding_moved, negation=false)
+    //     primary_effect: look_and_select(4→2, hand, rest→discard)
+    //     alternative_effect: move_cards(discard→hand, 1, live_card)
+    //   Flow: discard card → check if it has μ's group →
+    //     Yes → look 4, select 2 to hand
+    //     No  → recover 1 live card from waitroom
     pub fn execute_conditional_alternative(
         &mut self,
         gs: &mut GameState,
@@ -457,7 +510,7 @@ impl AbilityResolver {
             // Tiered conditions: alternative_condition (stricter) checked first.
             // If met → execute alternative_effect (replaces primary).
             // Otherwise check the base condition — if met → execute primary_effect.
-            // If neither is met → do nothing.
+            // If neither is met → do nothing (Rule 1.3.2).
             if effect.compound.alternative_condition.is_some() && effect.condition.is_some() {
                 if let Some(ref alt_cond) = effect.compound.alternative_condition {
                     if ctx.evaluate_condition(alt_cond) {
@@ -626,6 +679,21 @@ impl AbilityResolver {
         Ok(())
     }
 
+    // Q92 / Q217: Conditional-on-optional effect
+    //
+    // Implements "may [pay cost]: if you do → A, if you don't → B" patterns.
+    //
+    // Q92: If the optional action requires energy and the player can't afford
+    //   it, skip the choice entirely and execute the conditional action directly.
+    //   This prevents pointless "Pay 5 energy?" prompts when player has 0 active.
+    //
+    // Q217: "好きな枚数～" (any number) cost: choosing 0 still counts as
+    //   "cost was paid" (the player chose to pay 0). This triggers the
+    //   conditional action branch.
+    //
+    // Negation mode: when `is_negation` = true, paying the optional action
+    //   routes to the optional_action instead of the conditional_action.
+    //   This implements "unless you pay → do B" patterns.
     pub fn execute_conditional_on_optional(
         &mut self,
         gs: &mut GameState,

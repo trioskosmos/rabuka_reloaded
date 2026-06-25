@@ -13,6 +13,16 @@ impl super::TurnEngine {
         stage_area: Option<crate::zones::MemberArea>,
         use_baton_touch: Option<bool>,
     ) -> Result<(), String> {
+        // UseAbility must check activation legality independently — never
+        // route through resume_with_choice, even when another ability's choice
+        // is pending (e.g. a debut look-and-select from play_to_stage).
+        if matches!(action, crate::game_setup::ActionType::UseAbility) {
+            if game_state.has_pending_choice() {
+                return Err("Cannot activate ability while another choice is pending".to_string());
+            }
+            return Self::handle_use_ability(game_state, card_id);
+        }
+
         if game_state.has_pending_choice() {
             return Self::resume_with_choice(game_state, card_id, card_indices);
         }

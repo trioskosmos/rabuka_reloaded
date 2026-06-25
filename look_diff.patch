@@ -1,0 +1,201 @@
+diff --git a/engine/src/ability/look.rs b/engine/src/ability/look.rs
+index 152351a..13c70e7 100644
+--- a/engine/src/ability/look.rs
++++ b/engine/src/ability/look.rs
+@@ -6,6 +6,24 @@ use crate::card::AbilityEffect;
+ use crate::game_state::GameState;
+ 
+ impl AbilityResolver {
++    // Q85 / Q86 / Q122: Look-and-select compound effect
++    //
++    // This implements the common ability pattern:
++    //   "Look at N cards from deck top, select M to hand, rest to discard"
++    //
++    // Execution flow (via normalized_steps in card.rs):
++    //   1. look_action — execute_look_at (deck top → looked_at_cards)
++    //      - Q85: If deck has < N, refresh mid-look
++    //      - Q86: If deck has exactly N, no refresh during look
++    //      - Q122: If cards stay on deck (rearrangement), no refresh
++    //   2. select_action — execute_select_cards (filter → choice → selection)
++    //   3. followup_action — optional post-selection effect
++    //
++    // After selection (in move_cards.rs handle_select_cards_looked_at):
++    //   - Selected cards go to destination (usually hand)
++    //   - Remaining cards go to discard (if discard_remaining = true)
++    //   - Q86/Q122: If this empties the deck, Rule 10.2.2.1 refresh fires
++    //     at the next check timing
+     pub fn execute_look_and_select(
+         &mut self,
+         gs: &mut GameState,
+@@ -611,6 +629,21 @@ impl AbilityResolver {
+         };
+         Ok(())
+     }
++    // Rule 10.2.2.2 / Q85 / Q86: Look at N cards from deck
++    //
++    // When looking from deck and deck has < N cards, Rule 10.2.2.2 triggers
++    // a mid-look refresh per the Q85 multi-step procedure:
++    //   ① Look at min(deck, N) cards
++    //   ② If deck became 0 and waitroom ≥1, refresh (10.2.2.1)
++    //   ③ If we still have < N cards after refresh, look at more
++    //   ④ Repeat until we have N cards or can't get more
++    //
++    // Q86: When deck has exactly N cards, no refresh during look.
++    //   If resolution empties the deck (e.g. all go to discard), refresh
++    //   happens after via 10.2.2.1.
++    //
++    // Q122: Rearrangement effects (look + put back on deck) — refresh only
++    //   after cards leave the deck zone, not during the look itself.
+     pub fn execute_look_at(
+         &mut self,
+         gs: &mut GameState,
+@@ -631,19 +664,17 @@ impl AbilityResolver {
+             }
+             return Ok(());
+         }
+-        let player = gs.resolve_target_player_mut(target);
+-
+-        // If deck has fewer cards than requested, the effect cannot execute.
+-        if (Zone::from_str(source) == Some(Zone::Deck)
+-            || Zone::from_str(source) == Some(Zone::DeckTop))
+-            && player.main_deck.cards.len() < count as usize
++        // Q85: If deck has fewer cards than needed, perform multi-step refresh.
++        // Must do this before borrowing player to avoid borrow conflicts.
++        if Zone::from_str(source) == Some(Zone::Deck)
++            || Zone::from_str(source) == Some(Zone::DeckTop)
+         {
+-            return Err(format!(
+-                "Not enough cards in deck: need {}, have {}",
+-                count,
+-                player.main_deck.cards.len()
+-            ));
++            let deck_count = gs.resolve_target_player(target).main_deck.cards.len();
++            if deck_count < count as usize {
++                return self.execute_look_at_insufficient_deck(gs, effect, count, target, source);
++            }
+         }
++        let player = gs.resolve_target_player_mut(target);
+ 
+         let fetch_all = effect.all.unwrap_or(false);
+         let take_cards = |cards: &[i16]| -> Vec<i16> {
+@@ -673,6 +704,73 @@ impl AbilityResolver {
+         gs.looked_at_cards = cards;
+         Ok(())
+     }
++
++    // Q85: Handle look-at-N when deck has < N cards.
++    //
++    // Multi-step procedure:
++    //   ① Take all available cards from deck
++    //   ② If deck is now 0 and waitroom has cards → refresh (Rule 10.2.2.1)
++    //   ③ If we still need more, draw remaining from refreshed deck
++    //   ④ Assign combined cards to looked_at_cards
++    //
++    // This is the Q85 procedure: "look at 5, deck has 4"
++    //   → look 4 from deck
++    //   → need 1 more → refresh (shuffle waitroom UNDER the 4)
++    //   → look 1 more from refreshed deck
++    //   → total 5 in looked_at_cards → resolve selection
++    //
++    // Q101: If BOTH deck and waitroom are empty, we stop with whatever we have.
++    //   The effect does as much as possible per Rule 1.3.2.
++    //
++    // Q104: Mill effects — the just-milled cards reach the waitroom before
++    //   refresh is checked, so they ARE included in the refresh.
++    fn execute_look_at_insufficient_deck(
++        &mut self,
++        gs: &mut GameState,
++        _effect: &AbilityEffect,
++        count: u32,
++        target: &str,
++        _source: &str,
++    ) -> Result<(), String> {
++        let count = count as usize;
++
++        // Q85 step ①: Draw all available cards from deck (at most count)
++        let first_batch = {
++            let player = gs.resolve_target_player_mut(target);
++            let to_take = std::cmp::min(player.main_deck.cards.len(), count);
++            if to_take == 0 {
++                Vec::new()
++            } else {
++                player.main_deck.draw_multiple(to_take)
++            }
++        };
++
++        // Q85 step ②: If we still need more and deck is now empty, refresh
++        let mut looked = first_batch;
++        if looked.len() < count {
++            let remaining = count - looked.len();
++            {
++                let player = gs.resolve_target_player_mut(target);
++                if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
++                    // Rule 10.2.3: Shuffle waitroom → new deck
++                    // (deck is empty, so all waitroom cards become the deck)
++                    player.refresh();
++                }
++            }
++
++            // Q85 step ③: Draw remaining from refreshed deck
++            let player = gs.resolve_target_player_mut(target);
++            if !player.main_deck.cards.is_empty() {
++                let more = std::cmp::min(remaining, player.main_deck.cards.len());
++                let extra = player.main_deck.draw_multiple(more);
++                looked.extend(extra);
++            }
++        }
++
++        gs.looked_at_cards = looked;
++        Ok(())
++    }
++
+     pub fn execute_reveal_per_group(
+         &mut self,
+         gs: &mut GameState,
+@@ -731,7 +829,21 @@ impl AbilityResolver {
+ 
+         Ok(())
+     }
+-    /// Draw from deck until `termination_check` passes, refreshing from waitroom if deck empties.
++    // Q100 / Q101 / Rule 10.2: Draw from deck until `termination_check`
++    // passes, refreshing from waitroom if deck empties.
++    //
++    // Q100: Cards already revealed (in resolution area) are NOT in waitroom,
++    //   so they don't participate in the refresh. Only cards that previously
++    //   reached the waitroom are shuffled back.
++    //
++    // Q101: If BOTH deck AND waitroom become empty mid-process, the loop
++    //   terminates. A new refresh triggers later when waitroom gets cards
++    //   (Rule 10.2.2.1 fires at next check timing).
++    //
++    // Rule 10.2.3: Refreshed cards go UNDER any existing deck cards.
++    //   Since this method only refreshes when deck is EMPTY (draw returned None),
++    //   there are no existing deck cards, so all waitroom cards become the
++    //   new deck.
+     fn reveal_until<F>(
+         &mut self,
+         gs: &mut GameState,
+@@ -761,16 +873,15 @@ impl AbilityResolver {
+                 }
+                 None => {
+                     let player = gs.resolve_target_player_mut(target);
+-                    let refresh_count = player.waitroom.cards.len();
+-                    if refresh_count == 0 {
++                    // Q101: If both deck and waitroom are empty, stop
++                    if player.waitroom.cards.is_empty() {
+                         break;
+                     }
+-                    for _ in 0..refresh_count {
+-                        if let Some(card) = player.waitroom.cards.pop() {
+-                            player.main_deck.cards.push(card);
+-                        }
+-                    }
+-                    player.main_deck.shuffle();
++                    // Rule 10.2.3: Shuffle waitroom into new deck.
++                    // Deck is empty (draw returned None), so all waitroom
++                    // cards become the new deck (no "under" placement needed).
++                    player.refresh();
++                    // Draw one card from the refreshed deck
+                     if let Some(cid) = player.main_deck.draw() {
+                         all_revealed.push(cid);
+                         gs.revealed_cards.push(cid);

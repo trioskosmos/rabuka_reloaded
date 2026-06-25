@@ -1160,13 +1160,24 @@ impl AbilityEffect {
         self.value.or(self.count).unwrap_or(default) as i32
     }
 
-    /// Returns the normalized sub-effect steps for this effect, preferring
-    /// the unified `effect_steps` form when present and otherwise building
-    /// the steps list from the legacy compound fields
-    /// (`look_action`/`select_action`/etc.). This is the consolidation point
-    /// for the 4 specialized compound shapes — once the parser emits only
-    /// `effect_steps`, the legacy branches in this function become dead code
-    /// and can be removed.
+    // Rule 9.2.1 / Q85 / Q86 / Q122: Normalized sub-effect steps
+    //
+    // Flattens compound effect shapes into a linear Vec<AbilityEffect> for
+    // sequential execution. The engine's sequential pipeline (compound.rs)
+    // iterates these steps, evaluating conditions/gating between them.
+    //
+    // Compound shapes:
+    //   1. sequential → compound.actions (direct passthrough)
+    //   2. look_and_select → [look_action, select_action, followup_action]
+    //      Q85: look_action may trigger mid-look refresh
+    //      Q86: if deck >= count, no refresh during look
+    //   3. conditional_alternative → [alternative_effect, primary_effect]
+    //      The alternative_effect carries the condition; if it fails,
+    //      the sequential pipeline falls through to primary_effect.
+    //   4. conditional_on_result → [primary_effect, followup_action]
+    //      followup_action's condition gates on result of primary.
+    //   5. conditional_on_optional → [single conditional_optional step]
+    //      Dispatches to execute_conditional_on_optional for yes/no routing.
     pub fn normalized_steps(&self) -> Vec<AbilityEffect> {
         if let Some(ref steps) = self.effect_steps {
             return steps.clone();

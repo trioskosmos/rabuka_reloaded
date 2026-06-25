@@ -2143,6 +2143,25 @@ impl AbilityResolver {
     }
 
     /// Handle looked_at card selection: validate, move to destination, handle multi-select and remaining cards.
+    // Q86 / Q122 / Rule 4.8.3: Finalize look-and-select selection
+    //
+    // After the user selects cards from looked_at_cards:
+    //   1. Selected cards → destination (usually hand, via place_card_in_zone)
+    //   2. Unselected cards → discard (if discard_remaining = true)
+    //      or → deck bottom (if discard_remaining = false)
+    //   3. Per-group constraint (max_per_group) enforced before moving
+    //
+    // Rule 4.8.3: When moving multiple cards from main deck, they are moved
+    //   one at a time. Since these cards are already in looked_at_cards
+    //   (not in the deck zone anymore), this rule doesn't apply here.
+    //
+    // Q86: After selected cards go to hand and remainder to discard, if
+    //   the source deck is now empty, Rule 10.2.2.1 triggers at next
+    //   check timing (refresh).
+    //
+    // Q122: If an effect looks at cards and puts them back on deck
+    //   (rearrangement), the cards were never removed from the deck zone
+    //   for refresh purposes, so no refresh occurs during the effect.
     pub fn handle_select_cards_looked_at(
         &mut self,
         gs: &mut GameState,

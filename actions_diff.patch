@@ -1,0 +1,66 @@
+diff --git a/engine/src/turn/actions.rs b/engine/src/turn/actions.rs
+index 013d116..86fa615 100644
+--- a/engine/src/turn/actions.rs
++++ b/engine/src/turn/actions.rs
+@@ -13,6 +13,16 @@ impl super::TurnEngine {
+         stage_area: Option<crate::zones::MemberArea>,
+         use_baton_touch: Option<bool>,
+     ) -> Result<(), String> {
++        // UseAbility must NEVER route through resume_with_choice — it should
++        // check activation legality independently. If a choice is pending from
++        // another ability (e.g. a debut look-and-select), the activation fails.
++        if matches!(action, crate::game_setup::ActionType::UseAbility) {
++            if game_state.has_pending_choice() {
++                return Err("Cannot activate ability while another choice is pending".to_string());
++            }
++            return Self::handle_use_ability(game_state, card_id);
++        }
++
+         if game_state.has_pending_choice() {
+             return Self::resume_with_choice(game_state, card_id, card_indices);
+         }
+@@ -879,11 +889,42 @@ impl super::TurnEngine {
+         Ok(())
+     }
+ 
++    // Rule 10.2 / Q53 / Q85 / Q86 / Q100 / Q101 / Q104: Check timing
++    //
++    // This is the central "check timing" (チェックタイミング) function called
++    // at Rule 9.5.1 prescribed points during game flow. It performs:
++    //
++    //   1. Refresh (Rule 10.2) — condition check + execution
++    //      Q100: Yell-revealed cards NOT included (still in resolution area)
++    //      Q101: Full refresh mid-effect when both deck & waitroom empty
++    //      Q104: Mill effects — just-milled cards ARE included in refresh
++    //
++    //   2. Duplicate member removal (Rule 10.4)
++    //   3. Victory check (Rule 10.3)
++    //   4. Invalid card cleanup (Rule 10.5)
++    //
++    // Rule 10.2.1: Refresh is NOT limited to check timing — it can interrupt
++    //   mid-effect processing (e.g. Q85 look_at, Q104 mill). The interrupted
++    //   processing resumes after the refresh completes.
++    //   HOWEVER, the condition is ALSO checked here for safety (Rule 10.1.2
++    //   says most rule processing happens at check timing).
++    //
++    // Rule 10.2.2.1: Trigger: deck = 0 AND waitroom ≥ 1
++    // Rule 10.2.2.2: Trigger: "look at N", deck has < N (handled in look.rs)
++    // Rule 10.2.3: Shuffle waitroom → place UNDER existing deck cards
++    //
++    // Q48: Score ≤ 0 does NOT prevent winning — comparison uses total, not
++    //   absolute values.
++    // Q84: Multi-auto-ability ordering — active player resolves all theirs
++    //   first, then non-active player.
++    // Rule 10.4: If multiple member cards occupy one area, keep newest.
++    // Rule 10.5: Energy cards in non-energy zones → energy deck.
++    //   Member cards under without a member above → waitroom.
+     pub fn check_timing(game_state: &mut GameState) {
+-        // Q100: Yell-revealed cards are NOT included in refresh when deck hits 0 during yell.
+-        // Q101: Full refresh procedure during mid-effect resolution.
++        // Rule 10.2.2.1 + Q100/Q101/Q104: Check and perform refresh
+         game_state.player1.refresh();
+         game_state.player2.refresh();
++        // Legacy inline refresh (TODO: migrate to player.refresh())
+         let p1_needs_refresh = game_state.player1.main_deck.cards.is_empty()
+             && !game_state.player1.waitroom.cards.is_empty();
+         let p2_needs_refresh = game_state.player2.main_deck.cards.is_empty()

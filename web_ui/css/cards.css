@@ -176,11 +176,7 @@
     pointer-events: none;
 }
 
-.hand-row .card:hover,
-.hand-row .card.hover-highlight {
-    z-index: 100 !important;
-    transform: translateY(-2px) scale(1.01);
-}
+
 
 .area-count {
     background: var(--accent-blue);
@@ -257,14 +253,15 @@
     cursor: pointer !important; 
 }
 
-/* Gold: Main Interactive / Success / Selected */
-.card.valid-target,
-.card.selected,
+/* Gold border only: hover highlight (no glow, no movement, no z-index) */
 .hover-highlight {
-    z-index: 100 !important;
     border: 2px solid var(--accent-gold) !important;
-    box-shadow: 0 0 6px rgba(245, 158, 11, 0.4) !important;
-    transform: translateY(-2px) !important;
+}
+
+/* Gold border only: valid target / selected */
+.card.valid-target,
+.card.selected {
+    border: 2px solid var(--accent-gold) !important;
 }
 
 .card.mulligan-selected {
@@ -280,18 +277,15 @@
     filter: grayscale(1) !important;
 }
 
-/* Pink: Source / Initiator */
+/* Gold: Source / Initiator */
 .highlight-source {
-    border-color: var(--accent-pink) !important;
-    box-shadow: var(--glow-pink-strong) !important;
-    z-index: 25;
+    border-color: var(--accent-gold) !important;
 }
 
-/* Blue: Target / Secondary */
+/* Gold: Target / Secondary */
 .highlight-target,
 .highlight-target-opp {
-    border-color: var(--accent-blue) !important;
-    box-shadow: var(--glow-blue) !important;
+    border-color: var(--accent-gold) !important;
 }
 
 /* Keyframes removed for snappiness */

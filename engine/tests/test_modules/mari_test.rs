@@ -24,14 +24,16 @@ fn choose_opponent(game: &mut TestGame) {
     }
 }
 
-/// Deck starts empty. LiveStart triggers → choose self → look fails silently.
+/// Deck starts with 2 cards → set_live_card draws 1 → look at 2, deck has 1.
+/// Q85: Should take the 1 card and create a (skip-able) selection choice.
 #[test]
 fn mari_q131_zero_deck_blocks_live_start() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
     // Give 2 cards: one consumed by set_live_card's replacement draw,
-    // leaving 0 — not enough for the 2-card look needed by the ability
+    // leaving 1 — not enough for the 2-card look, but per Q85 we take
+    // what's available and let the player choose (or skip).
     let filler = game.id("PL!-sd1-010-SD");
     game.state.player1.main_deck.cards.clear();
     game.state.player1.main_deck.cards.push(filler);
@@ -57,14 +59,16 @@ fn mari_q131_zero_deck_blocks_live_start() {
     );
     choose_self(&mut game);
 
-    // After choose self, look fails silently since deck has 0 cards
+    // Q85: After choose self, deck has 1 card (need 2). Take the 1 and show
+    // a skip-able selection choice rather than failing silently.
     assert!(
-        !game.has_pending_choice(),
-        "No pending choices when deck has 0 cards"
+        game.has_pending_choice(),
+        "Look-and-select choice should appear (Q85: partial look allowed)"
     );
 }
 
-/// Deck has 1 card (< 2 needed). LiveStart fires → choose self → fails silently.
+/// Deck starts with 1 card → set_live_card draws it → deck = 0, waitroom empty.
+/// Look at 2 with empty deck + empty waitroom → nothing to show → no choice.
 #[test]
 fn mari_q131_one_card_deck_blocked() {
     let db = load_real_database();
@@ -94,10 +98,10 @@ fn mari_q131_one_card_deck_blocked() {
     );
     choose_self(&mut game);
 
-    // After choose self, look fails silently since deck has 1 card
+    // After choose self, deck = 0 AND waitroom = 0 → no cards to look at → no choice
     assert!(
         !game.has_pending_choice(),
-        "No pending choices when deck has < 2 cards"
+        "No pending choice when both deck and waitroom are empty"
     );
 }
 

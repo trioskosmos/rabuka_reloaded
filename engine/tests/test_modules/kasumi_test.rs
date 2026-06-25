@@ -23,12 +23,23 @@ fn kasumi_ability_only_from_discard() {
     // Put Kasumi in discard (this is the copy we'll test activation from)
     game.state.player1.waitroom.cards.push(kasumi);
 
+    // Add enough deck cards so the debut look-at-3 doesn't trigger Q85 refresh
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+
     // Put a different Kasumi copy on stage (to test stage activation fails)
     let kasumi_stage = game.new_id("PL!N-bp1-002-R\u{ff0b}");
     game.state.player1.hand.cards.push(kasumi_stage);
     game.give_energy(3);
     game.play_to_stage(kasumi_stage, MemberArea::LeftSide);
     // Note: 3 energy given — 2 spent on play_to_stage, 1 remains for activation test
+
+    // After play_to_stage, the debut ability (look at 3 → reorder) fires and
+    // creates a pending choice. Skip it before testing activation.
+    if game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
 
     // Should NOT be able to activate from stage (card not in discard)
     assert!(
@@ -195,11 +206,15 @@ fn kasumi_q76_appear_on_occupied_area() {
     let filler = game.id("PL!-sd1-010-SD");
     let discard_fodder = game.id("PL!-sd1-010-SD");
 
-    // Setup: filler at Center, Kasumi in discard
+    // Setup: filler at Center, Kasumi in discard, enough deck cards
+    // for the post-activation debut look-at-3 to not trigger Q85 refresh
     game.state.player1.stage.stage[1] = filler;
     game.state.player1.waitroom.cards.push(kasumi);
     game.state.player1.hand.cards.push(discard_fodder);
     game.give_energy(2);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
 
     // Activate ability through the engine
     game.activate_ability(kasumi);
@@ -290,13 +305,17 @@ fn kasumi_q76_appear_when_stage_full_all_occupied() {
     let filler3 = game.new_id("PL!-sd1-010-SD");
     let discard_fodder = game.id("PL!-sd1-010-SD");
 
-    // Setup: all 3 stage positions occupied, Kasumi in discard
+    // Setup: all 3 stage positions occupied, Kasumi in discard, enough
+    // deck cards for post-activation debut look-at-3
     game.state.player1.stage.stage[0] = filler1;
     game.state.player1.stage.stage[1] = filler2;
     game.state.player1.stage.stage[2] = filler3;
     game.state.player1.waitroom.cards.push(kasumi);
     game.state.player1.hand.cards.push(discard_fodder);
     game.give_energy(2);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(discard_fodder);
+    }
 
     // Activate ability
     game.activate_ability(kasumi);

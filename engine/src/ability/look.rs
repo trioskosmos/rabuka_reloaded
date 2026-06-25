@@ -631,19 +631,17 @@ impl AbilityResolver {
             }
             return Ok(());
         }
-        let player = gs.resolve_target_player_mut(target);
-
-        // If deck has fewer cards than requested, the effect cannot execute.
-        if (Zone::from_str(source) == Some(Zone::Deck)
-            || Zone::from_str(source) == Some(Zone::DeckTop))
-            && player.main_deck.cards.len() < count as usize
-        {
-            return Err(format!(
-                "Not enough cards in deck: need {}, have {}",
-                count,
-                player.main_deck.cards.len()
-            ));
+        // Rule 10.2.2.2 / Q85: If deck has fewer cards than needed, take
+        // what's available (Q85 multi-step: draw → refresh → draw remaining).
+        let look_from_deck = Zone::from_str(source) == Some(Zone::Deck)
+            || Zone::from_str(source) == Some(Zone::DeckTop);
+        if look_from_deck {
+            let deck_count = gs.resolve_target_player(target).main_deck.cards.len();
+            if (deck_count as u32) < count {
+                return self.look_at_with_refresh(gs, effect, count, target, source);
+            }
         }
+        let player = gs.resolve_target_player_mut(target);
 
         let fetch_all = effect.all.unwrap_or(false);
         let take_cards = |cards: &[i16]| -> Vec<i16> {
@@ -673,6 +671,45 @@ impl AbilityResolver {
         gs.looked_at_cards = cards;
         Ok(())
     }
+
+    // Q85 / Rule 10.2.2.2: Look at N from deck with < N cards available.
+    fn look_at_with_refresh(
+        &mut self,
+        gs: &mut GameState,
+        _effect: &AbilityEffect,
+        count: u32,
+        target: &str,
+        _source: &str,
+    ) -> Result<(), String> {
+        let count = count as usize;
+        let first = {
+            let player = gs.resolve_target_player_mut(target);
+            let take = player.main_deck.cards.len();
+            if take > 0 {
+                player.main_deck.draw_multiple(take)
+            } else {
+                Vec::new()
+            }
+        };
+        let mut looked = first;
+        if looked.len() < count {
+            {
+                let player = gs.resolve_target_player_mut(target);
+                if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
+                    player.refresh();
+                }
+            }
+            let remaining = count - looked.len();
+            let player = gs.resolve_target_player_mut(target);
+            if !player.main_deck.cards.is_empty() {
+                let more = std::cmp::min(remaining, player.main_deck.cards.len());
+                looked.extend(player.main_deck.draw_multiple(more));
+            }
+        }
+        gs.looked_at_cards = looked;
+        Ok(())
+    }
+
     pub fn execute_reveal_per_group(
         &mut self,
         gs: &mut GameState,

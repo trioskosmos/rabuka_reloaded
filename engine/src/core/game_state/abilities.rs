@@ -1004,11 +1004,23 @@ impl GameState {
                 }
             }
         }
-        // After loop, scan for watchers triggered by batch discards from
-        // look_and_select or similar (callers that finalize_card_movement
-        // after the loop already exited, via moved_snapshot in actions.rs).
-        // Trigger types: each_time:discard, each_time:hand_to_discard, each_time:any_to_discard,
-        // each_time:energy_placed
+        // Q86 / Q252 / Rule 9.5.3.1: Post-loop scan for batch-triggered abilities
+        //
+        // After the main ability loop, we scan for auto-abilities triggered by
+        // batch movements from look_and_select or other compound effects that
+        // finalize card movement outside individual ability resolution.
+        //
+        // Trigger types: each_time:discard, each_time:hand_to_discard,
+        //   each_time:any_to_discard, each_time:energy_placed
+        //
+        // Q86: After look-and-select resolves, if all looked-at cards go to
+        //   discard and deck becomes empty, the batch movement triggers
+        //   each_time:discard watchers. The post-loop scan catches these.
+        //
+        // Q252: "When multiple live cards go to discard simultaneously, can
+        //   I put all of them back with one trigger?" → No, only 1 card per
+        //   trigger instance. The batch scan fires the ability once per batch,
+        //   and the ability selects 1 card from the batch.
         let moved_marker = self.recently_moved_cards.is_some();
         if (moved_marker || self.last_energy_placed_by_effect())
             && self.current_phase == crate::types::Phase::Main
