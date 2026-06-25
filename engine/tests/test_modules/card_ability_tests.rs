@@ -1105,7 +1105,6 @@ fn mia_bp5_different_groups_2_cards_total_no_effect() {
     assert_eq!(game.state.player1.waitroom.cards.len(), discard_before);
 }
 
-
 // --------------------------------------------------------------------
 //  Option 1: distinct card names
 // --------------------------------------------------------------------
@@ -1218,12 +1217,9 @@ fn mia_bp5_different_groups_5_cards_3_groups_returns_2() {
     assert_eq!(game.state.player1.waitroom.cards.len(), discard_before - 2);
 }
 
-
 // ====================================================================
 //  桂城 泉 (PL!HS-pb1-016-R) — debut: give heart06 to another member with heart06
 //  Tests filter_targets_by_heart_colors auto-resolve without prompting
-
-
 
 // ====================================================================
 //  桂城 泉 (PL!HS-pb1-016-R) — debut: give heart06 to another member with heart06
@@ -1244,8 +1240,8 @@ fn fu_pb1_debut_heart06_member_auto_gains_heart06() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let fu = game.id("PL!HS-pb1-016-R");
-    let has_heart06 = game.id("PL!-sd1-001-SD");   // base_heart has heart06
-    let no_heart06 = game.id("PL!-sd1-010-SD");    // no heart06
+    let has_heart06 = game.id("PL!-sd1-001-SD"); // base_heart has heart06
+    let no_heart06 = game.id("PL!-sd1-010-SD"); // no heart06
 
     setup_fu_board(&mut game, fu);
     game.add_to_stage(rabuka_engine::zones::MemberArea::LeftSide, has_heart06);
@@ -1256,23 +1252,32 @@ fn fu_pb1_debut_heart06_member_auto_gains_heart06() {
     // Auto-ability resolves, then auto-targets has_heart06 (only match)
     // has_heart06 should now have +1 heart06 modifier
     assert_eq!(
-        game.state.mods.get_heart_modifier(has_heart06, rabuka_engine::card::HeartColor::Heart06),
+        game.state
+            .mods
+            .get_heart_modifier(has_heart06, rabuka_engine::card::HeartColor::Heart06),
         1,
         "member with base heart06 should receive +1 heart06 modifier"
     );
     // no_heart06 should NOT get heart06
     assert_eq!(
-        game.state.mods.get_heart_modifier(no_heart06, rabuka_engine::card::HeartColor::Heart06),
+        game.state
+            .mods
+            .get_heart_modifier(no_heart06, rabuka_engine::card::HeartColor::Heart06),
         0,
         "member without heart06 should NOT receive heart06"
     );
     // Fu itself should NOT get heart06 (exclude_self)
     assert_eq!(
-        game.state.mods.get_heart_modifier(fu, rabuka_engine::card::HeartColor::Heart06),
+        game.state
+            .mods
+            .get_heart_modifier(fu, rabuka_engine::card::HeartColor::Heart06),
         0,
         "Fu (activating card) should NOT receive heart06 (exclude_self)"
     );
-    assert!(!game.has_pending_choice(), "no pending choices after auto-resolve");
+    assert!(
+        !game.has_pending_choice(),
+        "no pending choices after auto-resolve"
+    );
 }
 
 /// Fu played; TWO other members have heart06 -> player must choose one.
@@ -1281,8 +1286,8 @@ fn fu_pb1_debut_two_heart06_members_prompts_choice() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let fu = game.id("PL!HS-pb1-016-R");
-    let has_heart06a = game.id("PL!-sd1-001-SD");  // heart06
-    let has_heart06b = game.id("PL!-sd1-003-SD");  // heart06
+    let has_heart06a = game.id("PL!-sd1-001-SD"); // heart06
+    let has_heart06b = game.id("PL!-sd1-003-SD"); // heart06
 
     setup_fu_board(&mut game, fu);
     game.add_to_stage(rabuka_engine::zones::MemberArea::LeftSide, has_heart06a);
@@ -1295,9 +1300,14 @@ fn fu_pb1_debut_two_heart06_members_prompts_choice() {
     game.select_indices(&[0]);
     // Selected member gets +1 heart06, other gets nothing
     assert!(
-        game.state.mods.get_heart_modifier(has_heart06a, rabuka_engine::card::HeartColor::Heart06)
-        + game.state.mods.get_heart_modifier(has_heart06b, rabuka_engine::card::HeartColor::Heart06)
-        == 1,
+        game.state
+            .mods
+            .get_heart_modifier(has_heart06a, rabuka_engine::card::HeartColor::Heart06)
+            + game
+                .state
+                .mods
+                .get_heart_modifier(has_heart06b, rabuka_engine::card::HeartColor::Heart06)
+            == 1,
         "exactly one member should receive +1 heart06"
     );
 }
@@ -1315,9 +1325,14 @@ fn fu_pb1_debut_no_heart06_member_no_effect() {
 
     game.play_to_stage(fu, rabuka_engine::zones::MemberArea::Center);
 
-    assert!(!game.has_pending_choice(), "no choice when no target has heart06");
+    assert!(
+        !game.has_pending_choice(),
+        "no choice when no target has heart06"
+    );
     assert_eq!(
-        game.state.mods.get_heart_modifier(no_heart06, rabuka_engine::card::HeartColor::Heart06),
+        game.state
+            .mods
+            .get_heart_modifier(no_heart06, rabuka_engine::card::HeartColor::Heart06),
         0,
         "member without heart06 should not receive heart06"
     );

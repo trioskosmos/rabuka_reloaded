@@ -58,7 +58,8 @@ fn q77_self_appearance_activates_energy() {
     activate_and_drain(&mut game, konata);
 
     assert_eq!(
-        game.state.player1.energy_zone.active_count(), 4,
+        game.state.player1.energy_zone.active_count(),
+        4,
         "net: 4-2+2=4 (ab#1 cost 2E, ab#0 activates 2E)"
     );
 }
@@ -97,7 +98,8 @@ fn different_niji_member_on_turn2_activates() {
     // Turn 2 starts with 8 energy (second give_energy(4) after advance adds to the first 4).
     // ab#1 pays 2E (8→6), ab#0 activates 2E (6→8).
     assert_eq!(
-        game.state.player1.energy_zone.active_count(), 8,
+        game.state.player1.energy_zone.active_count(),
+        8,
         "net: 8-2+2=8 — different 虹ヶ咲 member on stage this turn satisfies the condition"
     );
 }

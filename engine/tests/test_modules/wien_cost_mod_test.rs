@@ -82,7 +82,7 @@ fn wien_cost_modifier_dynamic() {
 
     // Add 1 more → 10 energy
     game.state.player1.energy_zone.cards.push(energy_id);
-    game.state.player1.energy_zone.add_active( 1);
+    game.state.player1.energy_zone.add_active(1);
     game.state.recalculate_constant_blade_modifiers();
     assert_eq!(
         game.state.mods.get_cost_modifier(wien),
@@ -92,7 +92,7 @@ fn wien_cost_modifier_dynamic() {
 
     // Remove 1 → back to 9
     game.state.player1.energy_zone.cards.pop();
-    game.state.player1.energy_zone.sub_active( 1);
+    game.state.player1.energy_zone.sub_active(1);
     game.state.recalculate_constant_blade_modifiers();
     assert_eq!(
         game.state.mods.get_cost_modifier(wien),

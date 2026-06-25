@@ -68,7 +68,8 @@ fn shizuku_bp5_dynamic_energy_payment_tests() {
 
         // Verify state
         assert_eq!(
-            game.state.player1.energy_zone.active_count(), 3,
+            game.state.player1.energy_zone.active_count(),
+            3,
             "should pay 2 energy (5 -> 3)"
         );
         assert!(
@@ -116,7 +117,8 @@ fn shizuku_bp5_dynamic_energy_payment_tests() {
 
         // Verify state
         assert_eq!(
-            game.state.player1.energy_zone.active_count(), 1,
+            game.state.player1.energy_zone.active_count(),
+            1,
             "should pay 0 energy (1 -> 1)"
         );
         assert!(
@@ -167,7 +169,8 @@ fn shizuku_bp5_dynamic_energy_payment_tests() {
 
         // Verify state: Live card is NOT in hand, still in waitroom
         assert_eq!(
-            game.state.player1.energy_zone.active_count(), 1,
+            game.state.player1.energy_zone.active_count(),
+            1,
             "energy should remain unchanged"
         );
         assert!(
@@ -215,7 +218,8 @@ fn shizuku_bp5_dynamic_energy_payment_tests() {
 
         // Verify state: Live card is NOT in hand, still in waitroom
         assert_eq!(
-            game.state.player1.energy_zone.active_count(), 5,
+            game.state.player1.energy_zone.active_count(),
+            5,
             "energy should remain unchanged"
         );
         assert!(

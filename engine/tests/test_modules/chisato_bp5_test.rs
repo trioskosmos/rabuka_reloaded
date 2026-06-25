@@ -34,10 +34,7 @@ fn chisato_bp5_q219_cost_10_needs_10_energy() {
         game.state.player1.stage.stage[0] == liella,
         "Member on stage"
     );
-    assert_eq!(
-        game.state.player1.energy_zone.active_count(), 0,
-        "Spent 10"
-    );
+    assert_eq!(game.state.player1.energy_zone.active_count(), 0, "Spent 10");
 }
 
 /// 9 energy is NOT enough for a cost-10 member.
@@ -97,7 +94,8 @@ fn chisato_bp5_q219_cross_card_reduction_8_works() {
         "Liella! on stage after cost reduction"
     );
     assert_eq!(
-        game.state.player1.energy_zone.active_count(), 0,
+        game.state.player1.energy_zone.active_count(),
+        0,
         "Spent 8 (reduced from 10)"
     );
 }
@@ -205,7 +203,8 @@ fn chisato_promo_ab0_cross_card_reduction() {
         "Liella! on stage after cost reduction"
     );
     assert_eq!(
-        game.state.player1.energy_zone.active_count(), 0,
+        game.state.player1.energy_zone.active_count(),
+        0,
         "Spent 8 (reduced from 10)"
     );
 }
@@ -268,7 +267,8 @@ fn chisato_promo_ab1_live_start() {
         "Chisato should be active"
     );
     assert_eq!(
-        game.state.player1.energy_zone.active_count(), 3,
+        game.state.player1.energy_zone.active_count(),
+        3,
         "All 3 energy should be active"
     );
 }

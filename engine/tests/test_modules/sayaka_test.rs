@@ -35,7 +35,8 @@ fn sayaka_q63_ability_debut_no_cost_payment() {
     }
 
     assert_eq!(
-        game.state.player1.energy_zone.active_count(), 0,
+        game.state.player1.energy_zone.active_count(),
+        0,
         "Q63: 2E should be fully consumed by activation cost"
     );
     assert!(

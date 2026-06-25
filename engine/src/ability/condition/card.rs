@@ -639,7 +639,7 @@ impl<'a> ConditionContext<'a> {
                 _ => false,
             }
         };
-        check_cards.iter().any(|&id| has_prop(id))
+        check_cards.iter().any(|&id| has_prop(id)) != condition.negation.unwrap_or(false)
     }
 
     pub(crate) fn check_baton_touch(&self, condition: &Condition) -> bool {

@@ -484,6 +484,51 @@ impl<'a> ConditionContext<'a> {
                         }
                     }
                 }
+                if self.game_state.baton_touch_count == 0 {
+                    eprintln!("[BT_DEBUG] baton_touch_count=0");
+                    return false;
+                }
+                if let Some(min_count) = condition
+                    .min_baton_touch_count
+                    .or_else(|| te.and_then(|t| t.min_count))
+                {
+                    if self.game_state.baton_touch_count < min_count {
+                        eprintln!(
+                            "[BT_DEBUG] min_count={} < count={}",
+                            min_count, self.game_state.baton_touch_count
+                        );
+                        return false;
+                    }
+                }
+                let replaced_id = match self.game_state.baton_touch_replaced_member_id {
+                    Some(id) => id,
+                    None => {
+                        eprintln!("[BT_DEBUG] replaced_member_id=None");
+                        return false;
+                    }
+                };
+                if !location.is_empty() {
+                    if Zone::from_str(location) == Some(Zone::Discard)
+                        || Zone::from_str(location) == Some(Zone::Waitroom)
+                    {
+                        let in_discard = self
+                            .game_state
+                            .player1
+                            .waitroom
+                            .cards
+                            .contains(&replaced_id)
+                            || self
+                                .game_state
+                                .player2
+                                .waitroom
+                                .cards
+                                .contains(&replaced_id);
+                        if !in_discard {
+                            eprintln!("[BT_DEBUG] replaced_id={} not in waitroom", replaced_id);
+                            return false;
+                        }
+                    }
+                }
                 if condition.exclude_self.unwrap_or(false)
                     && self.game_state.activating_card == Some(replaced_id)
                 {

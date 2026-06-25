@@ -66,7 +66,8 @@ fn shizuku_q196_draw_after_discard_cost() {
     }
 
     assert_eq!(
-        game.state.player1.energy_zone.active_count(), 13,
+        game.state.player1.energy_zone.active_count(),
+        13,
         "2 energy should have been paid (15-2=13)"
     );
 

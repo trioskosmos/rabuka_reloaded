@@ -95,7 +95,8 @@ fn kasumi_q63_ability_appearance_no_cost_paid() {
 
     // Verify: 2 energy consumed (only ability cost, no member cost)
     assert_eq!(
-        game.state.player1.energy_zone.active_count(), 0,
+        game.state.player1.energy_zone.active_count(),
+        0,
         "Q63: 2E consumed for ability cost, no extra member cost"
     );
 

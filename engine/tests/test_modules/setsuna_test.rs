@@ -79,7 +79,8 @@ fn setsuna_q184_energy_under_member_not_counted() {
         "Q184: 1 card removed for placement, 2 remain (inactive)"
     );
     assert_eq!(
-        game.state.player1.energy_zone.active_count(), 0,
+        game.state.player1.energy_zone.active_count(),
+        0,
         "Q184: 2 active consumed for cost, 1 removed for placement → 0 remaining"
     );
 }

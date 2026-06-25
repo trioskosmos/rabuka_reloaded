@@ -106,6 +106,7 @@ pub mod miracle_stay_tune_test;
 pub mod miracle_wave_test;
 pub mod mirai_ticket_test;
 pub mod miyashita_ai_bp3_test;
+pub mod miyashita_ai_bp5_test;
 pub mod miyashita_ai_pb1_test;
 pub mod miyashita_ai_pr_test;
 pub mod miyashita_ai_test;
