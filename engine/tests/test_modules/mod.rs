@@ -127,6 +127,7 @@ pub mod per_unit_discard_fix;
 pub mod performance_pipeline_test;
 pub mod poppin_test;
 pub mod position_ability_test;
+pub mod position_change_condition_test;
 pub mod position_change_multi_test;
 pub mod position_change_triggers_jidou_move_test;
 pub mod q38_live_card_zone_test;

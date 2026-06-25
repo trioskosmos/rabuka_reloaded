@@ -442,6 +442,83 @@ impl<'a> ConditionContext<'a> {
                 }
                 true
             }
+            "position_change" => {
+                let snapshot = self
+                    .game_state
+                    .entry_snapshot_stage_positions()
+                    .or_else(|| self.game_state.stage_position_snapshot.as_ref());
+                let snapshot = match snapshot {
+                    Some(s) => s,
+                    None => return false,
+                };
+                let card_db = &self.game_state.card_database;
+                let position_changed =
+                    player
+                        .stage
+                        .stage
+                        .iter()
+                        .enumerate()
+                        .any(|(new_pos, &cid)| {
+                            if cid == -1 {
+                                return false;
+                            }
+                            if let Some(ref groups) = condition.group_names {
+                                if !groups.is_empty()
+                                    && !groups.iter().any(|g| {
+                                        crate::ability::util::card_matches_group_str(
+                                            card_db,
+                                            cid,
+                                            Some(g),
+                                        )
+                                    })
+                                {
+                                    return false;
+                                }
+                            }
+                            if condition.self_target.unwrap_or(false)
+                                && self.activating_card_id != Some(cid)
+                            {
+                                return false;
+                            }
+                            let old_pos = snapshot.get(&cid);
+                            let has_moved = old_pos.is_some_and(|&old| old != new_pos);
+                            if !has_moved {
+                                return false;
+                            }
+                            if let Some(req_pos) =
+                                condition.position.as_ref().and_then(|p| p.get_position())
+                            {
+                                let pos_names = ["left_side", "center", "right_side"];
+                                if new_pos >= pos_names.len() || pos_names[new_pos] != req_pos {
+                                    return false;
+                                }
+                            }
+                            true
+                        });
+                if !position_changed {
+                    return false;
+                }
+                if let Some(cost_limit) = condition.cost_limit {
+                    let op = condition.cost_limit_operator.as_deref().unwrap_or(">=");
+                    if let Some(ref moved) = self.game_state.recently_moved_cards {
+                        if !moved.iter().any(|&cid| {
+                            self.game_state
+                                .card_database
+                                .get_card(cid)
+                                .is_some_and(|c| {
+                                    c.cost.is_some_and(|cost| {
+                                        compare_counts(Some(op), cost, cost_limit)
+                                    })
+                                })
+                        }) {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+                true
+            }
             "notmoved" => true,
             "baton_touch" => {
                 let triggered = condition.baton_touch_trigger.unwrap_or(false);

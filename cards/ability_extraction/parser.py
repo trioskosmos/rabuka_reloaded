@@ -1347,16 +1347,33 @@ def _try_movement(text):
     te_data: Dict[str, Any] = {"type": "area_move", "tense": tense}
     if "たび" in text:
         te_data["recurrence"] = "each_time"
+    is_future = (
+        "移動する" in text and "移動した" not in text and "移動している" not in text
+    )
     result = {
         "type": "movement_condition",
         "text": text,
         "trigger_event": te_data,
         "movement": "moves"
-        if (
-            "移動する" in text and "移動した" not in text and "移動している" not in text
-        )
-        else "moved",
+        if is_future
+        else None,  # placeholder, set after generic fields
     }
+    _extract_generic_fields(result, text)
+    # Override movement: _extract_generic_fields may set "moved" from "置かれた"
+    # patterns, but _try_movement handles area moves, not zone placements.
+    result["movement"] = "moves" if is_future else "position_change"
+    # Extract position (センター/左サイド/右サイド) — _extract_generic_fields
+    # doesn't do this for handler results, only the fall-through path.
+    if "position" not in result:
+        matched = {pos for kw, pos in POSITION_KEYWORDS.items() if kw in text}
+        if len(matched) == 1:
+            result["position"] = matched.pop()
+        elif len(matched) > 1:
+            positions_list = sorted(matched)
+            result["position"] = positions_list[0]
+            result["position_compare"] = positions_list[1]
+    if "position" in result:
+        te_data["position"] = result["position"]
     if "移動していない" in text:
         result["negation"] = True
     # Extract "自分のカードの効果" (own card effect) constraint

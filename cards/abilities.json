@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-25T19:55:20.237236",
+  "generated_at": "2026-06-25T20:20:15.194842",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -4876,7 +4876,12 @@
             "self_effect_only": true,
             "energy_placed": true
           },
-          "movement": "moves"
+          "movement": "moves",
+          "target": "self",
+          "location": "energy_zone",
+          "resource_type": "energy",
+          "card_type": "member_card",
+          "self_target": true
         },
         "action": "sequential",
         "actions": [
@@ -8697,7 +8702,9 @@
             "type": "area_move",
             "tense": "past"
           },
-          "movement": "moved"
+          "movement": "position_change",
+          "card_type": "member_card",
+          "self_target": true
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -10703,7 +10710,9 @@
             "type": "area_move",
             "tense": "past"
           },
-          "movement": "moved"
+          "movement": "position_change",
+          "card_type": "member_card",
+          "self_target": true
         },
         "source": "energy_deck",
         "destination": "energy_zone",
@@ -14377,7 +14386,9 @@
             "type": "area_move",
             "tense": "past"
           },
-          "movement": "moved"
+          "movement": "position_change",
+          "card_type": "member_card",
+          "self_target": true
         },
         "source": "discard",
         "destination": "hand",
@@ -16209,7 +16220,9 @@
             "type": "area_move",
             "tense": "past"
           },
-          "movement": "moved"
+          "movement": "position_change",
+          "card_type": "member_card",
+          "self_target": true
         },
         "source": "stage",
         "state_change": "wait",
@@ -16243,7 +16256,9 @@
             "type": "area_move",
             "tense": "past"
           },
-          "movement": "moved"
+          "movement": "position_change",
+          "card_type": "member_card",
+          "self_target": true
         },
         "state_change": "active",
         "count": 2,
@@ -18832,7 +18847,10 @@
             "type": "area_move",
             "tense": "past"
           },
-          "movement": "moved"
+          "movement": "position_change",
+          "target": "self",
+          "card_type": "member_card",
+          "self_target": true
         },
         "source": "discard",
         "destination": "under_member",
@@ -19033,9 +19051,13 @@
           "text": "自分のステージのセンターエリアにいるメンバーがエリアを移動したとき",
           "trigger_event": {
             "type": "area_move",
-            "tense": "past"
+            "tense": "past",
+            "position": "center"
           },
-          "movement": "moved",
+          "movement": "position_change",
+          "target": "self",
+          "location": "stage",
+          "card_type": "member_card",
           "position": "center"
         },
         "action": "choice",
@@ -19381,13 +19403,17 @@
           "text": "自分のステージにいる『5yncri5e!』のメンバーがセンターエリアに移動したとき",
           "trigger_event": {
             "type": "area_move",
-            "tense": "past"
+            "tense": "past",
+            "position": "center"
           },
-          "movement": "moved",
-          "position": "center",
+          "movement": "position_change",
           "group_names": [
             "5yncri5e!"
-          ]
+          ],
+          "target": "self",
+          "location": "stage",
+          "card_type": "member_card",
+          "position": "center"
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -21553,7 +21579,9 @@
             "type": "area_move",
             "tense": "nonpast"
           },
-          "movement": "moves"
+          "movement": "moves",
+          "card_type": "member_card",
+          "self_target": true
         },
         "parenthetical": [
           "対戦相手のカードの効果でも発動する。"
@@ -27159,7 +27187,9 @@
             "type": "area_move",
             "tense": "past"
           },
-          "movement": "moved"
+          "movement": "position_change",
+          "card_type": "member_card",
+          "self_target": true
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -31792,7 +31822,9 @@
             "type": "area_move",
             "tense": "past"
           },
-          "movement": "moved"
+          "movement": "position_change",
+          "card_type": "member_card",
+          "self_target": true
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -31823,7 +31855,9 @@
             "type": "area_move",
             "tense": "past"
           },
-          "movement": "moved"
+          "movement": "position_change",
+          "card_type": "member_card",
+          "self_target": true
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -31908,7 +31942,9 @@
             "type": "area_move",
             "tense": "past"
           },
-          "movement": "moved"
+          "movement": "position_change",
+          "card_type": "member_card",
+          "self_target": true
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -32174,7 +32210,10 @@
             "phase": "main",
             "phase_target": "self"
           },
-          "movement": "moved"
+          "movement": "position_change",
+          "target": "self",
+          "card_type": "member_card",
+          "self_target": true
         },
         "state_change": "active",
         "count": 2,
