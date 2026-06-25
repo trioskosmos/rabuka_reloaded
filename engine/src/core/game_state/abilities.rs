@@ -253,6 +253,7 @@ impl GameState {
                             .as_ref()
                             .is_some_and(|t| t == crate::triggers::AUTO)
                         {
+                            let mut trigger_multiplicity: u32 = 1;
                             // Guard: skip discard-location abilities when the card
                             // is on stage (prevents premature triggering).
                             if let Some(ref effect) = ability.effect {
@@ -335,6 +336,14 @@ impl GameState {
                                         }
                                     }
                                 }
+                                // §9.7.2.1: Compute trigger multiplicity before
+                                // the effect block closes — condition and effect
+                                // are only in scope here.
+                                trigger_multiplicity = Self::trigger_instance_count(
+                                    &event.moved_cards,
+                                    effect,
+                                    &self.card_database,
+                                );
                             }
                             // During in-execution scans (e.g. state.rs state-change),
                             // skip the exact same ability on the same card to prevent
@@ -365,7 +374,18 @@ impl GameState {
                             if skip_this_card_auto_key.as_deref() == Some(&ability_id) {
                                 continue;
                             }
-                            abilities_to_trigger.push((ability_id, card.card_no.clone(), card_id));
+                            // §9.7.2.1: Multi-trigger — N trigger instances → N
+                            // standby entries.  All entries share the same
+                            // trigger_moved_cards (full batch) because each
+                            // instance independently re-evaluates the condition
+                            // at resolution time via can_activate_effect.
+                            for _ in 0..trigger_multiplicity {
+                                abilities_to_trigger.push((
+                                    ability_id.clone(),
+                                    card.card_no.clone(),
+                                    card_id,
+                                ));
+                            }
                         }
                     }
                 }
@@ -520,6 +540,68 @@ impl GameState {
         // trigger at most one batch of each_time abilities.  The snapshot
         // captured in trigger_auto_ability (above) preserves the flag value
         // for abilities that need it during execution (e.g. Sumire's "moves").
+    }
+
+    /// §9.7.2.1: Count how many standby entries to create for a trigger event.
+    ///
+    /// For `card_count_condition` with `source: "preceding_moved"`, counts
+    /// cards in the event batch matching the condition's filters.  Returns 1
+    /// for batch patterns ("すべて", "1枚以上", self_target, count=1+op=>=).
+    /// All other condition types return 1 (single standby instance).
+    fn trigger_instance_count(
+        moved_cards: &[i16],
+        effect: &crate::card::AbilityEffect,
+        card_db: &crate::card::CardDatabase,
+    ) -> u32 {
+        let condition = match &effect.condition {
+            Some(c) => c,
+            None => return 1,
+        };
+        if condition.condition_type
+            != Some(crate::ability::enums::ConditionType::CardCountCondition)
+            || condition.source.as_deref() != Some("preceding_moved")
+        {
+            return 1;
+        }
+        let matching: Vec<&i16> = moved_cards
+            .iter()
+            .filter(|&&cid| {
+                if cid == -1 {
+                    return false;
+                }
+                if let Some(ref ct) = condition.card_type {
+                    if !crate::ability::util::card_matches_type(card_db, cid, Some(ct)) {
+                        return false;
+                    }
+                }
+                if let Some(ref hc) = condition.heart_colors {
+                    if !hc.is_empty()
+                        && !crate::ability::util::card_matches_heart_colors(card_db, cid, hc)
+                    {
+                        return false;
+                    }
+                }
+                true
+            })
+            .collect();
+        let match_count = matching.len() as u32;
+        if match_count <= 1 {
+            return match_count;
+        }
+        let ct = &condition.text;
+        if ct.contains("すべて") || ct.contains("全て") || ct.contains("全部") {
+            return 1;
+        }
+        if ct.contains("1枚以上") || ct.contains("1つ以上") {
+            return 1;
+        }
+        if condition.count == Some(1) && condition.operator.as_deref() == Some(">=") {
+            return 1;
+        }
+        if condition.self_target.unwrap_or(false) {
+            return 1;
+        }
+        match_count
     }
 
     pub fn trigger_auto_ability(
@@ -1194,6 +1276,36 @@ impl GameState {
                 // discard/waitroom→hand auto abilities) reads it after
                 // process_pending_auto_abilities completes.
                 self.stage_position_snapshot = None;
+                // §9.5.3: After each ability resolves, check for each_time
+                // watchers triggered by the just-completed effect.
+                // Each_time abilities on live cards (たび) are not caught by the
+                // TAS scan above (§9.7.2: they enter standby), so fire their
+                // trigger substrings here.  The conditions are evaluated inside
+                // trigger_each_time_abilities — only matching abilities queue.
+                if self.current_phase == crate::types::Phase::Main {
+                    if self.recently_moved_cards.is_some() {
+                        crate::turn::TurnEngine::trigger_each_time_abilities(
+                            self,
+                            &current_pid,
+                            "控え室に置かれ",
+                            None,
+                        );
+                        crate::turn::TurnEngine::trigger_each_time_abilities(
+                            self,
+                            &current_pid,
+                            "エリアを移動",
+                            None,
+                        );
+                    }
+                    if self.last_energy_placed_by_effect() {
+                        crate::turn::TurnEngine::trigger_each_time_abilities(
+                            self,
+                            &current_pid,
+                            "エネルギー置き場",
+                            None,
+                        );
+                    }
+                }
             }
             // Clear activating_card AFTER the TAS scan (the guard at line 331-335
             // uses it to prevent re-enqueueing the just-completed ability).

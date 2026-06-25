@@ -8680,6 +8680,18 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 for key in ("cost_limit", "cost_limit_operator"):
                     if key in reparse and key not in cond:
                         cond[key] = reparse[key]
+            # Fix missing yell_trigger: "エールにより公開された" cards (平安名すみれ,
+            # 鬼塚夏美, ウィーン・マルガレーテ) were missed by _fill_defaults which
+            # only checks "エールしたとき". Apply only to auto abilities (自動) —
+            # non-auto triggers like ライブ成功時 must NOT get yell_trigger (Q264
+            # only applies to auto abilities that fire at yell timing).
+            if ability.get("triggers") == "自動":
+                has_yell_text = (
+                    "エールしたとき" in cond_text
+                    or "エールにより公開された" in cond_text
+                )
+                if cond.get("yell_trigger") is None and has_yell_text:
+                    cond["yell_trigger"] = True
 
     # Post-processing: infer action for any effect with empty action,
     # plus apply sequential action chaining fixes for ALL abilities

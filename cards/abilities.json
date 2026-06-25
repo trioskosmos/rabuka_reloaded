@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-25T19:02:37.030933",
+  "generated_at": "2026-06-25T19:55:20.237236",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1516,7 +1516,8 @@
               "text": "自分の手札が7枚以下の場合"
             }
           ],
-          "text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、自分の手札が7枚以下の場合"
+          "text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、自分の手札が7枚以下の場合",
+          "yell_trigger": true
         },
         "count": 1,
         "action": "draw_card",
@@ -4040,7 +4041,8 @@
           "card_type": "member_card",
           "target": "self",
           "comparison_target": "self",
-          "card_property": "has_blade_heart"
+          "card_property": "has_blade_heart",
+          "yell_trigger": true
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -8942,7 +8944,8 @@
           "card_type": "member_card",
           "target": "self",
           "comparison_target": "self",
-          "group_reference": "same_group_name"
+          "group_reference": "same_group_name",
+          "yell_trigger": true
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -10519,7 +10522,8 @@
           "text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき",
           "location": "revealed_cards",
           "card_type": "live_card",
-          "target": "self"
+          "target": "self",
+          "yell_trigger": true
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -21695,7 +21699,8 @@
           "card_property": "has_blade_heart",
           "heart_colors": [
             "heart06"
-          ]
+          ],
+          "yell_trigger": true
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -21729,7 +21734,8 @@
           "card_property": "has_blade_heart",
           "heart_colors": [
             "heart02"
-          ]
+          ],
+          "yell_trigger": true
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -21763,7 +21769,8 @@
           "card_property": "has_blade_heart",
           "heart_colors": [
             "heart03"
-          ]
+          ],
+          "yell_trigger": true
         },
         "action": "gain_resource",
         "resource": "heart",
