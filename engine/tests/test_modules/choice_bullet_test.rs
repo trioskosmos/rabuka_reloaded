@@ -201,9 +201,6 @@ fn dia_position_change_saintsnow_source_any_destination() {
     game.state.player1.stage.stage = [seira, filler, -1];
     debut_play(&mut game, dia, 10, MemberArea::RightSide);
 
-    // Drain any SelectAutoAbility (Dia's debut + Seira's auto queued together)
-    game.drain_auto_ability_choices();
-
     // Dia's 登場 → choice between blade (0) and position_change (1)
     assert!(game.has_pending_choice(), "Dia's 登場 choice expected");
     game.select_option(1);
@@ -336,9 +333,6 @@ fn dia_position_change_two_saintsnow_both_selectable() {
     // Stage: [理亞1(SaintSnow), 理亞2(SaintSnow), -]
     game.state.player1.stage.stage = [seira1, seira2, -1];
     debut_play(&mut game, dia, 10, MemberArea::RightSide);
-
-    // Drain any SelectAutoAbility (Dia's debut + Seiras' auto queued together)
-    game.drain_auto_ability_choices();
 
     // Choose position_change (option 1)
     assert!(game.has_pending_choice(), "Dia's 登場 choice expected");
