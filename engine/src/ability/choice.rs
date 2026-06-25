@@ -666,8 +666,26 @@ impl super::resolver::AbilityResolver {
                     let p = gs.resolve_target_player_mut(&target);
                     p.hand.cards.to_vec()
                 };
+                let same_unit_name = gs
+                    .entry_cost()
+                    .and_then(|c| c.same_unit_name)
+                    .unwrap_or(false);
+                let same_unit_filter = if same_unit_name {
+                    self.moved_cards
+                        .first()
+                        .and_then(|&cid| card_db.get_card(cid))
+                        .and_then(|c| c.unit.clone())
+                } else {
+                    None
+                };
                 let available_idxs: Vec<usize> = (0..hand_now.len())
-                    .filter(|i| validate_card(hand_now[*i]))
+                    .filter(|i| {
+                        let cid = hand_now[*i];
+                        validate_card(cid)
+                            && same_unit_filter.as_ref().map_or(true, |unit| {
+                                card_db.get_card(cid).and_then(|c| c.unit.as_ref()) == Some(unit)
+                            })
+                    })
                     .collect();
                 let fi = if available_idxs.is_empty() {
                     None
@@ -689,6 +707,62 @@ impl super::resolver::AbilityResolver {
                 );
                 self.store_pending_choice(gs);
                 return Ok(());
+            }
+            // Same-unit cost: after selecting the first card, re-prompt
+            // for remaining cards filtered to only the chosen unit.
+            if count > 0 && !new_card_ids.is_empty() && new_card_ids.len() == count {
+                if let Some(cost) = gs.entry_cost() {
+                    if cost.same_unit_name.unwrap_or(false) {
+                        let total_needed = cost.count.unwrap_or(1) as usize;
+                        let total_moved = self.moved_cards.len();
+                        if total_moved < total_needed {
+                            let remaining = total_needed - total_moved;
+                            let hand_now: Vec<i16> = {
+                                let p = gs.resolve_target_player_mut(&target);
+                                p.hand.cards.to_vec()
+                            };
+                            let unit_name = self
+                                .moved_cards
+                                .first()
+                                .and_then(|&cid| card_db.get_card(cid))
+                                .and_then(|c| c.unit.clone());
+                            let same_unit_idxs: Vec<usize> = (0..hand_now.len())
+                                .filter(|i| {
+                                    let cid = hand_now[*i];
+                                    validate_card(cid)
+                                        && unit_name.as_ref().map_or(false, |un| {
+                                            card_db.get_card(cid).and_then(|c| c.unit.as_ref())
+                                                == Some(un)
+                                        })
+                                })
+                                .collect();
+                            if same_unit_idxs.is_empty() {
+                                return Err(format!(
+                                    "Cannot pay cost: not enough cards with unit '{}' in hand",
+                                    unit_name.unwrap_or_default()
+                                ));
+                            }
+                            self.pending_choice = Some(
+                                common_re(
+                                    Zone::Hand.to_str(),
+                                    remaining,
+                                    format!(
+                                        "Select {} more card(s) with the same unit name",
+                                        remaining
+                                    ),
+                                    false,
+                                    Some(same_unit_idxs),
+                                    Some(target.clone()),
+                                    cost_total,
+                                    cost_total_operator.clone(),
+                                )
+                                .build(),
+                            );
+                            self.store_pending_choice(gs);
+                            return Ok(());
+                        }
+                    }
+                }
             }
             if count == 0 && allow_skip {
                 let hand_now: Vec<i16> = {

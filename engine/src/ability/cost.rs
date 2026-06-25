@@ -345,8 +345,8 @@ impl AbilityResolver {
                         self.pending_choice = Some(
                             Choice::select_cards(
                                 Zone::Hand.to_str(),
-                                count,
-                                format!("Select {} card(s) with the same unit name", count),
+                                1,
+                                format!("Select 1 card (need {} with the same unit name)", count),
                                 is_optional,
                             )
                             .card_type(cost.card_type.clone())

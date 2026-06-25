@@ -20,7 +20,8 @@ fn advance_to_live_start(game: &mut TestGame) {
     game.pass(); // LiveCardSetP2→FirstAttackerPerf, draws for P2, triggers LiveStart
 }
 
-/// 3 Printemps in hand → eligible unit (≥2). Choice created, player picks 2.
+/// 3 Printemps in hand → eligible unit (≥2). First prompt shows all,
+/// then re-prompt filters to chosen unit. Player picks 2.
 #[test]
 fn hanano_same_unit_choice_discards_2() {
     let db = load_real_database();
@@ -66,7 +67,10 @@ fn hanano_same_unit_choice_discards_2() {
     );
 
     let before = game.state.player1.hand.cards.len();
-    game.try_select_indices(&[0, 1]).unwrap();
+    // First prompt: pick 1 card from any qualifying unit
+    game.try_select_indices(&[0]).unwrap();
+    // Re-prompt: pick 1 more card, filtered to same unit
+    game.try_select_indices(&[0]).unwrap();
     assert_eq!(
         game.state.player1.hand.cards.len(),
         before - 2,
