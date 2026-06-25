@@ -83,16 +83,7 @@ impl super::TurnEngine {
             for yc in &snap.yell_cards {
                 for (i, &count) in yc.blade_hearts.iter().enumerate() {
                     if count > 0 {
-                        let color = match i {
-                            0 => crate::card::HeartColor::Heart00,
-                            1 => crate::card::HeartColor::Heart01,
-                            2 => crate::card::HeartColor::Heart02,
-                            3 => crate::card::HeartColor::Heart03,
-                            4 => crate::card::HeartColor::Heart04,
-                            5 => crate::card::HeartColor::Heart05,
-                            6 => crate::card::HeartColor::Heart06,
-                            _ => continue,
-                        };
+                        let color = crate::card::HeartColor::from_index(i);
                         *target.hearts.entry(color).or_insert(0) += count;
                     }
                 }
@@ -441,7 +432,7 @@ impl super::TurnEngine {
                 }
                 // spare = total_hearts - cumulative_used (what remains after this card)
                 let mut spare = EMPTY_H8;
-                for idx in 0..7 {
+                for idx in 0..8 {
                     spare[idx] = snap.total_hearts[idx].saturating_sub(cumulative_used[idx]);
                 }
                 snap.lives[i].spare = spare;
@@ -1206,12 +1197,13 @@ impl super::TurnEngine {
                 if let Some(ref bh) = card.blade_heart {
                     for (color, count) in &bh.hearts {
                         let effective_color = override_color.unwrap_or(*color);
-                        // Q45: ALL-blade (BAll) can be treated as any color heart
-                        // during heart requirement check (mapped to Heart00 wildcard).
+                        // Q45: ALL-blade (BAll) can be treated as any color heart.
+                        // Mapped to HeartColor::All (icon_all, index 7) so the UI
+                        // displays icon_all.png for BAll yell hearts.
                         if effective_color == HeartColor::BAll {
-                            *owned_hearts.hearts.entry(HeartColor::Heart00).or_insert(0) += count;
-                            bh_arr[0] += count;
-                            total_hearts_arr[0] += count;
+                            *owned_hearts.hearts.entry(HeartColor::All).or_insert(0) += count;
+                            bh_arr[7] += count;
+                            total_hearts_arr[7] += count;
                         } else if effective_color == HeartColor::Draw {
                             draw_icons += count;
                         // Q44: Each score icon revealed during yell adds 1 to total score.
@@ -1267,7 +1259,7 @@ impl super::TurnEngine {
         // Yell heart source
         let mut yell_heart_arr = EMPTY_H8;
         for yc in &yell_cards {
-            for i in 0..7 {
+            for i in 0..8 {
                 yell_heart_arr[i] += yc.blade_hearts[i];
             }
         }
@@ -1384,6 +1376,7 @@ impl super::TurnEngine {
                                 color: c_idx,
                                 amount: used,
                                 is_bonus: false,
+                                phase: "1a_colored".into(),
                             });
                             *remaining.hearts.entry(*color).or_insert(0) -= used;
                         }
@@ -1404,6 +1397,7 @@ impl super::TurnEngine {
                                     color: c_idx,
                                     amount: h00_use,
                                     is_bonus: false,
+                                    phase: "1b_h00_wild".into(),
                                 });
                                 *remaining.hearts.entry(HeartColor::Heart00).or_insert(0) -=
                                     h00_use;
@@ -1424,6 +1418,7 @@ impl super::TurnEngine {
                                         color: c_idx,
                                         amount: fill,
                                         is_bonus: false,
+                                        phase: "1c_all_wild".into(),
                                     });
                                     *remaining.hearts.entry(HeartColor::All).or_insert(0) -= fill;
                                 }
@@ -1459,6 +1454,7 @@ impl super::TurnEngine {
                                     color: c_idx,
                                     amount: fill,
                                     is_bonus: false,
+                                    phase: "2_wildcard".into(),
                                 });
                                 wildcard_used += fill;
                             }
@@ -1496,6 +1492,7 @@ impl super::TurnEngine {
                                     color: color_idx,
                                     amount: fill,
                                     is_bonus: false,
+                                    phase: "3a_colored_surplus".into(),
                                 });
                                 *remaining.hearts.entry(hc).or_insert(0) -= fill;
                                 any_filled += fill;
@@ -1520,6 +1517,7 @@ impl super::TurnEngine {
                                         color: 0,
                                         amount: h00_use,
                                         is_bonus: false,
+                                        phase: "3b_h00".into(),
                                     });
                                     *remaining.hearts.entry(HeartColor::Heart00).or_insert(0) -=
                                         h00_use;
@@ -1536,6 +1534,7 @@ impl super::TurnEngine {
                                         color: 7,
                                         amount: all_use,
                                         is_bonus: false,
+                                        phase: "3c_all".into(),
                                     });
                                     *remaining.hearts.entry(HeartColor::All).or_insert(0) -=
                                         all_use;
@@ -1581,7 +1580,7 @@ impl super::TurnEngine {
             heart_color_multiplier,
         );
         for yc in yell_cards {
-            for i in 0..7 {
+            for i in 0..8 {
                 if yc.blade_hearts[i] > 0 {
                     *owned_hearts
                         .hearts
@@ -1979,7 +1978,7 @@ pub fn snapshot_to_rule_log(
         for yc in &snap.yell_cards {
             let name = card_name_by_no(card_db, &yc.card_no);
             let bh = fmt_hearts(&yc.blade_hearts);
-            for i in 0..7 {
+            for i in 0..8 {
                 yell_total_hearts[i] += yc.blade_hearts[i];
             }
             if bh.is_empty() {

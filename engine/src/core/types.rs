@@ -222,6 +222,11 @@ pub struct Allocation {
     pub color: usize,
     pub amount: u32,
     pub is_bonus: bool,
+    /// Phase tag emitted by the engine's compute_allocations so the UI
+    /// can display steps without re-deriving allocation logic.
+    /// Values: "1a_colored", "1b_h00_wild", "1c_all_wild",
+    /// "2_wildcard", "3a_colored_surplus", "3b_h00", "3c_all".
+    pub phase: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

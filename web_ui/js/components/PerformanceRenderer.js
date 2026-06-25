@@ -225,20 +225,13 @@ function renderAggregateHeartSummary(result) {
 
     const totalHearts = result.total_hearts || [0,0,0,0,0,0,0,0];
     const totalAvailable = sumHearts(totalHearts);
-    const allPassed = lives.every(l => l.passed);
     const allocations = result?.breakdown?.allocations || [];
 
-    const fmtPool = (arr, label) => `
-        <div class="perf-agg-row">
-            <span class="perf-agg-label"></span>
-            ${renderHeartsCompact(arr)}
-            <span class="perf-agg-sum">${sumHearts(arr)}</span>
-            ${label ? `<span class="perf-agg-desc">${label}</span>` : ''}
-        </div>`;
+    // Use the engine's own success determination (all passed + total_score > 0)
+    const isSuccess = !!result.success;
 
-    // Reconstruct remaining pool at each step using allocations
     let html = `
-        <div class="perf-agg-summary ${allPassed ? 'success' : 'failure'}">
+        <div class="perf-agg-summary ${isSuccess ? 'success' : 'failure'}">
             <div class="perf-agg-header">
                 <img src="img/texticon/heart_00.png" class="heart-mini-icon" alt="">
                 Heart Allocation — sequential per live card
@@ -250,60 +243,14 @@ function renderAggregateHeartSummary(result) {
                     <span class="perf-agg-sum">${totalAvailable}</span>
                 </div>`;
 
-    // The engine allocates hearts from the shared pool to each live card sequentially.
-    // Allocation phases (engine/src/turn/live.rs):
-    //
-    //   Phase ① — Colored hearts → colored req (by matching color, up to req)
-    //     e.g. 4 Red hearts with req 2 Red: 2 go to Phase ①, 2 remain as excess
-    //
-    //   Phase ② — Wild (Any / heart_00) hearts → remaining colored deficits
-    //     Any heart (index 0) is a wildcard that fills any color's unmet req.
-    //
-    //   Phase ③ step 1 — Leftover colored hearts → Heart00 req
-    //     Colored hearts beyond what Phase ① used go to the Any/Heart00 requirement.
-    //     The engine records these under their original color index (1-6), NOT as index 0.
-    //
-    //   Phase ③ step 2 — Remaining Any (heart_00) hearts → Heart00 req
-    //     Recorded with color index 0.
-    //
-    // Heart type reference:
-    //   heart_00  (index 0, img/texticon/heart_00.png)
-    //     Rule 2.1.1.2: "heart icon with no specific color" — wildcard.
-    //     In pool: a wildcard heart that can be any single color.
-    //     In need_heart: accepts hearts of ANY color to satisfy this slot.
-    //
-    //   icon_all  (index 7, img/texticon/icon_all.png)
-    //     Rule 2.1.1.3: "can be treated as any ONE of Pink/Red/Yellow/Green/Blue/Purple"
-    //     Rule 8.3.15.1.1: during performance check, each icon_all = any ONE color.
-    //     QA Q46: icon_all's color assignment is decided at perf check time.
-    //     QA Q67: icon_all is ONLY treated as any color during perf check, NOT live start.
-    //     NOTE: icon_all can fill heart00 req by being treated as one of the other colors.
-    //     If there are no specific color deficits, which color you pick doesn't matter —
-    //     h00_satisfied = sum(filled[1..7]) counts all colored hearts equally. The choice
-    //     only matters when a specific colored slot still has a deficit.
-    //
-    //   ALLブレード (BAll, img/texticon/icon_b_all.png)
-    //     QA Q45: during perf check, each ALLブレード counts as any ONE color.
-    //     QA Q112: ALLブレード is classified as a blade heart.
-    //     Engine: BladeColor::All → HeartColor::Heart00 (converted during blade processing).
-    //
-    //   heart_01-06  — Pink, Red, Yellow, Green, Blue, Purple specific colors.
-    //
-    // PASS/FAIL logic (engine check_heart_requirement, engine/src/core/card.rs):
-    //   Rule 2.11.3 — Requires BOTH:
-    //     (a) For each non-heart_00 slot: enough hearts of that color exist.
-    //     (b) Total provided hearts >= total required hearts.
-    //   Engine steps:
-    //     1. total_filled < total_required → FAIL (2.11.3 bullet 2)
-    //     2. Heart00: sum(filled[1..7]) + filled[0] < req[0] → FAIL
-    //        All colored hearts consumed count toward Heart00 (h00_satisfied).
-    //     3. Each colored slot: filled[c] < req[c] AND wildcard (heart00+all) can't cover → FAIL
-    //   QA Q115: need_heart modifications apply "set" then "add/subtract".
-    //   QA Q127, Q110: heart_00 increases from multiple sources stack.
-    //   QA Q148, Q114, Q99, Q98: heart_00 reductions per condition.
-    //
-    // filled[c] includes ALL allocations to color c (Phases ① + ② + ③ step 1).
-    // We split Phase ① and Phase ③ step 1 by capping at per-color req.
+    // Phase tags emitted by the engine (engine/src/turn/live.rs compute_allocations):
+    //   1a_colored       — colored hearts → colored req (matching color, capped at req)
+    //   1b_h00_wild      — Heart00 wildcard → remaining colored deficit
+    //   1c_all_wild      — All (icon_all) wildcard → remaining colored deficit
+    //   2_wildcard       — remaining wildcards (H00+All) → remaining colored deficit
+    //   3a_colored_surplus — leftover colored hearts → Heart00 req (conversion step)
+    //   3b_h00           — Heart00 wildcards → remaining Heart00 req
+    //   3c_all           — All wildcards → remaining Heart00 req
 
     const remaining = totalHearts.map(v => v);
     for (let liveIdx = 0; liveIdx < lives.length; liveIdx++) {
@@ -311,56 +258,58 @@ function renderAggregateHeartSummary(result) {
         const cd = live.card_no ? State.resolveCardData(live.card_no) : null;
         const liveName = cd?.name || `Live ${liveIdx + 1}`;
         const req = live.required || [0,0,0,0,0,0,0,0];
-        const filled = live.filled || [0,0,0,0,0,0,0,0];
-        const reqSum = sumHearts(req);
-        const fillSum = sumHearts(filled);
         const passed = live.passed;
-        const colorReq = req.slice(1, 7);
-        const colorFill = filled.slice(1, 7);
-        const colorReqSum = sumHearts(colorReq);
-        const colorFillSum = sumHearts(colorFill);
+        const reqSum = sumHearts(req);
+        const colorReqSum = sumHearts(req.slice(1, 7));
         const wildReq = req[0] || 0;
-        const wildFill = filled[0] || 0;
 
-        // Per-color deficit for colored req (sum of shortfalls per color, not total)
-        const colDeficit = [1,2,3,4,5,6].reduce((sum, c) => sum + Math.max(0, (req[c] || 0) - (filled[c] || 0)), 0);
+        // Group allocations for this live card by phase
+        const liveAllocs = allocations.filter(a => a.target_idx === liveIdx);
+        const phase1aAllocs = liveAllocs.filter(a => a.phase === '1a_colored');
+        const phase1bAllocs = liveAllocs.filter(a => a.phase === '1b_h00_wild');
+        const phase1cAllocs = liveAllocs.filter(a => a.phase === '1c_all_wild');
+        const phase2Allocs = liveAllocs.filter(a => a.phase === '2_wildcard');
+        const phase3aAllocs = liveAllocs.filter(a => a.phase === '3a_colored_surplus');
+        const phase3bAllocs = liveAllocs.filter(a => a.phase === '3b_h00');
+        const phase3cAllocs = liveAllocs.filter(a => a.phase === '3c_all');
 
-        // Phase 1: colored hearts → colored req (capped at req per color)
-        // Phase 3 step 1: excess colored hearts → Heart00 (colored beyond req)
-        const phase1PerColor = [0,0,0,0,0,0,0,0];
-        const p3ColorPerColor = [0,0,0,0,0,0,0,0];
-        for (let c = 1; c <= 6; c++) {
-            const fc = filled[c] || 0;
-            const rc = req[c] || 0;
-            phase1PerColor[c] = Math.min(fc, rc);
-            p3ColorPerColor[c] = Math.max(0, fc - rc);
-        }
-        const phase1Total = sumHearts(phase1PerColor);
-        const p3ColorTotal = sumHearts(p3ColorPerColor);
-        const totalWildFill = wildFill + p3ColorTotal;
-
-        // Phase 2: wildcard (Any index-0) hearts filling colored deficit
-        const p2Allocs = allocations.filter(a => a.target_idx === liveIdx && a.wildcard);
-        // Phase 3 step 2: wildcard Any hearts (color 0) filling remaining Heart00
-        const p3Allocs = allocations.filter(a => a.target_idx === liveIdx && !a.wildcard && a.color === 0);
+        const sumAllocs = (arr) => arr.reduce((s, a) => s + a.amount, 0);
+        const sumPhase1a = sumAllocs(phase1aAllocs);
+        const sumPhase1b = sumAllocs(phase1bAllocs);
+        const sumPhase1c = sumAllocs(phase1cAllocs);
+        const sumPhase2 = sumAllocs(phase2Allocs);
+        const sumPhase3a = sumAllocs(phase3aAllocs);
+        const sumPhase3b = sumAllocs(phase3bAllocs);
+        const sumPhase3c = sumAllocs(phase3cAllocs);
+        const totalWildToColored = sumPhase1b + sumPhase1c + sumPhase2;
+        const totalWildToH00 = sumPhase3b + sumPhase3c;
 
         // Compute what was left before this card
         const beforeDisplay = remaining.map(v => v);
 
         // Deduct what this card consumed
-        for (const a of allocations) {
-            if (a.target_idx === liveIdx) {
-                remaining[a.color] = Math.max(0, remaining[a.color] - a.amount);
-            }
+        for (const a of liveAllocs) {
+            remaining[a.color] = Math.max(0, remaining[a.color] - a.amount);
         }
 
         const afterDisplay = remaining.map(v => v);
         const beforeSum = sumHearts(beforeDisplay);
         const afterSum = sumHearts(afterDisplay);
-
         const consumedArr = beforeDisplay.map((v, i) => v - afterDisplay[i]);
         const consumedSum = sumHearts(consumedArr);
         const totalShort = Math.max(0, reqSum - consumedSum);
+
+        // Detail strings for each phase group
+        const detail1a = phase1aAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
+        const detail1b = phase1bAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
+        const detail1c = phase1cAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
+        const detail2 = phase2Allocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
+        const detail3a = phase3aAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
+        const detail3b = phase3bAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
+        const detail3c = phase3cAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
+
+        // Color deficits still exist after Phase 1a only
+        const colDeficit = [1,2,3,4,5,6].reduce((sum, c) => sum + Math.max(0, (req[c] || 0) - (live.filled?.[c] || 0)), 0);
 
         html += `
             <div class="perf-agg-card ${passed ? 'success' : 'failure'}">
@@ -373,37 +322,41 @@ function renderAggregateHeartSummary(result) {
                 <div class="perf-agg-card-pool consumed">Used: ${renderHeartsCompact(consumedArr)} = ${consumedSum}${totalShort > 0 ? ` <span class="perf-agg-fail">(${totalShort} short of ${reqSum} needed)</span>` : ''}</div>
                 <div class="perf-agg-steps">
                     ${colorReqSum > 0 ? `
-                    <div class="perf-agg-step ${phase1Total >= colorReqSum ? 'done' : 'fail'}">
+                    <div class="perf-agg-step ${sumPhase1a >= colorReqSum ? (colDeficit === 0 ? 'done' : (totalWildToColored > 0 ? 'done' : 'fail')) : 'fail'}">
                         <span class="perf-agg-marker">①</span>
-                        <span>Colored hearts → colored req</span>
-                        <span class="perf-agg-step-stat">${phase1Total}/${colorReqSum}${phase1Total < colorReqSum ? `<span class="perf-agg-fail"> (${colorReqSum - phase1Total} short)</span>` : ''}</span>
-                        ${phase1Total > 0 ? `<div class="perf-agg-alloc-detail">${[1,2,3,4,5,6].filter(c => phase1PerColor[c] > 0).map(c => `${phase1PerColor[c]}×${HEART_LABELS[c]}`).join(', ')}</div>` : ''}
+                        <span>Colored → colored req</span>
+                        <span class="perf-agg-step-stat">${sumPhase1a}/${colorReqSum}${sumPhase1a < colorReqSum ? `<span class="perf-agg-fail"> (${colorReqSum - sumPhase1a} short)</span>` : ''}</span>
+                        ${detail1a ? `<div class="perf-agg-alloc-detail">${detail1a}</div>` : ''}
                     </div>` : ''}
-                    ${colDeficit > 0 ? `
-                    <div class="perf-agg-step ${p2Allocs.reduce((s, a) => s + a.amount, 0) >= colDeficit ? 'done' : 'fail'}">
-                        <span class="perf-agg-marker">②</span>
-                        <span>Wild (Any) → colored deficit</span>
-                        <span class="perf-agg-step-stat">${p2Allocs.reduce((s, a) => s + a.amount, 0)}/${colDeficit}${p2Allocs.reduce((s, a) => s + a.amount, 0) < colDeficit ? `<span class="perf-agg-fail"> (${colDeficit - p2Allocs.reduce((s, a) => s + a.amount, 0)} short)</span>` : ''}</span>
-                        ${p2Allocs.length > 0 ? `<div class="perf-agg-alloc-detail">${p2Allocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ')}</div>` : ''}
-                        ${p2Allocs.length === 0 ? '<div class="perf-agg-alloc-detail">No wild (Any) hearts available</div>' : ''}
+                    ${totalWildToColored > 0 ? `
+                    <div class="perf-agg-step done">
+                        <span class="perf-agg-marker">①b</span>
+                        <span>Wildcards → colored deficit</span>
+                        <span class="perf-agg-step-stat">+${totalWildToColored}</span>
+                        ${detail1b ? `<div class="perf-agg-alloc-detail">Heart00 wild: ${detail1b}</div>` : ''}
+                        ${detail1c ? `<div class="perf-agg-alloc-detail">icon_all wild: ${detail1c}</div>` : ''}
+                        ${detail2 ? `<div class="perf-agg-alloc-detail">Pool wild: ${detail2}</div>` : ''}
                     </div>` : ''}
                     ${wildReq > 0 ? `
-                    <div class="perf-agg-step ${totalWildFill >= wildReq ? 'done' : 'fail'}">
-                        <span class="perf-agg-marker">③</span>
-                        <span>Heart00 (any heart color accepted)</span>
-                        <span class="perf-agg-step-stat">${totalWildFill}/${wildReq}${totalWildFill < wildReq ? `<span class="perf-agg-fail"> (${wildReq - totalWildFill} short)</span>` : ''}</span>
-                        ${totalWildFill > 0 ? `<div class="perf-agg-alloc-detail">${
-                            [1,2,3,4,5,6].filter(c => p3ColorPerColor[c] > 0).map(c => `${p3ColorPerColor[c]}×${HEART_LABELS[c]}`).concat(
-                                p3Allocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`)
-                            ).join(', ')
-                        }</div>` : ''}
+                    <div class="perf-agg-step ${(sumPhase3a + totalWildToH00) >= wildReq ? 'done' : 'fail'}">
+                        <span class="perf-agg-marker">③a</span>
+                        <span>Colored surplus → Heart00 req</span>
+                        <span class="perf-agg-step-stat">${sumPhase3a}/${wildReq}${sumPhase3a < wildReq ? `<span class="perf-agg-fail"> (${wildReq - sumPhase3a} remaining)</span>` : ''}</span>
+                        ${detail3a ? `<div class="perf-agg-alloc-detail">${detail3a}</div>` : ''}
+                    </div>` : ''}
+                    ${wildReq > 0 && totalWildToH00 > 0 ? `
+                    <div class="perf-agg-step ${(sumPhase3a + totalWildToH00) >= wildReq ? 'done' : 'fail'}">
+                        <span class="perf-agg-marker">③b</span>
+                        <span>Wildcards → Heart00 deficit</span>
+                        <span class="perf-agg-step-stat">+${totalWildToH00}</span>
+                        ${detail3b ? `<div class="perf-agg-alloc-detail">Heart00 wild: ${detail3b}</div>` : ''}
+                        ${detail3c ? `<div class="perf-agg-alloc-detail">icon_all wild: ${detail3c}</div>` : ''}
                     </div>` : ''}
                 </div>
                 <div class="perf-agg-card-after">After: ${renderHeartsCompact(afterDisplay)} = ${afterSum}</div>
             </div>`;
     }
 
-    // Final surplus (always show)
     const finalRemaining = remaining.map(v => v);
     const surplusTotal = sumHearts(finalRemaining);
     html += `
@@ -1178,28 +1131,37 @@ function renderPlayerPanel(playerId, result) {
         }
     }
 
+    // Comparative win flags from the engine
+    const winsKey = playerId === 0 ? 'p0_wins' : 'p1_wins';
+    const otherWinsKey = playerId === 0 ? 'p1_wins' : 'p0_wins';
+    const selfWins = !!result[winsKey];
+    const otherWins = !!result[otherWinsKey];
+
     const totalHearts = sumHearts(result.total_hearts);
     const baseLiveScore = sumPassedLiveScores(lives);
     
+    // Outcome prioritizes comparative win/loss; heart-check pass/fail is fallback
     let outcome = 'Failed performance';
     if (isCannotLive) {
         outcome = 'Live cannot happen';
+    } else if (selfWins && otherWins) {
+        outcome = 'Comparative tie';
+    } else if (selfWins) {
+        outcome = 'Won live result';
+    } else if (otherWins) {
+        outcome = 'Lost live result';
     } else if (isSuccess) {
-        const winsKey = playerId === 0 ? 'p0_wins' : 'p1_wins';
-        const otherWinsKey = playerId === 0 ? 'p1_wins' : 'p0_wins';
-        const selfWins = !!result[winsKey];
-        const otherWins = !!result[otherWinsKey];
-        if (selfWins && otherWins) outcome = 'Comparative tie';
-        else if (selfWins) outcome = 'Won live result';
-        else if (otherWins) outcome = 'Lost live result';
-        else outcome = 'Passed performance';
+        outcome = 'Passed performance';
     }
 
     const members = result?.member_contributions || [];
     const totalBlades = members.reduce((s, m) => m.is_wait ? s : s + (m.base_blades || 0) + (m.bonus_blades || 0), 0);
 
+    // Panel success if either heart check passed OR player won comparative
+    const panelSuccess = isSuccess || selfWins;
+
     return `
-        <article class="perf-panel ${isSuccess ? 'success' : 'failure'}">
+        <article class="perf-panel ${panelSuccess ? 'success' : 'failure'}">
             <header class="perf-panel-header">
                 <div class="perf-panel-header-main">
                     <div class="perf-eyebrow">${escapeHtml(getPlayerName(playerId))}</div>
