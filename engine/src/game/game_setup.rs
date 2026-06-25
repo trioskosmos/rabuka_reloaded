@@ -204,6 +204,29 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
     }
 }
 
+fn make_choice_pair(action_type: ActionType, yes_text: &str, no_text: &str) -> Vec<Action> {
+    vec![
+        make_action_params(
+            action_type,
+            yes_text,
+            ActionParameters {
+                card_id: Some(1),
+                card_no: Some("yes".to_string()),
+                ..make_params()
+            },
+        ),
+        make_action_params(
+            action_type,
+            no_text,
+            ActionParameters {
+                card_id: Some(0),
+                card_no: Some("no".to_string()),
+                ..make_params()
+            },
+        ),
+    ]
+}
+
 fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> Vec<Action> {
     match choice {
         Choice::SelectTarget {
@@ -395,26 +418,11 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 ];
             }
             if target == "apply_replacement" {
-                return vec![
-                    make_action_params(
-                        ActionType::ChoiceOption,
-                        "Apply replacement",
-                        ActionParameters {
-                            card_id: Some(1),
-                            card_no: Some("yes".to_string()),
-                            ..make_params()
-                        },
-                    ),
-                    make_action_params(
-                        ActionType::ChoiceOption,
-                        "Don't apply",
-                        ActionParameters {
-                            card_id: Some(0),
-                            card_no: Some("no".to_string()),
-                            ..make_params()
-                        },
-                    ),
-                ];
+                return make_choice_pair(
+                    ActionType::ChoiceOption,
+                    "Apply replacement",
+                    "Don't apply",
+                );
             }
             if target == "choice_string" || target == "conditional_optional" {
                 if let Some(ref opts) = options {
@@ -437,27 +445,11 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             .collect();
                     }
                 }
-                // Fallback: Yes/No (1 option or empty)
-                return vec![
-                    make_action_params(
-                        ActionType::ChoiceOption,
-                        &format!("Yes E{}", description),
-                        ActionParameters {
-                            card_id: Some(1),
-                            card_no: Some("yes".to_string()),
-                            ..make_params()
-                        },
-                    ),
-                    make_action_params(
-                        ActionType::ChoiceOption,
-                        &format!("No E{}", description),
-                        ActionParameters {
-                            card_id: Some(0),
-                            card_no: Some("no".to_string()),
-                            ..make_params()
-                        },
-                    ),
-                ];
+                return make_choice_pair(
+                    ActionType::ChoiceOption,
+                    &format!("Yes E{}", description),
+                    &format!("No E{}", description),
+                );
             }
             if target == "choice_condition" {
                 let opts = options.as_ref().map(|v| v.as_slice()).unwrap_or(&[]);
@@ -479,26 +471,11 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         .collect();
                 }
             }
-            vec![
-                make_action_params(
-                    ActionType::ChoiceDecision,
-                    &format!("Yes  E{}", description),
-                    ActionParameters {
-                        card_id: Some(1),
-                        card_no: Some("yes".to_string()),
-                        ..make_params()
-                    },
-                ),
-                make_action_params(
-                    ActionType::ChoiceDecision,
-                    &format!("No  E{}", description),
-                    ActionParameters {
-                        card_id: Some(0),
-                        card_no: Some("no".to_string()),
-                        ..make_params()
-                    },
-                ),
-            ]
+            make_choice_pair(
+                ActionType::ChoiceDecision,
+                &format!("Yes  E{}", description),
+                &format!("No  E{}", description),
+            )
         }
         Choice::SelectCard {
             zone,

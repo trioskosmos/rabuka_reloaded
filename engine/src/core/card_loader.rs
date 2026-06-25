@@ -48,6 +48,7 @@ impl CardLoader {
         Ok(cards)
     }
 
+    #[allow(dead_code)]
     fn load_abilities_from_file(path: &Path) -> Result<serde_json::Value, String> {
         let mut file =
             File::open(path).map_err(|e| format!("Failed to open abilities file: {}", e))?;

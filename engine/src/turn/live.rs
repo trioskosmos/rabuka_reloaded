@@ -678,6 +678,45 @@ impl super::TurnEngine {
         }
     }
 
+    fn try_take_success_zone_choice(
+        game_state: &mut GameState,
+        won: bool,
+        must_skip: bool,
+        cards_count: usize,
+        cards: Vec<i16>,
+        player_id: &str,
+    ) -> bool {
+        if !won || must_skip || cards_count <= 1 {
+            return false;
+        }
+        let can_place = cards.iter().any(|&cid| {
+            game_state.can_place_card_in_zone(cid, Zone::SuccessLiveZone.to_str(), player_id)
+        });
+        if !can_place {
+            return false;
+        }
+        let options: Vec<crate::ability::types::LiveSuccessOption> = cards
+            .iter()
+            .enumerate()
+            .map(|(i, &cid)| crate::ability::types::LiveSuccessOption {
+                card_name: game_state
+                    .card_database
+                    .get_card(cid)
+                    .map(|c| c.name.clone())
+                    .unwrap_or_default(),
+                card_index: i,
+            })
+            .collect();
+        let choice = crate::ability::types::Choice::SelectLiveSuccess {
+            player_id: player_id.to_string(),
+            count: 1,
+            options,
+            description: "Choose which live card goes to your success zone".to_string(),
+        };
+        game_state.ability_queue.pause_for_choice(choice);
+        true
+    }
+
     fn move_live_to_success_and_handle_wins(
         game_state: &mut GameState,
         player1_won: bool,
@@ -699,74 +738,22 @@ impl super::TurnEngine {
             p1_must_skip,
             p2_must_skip
         );
-        // Check if multiple live cards need a success zone choice (Rule 8.4.7)
-        if player1_won && !p1_must_skip && p1_cards > 1 {
-            // Check if ANY card in the live card zone can be placed in the success zone
-            // (not just the top card, since member cards may be in the zone too).
-            let p1_can_place = game_state.player1.live_card_zone.cards.iter().any(|&cid| {
-                game_state.can_place_card_in_zone(cid, Zone::SuccessLiveZone.to_str(), &p1_id)
-            });
-            log::debug!(
-                "[MULTI_LIVE] p1_cards={} p1_can_place={} success_zone.len={}",
-                p1_cards,
-                p1_can_place,
-                game_state.player1.success_live_card_zone.cards.len()
-            );
-            if p1_can_place {
-                let options: Vec<crate::ability::types::LiveSuccessOption> = game_state
-                    .player1
-                    .live_card_zone
-                    .cards
-                    .iter()
-                    .enumerate()
-                    .map(|(i, &cid)| crate::ability::types::LiveSuccessOption {
-                        card_name: game_state
-                            .card_database
-                            .get_card(cid)
-                            .map(|c| c.name.clone())
-                            .unwrap_or_default(),
-                        card_index: i,
-                    })
-                    .collect();
-                let choice = crate::ability::types::Choice::SelectLiveSuccess {
-                    player_id: p1_id.clone(),
-                    count: 1,
-                    options,
-                    description: "Choose which live card goes to your success zone".to_string(),
-                };
-                game_state.ability_queue.pause_for_choice(choice);
-                return;
-            }
-        }
-        if player2_won && !p2_must_skip && p2_cards > 1 {
-            let p2_can_place = game_state.player2.live_card_zone.cards.iter().any(|&cid| {
-                game_state.can_place_card_in_zone(cid, Zone::SuccessLiveZone.to_str(), &p2_id)
-            });
-            if p2_can_place {
-                let options: Vec<crate::ability::types::LiveSuccessOption> = game_state
-                    .player2
-                    .live_card_zone
-                    .cards
-                    .iter()
-                    .enumerate()
-                    .map(|(i, &cid)| crate::ability::types::LiveSuccessOption {
-                        card_name: game_state
-                            .card_database
-                            .get_card(cid)
-                            .map(|c| c.name.clone())
-                            .unwrap_or_default(),
-                        card_index: i,
-                    })
-                    .collect();
-                let choice = crate::ability::types::Choice::SelectLiveSuccess {
-                    player_id: p2_id.clone(),
-                    count: 1,
-                    options,
-                    description: "Choose which live card goes to your success zone".to_string(),
-                };
-                game_state.ability_queue.pause_for_choice(choice);
-                return;
-            }
+        if Self::try_take_success_zone_choice(
+            game_state,
+            player1_won,
+            p1_must_skip,
+            p1_cards,
+            game_state.player1.live_card_zone.cards.to_vec(),
+            &p1_id,
+        ) || Self::try_take_success_zone_choice(
+            game_state,
+            player2_won,
+            p2_must_skip,
+            p2_cards,
+            game_state.player2.live_card_zone.cards.to_vec(),
+            &p2_id,
+        ) {
+            return;
         }
 
         // Single card or no choice needed — process normally
@@ -779,18 +766,15 @@ impl super::TurnEngine {
             game_state.can_place_card_in_zone(cid, Zone::SuccessLiveZone.to_str(), &p2_id)
         });
 
-        // Check for success zone replacement abilities (e.g. 錯覚CROSSROADS)
-        if player1_won && !p1_must_skip && p1_cards == 1 {
-            if let Some(card_id) = p1_top {
-                if Self::try_create_success_replacement_choice(game_state, card_id, &p1_id) {
-                    return;
-                }
-            }
-        }
-        if player2_won && !p2_must_skip && p2_cards == 1 {
-            if let Some(card_id) = p2_top {
-                if Self::try_create_success_replacement_choice(game_state, card_id, &p2_id) {
-                    return;
+        for (won, must_skip, cards_count, top, player_id) in [
+            (player1_won, p1_must_skip, p1_cards, p1_top, &p1_id),
+            (player2_won, p2_must_skip, p2_cards, p2_top, &p2_id),
+        ] {
+            if won && !must_skip && cards_count == 1 {
+                if let Some(card_id) = top {
+                    if Self::try_create_success_replacement_choice(game_state, card_id, player_id) {
+                        return;
+                    }
                 }
             }
         }

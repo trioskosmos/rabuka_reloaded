@@ -3461,18 +3461,10 @@ impl<'a> ConditionContext<'a> {
                 let player = self.resolve_condition_player(target);
                 let card_db = &self.game_state.card_database;
                 let location = condition.location.as_deref().unwrap_or("stage");
-                let cards: Vec<i16> = match Zone::from_str(location) {
-                    Some(Zone::Stage) => player
-                        .stage
-                        .stage
-                        .iter()
-                        .filter(|&&id| id != -1)
-                        .copied()
-                        .collect(),
-                    Some(Zone::Hand) => player.hand.cards.to_vec(),
-                    Some(Zone::Discard) | Some(Zone::Waitroom) => player.waitroom.cards.to_vec(),
-                    _ => vec![],
-                };
+                let mut cards = util::zone_card_ids(&player, location);
+                if Zone::from_str(location) == Some(Zone::Stage) {
+                    cards.retain(|&id| id != -1);
+                }
                 if cards.is_empty() {
                     return 0;
                 }
@@ -3515,20 +3507,10 @@ impl<'a> ConditionContext<'a> {
                 if !loc.is_empty() {
                     let player = self.resolve_condition_player(target);
                     let card_db = &self.game_state.card_database;
-                    let cards: Vec<i16> = match Zone::from_str(loc) {
-                        Some(Zone::Stage) => player
-                            .stage
-                            .stage
-                            .iter()
-                            .filter(|&&id| id != -1)
-                            .copied()
-                            .collect(),
-                        Some(Zone::Hand) => player.hand.cards.to_vec(),
-                        Some(Zone::Discard) | Some(Zone::Waitroom) => {
-                            player.waitroom.cards.to_vec()
-                        }
-                        _ => vec![],
-                    };
+                    let mut cards = util::zone_card_ids(&player, loc);
+                    if Zone::from_str(loc) == Some(Zone::Stage) {
+                        cards.retain(|&id| id != -1);
+                    }
                     let total: u32 = cards
                         .iter()
                         .filter(|&&id| {
@@ -3568,7 +3550,21 @@ impl<'a> ConditionContext<'a> {
                 let color = crate::zones::parse_heart_color(&clean);
                 let player = self.resolve_condition_player(target);
                 let card_db = &self.game_state.card_database;
-                // If position is specified, only count hearts for the card at that position
+                let sum_all = || -> u32 {
+                    player
+                        .stage
+                        .stage
+                        .iter()
+                        .filter(|&&id| id != -1)
+                        .map(|&id| {
+                            card_db
+                                .get_card(id)
+                                .and_then(|c| c.base_heart.as_ref())
+                                .map(|bh| bh.hearts.get(&color).copied().unwrap_or(0))
+                                .unwrap_or(0)
+                        })
+                        .sum()
+                };
                 let count = if let Some(ref pos) = condition.position {
                     if let Some(p) = pos.get_position() {
                         if let Some(idx) = util::stage_position_index(p) {
@@ -3583,52 +3579,13 @@ impl<'a> ConditionContext<'a> {
                                 0
                             }
                         } else {
-                            // No valid position index → sum all
-                            player
-                                .stage
-                                .stage
-                                .iter()
-                                .filter(|&&id| id != -1)
-                                .map(|&id| {
-                                    card_db
-                                        .get_card(id)
-                                        .and_then(|c| c.base_heart.as_ref())
-                                        .map(|bh| bh.hearts.get(&color).copied().unwrap_or(0))
-                                        .unwrap_or(0)
-                                })
-                                .sum()
+                            sum_all()
                         }
                     } else {
-                        // No position found → sum all
-                        player
-                            .stage
-                            .stage
-                            .iter()
-                            .filter(|&&id| id != -1)
-                            .map(|&id| {
-                                card_db
-                                    .get_card(id)
-                                    .and_then(|c| c.base_heart.as_ref())
-                                    .map(|bh| bh.hearts.get(&color).copied().unwrap_or(0))
-                                    .unwrap_or(0)
-                            })
-                            .sum()
+                        sum_all()
                     }
                 } else {
-                    // No position filter → sum all
-                    player
-                        .stage
-                        .stage
-                        .iter()
-                        .filter(|&&id| id != -1)
-                        .map(|&id| {
-                            card_db
-                                .get_card(id)
-                                .and_then(|c| c.base_heart.as_ref())
-                                .map(|bh| bh.hearts.get(&color).copied().unwrap_or(0))
-                                .unwrap_or(0)
-                        })
-                        .sum()
+                    sum_all()
                 };
                 return count;
             }

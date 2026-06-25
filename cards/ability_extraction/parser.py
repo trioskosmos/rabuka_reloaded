@@ -5166,7 +5166,7 @@ def _try_conditional_alternative(text):
                             alt_cond[key] = result["condition"][key]
                 result["alternative_condition"] = alt_cond
             at = at.replace(sec_text, "").strip().strip("、").strip()
-        secondary_m = re.search(r"(\d+)枚以上[いあ]る場合", at)
+        secondary_m = re.search(r"([^、。]*\d+)枚以上[いあ]る場合", at)
         if secondary_m:
             sec_text = secondary_m.group(0)
             alt_cond = parse_condition(sec_text)
@@ -8466,7 +8466,8 @@ def _normalize_effect_tree(effect, original_text=None):
     _collect_gain(effect, gain_nodes)
     for node in gain_nodes:
         if "gained_effect" not in node:
-            gained = parse_effect(node["ability_gain"])
+            clean_gain = re.sub(r"【[^】]+】", "", node["ability_gain"]).strip()
+            gained = parse_effect(clean_gain)
             if gained and gained.get("action") and gained.get("action") != "custom":
                 node["gained_effect"] = gained
 
@@ -9793,7 +9794,8 @@ def _fix_mari_gain_ability(data: Dict[str, Any], fix_stats: Dict[str, int]) -> N
         fix_stats["leak"] = fix_stats.get("leak", 0) + 1
         # Re-run enrichment: gained_effect from ability_gain text
         if "gained_effect" not in fixed and fixed.get("ability_gain"):
-            gained = parse_effect(fixed["ability_gain"])
+            clean_gain = re.sub(r"【[^】]+】", "", fixed["ability_gain"]).strip()
+            gained = parse_effect(clean_gain)
             if gained and gained.get("action") and gained.get("action") != "custom":
                 fixed["gained_effect"] = gained
 

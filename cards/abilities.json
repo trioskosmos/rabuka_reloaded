@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-26T02:28:39.582511",
+  "generated_at": "2026-06-26T03:17:45.353132",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1138,7 +1138,7 @@
         "ability_gain": "【常時】ライブの合計スコアを+1する。",
         "duration": "live_end",
         "gained_effect": {
-          "text": "【常時】ライブの合計スコアを+1する",
+          "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add"
@@ -1262,7 +1262,7 @@
           "蓮ノ空"
         ],
         "gained_effect": {
-          "text": "【常時】ライブの合計スコアを+1する",
+          "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add"
@@ -1671,7 +1671,7 @@
           "distinct": "card_name"
         },
         "gained_effect": {
-          "text": "【ライブ成功時】エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを+1する。ライブカードが3枚以上ある場合、代わりに合計スコアを+2する",
+          "text": "エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを+1する。ライブカードが3枚以上ある場合、代わりに合計スコアを+2する",
           "action": "conditional_alternative",
           "alternative_effect": {
             "text": "合計スコアを+2する",
@@ -1683,7 +1683,7 @@
             "type": "card_count_condition",
             "count": 1,
             "operator": ">=",
-            "text": "【ライブ成功時】エールにより公開された自分のカードの中にライブカードが1枚以上ある場合",
+            "text": "エールにより公開された自分のカードの中にライブカードが1枚以上ある場合",
             "location": "revealed_cards",
             "card_type": "live_card",
             "target": "self"
@@ -1692,13 +1692,13 @@
             "type": "card_count_condition",
             "count": 3,
             "operator": ">=",
-            "text": "3枚以上ある場合",
+            "text": "ライブカードが3枚以上ある場合",
+            "card_type": "live_card",
             "location": "revealed_cards",
             "target": "self"
           },
           "primary_effect": {
-            "text": "ライブの合計スコアを+1する。ライブカードが",
-            "card_type": "live_card",
+            "text": "ライブの合計スコアを+1する。",
             "action": "modify_score",
             "value": 1,
             "operation": "add"
@@ -2498,7 +2498,7 @@
         },
         "activation_position": "center",
         "gained_effect": {
-          "text": "【常時】ライブの合計スコアを+1する",
+          "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add"
@@ -2790,7 +2790,7 @@
         "ability_gain": "【常時】ライブの合計スコアを+1する。",
         "duration": "live_end",
         "gained_effect": {
-          "text": "【常時】ライブの合計スコアを+1する",
+          "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add"
@@ -4294,7 +4294,7 @@
             "ability_gain": "【常時】ライブの合計スコアを+1する。",
             "duration": "live_end",
             "gained_effect": {
-              "text": "【常時】ライブの合計スコアを+1する",
+              "text": "ライブの合計スコアを+1する",
               "action": "modify_score",
               "value": 1,
               "operation": "add"
@@ -11453,7 +11453,7 @@
               "ability_gain_trigger": "常時",
               "ability_gain": "【常時】ライブの合計スコアを+1する。",
               "gained_effect": {
-                "text": "【常時】ライブの合計スコアを+1する",
+                "text": "ライブの合計スコアを+1する",
                 "action": "modify_score",
                 "value": 1,
                 "operation": "add"
@@ -12878,7 +12878,7 @@
           "ability_gain": "【常時】ライブの合計スコアを+2する。",
           "activation_position": "center",
           "gained_effect": {
-            "text": "【常時】ライブの合計スコアを+2する",
+            "text": "ライブの合計スコアを+2する",
             "action": "modify_score",
             "value": 2,
             "operation": "add"
@@ -12919,7 +12919,7 @@
           "ability_gain": "【常時】ライブの合計スコアを+1する。",
           "activation_position": "center",
           "gained_effect": {
-            "text": "【常時】ライブの合計スコアを+1する",
+            "text": "ライブの合計スコアを+1する",
             "action": "modify_score",
             "value": 1,
             "operation": "add"
@@ -13320,7 +13320,7 @@
           "ability_gain_trigger": "常時",
           "ability_gain": "【常時】ライブの合計スコアを+1する。",
           "gained_effect": {
-            "text": "【常時】ライブの合計スコアを+1する",
+            "text": "ライブの合計スコアを+1する",
             "action": "modify_score",
             "value": 1,
             "operation": "add"
@@ -13742,7 +13742,7 @@
         "ability_gain": "【常時】ライブの合計スコアを+1する。",
         "duration": "live_end",
         "gained_effect": {
-          "text": "【常時】ライブの合計スコアを+1する",
+          "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add"
@@ -17921,7 +17921,7 @@
         "max": true,
         "duration": "live_end",
         "gained_effect": {
-          "text": "【常時】ライブの合計スコアを+1する",
+          "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add"
@@ -19747,7 +19747,7 @@
           "μ's"
         ],
         "gained_effect": {
-          "text": "【常時】ライブの合計スコアを+1する",
+          "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add"
@@ -20613,7 +20613,7 @@
           "手札のこのカードもこの効果で控え室に置ける。"
         ],
         "gained_effect": {
-          "text": "【常時】ライブの合計スコアを+3する",
+          "text": "ライブの合計スコアを+3する",
           "action": "modify_score",
           "value": 3,
           "operation": "add"
@@ -21309,7 +21309,7 @@
         "ability_gain_trigger": "常時",
         "ability_gain": "【常時】ライブの合計スコアを+1する。",
         "gained_effect": {
-          "text": "【常時】ライブの合計スコアを+1する",
+          "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
           "value": 1,
           "operation": "add"
@@ -30148,7 +30148,7 @@
             "ability_gain": "【ライブ成功時】カードを1枚引く。",
             "self_target": true,
             "gained_effect": {
-              "text": "【ライブ成功時】カードを1枚引く",
+              "text": "カードを1枚引く",
               "count": 1,
               "action": "draw_card",
               "source": "deck",
