@@ -929,6 +929,12 @@ pub struct AbilityEffect {
     pub timing_condition: Option<String>,
     #[serde(default)]
     pub self_target: Option<bool>,
+    /// When true, the resource (blade/heart) goes to the card(s) selected by
+    /// the preceding action in the same sequential chain, not to all matching
+    /// members on stage.  Used for patterns like "activated member + this card
+    /// each gain heart04" where two gain_resource actions split the targets.
+    #[serde(default)]
+    pub target_from_selection: Option<bool>,
     /// When true, this effect can place cards on occupied stage slots
     /// (replacing existing cards). Used for Q76-style rulings.
     #[serde(default)]

@@ -9064,7 +9064,52 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                                     break
                         if gns:
                             eff["group_names"] = gns
-                    fix_stats["compound_split"] += 1
+
+        # FIX 13: Split gain_resource that targets both "selected member + self"
+        # into two actions (one per target).  Detected by the text pattern:
+        #   "これによりアクティブにしたメンバーと、このメンバーは"
+        # The second gain_resource gets self_target:true (this card);
+        # the first keeps card_type=member_card (selected card via sequential flow).
+        if eff.get("action") == "sequential":
+            new_actions = []
+            for sub in eff.get("actions", []):
+                if (
+                    isinstance(sub, dict)
+                    and sub.get("action") == "gain_resource"
+                    and "これによりアクティブにしたメンバーと、このメンバーは"
+                    in sub.get("text", "")
+                ):
+                    heart_colors = sub.get("heart_colors", [])
+                    duration = sub.get("duration")
+                    sr = sub.get("resource", "heart")
+                    cnt = sub.get("count", 1)
+                    new_actions.append(
+                        {
+                            "action": "gain_resource",
+                            "resource": sr,
+                            "count": cnt,
+                            "heart_colors": list(heart_colors),
+                            "duration": duration,
+                            "target_from_selection": True,
+                        }
+                    )
+                    new_actions.append(
+                        {
+                            "action": "gain_resource",
+                            "resource": sr,
+                            "count": cnt,
+                            "heart_colors": list(heart_colors),
+                            "duration": duration,
+                            "self_target": True,
+                        }
+                    )
+                    continue
+                new_actions.append(sub)
+            if new_actions != eff.get("actions", []):
+                eff["actions"] = new_actions
+
+        # FIX 14: sequential chaining — infer select_cards → move_cards implied source
+        fix_stats["compound_split"] += 1
 
         # FIX 13: Auto abilities with no condition — extract from text
         if (

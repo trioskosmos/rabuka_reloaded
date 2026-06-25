@@ -808,7 +808,9 @@ impl AbilityResolver {
                 "[GAIN_RESOURCE] blade_targets computation starts ({} candidates)",
                 all_candidates.len()
             );
-            let blade_targets: Vec<i16> = if let Some(tgt_count) = tc {
+            let blade_targets: Vec<i16> = if effect.target_from_selection.unwrap_or(false) {
+                selected_for_current.clone()
+            } else if let Some(tgt_count) = tc {
                 if !selected_for_current.is_empty() {
                     selected_for_current
                         .iter()
@@ -833,58 +835,61 @@ impl AbilityResolver {
             let heart_color_inner = single_fixed_heart
                 .clone()
                 .or_else(|| effect.heart_colors.first().map(|s| s.to_string()));
-            let mut heart_targets: Vec<i16> =
-                if use_raw && !selected_for_current.is_empty() && effect.distinct.is_none() {
+            let mut heart_targets: Vec<i16> = if effect.target_from_selection.unwrap_or(false) {
+                // Explicitly target only the cards selected by the preceding
+                // sequential action (e.g. a change_state that activated a member).
+                selected_for_current
+            } else if use_raw && !selected_for_current.is_empty() && effect.distinct.is_none() {
+                selected_for_current
+            } else if use_raw {
+                all_selected.clone()
+            } else if resource == "heart" || resource == "ハート" {
+                let mut h = if !selected_for_current.is_empty() && effect.distinct.is_none() {
                     selected_for_current
-                } else if use_raw {
-                    all_selected.clone()
-                } else if resource == "heart" || resource == "ハート" {
-                    let mut h = if !selected_for_current.is_empty() && effect.distinct.is_none() {
-                        selected_for_current
-                    } else if !selected_for_current.is_empty()
-                        && effect.target_count.is_none()
-                        && effect.distinct.is_some()
-                    {
-                        // Saved action from distinct choice: target only the
-                        // NEWLY selected cards (after the pre-choice save point).
-                        if let Some(save_len) = self.selected_count_at_save {
-                            if save_len < selected_for_current.len() {
-                                selected_for_current[save_len..].to_vec()
-                            } else {
-                                selected_for_current
-                            }
+                } else if !selected_for_current.is_empty()
+                    && effect.target_count.is_none()
+                    && effect.distinct.is_some()
+                {
+                    // Saved action from distinct choice: target only the
+                    // NEWLY selected cards (after the pre-choice save point).
+                    if let Some(save_len) = self.selected_count_at_save {
+                        if save_len < selected_for_current.len() {
+                            selected_for_current[save_len..].to_vec()
                         } else {
                             selected_for_current
                         }
-                    } else if effect.card_type.is_none()
-                        && effect.group_names.is_none()
-                        && effect.characters.is_none()
-                        && effect.target_count.is_none()
-                        && effect.distinct.is_none()
-                        && !is_all
-                    {
-                        // No targeting info: default to activating card only.
-                        // Prevents heart from leaking to all stage members when
-                        // no card_type/group/characters/target_count filter is set.
-                        activating_card_id.map_or(vec![], |id| vec![id])
                     } else {
-                        util::matching_ids_filtered(
-                            util::zone_cards(player, Zone::Stage.to_str()),
-                            &card_db,
-                            &filter,
-                            true,
-                            if is_self_target { None } else { tc },
-                            dn,
-                            exclude,
-                        )
-                    };
-                    if effect.timing_condition.is_some() {
-                        h.retain(|&cid| appeared_ids.contains(&cid));
+                        selected_for_current
                     }
-                    h
+                } else if effect.card_type.is_none()
+                    && effect.group_names.is_none()
+                    && effect.characters.is_none()
+                    && effect.target_count.is_none()
+                    && effect.distinct.is_none()
+                    && !is_all
+                {
+                    // No targeting info: default to activating card only.
+                    // Prevents heart from leaking to all stage members when
+                    // no card_type/group/characters/target_count filter is set.
+                    activating_card_id.map_or(vec![], |id| vec![id])
                 } else {
-                    vec![]
+                    util::matching_ids_filtered(
+                        util::zone_cards(player, Zone::Stage.to_str()),
+                        &card_db,
+                        &filter,
+                        true,
+                        if is_self_target { None } else { tc },
+                        dn,
+                        exclude,
+                    )
                 };
+                if effect.timing_condition.is_some() {
+                    h.retain(|&cid| appeared_ids.contains(&cid));
+                }
+                h
+            } else {
+                vec![]
+            };
             if let Some(ref pos) = effect.position {
                 if let Some(p) = pos.get_position() {
                     if let Some(stage_idx) = util::stage_position_index(p) {

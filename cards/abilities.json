@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-25T23:05:26.551110",
+  "generated_at": "2026-06-25T23:50:46.823815",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -2866,16 +2866,24 @@
             "action": "change_state"
           },
           {
-            "text": "これによりアクティブにしたメンバーと、このメンバーは、それぞれ{{heart_04.png|heart04}}を得る",
-            "duration": "live_end",
-            "card_type": "member_card",
-            "multiple_targets": true,
             "action": "gain_resource",
             "resource": "heart",
             "count": 1,
             "heart_colors": [
               "heart04"
-            ]
+            ],
+            "duration": "live_end",
+            "target_from_selection": true
+          },
+          {
+            "action": "gain_resource",
+            "resource": "heart",
+            "count": 1,
+            "heart_colors": [
+              "heart04"
+            ],
+            "duration": "live_end",
+            "self_target": true
           }
         ],
         "conditional": true,
