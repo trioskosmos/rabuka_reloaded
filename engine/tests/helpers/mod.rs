@@ -5,7 +5,7 @@
 ///
 /// Filler cards (zero abilities, no ability triggers) are available in
 /// `tests/data/cards.json` and can be referenced by card_no.
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
@@ -80,9 +80,9 @@ pub fn card_id(db: &CardDatabase, card_no: &str) -> i16 {
 pub struct TestGame {
     pub db: Arc<CardDatabase>,
     pub state: GameState,
-    copy_pool: RefCell<HashMap<i16, Vec<i16>>>,
     debug_enabled: bool,
-    copy_counter: RefCell<i16>,
+    pool_positions: RefCell<HashMap<i16, usize>>,
+    internal_counter: Cell<i16>,
 }
 
 impl Drop for TestGame {
@@ -112,49 +112,51 @@ impl TestGame {
         state.turn_number = 1;
         rabuka_engine::ability::debug::set_debug(true);
 
-        // Clone the pre-seeded copy pool (once-populated, cheap per-test clone)
-        let copy_pool = PRELOADED.get().unwrap().pool.clone();
-
         TestGame {
             db: state.card_database.clone(),
             state,
-            copy_pool: RefCell::new(copy_pool),
             debug_enabled: true,
-            copy_counter: RefCell::new(20000),
+            pool_positions: RefCell::new(HashMap::new()),
+            internal_counter: Cell::new(20000),
         }
     }
 
     /// Look up a card's numeric ID by card_no in the database.
-    /// Returns a new unique copy_id each call (popped from the pre-created pool).
+    /// Returns a new unique copy_id each call.
     /// Each call returns a distinct ID so multiple copies of the same card on stage
     /// get per-card modifier tracking instead of sharing modifiers.
     /// Store the result in a variable if you need to reference the same card later.
     pub fn id(&self, card_no: &str) -> i16 {
         let template_id = card_id(&self.db, card_no);
-        self.copy_pool
-            .borrow_mut()
-            .get_mut(&template_id)
-            .and_then(|v| v.pop())
-            .unwrap_or(template_id)
+        let pool = &PRELOADED.get().unwrap().pool;
+        let mut positions = self.pool_positions.borrow_mut();
+        let pos = positions.entry(template_id).or_insert(0);
+        let id = pool
+            .get(&template_id)
+            .and_then(|v| v.get(*pos).copied())
+            .unwrap_or(template_id);
+        *pos += 1;
+        id
     }
 
     /// Get a NEW unique copy_id (different from `id()` and `id_ref()`).
-    /// Returns the template ID directly, matching the original behavior when
-    /// the 1-copy-per-template pool was empty after `id()` consumed it.
-    /// This preserves the original semantic: `new_id()` provides an ID that's
-    /// distinct from `id()` for the same card, but multiple `new_id()` calls
-    /// for the same card may return the same template ID.
+    /// Unlike `id()`, this uses the template ID when available or an
+    /// internal counter when more copies are needed than the pool provides.
     pub fn new_id(&self, card_no: &str) -> i16 {
         let template_id = card_id(&self.db, card_no);
-        self.copy_pool
-            .borrow_mut()
-            .get_mut(&template_id)
-            .and_then(|v| v.pop())
+        let pool = &PRELOADED.get().unwrap().pool;
+        let mut positions = self.pool_positions.borrow_mut();
+        let pos = positions.entry(template_id).or_insert(0);
+        let id = pool
+            .get(&template_id)
+            .and_then(|v| v.get(*pos).copied())
             .unwrap_or_else(|| {
-                let cid = *self.copy_counter.borrow();
-                *self.copy_counter.borrow_mut() = cid + 1;
+                let cid = self.internal_counter.get();
+                self.internal_counter.set(cid + 1);
                 cid
-            })
+            });
+        *pos += 1;
+        id
     }
 
     /// Get a stable reference ID for a card_no (always returns the same copy).
@@ -163,9 +165,11 @@ impl TestGame {
     /// after the card has been placed in a zone via `id()`.
     pub fn id_ref(&self, card_no: &str) -> i16 {
         let template_id = card_id(&self.db, card_no);
-        let pool = self.copy_pool.borrow();
+        let pool = &PRELOADED.get().unwrap().pool;
+        let positions = self.pool_positions.borrow();
+        let pos = positions.get(&template_id).copied().unwrap_or(0);
         pool.get(&template_id)
-            .and_then(|v| v.last().copied())
+            .and_then(|v| v.get(pos).copied())
             .unwrap_or(template_id)
     }
 

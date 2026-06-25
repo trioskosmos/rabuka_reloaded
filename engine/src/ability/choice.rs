@@ -263,6 +263,12 @@ impl super::resolver::AbilityResolver {
                 self.clear_choice_state(gs);
                 self.resume_execution(gs, context)
             }
+            (Some(Choice::SelectTarget { .. }), ChoiceResult::Skip) => {
+                // Skip the choice entirely — no option is executed.
+                gs.ability_queue.take_pending_actions();
+                self.clear_choice_state(gs);
+                self.resume_execution(gs, context)
+            }
             (
                 Some(Choice::SelectTarget { target, .. }),
                 ChoiceResult::TargetSelected { target: selected },

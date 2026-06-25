@@ -368,9 +368,17 @@ impl super::TurnEngine {
                             "primary".to_string()
                         }
                     }
-                    "choice" | "choice_string" | "conditional_optional" => card_id
-                        .map(|id| id.to_string())
-                        .unwrap_or_else(|| "0".into()),
+                    "choice" | "choice_string" | "conditional_optional" => {
+                        // card_id=None + card_indices absent/empty means skip
+                        if card_id.is_none()
+                            && card_indices.as_deref().map_or(true, |v| v.is_empty())
+                        {
+                            return Ok(crate::ability::types::ChoiceResult::Skip);
+                        }
+                        card_id
+                            .map(|id| id.to_string())
+                            .unwrap_or_else(|| "0".into())
+                    }
                     _ => {
                         // For position_change:opponent choices, use card_id as option index
                         // to look up the actual option string instead of the raw index.

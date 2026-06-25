@@ -1,2 +1,2 @@
 [alias]
-t = "test --no-fail-fast -- --test-threads=0"
+t = "test --no-fail-fast -- --test-threads=0 --quiet"

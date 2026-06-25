@@ -345,7 +345,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     .collect();
             }
             if target == "choice" {
-                return description
+                let mut actions: Vec<Action> = description
                     .split(" / ")
                     .enumerate()
                     .map(|(i, opt)| {
@@ -360,6 +360,17 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         )
                     })
                     .collect();
+                if *allow_skip {
+                    actions.push(make_action_params(
+                        ActionType::ChoiceSkip,
+                        "Skip",
+                        ActionParameters {
+                            card_no: Some("skip".to_string()),
+                            ..make_params()
+                        },
+                    ));
+                }
+                return actions;
             }
             if target == "primary|alternative" {
                 return vec![
