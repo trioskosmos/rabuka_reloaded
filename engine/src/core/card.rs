@@ -1490,6 +1490,10 @@ pub struct TriggerEvent {
     pub phase_target: Option<String>,
     pub recurrence: Option<String>,
     pub events: Option<Vec<TriggerEvent>>,
+    pub source: Option<String>,
+    pub destination: Option<String>,
+    pub from_state: Option<String>,
+    pub to_state: Option<String>,
 }
 
 /// Cost comparison for baton touch: e.g. "このメンバーよりコストが低い" (cost < activating).
@@ -1524,6 +1528,34 @@ impl Condition {
             exclude_group_names: self.exclude_group_names.as_ref(),
             ..Default::default()
         }
+    }
+
+    /// Helper: resolve `source` from the flat field (legacy JSON) or `trigger_event` (new JSON).
+    pub fn get_source(&self) -> Option<&str> {
+        self.source
+            .as_deref()
+            .or_else(|| self.trigger_event.as_ref()?.source.as_deref())
+    }
+
+    /// Helper: resolve `destination` from the flat field or `trigger_event`.
+    pub fn get_destination(&self) -> Option<&str> {
+        self.destination
+            .as_deref()
+            .or_else(|| self.trigger_event.as_ref()?.destination.as_deref())
+    }
+
+    /// Helper: resolve `from_state` from the flat field or `trigger_event`.
+    pub fn get_from_state(&self) -> Option<&str> {
+        self.from_state
+            .as_deref()
+            .or_else(|| self.trigger_event.as_ref()?.from_state.as_deref())
+    }
+
+    /// Helper: resolve `to_state` from the flat field or `trigger_event`.
+    pub fn get_to_state(&self) -> Option<&str> {
+        self.to_state
+            .as_deref()
+            .or_else(|| self.trigger_event.as_ref()?.to_state.as_deref())
     }
 }
 

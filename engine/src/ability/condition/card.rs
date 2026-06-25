@@ -252,8 +252,8 @@ impl<'a> ConditionContext<'a> {
                 .unwrap_or("=");
             let card_db = &self.game_state.card_database;
             let target = condition.target.as_deref().unwrap_or("self");
-            let sum_cost: i32 = if condition.source.as_deref() == Some("preceding_moved")
-                || condition.source.as_deref() == Some("previous_moved_cards")
+            let sum_cost: i32 = if condition.get_source() == Some("preceding_moved")
+                || condition.get_source() == Some("previous_moved_cards")
                 || condition.location.is_none()
             {
                 // When no explicit location, or source is preceding_moved,
@@ -1842,11 +1842,11 @@ impl<'a> ConditionContext<'a> {
             }
         };
 
-        let is_old_movement = condition.source.as_deref() == Some("preceding_moved")
-            || condition.source.as_deref() == Some("previous_moved_cards");
-        let is_new_movement = condition.source.as_deref().map_or(false, |s| {
+        let is_old_movement = condition.get_source() == Some("preceding_moved")
+            || condition.get_source() == Some("previous_moved_cards");
+        let is_new_movement = condition.get_source().map_or(false, |s| {
             s != "preceding_moved" && s != "previous_moved_cards"
-        }) && condition.destination.is_some();
+        }) && condition.get_destination().is_some();
 
         if is_old_movement || is_new_movement {
             let card_db = &self.game_state.card_database;
@@ -1857,7 +1857,7 @@ impl<'a> ConditionContext<'a> {
             // query turn_movements for all matching zone-transition events
             // this turn. For the old format (preceding_moved), use the
             // enqueue-time snapshot or recently_moved_cards.
-            let source_zone = condition.source.as_deref().unwrap_or("");
+            let source_zone = condition.get_source().unwrap_or("");
             // Build moved_source: for new format (source=zone+dst), prefer
             // turn_movements (has zone/player metadata for filtering).  When
             // turn_movements has any data, trust its filtered result (empty
@@ -1865,7 +1865,7 @@ impl<'a> ConditionContext<'a> {
             // Only fall back to the trigger-context card IDs when
             // turn_movements is completely empty (e.g. manual test setup).
             let moved_source: Vec<i16> = if is_new_movement {
-                let dest_zone = condition.destination.as_deref().unwrap_or("");
+                let dest_zone = condition.get_destination().unwrap_or("");
                 let target = condition.target.as_deref().unwrap_or("self");
                 let self_pl = self.resolve_condition_player(target);
                 let target_id = self_pl.id.as_str();
@@ -1982,14 +1982,16 @@ impl<'a> ConditionContext<'a> {
             // Determine destination zone for zone-transition filtering.
             // Prefer the explicit `destination` field (new pattern), then fall back
             // to inferring from locations (old pattern: location=source, locations contains dest).
-            let dest_zone: Option<String> = condition.destination.clone().or_else(|| {
-                condition.location.as_ref().and_then(|src| {
-                    condition
-                        .locations
-                        .as_ref()
-                        .and_then(|locs| locs.iter().find(|l| l.as_str() != src.as_str()).cloned())
-                })
-            });
+            let dest_zone: Option<String> = condition
+                .get_destination()
+                .map(|s| s.to_string())
+                .or_else(|| {
+                    condition.location.as_ref().and_then(|src| {
+                        condition.locations.as_ref().and_then(|locs| {
+                            locs.iter().find(|l| l.as_str() != src.as_str()).cloned()
+                        })
+                    })
+                });
             let moved_group_name = condition
                 .group_names
                 .as_ref()
@@ -2413,7 +2415,7 @@ impl<'a> ConditionContext<'a> {
     pub(crate) fn evaluate_card_blade_condition(&self, condition: &Condition) -> bool {
         let count = condition.count.unwrap_or(1);
         let operator = condition.operator.as_deref();
-        let source = condition.source.as_deref().unwrap_or("selected_cards");
+        let source = condition.get_source().unwrap_or("selected_cards");
         let cards: &[i16] = match source {
             "selected_cards" => self.selected_card_ids,
             "preceding_moved" => self.moved_cards,
@@ -3841,8 +3843,8 @@ impl<'a> ConditionContext<'a> {
         let exc = condition.exclude_characters.as_deref();
 
         // Preceding-moved path: check recently moved cards instead of a zone.
-        if condition.source.as_deref() == Some("preceding_moved")
-            || condition.source.as_deref() == Some("previous_moved_cards")
+        if condition.get_source() == Some("preceding_moved")
+            || condition.get_source() == Some("previous_moved_cards")
         {
             let moved_source: Vec<i16> = if self.moved_cards.is_empty() {
                 let enqueued = self.game_state.entry_trigger_moved_cards();

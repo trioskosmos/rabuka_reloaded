@@ -1376,43 +1376,34 @@ def _try_zone_placement(text):
     if m_from:
         source_text = text[: m_from.start()]
         if "控え室" in source_text:
-            result["source"] = "discard"
             result["trigger_event"]["source"] = "discard"
         elif "ライブカード置き場" in source_text:
-            result["source"] = "live_card_zone"
             result["trigger_event"]["source"] = "live_card_zone"
         elif "エネルギー置き場" in source_text:
-            result["source"] = "energy_zone"
             result["trigger_event"]["source"] = "energy_zone"
         elif "手札" in source_text or "手元" in source_text:
-            result["source"] = "hand"
             result["trigger_event"]["source"] = "hand"
         elif "ステージ" in source_text:
-            result["source"] = "stage"
             result["trigger_event"]["source"] = "stage"
     # Extract destination zone (between から and the verb) into `destination`
     dest_match = re.search(r"から(.+?)に(?:置かれ|加えられ|加わる|移され|送られ)", text)
     if dest_match:
         dest_text = dest_match.group(1)
         if "控え室" in dest_text:
-            result["destination"] = "discard"
             result["trigger_event"]["destination"] = "discard"
         elif "手札" in dest_text or "手元" in dest_text:
-            result["destination"] = "hand"
             result["trigger_event"]["destination"] = "hand"
         elif "ステージ" in dest_text:
-            result["destination"] = "stage"
             result["trigger_event"]["destination"] = "stage"
         elif "デッキ" in dest_text:
-            result["destination"] = "deck"
             result["trigger_event"]["destination"] = "deck"
     # Phase restriction: 自分のメインフェイズに / 相手のメインフェイズに
     if "メインフェイズ" in text:
-        result["phase"] = "main"
+        result["trigger_event"]["phase"] = "main"
         if "自分の" in text:
-            result["phase_target"] = "self"
+            result["trigger_event"]["phase_target"] = "self"
         elif "相手の" in text:
-            result["phase_target"] = "opponent"
+            result["trigger_event"]["phase_target"] = "opponent"
     # Remove location/locations — source+destination carry the zone info
     result.pop("location", None)
     result.pop("locations", None)
@@ -1761,23 +1752,19 @@ def _try_state_change(text):
 
     # Detect direction
     if "ウェイト状態になった" in text or "アクティブ状態から" in text:
-        result["from_state"] = "active"
-        result["to_state"] = "wait"
         result["trigger_event"]["from_state"] = "active"
         result["trigger_event"]["to_state"] = "wait"
     else:
         # Wait → active (e.g. ウェイト状態の...アクティブ状態になった)
-        result["from_state"] = "wait"
-        result["to_state"] = "active"
         result["trigger_event"]["from_state"] = "wait"
         result["trigger_event"]["to_state"] = "active"
 
     if "メインフェイズ" in text:
-        result["phase"] = "main"
+        result["trigger_event"]["phase"] = "main"
         if "自分の" in text:
-            result["phase_target"] = "self"
+            result["trigger_event"]["phase_target"] = "self"
         elif "相手の" in text:
-            result["phase_target"] = "opponent"
+            result["trigger_event"]["phase_target"] = "opponent"
 
     # Extract target (self/opponent/both)
     tgt = extract_target(text)

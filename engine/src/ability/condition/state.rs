@@ -741,10 +741,7 @@ impl<'a> ConditionContext<'a> {
         if _during_main_phase && self.game_state.current_phase != Phase::Main {
             return false;
         }
-        if let (Some(from), Some(to)) = (
-            condition.from_state.as_deref(),
-            condition.to_state.as_deref(),
-        ) {
+        if let (Some(from), Some(to)) = (condition.get_from_state(), condition.get_to_state()) {
             if let Some(target_count) = condition.count {
                 if condition.operator.as_deref() == Some(">=") {
                     let actual = self.game_state.last_state_change_wait_to_active_count;

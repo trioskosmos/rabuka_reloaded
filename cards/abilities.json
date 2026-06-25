@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-25T08:26:09.684401",
+  "generated_at": "2026-06-25T08:34:45.285859",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -4359,9 +4359,7 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true,
-          "source": "stage",
-          "destination": "discard"
+          "self_target": true
         }
       }
     },
@@ -5158,9 +5156,7 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true,
-          "source": "stage",
-          "destination": "discard"
+          "self_target": true
         },
         "count": 1,
         "card_type": "member_card",
@@ -5619,9 +5615,7 @@
             "Aqours"
           ],
           "target": "self",
-          "card_type": "live_card",
-          "source": "live_card_zone",
-          "destination": "discard"
+          "card_type": "live_card"
         },
         "source": "those_cards",
         "destination": "deck_top_or_bottom",
@@ -8704,9 +8698,7 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true,
-          "source": "stage",
-          "destination": "discard"
+          "self_target": true
         },
         "count": 1,
         "card_type": "member_card",
@@ -10463,9 +10455,7 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true,
-          "source": "stage",
-          "destination": "discard"
+          "self_target": true
         },
         "group_names": [
           "Aqours"
@@ -13371,8 +13361,6 @@
             "from_state": "active",
             "to_state": "wait"
           },
-          "from_state": "active",
-          "to_state": "wait",
           "target": "opponent",
           "location": "stage",
           "card_type": "member_card",
@@ -15190,8 +15178,6 @@
           "negation": true,
           "temporal": "this_turn",
           "temporal_scope": "this_turn",
-          "source": "live_card_zone",
-          "destination": "discard",
           "card_property": "has_blade_heart"
         },
         "action": "sequential",
@@ -21745,9 +21731,7 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true,
-          "source": "stage",
-          "destination": "discard"
+          "self_target": true
         },
         "look_action": {
           "text": "自分のデッキの上からカードを5枚見る。",
@@ -21793,9 +21777,7 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true,
-          "source": "stage",
-          "destination": "discard"
+          "self_target": true
         },
         "look_action": {
           "text": "自分のデッキの上からカードを5枚見る。",
@@ -21873,9 +21855,7 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true,
-          "source": "stage",
-          "destination": "discard"
+          "self_target": true
         },
         "action": "sequential",
         "actions": [
@@ -23651,8 +23631,6 @@
             "from_state": "wait",
             "to_state": "active"
           },
-          "from_state": "wait",
-          "to_state": "active",
           "count": 3,
           "operator": ">=",
           "unit": "人",
@@ -24321,12 +24299,10 @@
           "trigger_event": {
             "type": "state_change",
             "from_state": "active",
-            "to_state": "wait"
+            "to_state": "wait",
+            "phase": "main",
+            "phase_target": "self"
           },
-          "from_state": "active",
-          "to_state": "wait",
-          "phase": "main",
-          "phase_target": "self",
           "target": "self",
           "card_type": "member_card",
           "self_target": true
@@ -24533,14 +24509,12 @@
           "trigger_event": {
             "type": "zone_change",
             "source": "discard",
-            "destination": "hand"
+            "destination": "hand",
+            "phase": "main",
+            "phase_target": "self"
           },
           "target": "self",
-          "self_target": true,
-          "source": "discard",
-          "destination": "hand",
-          "phase": "main",
-          "phase_target": "self"
+          "self_target": true
         }
       }
     },
@@ -30645,9 +30619,7 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true,
-          "source": "stage",
-          "destination": "discard"
+          "self_target": true
         }
       }
     },
@@ -30701,9 +30673,7 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true,
-          "source": "stage",
-          "destination": "discard"
+          "self_target": true
         },
         "heart_colors": [
           "heart05"
@@ -30734,9 +30704,7 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true,
-          "source": "stage",
-          "destination": "discard"
+          "self_target": true
         },
         "action": "sequential",
         "actions": [
