@@ -2515,6 +2515,50 @@ impl<'a> ConditionContext<'a> {
                         push_rich("ステージ空", false);
                         return false;
                     }
+                    // Self-trigger guard: when the condition has NO card-
+                    // targeting filters (group_names, cost_limit, card_type,
+                    // characters), it can only be "このメンバーが登場" (this
+                    // member appears). For those conditions, the scanned card
+                    // must have actually appeared this turn.
+                    let has_card_filters = condition
+                        .group_names
+                        .as_ref()
+                        .map_or(false, |g| !g.is_empty())
+                        || condition.cost_limit.is_some()
+                        || condition.card_type.is_some()
+                        || condition
+                            .characters
+                            .as_ref()
+                            .map_or(false, |c| !c.is_empty());
+                    if !baton_touch_trigger
+                        && !has_card_filters
+                        && !self.game_state.cards_appeared_this_turn.is_empty()
+                    {
+                        let self_appeared = self.activating_card_id.is_some_and(|cid| {
+                            self.game_state.has_card_appeared_this_turn(cid)
+                                && stage_ids.contains(&cid)
+                        });
+                        if !self_appeared {
+                            push_rich("自カード未登場", false);
+                            return false;
+                        }
+                    }
+                    // Generalized self-trigger guard: when cost_limit or card_type filters
+                    // are set, prevent the activating card from triggering on its own appearance
+                    // (the same logic as the group_names guard below).
+                    if !baton_touch_trigger
+                        && !self.game_state.cards_appeared_this_turn.is_empty()
+                        && (condition.cost_limit.is_some() || condition.card_type.is_some())
+                    {
+                        let has_other_appeared = stage_ids.iter().any(|&cid| {
+                            self.activating_card_id.map_or(true, |act_id| cid != act_id)
+                                && self.game_state.has_card_appeared_this_turn(cid)
+                        });
+                        if !has_other_appeared {
+                            push_rich("自カードのみ登場", false);
+                            return false;
+                        }
+                    }
                     let filled_count = player.stage.stage.iter().filter(|&&id| id != -1).count();
                     if condition.all_areas.unwrap_or(false) && filled_count != 3 {
                         push_rich(&format!("全エリア未充足({}/3)", filled_count), false);
@@ -2548,22 +2592,6 @@ impl<'a> ConditionContext<'a> {
                             util::card_matches_type(&self.game_state.card_database, cid, Some(ct))
                         }) {
                             push_rich(&format!("カード種別不一致(type={})", ct), false);
-                            return false;
-                        }
-                    }
-                    // Generalized self-trigger guard: when cost_limit or card_type filters
-                    // are set, prevent the activating card from triggering on its own appearance
-                    // (the same logic as the group_names guard below).
-                    if !baton_touch_trigger
-                        && !self.game_state.cards_appeared_this_turn.is_empty()
-                        && (condition.cost_limit.is_some() || condition.card_type.is_some())
-                    {
-                        let has_other_appeared = stage_ids.iter().any(|&cid| {
-                            self.activating_card_id.map_or(true, |act_id| cid != act_id)
-                                && self.game_state.has_card_appeared_this_turn(cid)
-                        });
-                        if !has_other_appeared {
-                            push_rich("自カードのみ登場", false);
                             return false;
                         }
                     }

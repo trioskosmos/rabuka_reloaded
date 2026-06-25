@@ -27,6 +27,8 @@ pub struct ConditionContext<'a> {
     pub activating_card_id: Option<i16>,
     pub moved_cards: &'a [i16],
     pub selected_card_ids: &'a [i16],
+    /// Whether a position change occurred this turn (fallback for snapshot).
+    pub position_change_occurred: bool,
     /// Cached player reference for "self" target — resolved once at creation.
     self_player: Option<&'a crate::player::Player>,
 }
@@ -65,6 +67,7 @@ impl<'a> ConditionContext<'a> {
             activating_card_id,
             moved_cards: &[],
             selected_card_ids: &[],
+            position_change_occurred: game_state.position_change_occurred_this_turn,
             self_player: Self::resolve_self_player(game_state),
         }
     }
@@ -79,6 +82,7 @@ impl<'a> ConditionContext<'a> {
             activating_card_id,
             moved_cards,
             selected_card_ids: &[],
+            position_change_occurred: game_state.position_change_occurred_this_turn,
             self_player: Self::resolve_self_player(game_state),
         }
     }
@@ -94,6 +98,7 @@ impl<'a> ConditionContext<'a> {
             activating_card_id,
             moved_cards,
             selected_card_ids,
+            position_change_occurred: game_state.position_change_occurred_this_turn,
             self_player: Self::resolve_self_player(game_state),
         }
     }

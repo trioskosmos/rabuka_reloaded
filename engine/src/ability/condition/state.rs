@@ -443,13 +443,22 @@ impl<'a> ConditionContext<'a> {
                 true
             }
             "position_change" => {
-                let snapshot = self
+                let snapshot_opt = self
                     .game_state
                     .entry_snapshot_stage_positions()
                     .or_else(|| self.game_state.stage_position_snapshot.as_ref());
-                let snapshot = match snapshot {
-                    Some(s) => s,
-                    None => return false,
+                let snapshot = match snapshot_opt {
+                    Some(s) => Some(s),
+                    None => {
+                        // Fallback: no snapshot available (e.g. TAS scan in
+                        // resume_queue_with_choice after sub-choices cleared it).
+                        // Use position_change_occurred + cards_moved_this_turn
+                        // as secondary signal, matching what "moves" does.
+                        if !self.position_change_occurred {
+                            return false;
+                        }
+                        None
+                    }
                 };
                 let card_db = &self.game_state.card_database;
                 let position_changed =
@@ -480,8 +489,20 @@ impl<'a> ConditionContext<'a> {
                             {
                                 return false;
                             }
-                            let old_pos = snapshot.get(&cid);
-                            let has_moved = old_pos.is_some_and(|&old| old != new_pos);
+                            let has_moved = match snapshot {
+                                Some(snap) => {
+                                    // Snapshot comparison: check if this card's
+                                    // position differs from the pre-move snapshot.
+                                    let old_pos = snap.get(&cid);
+                                    old_pos.is_some_and(|&old| old != new_pos)
+                                }
+                                None => {
+                                    // Fallback: no snapshot — check
+                                    // cards_moved_this_turn for a persistent
+                                    // signal that this card moved areas.
+                                    self.game_state.has_card_moved_this_turn(cid)
+                                }
+                            };
                             if !has_moved {
                                 return false;
                             }
@@ -493,7 +514,10 @@ impl<'a> ConditionContext<'a> {
                             {
                                 let pos_names = ["left_side", "center", "right_side"];
                                 let check_pos = if is_from {
-                                    *old_pos.unwrap_or(&usize::MAX)
+                                    match snapshot {
+                                        Some(snap) => *snap.get(&cid).unwrap_or(&usize::MAX),
+                                        None => usize::MAX, // can't determine source in fallback
+                                    }
                                 } else {
                                     new_pos
                                 };
@@ -832,10 +856,25 @@ impl<'a> ConditionContext<'a> {
                 let snapshot = self
                     .game_state
                     .entry_snapshot_stage_positions()
-                    .or_else(|| self.game_state.stage_position_snapshot.as_ref())?;
-                let old_pos = snapshot.get(&cid)?;
-                let new_pos = player.stage.stage.iter().position(|&id| id == cid)?;
-                Some(*old_pos != new_pos)
+                    .or_else(|| self.game_state.stage_position_snapshot.as_ref());
+                match snapshot {
+                    Some(snap) => {
+                        let old_pos = snap.get(&cid)?;
+                        let new_pos = player.stage.stage.iter().position(|&id| id == cid)?;
+                        Some(*old_pos != new_pos)
+                    }
+                    None => {
+                        // Fallback: no snapshot — use position_change_occurred
+                        // + cards_moved_this_turn as secondary signal.
+                        if self.position_change_occurred
+                            && self.game_state.has_card_moved_this_turn(cid)
+                        {
+                            Some(true)
+                        } else {
+                            None
+                        }
+                    }
+                }
             })
             .unwrap_or(false);
 

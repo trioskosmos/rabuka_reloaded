@@ -835,6 +835,13 @@ impl super::TurnEngine {
                 // Must run AFTER complete_current() to match process_current_ability ordering.
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
+                // Ensure stage_position_snapshot is set before TAS scan so
+                // "position_change" movement conditions can detect swaps.
+                // May have been cleared by intervening process_current_ability calls
+                // during the sub-choice cycle (before the final choice resolves).
+                if game_state.stage_position_snapshot.is_none() {
+                    game_state.stage_position_snapshot = Some(game_state.capture_stage_positions());
+                }
                 let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
                 if (game_state.recently_moved_cards.is_some()
                     || game_state.last_energy_placed_by_effect())
@@ -843,6 +850,7 @@ impl super::TurnEngine {
                     let event = crate::ability::types::TriggerEvent {
                         moved_cards: game_state.recently_moved_cards.clone().unwrap_or_default(),
                         moved_from_zone: game_state.recently_moved_from_zone.clone(),
+                        position_change_occurred: game_state.position_change_occurred_this_turn,
                         energy_placed_by_effect: game_state.last_energy_placed_by_effect(),
                         energy_placed_by_player: game_state
                             .last_energy_placed_by_player()
@@ -861,6 +869,10 @@ impl super::TurnEngine {
             } else {
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
+                // Ensure stage_position_snapshot is set before TAS scan.
+                if game_state.stage_position_snapshot.is_none() {
+                    game_state.stage_position_snapshot = Some(game_state.capture_stage_positions());
+                }
                 let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
                 if (game_state.recently_moved_cards.is_some()
                     || game_state.last_energy_placed_by_effect())
@@ -869,6 +881,7 @@ impl super::TurnEngine {
                     let event = crate::ability::types::TriggerEvent {
                         moved_cards: game_state.recently_moved_cards.clone().unwrap_or_default(),
                         moved_from_zone: game_state.recently_moved_from_zone.clone(),
+                        position_change_occurred: game_state.position_change_occurred_this_turn,
                         energy_placed_by_effect: game_state.last_energy_placed_by_effect(),
                         energy_placed_by_player: game_state
                             .last_energy_placed_by_player()

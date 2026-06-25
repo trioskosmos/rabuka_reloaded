@@ -1274,6 +1274,7 @@ impl GameState {
                 let event = crate::ability::types::TriggerEvent {
                     moved_cards: self.recently_moved_cards.clone().unwrap_or_default(),
                     moved_from_zone: self.recently_moved_from_zone.clone(),
+                    position_change_occurred: self.position_change_occurred_this_turn,
                     energy_placed_by_effect: self.last_energy_placed_by_effect(),
                     energy_placed_by_player: self
                         .last_energy_placed_by_player()

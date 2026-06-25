@@ -351,11 +351,12 @@
 
 .game-board.both-mode .energy-area-container {
     height: auto;
-    min-height: calc(var(--card-h-compact) + 6px);
+    min-height: calc(var(--card-h-compact) * 0.5 + 4px);
 }
 
-.game-board.both-mode .energy-row-hud .card.energy {
-    --card-h: clamp(28px, 4dvh, 48px);
+.game-board.both-mode .energy-pip {
+    width: calc(var(--card-w-compact) * 0.5);
+    height: calc(var(--card-h-compact) * 0.5);
 }
 
 /* Stage takes remaining space */
