@@ -1,6 +1,6 @@
 use super::super::resolver::AbilityResolver;
 use super::super::util;
-use crate::card::AbilityEffect;
+use crate::card::{Ability, AbilityEffect};
 use crate::game_state::GameState;
 
 impl AbilityResolver {
@@ -21,7 +21,14 @@ impl AbilityResolver {
                 }
             })
             .unwrap_or("");
-        self.execute_gain_ability(gs, text, effect.target_name(), effect.duration.as_deref())
+        self.execute_gain_ability(
+            gs,
+            text,
+            effect.target_name(),
+            effect.duration.as_deref(),
+            effect.gained_effect.clone(),
+            effect.ability_gain_trigger.as_deref(),
+        )
     }
 
     pub(crate) fn execute_set_card_identity_effect(
@@ -196,6 +203,8 @@ impl AbilityResolver {
         ability_text: &str,
         target: &str,
         duration: Option<&str>,
+        gained_effect: Option<Box<AbilityEffect>>,
+        trigger: Option<&str>,
     ) -> Result<(), String> {
         // Store the gained ability for tracking purposes
         if let Some(card_id) = gs.activating_card {
@@ -205,18 +214,26 @@ impl AbilityResolver {
                 .push(ability_text.to_string());
         }
 
-        // If the parser provided a pre-parsed gained_effect, execute it directly.
-        // This handles the common "score +X" pattern generically (any value).
-        if let Some(gained) = self
-            .current_effect
-            .as_ref()
-            .and_then(|e| e.gained_effect.clone())
-        {
-            log::debug!(
-                "[GAINED_ABILITY] Executing gained effect: {:?}",
-                gained.action
-            );
-            self.execute_effect(gs, &gained)?;
+        // LIVE_SUCCESS trigger → store as a proper Ability so the trigger pipeline
+        // picks it up.  For all other triggers (or no trigger) preserve the original
+        // behaviour: fall back to the text-based score-modifier parsing below.
+        if trigger == Some(crate::triggers::LIVE_SUCCESS) {
+            if let (Some(gained), Some(card_id)) = (gained_effect, gs.activating_card) {
+                let gained_ability = Ability {
+                    full_text: ability_text.to_string(),
+                    triggerless_text: ability_text.to_string(),
+                    triggers: Some(crate::triggers::LIVE_SUCCESS.to_string()),
+                    use_limit: None,
+                    is_null: false,
+                    cost: None,
+                    effect: Some(*gained),
+                    keywords: None,
+                };
+                gs.gained_card_abilities
+                    .entry(card_id)
+                    .or_default()
+                    .push(gained_ability);
+            }
         } else {
             // Fallback: parse value from the gained ability text
             if let Some(val) = ability_text.split('+').nth(1).and_then(|s| {

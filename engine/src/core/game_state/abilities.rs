@@ -539,6 +539,7 @@ impl GameState {
                 self.find_card_by_number_for_player(card_no, &player_id)
             };
             if let Some(card) = card {
+                // Check original abilities
                 for (ability_index, ability) in card.abilities.iter().enumerate() {
                     if Self::ability_matches_trigger(ability, &trigger_type)
                         && ability_id.contains(&ability.full_text)
@@ -577,7 +578,47 @@ impl GameState {
                             );
                         }
                         self.ability_queue.enqueue(entry);
-                        break;
+                        return;
+                    }
+                }
+                // Check gained card abilities (ability_id format: "card_no_gained_{idx}")
+                if ability_id.contains("_gained_") {
+                    let cid = card_id.or(explicit_card_id);
+                    if let Some(card_id_val) = cid {
+                        if let Some(gained_list) = self.gained_card_abilities.get(&card_id_val) {
+                            // Extract the gained index from ability_id
+                            if let Some(idx_str) = ability_id.rsplit('_').next() {
+                                if let Ok(gidx) = idx_str.parse::<usize>() {
+                                    if let Some(gained_ability) = gained_list.get(gidx) {
+                                        if Self::ability_matches_trigger(
+                                            gained_ability,
+                                            &trigger_type,
+                                        ) {
+                                            let entry = self.build_ability_queue_entry(
+                                                card_no.clone(),
+                                                10000 + gidx,
+                                                gained_ability.clone(),
+                                                Some(card_id_val),
+                                                player_id.clone(),
+                                                trigger_type,
+                                                trigger_moved_cards.clone(),
+                                                triggering_member_id,
+                                            );
+                                            let mut entry = entry;
+                                            entry.snapshot_movements = self.batch_movements.clone();
+                                            entry.snapshot_energy_placed_by_effect =
+                                                self.last_energy_placed_by_effect();
+                                            entry.snapshot_energy_placed_by_player = self
+                                                .last_energy_placed_by_player()
+                                                .map(|s| s.to_string());
+                                            entry.snapshot_stage_positions =
+                                                self.stage_position_snapshot.clone();
+                                            self.ability_queue.enqueue(entry);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2097,32 +2138,42 @@ impl GameState {
                 }
                 s if s.starts_with("gain_ability:") => {
                     let ability_text = s.trim_start_matches("gain_ability:");
-                    // Revert gained score modifier if any
-                    if let Some(val) = ability_text.split('+').nth(1).and_then(|s| {
-                        s.chars()
-                            .take_while(|c| c.is_ascii_digit())
-                            .collect::<String>()
-                            .parse::<i32>()
-                            .ok()
-                    }) {
-                        // Scan for card modifications to remove this score bonus
-                        // Since temporary effects might not store card_id in some paths, check the gained_abilities keys
-                        let mut card_to_revert = None;
-                        for (&cid, abilities) in &self.gained_abilities {
-                            if abilities.contains(&ability_text.to_string()) {
-                                card_to_revert = Some(cid);
+                    // Find the card that has this gained ability
+                    let mut card_to_clear = None;
+                    for (&cid, abilities) in &self.gained_abilities {
+                        if abilities.contains(&ability_text.to_string()) {
+                            card_to_clear = Some(cid);
+                            break;
+                        }
+                    }
+                    // Also check gained_card_abilities for the card
+                    if card_to_clear.is_none() {
+                        for (&cid, abils) in &self.gained_card_abilities {
+                            if abils.iter().any(|a| {
+                                a.triggerless_text == ability_text || a.full_text == ability_text
+                            }) {
+                                card_to_clear = Some(cid);
                                 break;
                             }
                         }
-                        if let Some(card_id) = card_to_revert {
+                    }
+                    if let Some(card_id) = card_to_clear {
+                        // Revert gained score modifier if any
+                        if let Some(val) = ability_text.split('+').nth(1).and_then(|s| {
+                            s.chars()
+                                .take_while(|c| c.is_ascii_digit())
+                                .collect::<String>()
+                                .parse::<i32>()
+                                .ok()
+                        }) {
                             self.mods.remove_score_modifier(card_id, val);
-                            self.clear_gained_abilities_for_card(card_id);
                             log::debug!(
                                 "Reverted gained ability score modifier +{} for card {}",
                                 val,
                                 card_id
                             );
                         }
+                        self.clear_gained_abilities_for_card(card_id);
                     }
                 }
                 "set_heart_type" => {

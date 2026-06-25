@@ -1031,6 +1031,7 @@ impl GameState {
 
     pub fn remove_gained_abilities(&mut self, card_id: i16) {
         self.gained_abilities.remove(&card_id);
+        self.gained_card_abilities.remove(&card_id);
     }
 
     pub fn has_gained_ability(&self, card_id: i16, ability_type: &str) -> bool {
@@ -1041,6 +1042,7 @@ impl GameState {
 
     pub fn clear_gained_abilities_for_card(&mut self, card_id: i16) {
         self.gained_abilities.remove(&card_id);
+        self.gained_card_abilities.remove(&card_id);
     }
 
     /// Evaluate all constant (常時) `modify_required_hearts` abilities on cards

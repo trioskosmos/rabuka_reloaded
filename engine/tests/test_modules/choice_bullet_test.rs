@@ -1,6 +1,10 @@
 /// Choice/Bullet-point cards — engine fix validation.
 use crate::helpers::*;
+use rabuka_engine::card::{BaseHeart, HeartColor};
+use rabuka_engine::core::types::Phase;
+use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
+use std::collections::HashMap;
 
 fn fill_decks(game: &mut TestGame) {
     let filler = game.id("PL!-sd1-010-SD");
@@ -394,10 +398,131 @@ fn dia_position_change_two_saintsnow_both_selectable() {
     );
     assert_eq!(
         game.state.player1.stage.stage[1], seira1,
-        "Center should have 理亞1 (moved from left)"
+        "Center should have \u{7406}\u{4e9c}1 (moved from left)"
     );
     assert_eq!(
         game.state.player1.stage.stage[2], dia,
         "Right should still have Dia"
+    );
+}
+
+/// Trigger a card's ability directly by trigger type.
+fn trigger_ability(game: &mut TestGame, card_id: i16, trigger_str: &str) {
+    let card = game.db.get_card(card_id).unwrap();
+    let ab = card
+        .abilities
+        .iter()
+        .find(|a| a.triggers.as_deref() == Some(trigger_str))
+        .cloned()
+        .unwrap();
+    let pid = game.state.player1.id.clone();
+    let trigger = match trigger_str {
+        "ライブ開始時" => rabuka_engine::core::types::AbilityTrigger::LiveStart,
+        _ => rabuka_engine::core::types::AbilityTrigger::Auto,
+    };
+    game.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ab.full_text),
+        trigger,
+        pid.clone(),
+        Some(card.card_no.clone()),
+        Some(card_id),
+        None,
+        None,
+    );
+    game.state.activating_card = Some(card_id);
+    game.state.process_pending_auto_abilities(&pid);
+}
+
+/// Bouken (PL!S-bp6-020-L): LiveStart → choose gain_ability → LiveSuccess draws.
+#[test]
+fn bouken_gain_ability_draws_on_live_success() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let bouken = game.id("PL!S-bp6-020-L");
+    let aqours = game.id("PL!S-bp2-001-R");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    fill_decks(&mut game);
+    let initial_hand = game.state.player1.hand.cards.len();
+    game.state.player1.live_card_zone.cards.push(bouken);
+    game.state.player1.stage.stage = [aqours, filler, -1];
+
+    trigger_ability(&mut game, bouken, "ライブ開始時");
+
+    // The LiveStart choice should appear
+    while game.state.has_pending_choice() {
+        game.select_option(0);
+    }
+
+    assert!(
+        game.state.gained_card_abilities.contains_key(&bouken),
+        "Gained ability should be stored"
+    );
+    let gained = &game.state.gained_card_abilities[&bouken];
+    assert_eq!(gained.len(), 1);
+    assert_eq!(
+        gained[0].triggers.as_deref(),
+        Some(rabuka_engine::triggers::LIVE_SUCCESS),
+        "Trigger should be LIVE_SUCCESS"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        initial_hand,
+        "No draw at LiveStart"
+    );
+
+    // Trigger LiveSuccess with hearts
+    game.state.current_phase = Phase::LiveVictoryDetermination;
+    let mut h = BaseHeart {
+        hearts: HashMap::new(),
+    };
+    h.hearts.insert(HeartColor::Heart00, 20);
+    game.state.player1.stage_hearts = Some(h);
+
+    TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
+    game.state.process_pending_auto_abilities("p1");
+
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        initial_hand + 1,
+        "Draw on LiveSuccess"
+    );
+    assert!(
+        game.state.gained_card_abilities.contains_key(&bouken),
+        "Gained ability persists after LiveSuccess"
+    );
+}
+
+/// Bouken: LiveStart → gain_ability → no hearts → no draw.
+#[test]
+fn bouken_gain_ability_no_draw_on_failed_live() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let bouken = game.id("PL!S-bp6-020-L");
+    let aqours = game.id("PL!S-bp2-001-R");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    fill_decks(&mut game);
+    let initial_hand = game.state.player1.hand.cards.len();
+    game.state.player1.live_card_zone.cards.push(bouken);
+    game.state.player1.stage.stage = [aqours, filler, -1];
+
+    trigger_ability(&mut game, bouken, "ライブ開始時");
+
+    while game.state.has_pending_choice() {
+        game.select_option(0);
+    }
+
+    assert!(game.state.gained_card_abilities.contains_key(&bouken));
+
+    // No hearts → LiveSuccess should not trigger
+    game.state.current_phase = Phase::LiveVictoryDetermination;
+    TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
+    game.state.process_pending_auto_abilities("p1");
+
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        initial_hand,
+        "No draw on failed live"
     );
 }

@@ -89,6 +89,8 @@ impl AbilityResolver {
                 text,
                 effect.target.as_deref().unwrap_or("self"),
                 effect.duration.as_deref(),
+                effect.gained_effect.clone(),
+                effect.ability_gain_trigger.as_deref(),
             );
         }
 

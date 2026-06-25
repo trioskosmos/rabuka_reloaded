@@ -539,6 +539,7 @@ impl super::TurnEngine {
                 let card_id = player.stage.stage[index];
                 if card_id != -1 && !skip_negated(game_state, card_id) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
+                        let card_no = card.card_no.clone();
                         for (aidx, ability) in card.abilities.iter().enumerate() {
                             if ability
                                 .triggers
@@ -565,12 +566,44 @@ impl super::TurnEngine {
                                         "result": "pending"
                                     })),
                                 });
-                                let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                                abilities_to_trigger.push((
-                                    ability_id,
-                                    card.card_no.clone(),
-                                    card_id,
-                                ));
+                                let ability_id = format!("{}_{}", card_no, ability.full_text);
+                                abilities_to_trigger.push((ability_id, card_no.clone(), card_id));
+                            }
+                        }
+                        // Also check gained card abilities
+                        if let Some(gained_list) = game_state.gained_card_abilities.get(&card_id) {
+                            for (gidx, gained_ability) in gained_list.iter().enumerate() {
+                                if gained_ability
+                                    .triggers
+                                    .as_ref()
+                                    .is_some_and(|t| t == crate::triggers::LIVE_SUCCESS)
+                                {
+                                    if !seen.insert((card_id, 10000 + gidx)) {
+                                        continue;
+                                    }
+                                    let pp = player_id_clone.clone();
+                                    game_state.structured_log.push(LogEntry {
+                                        text: format!(
+                                            "{pp} card#{card_id} [ステージ/獲得]: 能力確認 [ライブ成功時]"
+                                        ),
+                                        turn: game_state.turn_number,
+                                        player_label: pp,
+                                        source_card_id: Some(card_id),
+                                        source_card_name: None,
+                                        category: "trigger_evaluation".to_string(),
+                                        metadata: Some(serde_json::json!({
+                                            "trigger": "live_success",
+                                            "zone": "stage_gained",
+                                            "result": "pending"
+                                        })),
+                                    });
+                                    let ability_id = format!("{}_gained_{}", card_no, gidx);
+                                    abilities_to_trigger.push((
+                                        ability_id,
+                                        card_no.clone(),
+                                        card_id,
+                                    ));
+                                }
                             }
                         }
                     }
@@ -578,6 +611,7 @@ impl super::TurnEngine {
             }
             for card_id in &player.live_card_zone.cards {
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
+                    let card_no = card.card_no.clone();
                     for (aidx, ability) in card.abilities.iter().enumerate() {
                         let trigger_match = ability.triggers.as_ref().is_some_and(|t| {
                             t == crate::triggers::LIVE_SUCCESS
@@ -604,8 +638,40 @@ impl super::TurnEngine {
                                 "result": "pending"
                             })),
                         });
-                        let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                        abilities_to_trigger.push((ability_id, card.card_no.clone(), *card_id));
+                        let ability_id = format!("{}_{}", card_no, ability.full_text);
+                        abilities_to_trigger.push((ability_id, card_no.clone(), *card_id));
+                    }
+                    // Also check gained card abilities
+                    if let Some(gained_list) = game_state.gained_card_abilities.get(card_id) {
+                        for (gidx, gained_ability) in gained_list.iter().enumerate() {
+                            if gained_ability
+                                .triggers
+                                .as_ref()
+                                .is_some_and(|t| t == crate::triggers::LIVE_SUCCESS)
+                            {
+                                if !seen.insert((*card_id, 10000 + gidx)) {
+                                    continue;
+                                }
+                                let pp = player_id_clone.clone();
+                                game_state.structured_log.push(LogEntry {
+                                    text: format!(
+                                        "{pp} card#{card_id} [ライブ置場/獲得]: 能力確認 [ライブ成功時]"
+                                    ),
+                                    turn: game_state.turn_number,
+                                    player_label: pp,
+                                    source_card_id: Some(*card_id),
+                                    source_card_name: None,
+                                    category: "trigger_evaluation".to_string(),
+                                    metadata: Some(serde_json::json!({
+                                        "trigger": "live_success",
+                                        "zone": "live_card_zone_gained",
+                                        "result": "pending"
+                                    })),
+                                });
+                                let ability_id = format!("{}_gained_{}", card_no, gidx);
+                                abilities_to_trigger.push((ability_id, card_no.clone(), *card_id));
+                            }
+                        }
                     }
                 }
             }
