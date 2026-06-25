@@ -170,12 +170,18 @@ impl GameState {
     /// ability resolution, so they are deferred.
     fn condition_is_event_based(condition: &crate::card::Condition) -> bool {
         let movement = condition.movement.as_deref();
-        // All movement types ("moved" and "moves") are event-based.
+        // All movement types ("moved", "moves", and "position_change") are event-based.
         // "moved" → card has already moved (can be checked now).
         // "moves" → card is / was moving (checkable because we set
         //   activating_card to the scanned card, and cards_moved_this_turn
         //   is persistent across the turn).
-        if movement == Some("moved") || movement == Some("moves") {
+        // "position_change" → card changed position on stage (checkable
+        //   only when stage_position_snapshot is available; if no snapshot,
+        //   the condition does not fire).
+        if movement == Some("moved")
+            || movement == Some("moves")
+            || movement == Some("position_change")
+        {
             return true;
         }
         // Appearance
