@@ -8892,9 +8892,10 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
 
             # 8b: card_property enrichment for card_count_condition
             if cond.get("type") == "card_count_condition":
-                if "ブレードハートを持たない" in ct or "ブレードハートがない" in ct:
+                if "ブレードハート" in ct:
                     cond["card_property"] = "has_blade_heart"
-                    cond["negation"] = True
+                    if "持たない" in ct or "ない" in ct:
+                        cond["negation"] = True
                     fix_stats["card_property"] += 1
                 if "{{icon_score.png|スコア}}を持つ" in ct and not cond.get(
                     "card_property"
@@ -8963,17 +8964,24 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
 
         # FIX 9: Result condition enrichment in conditional_on_result
         rc = eff.get("result_condition")
-        if isinstance(rc, dict) and rc.get("type") == "card_count_condition":
+        if isinstance(rc, dict) and not rc.get("card_property"):
             rct = rc.get("text", "")
-            if "ブレードハートを持たない" in rct or "ブレードハートがない" in rct:
+            if "ブレードハート" in rct:
                 rc["card_property"] = "has_blade_heart"
-                rc["negation"] = True
+                if "持たない" in rct or "ない" in rct:
+                    rc["negation"] = True
                 fix_stats["result_cond"] += 1
-            if "{{icon_score.png|スコア}}を持つ" in rct and not rc.get("card_property"):
+            if "{{icon_score.png|スコア}}を持つ" in rct:
                 rc["card_property"] = "has_score_icon"
                 fix_stats["result_cond"] += 1
             _infer_heart_source(rc, rct)
             _infer_baton_touch(rc, rct)
+
+        # FIX 9b: followup_action with "このメンバー" → self_target
+        fa = eff.get("followup_action")
+        if isinstance(fa, dict) and "このメンバー" in fa.get("text", ""):
+            if not fa.get("target") and fa.get("self_target") is None:
+                fa["self_target"] = True
 
         # FIX 10: Primary effect fixes — negation condition
         pe = eff.get("primary_effect")
@@ -9209,6 +9217,15 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             continue
         t = ability.get("triggerless_text", "")
         cond = eff.get("condition", {})
+
+        # ---- Cost: card_property enrichment ----
+        cost = ability.get("cost")
+        if isinstance(cost, dict) and not cost.get("card_property"):
+            ct = cost.get("text", "") or ""
+            if "ブレードハート" in ct:
+                cost["card_property"] = "has_blade_heart"
+                if "持たない" in ct or "ない" in ct:
+                    cost["negation"] = True
 
         # ---- A: Strip trailing period from primary_effect text ----
         pe = eff.get("primary_effect")

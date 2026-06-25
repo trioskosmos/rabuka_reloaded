@@ -1470,6 +1470,9 @@ impl AbilityResolver {
 
                 gs.mods.clear_all_for_card(card_id);
                 gs.record_card_movement(card_id);
+                if !self.moved_cards.contains(&card_id) {
+                    self.moved_cards.push(card_id);
+                }
                 if state_change.as_deref() == Some("wait") {
                     gs.mods.add_orientation_modifier(card_id, "wait");
                 }

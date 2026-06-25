@@ -2843,7 +2843,28 @@ impl<'a> ConditionContext<'a> {
                             .collect::<Vec<_>>()
                             .join(", ");
                         push_rich(&format!("在籍キャラ: [{}]", names), true);
-                        !stage_ids.is_empty()
+                        let stage_occupied = !stage_ids.is_empty();
+                        if stage_occupied {
+                            if let Some(ref prop) = condition.card_property {
+                                if !self.moved_cards.is_empty() {
+                                    let has_prop = self.moved_cards.iter().any(|&cid| {
+                                        self.game_state.card_database.get_card(cid).is_some_and(
+                                            |c| match prop.as_str() {
+                                                "has_blade_heart" => c.has_blade_heart(),
+                                                "has_score_icon" => c.has_score_icon(),
+                                                "has_all_blade" => c.has_all_blade(),
+                                                _ => false,
+                                            },
+                                        )
+                                    });
+                                    if condition.negation.unwrap_or(false) == has_prop {
+                                        push_rich(&format!("card_property={} unmet", prop), false);
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
+                        stage_occupied
                     }
                 }
                 Some(Zone::Hand) => {

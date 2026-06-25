@@ -692,6 +692,36 @@ def _validate_output(result):
             if not _find_state_change(eff) and not _find_state_change(cost_obj):
                 gaps[f"state_change:{expected}"] += 1
 
+        # card_property — "ブレードハート" / "スコアを持つ" in text should have card_property
+        # Skip false positives: "ブレードハートの中に" (heart colors within), "ブレードハートを失" (lose)
+        if (
+            "ブレードハートを持" in t
+            or "ブレードハートがない" in t
+            or "スコアを持つ" in t
+        ):
+
+            def _find_card_property(obj, depth=0):
+                if depth > 10 or not isinstance(obj, dict):
+                    return False
+                if obj.get("card_property") in ("has_blade_heart", "has_score_icon"):
+                    return True
+                for v in obj.values():
+                    if isinstance(v, dict):
+                        if _find_card_property(v, depth + 1):
+                            return True
+                    elif isinstance(v, list):
+                        for item in v:
+                            if isinstance(item, dict) and _find_card_property(
+                                item, depth + 1
+                            ):
+                                return True
+                return False
+
+            if not _find_card_property(eff) and not _find_card_property(
+                a.get("cost", {})
+            ):
+                gaps["card_property"] += 1
+
     if gaps:
         print("\n  GAPS DETECTED:")
         for gap, count in gaps.most_common():

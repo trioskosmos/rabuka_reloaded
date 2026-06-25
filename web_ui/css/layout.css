@@ -345,9 +345,7 @@
 /* Energy compact */
 .game-board.both-mode .energy-row-hud {
     flex-shrink: 1;
-    height: auto;
-    max-height: 8%;
-    overflow-x: auto;
+    height: calc(var(--card-h-compact) * 0.5 + 6px);
     overflow-y: hidden;
 }
 

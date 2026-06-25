@@ -671,6 +671,10 @@ impl AbilityResolver {
 
         if condition_met {
             if let Some(followup) = followup_action {
+                // Clear selected_cards so the followup doesn't inherit
+                // the primary effect's targets (e.g. change_state targeting
+                // the deployed card instead of "this member").
+                self.selected_cards.clear();
                 self.execute_effect(gs, followup)?;
             }
         } else {

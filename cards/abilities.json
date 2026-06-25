@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-26T04:33:10.147973",
+  "generated_at": "2026-06-26T05:14:05.917771",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -7399,7 +7399,9 @@
         "optional": true,
         "max": true,
         "any_number": true,
-        "type": "move_cards"
+        "type": "move_cards",
+        "card_property": "has_blade_heart",
+        "negation": true
       },
       "effect": {
         "text": "自分の控え室から、これにより控え室に置いたカードと同じ枚数の『Aqours』のライブカードを手札に加える",
@@ -13324,7 +13326,8 @@
             "action": "modify_score",
             "value": 1,
             "operation": "add"
-          }
+          },
+          "self_target": true
         }
       }
     },
@@ -14024,14 +14027,16 @@
             "location": "stage"
           },
           "location": "stage",
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "card_property": "has_blade_heart"
         },
         "followup_action": {
           "text": "このメンバーをウェイトにする",
           "state_change": "wait",
           "card_type": "member_card",
           "action": "change_state",
-          "count": 1
+          "count": 1,
+          "self_target": true
         },
         "group_names": [
           "虹ヶ咲"
@@ -23142,7 +23147,8 @@
           "count": 1,
           "operator": ">=",
           "text": "エールにより自分のカードを1枚以上公開したとき、それらのカードの中にブレードハートを持つカードが2枚以下の場合",
-          "target": "self"
+          "target": "self",
+          "card_property": "has_blade_heart"
         },
         "action": "sequential",
         "actions": [
