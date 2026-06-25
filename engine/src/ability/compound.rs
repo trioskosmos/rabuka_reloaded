@@ -738,10 +738,16 @@ impl AbilityResolver {
                         .and_then(|idx| opts.get(idx).cloned())
                 })
         });
-        if let Some(s) = chosen {
+        eprintln!(
+            "[DBG_CHOICE] handle_choice_string_store: selected={} chosen_is_some={}",
+            selected,
+            chosen.is_some()
+        );
+        if let Some(ref s) = chosen {
             gs.ability_queue
                 .current_entry_mut()
-                .map(|e| e.conditional_choice = Some(s));
+                .map(|e| e.conditional_choice = Some(s.clone()));
+            eprintln!("[DBG_CHOICE] stored conditional_choice");
         }
         self.pending_choice = None;
         self.resume_pending_actions(gs)?;
