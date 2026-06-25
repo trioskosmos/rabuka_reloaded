@@ -25,6 +25,7 @@ pub(crate) struct SelectionContext {
     pub filtered_indices: Option<Vec<usize>>,
     pub is_select_action: bool,
     pub target_player_id: Option<String>,
+    pub destination: Option<String>,
     pub blind: bool,
     pub is_reveal: bool,
 }
@@ -224,6 +225,7 @@ impl super::resolver::AbilityResolver {
                     is_select_action,
                     ref target_player_id,
                     blind,
+                    destination,
                     ..
                 }),
                 ChoiceResult::CardSelected { indices },
@@ -245,6 +247,7 @@ impl super::resolver::AbilityResolver {
                 filtered_indices.clone(),
                 *is_select_action,
                 target_player_id.clone(),
+                destination.clone(),
                 *blind,
                 choice.as_ref().is_some_and(|c| {
                     matches!(
@@ -328,6 +331,7 @@ impl super::resolver::AbilityResolver {
         filtered_indices: Option<Vec<usize>>,
         is_select_action: bool,
         target_player_id: Option<String>,
+        destination: Option<String>,
         blind: bool,
         is_reveal: bool,
     ) -> Result<(), String> {
@@ -361,6 +365,7 @@ impl super::resolver::AbilityResolver {
             filtered_indices: filtered_indices.clone(),
             is_select_action,
             target_player_id: target_player_id.clone(),
+            destination,
             blind,
             is_reveal,
         };
@@ -702,14 +707,12 @@ impl super::resolver::AbilityResolver {
                 return self.handle_looked_at_selection(gs, &ctx, &context);
             }
             Some(Zone::RevealedCards) => {
-                // Use the destination from the choice (sub-action), not from
-                // entry_effect() which returns None for sequential top-level.
-                let dst_str = match choice {
-                    Choice::SelectCard { destination, .. } => destination
-                        .clone()
-                        .unwrap_or_else(|| Zone::Discard.to_string()),
-                    _ => Zone::Discard.to_string(),
-                };
+                let edst = gs.entry_destination().map(|s| s.to_string());
+                let dst_str = ctx
+                    .destination
+                    .clone()
+                    .or(edst)
+                    .unwrap_or_else(|| Zone::Discard.to_string());
                 self.handle_revealed_cards_selection(gs, &ctx, &mut validate_card, &dst_str)?;
             }
             Some(Zone::Energy) => {
@@ -742,11 +745,12 @@ impl super::resolver::AbilityResolver {
                 self.handle_stage_selection(gs, &ctx, &mut validate_card)?;
             }
             Some(Zone::UnderMember) => {
-                let dst = gs.entry_destination().map(|s| s.to_string());
-                let dst_str = dst
-                    .as_deref()
-                    .unwrap_or(Zone::EnergyDeck.to_str())
-                    .to_string();
+                let edst = gs.entry_destination().map(|s| s.to_string());
+                let dst_str = ctx
+                    .destination
+                    .clone()
+                    .or(edst)
+                    .unwrap_or_else(|| Zone::EnergyDeck.to_string());
                 let tgt = target_player_id
                     .clone()
                     .unwrap_or_else(|| "self".to_string());
@@ -1148,8 +1152,12 @@ impl super::resolver::AbilityResolver {
         validate_card: &mut impl FnMut(i16) -> bool,
     ) -> Result<(), String> {
         let mapped = ctx.mfi(&ctx.indices);
-        let dst = gs.entry_destination().map(|s| s.to_string());
-        let dst_str = dst.as_deref().unwrap_or(Zone::Discard.to_str()).to_string();
+        let edst = gs.entry_destination().map(|s| s.to_string());
+        let dst_str = ctx
+            .destination
+            .clone()
+            .or(edst)
+            .unwrap_or_else(|| Zone::Discard.to_string());
         let target = ctx.target_player_id.as_deref().unwrap_or("self");
         let card_db = gs.card_database.clone();
         let player = gs.resolve_target_player_mut(target);
@@ -1363,8 +1371,12 @@ impl super::resolver::AbilityResolver {
                 }
             }
         } else {
-            let dst = gs.entry_destination().map(|s| s.to_string());
-            let dst_str = dst.as_deref().unwrap_or(Zone::Discard.to_str()).to_string();
+            let edst = gs.entry_destination().map(|s| s.to_string());
+            let dst_str = ctx
+                .destination
+                .clone()
+                .or(edst)
+                .unwrap_or_else(|| Zone::Discard.to_string());
             let card_db = gs.card_database.clone();
             let player = gs.active_player_mut();
             let card_ids = util::resolve_indices_to_ids(player, Zone::Stage.to_str(), &ctx.indices);
