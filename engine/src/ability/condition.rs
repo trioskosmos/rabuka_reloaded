@@ -1,4 +1,7 @@
+use std::sync::atomic::Ordering;
+
 use super::debug::AbDebug;
+use crate::ability::debug::ABILITY_DEBUG;
 use crate::ability::enums::ConditionType;
 use crate::ability::enums::Zone;
 use crate::card::Condition;
@@ -116,6 +119,9 @@ pub fn push_cond_verdict(
     passed: bool,
     children: Vec<crate::ability::log::AbilityLogItem>,
 ) {
+    if !ABILITY_DEBUG.load(Ordering::Relaxed) {
+        return;
+    }
     use crate::ability::log::{push_verdict, AbilityLogItem};
     let ct = condition.condition_type;
     let condition_type = ct.map(|t| t.to_str().to_string()).unwrap_or_default();
@@ -393,8 +399,10 @@ impl<'a> ConditionContext<'a> {
             result
         };
         // Push ONE verdict per condition with actual game state value
-        let actual = self.describe_condition_actual(condition);
-        push_cond_verdict(condition, &actual, final_result, vec![]);
+        if ABILITY_DEBUG.load(Ordering::Relaxed) {
+            let actual = self.describe_condition_actual(condition);
+            push_cond_verdict(condition, &actual, final_result, vec![]);
+        }
         let thresh = if ct == Some(ConditionType::ComparisonCondition) {
             condition.count.unwrap_or(0)
         } else {

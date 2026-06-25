@@ -455,7 +455,7 @@ impl AbilityResolver {
             if matching.is_empty() {
                 return Ok(vec![]);
             }
-            if take_count < matching.len() && can_skip {
+            if (take_count < matching.len() || can_skip) && can_skip {
                 self.prompt_card_selection(
                     "revealed_cards",
                     take_count,

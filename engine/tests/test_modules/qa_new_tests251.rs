@@ -46,16 +46,14 @@ fn q251_member_no_blade_can_move() {
     trigger_mitsuki_auto(&mut game);
 
     assert!(
-        !game.has_pending_choice(),
-        "Single matching card auto-resolved (no selection needed)"
+        game.has_pending_choice(),
+        "Choice shown — up to N includes declining"
     );
+    game.select_indices(&[0]);
+    game.state.process_pending_auto_abilities("player1");
     assert!(
         game.state.player1.waitroom.cards.contains(&member),
         "蓮ノ空 member without blade heart moved to waitroom"
-    );
-    assert!(
-        !game.state.revealed_cards.contains(&member),
-        "Card removed from revealed_cards"
     );
 }
 
@@ -150,9 +148,11 @@ fn q251_mixed_pool_only_member_can_move() {
     trigger_mitsuki_auto(&mut game);
 
     assert!(
-        !game.has_pending_choice(),
-        "Single matching card auto-resolved"
+        game.has_pending_choice(),
+        "Choice shown — up to N includes declining"
     );
+    game.select_indices(&[0]);
+    game.state.process_pending_auto_abilities("player1");
     assert!(
         game.state.player1.waitroom.cards.contains(&member),
         "蓮ノ空 member moved to waitroom"

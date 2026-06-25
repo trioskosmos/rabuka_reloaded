@@ -702,7 +702,15 @@ impl super::resolver::AbilityResolver {
                 return self.handle_looked_at_selection(gs, &ctx, &context);
             }
             Some(Zone::RevealedCards) => {
-                self.handle_revealed_cards_selection(gs, &ctx, &mut validate_card)?;
+                // Use the destination from the choice (sub-action), not from
+                // entry_effect() which returns None for sequential top-level.
+                let dst_str = match choice {
+                    Choice::SelectCard { destination, .. } => destination
+                        .clone()
+                        .unwrap_or_else(|| Zone::Discard.to_string()),
+                    _ => Zone::Discard.to_string(),
+                };
+                self.handle_revealed_cards_selection(gs, &ctx, &mut validate_card, &dst_str)?;
             }
             Some(Zone::Energy) => {
                 let dst = if let Choice::SelectCard { destination, .. } = choice {
@@ -1110,9 +1118,8 @@ impl super::resolver::AbilityResolver {
         gs: &mut GameState,
         ctx: &SelectionContext,
         validate_card: &mut impl FnMut(i16) -> bool,
+        dst_str: &str,
     ) -> Result<(), String> {
-        let dst = gs.entry_destination().map(|s| s.to_string());
-        let dst_str = dst.as_deref().unwrap_or(Zone::Hand.to_str());
         let moved = self.move_from_revealed(gs, &ctx.indices, validate_card, dst_str);
         if self
             .current_effect

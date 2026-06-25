@@ -33,8 +33,8 @@ fn drain(game: &mut TestGame) {
 fn mirai_ticket_two_cards_select_first() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let aq1 = game.id("PL!S-bp3-009-R"); // Aqours cost 9
-    let aq2 = game.id("PL!S-bp2-002-R"); // Aqours cost 4
+    let aq1 = game.id("PL!S-bp3-009-R");
+    let aq2 = game.id("PL!S-bp2-002-R");
     setup_mirai(&mut game, &[aq1, aq2]);
     fire(&mut game);
 
@@ -81,7 +81,6 @@ fn mirai_ticket_two_cards_select_second() {
 
 #[test]
 fn mirai_ticket_skip_leaves_both_in_revealed() {
-    // Select 0 cards (skip) — so shita baai should prevent extra yell
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let aq1 = game.id("PL!S-bp3-009-R");
@@ -90,7 +89,7 @@ fn mirai_ticket_skip_leaves_both_in_revealed() {
     fire(&mut game);
 
     assert!(game.has_pending_choice(), "MIRAI TICKET must show a choice");
-    game.select_indices(&[]); // skip
+    game.select_indices(&[]);
     drain(&mut game);
 
     assert!(
@@ -104,20 +103,42 @@ fn mirai_ticket_skip_leaves_both_in_revealed() {
 }
 
 #[test]
+fn mirai_ticket_skip_with_single_card() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let aq = game.id("PL!S-bp3-009-R");
+    setup_mirai(&mut game, &[aq]);
+    fire(&mut game);
+
+    assert!(
+        game.has_pending_choice(),
+        "choice expected even with 1 card"
+    );
+    game.select_indices(&[]);
+    drain(&mut game);
+    assert!(
+        game.state.revealed_cards.contains(&aq),
+        "skipped: card should stay in revealed"
+    );
+}
+
+#[test]
 fn mirai_ticket_use_limit_blocks_second_trigger() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let aq = game.id("PL!S-bp2-002-R"); // cost 4
-    let aq2 = game.id("PL!S-bp3-009-R"); // cost 9
+    let aq = game.id("PL!S-bp2-002-R");
+    let aq2 = game.id("PL!S-bp3-009-R");
     setup_mirai(&mut game, &[aq]);
     fire(&mut game);
-    // Single card -> auto-selected, no choice shown.
+
+    assert!(game.has_pending_choice(), "choice expected");
+    game.select_indices(&[0]);
+    drain(&mut game);
     assert!(
         !game.state.revealed_cards.contains(&aq),
         "first trigger: card should move from revealed"
     );
 
-    // Second yell trigger -- should be blocked by use_limit: 1
     game.state.revealed_cards.push(aq2);
     game.state.player1.waitroom.cards.push(aq2);
     game.state.yell_occurred = true;
@@ -153,13 +174,15 @@ fn mirai_ticket_empty_revealed_triggers_and_auto_skips() {
 
 #[test]
 fn mirai_ticket_cost4_zero_extra_yells() {
-    // cost 4 -> 4/5 = 0 extra yells (floor division)
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let aq = game.id("PL!S-bp2-002-R");
     setup_mirai(&mut game, &[aq]);
     fire(&mut game);
 
+    assert!(game.has_pending_choice(), "choice expected");
+    game.select_indices(&[0]);
+    drain(&mut game);
     assert!(
         !game.state.revealed_cards.contains(&aq),
         "selected card should move to waitroom"
@@ -168,13 +191,15 @@ fn mirai_ticket_cost4_zero_extra_yells() {
 
 #[test]
 fn mirai_ticket_cost5_one_extra_yell() {
-    // cost 5 -> 5/5 = 1 extra yell
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let aq = game.id("PL!S-bp6-013-N");
     setup_mirai(&mut game, &[aq]);
     fire(&mut game);
 
+    assert!(game.has_pending_choice(), "choice expected");
+    game.select_indices(&[0]);
+    drain(&mut game);
     assert!(
         !game.state.revealed_cards.contains(&aq),
         "selected card should move to waitroom"
@@ -183,13 +208,15 @@ fn mirai_ticket_cost5_one_extra_yell() {
 
 #[test]
 fn mirai_ticket_cost9_one_extra_yell() {
-    // cost 9 -> 9/5 = 1 extra yell
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let aq = game.id("PL!S-bp3-009-R");
     setup_mirai(&mut game, &[aq]);
     fire(&mut game);
 
+    assert!(game.has_pending_choice(), "choice expected");
+    game.select_indices(&[0]);
+    drain(&mut game);
     assert!(
         !game.state.revealed_cards.contains(&aq),
         "selected card should move to waitroom"
@@ -198,13 +225,15 @@ fn mirai_ticket_cost9_one_extra_yell() {
 
 #[test]
 fn mirai_ticket_cost10_two_extra_yells() {
-    // cost 10 -> 10/5 = 2 extra yells
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let aq = game.id("PL!S-bp5-001-R+");
     setup_mirai(&mut game, &[aq]);
     fire(&mut game);
 
+    assert!(game.has_pending_choice(), "choice expected");
+    game.select_indices(&[0]);
+    drain(&mut game);
     assert!(
         !game.state.revealed_cards.contains(&aq),
         "selected card should move to waitroom"
@@ -213,13 +242,15 @@ fn mirai_ticket_cost10_two_extra_yells() {
 
 #[test]
 fn mirai_ticket_cost20_capped_at_four() {
-    // cost 20 -> 20/5 = 4, exactly at the 4-cap
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let aq = game.id("LL-bp2-001-R+");
     setup_mirai(&mut game, &[aq]);
     fire(&mut game);
 
+    assert!(game.has_pending_choice(), "choice expected");
+    game.select_indices(&[0]);
+    drain(&mut game);
     assert!(
         !game.state.revealed_cards.contains(&aq),
         "selected card should move to waitroom"

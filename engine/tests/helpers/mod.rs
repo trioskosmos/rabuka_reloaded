@@ -104,7 +104,6 @@ impl TestGame {
     /// Pre-creates unique copy IDs for each card template so `id()` returns
     /// distinct IDs for per-copy modifier tracking without mutating state.
     pub fn new(db: Arc<CardDatabase>) -> Self {
-        let t0 = std::time::Instant::now();
         let mut p1 = Player::new("p1".into(), "Player 1".into(), true);
         let p2 = Player::new("p2".into(), "Player 2".into(), false);
         p1.is_first_attacker = true;
@@ -118,15 +117,13 @@ impl TestGame {
             rabuka_engine::ability::debug::set_debug(true);
         }
 
-        let tg = TestGame {
+        TestGame {
             db: state.card_database.clone(),
             state,
             debug_enabled,
             pool_positions: RefCell::new(HashMap::new()),
             internal_counter: Cell::new(20000),
-        };
-        eprintln!("[TIMING] TestGame::new: {:?}", t0.elapsed());
-        tg
+        }
     }
 
     /// Look up a card's numeric ID by card_no in the database.
@@ -217,25 +214,20 @@ impl TestGame {
 
     /// Play a member card from hand onto the stage.
     pub fn play_to_stage(&mut self, card_id: i16, area: MemberArea) {
-        let t0 = std::time::Instant::now();
         self.try_play_to_stage(card_id, area)
             .expect("play_to_stage failed");
-        eprintln!("[TIMING] play_to_stage: {:?}", t0.elapsed());
     }
 
     /// Attempt to play a member card from hand onto the stage. Returns Result.
     pub fn try_play_to_stage(&mut self, card_id: i16, area: MemberArea) -> Result<(), String> {
-        let t0 = std::time::Instant::now();
-        let r = TurnEngine::execute_main_phase_action(
+        TurnEngine::execute_main_phase_action(
             &mut self.state,
             &ActionType::PlayMemberToStage,
             Some(card_id),
             None,
             Some(area),
             Some(false),
-        );
-        eprintln!("[TIMING] try_play_to_stage inner: {:?}", t0.elapsed());
-        r
+        )
     }
 
     /// Activate the first 起動 (activation) ability on a stage card.
