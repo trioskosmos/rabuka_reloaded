@@ -564,7 +564,7 @@ impl AbilityResolver {
                 }
             ),
             allow_skip: effect.optional.unwrap_or(false),
-            options: None,
+            options: Some(options),
         });
         Ok(())
     }

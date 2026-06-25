@@ -3549,7 +3549,7 @@ fn kosuzu_choose_number_adds_to_hand() {
     let (kosuzu, _) = setup_kosuzu_test(&mut game, Some(top_card));
     advance_to_live_start_from_main(&mut game);
     assert!(game.has_pending_choice());
-    game.select_option(0);
+    game.select_generated(0);
     assert!(!game.has_pending_choice());
     assert!(game.state.player1.hand.cards.contains(&top_card));
     assert_eq!(game.state.mods.get_blade_modifier(kosuzu), 0);
@@ -3563,7 +3563,7 @@ fn kosuzu_choose_number_gains_blade() {
     let (kosuzu, _) = setup_kosuzu_test(&mut game, Some(top_card));
     advance_to_live_start_from_main(&mut game);
     assert!(game.has_pending_choice());
-    game.select_option(9);
+    game.select_generated(9);
     assert!(!game.has_pending_choice());
     assert!(!game.state.player1.hand.cards.contains(&top_card));
     assert!(game.state.mods.get_blade_modifier(kosuzu) > 0);
@@ -3577,7 +3577,7 @@ fn kosuzu_equal_choice_both_effects() {
     let (kosuzu, _) = setup_kosuzu_test(&mut game, Some(top_card));
     advance_to_live_start_from_main(&mut game);
     assert!(game.has_pending_choice());
-    game.select_option(3);
+    game.select_generated(3);
     assert!(!game.has_pending_choice());
     assert!(game.state.player1.hand.cards.contains(&top_card));
     assert!(game.state.mods.get_blade_modifier(kosuzu) > 0);

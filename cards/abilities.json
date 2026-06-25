@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-25T08:34:45.285859",
+  "generated_at": "2026-06-25T14:18:07.909063",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1080,7 +1080,9 @@
           "appearance": true,
           "text": "ステージの左サイドエリアに登場しているなら",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage",
+            "position": "left_side"
           },
           "location": "stage",
           "position": "left_side"
@@ -1221,7 +1223,8 @@
               "appearance": true,
               "text": "自分のステージのエリアすべてに『蓮ノ空』のメンバーが登場しており、",
               "trigger_event": {
-                "type": "appearance"
+                "type": "appearance",
+                "location": "stage"
               },
               "location": "stage",
               "all_areas": true,
@@ -1638,7 +1641,8 @@
               "appearance": true,
               "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、",
               "trigger_event": {
-                "type": "appearance"
+                "type": "appearance",
+                "location": "stage"
               },
               "location": "stage",
               "all_areas": true,
@@ -2097,7 +2101,8 @@
           "appearance": true,
           "text": "自分のステージのエリアすべてにメンバーが登場している場合",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage"
           },
           "location": "stage",
           "all_areas": true,
@@ -2478,7 +2483,9 @@
           "appearance": true,
           "text": "この能力はセンターエリアに登場している場合のみ起動できる。",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage",
+            "position": "center"
           },
           "location": "stage",
           "position": "center"
@@ -2636,7 +2643,9 @@
           "appearance": true,
           "text": "この能力はセンターエリアに登場している場合のみ起動できる。",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage",
+            "position": "center"
           },
           "location": "stage",
           "position": "center"
@@ -2726,7 +2735,8 @@
           "temporal": "this_turn",
           "text": "このターン、自分のステージにメンバーが3回登場したとき",
           "trigger_event": {
-            "type": "temporal_count"
+            "type": "temporal_count",
+            "count": 3
           },
           "count": 3,
           "location": "stage",
@@ -2761,7 +2771,8 @@
           "temporal": "this_turn",
           "text": "このターン、自分のステージにメンバーが2回以上登場している場合",
           "trigger_event": {
-            "type": "temporal_count"
+            "type": "temporal_count",
+            "count": 2
           },
           "count": 2,
           "location": "stage",
@@ -3476,7 +3487,10 @@
           "appearance": true,
           "text": "『Liella!』のメンバー2人からバトンタッチして登場している場合",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage",
+            "baton_touch": true,
+            "position": "center"
           },
           "location": "stage",
           "group_names": [
@@ -11234,7 +11248,8 @@
               "appearance": true,
               "text": "自分のステージに「徒町小鈴」が登場しており、",
               "trigger_event": {
-                "type": "appearance"
+                "type": "appearance",
+                "location": "stage"
               },
               "location": "stage",
               "characters": [
@@ -11247,7 +11262,8 @@
               "appearance": true,
               "text": "「徒町小鈴」よりコストの大きい「村野さやか」が登場している場合",
               "trigger_event": {
-                "type": "appearance"
+                "type": "appearance",
+                "location": "stage"
               },
               "location": "stage",
               "cost_reference_character": "徒町小鈴",
@@ -11290,7 +11306,8 @@
           "appearance": true,
           "text": "自分のステージの右サイドエリアに「大沢瑠璃乃」が、左サイドエリアに「安養寺姫芽」が、センターエリアに「藤島慈」がそれぞれ登場している場合",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage"
           },
           "location": "stage",
           "positions_characters": [
@@ -12871,7 +12888,9 @@
           "appearance": true,
           "text": "この能力はセンターエリアに登場した場合のみ発動する。",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage",
+            "position": "center"
           },
           "location": "stage",
           "position": "center"
@@ -13467,7 +13486,9 @@
               "appearance": true,
               "text": "このメンバーが『Printemps』のメンバーからバトンタッチして登場していない",
               "trigger_event": {
-                "type": "appearance"
+                "type": "appearance",
+                "location": "stage",
+                "baton_touch": true
               },
               "location": "stage",
               "group_names": [
@@ -13950,7 +13971,8 @@
           "appearance": true,
           "text": "これにより登場したメンバーがブレードハートを持つ場合",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage"
           },
           "location": "stage",
           "card_type": "member_card"
@@ -14227,7 +14249,9 @@
           "appearance": true,
           "text": "この能力は左サイドエリアか右サイドエリアに登場した場合のみ発動する。",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage",
+            "position": "left_side"
           },
           "location": "stage",
           "position": "left_side",
@@ -15015,7 +15039,8 @@
           "appearance": true,
           "text": "自分のステージにコスト10のメンバーが登場したとき",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage"
           },
           "location": "stage",
           "target": "self",
@@ -15331,7 +15356,8 @@
           "appearance": true,
           "text": "自分のステージにこのメンバー以外のコスト11のメンバーが登場したとき",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage"
           },
           "location": "stage",
           "exclude_self": true,
@@ -16335,7 +16361,8 @@
           "appearance": true,
           "text": "自分のステージにほかの『スリーズブーケ』のメンバーが登場する",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage"
           },
           "location": "stage",
           "exclude_self": true,
@@ -16997,7 +17024,9 @@
           "appearance": true,
           "text": "自分のステージに『蓮ノ空』のメンバーが登場する",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage",
+            "position": "center"
           },
           "location": "stage",
           "group_names": [
@@ -17580,7 +17609,9 @@
           "appearance": true,
           "text": "控え室から登場している場合",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage",
+            "appearance_source": "discard"
           },
           "location": "stage",
           "appearance_source": "discard"
@@ -17743,7 +17774,9 @@
               "appearance": true,
               "text": "控え室から登場している場合",
               "trigger_event": {
-                "type": "appearance"
+                "type": "appearance",
+                "location": "stage",
+                "appearance_source": "discard"
               },
               "location": "stage",
               "appearance_source": "discard"
@@ -18119,7 +18152,8 @@
           "appearance": true,
           "text": "自分のステージに『EdelNote』のメンバーが登場したとき",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage"
           },
           "location": "stage",
           "group_names": [
@@ -24674,6 +24708,12 @@
           "type": "temporal_condition",
           "phase": "live_phase",
           "text": "このゲームの1ターン目のライブフェイズの場合",
+          "trigger_event": {
+            "type": "temporal",
+            "scope": "game",
+            "phase": "live_phase",
+            "turn_number": 1
+          },
           "turn_number": 1
         },
         "action": "sequential",
@@ -29846,7 +29886,9 @@
           "appearance": true,
           "text": "控え室から登場している場合",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage",
+            "appearance_source": "discard"
           },
           "location": "stage",
           "appearance_source": "discard"
@@ -29909,7 +29951,9 @@
           "appearance": true,
           "text": "控え室から登場している場合",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage",
+            "appearance_source": "discard"
           },
           "location": "stage",
           "appearance_source": "discard"
@@ -30491,7 +30535,8 @@
           "appearance": true,
           "text": "このメンバーが手札以外からステージに登場している場合",
           "trigger_event": {
-            "type": "appearance"
+            "type": "appearance",
+            "location": "stage"
           },
           "location": "stage",
           "card_type": "member_card"

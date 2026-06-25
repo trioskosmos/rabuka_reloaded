@@ -1118,10 +1118,16 @@ def _try_temporal_turn_phase(text):
         or "ライブフェイズ" not in text
     ):
         return None
-    result = {"type": "temporal_condition", "phase": "live_phase", "text": text}
+    result = {
+        "type": "temporal_condition",
+        "phase": "live_phase",
+        "text": text,
+        "trigger_event": {"type": "temporal", "scope": "game", "phase": "live_phase"},
+    }
     tm = re.search(r"(\d+)ターン目", text)
     if tm:
         result["turn_number"] = int(tm.group(1))
+        result["trigger_event"]["turn_number"] = int(tm.group(1))
     return result
 
 
@@ -1207,16 +1213,20 @@ def _try_temporal_count(text):
     m = re.search(r"(\d+)回", text)
     if m:
         result["count"] = int(m.group(1))
+        result["trigger_event"]["count"] = int(m.group(1))
     elif "登場" in text and "回" not in text:
         result["count"] = 1
     if "ライブフェイズ" in text:
         result["phase"] = "live_phase"
     elif "メインフェイズ" in text:
         result["phase"] = "main_phase"
+        result["trigger_event"]["phase"] = "main_phase"
         if "自分の" in text:
             result["phase_target"] = "self"
+            result["trigger_event"]["phase_target"] = "self"
         elif "相手の" in text:
             result["phase_target"] = "opponent"
+            result["trigger_event"]["phase_target"] = "opponent"
     loc = extract_location(text)
     if loc:
         result["location"] = loc
@@ -1449,13 +1459,14 @@ def _try_appearance(text):
         "type": "appearance_condition",
         "appearance": True,
         "text": text,
-        "trigger_event": {"type": "appearance"},
+        "trigger_event": {"type": "appearance", "location": "stage"},
     }
     # Default to stage since abilities almost always check member appearance
     result["location"] = "stage"
     # Detect "appeared from waiting room" (控え室から登場)
     if "控え室から" in text:
         result["appearance_source"] = "discard"
+        result["trigger_event"]["appearance_source"] = "discard"
     # Extract subject character (the one before が/を登場)
     # Pattern: 「X」が登場 → X is the subject
     # Pattern: 「A」よりコストの(大きい|高い)「B」が登場 → B is the subject
@@ -1511,9 +1522,11 @@ def _try_appearance(text):
         result["group_names"] = gns
     if "バトンタッチ" in text:
         result["baton_touch_trigger"] = True
+        result["trigger_event"]["baton_touch"] = True
         bts = re.search(r"「([^」]+)」からバトンタッチ", text)
         if bts:
             result["baton_touch_source"] = bts.group(1)
+            result["trigger_event"]["source_character"] = bts.group(1)
         # 「名」以外の...からバトンタッチ — exclude this character
         bte = re.search(r"「([^」]+)」以外の.*からバトンタッチ", text)
         if bte:
@@ -1547,6 +1560,8 @@ def _try_appearance(text):
             positions_list = sorted(matched)
             result["position"] = positions_list[0]
             result["position_compare"] = positions_list[1]
+    if "position" in result:
+        result["trigger_event"]["position"] = result["position"]
     return result
 
 
