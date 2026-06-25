@@ -485,11 +485,19 @@ impl<'a> ConditionContext<'a> {
                             if !has_moved {
                                 return false;
                             }
+                            // Check position: "from" = source (was AT this pos),
+                            // "to"/absent = destination (moved TO this pos).
+                            let is_from = condition.area_direction.as_deref() == Some("from");
                             if let Some(req_pos) =
                                 condition.position.as_ref().and_then(|p| p.get_position())
                             {
                                 let pos_names = ["left_side", "center", "right_side"];
-                                if new_pos >= pos_names.len() || pos_names[new_pos] != req_pos {
+                                let check_pos = if is_from {
+                                    *old_pos.unwrap_or(&usize::MAX)
+                                } else {
+                                    new_pos
+                                };
+                                if check_pos >= pos_names.len() || pos_names[check_pos] != req_pos {
                                     return false;
                                 }
                             }

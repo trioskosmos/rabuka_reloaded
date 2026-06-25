@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-25T20:20:15.194842",
+  "generated_at": "2026-06-25T20:54:21.116661",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -19058,7 +19058,8 @@
           "target": "self",
           "location": "stage",
           "card_type": "member_card",
-          "position": "center"
+          "position": "center",
+          "area_direction": "from"
         },
         "action": "choice",
         "options": [

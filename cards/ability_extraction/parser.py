@@ -1362,16 +1362,24 @@ def _try_movement(text):
     # Override movement: _extract_generic_fields may set "moved" from "置かれた"
     # patterns, but _try_movement handles area moves, not zone placements.
     result["movement"] = "moves" if is_future else "position_change"
-    # Extract position (センター/左サイド/右サイド) — _extract_generic_fields
-    # doesn't do this for handler results, only the fall-through path.
+    # Extract position (センター/左サイド/右サイド) and direction.
+    # "センターエリアにいるメンバーがエリアを移動" → position=center, area_direction=from
+    # "メンバーがセンターエリアに移動"               → position=center, area_direction=to
     if "position" not in result:
+        for kw, pos in POSITION_KEYWORDS.items():
+            if kw in text:
+                result["position"] = pos
+                if f"{kw}にいる" in text or f"{kw}にいて" in text:
+                    result["area_direction"] = "from"
+                break
         matched = {pos for kw, pos in POSITION_KEYWORDS.items() if kw in text}
-        if len(matched) == 1:
-            result["position"] = matched.pop()
-        elif len(matched) > 1:
+        if len(matched) > 1:
             positions_list = sorted(matched)
-            result["position"] = positions_list[0]
-            result["position_compare"] = positions_list[1]
+            result["position_compare"] = (
+                positions_list[1]
+                if positions_list[0] == result["position"]
+                else positions_list[0]
+            )
     if "position" in result:
         te_data["position"] = result["position"]
     if "移動していない" in text:
@@ -8697,6 +8705,14 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 for key in ("cost_limit", "cost_limit_operator"):
                     if key in reparse and key not in cond:
                         cond[key] = reparse[key]
+                # Merge movement and direction fields — the fresh parse may detect
+                # area_direction ("from"/"to") that the old parse didn't have.
+                if "movement" in reparse and reparse["movement"] != cond.get(
+                    "movement"
+                ):
+                    cond["movement"] = reparse["movement"]
+                if "area_direction" in reparse and "area_direction" not in cond:
+                    cond["area_direction"] = reparse["area_direction"]
             # Fix missing yell_trigger: "エールにより公開された" cards (平安名すみれ,
             # 鬼塚夏美, ウィーン・マルガレーテ) were missed by _fill_defaults which
             # only checks "エールしたとき". Apply only to auto abilities (自動) —

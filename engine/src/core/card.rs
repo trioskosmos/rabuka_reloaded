@@ -1333,6 +1333,10 @@ pub struct Condition {
     /// Cross-position comparison target (e.g. "right_side" when position is "left_side")
     #[serde(default)]
     pub position_compare: Option<String>,
+    /// Direction for area move: "from" = position is source (was AT this pos),
+    /// "to" or absent = position is destination (moved TO this pos).
+    #[serde(default)]
+    pub area_direction: Option<String>,
     pub temporal_scope: Option<String>,
     #[serde(default)]
     pub distinct: Option<DistinctInfo>,
