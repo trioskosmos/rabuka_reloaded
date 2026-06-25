@@ -106,7 +106,7 @@ fn yoshiko_pb1_opponent_skips_gains_blade() {
     );
 }
 
-/// Edge: Opponent has no cards in hand → auto-skips → blade gained.
+/// Edge: Opponent has no cards in hand → auto-skips without prompt → blade gained.
 #[test]
 fn yoshiko_pb1_opponent_empty_hand_auto_skips() {
     let db = load_real_database();
@@ -122,12 +122,12 @@ fn yoshiko_pb1_opponent_empty_hand_auto_skips() {
     game.activate_ability(yoshiko);
 
     // Opponent has 0 cards — the move_cards auto-skips (no SelectCard).
-    // conditional_on_optional presents Skip/Pay because optional_cost_evaluated
-    // was never set. Choose "Skip" (option 0) → blade +4.
-    if game.has_pending_choice() {
-        game.assert_conditional_optional(&["Skip", "Pay"]);
-        game.select_option(0);
-    }
+    // conditional_on_optional should auto-resolve without prompt:
+    // optional_cost_result = Some(false) + negation=true → conditional_action fires.
+    assert!(
+        !game.has_pending_choice(),
+        "No prompt when opponent hand is empty"
+    );
 
     assert!(!game.has_pending_choice(), "Ability should resolve cleanly");
     assert_eq!(

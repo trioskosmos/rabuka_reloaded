@@ -360,12 +360,26 @@ impl AbilityResolver {
                                     eprintln!("[SEQ_TRACE] cancel_remaining_commands set — aborting sequential loop");
                                 }
                                 return Ok(());
-                            } else if action.optional.unwrap_or(false)
-                                && action.action == "change_state"
-                            {
-                                // Optional change_state completed without creating a choice
-                                // (no valid targets). Skip remaining actions (そうした場合).
-                                return Ok(());
+                            } else if action.optional.unwrap_or(false) {
+                                if action.action == "change_state" {
+                                    // Optional change_state completed without creating a choice
+                                    // (no valid targets). Skip remaining actions (そうした場合).
+                                    return Ok(());
+                                }
+                                let was_moved = self.moved_cards.len() - moved_before;
+                                if was_moved == 0 {
+                                    // Optional action auto-skipped (e.g., empty source).
+                                    // Record as "skipped" so conditional_on_optional
+                                    // can route correctly without prompting.
+                                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                                        entry.optional_cost_result = Some(false);
+                                    }
+                                }
+                                // Parent-conditional sequential: track implicit
+                                // condition via was_moved (old behavior).
+                                if conditional && action.condition.is_none() {
+                                    condition_failed = Some(was_moved == 0);
+                                }
                             } else if !self.pending_choice.is_some()
                                 && conditional
                                 && action.condition.is_none()
