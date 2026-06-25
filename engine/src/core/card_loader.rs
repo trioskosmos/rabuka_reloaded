@@ -16,21 +16,33 @@ impl CardLoader {
         file.read_to_string(&mut contents)
             .map_err(|e| format!("Failed to read file: {}", e))?;
 
+        let abilities_path = path.parent().unwrap().join("abilities.json");
+        let abilities_contents = std::fs::read_to_string(&abilities_path).ok();
+
+        Self::load_cards_from_strs(&contents, abilities_contents.as_deref())
+    }
+
+    /// Parse cards from embedded string content (no file I/O at runtime).
+    pub fn load_cards_from_strs(
+        cards_json: &str,
+        abilities_json: Option<&str>,
+    ) -> Result<Vec<Card>, String> {
         // Try parsing as array first
-        let mut cards: Vec<Card> = match serde_json::from_str::<Vec<Card>>(&contents) {
+        let mut cards: Vec<Card> = match serde_json::from_str::<Vec<Card>>(cards_json) {
             Ok(cards) => cards,
             Err(_) => {
                 // If that fails, try parsing as object (map) and convert to array
-                let card_map: HashMap<String, Card> = serde_json::from_str(&contents)
+                let card_map: HashMap<String, Card> = serde_json::from_str(cards_json)
                     .map_err(|e| format!("Failed to parse JSON as object: {}", e))?;
                 card_map.into_values().collect()
             }
         };
 
-        // Load abilities from abilities.json
-        let abilities_path = path.parent().unwrap().join("abilities.json");
-        if let Ok(abilities_data) = Self::load_abilities_from_file(&abilities_path) {
-            cards = Self::attach_abilities(cards, &abilities_data);
+        // Load abilities if provided
+        if let Some(abilities_str) = abilities_json {
+            if let Ok(abilities_data) = Self::load_abilities_from_str(abilities_str) {
+                cards = Self::attach_abilities(cards, &abilities_data);
+            }
         }
 
         Ok(cards)
@@ -42,10 +54,12 @@ impl CardLoader {
         let mut contents = String::new();
         file.read_to_string(&mut contents)
             .map_err(|e| format!("Failed to read abilities file: {}", e))?;
+        Self::load_abilities_from_str(&contents)
+    }
 
-        let data: serde_json::Value = serde_json::from_str(&contents)
+    fn load_abilities_from_str(contents: &str) -> Result<serde_json::Value, String> {
+        let data: serde_json::Value = serde_json::from_str(contents)
             .map_err(|e| format!("Failed to parse abilities JSON: {}", e))?;
-
         Ok(data)
     }
 

@@ -7,7 +7,6 @@
 /// `tests/data/cards.json` and can be referenced by card_no.
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
-use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 use rabuka_engine::ability::debug::AbDebug;
@@ -21,9 +20,13 @@ use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::types::{Phase, TurnPhase};
 use rabuka_engine::zones::MemberArea;
 
+/// Embedded card data (compile-time, no file I/O at test startup).
+static CARDS_JSON: &str = include_str!("../../../cards/cards.json");
+static ABILITIES_JSON: &str = include_str!("../../../cards/abilities.json");
+
 /// Pre-seeded database + copy pool, initialised once per process.
-/// The database has 5 copies per template pre-created and registered,
-/// so tests never need to mutate the `Arc<CardDatabase>`.
+/// The database has 1 copy per template pre-created (enough for unique IDs
+/// within a single test; beyond that the template ID serves as fallback).
 struct PreloadedDb {
     db: CardDatabase,
     pool: HashMap<i16, Vec<i16>>,
@@ -31,12 +34,11 @@ struct PreloadedDb {
 
 static PRELOADED: OnceLock<PreloadedDb> = OnceLock::new();
 
-/// Load (once) and return a pre-seeded database with 5 copies per template.
+/// Load (once) and return a pre-seeded database.
 pub fn load_real_database() -> Arc<CardDatabase> {
     PRELOADED.get_or_init(|| {
-        let cards_path = Path::new("../cards/cards.json");
-        let cards = CardLoader::load_cards_from_file(cards_path)
-            .expect("Failed to load real cards from ../cards/cards.json");
+        let cards = CardLoader::load_cards_from_strs(CARDS_JSON, Some(ABILITIES_JSON))
+            .expect("Failed to load embedded cards");
         let mut db = CardDatabase::load_or_create(cards);
         let tids: Vec<i16> = db.cards.keys().copied().collect();
         let mut pool: HashMap<i16, Vec<i16>> = HashMap::new();
@@ -102,6 +104,7 @@ impl TestGame {
     /// Pre-creates unique copy IDs for each card template so `id()` returns
     /// distinct IDs for per-copy modifier tracking without mutating state.
     pub fn new(db: Arc<CardDatabase>) -> Self {
+        let t0 = std::time::Instant::now();
         let mut p1 = Player::new("p1".into(), "Player 1".into(), true);
         let p2 = Player::new("p2".into(), "Player 2".into(), false);
         p1.is_first_attacker = true;
@@ -110,15 +113,20 @@ impl TestGame {
         state.current_phase = Phase::Main;
         state.current_turn_phase = TurnPhase::FirstAttackerNormal;
         state.turn_number = 1;
-        rabuka_engine::ability::debug::set_debug(true);
+        let debug_enabled = std::env::var("RABUKA_DEBUG").is_ok();
+        if debug_enabled {
+            rabuka_engine::ability::debug::set_debug(true);
+        }
 
-        TestGame {
+        let tg = TestGame {
             db: state.card_database.clone(),
             state,
-            debug_enabled: true,
+            debug_enabled,
             pool_positions: RefCell::new(HashMap::new()),
             internal_counter: Cell::new(20000),
-        }
+        };
+        eprintln!("[TIMING] TestGame::new: {:?}", t0.elapsed());
+        tg
     }
 
     /// Look up a card's numeric ID by card_no in the database.
@@ -209,20 +217,25 @@ impl TestGame {
 
     /// Play a member card from hand onto the stage.
     pub fn play_to_stage(&mut self, card_id: i16, area: MemberArea) {
+        let t0 = std::time::Instant::now();
         self.try_play_to_stage(card_id, area)
             .expect("play_to_stage failed");
+        eprintln!("[TIMING] play_to_stage: {:?}", t0.elapsed());
     }
 
     /// Attempt to play a member card from hand onto the stage. Returns Result.
     pub fn try_play_to_stage(&mut self, card_id: i16, area: MemberArea) -> Result<(), String> {
-        TurnEngine::execute_main_phase_action(
+        let t0 = std::time::Instant::now();
+        let r = TurnEngine::execute_main_phase_action(
             &mut self.state,
             &ActionType::PlayMemberToStage,
             Some(card_id),
             None,
             Some(area),
             Some(false),
-        )
+        );
+        eprintln!("[TIMING] try_play_to_stage inner: {:?}", t0.elapsed());
+        r
     }
 
     /// Activate the first 起動 (activation) ability on a stage card.

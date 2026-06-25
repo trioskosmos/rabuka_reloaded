@@ -1212,11 +1212,11 @@ impl<'a> ConditionContext<'a> {
         let cost_op = condition.cost_limit_operator.as_deref();
 
         let cards: Vec<i16> = if Zone::from_str(location) == Some(Zone::RevealedCards) {
-            // When yell_trigger is true, the ability requires a yell to have actually
-            // occurred (total_blade > 0 after modifiers, per Q264). If no yell was
-            // performed, return false immediately regardless of revealed_cards state.
-            if condition.yell_trigger == Some(true) && !self.game_state.yell_occurred {
-                return false;
+            // When yell_trigger is true, the ability triggers on yell alone
+            // regardless of how many (or which) cards were revealed.
+            // The revealed pool is an action detail, not a trigger gate.
+            if condition.yell_trigger == Some(true) {
+                return self.game_state.yell_occurred;
             }
             self.game_state.revealed_cards.clone()
         } else if is_both {

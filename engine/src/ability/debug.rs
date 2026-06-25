@@ -84,7 +84,7 @@ impl AbDebug {
             self.p("TEXT", &ability.full_text);
         }
         // Record coverage: (card_no, full_text) for untested-ability reporting
-        if !ability.full_text.is_empty() {
+        if ABILITY_DEBUG.load(Ordering::Relaxed) && !ability.full_text.is_empty() {
             if let Ok(mut cov) = COVERAGE_LOG.lock() {
                 cov.push((card_no.to_string(), ability.full_text.clone()));
             }
