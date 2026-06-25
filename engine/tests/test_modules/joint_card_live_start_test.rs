@@ -344,13 +344,22 @@ fn test_bp4_live_start_dual_trigger_fires() {
 
     let joint = game.id("LL-bp4-001-R\u{ff0b}"); // 絢瀬絵里&朝香果林&葉月恋
     let live = game.id("PL!-sd1-010-SD");
+    let ayumu = game.id("PL!-pb1-011-R"); // 絢瀬絵里 — matches select filter
     let filler = game.new_id("PL!-sd1-010-SD");
 
     game.state.player1.stage.stage[1] = joint;
     game.add_to_hand(live);
-    // Put 5 filler cards on top of deck so the look-at-5 has something
-    for _ in 0..10 {
+    // Only ~1 draw happens before live_start triggers. Place ayumu in
+    // position 3 so after 1 draw it's still in the top-5 looked-at cards.
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..3 {
         game.state.player1.main_deck.cards.push(filler);
+    }
+    game.state.player1.main_deck.cards.push(ayumu); // positioned at index 3
+    for _ in 0..7 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
         game.state.player2.main_deck.cards.push(filler);
     }
     game.state.player2.hand.cards.push(filler);
@@ -375,9 +384,12 @@ fn test_bp4_debut_trigger_fires_independently() {
     let mut game = TestGame::new(db);
 
     let joint = game.id("LL-bp4-001-R\u{ff0b}");
+    let ayumu = game.id("PL!-pb1-011-R"); // 絢瀬絵里 — matches select filter
     let filler = game.new_id("PL!-sd1-010-SD");
 
     game.add_to_hand(joint);
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.main_deck.cards.push(ayumu);
     for _ in 0..10 {
         game.state.player1.main_deck.cards.push(filler);
     }

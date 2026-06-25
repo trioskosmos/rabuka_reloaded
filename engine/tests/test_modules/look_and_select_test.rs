@@ -168,3 +168,37 @@ fn look_and_select_dynamic_count_look_at_counts_stage_members_plus_two() {
         "Should look at 3 cards when the entering member is on stage"
     );
 }
+
+/// Debut look_and_select with group_filter — no eligible cards among looked-at.
+/// Should auto-skip without showing a prompt.
+#[test]
+fn look_and_select_no_eligible_cards_auto_skips() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    // 園田海未 — debut: look at 5, select up to 1 μ's live card to hand
+    let card = game.id("PL!-sd1-004-SD");
+    let filler = game.id("PL!-sd1-010-SD"); // not a μ's live card
+
+    game.state.player1.hand.cards.push(card);
+    game.give_energy(11);
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..5 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.play_to_stage(card, rabuka_engine::zones::MemberArea::Center);
+
+    // No eligible μ's live cards → should auto-skip, no prompt
+    assert!(
+        !game.has_pending_choice(),
+        "No eligible cards → should auto-skip without prompt"
+    );
+
+    // All 5 looked-at cards should have gone to waitroom
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        5,
+        "All 5 non-matching cards should be in waitroom"
+    );
+}

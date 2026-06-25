@@ -68,6 +68,14 @@ impl AbilityResolver {
             );
 
             let available_count = gs.looked_at_cards.len();
+            if available_count == 0 {
+                if let Some(ref followup) = effect.compound.followup_action {
+                    let mut existing = gs.ability_queue.take_pending_actions();
+                    existing.push(followup.as_ref().clone());
+                    gs.ability_queue.set_pending_actions(existing);
+                }
+                return Ok(());
+            }
             let is_max = select_action.max.unwrap_or(false);
             let max_select = if any_number {
                 available_count
@@ -79,9 +87,7 @@ impl AbilityResolver {
                 std::cmp::min(count as usize, available_count)
             };
 
-            let description = if available_count == 0 {
-                "No eligible cards found among looked-at cards".to_string()
-            } else if any_number {
+            let description = if any_number {
                 format!("Select any number of cards from the {} looked-at cards (or skip) (placement_order: {})",
                     available_count, placement_order.unwrap_or("default"))
             } else if is_max || optional {
@@ -100,7 +106,7 @@ impl AbilityResolver {
                 Zone::LookedAt.to_str(),
                 max_select,
                 description.clone(),
-                optional || is_max || any_number || available_count == 0,
+                optional || is_max || any_number,
             )
             .card_type(select_action.card_type.clone())
             .cost_limit(
@@ -127,14 +133,6 @@ impl AbilityResolver {
                 },
             };
 
-            // Save followup_action as pending command — it executes after the selection completes.
-            // This enables the "その後" (afterwards) pattern where a separate effect runs
-            // after the look_and_select finishes (e.g. wait opponent members based on revealed card).
-            if let Some(ref followup) = effect.compound.followup_action {
-                let mut existing = gs.ability_queue.take_pending_actions();
-                existing.push(followup.as_ref().clone());
-                gs.ability_queue.set_pending_actions(existing);
-            }
             println!(
                 "DEBUG: Choice created and stored - pending_choice.is_some(): {}",
                 self.pending_choice.is_some()
@@ -562,6 +560,9 @@ impl AbilityResolver {
         }
 
         let available_count = gs.looked_at_cards.len();
+        if available_count == 0 {
+            return Ok(());
+        }
         let is_max = effect.max.unwrap_or(false);
         let max_select = if any_number {
             available_count
@@ -571,9 +572,7 @@ impl AbilityResolver {
             std::cmp::min(count, available_count)
         };
 
-        let description = if available_count == 0 {
-            "No eligible cards found among looked-at cards".to_string()
-        } else if any_number {
+        let description = if any_number {
             format!(
                 "Select any number of cards from the {} looked-at cards (or skip) (placement_order: {})",
                 available_count, placement_order.unwrap_or("default")
@@ -596,7 +595,7 @@ impl AbilityResolver {
             Zone::LookedAt.to_str(),
             max_select,
             description.clone(),
-            optional || is_max || any_number || available_count == 0,
+            optional || is_max || any_number,
         )
         .card_type(effect.card_type.clone())
         .cost_limit(effect.cost_limit, effect.cost_limit_operator.clone())
