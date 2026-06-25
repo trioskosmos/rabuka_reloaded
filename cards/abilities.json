@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-26T05:14:05.917771",
+  "generated_at": "2026-06-26T05:35:46.340413",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -7843,6 +7843,7 @@
         "target": "self",
         "action": "restriction",
         "restriction_type": "cannot_activate",
+        "phase": "active_phase",
         "count": 1
       }
     },
@@ -7872,8 +7873,7 @@
         "state_change": "wait",
         "card_type": "member_card",
         "action": "change_state",
-        "count": 1,
-        "exclude_self": true
+        "count": 1
       }
     },
     {
@@ -9256,8 +9256,7 @@
         "state_change": "active",
         "count": 1,
         "action": "change_state",
-        "card_type": "energy_card",
-        "exclude_self": true
+        "card_type": "energy_card"
       }
     },
     {
@@ -30531,8 +30530,7 @@
         "state_change": "active",
         "count": 1,
         "action": "change_state",
-        "card_type": "energy_card",
-        "exclude_self": true
+        "card_type": "energy_card"
       }
     },
     {

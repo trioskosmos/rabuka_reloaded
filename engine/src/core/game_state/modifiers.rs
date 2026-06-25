@@ -12,6 +12,7 @@ impl GameState {
         let mut exp_heart: std::collections::HashMap<i16, std::collections::HashMap<String, i32>> =
             std::collections::HashMap::new();
         let mut exp_prohibition: Vec<String> = Vec::new();
+        self.constant_cannot_activate_members.clear();
         let mut exp_global_need_heart: Vec<(i16, String, i32)> = Vec::new();
         let mut p1_constant_score_bonus: i32 = 0;
         let mut p2_constant_score_bonus: i32 = 0;
@@ -234,11 +235,33 @@ impl GameState {
                                         rt, card_id, card_name
                                     ));
                                     let tgt = effect.target.as_deref().unwrap_or("self");
-                                    if rt == "cannot_activate" || rt == "cannot_activate_by_effect"
-                                    {
+                                    if rt == "cannot_activate_by_effect" {
                                         let resolved = self.resolve_target_player(tgt).id.clone();
                                         if !self.cannot_activate_members.contains(&resolved) {
                                             self.cannot_activate_members.push(resolved);
+                                        }
+                                    } else if rt == "cannot_activate" {
+                                        if tgt == "self" {
+                                            // Per-card: only block this specific member
+                                            let card_id_str = card_id.to_string();
+                                            if !self
+                                                .constant_cannot_activate_members
+                                                .contains(&card_id_str)
+                                            {
+                                                self.constant_cannot_activate_members
+                                                    .push(card_id_str);
+                                            }
+                                        } else {
+                                            // Player-level: block all members of the target player
+                                            let resolved =
+                                                self.resolve_target_player(tgt).id.clone();
+                                            if !self
+                                                .constant_cannot_activate_members
+                                                .contains(&resolved)
+                                            {
+                                                self.constant_cannot_activate_members
+                                                    .push(resolved);
+                                            }
                                         }
                                     }
                                     if rt == "cannot_live" {

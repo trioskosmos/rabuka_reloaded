@@ -2632,8 +2632,7 @@ impl AbilityResolver {
             gs.prohibition_effects.push(restriction_str);
         }
         // Handle cannot_activate restrictions — store for checking during Active phase
-        if restriction_type == Some("cannot_activate")
-            || restriction_type == Some("cannot_activate_by_effect")
+        if restriction_type == Some("cannot_activate_by_effect")
             || restriction_type == Some("cannot_active")
         {
             if delayed {

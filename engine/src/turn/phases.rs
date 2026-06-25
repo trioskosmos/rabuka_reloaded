@@ -52,6 +52,14 @@ impl super::TurnEngine {
                                 {
                                     return None;
                                 }
+                                // Skip members with a constant cannot_activate restriction
+                                // (per-card, e.g. "このメンバーはアクティブフェイズにアクティブにしない")
+                                if game_state
+                                    .constant_cannot_activate_members
+                                    .contains(&cid.to_string())
+                                {
+                                    return None;
+                                }
                                 // Skip members with an active delayed_cannot_active flag
                                 if game_state.mods.is_delayed_cannot_active(cid) {
                                     return None;

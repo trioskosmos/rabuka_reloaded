@@ -3822,6 +3822,7 @@ def parse_action(text: str) -> Dict[str, Any]:
                 else "self"
                 if "自分" in t
                 else None,
+                "phase": "active_phase" if "アクティブフェイズ" in t else None,
             }
         ),
     )
@@ -7987,6 +7988,7 @@ def _normalize_effect_tree(effect, original_text=None):
                 "set_heart_type",
                 "heart_selection",
                 "modify_score",
+                "change_state",
             ) or (d.get("action") in ("gain_resource",) and not is_per_unit)
             if (
                 d.get("action") == "position_change" or d.get("target") != "self"

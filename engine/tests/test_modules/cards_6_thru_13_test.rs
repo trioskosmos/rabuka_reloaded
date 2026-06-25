@@ -269,11 +269,15 @@ fn c12_restriction_blocks_opponent_active() {
     deck(&mut g, f);
     g.give_energy(5);
     g.state.recalculate_constants();
-    // restriction stores opponent player ID in cannot_activate_members
+    // restriction stores opponent player ID in constant_cannot_activate_members
     let opp_id = &g.state.player2.id;
     assert!(
-        g.state.cannot_activate_members.contains(opp_id),
-        "opponent activation should be restricted (P2 in cannot_activate_members)"
+        g.state.constant_cannot_activate_members.contains(opp_id),
+        "opponent activation should be restricted (P2 in constant_cannot_activate_members)"
+    );
+    assert!(
+        !g.state.cannot_activate_members.contains(opp_id),
+        "cannot_activate (without _by_effect) should NOT go into cannot_activate_members"
     );
 }
 
