@@ -156,7 +156,9 @@ fn shizuku_bp1_live_start_gains_chosen_heart() {
         game.has_pending_choice(),
         "heart color selection should be pending"
     );
-    game.select_option(4);
+    // SelectHeartColor options are [heart01..heart06], 0-indexed.
+    // heart04 is at index 3.
+    game.select_option(3);
 
     let after = heart_mods(&game, shizuku);
     eprintln!(

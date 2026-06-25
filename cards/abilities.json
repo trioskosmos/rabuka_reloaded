@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-25T22:30:08.626144",
+  "generated_at": "2026-06-25T23:05:26.551110",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -30225,13 +30225,11 @@
           },
           {
             "text": "これにより控え室に置いたカードのコスト5につき、追加で1枚エールを行う。この能力では4枚までしか追加でエールできない",
-            "count": 4,
             "max": true,
             "action": "perform_yell",
             "max_repeats": 4,
             "per_unit": true,
             "per_unit_count": 5,
-            "per_unit_type": "discard",
             "per_unit_source": "previous_moved_cards",
             "group_names": [
               "Aqours"

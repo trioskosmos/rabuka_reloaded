@@ -9685,6 +9685,26 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                         sub["action"] = "reduce_live_card_set_limit"
                         sub.pop("card_type", None)
 
+    # FIX 17: Clean up redundant fields on perform_yell actions with per_unit_source
+    # When per_unit_source is "previous_moved_cards", the engine sums costs from
+    # self.moved_cards directly — per_unit_type and count are not used for yell.
+    def _clean_per_unit_source(d):
+        if isinstance(d, dict):
+            if (
+                d.get("per_unit")
+                and d.get("action") == "perform_yell"
+                and d.get("per_unit_source") == "previous_moved_cards"
+            ):
+                d.pop("per_unit_type", None)
+                d.pop("count", None)
+            for v in d.values():
+                _clean_per_unit_source(v)
+        elif isinstance(d, list):
+            for item in d:
+                _clean_per_unit_source(item)
+
+    _clean_per_unit_source(data["unique_abilities"])
+
     # Group/unit filter fields are validated in extract_card_abilities.py
     return data
 

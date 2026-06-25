@@ -967,15 +967,23 @@ impl AbilityResolver {
         &mut self,
         _gs: &mut GameState,
         choice: bool,
-        target: &str,
+        _target: &str,
     ) {
-        log::debug!("specify_heart_color: choice={}, target={}", choice, target);
+        log::debug!("specify_heart_color: choice={}", choice);
         if choice {
-            self.pending_choice = Some(Choice::SelectTarget {
-                target: "heart_color".to_string(),
+            // Q190 (2025.11.17): ALL heart (heart00) cannot be selected.
+            // Present the 6 individual heart colors for the player to choose.
+            self.pending_choice = Some(Choice::SelectHeartColor {
+                count: 1,
+                options: vec![
+                    "heart01".into(),
+                    "heart02".into(),
+                    "heart03".into(),
+                    "heart04".into(),
+                    "heart05".into(),
+                    "heart06".into(),
+                ],
                 description: "Choose a heart color".to_string(),
-                allow_skip: false,
-                options: None,
             });
         }
     }

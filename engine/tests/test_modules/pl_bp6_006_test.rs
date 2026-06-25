@@ -11,8 +11,13 @@ fn drain_cost_and_color(game: &mut TestGame) {
     if game.has_pending_choice() && game.pending_choice_type().as_deref() == Some("SelectCard") {
         game.select_indices(&[0]);
     }
-    if game.has_pending_choice() && game.pending_choice_type().as_deref() == Some("SelectTarget") {
-        game.select_option(1);
+    if game.has_pending_choice() {
+        let typ = game.pending_choice_type();
+        if typ.as_deref() == Some("SelectHeartColor") {
+            game.select_option(1); // heart02
+        } else if typ.as_deref() == Some("SelectTarget") {
+            game.select_option(1);
+        }
     }
 }
 
@@ -189,7 +194,7 @@ fn maki_bp6_use_limit_turn1_enforces() {
     game.activate_ability(maki);
     while game.has_pending_choice() {
         match game.pending_choice_type().as_deref() {
-            Some("SelectTarget") => {
+            Some("SelectHeartColor") | Some("SelectTarget") => {
                 game.select_option(1);
             }
             Some("SelectCard") => {
