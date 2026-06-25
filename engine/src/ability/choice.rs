@@ -1933,6 +1933,7 @@ impl super::resolver::AbilityResolver {
         selected: &str,
     ) -> Result<(), String> {
         if selected == "skip" {
+            self.formation_plan.clear();
             self.clear_choice_state_and_resume(gs)?;
             self.execution_context = ExecutionContext::None;
             return Ok(());
@@ -1978,21 +1979,12 @@ impl super::resolver::AbilityResolver {
             if was_select {
                 // The user just chose WHICH member to move (the source position).
                 // Now ask WHERE to move it (destination choice).
-                // modified.source_position is already set to the chosen source area.
-                // Call execute_position_change with target_member="this_member" so it
-                // enters the source_position branch and creates a destination choice.
                 let target_str = modified
                     .target
                     .clone()
                     .unwrap_or_else(|| "self".to_string());
-                // Clear old choice metadata so the destination choice can set fresh routing.
                 self.clear_choice_meta(gs);
                 modified.target_member = Some("this_member".to_string());
-                // Source was already filtered by group_names during source selection;
-                // clear it so destinations aren't restricted to the same group.
-                // Also clear exclude_self since entry_effect() returns the choice-level
-                // effect which may have exclude_self set — that constraint only applies
-                // to member targeting, not destination selection.
                 modified.group_names = None;
                 modified.exclude_self = None;
                 if let Err(e) =
@@ -2003,16 +1995,80 @@ impl super::resolver::AbilityResolver {
                         e
                     );
                 }
-                // If a pending_choice was created, store it and return — the destination
-                // selection will be handled on the next interaction.
                 if self.pending_choice.is_some() {
                     self.store_pending_choice(gs);
                     return Ok(());
                 }
-                // No valid destinations (empty stage, etc.) — resume normally.
                 self.clear_choice_state_and_resume(gs)?;
                 return Ok(());
             }
+
+            // Formation change: store the assignment and either present the next
+            // destination choice or finalize the batch once all members are set.
+            if !self.formation_plan.is_empty() {
+                let target_card_id = choice_card_no.as_ref().and_then(|ccn| match ccn {
+                    ChoiceRoute::Raw(s) => s
+                        .strip_prefix("position_change:self:")
+                        .and_then(|id_str| id_str.parse::<i16>().ok()),
+                    _ => None,
+                });
+                let entry_idx = target_card_id
+                    .and_then(|cid| self.formation_plan.iter().position(|(id, _)| *id == cid));
+                if let Some(idx) = entry_idx {
+                    self.formation_plan[idx].1 = dest.to_string();
+                    let next = self.formation_plan.iter().position(|(_, d)| d.is_empty());
+                    if let Some(next_idx) = next {
+                        let next_cid = self.formation_plan[next_idx].0;
+                        let next_cname = self
+                            .card_database
+                            .get_card(next_cid)
+                            .map(|c| c.name.clone())
+                            .unwrap_or_else(|| "member".to_string());
+                        let current_pos = {
+                            let player = gs.resolve_target_player_mut(
+                                effect.target.as_deref().unwrap_or("self"),
+                            );
+                            player.stage.stage.iter().position(|&id| id == next_cid)
+                        };
+                        let pos_name = match current_pos {
+                            Some(0) => "Left",
+                            Some(1) => "Center",
+                            Some(2) => "Right",
+                            _ => "?",
+                        };
+                        let valid_destinations =
+                            self.compute_valid_position_destinations(gs, &effect, "self");
+                        if valid_destinations.is_empty() {
+                            self.finalize_formation_change(gs)?;
+                            self.clear_choice_state_and_resume(gs)?;
+                            return Ok(());
+                        }
+                        if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                            entry.choice_card_no = Some(ChoiceRoute::Raw(format!(
+                                "position_change:self:{}",
+                                next_cid
+                            )));
+                        }
+                        self.pending_choice = Some(Choice::SelectTarget {
+                            target: "position|destination".to_string(),
+                            description: format!(
+                                "Choose destination for {} (currently at {})",
+                                next_cname, pos_name
+                            ),
+                            allow_skip: effect.optional.unwrap_or(false),
+                            options: Some(valid_destinations),
+                        });
+                        self.store_pending_choice(gs);
+                        return Ok(());
+                    } else {
+                        // All members assigned — execute batch swap.
+                        self.finalize_formation_change(gs)?;
+                        self.clear_choice_state_and_resume(gs)?;
+                        return Ok(());
+                    }
+                }
+            }
+
             modified.destination = Some(dest.to_string());
             if let Err(e) = self.execute_position_change_with_destination(gs, &modified, dest) {
                 log::debug!("Failed to execute position change: {}", e);

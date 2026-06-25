@@ -1796,15 +1796,13 @@ impl AbilityResolver {
                 if card_ids.is_empty() {
                     return Ok(());
                 }
-                let card_nos: Vec<String> = card_ids
-                    .iter()
-                    .filter_map(|&cid| card_db.get_card(cid).map(|c| c.card_no.clone()))
-                    .collect();
-                if card_nos.is_empty() {
-                    return Ok(());
-                }
 
-                // First card: create choice for destination
+                // Initialize formation_plan with all members (no destination yet).
+                // This drives zone exclusion in compute_valid_position_destinations
+                // and tracks which members still need assignment.
+                self.formation_plan = card_ids.iter().map(|&cid| (cid, String::new())).collect();
+
+                // First member: create destination choice.
                 let first_card_id = card_ids[0];
                 let current_idx = {
                     let player = gs.resolve_target_player_mut(target_m);
@@ -1820,16 +1818,21 @@ impl AbilityResolver {
                     Some(2) => "Right",
                     _ => "?",
                 };
+                let first_card_name = card_db
+                    .get_card(first_card_id)
+                    .map(|c| c.name.clone())
+                    .unwrap_or_else(|| "member".to_string());
 
                 let valid_destinations =
                     self.compute_valid_position_destinations(gs, effect, target_m);
                 if valid_destinations.is_empty() {
+                    self.formation_plan.clear();
                     return Ok(());
                 }
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
                     entry.choice_card_no = Some(ChoiceRoute::Raw(format!(
                         "position_change:self:{}",
-                        card_nos[0]
+                        first_card_id
                     )));
                 }
                 self.pending_choice = Some(Choice::SelectTarget {
@@ -1845,20 +1848,6 @@ impl AbilityResolver {
                     allow_skip: effect.optional.unwrap_or(false),
                     options: Some(valid_destinations),
                 });
-
-                // Save remaining cards as pending_sequential_actions
-                if card_nos.len() > 1 {
-                    let mut remaining: Vec<AbilityEffect> = Vec::new();
-                    for cn in &card_nos[1..] {
-                        let mut sub = AbilityEffect::default();
-                        sub.action = "position_change".to_string();
-                        sub.target = Some(target_m.to_string());
-                        sub.target_member = Some(cn.clone());
-                        sub.optional = effect.optional;
-                        remaining.push(sub);
-                    }
-                    gs.ability_queue.set_pending_actions(remaining);
-                }
                 return Ok(());
             }
 
@@ -2082,8 +2071,21 @@ impl AbilityResolver {
         let position_names = ["left", "center", "right"];
         let mut valid = Vec::new();
 
+        // Formation change: exclude zones already assigned to another member.
+        let planned_zones: Vec<String> = self
+            .formation_plan
+            .iter()
+            .map(|(_, d)| d.clone())
+            .filter(|d| !d.is_empty())
+            .collect();
+
         for (i, pos_name) in position_names.iter().enumerate() {
             let card_id = player.stage.stage[i];
+
+            // Formation change: skip zones already claimed.
+            if planned_zones.contains(&pos_name.to_string()) {
+                continue;
+            }
 
             // Exclude the activating card's own position when exclude_self is set.
             if exclude_self && Some(card_id) == activating_card_id {
@@ -2115,6 +2117,68 @@ impl AbilityResolver {
         }
 
         valid
+    }
+
+    /// Execute all formation change swaps as a batch after all members have
+    /// been assigned destinations via `formation_plan`.  Each swap is executed
+    /// via `stage.position_change` and each member's movement is individually
+    /// tracked via `push_movement_event`.
+    pub(crate) fn finalize_formation_change(&mut self, gs: &mut GameState) -> Result<(), String> {
+        if self.formation_plan.is_empty() {
+            return Ok(());
+        }
+        let (cause_cid, mover_pid) = (
+            gs.activating_card,
+            gs.ability_queue
+                .current_entry()
+                .map(|e| e.player_id.clone())
+                .unwrap_or_default(),
+        );
+        let target = "self";
+        // Collect swaps first, then execute (avoids overlapping gs borrows).
+        let swaps: Vec<(usize, usize, i16)> = {
+            let player = gs.resolve_target_player_mut(target);
+            self.formation_plan
+                .iter()
+                .filter_map(|&(member_id, ref dest)| {
+                    if member_id == -1 || dest.is_empty() {
+                        return None;
+                    }
+                    let dest_idx = match dest.as_str() {
+                        "left" => 0usize,
+                        "center" => 1,
+                        "right" => 2,
+                        _ => return None,
+                    };
+                    let from_idx = player.stage.stage.iter().position(|&id| id == member_id)?;
+                    if from_idx == dest_idx {
+                        return None; // already at destination
+                    }
+                    Some((from_idx, dest_idx, member_id))
+                })
+                .collect()
+        };
+        for (from_idx, dest_idx, member_id) in &swaps {
+            let from_area = match from_idx {
+                0 => crate::zones::MemberArea::LeftSide,
+                1 => crate::zones::MemberArea::Center,
+                _ => crate::zones::MemberArea::RightSide,
+            };
+            let to_area = match dest_idx {
+                0 => crate::zones::MemberArea::LeftSide,
+                1 => crate::zones::MemberArea::Center,
+                _ => crate::zones::MemberArea::RightSide,
+            };
+            let player = gs.resolve_target_player_mut(target);
+            if let Err(e) = player.stage.position_change(from_area, to_area) {
+                log::debug!("formation_change swap failed: {}", e);
+                continue;
+            }
+            gs.push_movement_event(*member_id, "stage", "stage", cause_cid, &mover_pid, true);
+        }
+        gs.position_change_occurred_this_turn = true;
+        self.formation_plan.clear();
+        Ok(())
     }
 
     pub fn execute_position_change_with_destination(

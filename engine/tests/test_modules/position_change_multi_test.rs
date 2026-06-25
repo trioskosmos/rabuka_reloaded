@@ -22,21 +22,21 @@ fn position_change_three_members_all_move() {
 
     game.play_to_stage(chii, rabuka_engine::zones::MemberArea::RightSide);
 
-    // All 3 positions occupied → 3 sequential choices
-    // Verify the frontend would show all 3 position buttons
+    // All 3 positions occupied → 3 sequential choices, each with
+    // reduced options as zones are claimed (formation change).
     assert!(game.has_pending_choice(), "First choice");
     let actions = game.generated_actions();
-    assert_eq!(actions.len(), 3, "Should have 3 position options");
-    game.select_generated(1); // a → Center (swap with b)
+    assert_eq!(actions.len(), 3, "First: all 3 zones available");
+    game.select_generated(1); // a → Center
 
     assert!(game.has_pending_choice(), "Second choice");
     let actions = game.generated_actions();
-    assert_eq!(actions.len(), 3, "Should have 3 position options");
-    game.select_generated(2); // → Right
+    assert_eq!(actions.len(), 2, "Second: 2 zones remain after first pick");
+    game.select_generated(1); // → Right
 
     assert!(game.has_pending_choice(), "Third choice");
     let actions = game.generated_actions();
-    assert_eq!(actions.len(), 3, "Should have 3 position options");
+    assert_eq!(actions.len(), 1, "Third: last remaining zone");
     game.select_generated(0); // → Left
 
     assert!(!game.has_pending_choice());
@@ -180,18 +180,18 @@ fn position_change_with_swap() {
         "First: move a (L) → Right, swaps chii to Left"
     );
     let actions = game.generated_actions();
-    assert_eq!(actions.len(), 3);
-    game.select_generated(2); // Move to Right (swap a with chii)
+    assert_eq!(actions.len(), 3, "First: all 3 zones available");
+    game.select_generated(2); // Move to Right
 
     assert!(game.has_pending_choice(), "Second choice");
     let actions = game.generated_actions();
-    assert_eq!(actions.len(), 3);
+    assert_eq!(actions.len(), 2, "Second: 2 zones remain after first pick");
     game.select_generated(0); // Move to Left
 
     assert!(game.has_pending_choice(), "Third choice");
     let actions = game.generated_actions();
-    assert_eq!(actions.len(), 3);
-    game.select_generated(1); // Move to Center
+    assert_eq!(actions.len(), 1, "Third: last remaining zone");
+    game.select_generated(0); // Move to Center
 
     assert!(!game.has_pending_choice());
     assert_ne!(game.state.player1.stage.stage[0], -1);
@@ -478,13 +478,19 @@ fn position_change_tracks_card_movement() {
     game.play_to_stage(chii, rabuka_engine::zones::MemberArea::RightSide);
 
     assert!(game.has_pending_choice());
-    game.select_generated(1); // a → Center (swap with b)
+    let actions = game.generated_actions();
+    assert_eq!(actions.len(), 3, "First: all 3 zones available");
+    game.select_generated(1); // a → Center
 
     assert!(game.has_pending_choice());
+    let actions = game.generated_actions();
+    assert_eq!(actions.len(), 2, "Second: 2 zones remain");
     game.select_generated(0); // → Left
 
     assert!(game.has_pending_choice());
-    game.select_generated(2); // → Right
+    let actions = game.generated_actions();
+    assert_eq!(actions.len(), 1, "Third: last remaining zone");
+    game.select_generated(0); // → Right
 
     let moved = &game.state.cards_moved_this_turn;
     assert!(!moved.is_empty(), "At least one card should have moved");

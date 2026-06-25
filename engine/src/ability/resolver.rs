@@ -46,6 +46,9 @@ pub struct AbilityResolver {
     pub pending_reprompt_choice: Option<Choice>,
     /// Buffer for structured ability resolution log items.
     pub log_items: Vec<AbilityLogItem>,
+    /// Formation change plan: (member_id, chosen_destination) pairs accumulated
+    /// across sequential choices.  All swaps execute as a batch at the end.
+    pub formation_plan: Vec<(i16, String)>,
 }
 
 impl AbilityResolver {
@@ -74,6 +77,7 @@ impl AbilityResolver {
             pending_repeat_actions: Vec::new(),
             pending_reprompt_choice: None,
             log_items: Vec::new(),
+            formation_plan: Vec::new(),
         }
     }
 
