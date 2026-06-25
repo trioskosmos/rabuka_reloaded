@@ -646,35 +646,16 @@ impl AbilityResolver {
         }
 
         let fetch_all = effect.all.unwrap_or(false);
+        let take_cards = |cards: &[i16]| -> Vec<i16> {
+            if fetch_all {
+                cards.to_vec()
+            } else {
+                cards.iter().take(count as usize).copied().collect()
+            }
+        };
         let cards: Vec<i16> = match Zone::from_str(source) {
             Some(Zone::Deck) | Some(Zone::DeckTop) => {
                 player.main_deck.draw_multiple(count as usize)
-            }
-            Some(Zone::Hand) => {
-                if fetch_all {
-                    player.hand.cards.iter().copied().collect::<Vec<_>>()
-                } else {
-                    player
-                        .hand
-                        .cards
-                        .iter()
-                        .take(count as usize)
-                        .copied()
-                        .collect()
-                }
-            }
-            Some(Zone::Discard) | Some(Zone::Waitroom) => {
-                if fetch_all {
-                    player.waitroom.cards.iter().copied().collect::<Vec<_>>()
-                } else {
-                    player
-                        .waitroom
-                        .cards
-                        .iter()
-                        .take(count as usize)
-                        .copied()
-                        .collect()
-                }
             }
             Some(Zone::Stage) => {
                 let sc: Vec<i16> = player
@@ -684,62 +665,9 @@ impl AbilityResolver {
                     .filter(|&&id| id != -1)
                     .copied()
                     .collect();
-                if fetch_all {
-                    sc
-                } else {
-                    sc.into_iter().take(count as usize).collect()
-                }
+                take_cards(&sc)
             }
-            Some(Zone::Energy) | Some(Zone::EnergyZone) => {
-                if fetch_all {
-                    player.energy_zone.cards.iter().copied().collect::<Vec<_>>()
-                } else {
-                    player
-                        .energy_zone
-                        .cards
-                        .iter()
-                        .take(count as usize)
-                        .copied()
-                        .collect()
-                }
-            }
-            Some(Zone::LiveCardZone) => {
-                if fetch_all {
-                    player
-                        .live_card_zone
-                        .cards
-                        .iter()
-                        .copied()
-                        .collect::<Vec<_>>()
-                } else {
-                    player
-                        .live_card_zone
-                        .cards
-                        .iter()
-                        .take(count as usize)
-                        .copied()
-                        .collect()
-                }
-            }
-            Some(Zone::SuccessLiveZone) => {
-                if fetch_all {
-                    player
-                        .success_live_card_zone
-                        .cards
-                        .iter()
-                        .copied()
-                        .collect::<Vec<_>>()
-                } else {
-                    player
-                        .success_live_card_zone
-                        .cards
-                        .iter()
-                        .take(count as usize)
-                        .copied()
-                        .collect()
-                }
-            }
-            _ => vec![],
+            _ => take_cards(util::zone_cards(player, source)),
         };
 
         gs.looked_at_cards = cards;
