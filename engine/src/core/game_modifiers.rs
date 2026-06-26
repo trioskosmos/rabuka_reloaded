@@ -61,6 +61,15 @@ pub struct GameModifiers {
     /// The surplus heart count just before it was zeroed by gain_resource(surplus_heart).
     /// Used by `delta: true` conditions on subsequent steps.
     pub last_surplus_loss_count: u32,
+    /// Blade bonuses contributed by constant abilities on success zone cards.
+    /// Key: target member card_id, value: total blade amount from success zone.
+    pub success_zone_blade_bonuses: HashMap<i16, i32>,
+    /// Heart bonuses contributed by constant abilities on success zone cards.
+    /// Key: target member card_id → {heart_color_str → amount}.
+    pub success_zone_heart_bonuses: HashMap<i16, HashMap<String, i32>>,
+    /// Score bonuses contributed by constant abilities on success zone cards.
+    /// Key: target live card card_id, value: total score amount from success zone.
+    pub success_zone_score_bonuses: HashMap<i16, i32>,
 }
 
 impl Default for GameModifiers {
@@ -93,6 +102,9 @@ impl GameModifiers {
             last_cost_energy_count: 0,
             delayed_cannot_active: HashMap::new(),
             last_surplus_loss_count: 0,
+            success_zone_blade_bonuses: HashMap::new(),
+            success_zone_heart_bonuses: HashMap::new(),
+            success_zone_score_bonuses: HashMap::new(),
         }
     }
 

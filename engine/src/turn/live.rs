@@ -34,10 +34,10 @@ impl super::TurnEngine {
         // Evaluate constant modify_required_hearts abilities on cards in the
         // success_live_card_zone (e.g. PL!-bp6-022-L) before any scoring or
         // heart requirement checks.
-        game_state.evaluate_success_zone_heart_reductions();
+        game_state.evaluate_success_zone_constant_abilities();
 
         // Restore performance-time need_heart_modifiers that were cleared by
-        // evaluate_success_zone_heart_reductions. This preserves modifications
+        // evaluate_success_zone_constant_abilities. This preserves modifications
         // from live_start triggers and other non-constant sources.
         // Deduplicate (cid,color) pairs to avoid double-counting when the same
         // global modifier is captured in multiple players' snapshots.

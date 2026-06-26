@@ -29,7 +29,7 @@ fn high_score_mus_live_gets_heart_reduction() {
         .push(activator);
     game.state.player1.live_card_zone.cards.push(high_score);
 
-    game.state.evaluate_success_zone_heart_reductions();
+    game.state.evaluate_success_zone_constant_abilities();
 
     let mod_val = game
         .state
@@ -57,7 +57,7 @@ fn low_score_mus_live_gets_no_reduction() {
         .push(activator);
     game.state.player1.live_card_zone.cards.push(low_score);
 
-    game.state.evaluate_success_zone_heart_reductions();
+    game.state.evaluate_success_zone_constant_abilities();
 
     let mod_val = game
         .state
@@ -87,7 +87,7 @@ fn mixed_scores_filter_correctly() {
     game.state.player1.live_card_zone.cards.push(high_score);
     game.state.player1.live_card_zone.cards.push(low_score);
 
-    game.state.evaluate_success_zone_heart_reductions();
+    game.state.evaluate_success_zone_constant_abilities();
 
     let high_mod = game
         .state
@@ -124,7 +124,7 @@ fn non_mus_high_score_gets_no_reduction() {
         .push(activator);
     game.state.player1.live_card_zone.cards.push(non_mus);
 
-    game.state.evaluate_success_zone_heart_reductions();
+    game.state.evaluate_success_zone_constant_abilities();
 
     let mod_val = game
         .state
@@ -149,7 +149,7 @@ fn activator_not_in_success_zone_does_nothing() {
     game.state.player1.live_card_zone.cards.push(activator);
     game.state.player1.live_card_zone.cards.push(high_score);
 
-    game.state.evaluate_success_zone_heart_reductions();
+    game.state.evaluate_success_zone_constant_abilities();
 
     let mod_val = game
         .state
@@ -174,7 +174,7 @@ fn no_live_cards_no_crash() {
         .cards
         .push(activator);
 
-    game.state.evaluate_success_zone_heart_reductions();
+    game.state.evaluate_success_zone_constant_abilities();
 
     // live_card_zone is empty — no modifiers should be applied
     assert!(
@@ -205,7 +205,7 @@ fn non_stackable_duplicate_cards() {
         .push(game.id("PL!-bp6-022-L"));
     game.state.player1.live_card_zone.cards.push(high_score);
 
-    game.state.evaluate_success_zone_heart_reductions();
+    game.state.evaluate_success_zone_constant_abilities();
 
     let mod_val = game
         .state
@@ -234,7 +234,7 @@ fn as_long_as_expiration_on_zone_exit() {
     game.state.player1.live_card_zone.cards.push(high_score);
 
     // First evaluation: activator IS in success zone → reduction applied
-    game.state.evaluate_success_zone_heart_reductions();
+    game.state.evaluate_success_zone_constant_abilities();
 
     let mod_val = game
         .state
@@ -251,7 +251,7 @@ fn as_long_as_expiration_on_zone_exit() {
     // Re-evaluate: no activator in zone → no reduction
     // Note: we must also clear the local non_stackable tracker, which
     // a fresh evaluate call does automatically.
-    game.state.evaluate_success_zone_heart_reductions();
+    game.state.evaluate_success_zone_constant_abilities();
 
     let mod_val2 = game
         .state

@@ -480,7 +480,7 @@ impl super::TurnEngine {
     pub fn trigger_live_success_abilities(game_state: &mut GameState, player_id: &str) {
         // Evaluate constant modify_required_hearts abilities on cards in the
         // success_live_card_zone before checking live success conditions.
-        game_state.evaluate_success_zone_heart_reductions();
+        game_state.evaluate_success_zone_constant_abilities();
 
         // Restore performance-time need_heart_modifiers that were cleared above.
         // This preserves modifications from live_start triggers and other non-constant

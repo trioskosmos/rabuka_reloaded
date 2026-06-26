@@ -1102,39 +1102,49 @@ impl GameState {
         self.gained_card_abilities.remove(&card_id);
     }
 
-    /// Evaluate all constant (常時) `modify_required_hearts` abilities on cards
-    /// in the success_live_card_zone. Used by tests and by the live success flow
-    /// to apply ongoing heart requirement reductions (e.g. PL!-bp6-022-L).
-    /// Created as a focused scan because `recalculate_constants` only evaluates
-    /// stage-based constant abilities. This function:
-    ///   1. Scans all cards in the current player's success_live_card_zone
-    ///   2. For each card with a constant `modify_required_hearts` ability whose
-    ///      location_condition passes (self is in success_live_card_zone), executes
-    ///      the effect through the AbilityResolver to handle original_value filter,
-    ///      group_names filter, per_unit counting, etc.
-    pub fn evaluate_success_zone_heart_reductions(&mut self) {
+    /// Evaluate all constant (常時) abilities on cards in the success_live_card_zone.
+    /// Handles the following action types:
+    ///   - modify_required_hearts: heart requirement reductions (existing behavior)
+    ///   - gain_resource(blade): blade grants to stage members
+    ///   - gain_resource(heart): heart grants to stage members
+    ///   - modify_score: score bonuses to live cards
+    ///   - sequential: recurses into sub-actions
+    /// Uses a clear-and-re-evaluate pattern to ensure as_long_as semantics: when a
+    /// card leaves the success zone, its modifier is not re-applied.
+    pub fn evaluate_success_zone_constant_abilities(&mut self) {
         use crate::ability::condition::ConditionContext;
-        use crate::ability::enums::ActionType;
-        use crate::ability::resolver::AbilityResolver;
 
-        // Clear all need_heart_modifiers first, then re-evaluate from current zone state.
-        // This ensures as_long_as semantics: when a card leaves the success zone, its
-        // constant modifier is not re-applied on the next evaluation.
+        // ── Clear all need_heart_modifiers (existing behavior) ──
         self.mods.need_heart_modifiers.clear();
+
+        // ── Clear previously-applied success zone bonuses ──
+        let old_sz_blade = std::mem::take(&mut self.mods.success_zone_blade_bonuses);
+        for (cid, val) in &old_sz_blade {
+            self.mods.remove_blade_modifier(*cid, *val);
+        }
+        let old_sz_heart = std::mem::take(&mut self.mods.success_zone_heart_bonuses);
+        for (cid, cols) in &old_sz_heart {
+            for (color_str, delta) in cols {
+                let hc = crate::card::parse_heart_color(color_str);
+                self.mods.remove_heart_modifier(*cid, hc, *delta);
+            }
+        }
+        let old_sz_score = std::mem::take(&mut self.mods.success_zone_score_bonuses);
+        for (cid, val) in &old_sz_score {
+            self.mods.remove_score_modifier(*cid, *val);
+        }
 
         // Track non-stackable effects locally so they are reset each evaluation
         let mut local_non_stackable: std::collections::HashSet<String> =
             std::collections::HashSet::new();
 
-        // Process both players' success_live_card_zones
-        for player_idx in 0..2 {
-            let zone_cards = if player_idx == 0 {
-                self.player1.success_live_card_zone.cards.clone()
-            } else {
-                self.player2.success_live_card_zone.cards.clone()
-            };
+        let zone_cards_p1 = self.player1.success_live_card_zone.cards.clone();
+        let zone_cards_p2 = self.player2.success_live_card_zone.cards.clone();
 
-            for cid in &zone_cards {
+        // Collect all (cid, effect) pairs upfront to avoid borrow conflicts
+        let mut entries: Vec<(i16, crate::card::AbilityEffect)> = Vec::new();
+        for (_player_idx, zone_cards) in [(0, &zone_cards_p1), (1, &zone_cards_p2)] {
+            for cid in zone_cards {
                 let card = match self.card_database.get_card(*cid) {
                     Some(c) => c.clone(),
                     None => continue,
@@ -1147,61 +1157,176 @@ impl GameState {
                     if !is_constant {
                         continue;
                     }
-                    let effect = match ability.effect.as_ref() {
-                        Some(e) => e.clone(),
-                        None => continue,
-                    };
-                    if ActionType::from_str(&effect.action)
-                        != Some(ActionType::ModifyRequiredHearts)
-                    {
-                        continue;
+                    if let Some(effect) = ability.effect.as_ref() {
+                        entries.push((*cid, effect.clone()));
                     }
-                    // Evaluate location condition
-                    let prev_activating = self.activating_card;
-                    self.activating_card = Some(*cid);
-                    let ctx = ConditionContext::new(self);
-                    let cond_met = effect
-                        .condition
-                        .as_ref()
-                        .is_none_or(|c| ctx.evaluate_condition(c));
-                    if !cond_met {
-                        self.activating_card = prev_activating;
-                        continue;
-                    }
-                    // Non-stackable check: skip if this effect was already applied
-                    // in this evaluation pass. Uses a local set so the check is
-                    // reset each time the function is called.
-                    if effect.non_stackable.unwrap_or(false) {
-                        let effect_key = format!("{}:{}", effect.action, effect.text);
-                        if local_non_stackable.contains(&effect_key) {
-                            self.activating_card = prev_activating;
-                            continue;
-                        }
-                        local_non_stackable.insert(effect_key);
-                    }
-
-                    // Execute the effect through the resolver
-                    let mut resolver = AbilityResolver::new(self.card_database.clone(), Some(*cid));
-                    let _ = resolver.execute_modify_required_hearts(
-                        self,
-                        effect.operation.as_deref().unwrap_or("decrease"),
-                        effect.value_or_count(0),
-                        &effect.heart_colors,
-                        effect.target_name(),
-                        effect.per_unit.unwrap_or(false),
-                        effect.per_unit_count.unwrap_or(1),
-                        effect.group_name(),
-                        effect.timing_condition.as_deref(),
-                        effect.location.as_deref(),
-                        effect.original_value,
-                        effect.original_count,
-                        effect.original_operator.as_deref(),
-                        effect.exclude_self.unwrap_or(false),
-                        effect.self_target.unwrap_or(false),
-                    );
-                    self.activating_card = prev_activating;
                 }
             }
+        }
+
+        for (cid, effect) in &entries {
+            let prev_activating = self.activating_card;
+            self.activating_card = Some(*cid);
+            let ctx = ConditionContext::new(self);
+            let cond_met = effect
+                .condition
+                .as_ref()
+                .is_none_or(|c| ctx.evaluate_condition(c));
+            if !cond_met {
+                self.activating_card = prev_activating;
+                continue;
+            }
+            if effect.non_stackable.unwrap_or(false) {
+                let effect_key = format!("{}:{}", effect.action, effect.text);
+                if local_non_stackable.contains(&effect_key) {
+                    self.activating_card = prev_activating;
+                    continue;
+                }
+                local_non_stackable.insert(effect_key);
+            }
+
+            self.apply_success_zone_effect(*cid, effect);
+            self.activating_card = prev_activating;
+        }
+    }
+
+    /// Apply a single success zone constant effect. Called by
+    /// evaluate_success_zone_constant_abilities and recursively for sequential sub-actions.
+    fn apply_success_zone_effect(&mut self, cid: i16, effect: &crate::card::AbilityEffect) {
+        use crate::ability::enums::ActionType;
+        use crate::ability::resolver::AbilityResolver;
+
+        match ActionType::from_str(&effect.action) {
+            Some(ActionType::ModifyRequiredHearts) => {
+                let prev = self.activating_card;
+                self.activating_card = Some(cid);
+                let mut resolver = AbilityResolver::new(self.card_database.clone(), Some(cid));
+                let _ = resolver.execute_modify_required_hearts(
+                    self,
+                    effect.operation.as_deref().unwrap_or("decrease"),
+                    effect.value_or_count(0),
+                    &effect.heart_colors,
+                    effect.target_name(),
+                    effect.per_unit.unwrap_or(false),
+                    effect.per_unit_count.unwrap_or(1),
+                    effect.group_name(),
+                    effect.timing_condition.as_deref(),
+                    effect.location.as_deref(),
+                    effect.original_value,
+                    effect.original_count,
+                    effect.original_operator.as_deref(),
+                    effect.exclude_self.unwrap_or(false),
+                    effect.self_target.unwrap_or(false),
+                );
+                self.activating_card = prev;
+            }
+            Some(ActionType::GainResource) => {
+                let resource = effect.resource.as_deref().unwrap_or("");
+                let amount = effect.resource_icon_count.unwrap_or(effect.count_or(1)) as i32;
+                let card_db = self.card_database.clone();
+                let player = self.resolve_target_player_mut(effect.target_name());
+
+                let candidates: Vec<i16> = player
+                    .stage
+                    .stage
+                    .iter()
+                    .enumerate()
+                    .filter(|&(_, &idx)| idx != -1)
+                    .filter(|&(pos, _)| {
+                        if let Some(ref pos_req) = effect.position {
+                            let pos_str = pos_req.get_position();
+                            match pos_str {
+                                Some("center") => pos == 1,
+                                Some("left") | Some("left_side") => pos == 0,
+                                Some("right") | Some("right_side") => pos == 2,
+                                _ => true,
+                            }
+                        } else {
+                            true
+                        }
+                    })
+                    .filter(|&(_, &id)| {
+                        if let Some(ref groups) = effect.group_names {
+                            groups.iter().any(|g| {
+                                crate::ability::util::card_matches_group_str(
+                                    &card_db,
+                                    id,
+                                    Some(g.as_str()),
+                                )
+                            })
+                        } else {
+                            true
+                        }
+                    })
+                    .map(|(_, &id)| id)
+                    .collect();
+
+                match resource {
+                    "blade" | "ブレード" => {
+                        for &target_id in &candidates {
+                            self.mods.add_blade_modifier(target_id, amount);
+                            *self
+                                .mods
+                                .success_zone_blade_bonuses
+                                .entry(target_id)
+                                .or_insert(0) += amount;
+                        }
+                    }
+                    "heart" | "ハート" => {
+                        let heart_colors = if effect.heart_colors.is_empty() {
+                            vec!["heart01".to_string()]
+                        } else {
+                            effect.heart_colors.clone()
+                        };
+                        for &target_id in &candidates {
+                            for color_str in &heart_colors {
+                                let hc = crate::card::parse_heart_color(color_str);
+                                self.mods.add_heart_modifier(target_id, hc, amount);
+                                *self
+                                    .mods
+                                    .success_zone_heart_bonuses
+                                    .entry(target_id)
+                                    .or_default()
+                                    .entry(color_str.clone())
+                                    .or_insert(0) += amount;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Some(ActionType::ModifyScore) => {
+                let player = self.resolve_target_player_mut(effect.target_name());
+                let value = effect.value_or_count(1) as i32;
+                let op = effect.operation.as_deref().unwrap_or("add");
+                let live_cards = player.live_card_zone.cards.to_vec();
+                for &target_id in &live_cards {
+                    match op {
+                        "set" => {
+                            self.mods.set_score_modifier(target_id, value);
+                            self.mods
+                                .success_zone_score_bonuses
+                                .insert(target_id, value);
+                        }
+                        _ => {
+                            self.mods.add_score_modifier(target_id, value);
+                            *self
+                                .mods
+                                .success_zone_score_bonuses
+                                .entry(target_id)
+                                .or_insert(0) += value;
+                        }
+                    }
+                }
+            }
+            Some(ActionType::Sequential) => {
+                if let Some(ref actions) = effect.compound.actions {
+                    for sub in actions {
+                        self.apply_success_zone_effect(cid, sub);
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }
