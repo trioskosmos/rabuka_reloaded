@@ -54,6 +54,7 @@ pub mod fuyumari_debut_test;
 pub mod fuyumari_test;
 pub mod gameplay_test;
 pub mod genki_zenkai_test;
+pub mod hanabiko_discard_test;
 pub mod hanamaru_test;
 
 pub mod hanamusubi_exclude_self_test;

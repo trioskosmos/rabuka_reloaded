@@ -428,3 +428,66 @@ fn two_static_one_moved_only_one_trigger() {
         choice_count
     );
 }
+
+/// DIVE! ab#0: skip placement, then another DIVE! moves → should fire fresh.
+/// Tests that the ability is NOT permanently blocked after skipping.
+#[test]
+fn skip_placement_then_new_retrieval_still_triggers() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let dive_a = g.id("PL!N-bp4-026-L");
+    let dive_b = g.id("PL!N-bp4-026-L");
+    let niji = g.id("PL!N-PR-003-PR");
+    let filler = g.id("PL!-sd1-010-SD");
+
+    g.state.player1.stage.stage = [niji, -1, -1];
+    g.state.player1.hand.cards.push(filler);
+    for _ in 0..10 {
+        g.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        g.state.player2.main_deck.cards.push(filler);
+    }
+
+    // First retrieval: ab#0 fires → skip placement
+    g.state.player1.waitroom.cards.push(dive_a);
+    g.state.player1.waitroom.cards.retain(|c| *c != dive_a);
+    g.state.player1.hand.cards.push(dive_a);
+    g.state.recently_moved_cards = Some(vec![dive_a]);
+
+    let pid = g.state.player1.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
+    g.state.process_pending_auto_abilities(&pid);
+
+    assert!(g.has_pending_choice(), "ab#0 should fire for dive_a");
+    g.select_indices(&[]); // decline placement
+
+    // DIVE! should still be in hand
+    assert!(
+        !g.state.player1.live_card_zone.cards.contains(&dive_a),
+        "dive_a should not be in live zone after decline"
+    );
+
+    // Second retrieval (new movement)
+    g.state.turn_number += 1;
+    g.state.player1.waitroom.cards.push(dive_b);
+    g.state.player1.waitroom.cards.retain(|c| *c != dive_b);
+    g.state.player1.hand.cards.push(dive_b);
+    g.state.recently_moved_cards = Some(vec![dive_b]);
+
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
+    g.state.process_pending_auto_abilities(&pid);
+
+    assert!(g.has_pending_choice(), "ab#0 should fire for dive_b");
+    g.select_indices(&[0]); // accept placement
+
+    // ab#1 should fire (or auto-select blade)
+    while g.has_pending_choice() {
+        g.select_indices(&[0]);
+    }
+
+    assert!(
+        g.state.player1.live_card_zone.cards.contains(&dive_b),
+        "dive_b should be in live zone"
+    );
+}
