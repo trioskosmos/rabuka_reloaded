@@ -426,17 +426,21 @@ impl super::TurnEngine {
             // Compute per-card spare (余剰ハート): remaining hearts from the pool
             // after this card's allocation. For each live card, spare = total available
             // minus all allocations up to and including this card.
-            // This correctly shows how many hearts remain in the pool after each card
-            // consumes its share from the shared pool.
+            // Wildcard allocations use alloc.color as the TARGET color, but the
+            // actual pool deduction is from heart00 (index 0) or icon_all (index 7).
+            // We map to the source pool index so spare reflects the real pool.
             let mut cumulative_used = EMPTY_H8;
             for i in 0..snap.lives.len() {
-                // Accumulate allocations for this live card
                 for alloc in &snap.breakdown.allocations {
                     if alloc.target_idx == i {
-                        cumulative_used[alloc.color] += alloc.amount;
+                        let source_idx = match alloc.phase.as_str() {
+                            "1b_h00_wild" | "2_wildcard" => 0,
+                            "1c_all_wild" | "3c_all" | "4_all_cleanup" => 7,
+                            _ => alloc.color,
+                        };
+                        cumulative_used[source_idx] += alloc.amount;
                     }
                 }
-                // spare = total_hearts - cumulative_used (what remains after this card)
                 let mut spare = EMPTY_H8;
                 for idx in 0..8 {
                     spare[idx] = snap.total_hearts[idx].saturating_sub(cumulative_used[idx]);

@@ -3,6 +3,7 @@ impl GameState {
     /// Handles gain_resource(blade, heart), modify_score, modify_cost.
     /// Clears old constant-derived values and re-applies those whose conditions pass.
     pub fn recalculate_constants(&mut self) {
+        eprintln!("[SZ_DEBUG] recalculate_constants ENTERED");
         let entries = self.collect_constant_stage_effects();
         self.mods.constant_score_sources.clear();
 
@@ -511,6 +512,9 @@ impl GameState {
 
         // Also recalculate cost modifiers from hand cards (hand-based cost reductions)
         self.recalculate_constant_cost_modifiers();
+
+        // Evaluate constant abilities from success live card zone (e.g. Love wing bell)
+        self.evaluate_success_zone_constant_modifiers();
     }
 
     pub fn recalculate_constant_blade_modifiers(&mut self) {
@@ -592,6 +596,8 @@ impl GameState {
         }
         self.mods.constant_blade_bonuses = expected;
         self.recalculate_constant_cost_modifiers();
+        eprintln!("[SZ_DEBUG] about to call evaluate_success_zone_constant_modifiers from recalculate_constants");
+        self.evaluate_success_zone_constant_modifiers();
     }
 
     pub fn recalculate_constant_cost_modifiers(&mut self) {
@@ -1111,11 +1117,31 @@ impl GameState {
     ///   - sequential: recurses into sub-actions
     /// Uses a clear-and-re-evaluate pattern to ensure as_long_as semantics: when a
     /// card leaves the success zone, its modifier is not re-applied.
+    /// Evaluate all constant (常時) abilities on cards in the success_live_card_zone.
+    /// Used during the live flow (victory determination and live success triggering).
+    /// Clears need_heart_modifiers first, then delegates to
+    /// evaluate_success_zone_constant_modifiers for the tracked bonuses.
     pub fn evaluate_success_zone_constant_abilities(&mut self) {
+        self.mods.need_heart_modifiers.clear();
+        self.evaluate_success_zone_constant_modifiers();
+    }
+
+    /// Evaluate constant abilities on success zone cards for tracked bonuses
+    /// (blade, heart, score). Does NOT touch need_heart_modifiers.
+    /// Called from recalculate_constants on every state change, and from
+    /// evaluate_success_zone_constant_abilities during the live flow.
+    pub fn evaluate_success_zone_constant_modifiers(&mut self) {
         use crate::ability::condition::ConditionContext;
 
-        // ── Clear all need_heart_modifiers (existing behavior) ──
-        self.mods.need_heart_modifiers.clear();
+        eprintln!("[SZ_DEBUG] evaluate_success_zone_constant_modifiers called");
+        eprintln!(
+            "[SZ_DEBUG] p1 success zone = {:?}",
+            self.player1.success_live_card_zone.cards.to_vec()
+        );
+        eprintln!(
+            "[SZ_DEBUG] p2 success zone = {:?}",
+            self.player2.success_live_card_zone.cards.to_vec()
+        );
 
         // ── Clear previously-applied success zone bonuses ──
         let old_sz_blade = std::mem::take(&mut self.mods.success_zone_blade_bonuses);
@@ -1141,9 +1167,9 @@ impl GameState {
         let zone_cards_p1 = self.player1.success_live_card_zone.cards.clone();
         let zone_cards_p2 = self.player2.success_live_card_zone.cards.clone();
 
-        // Collect all (cid, effect) pairs upfront to avoid borrow conflicts
-        let mut entries: Vec<(i16, crate::card::AbilityEffect)> = Vec::new();
-        for (_player_idx, zone_cards) in [(0, &zone_cards_p1), (1, &zone_cards_p2)] {
+        // Collect all (cid, player_index, effect) pairs upfront to avoid borrow conflicts
+        let mut entries: Vec<(i16, usize, crate::card::AbilityEffect)> = Vec::new();
+        for (player_idx, zone_cards) in [(0usize, &zone_cards_p1), (1, &zone_cards_p2)] {
             for cid in zone_cards {
                 let card = match self.card_database.get_card(*cid) {
                     Some(c) => c.clone(),
@@ -1158,20 +1184,22 @@ impl GameState {
                         continue;
                     }
                     if let Some(effect) = ability.effect.as_ref() {
-                        entries.push((*cid, effect.clone()));
+                        entries.push((*cid, player_idx, effect.clone()));
                     }
                 }
             }
         }
 
-        for (cid, effect) in &entries {
+        for (cid, player_idx, effect) in &entries {
             let prev_activating = self.activating_card;
             self.activating_card = Some(*cid);
             let ctx = ConditionContext::new(self);
+            eprintln!("[SZ_DEBUG] cid={} effect={}", cid, effect.action);
             let cond_met = effect
                 .condition
                 .as_ref()
                 .is_none_or(|c| ctx.evaluate_condition(c));
+            eprintln!("[SZ_DEBUG] cond_met={}", cond_met);
             if !cond_met {
                 self.activating_card = prev_activating;
                 continue;
@@ -1185,16 +1213,28 @@ impl GameState {
                 local_non_stackable.insert(effect_key);
             }
 
-            self.apply_success_zone_effect(*cid, effect);
+            self.apply_success_zone_effect(*cid, *player_idx, effect);
             self.activating_card = prev_activating;
         }
     }
 
     /// Apply a single success zone constant effect. Called by
-    /// evaluate_success_zone_constant_abilities and recursively for sequential sub-actions.
-    fn apply_success_zone_effect(&mut self, cid: i16, effect: &crate::card::AbilityEffect) {
+    /// evaluate_success_zone_constant_modifiers and recursively for sequential sub-actions.
+    fn apply_success_zone_effect(
+        &mut self,
+        cid: i16,
+        player_idx: usize,
+        effect: &crate::card::AbilityEffect,
+    ) {
         use crate::ability::enums::ActionType;
         use crate::ability::resolver::AbilityResolver;
+
+        // Resolve the correct player directly since these effects don't go through the ability queue
+        let owner_player = match player_idx {
+            0 => &mut self.player1,
+            1 => &mut self.player2,
+            _ => return,
+        };
 
         match ActionType::from_str(&effect.action) {
             Some(ActionType::ModifyRequiredHearts) => {
@@ -1224,7 +1264,23 @@ impl GameState {
                 let resource = effect.resource.as_deref().unwrap_or("");
                 let amount = effect.resource_icon_count.unwrap_or(effect.count_or(1)) as i32;
                 let card_db = self.card_database.clone();
-                let player = self.resolve_target_player_mut(effect.target_name());
+                let player = match effect.target_name() {
+                    "self" | "自分" => owner_player,
+                    "opponent" | "相手" => match player_idx {
+                        0 => &mut self.player2,
+                        1 => &mut self.player1,
+                        _ => return,
+                    },
+                    _ => owner_player,
+                };
+                eprintln!(
+                    "[SZ_DEBUG] GainResource resource={} amount={} target={} position={:?}",
+                    resource,
+                    amount,
+                    effect.target_name(),
+                    effect.position
+                );
+                eprintln!("[SZ_DEBUG] stage={:?}", player.stage.stage);
 
                 let candidates: Vec<i16> = player
                     .stage
@@ -1261,9 +1317,19 @@ impl GameState {
                     .map(|(_, &id)| id)
                     .collect();
 
+                eprintln!(
+                    "[SZ_DEBUG] GainResource resource={} amount={}",
+                    resource, amount
+                );
+                eprintln!(
+                    "[SZ_DEBUG] candidates count={} ids={:?}",
+                    candidates.len(),
+                    candidates
+                );
                 match resource {
                     "blade" | "ブレード" => {
                         for &target_id in &candidates {
+                            eprintln!("[SZ_DEBUG] ADDING blade {} to target {}", amount, target_id);
                             self.mods.add_blade_modifier(target_id, amount);
                             *self
                                 .mods
@@ -1296,7 +1362,15 @@ impl GameState {
                 }
             }
             Some(ActionType::ModifyScore) => {
-                let player = self.resolve_target_player_mut(effect.target_name());
+                let player = match effect.target_name() {
+                    "self" | "自分" => owner_player,
+                    "opponent" | "相手" => match player_idx {
+                        0 => &mut self.player2,
+                        1 => &mut self.player1,
+                        _ => return,
+                    },
+                    _ => owner_player,
+                };
                 let value = effect.value_or_count(1) as i32;
                 let op = effect.operation.as_deref().unwrap_or("add");
                 let live_cards = player.live_card_zone.cards.to_vec();
@@ -1322,7 +1396,7 @@ impl GameState {
             Some(ActionType::Sequential) => {
                 if let Some(ref actions) = effect.compound.actions {
                     for sub in actions {
-                        self.apply_success_zone_effect(cid, sub);
+                        self.apply_success_zone_effect(cid, player_idx, sub);
                     }
                 }
             }

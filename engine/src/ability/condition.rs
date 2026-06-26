@@ -43,6 +43,7 @@ impl<'a> ConditionContext<'a> {
             if p1.stage.stage.contains(&cid)
                 || p1.hand.cards.contains(&cid)
                 || p1.live_card_zone.cards.contains(&cid)
+                || p1.success_live_card_zone.cards.contains(&cid)
                 || p1.energy_zone.cards.contains(&cid)
                 || p1.waitroom.cards.contains(&cid)
             {
@@ -50,6 +51,7 @@ impl<'a> ConditionContext<'a> {
             } else if p2.stage.stage.contains(&cid)
                 || p2.hand.cards.contains(&cid)
                 || p2.live_card_zone.cards.contains(&cid)
+                || p2.success_live_card_zone.cards.contains(&cid)
                 || p2.energy_zone.cards.contains(&cid)
                 || p2.waitroom.cards.contains(&cid)
             {

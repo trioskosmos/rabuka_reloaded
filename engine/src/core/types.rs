@@ -224,8 +224,15 @@ pub struct Allocation {
     pub is_bonus: bool,
     /// Phase tag emitted by the engine's compute_allocations so the UI
     /// can display steps without re-deriving allocation logic.
-    /// Values: "1a_colored", "1b_h00_wild", "1c_all_wild",
-    /// "2_wildcard", "3a_colored_surplus", "3b_h00", "3c_all".
+    /// Values (current engine):
+    ///   "1a_colored"        — matching colored → specific color req
+    ///   "1b_h00_wild"       — Heart00 wildcard → remaining color deficit
+    ///   "2_wildcard"        — Heart00 wildcard → color deficit (second pass)
+    ///   "3a_colored_surplus" — colored surplus → Heart00 req (demand-aware)
+    ///   "3b_h00"            — Heart00 → remaining Heart00 req
+    ///   "4_all_cleanup"     — icon_all → ANY remaining deficit (color first)
+    /// Legacy values (old engine, kept for backward compat):
+    ///   "1c_all_wild", "3c_all"
     pub phase: String,
 }
 
