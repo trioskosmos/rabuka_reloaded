@@ -1667,7 +1667,10 @@ impl AbilityResolver {
             }
             result
         };
-        self.selected_cards = cards.clone();
+        // Don't set self.selected_cards here — cards moved from
+        // revealed_cards are effect-internal (not user-targeted
+        // selections), and would bleed into downstream gain_resource
+        // via the "pure sequential select→gain_resource" path.
         let player = gs.active_player_mut();
         for &cid in &cards {
             util::place_card_in_zone(player, cid, dst, None, false, 1);

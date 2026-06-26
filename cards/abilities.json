@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-27T00:47:36.621493",
+  "generated_at": "2026-06-27T01:31:10.072099",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -5529,40 +5529,47 @@
             "text": "好きなハートの色を1つ指定する"
           },
           {
-            "action": "reveal",
-            "source": "deck_top",
-            "count": 5,
-            "target": "self",
-            "text": "自分のデッキの上からカードを5枚公開する"
-          },
-          {
-            "action": "select_cards",
-            "source": "revealed_cards",
-            "count": 1,
-            "destination": "hand",
-            "group_names": [
-              "μ's"
-            ],
-            "condition": {
+            "action": "conditional_on_result",
+            "text": "自分のデッキの上からカードを5枚公開する",
+            "primary_effect": {
+              "action": "reveal",
+              "source": "deck_top",
+              "count": 5,
+              "target": "self",
+              "text": "自分のデッキの上からカードを5枚公開する"
+            },
+            "result_condition": {
               "type": "all_revealed_match_heart_color",
               "count": 5,
               "operator": ">=",
               "text": "公開されたカードの中に指定した色に合致するカードが合計5枚含まれる場合"
             },
-            "text": "好きなハートの色を1つ指定する。その後、自分のデッキの上からカードを5枚公開する。公開されたカードの中に指定した色のハートを持つメンバーカードと必要ハートに指定した色を含むライブカードが合計5枚含まれる場合、その中から『μ's』のカードを1枚手札に加え、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。公開した残りのカードを控え室に置く"
-          },
-          {
-            "action": "gain_resource",
-            "resource": "blade",
-            "count": 3,
-            "duration": "live_end",
-            "text": "ブレードを得る",
-            "condition": {
-              "type": "all_revealed_match_heart_color",
-              "count": 5,
-              "operator": ">=",
-              "text": "公開されたカードの中に指定した色に合致するカードが合計5枚含まれる場合"
-            }
+            "followup_action": {
+              "action": "sequential",
+              "actions": [
+                {
+                  "action": "select_cards",
+                  "source": "revealed_cards",
+                  "count": 1,
+                  "destination": "hand",
+                  "group_names": [
+                    "μ's"
+                  ],
+                  "text": "自分のデッキの上からカードを5枚公開する"
+                },
+                {
+                  "action": "gain_resource",
+                  "resource": "blade",
+                  "count": 3,
+                  "duration": "live_end",
+                  "text": "ブレードを得る"
+                }
+              ],
+              "text": "自分のデッキの上からカードを5枚公開する"
+            },
+            "group_names": [
+              "μ's"
+            ]
           },
           {
             "action": "move_cards",

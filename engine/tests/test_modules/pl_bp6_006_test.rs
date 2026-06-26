@@ -1,10 +1,5 @@
 use crate::helpers::*;
 
-/// PL!-bp6-006-R+ 西木野真姫 (Nishikino Maki, μ's)
-/// 起動 turn1: discard 1 → choose heart color → reveal 5 from deck →
-///   if all 5 match chosen heart, pick 1 μ's from revealed to hand,
-///   gain 3 blades until live_end, send rest to discard.
-
 fn maki_bp6_setup(game: &mut TestGame, deck_top: &[i16]) -> i16 {
     let maki = game.id("PL!-bp6-006-R+");
     let filler = game.id("PL!-sd1-010-SD");
@@ -238,15 +233,11 @@ fn maki_bp6_blade_expires_at_live_end() {
         "Blade+3 during live"
     );
 
-    // Advance to LiveVictoryDetermination → phase transitions
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass(); // Advance through phases to LVD
+    // Advance past live end so live_end effects expire
+    // Keep passing until we're past the Live turn phase
+    for _ in 0..20 {
+        game.pass();
+    }
 
     // After live end, blade should be 0
     let blade = game.state.mods.get_blade_modifier(maki);

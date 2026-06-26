@@ -5863,7 +5863,7 @@ def _try_heart_select_reveal(text):
     Handles the Maki bp6 pattern:
       "好きなハートの色を1つ指定する。その後、デッキの上からカードをN枚公開する。
        公開されたカードの中に...条件...合計N枚含まれる場合、その中から..."
-    → sequential [specify_heart_color, reveal, select_cards, gain_resource, cleanup]
+    → sequential [specify_heart_color, conditional_on_result(reveal→cond→followup), cleanup]
     """
     if "好きなハートの色" not in text or "公開" not in text or "その中から" not in text:
         return None
@@ -5916,33 +5916,37 @@ def _try_heart_select_reveal(text):
             "text": "好きなハートの色を1つ指定する",
         }
     )
-    # Step 2: reveal from deck_top
-    seq.append(
-        {
+    # Step 2: reveal + conditional_on_result wrapping the followup actions
+    # The condition lives ONLY on the conditional_on_result wrapper —
+    # select_cards and gain_resource inside have NO conditions so they
+    # never get re-evaluated against stale state (revealed_cards was
+    # modified by select_cards filtering).
+    cond_on_result = {
+        "action": "conditional_on_result",
+        "text": f"自分のデッキの上からカードを{reveal_count}枚公開する",
+        "primary_effect": {
             "action": "reveal",
             "source": "deck_top",
             "count": reveal_count,
             "target": "self",
             "text": f"自分のデッキの上からカードを{reveal_count}枚公開する",
-        }
-    )
-    # Step 3: select_cards from revealed_cards (if we had a select_action from _build)
+        },
+    }
+    if heart_match_condition:
+        cond_on_result["result_condition"] = heart_match_condition
+    followup_actions = []
     if select_actions.get("action") == "select_cards":
         sel = {
             "action": "select_cards",
             "source": "revealed_cards",
             "count": select_actions.get("count", 1),
             "destination": select_actions.get("destination", "hand"),
-            # No discard_remaining — explicit move_cards step handles cleanup
         }
         if select_actions.get("group_names"):
             sel["group_names"] = select_actions["group_names"]
         if select_actions.get("card_type"):
             sel["card_type"] = select_actions["card_type"]
-        if heart_match_condition:
-            sel["condition"] = heart_match_condition
-        seq.append(sel)
-    # Step 4: gain_resource blade if present
+        followup_actions.append(sel)
     if blade_count > 0:
         gr = {
             "action": "gain_resource",
@@ -5951,10 +5955,14 @@ def _try_heart_select_reveal(text):
             "duration": "live_end",
             "text": "ブレードを得る",
         }
-        if heart_match_condition:
-            gr["condition"] = heart_match_condition
-        seq.append(gr)
-    # Step 5: discard remaining revealed cards
+        followup_actions.append(gr)
+    if followup_actions:
+        cond_on_result["followup_action"] = {
+            "action": "sequential",
+            "actions": followup_actions,
+        }
+    seq.append(cond_on_result)
+    # Step 3: discard remaining revealed cards (unconditional cleanup)
     seq.append(
         {
             "action": "move_cards",
