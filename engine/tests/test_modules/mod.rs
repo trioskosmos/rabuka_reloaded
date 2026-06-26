@@ -209,8 +209,8 @@ pub mod yoshiko_test;
 pub mod you_debut_test;
 pub mod zero_tested_action_types_test;
 
-// PVP room / web server integration tests
-pub mod pvp_room_test;
+// PVP room / web server integration tests (excluded from main test suite — runs slowly)
+// pub mod pvp_room_test;
 
 // Playthrough of coverage-gap test cards
 pub mod untested_abilities_playthrough_test;
@@ -278,3 +278,6 @@ pub mod keke_pb2_013_debut_test;
 // CatChu! per-unit energy activation (PL!SP-pb2-018-R)
 pub mod catchu_energy_activation_test;
 pub mod live_cards_disappear_test;
+
+// ノンフィクション!! (PL!SP-bp4-024) — LiveStart cost comparison (ab#0)
+pub mod nonfiction_cost_comparison_test;

@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ラブカ ! | Card Browser</title>
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ctAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAABklJREFUeNrs3b9PG2cAxvFLC1IYGlGGVAoLEh5BnUDNAtnISEa2whgW/BeEqhkbwUIGBhgYyIAUMiDVU4OHBuGhqfAIUhYzMBA2OiC173P1tcflPfsw94u77yeyLGLOr/H7+H3vfe/es+MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAArtXpxPVl2qLpm7Fd7W5K2srtyzvP+/mbsnCRddNWWvxvVkX8X84r4nGoUXax3HFkDz6Rs0d7PUT+HNtus6dy3gprkNUj+FN9iu61j0xdDyjbRf0BPqplSt4Nv2/uCnTAJoXsCyuZsmeOUNYTuI7839vgnictpd8AvCh3YGXuRlFAwQQBBAgACCAAIEEAQQIIDIn76sX8DE5IQzNTXlDA8Puz+fHJ84+/V9p3nU7Ljd0NCQMzMz44yNjzkDAwPO+fm5u02tVnMuLy9vVKa2q9frzvHxccft9Pvazl9mo9Fw6vv1rmXOPDWvdWzsxmUSwATNzc25YfAbrYy6t8Zhw9ne3g4NwvPF524I/IGcmp5yn+/VL6/ccNgsLi66z++nQOmm8NZ+rVm30+MLCwv2D4EJ1uu119YQ6jXqtXrBC5apv1F/K11wyrywdGqlVEFhFeoPX/BxBTusFQqG79rjJkyVSuVGz+l9IILh9D9nMHzBD6GtTAKYdABNV9bN5MSktSUKC5+/FbVVepQybb+jD0OUMtUi2rbtuhsyMUEA02arLFvYetnOC0Rwu24hkkfDj774v8popae/SS1blDKj/k0E8A4JVnyUIIT9XtRtcYcCGDZI8NOIOKjbaNMTHEW3Wq1I29rKPGoeRSoz+PxRR7hR3gsCGDNNX3R2Dj8cjszYuwWJIVNtyBNe/RSpsLcrUwF11ZmlBFulPeCAMZM0x22CvNXnK3yFISw6Rnv8Tfbb6yPab6uW5m2+Ue1ULu7ux3LDHtc/9+pTL2mMs8Fft3rho9/eLx828I//P7BXZnsHyB4la05uTBnZ2dOs9l0HnzzwHn43cNrAdra2nIft7m6unI+/vHRvfeXqYDs7e11LPO0deqcnJy423mDBgVPz7e+vh3ajfrL1Mi8v7//vzJ3dnYitco2BwcHP1nq5EdzN5JFkGyvJ4qeF6ZXl6p/swudnQwXpkd+PaUeBYN9QBSAjlglOQ1FABHK3d/9dijy1BcBRKx0nLrXQRIBxK27Xm9WggAi9a5XZ/HYJuUJIBI3vzDvDjy6nRRMAJHIfp8mzKMcfiSAiJXOXfTOX2ydtlIps4+3Hd6gY3b2/+uLdjp+TQAR64BDwQue/Ds+Np7KPiABLCkFTiELWzKg/9c+oOYBk5yKIYAFb910uz9w3x1Y6KiGlhx0WiQV7JZ1U3es8x0v/7r8994EM64uOtMAapWaFgGV+ZR3VejGxkaiI07v/VUYo4bPo9bv8/lnN3xJtIR9WYZPk51lp8VT2gfrdJJtrxQYf2hq5p/CqO5V733YB18fCk1CpzEVk1kAoyyRLFNXmRZ3v659JYfgWmd1q+9236V6hnZmAWSl2fWWKm3uCHfu+s9qhdOYfGYQkiNqdTqtN0mKf19Q4dN+aBZyFUDvgj1lEedo8qa8BfgqP4n9zzsZQB3+KfvVotKiqz3oA7C5sZl6t+vHseCSDno0Ea2uP+tF8QSwhDQNo92dPFwWLlddsHsRoKfFG2R4Rw/ywrueYR7kKoDexSmLONh4+fPLXIRQrV+Uq8jSBReI5jy9NRZ52P9L4ywXAgirsEsQE8CCy2q+L+84EpIw70r6eer2CGBY99DhKvUoJrpgEEAQQIAADtznHEEGIRnyFsGUhY5GaHSskwLydKiOLrgkvPUZ/gA">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; }
+
+#app { position: fixed; inset: 0; display: flex; }
+
+#sidebar {
+  width: 280px; overflow-y: auto; background: #16213e;
+  border-right: 1px solid #0f3460; padding: 12px 14px 14px; flex-shrink: 0;
+}
+#sidebar h1 { font-size: 14px; margin-bottom: 8px; color: #e94560; display: flex; align-items: center; gap: 6px; }
+#sidebar h1 span { font-size: 16px; }
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-track { background: transparent; }
+#sidebar::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 2px; }
+
+.filter-group { margin-bottom: 5px; }
+.filter-group label.filter-label { display: flex; align-items: center; gap: 3px; font-size: 10px; color: #8888a0; margin-bottom: 1px; text-transform: uppercase; letter-spacing: 0.2px; }
+.filter-group label img.icon { width: 12px; height: 12px; object-fit: contain; }
+.filter-group select, .filter-group input[type="number"] {
+  width: 100%; padding: 3px 5px; background: #1a1a2e; color: #e0e0e0; border: 1px solid #0f3460;
+  border-radius: 3px; font-size: 11px; outline: none;
+}
+.filter-group select:focus, .filter-group input[type="number"]:focus { border-color: #e94560; }
+.filter-group input[type="number"] { width: 65px; }
+.filter-group .checkbox-group { display: flex; flex-wrap: wrap; gap: 3px 8px; padding: 1px 0; }
+.filter-group .checkbox-group label { display: flex; align-items: center; gap: 3px; text-transform: none; letter-spacing: 0; font-size: 11px; color: #c0c0d0; cursor: pointer; }
+.filter-group .checkbox-group input[type="checkbox"] { accent-color: #e94560; width: 11px; height: 11px; }
+
+#panel-count { padding: 2px 0 6px; font-size: 11px; color: #808090; text-align: center; flex: 0 0 100%; }
+.btn-group { display: flex; flex-wrap: wrap; gap: 3px; }
+.btn-opt {
+  padding: 3px 8px; background: #1a1a2e; color: #8888a0; border: 1px solid #0f3460;
+  border-radius: 3px; font-size: 10px; cursor: pointer; transition: 0.1s;
+}
+.btn-opt:hover { border-color: #555; color: #ccc; }
+.btn-opt.active { background: #e94560; color: #fff; border-color: #e94560; }
+
+#result-count { margin-top: 4px; padding-top: 5px; border-top: 1px solid #0f3460; font-size: 11px; color: #808090; text-align: center; }
+
+#card-panel {
+  flex: 1; overflow-y: scroll;
+  padding: 8px; display: flex; flex-wrap: wrap; gap: 5px; align-content: start;
+}
+#card-panel::-webkit-scrollbar { width: 6px; }
+#card-panel::-webkit-scrollbar-track { background: transparent; }
+#card-panel::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+
+#empty-state {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  text-align: center; color: #505060; font-size: 13px; line-height: 1.6;
+  z-index: -1;
+}
+
+.card-item {
+  position: relative; border-radius: 4px; overflow: hidden;
+  cursor: pointer; background: #0d1b2a; width: 110px; flex: 0 0 110px;
+}
+.card-item:hover { box-shadow: 0 2px 10px rgba(233,69,96,0.25); }
+.card-item img { width: 100%; display: block; object-fit: contain; }
+.card-item .card-name {
+  padding: 2px 4px; font-size: 9px; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; color: #b0b0c0;
+}
+.card-item .copy-badge {
+  position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.7);
+  color: #fff; font-size: 8px; padding: 1px 4px; border-radius: 2px; opacity: 0;
+  transition: opacity 0.1s; pointer-events: none;
+}
+.card-item:hover .copy-badge { opacity: 1; }
+.card-item .type-badge {
+  position: absolute; bottom: 18px; left: 2px;
+  background: rgba(0,0,0,0.55); color: #bbb; font-size: 7px;
+  padding: 1px 3px; border-radius: 2px;
+}
+
+#tooltip {
+  position: fixed; z-index: 9999; pointer-events: none;
+  max-width: 340px; background: #0d1b2a; border: 1px solid #0f3460;
+  border-radius: 6px; padding: 10px 12px; font-size: 12px;
+  color: #e0e0e0; line-height: 1.5; opacity: 0;
+  transition: opacity 0.15s; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+#tooltip.show { opacity: 1; }
+#tooltip .tt-name { font-weight: bold; color: #fff; font-size: 13px; margin-bottom: 4px; }
+#tooltip .tt-id { color: #e94560; font-size: 10px; margin-bottom: 6px; }
+#tooltip .tt-ability { color: #c0c0d0; font-size: 11px; margin-top: 4px; padding-top: 4px; border-top: 1px solid #0f3460; }
+#tooltip .tt-ability img.tt-icon { height: 1.1em; vertical-align: middle; display: inline; }
+
+#toast {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  background: #e94560; color: #fff; padding: 6px 16px; border-radius: 5px;
+  font-size: 11px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 99999;
+}
+#toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <aside id="sidebar">
+    <h1><span>&#128269;</span> Card Browser</h1>
+    <div id="filters"></div>
+    <div id="result-count">Select filters to browse</div>
+  </aside>
+  <div id="card-panel">
+    <div id="panel-count"></div>
+    <div id="empty-state">&#128270; Select filters to browse cards</div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+<div id="toast"></div>
+
+<script>
+const TEXT_ICONS = {
+  heart: 'img/texticon/heart_01.png',
+  blade: 'img/texticon/icon_blade.png',
+  score: 'img/texticon/icon_score.png',
+  energy: 'img/texticon/icon_energy.png',
+  kidou: 'img/texticon/kidou.png',
+  turn1: 'img/texticon/turn1.png',
+};
+
+const filtersEl = document.getElementById('filters');
+const cardPanel = document.getElementById('card-panel');
+const emptyEl = document.getElementById('empty-state');
+const countEl = document.getElementById('result-count');
+const tooltipEl = document.getElementById('tooltip');
+const toastEl = document.getElementById('toast');
+
+let allCardsArr = [];
+let abilityIndex = null;
+let abilityTextIndex = null;
+let filterActive = false;
+
+function iconImg(src, alt) {
+  return `<img class="icon" src="${src}" alt="${alt}" loading="lazy">`;
+}
+
+function buildFilter(id, label, icon, innerHtml) {
+  const labelHtml = label ? `<label class="filter-label">${icon ? iconImg(icon, label) : ''}${label}</label>` : '';
+  return `<div class="filter-group" data-fgroup="${id}">${labelHtml}${innerHtml}</div>`;
+}
+
+function buildSelect(id, label, icon, options, selected) {
+  const opts = options.map(o =>
+    `<option value="${o}"${o === selected ? ' selected' : ''}>${o}</option>`
+  ).join('');
+  return buildFilter(id, label, icon, `<select data-fid="${id}">${opts}</select>`);
+}
+
+function buildBtnGroup(id, label, icon, options) {
+  const btns = options.map(o =>
+    `<button class="btn-opt${o === 'All' ? ' active' : ''}" data-fid="${id}" data-value="${o}">${o}</button>`
+  ).join('');
+  return buildFilter(id, label, icon, `<div class="btn-group" data-fid="${id}">${btns}</div>`);
+}
+
+function enrichText(text) {
+  if (!text) return '';
+  return text.replace(/\{\{(.*?)\|(.*?)\}\}/g, (match, img, alt) => {
+    const src = img.endsWith('.png') && !img.includes('/') ? 'img/texticon/' + img : 'img/' + img;
+    let style = 'height:1.1em;vertical-align:middle;';
+    if (img.includes('live_start') || img.includes('live_success')) style += 'min-width:3.2em;';
+    return `<img class="tt-icon" src="${src}" alt="${alt}" style="${style}">`;
+  });
+}
+
+function getBtnVal(id) {
+  const active = document.querySelector(`.btn-group[data-fid="${id}"] .btn-opt.active`);
+  return active ? active.dataset.value : 'All';
+}
+
+function isDefaultFilters() {
+  const els = document.querySelectorAll('[data-fid]');
+  for (const el of els) {
+    if (el.tagName === 'SELECT' && el.value !== 'All') return false;
+    if (el.tagName === 'INPUT' && el.type === 'number' && el.value !== '' && el.value !== '0') return false;
+    if (el.classList.contains('btn-group') && getBtnVal(el.dataset.fid) !== 'All') return false;
+  }
+  const cbs = document.querySelectorAll('input[type="checkbox"]');
+  for (const cb of cbs) {
+    if (cb.checked) return false;
+  }
+  return true;
+}
+
+function applyFilters() {
+  if (!filterActive) {
+    emptyEl.style.display = '';
+    emptyEl.textContent = '\u{1F50D} Select filters to browse cards';
+    countEl.textContent = 'Select filters to browse';
+    cardPanel.querySelectorAll('.card-item').forEach(el => el.remove());
+    return;
+  }
+
+  const vals = {};
+  document.querySelectorAll('[data-fid]').forEach(el => {
+    if (el.tagName === 'SELECT' || (el.tagName === 'INPUT' && el.type === 'number')) {
+      vals[el.dataset.fid] = el.value;
+    }
+    if (el.classList.contains('btn-group')) {
+      vals[el.dataset.fid] = getBtnVal(el.dataset.fid);
+    }
+  });
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    vals[cb.name] = cb.checked;
+  });
+
+  const results = allCardsArr.filter(card => {
+    if (vals.type && vals.type !== 'All' && card.type !== vals.type) return false;
+    if (vals.series && vals.series !== 'All' && card.series !== vals.series) return false;
+    if (vals.unit && vals.unit !== 'All' && (card.unit || '') !== vals.unit) return false;
+    if (vals.rarity && vals.rarity !== 'All' && card.rare !== vals.rarity) return false;
+    if (vals.product && vals.product !== 'All' && card.product !== vals.product) return false;
+    if (vals.hasAbility && vals.hasAbility !== 'All') {
+      const has = abilityIndex && abilityIndex.has(card.card_no);
+      if (vals.hasAbility === 'Yes' && !has) return false;
+      if (vals.hasAbility === 'No' && has) return false;
+    }
+    const costMin = parseInt(vals.costMin);
+    if (!isNaN(costMin) && (card.cost === undefined || card.cost < costMin)) return false;
+    const scoreMin = parseInt(vals.scoreMin);
+    if (!isNaN(scoreMin) && (card.score === undefined || card.score < scoreMin)) return false;
+    const heartMin = parseInt(vals.heartMin);
+    if (!isNaN(heartMin)) {
+      let total = 0;
+      if (card.base_heart) total += Object.values(card.base_heart).reduce((a,b) => a + b, 0);
+      if (card.need_heart) total += Object.values(card.need_heart).reduce((a,b) => a + b, 0);
+      if (total < heartMin) return false;
+    }
+    if (vals.noHearts) {
+      const has = (card.base_heart && Object.keys(card.base_heart).length > 0) ||
+                  (card.need_heart && Object.keys(card.need_heart).length > 0);
+      if (has) return false;
+    }
+    if (vals.hasBlade && !(card.blade && card.blade > 0)) return false;
+    if (vals.hasBladeHeart && !(card.blade_heart && Object.keys(card.blade_heart).length > 0)) return false;
+    if (vals.trigger && vals.trigger !== 'All') {
+      const info = abilityIndex && abilityIndex.get(card.card_no);
+      if (!info || !info.some(a => a.triggers.includes(vals.trigger))) return false;
+    }
+    if (vals.costAction && vals.costAction !== 'All') {
+      const info = abilityIndex && abilityIndex.get(card.card_no);
+      if (!info || !info.some(a => a.costAction === vals.costAction)) return false;
+    }
+    if (vals.effectAction && vals.effectAction !== 'All') {
+      const info = abilityIndex && abilityIndex.get(card.card_no);
+      if (!info || !info.some(a => a.effectAction === vals.effectAction)) return false;
+    }
+    if (vals.useLimit && vals.useLimit !== 'All') {
+      const limit = parseInt(vals.useLimit);
+      const info = abilityIndex && abilityIndex.get(card.card_no);
+      if (!info || !info.some(a => a.useLimit === limit)) return false;
+    }
+    return true;
+  });
+
+  let displayCards = results;
+  if (!vals.showAllRarities) {
+    const seen = new Set();
+    const deduped = [];
+    for (const card of results) {
+      const key = card.name + '|' + card.type + '|' + (card.series || '');
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(card);
+      }
+    }
+    displayCards = deduped;
+  }
+
+  renderCards(displayCards);
+}
+
+function renderCards(cards) {
+  cardPanel.querySelectorAll('.card-item').forEach(el => el.remove());
+  emptyEl.style.display = 'none';
+  const pc = document.getElementById('panel-count');
+
+  if (cards.length === 0) {
+    emptyEl.textContent = 'No cards match the current filters';
+    emptyEl.style.display = '';
+    countEl.textContent = 'Results: 0 cards';
+    if (pc) pc.textContent = '';
+    return;
+  }
+
+  countEl.textContent = `Results: ${cards.length} card${cards.length !== 1 ? 's' : ''}`;
+  if (pc) pc.textContent = `Showing ${cards.length} card${cards.length !== 1 ? 's' : ''}`;
+
+  const fragment = document.createDocumentFragment();
+  for (const card of cards) {
+    const div = document.createElement('div');
+    div.className = 'card-item';
+    div.dataset.cardNo = card.card_no;
+
+    const img = document.createElement('img');
+    img.src = `img/cards_webp/${card.card_no}.webp`;
+    img.alt = card.name;
+    img.loading = 'lazy';
+    img.onerror = function() { this.src = 'img/texticon/lltcg-back.png'; };
+
+    const name = document.createElement('div');
+    name.className = 'card-name';
+    name.textContent = card.name;
+
+    const badge = document.createElement('div');
+    badge.className = 'copy-badge';
+    badge.textContent = 'COPY';
+
+    const tBadge = document.createElement('div');
+    tBadge.className = 'type-badge';
+    const typeMap = { 'メンバー': 'M', 'ライブ': 'L', 'エネルギー': 'E' };
+    tBadge.textContent = typeMap[card.type] || card.type;
+
+    div.appendChild(img);
+    div.appendChild(name);
+    div.appendChild(badge);
+    div.appendChild(tBadge);
+
+    div.addEventListener('click', () => copyToClipboard(card.card_no));
+    div.addEventListener('mouseenter', showTooltip);
+    div.addEventListener('mouseleave', hideTooltip);
+    div.addEventListener('mousemove', moveTooltip);
+    fragment.appendChild(div);
+  }
+  cardPanel.appendChild(fragment);
+}
+
+function showTooltip(e) {
+  const cardNo = e.currentTarget.dataset.cardNo;
+  const card = allCardsArr.find(c => c.card_no === cardNo);
+  if (!card) return;
+
+  let html = `<div class="tt-name">${card.name}</div>`;
+  html += `<div class="tt-id">${card.card_no}</div>`;
+
+  const abilities = abilityTextIndex ? abilityTextIndex.get(cardNo) : null;
+  if (abilities && abilities.length > 0) {
+    html += abilities.map(a => `<div class="tt-ability">${enrichText(a)}</div>`).join('');
+  } else if (card.ability) {
+    html += `<div class="tt-ability">${enrichText(card.ability)}</div>`;
+  }
+
+  tooltipEl.innerHTML = html;
+  tooltipEl.classList.add('show');
+  positionTooltip(e);
+}
+
+function hideTooltip() {
+  tooltipEl.classList.remove('show');
+}
+
+function moveTooltip(e) { positionTooltip(e); }
+
+function positionTooltip(e) {
+  const x = e.clientX + 14, y = e.clientY + 14;
+  const tw = tooltipEl.offsetWidth, th = tooltipEl.offsetHeight;
+  tooltipEl.style.left = (x + tw > window.innerWidth ? e.clientX - tw - 14 : x) + 'px';
+  tooltipEl.style.top = (y + th > window.innerHeight ? e.clientY - th - 14 : y) + 'px';
+}
+
+let toastTimeout = null;
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    toastEl.textContent = `Copied: ${text}`;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => toastEl.classList.remove('show'), 2000);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toastEl.textContent = `Copied: ${text}`;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => toastEl.classList.remove('show'), 2000);
+  });
+}
+
+function onFilterChange() {
+  filterActive = !isDefaultFilters();
+  applyFilters();
+}
+
+function populateFilters() {
+  const seriesSet = new Set(), unitSet = new Set(), raritySet = new Set();
+  const productSet = new Set(), triggerSet = new Set();
+  const costActionSet = new Set(), effectActionSet = new Set();
+
+  for (const card of allCardsArr) {
+    if (card.series) card.series.split('\n').forEach(s => { if (s.trim()) seriesSet.add(s.trim()); });
+    if (card.unit) unitSet.add(card.unit);
+    if (card.rare) raritySet.add(card.rare);
+    if (card.product) productSet.add(card.product);
+  }
+
+  abilityIndex = new Map();
+  abilityTextIndex = new Map();
+  if (window._uniqueAbilities) {
+    for (const entry of window._uniqueAbilities) {
+      const triggers = (entry.triggers || '').split(/, ?/).filter(Boolean);
+      const costAction = entry.cost?.action || null;
+      const effectAction = entry.effect?.action || null;
+      const fullText = entry.full_text || '';
+      if (!entry.cards) continue;
+      for (const cardStr of entry.cards) {
+        const cardNo = cardStr.split(' | ')[0];
+        if (!cardNo) continue;
+        if (!abilityIndex.has(cardNo)) abilityIndex.set(cardNo, []);
+        abilityIndex.get(cardNo).push({ triggers, useLimit: entry.use_limit, costAction, effectAction });
+        if (!abilityTextIndex.has(cardNo)) abilityTextIndex.set(cardNo, []);
+        if (fullText && !abilityTextIndex.get(cardNo).includes(fullText)) {
+          abilityTextIndex.get(cardNo).push(fullText);
+        }
+        triggers.forEach(t => triggerSet.add(t));
+        if (costAction) costActionSet.add(costAction);
+        if (effectAction) effectActionSet.add(effectAction);
+      }
+    }
+  }
+
+  const sorted = (set) => ['All', ...[...set].sort()];
+
+  let html = '';
+  html += buildBtnGroup('type', 'Type', null, ['All', 'メンバー', 'ライブ', 'エネルギー']);
+  html += buildSelect('series', 'Series', null, sorted(seriesSet));
+  html += buildSelect('unit', 'Unit', null, sorted(unitSet));
+  html += buildSelect('rarity', 'Rarity', null, sorted(raritySet));
+  html += buildFilter('allRarities', null, null,
+    '<div class="checkbox-group"><label><input type="checkbox" name="showAllRarities"> Show all rarities</label></div>');
+  html += buildSelect('product', 'Product', null, sorted(productSet));
+  html += buildBtnGroup('hasAbility', 'Has Ability', null, ['All', 'Yes', 'No']);
+
+  html += buildFilter('costMin', 'Cost >=', TEXT_ICONS.energy,
+    '<input type="number" data-fid="costMin" min="0" max="30" placeholder="Any">');
+  html += buildFilter('scoreMin', 'Score >=', TEXT_ICONS.score,
+    '<input type="number" data-fid="scoreMin" min="0" max="30" placeholder="Any">');
+
+  html += buildFilter('heartMin', 'Min Hearts', TEXT_ICONS.heart,
+    '<input type="number" data-fid="heartMin" min="0" max="20" placeholder="0">');
+  html += buildFilter('noHearts', null, null,
+    '<div class="checkbox-group"><label><input type="checkbox" name="noHearts"> No hearts wanted</label></div>');
+
+  html += buildFilter('blade', null, TEXT_ICONS.blade,
+    '<div class="checkbox-group"><label><input type="checkbox" name="hasBlade"> Has blade</label><label><input type="checkbox" name="hasBladeHeart"> Has blade_heart</label></div>');
+
+  const sortedTriggers = [...triggerSet].sort();
+  const triggerOpts = ['<option value="All">All</option>'];
+  sortedTriggers.forEach(t => triggerOpts.push(`<option value="${t}">${t}</option>`));
+  html += buildFilter('trigger', 'Trigger', TEXT_ICONS.kidou,
+    `<select data-fid="trigger">${triggerOpts.join('')}</select>`);
+  html += buildFilter('costAction', 'Cost Action', null,
+    `<select data-fid="costAction">${sorted(costActionSet).map(v => `<option value="${v}">${v}</option>`).join('')}</select>`);
+  html += buildFilter('effectAction', 'Effect Action', null,
+    `<select data-fid="effectAction">${sorted(effectActionSet).map(v => `<option value="${v}">${v}</option>`).join('')}</select>`);
+  html += buildBtnGroup('useLimit', 'Use Limit', TEXT_ICONS.turn1, ['All', '1', '2']);
+
+  filtersEl.innerHTML = html;
+
+  filtersEl.querySelectorAll('select, input[type="number"], input[type="checkbox"]').forEach(el => {
+    el.addEventListener('change', onFilterChange);
+    el.addEventListener('input', onFilterChange);
+  });
+  filtersEl.addEventListener('click', e => {
+    const btn = e.target.closest('.btn-opt');
+    if (!btn) return;
+    const grp = btn.closest('.btn-group');
+    if (!grp) return;
+    grp.querySelectorAll('.btn-opt').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    onFilterChange();
+  });
+
+  filterActive = false;
+  applyFilters();
+}
+
+async function init() {
+  try {
+    const [cardsResp, abilitiesResp] = await Promise.all([
+      fetch('/cards/cards.json'), fetch('/cards/abilities.json')
+    ]);
+    if (!cardsResp.ok) throw new Error('Failed to load cards.json: ' + cardsResp.status);
+    allCardsArr = Object.values(await cardsResp.json()).filter(c => c && c.card_no);
+    if (abilitiesResp.ok) window._uniqueAbilities = (await abilitiesResp.json()).unique_abilities || [];
+    populateFilters();
+  } catch (err) {
+    filtersEl.innerHTML = `<div style="color:#e94560;padding:10px;font-size:12px;">Failed: ${err.message}</div>`;
+  }
+}
+
+init();
+</script>
+</body>
+</html>

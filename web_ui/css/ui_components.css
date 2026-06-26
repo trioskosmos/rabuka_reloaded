@@ -136,3 +136,18 @@
 .card-desc-content strong {
     color: var(--accent-blue);
 }
+
+.card-desc-image {
+    margin-top: var(--space-sm);
+    text-align: center;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.card-desc-image img {
+    max-width: 100%;
+    height: auto;
+    max-height: 280px;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}

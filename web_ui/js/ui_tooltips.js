@@ -5,20 +5,23 @@
 import { State } from './state.js';
 import { TextEnricher } from './utils/TextEnricher.js';
 import { Highlighter } from './components/Highlighter.js';
+import { fixImg } from './constants.js';
+import { resolveCardImagePath } from './components/CardRenderer.js';
 
 let tooltipTimeout = null;
 let tooltipHideTimeout = null;
 let currentTooltipTarget = null;
 
 // Lazily-cached DOM nodes — re-queried if cache is stale.
-let _panel, _content, _title;
+let _panel, _content, _title, _image;
 function dom() {
     if (!_panel || !_panel.isConnected) {
         _panel = document.getElementById('card-desc-panel');
         _content = document.getElementById('card-desc-content');
         _title = document.getElementById('card-desc-title');
+        _image = document.getElementById('card-desc-image');
     }
-    return { panel: _panel, content: _content, title: _title };
+    return { panel: _panel, content: _content, title: _title, image: _image };
 }
 
 export const Tooltips = {
@@ -226,6 +229,29 @@ export const Tooltips = {
         const enrichedText = combinedText ? TextEnricher.enrichAbilityText(combinedText) : "";
         dom().content.innerHTML = metadataHtml + enrichedText + rawJsonHtml;
         dom().content.dataset.rawText = enrichedText;
+
+        const imgContainer = dom().image;
+        if (imgContainer) {
+            if (cardObj && cardObj.card_no) {
+                const imgPath = resolveCardImagePath(cardObj.card_no);
+                if (imgPath) {
+                    imgContainer.innerHTML = '';
+                    const img = document.createElement('img');
+                    img.src = fixImg(imgPath);
+                    img.alt = cardObj.name || '';
+                    img.style.display = 'block';
+                    img.style.maxWidth = '100%';
+                    img.style.width = '100%';
+                    img.style.height = 'auto';
+                    imgContainer.appendChild(img);
+                } else {
+                    imgContainer.innerHTML = '';
+                }
+            } else {
+                imgContainer.innerHTML = '';
+            }
+        }
+
         dom().panel.classList.add('active');
 
         if (tooltipHideTimeout) {
