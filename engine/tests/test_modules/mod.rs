@@ -251,6 +251,7 @@ pub mod card_filter_test;
 pub mod condition_evaluation_test;
 pub mod deep_resonance_bp3_test;
 pub mod dive_auto_trigger_test;
+pub mod dive_edge_test;
 pub mod dive_live_card_test;
 pub mod emotion_bp4_test;
 pub mod kanon_bp5_constant_test;

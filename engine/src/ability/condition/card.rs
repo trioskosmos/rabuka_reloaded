@@ -1879,43 +1879,21 @@ impl<'a> ConditionContext<'a> {
                     Vec::new()
                 };
                 if !event_cards.is_empty() {
-                    // Cross-reference event cards with turn_movements for zone-
-                    // transition filtering. This ensures we only count cards
-                    // from the current event/trigger, not ALL movements this turn.
-                    let from_tm: Vec<i16> = self
-                        .game_state
-                        .turn_movements
-                        .iter()
-                        .filter(|m| {
-                            let src_ok = m.source_zone == source_zone
-                                || (source_zone == "discard" && m.source_zone == "waitroom")
-                                || (source_zone == "waitroom" && m.source_zone == "discard");
-                            src_ok
-                                && m.cause_player_id == target_id
-                                && (m.dest_zone == dest_zone
-                                    || (dest_zone == "discard" && m.dest_zone == "waitroom")
-                                    || (dest_zone == "waitroom" && m.dest_zone == "discard"))
-                                && event_cards.contains(&m.moved_card_id)
-                        })
-                        .map(|m| m.moved_card_id)
-                        .collect();
-                    // For each event card, check if turn_movements has zone
-                    // data for it.  If yes, apply the zone/player filter.  If
-                    // no (movement path skipped push_movement_event), include
-                    // the card directly.
-                    let result: Vec<i16> = event_cards
-                        .iter()
-                        .filter(|&&cid| {
-                            let tm: Vec<_> = self
-                                .game_state
-                                .turn_movements
-                                .iter()
-                                .filter(|m| m.moved_card_id == cid)
-                                .collect();
-                            if tm.is_empty() {
-                                return true; // no zone data → assume match
-                            }
-                            tm.iter().any(|m| {
+                    // Self-target + zone_change: the card moved. It's in
+                    // event_cards because the TAS scan found it. The zone
+                    // transition is defined statically in the condition;
+                    // turn_movements cross-referencing adds nothing here.
+                    if condition.self_target.unwrap_or(false) {
+                        event_cards
+                    } else {
+                        // Cross-reference event cards with turn_movements for zone-
+                        // transition filtering. This ensures we only count cards
+                        // from the current event/trigger, not ALL movements this turn.
+                        let from_tm: Vec<i16> = self
+                            .game_state
+                            .turn_movements
+                            .iter()
+                            .filter(|m| {
                                 let src_ok = m.source_zone == source_zone
                                     || (source_zone == "discard" && m.source_zone == "waitroom")
                                     || (source_zone == "waitroom" && m.source_zone == "discard");
@@ -1924,14 +1902,48 @@ impl<'a> ConditionContext<'a> {
                                     && (m.dest_zone == dest_zone
                                         || (dest_zone == "discard" && m.dest_zone == "waitroom")
                                         || (dest_zone == "waitroom" && m.dest_zone == "discard"))
+                                    && event_cards.contains(&m.moved_card_id)
                             })
-                        })
-                        .copied()
-                        .collect();
-                    if !from_tm.is_empty() {
-                        from_tm
-                    } else {
-                        result
+                            .map(|m| m.moved_card_id)
+                            .collect();
+                        // For each event card, check if turn_movements has zone
+                        // data for it.  If yes, apply the zone/player filter.  If
+                        // no (movement path skipped push_movement_event), include
+                        // the card directly.
+                        let result: Vec<i16> = event_cards
+                            .iter()
+                            .filter(|&&cid| {
+                                let tm: Vec<_> = self
+                                    .game_state
+                                    .turn_movements
+                                    .iter()
+                                    .filter(|m| m.moved_card_id == cid)
+                                    .collect();
+                                if tm.is_empty() {
+                                    return true; // no zone data → assume match
+                                }
+                                tm.iter().any(|m| {
+                                    let src_ok = m.source_zone == source_zone
+                                        || (source_zone == "discard"
+                                            && m.source_zone == "waitroom")
+                                        || (source_zone == "waitroom"
+                                            && m.source_zone == "discard");
+                                    src_ok
+                                        && m.cause_player_id == target_id
+                                        && (m.dest_zone == dest_zone
+                                            || (dest_zone == "discard"
+                                                && m.dest_zone == "waitroom")
+                                            || (dest_zone == "waitroom"
+                                                && m.dest_zone == "discard"))
+                                })
+                            })
+                            .copied()
+                            .collect();
+                        if !from_tm.is_empty() {
+                            from_tm
+                        } else {
+                            result
+                        }
                     }
                 } else if !self.game_state.turn_movements.is_empty() {
                     // No event data — use turn_movements directly (original behavior)
