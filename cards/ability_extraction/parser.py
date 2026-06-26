@@ -8059,12 +8059,32 @@ def _normalize_effect_tree(effect, original_text=None):
                         # Also skip card_count_condition — the parser already handles
                         # pure group-filtered counts; _walk would incorrectly add
                         # group_names to inclusion-pattern counts ("1人を含む").
-                        if (
-                            d.get("action") != "gain_resource"
-                            and d.get("type") != "card_count_condition"
-                            and (d.get("action") != "modify_cost" or d.get("per_unit"))
+                        # Only propagate if this action depends on the condition's
+                        # context (source="those_cards") or the group name actually
+                        # appears in the action's own text (not just the condition).
+                        # Otherwise the group name may only belong to the condition
+                        # (e.g. "『スリーズブーケ』のメンバーがいる場合") and should not
+                        # filter the action.
+                        node_text = d.get("text", "") or ""
+                        cond_text = d.get("condition", {}).get("text", "")
+                        if cond_text:
+                            for sep in ("、", "場合、", "とき、", "なら、"):
+                                combined = cond_text + sep
+                                if combined in node_text:
+                                    node_text = node_text.split(combined, 1)[-1]
+                                    break
+                        if d.get("source") == "those_cards" or any(
+                            g in node_text for g in gms
                         ):
-                            d["group_names"] = gms
+                            if (
+                                d.get("action") != "gain_resource"
+                                and d.get("type") != "card_count_condition"
+                                and (
+                                    d.get("action") != "modify_cost"
+                                    or d.get("per_unit")
+                                )
+                            ):
+                                d["group_names"] = gms
 
         # Propagate shuffle from text context
         if "shuffle" not in d and d_ctx and "シャッフル" in d_ctx:

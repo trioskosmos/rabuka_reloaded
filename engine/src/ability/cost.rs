@@ -781,9 +781,19 @@ impl AbilityResolver {
                 return self.resume_pending_actions(gs);
             }
         }
+        let has_pending = gs.ability_queue.has_pending_actions();
+        let has_cost = gs.entry_cost().is_some();
+        let is_deck_top = gs
+            .entry_effect()
+            .and_then(|e| e.source.as_deref())
+            .is_some_and(|s| s == "deck_top" || s == "deck");
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
             entry.cost_paid = true;
             entry.optional_cost_result = Some(true);
+            if !has_cost && is_deck_top && !has_pending {
+                entry.effect_started = false;
+                entry.conditional_choice = Some("pay_optional_cost".to_string());
+            }
         }
         let is_pay = true;
         if is_pay {

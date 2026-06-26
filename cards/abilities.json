@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-26T16:35:12.373697",
+  "generated_at": "2026-06-26T18:07:22.634902",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1258,9 +1258,6 @@
         "action": "gain_ability",
         "ability_gain_trigger": "常時",
         "ability_gain": "【常時】ライブの合計スコアを+1する。",
-        "group_names": [
-          "蓮ノ空"
-        ],
         "gained_effect": {
           "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
@@ -3090,9 +3087,6 @@
         "exclude_position": "center",
         "parenthetical": [
           "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
-        ],
-        "group_names": [
-          "μ's"
         ]
       }
     },
@@ -3614,9 +3608,6 @@
         "card_type": "energy_card",
         "target": "self",
         "action": "move_cards",
-        "group_names": [
-          "Liella!"
-        ],
         "baton_touch_trigger": true
       }
     },
@@ -5390,10 +5381,7 @@
             "count": 1,
             "action": "draw_card",
             "source": "deck",
-            "destination": "hand",
-            "group_names": [
-              "μ's"
-            ]
+            "destination": "hand"
           },
           {
             "text": "手札を1枚控え室に置く",
@@ -5403,9 +5391,6 @@
             "action": "move_cards",
             "card_type": "card"
           }
-        ],
-        "group_names": [
-          "μ's"
         ]
       }
     },
@@ -5885,9 +5870,6 @@
         "value": 1,
         "operation": "add",
         "activation_position": "center",
-        "group_names": [
-          "Aqours"
-        ],
         "position": "center"
       }
     },
@@ -7072,9 +7054,6 @@
         "value": 1,
         "operation": "add",
         "self_target": true,
-        "group_names": [
-          "Liella!"
-        ],
         "position": "center"
       }
     },
@@ -9957,10 +9936,7 @@
         "position": "left_side",
         "position_compare": "right_side",
         "multiple_targets": true,
-        "action": "position_change",
-        "group_names": [
-          "5yncri5e!"
-        ]
+        "action": "position_change"
       }
     },
     {
@@ -10208,10 +10184,7 @@
         "action": "draw_card",
         "source": "deck",
         "destination": "hand",
-        "exclude_self": true,
-        "group_names": [
-          "5yncri5e!"
-        ]
+        "exclude_self": true
       }
     },
     {
@@ -10376,10 +10349,7 @@
         "value": 1,
         "operation": "add",
         "self_target": true,
-        "distinct": "card_name",
-        "group_names": [
-          "KALEIDOSCORE"
-        ]
+        "distinct": "card_name"
       }
     },
     {
@@ -11263,10 +11233,7 @@
         "action": "modify_score",
         "value": 1,
         "operation": "add",
-        "self_target": true,
-        "group_names": [
-          "スリーズブーケ"
-        ]
+        "self_target": true
       }
     },
     {
@@ -12788,10 +12755,7 @@
         "action": "change_state",
         "original_value": true,
         "blade_limit": 3,
-        "blade_limit_operator": "<=",
-        "group_names": [
-          "BiBi"
-        ]
+        "blade_limit_operator": "<="
       }
     },
     {
@@ -12943,9 +12907,6 @@
           "position": "center"
         },
         "activation_position": "center",
-        "group_names": [
-          "μ's"
-        ],
         "position": "center"
       }
     },
@@ -13246,10 +13207,7 @@
         "card_type": "member_card",
         "target": "opponent",
         "action": "change_state",
-        "distinct": "card_name",
-        "group_names": [
-          "BiBi"
-        ]
+        "distinct": "card_name"
       }
     },
     {
@@ -13871,9 +13829,6 @@
         "value": 2,
         "operation": "add",
         "self_target": true,
-        "group_names": [
-          "μ's"
-        ],
         "position": "center"
       }
     },
@@ -14202,10 +14157,7 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "move_cards",
-        "group_names": [
-          "Liella!"
-        ]
+        "action": "move_cards"
       }
     },
     {
@@ -14630,9 +14582,6 @@
         "value": 1,
         "operation": "add",
         "self_target": true,
-        "group_names": [
-          "Liella!"
-        ],
         "position": "center"
       }
     },
@@ -14666,10 +14615,7 @@
         "action": "modify_score",
         "value": 1,
         "operation": "add",
-        "self_target": true,
-        "group_names": [
-          "Liella!"
-        ]
+        "self_target": true
       }
     },
     {
@@ -14747,9 +14693,6 @@
         "multiple_targets": true,
         "parenthetical": [
           "メンバーをそれぞれ好きなエリアに移動させる。この効果で1つのエリアに2人以上のメンバーを移動させることはできない。"
-        ],
-        "group_names": [
-          "Liella!"
         ]
       }
     },
@@ -16392,9 +16335,6 @@
         "value": 1,
         "operation": "add",
         "self_target": true,
-        "group_names": [
-          "蓮ノ空"
-        ],
         "card_names": [
           "DreamBelievers"
         ]
@@ -17324,10 +17264,7 @@
         "position": "front",
         "action": "position_change",
         "destination": "front",
-        "target_member": "select",
-        "group_names": [
-          "みらくらぱーく！"
-        ]
+        "target_member": "select"
       }
     },
     {
@@ -18232,10 +18169,7 @@
         "card_type": "member_card",
         "action": "change_state",
         "target": "opponent",
-        "action_by": "opponent",
-        "group_names": [
-          "EdelNote"
-        ]
+        "action_by": "opponent"
       }
     },
     {
@@ -18461,10 +18395,7 @@
         "value": 2,
         "self_target": true,
         "replace_all": true,
-        "distinct": "card_name",
-        "group_names": [
-          "Liella!"
-        ]
+        "distinct": "card_name"
       }
     },
     {
@@ -18679,10 +18610,7 @@
         },
         "action": "modify_score",
         "value": 1,
-        "operation": "add",
-        "group_names": [
-          "Liella!"
-        ]
+        "operation": "add"
       }
     },
     {
@@ -19213,9 +19141,6 @@
         "multiple_targets": true,
         "parenthetical": [
           "メンバーをそれぞれ好きなエリアに移動させてもよい。"
-        ],
-        "group_names": [
-          "5yncri5e!"
         ]
       }
     },
@@ -19747,9 +19672,6 @@
         "ability_gain_trigger": "常時",
         "ability_gain": "【常時】ライブの合計スコアを+1する。",
         "duration": "live_end",
-        "group_names": [
-          "μ's"
-        ],
         "gained_effect": {
           "text": "ライブの合計スコアを+1する",
           "action": "modify_score",
@@ -20267,10 +20189,7 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "move_cards",
-        "group_names": [
-          "Liella!"
-        ]
+        "action": "move_cards"
       }
     },
     {
@@ -20737,9 +20656,6 @@
         "self_target": true,
         "parenthetical": [
           "エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。"
-        ],
-        "group_names": [
-          "虹ヶ咲"
         ]
       }
     },
@@ -20886,10 +20802,7 @@
         "parenthetical": [
           "必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。"
         ],
-        "distinct": "card_name",
-        "group_names": [
-          "Liella!"
-        ]
+        "distinct": "card_name"
       }
     },
     {
@@ -20984,9 +20897,6 @@
         "self_target": true,
         "parenthetical": [
           "エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。"
-        ],
-        "group_names": [
-          "蓮ノ空"
         ]
       }
     },
@@ -21044,9 +20954,6 @@
         "action": "move_cards",
         "parenthetical": [
           "必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。"
-        ],
-        "group_names": [
-          "蓮ノ空"
         ]
       }
     },
@@ -22172,9 +22079,6 @@
         ],
         "count": 1,
         "optional": true,
-        "group_names": [
-          "蓮ノ空"
-        ],
         "heart_colors": [
           "heart01",
           "heart00",
@@ -22246,9 +22150,6 @@
         "operation": "decrease",
         "self_target": true,
         "count": 1,
-        "group_names": [
-          "蓮ノ空"
-        ],
         "value": 1,
         "baton_touch_trigger": true
       }
@@ -22288,9 +22189,6 @@
         "operation": "decrease",
         "self_target": true,
         "count": 1,
-        "group_names": [
-          "蓮ノ空"
-        ],
         "value": 1,
         "baton_touch_trigger": true
       }
@@ -22330,9 +22228,6 @@
         "operation": "decrease",
         "self_target": true,
         "count": 1,
-        "group_names": [
-          "蓮ノ空"
-        ],
         "value": 1,
         "baton_touch_trigger": true
       }
@@ -22605,9 +22500,6 @@
         },
         "action": "invalidate_ability",
         "self_target": true,
-        "group_names": [
-          "Aqours"
-        ],
         "heart_colors": [
           "heart02"
         ]
@@ -22669,9 +22561,6 @@
         "value": 2,
         "operation": "add",
         "self_target": true,
-        "group_names": [
-          "Aqours"
-        ],
         "heart_colors": [
           "heart04"
         ]
@@ -22739,9 +22628,6 @@
         "value": 2,
         "operation": "add",
         "self_target": true,
-        "group_names": [
-          "Aqours"
-        ],
         "heart_colors": [
           "heart05"
         ]
@@ -22773,10 +22659,7 @@
         "action": "modify_score",
         "value": 1,
         "operation": "add",
-        "self_target": true,
-        "group_names": [
-          "μ's"
-        ]
+        "self_target": true
       }
     },
     {
@@ -23267,9 +23150,6 @@
           }
         ],
         "count": 1,
-        "group_names": [
-          "Aqours"
-        ],
         "position": "center"
       }
     },
@@ -23596,9 +23476,6 @@
         "card_type": "energy_card",
         "target": "self",
         "action": "move_cards",
-        "group_names": [
-          "虹ヶ咲"
-        ],
         "heart_colors": [
           "heart04"
         ]
@@ -23816,10 +23693,7 @@
         "action": "modify_score",
         "value": 1,
         "operation": "add",
-        "self_target": true,
-        "group_names": [
-          "lilywhite"
-        ]
+        "self_target": true
       }
     },
     {
@@ -23949,10 +23823,7 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand",
-        "group_names": [
-          "μ's"
-        ]
+        "destination": "hand"
       }
     },
     {
@@ -24243,10 +24114,7 @@
         "target": "self",
         "optional": true,
         "action": "position_change",
-        "target_member": "select",
-        "group_names": [
-          "μ's"
-        ]
+        "target_member": "select"
       }
     },
     {
@@ -24564,9 +24432,6 @@
         "value": 1,
         "operation": "add",
         "self_target": true,
-        "group_names": [
-          "虹ヶ咲"
-        ],
         "heart_colors": [
           "heart01",
           "heart02",
@@ -24770,10 +24635,7 @@
           "operation": "add",
           "self_target": true,
           "location": "discard"
-        },
-        "group_names": [
-          "虹ヶ咲"
-        ]
+        }
       }
     },
     {
@@ -24952,10 +24814,7 @@
             "count": 3,
             "action": "draw_card",
             "source": "deck",
-            "destination": "hand",
-            "group_names": [
-              "虹ヶ咲"
-            ]
+            "destination": "hand"
           },
           {
             "text": "自分の手札を3枚好きな順番でデッキの上に置く",
@@ -24967,9 +24826,6 @@
             "action": "move_cards",
             "card_type": "card"
           }
-        ],
-        "group_names": [
-          "虹ヶ咲"
         ]
       }
     },
@@ -25447,9 +25303,6 @@
         "value": 1,
         "operation": "add",
         "self_target": true,
-        "group_names": [
-          "虹ヶ咲"
-        ],
         "heart_colors": [
           "heart01"
         ]
@@ -25535,9 +25388,6 @@
         ],
         "operation": "decrease",
         "self_target": true,
-        "group_names": [
-          "虹ヶ咲"
-        ],
         "value": 3
       }
     },
@@ -25742,9 +25592,6 @@
           "position": "center",
           "type": "group_condition"
         },
-        "group_names": [
-          "μ's"
-        ],
         "value": 2,
         "position": "center"
       }
@@ -27086,10 +26933,7 @@
         "action": "modify_score",
         "value": 1,
         "operation": "add",
-        "self_target": true,
-        "group_names": [
-          "Liella!"
-        ]
+        "self_target": true
       }
     },
     {
@@ -27303,10 +27147,7 @@
         "action": "modify_score",
         "value": 1,
         "operation": "add",
-        "self_target": true,
-        "group_names": [
-          "蓮ノ空"
-        ]
+        "self_target": true
       }
     },
     {
@@ -27422,10 +27263,7 @@
         "action": "modify_score",
         "value": 1,
         "operation": "add",
-        "self_target": true,
-        "group_names": [
-          "蓮ノ空"
-        ]
+        "self_target": true
       }
     },
     {
@@ -27487,10 +27325,7 @@
         "action": "modify_score",
         "value": 1,
         "operation": "add",
-        "self_target": true,
-        "group_names": [
-          "みらくらぱーく！"
-        ]
+        "self_target": true
       }
     },
     {
@@ -27747,10 +27582,7 @@
           }
         ],
         "count": 1,
-        "original_value": true,
-        "group_names": [
-          "A-RISE"
-        ]
+        "original_value": true
       }
     },
     {
@@ -28138,9 +27970,6 @@
         "card_type": "live_card",
         "target": "self",
         "action": "move_cards",
-        "group_names": [
-          "蓮ノ空"
-        ],
         "baton_touch_trigger": true
       }
     },
@@ -28395,10 +28224,7 @@
             "count": 1,
             "action": "draw_card",
             "source": "deck",
-            "destination": "hand",
-            "group_names": [
-              "蓮ノ空"
-            ]
+            "destination": "hand"
           },
           {
             "text": "手札を1枚控え室に置く",
@@ -28408,9 +28234,6 @@
             "action": "move_cards",
             "card_type": "card"
           }
-        ],
-        "group_names": [
-          "蓮ノ空"
         ]
       }
     },
@@ -29009,10 +28832,7 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand",
-        "group_names": [
-          "DOLLCHESTRA"
-        ]
+        "destination": "hand"
       }
     },
     {
@@ -29188,9 +29008,6 @@
         "operation": "decrease",
         "self_target": true,
         "distinct": "card_name",
-        "group_names": [
-          "蓮ノ空"
-        ],
         "value": 2
       }
     },
@@ -29223,10 +29040,7 @@
         "target": "self",
         "optional": true,
         "action": "move_cards",
-        "card_type": "card",
-        "group_names": [
-          "スリーズブーケ"
-        ]
+        "card_type": "card"
       }
     },
     {
@@ -29682,9 +29496,6 @@
         "card_type": "member_card",
         "action": "position_change",
         "target": null,
-        "group_names": [
-          "μ's"
-        ],
         "position": "center"
       }
     },
@@ -29727,9 +29538,6 @@
         "value": 1,
         "operation": "add",
         "self_target": true,
-        "group_names": [
-          "μ's"
-        ],
         "position": "center"
       }
     },
@@ -30092,10 +29900,7 @@
             "action": "modify_score",
             "value": 1,
             "operation": "add",
-            "self_target": true,
-            "group_names": [
-              "Aqours"
-            ]
+            "self_target": true
           },
           {
             "text": "カードを1枚引き、手札からカードを1枚デッキの一番上か一番下に置く",
@@ -30106,10 +29911,7 @@
                 "count": 1,
                 "action": "draw_card",
                 "source": "deck",
-                "destination": "hand",
-                "group_names": [
-                  "Aqours"
-                ]
+                "destination": "hand"
               },
               {
                 "text": "手札からカードを1枚デッキの一番上か一番下に置く",
@@ -30119,14 +29921,8 @@
                 "action": "move_cards",
                 "card_type": "card"
               }
-            ],
-            "group_names": [
-              "Aqours"
             ]
           }
-        ],
-        "group_names": [
-          "Aqours"
         ]
       }
     },
@@ -31097,9 +30893,6 @@
           "value": 2,
           "location": "stage"
         },
-        "group_names": [
-          "蓮ノ空"
-        ],
         "heart_colors": [
           "heart00"
         ]
@@ -32543,10 +32336,7 @@
         "count": 1,
         "card_type": "member_card",
         "target": "opponent",
-        "action": "change_state",
-        "group_names": [
-          "Liella!"
-        ]
+        "action": "change_state"
       }
     },
     {
@@ -32660,10 +32450,7 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "move_cards",
-        "group_names": [
-          "KALEIDOSCORE"
-        ]
+        "action": "move_cards"
       }
     },
     {
@@ -32727,9 +32514,6 @@
         "multiple_targets": true,
         "parenthetical": [
           "メンバーをそれぞれ好きなエリアに移動させてもよい。"
-        ],
-        "group_names": [
-          "5yncri5e!"
         ]
       }
     },
