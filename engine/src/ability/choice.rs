@@ -1297,7 +1297,16 @@ impl super::resolver::AbilityResolver {
             .ability_queue
             .current_entry()
             .and_then(|e| e.ability.effect.as_ref())
-            .and_then(|ef| ef.compound.select_action.clone());
+            .and_then(|ef| ef.compound.select_action.clone())
+            .or_else(|| {
+                self.current_effect.as_ref().and_then(|ef| {
+                    if ef.action == "select_cards" {
+                        Some(Box::new(ef.clone()))
+                    } else {
+                        None
+                    }
+                })
+            });
         let is_select_cards = select_action_entry
             .as_ref()
             .map(|sa| sa.action == "select_cards")

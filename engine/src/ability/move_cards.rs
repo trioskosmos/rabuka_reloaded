@@ -2202,6 +2202,15 @@ impl AbilityResolver {
                     .current_entry()
                     .and_then(|e| e.ability.effect.as_ref())
                     .and_then(|ef| ef.compound.select_action.clone())
+            })
+            .or_else(|| {
+                self.current_effect.as_ref().and_then(|ef| {
+                    if ef.action == "select_cards" {
+                        Some(Box::new(ef.clone()))
+                    } else {
+                        None
+                    }
+                })
             });
         let current = self.current_effect.as_ref();
         let (destination, discard_remaining, placement_order) = (
