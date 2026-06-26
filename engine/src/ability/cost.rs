@@ -14,6 +14,7 @@ fn get_change_state_candidates(
     exclude_self: bool,
     self_cost: bool,
     check_name: bool,
+    state: Option<&str>,
 ) -> Vec<i16> {
     let player = gs.resolve_target_player(target);
     let card_db = &gs.card_database;
@@ -44,6 +45,13 @@ fn get_change_state_candidates(
                     group_ok
                 }
             }
+            None => true,
+        })
+        .filter(|&id| match state {
+            Some(s) => gs
+                .mods
+                .get_orientation_modifier(id)
+                .map_or(s == "active", |o| o == s),
             None => true,
         })
         .collect()
@@ -469,7 +477,7 @@ impl AbilityResolver {
                     .is_some_and(|t| t == crate::triggers::ACTIVATION);
 
                 if optional && !is_activation {
-                    // For non-self_cost change_state, verify candidates exist before prompting
+                    // For non-self_cost change_state, verify active candidates exist before prompting
                     if state_change == "wait" && cost.self_cost != Some(true) {
                         let exclude_self = cost.exclude_self.unwrap_or(false);
                         let candidates = get_change_state_candidates(
@@ -480,6 +488,7 @@ impl AbilityResolver {
                             exclude_self,
                             false,
                             false,
+                            Some("active"),
                         );
                         if candidates.is_empty() {
                             return Ok(());
@@ -516,6 +525,7 @@ impl AbilityResolver {
                         exclude_self,
                         cost.self_cost.unwrap_or(false),
                         true,
+                        Some("active"),
                     );
                     log::debug!("[CHANGE_STATE] candidates={:?}", candidates);
 
@@ -860,19 +870,41 @@ impl AbilityResolver {
                             exclude_self,
                             false,
                             false,
+                            Some("active"),
                         );
 
                         if candidates.is_empty() {
                             return Err("No matching members on stage to change state".to_string());
                         }
 
-                        let to_wait: Vec<i16> = candidates.into_iter().take(count).collect();
-                        for &card_id in &to_wait {
-                            if state_change == "wait" {
-                                gs.mods.add_orientation_modifier(card_id, "wait");
-                            } else if state_change == "rest" || state_change == "rested" {
-                                gs.mods.add_orientation_modifier(card_id, "rest");
+                        if candidates.len() <= count {
+                            for &card_id in &candidates {
+                                if state_change == "wait" {
+                                    gs.mods.add_orientation_modifier(card_id, "wait");
+                                } else if state_change == "rest" || state_change == "rested" {
+                                    gs.mods.add_orientation_modifier(card_id, "rest");
+                                }
                             }
+                        } else {
+                            self.pending_choice =
+                                Some(
+                                    Choice::select_cards(
+                                        crate::ability::enums::Zone::Stage.to_str(),
+                                        count,
+                                        format!(
+                                            "Select {} stage member(s) to {}",
+                                            count, state_change,
+                                        ),
+                                        false,
+                                    )
+                                    .card_type(cost.card_type.clone())
+                                    .group(cost.group_names.clone().map(|v| v.join(",")))
+                                    .target_player_id(Some(
+                                        cost.target.clone().unwrap_or_else(|| "self".to_string()),
+                                    ))
+                                    .build(),
+                                );
+                            return Ok(());
                         }
                     }
                 }

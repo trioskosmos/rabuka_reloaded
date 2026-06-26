@@ -307,6 +307,13 @@ impl GameModifiers {
     // ============== ORIENTATION ==============
 
     pub fn add_orientation_modifier(&mut self, card_id: i16, orientation: &str) {
+        // Idempotent: skip if card already has the target orientation.
+        // This prevents setting "wait" on an already-wait card — a card
+        // can only be waited once per standing.  All 11 call sites
+        // (costs, effects, move_cards handlers) benefit from this guard.
+        if self.orientation_modifiers.get(&card_id).map(|s| s.as_str()) == Some(orientation) {
+            return;
+        }
         self.orientation_modifiers
             .insert(card_id, orientation.to_string());
     }

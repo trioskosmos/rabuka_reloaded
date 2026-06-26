@@ -141,7 +141,10 @@ fn n_pb1_006_activates_wait_energy_to_active() {
 }
 
 /// Edge case: no turn limit on this ability, so it could be activated
-/// multiple times. Each activation waits the card and gives 1 energy.
+/// multiple times once reactivated between uses.  After each activation
+/// the card is in wait state and must be reactivated (e.g. via a debut
+/// effect like PL!S-bp3-010-N's "activate 1 member") before it can be
+/// used again.
 #[test]
 fn n_pb1_006_can_activate_multiple_times() {
     let db = load_real_database();
@@ -151,14 +154,7 @@ fn n_pb1_006_can_activate_multiple_times() {
     let filler = game.id("PL!-sd1-010-SD");
 
     game.give_energy(15); // card costs 9 to play
-    game.state.player1.main_deck.cards.clear();
-    for _ in 0..30 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-    game.state.player2.main_deck.cards.clear();
-    for _ in 0..30 {
-        game.state.player2.main_deck.cards.push(filler);
-    }
+    fill_decks(&mut game, filler);
 
     game.state.player1.hand.cards.push(card);
     game.play_to_stage(card, MemberArea::Center);
@@ -168,7 +164,8 @@ fn n_pb1_006_can_activate_multiple_times() {
 
     let energy_before = game.state.player1.energy_zone.active_count();
 
-    // Activate 3 times
+    // Activate 3 times, reactivating the card between uses (simulating
+    // an external effect like PL!S-bp3-010-N's 登場: activate 1 member).
     for i in 0..3 {
         game.activate_ability(card);
         assert_eq!(
@@ -177,9 +174,13 @@ fn n_pb1_006_can_activate_multiple_times() {
             "Activation {} should give 1 energy",
             i + 1
         );
+        // Card is now wait — reactivate so it can be used again
+        if i < 2 {
+            game.state.mods.add_orientation_modifier(card, "active");
+        }
     }
 
-    // Card is in wait state after all activations
+    // Card is in wait state after final activation
     assert_eq!(
         game.state.mods.get_orientation_modifier(card),
         Some(&"wait".to_string()),
