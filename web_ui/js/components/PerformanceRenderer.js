@@ -253,7 +253,6 @@ function renderAggregateHeartSummary(result) {
     //   4_all_cleanup     — icon_all → ANY remaining deficit (color deficits first,
     //                        then heart00). Uses texticon images to show conversion.
 
-    const remaining = totalHearts.map(v => v);
     for (let liveIdx = 0; liveIdx < lives.length; liveIdx++) {
         const live = lives[liveIdx];
         const cd = live.card_no ? State.resolveCardData(live.card_no) : null;
@@ -287,15 +286,13 @@ function renderAggregateHeartSummary(result) {
         const totalWildToColored = sumPhase1b + sumPhase1c + sumPhase2;
         const totalWildToH00 = sumPhase3b + sumPhase3c;
 
-        // Compute what was left before this card
-        const beforeDisplay = remaining.map(v => v);
+        // Use engine's spare for "After" — reflects actual pool changes
+        const afterDisplay = Array.isArray(live.spare) ? live.spare : [0,0,0,0,0,0,0,0];
+        // Compute "Before" from previous card's spare (or total pool for card 0)
+        const beforeDisplay = liveIdx === 0
+            ? [...totalHearts]
+            : (Array.isArray(lives[liveIdx - 1].spare) ? [...lives[liveIdx - 1].spare] : [...totalHearts]);
 
-        // Deduct what this card consumed
-        for (const a of liveAllocs) {
-            remaining[a.color] = Math.max(0, remaining[a.color] - a.amount);
-        }
-
-        const afterDisplay = remaining.map(v => v);
         const beforeSum = sumHearts(beforeDisplay);
         const afterSum = sumHearts(afterDisplay);
         const consumedArr = beforeDisplay.map((v, i) => v - afterDisplay[i]);
@@ -307,14 +304,18 @@ function renderAggregateHeartSummary(result) {
         const detail1b = phase1bAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
         const detail1c = phase1cAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
         const detail2 = phase2Allocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
-        const detail3a = phase3aAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
+        const detail3a = phase3aAllocs.map(a => {
+            const srcIcon = `img/texticon/heart_0${a.color}.png`;
+            return `${a.amount}×<img src="${srcIcon}" class="heart-mini-icon"> → <img src="img/texticon/heart_00.png" class="heart-mini-icon"> Any`;
+        }).join(', ');
         const detail3b = phase3bAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
         const detail3c = phase3cAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
         const detail4 = phase4Allocs.map(a => {
-            const heartIcon = a.wildcard
-                ? `<img src="img/texticon/icon_all.png" class="heart-mini-icon"> → ${HEART_LABELS[a.color] || a.color}`
-                : `<img src="img/texticon/icon_all.png" class="heart-mini-icon"> → Heart00 (any)`;
-            return `${a.amount}×${heartIcon}`;
+            if (a.wildcard) {
+                const targetIcon = `img/texticon/heart_0${a.color}.png`;
+                return `${a.amount}×<img src="img/texticon/icon_all.png" class="heart-mini-icon"> → <img src="${targetIcon}" class="heart-mini-icon"> ${HEART_LABELS[a.color]}`;
+            }
+            return `${a.amount}×<img src="img/texticon/icon_all.png" class="heart-mini-icon"> → <img src="img/texticon/heart_00.png" class="heart-mini-icon"> Any`;
         }).join(', ');
 
         // Color deficits still exist after Phase 1a only
@@ -373,7 +374,10 @@ function renderAggregateHeartSummary(result) {
             </div>`;
     }
 
-    const finalRemaining = remaining.map(v => v);
+    // Surplus = last card's spare pool (or total pool if no cards)
+    const finalRemaining = lives.length > 0
+        ? (Array.isArray(lives[lives.length - 1].spare) ? lives[lives.length - 1].spare : [0,0,0,0,0,0,0,0])
+        : [...totalHearts];
     const surplusTotal = sumHearts(finalRemaining);
     html += `
                 <div class="perf-agg-divider"></div>
