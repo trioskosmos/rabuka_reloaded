@@ -62,13 +62,12 @@ pub struct AbilityQueueEntry {
     /// recently_moved_cards at enqueue time). Used by source:"those_cards"
     /// to resolve to only the trigger cards, not the full discard pile.
     pub trigger_moved_cards: Option<Vec<i16>>,
-    /// Snapshot of the full batch_movements vec captured at enqueue time.
-    /// Used by the "moves" condition to check what triggered the ability,
-    /// even after clear_effect_tracking() clears the global flags.
+    /// Snapshot of batch_movements at enqueue time so the "moves" and energy
+    /// conditions can see what triggered the ability even after
+    /// clear_effect_tracking() clears the global batch_movements.
     pub snapshot_movements: Vec<crate::types::MovementEvent>,
     pub snapshot_energy_placed_by_effect: bool,
     pub snapshot_energy_placed_by_player: Option<String>,
-
     /// Actions queued for sequential execution after a choice round-trip.
     pub pending_actions: Vec<AbilityEffect>,
     /// Persistent ability resolver — stays alive across choice round-trips

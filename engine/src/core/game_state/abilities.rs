@@ -640,16 +640,16 @@ impl GameState {
                             trigger_moved_cards.clone(),
                             triggering_member_id,
                         );
-                        // Snapshot tracking flags at enqueue time so the
-                        // "moves" condition can check what triggered it even
-                        // after clear_effect_tracking() clears the globals.
+                        // Snapshot batch_movements and energy flags at enqueue
+                        // time so the "moves" and energy conditions can check
+                        // what triggered the ability even after
+                        // clear_effect_tracking clears the global lists.
                         let mut entry = entry;
                         entry.snapshot_movements = self.batch_movements.clone();
                         entry.snapshot_energy_placed_by_effect =
                             self.last_energy_placed_by_effect();
                         entry.snapshot_energy_placed_by_player =
                             self.last_energy_placed_by_player().map(|s| s.to_string());
-
                         if crate::ability::debug::ABILITY_DEBUG
                             .load(std::sync::atomic::Ordering::Relaxed)
                         {
@@ -692,7 +692,6 @@ impl GameState {
                                             entry.snapshot_energy_placed_by_player = self
                                                 .last_energy_placed_by_player()
                                                 .map(|s| s.to_string());
-
                                             self.ability_queue.enqueue(entry);
                                         }
                                     }
@@ -1388,10 +1387,18 @@ impl GameState {
             .and_then(|e| e.conditional_choice.clone())
     }
 
-    /// Tracking flag snapshots captured at enqueue time. Used by condition
-    /// evaluation so that each_time / auto abilities see the trigger event
-    /// that caused their enqueue, even after clear_effect_tracking() clears
-    /// the global copies (e.g. last_energy_placed_by_effect).
+    /// Read trigger_moved_cards from the current queue entry (snapshot of
+    /// recently_moved_cards at enqueue time). Used by source:"those_cards"
+    /// in batch conditions to resolve to only the trigger cards.
+    pub fn entry_trigger_moved_cards(&self) -> Option<Vec<i16>> {
+        self.ability_queue
+            .current_entry()
+            .and_then(|e| e.trigger_moved_cards.clone())
+    }
+
+    /// Check whether energy was placed by an effect, using the entry's snapshot
+    /// of batch_movements at enqueue time. This survives per-ability clearing
+    /// of the global batch_movements list in clear_effect_tracking().
     pub fn entry_snapshot_last_energy_placed_by_effect(&self) -> bool {
         self.ability_queue
             .current_entry()
@@ -1414,6 +1421,7 @@ impl GameState {
             .map(|m| m.cause_player_id.clone())
     }
 
+    /// Find the latest area move (stage→stage) in the entry's snapshot_movements.
     pub fn entry_snapshot_last_area_move_card_id(&self) -> Option<i16> {
         self.ability_queue
             .current_entry()
@@ -1436,16 +1444,6 @@ impl GameState {
                     .find(|m| m.source_zone == "stage" && m.dest_zone == "stage")
             })
             .map(|m| m.cause_player_id.clone())
-    }
-
-    /// Snapshot of recently_moved_cards captured at enqueue time (trigger_moved_cards).
-    /// Used by card_count_condition "preceding_moved" so each_time abilities see
-    /// what triggered their enqueue, even after clear_effect_tracking() clears
-    /// the global recently_moved_cards.
-    pub fn entry_trigger_moved_cards(&self) -> Option<Vec<i16>> {
-        self.ability_queue
-            .current_entry()
-            .and_then(|e| e.trigger_moved_cards.clone())
     }
 
     /// If the pending choice is routed to a specific player (PVP), return their player_id.

@@ -733,10 +733,11 @@ impl<'a> ConditionContext<'a> {
                 let this_card_moved = self.game_state.activating_card.map_or(false, |activating| {
                     self.game_state.cards_moved_this_turn.contains(&activating)
                 });
-                let area_ok = if !this_card_moved {
+                let area_ok = if !this_card_moved {     
                     // "このメンバーがエリアを移動する" — THIS card must have moved.
                     // The area_ok shortcut (self_effect_only=None) does NOT apply
                     // because a different card moving does not satisfy "this member".
+               
                     false
                 } else {
                     self_effect_only.is_none_or(|_| {
@@ -753,7 +754,7 @@ impl<'a> ConditionContext<'a> {
                     } else if !self.game_state.last_energy_placed_by_effect() {
                         false
                     } else {
-                        // snapshot is false but global is true — use global
+                          // snapshot is false but global is true — use global
                         true
                     };
                     let energy_player = snapshot_energy_player
@@ -765,7 +766,6 @@ impl<'a> ConditionContext<'a> {
                 let has_area_check =
                     self_effect_only.is_some() || condition.movement.as_deref() == Some("moves");
                 let has_energy_check = energy_placed.is_some();
-                eprintln!("[TRACE_MOVES_COND_RESULT] area_ok={} energy_ok={} has_area={} has_energy={} final={}", area_ok, energy_ok, has_area_check, has_energy_check, if !has_area_check && !has_energy_check { true } else if has_area_check && has_energy_check { area_ok || energy_ok } else if has_area_check { area_ok } else { energy_ok });
                 if !has_area_check && !has_energy_check {
                     true
                 } else if has_area_check && has_energy_check {

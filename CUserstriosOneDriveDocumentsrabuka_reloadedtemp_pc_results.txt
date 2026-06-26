@@ -1,0 +1,53 @@
+POSITION_CHANGE entries:
+  movement text: このメンバーがエリアを移動したとき、ライブ終了時まで、{{heart_06.png|heart06}}を得る
+  full_text: N/A
+  cards: N/A
+
+  movement text: このメンバーがエリアを移動したとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く
+  full_text: N/A
+  cards: N/A
+
+  movement text: このメンバーがエリアを移動したとき、自分の控え室から、スコア3以下の『Liella!』のライブカードを1枚手札に加える
+  full_text: N/A
+  cards: N/A
+
+  movement text: このメンバーがエリアを移動したとき、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする
+  full_text: N/A
+  cards: N/A
+
+  movement text: このメンバーがエリアを移動したとき、エネルギーを2枚アクティブにする
+  full_text: N/A
+  cards: N/A
+
+  movement text: 自分のライブが成功するか、このメンバーがエリアを移動したとき、自分の控え室にある『Liella!』のメンバーカードを1枚、このメンバーの下に置く
+  full_text: N/A
+  cards: N/A
+
+  movement text: 自分のステージのセンターエリアにいるメンバーがエリアを移動したとき、以下から1つを選ぶ。\n・ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。\n・相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。\n・カードを1枚引く
+  full_text: N/A
+  cards: N/A
+
+  movement text: 自分のステージにいる『5yncri5e!』のメンバーがセンターエリアに移動したとき、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る
+  full_text: N/A
+  cards: N/A
+
+  movement text: このメンバーがエリアを移動したとき、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る
+  full_text: N/A
+  cards: N/A
+
+  movement text: このメンバーがエリアを移動したとき、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る
+  full_text: N/A
+  cards: N/A
+
+  movement text: このメンバーがエリアを移動したとき、ライブ終了時まで、{{heart_02.png|heart02}}を得る
+  full_text: N/A
+  cards: N/A
+
+  movement text: このメンバーがエリアを移動したとき、ライブ終了時まで、{{heart_03.png|heart03}}を得る
+  full_text: N/A
+  cards: N/A
+
+  movement text: 自分のメインフェイズの間、このメンバーがエリアを移動したとき、エネルギーを2枚アクティブにする
+  full_text: N/A
+  cards: N/A
+
