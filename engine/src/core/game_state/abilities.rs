@@ -92,7 +92,6 @@ impl GameState {
             snapshot_movements: Vec::new(),
             snapshot_energy_placed_by_effect: false,
             snapshot_energy_placed_by_player: None,
-            snapshot_stage_positions: None,
             choice_effect_text: None,
         }
     }
@@ -175,9 +174,8 @@ impl GameState {
         // "moves" → card is / was moving (checkable because we set
         //   activating_card to the scanned card, and cards_moved_this_turn
         //   is persistent across the turn).
-        // "position_change" → card changed position on stage (checkable
-        //   only when stage_position_snapshot is available; if no snapshot,
-        //   the condition does not fire).
+        // "position_change" → card changed position on stage (detected via
+        //   explicit PositionChangeEvent records, no snapshot dependency).
         if movement == Some("moved")
             || movement == Some("moves")
             || movement == Some("position_change")
@@ -651,12 +649,7 @@ impl GameState {
                             self.last_energy_placed_by_effect();
                         entry.snapshot_energy_placed_by_player =
                             self.last_energy_placed_by_player().map(|s| s.to_string());
-                        // Snapshot stage positions at enqueue time so the
-                        // "has_moved" condition can detect position changes
-                        // even after a new process_current_ability call
-                        // overwrites the GameState-wide snapshot during
-                        // sub-ability resolution.
-                        entry.snapshot_stage_positions = self.stage_position_snapshot.clone();
+
                         if crate::ability::debug::ABILITY_DEBUG
                             .load(std::sync::atomic::Ordering::Relaxed)
                         {
@@ -699,8 +692,7 @@ impl GameState {
                                             entry.snapshot_energy_placed_by_player = self
                                                 .last_energy_placed_by_player()
                                                 .map(|s| s.to_string());
-                                            entry.snapshot_stage_positions =
-                                                self.stage_position_snapshot.clone();
+
                                             self.ability_queue.enqueue(entry);
                                         }
                                     }
@@ -1040,6 +1032,7 @@ impl GameState {
             self.recently_state_changed.clear();
             self.recently_moved_from_zone = None;
             self.batch_movements.clear();
+            self.position_change_events.clear();
             // Re-enter the loop to process any abilities just enqueued
             // by the watcher scan (e.g. Hazuki Ren each_time after discard).
             if !self.has_pending_choice() {
@@ -1107,12 +1100,6 @@ impl GameState {
 
         self.activating_card = card_id;
         self.activating_ability_index = Some(ability_index);
-
-        // Snapshot stage positions before this ability resolves so the
-        // post-resolution TAS scan can detect stage-area-to-stage-area
-        // position changes (movement_condition "has_moved") by comparing
-        // the pre-resolution snapshot with the post-resolution positions.
-        self.stage_position_snapshot = Some(self.capture_stage_positions());
 
         // Check if a resolver already exists (e.g., cost phase completed, effect needs to run).
         // If so, reuse it — it carries state (revealed_cost_cards, etc.) needed by the effect.
@@ -1292,14 +1279,7 @@ impl GameState {
                 // process_pending_auto_abilities' post-loop TAS (line ~803)
                 // also needs the guard to prevent re-enqueueing the same
                 // each_time watcher on stale movement data.
-                // Stage snapshot consumed by TAS — clear so sub-ability
-                // resolutions in process_pending_auto_abilities
-                // capture a fresh pre-resolution state.
-                // NOTE: recently_moved_cards intentionally NOT cleared here —
-                // trigger_auto_for_discarded_cards (for movement-triggered
-                // discard/waitroom→hand auto abilities) reads it after
-                // process_pending_auto_abilities completes.
-                self.stage_position_snapshot = None;
+
                 // §9.5.3: After each ability resolves, check for each_time
                 // watchers triggered by the just-completed effect.
                 // Each_time abilities on live cards (たび) are not caught by the
@@ -1466,16 +1446,6 @@ impl GameState {
         self.ability_queue
             .current_entry()
             .and_then(|e| e.trigger_moved_cards.clone())
-    }
-
-    /// Snapshot of stage positions captured at enqueue time.
-    /// Used by the "has_moved" movement condition so that the
-    /// execution-time gate check compares against the original
-    /// pre-move state rather than the current (overwritten) snapshot.
-    pub fn entry_snapshot_stage_positions(&self) -> Option<&std::collections::HashMap<i16, usize>> {
-        self.ability_queue
-            .current_entry()
-            .and_then(|e| e.snapshot_stage_positions.as_ref())
     }
 
     /// If the pending choice is routed to a specific player (PVP), return their player_id.

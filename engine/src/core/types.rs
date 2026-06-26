@@ -271,6 +271,26 @@ pub struct MovementEvent {
     pub timestamp: u32,
 }
 
+/// A structured record of a stage-area-to-stage-area position change.
+/// Captures the old/new positions and what caused the move.
+/// Replaces the fragile snapshot-based position change detection with
+/// explicit event-based tracking.
+#[derive(Debug, Clone)]
+pub struct PositionChangeEvent {
+    /// The card that changed position.
+    pub moved_card_id: i16,
+    /// The position index before the change (0=left, 1=center, 2=right).
+    pub old_position: usize,
+    /// The position index after the change (0=left, 1=center, 2=right).
+    pub new_position: usize,
+    /// The card whose ability/action caused the move (None = rule/cost with no source card).
+    pub cause_card_id: Option<i16>,
+    /// The player whose effect/action caused the move.
+    pub cause_player_id: String,
+    /// Whether the move was caused by a card effect (true) vs cost/rules (false).
+    pub effect_only: bool,
+}
+
 /// Records that a specific ability applied a modifier during execution,
 /// so the source can be traced back to the originating card + ability text.
 /// Populated in effect handlers (execute_gain_resource etc.) and consumed

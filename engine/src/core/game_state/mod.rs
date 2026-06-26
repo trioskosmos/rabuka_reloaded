@@ -68,15 +68,12 @@ pub struct GameState {
     /// Synced from batch_movements by push_movement_event().
     pub recently_moved_cards: Option<Vec<i16>>,
     pub recently_moved_from_zone: Option<String>,
-    /// Snapshot of stage card positions taken at the start of each ability
-    /// resolution (process_current_ability). Used by the evaluate_movement_condition
-    /// "has_moved" branch to detect stage-area-to-stage-area position changes
-    /// by comparing the pre-resolution position with the current position.
-    /// Per Q126: "ステージに登場しているこの能力を持つメンバーが、
-    /// レフトサイドエリア、センターエリア、ライトサイドエリアの
-    /// いずれかのエリアに移動したときに発動する自動能力です。"
-    /// Cleared after each post-resolution TAS scan.
-    pub stage_position_snapshot: Option<std::collections::HashMap<i16, usize>>,
+    /// Explicit per-batch event log of stage-area-to-stage-area position changes.
+    /// Each entry records the moved card, old/new position, and cause info.
+    /// Replaces the fragile snapshot-based detection with direct event tracking.
+    /// Cleared at the end of each ability batch process (after post-loop TAS scan
+    /// in process_player_abilities), NOT in clear_effect_tracking.
+    pub position_change_events: Vec<crate::types::PositionChangeEvent>,
     /// Detailed event log for per-batch tracking: cards moved in the current
     /// cost/effect batch, what caused the move (cause_card_id), etc.
     /// recently_moved_cards/from_zone are synced from this vec.
@@ -248,7 +245,7 @@ impl GameState {
             ability_applications: Vec::new(),
             recently_moved_cards: None,
             recently_moved_from_zone: None,
-            stage_position_snapshot: None,
+            position_change_events: Vec::new(),
             batch_movements: Vec::new(),
             turn_area_movements: Vec::new(),
             turn_movements: Vec::new(),

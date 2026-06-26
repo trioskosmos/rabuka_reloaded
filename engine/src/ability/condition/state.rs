@@ -443,91 +443,50 @@ impl<'a> ConditionContext<'a> {
                 true
             }
             "position_change" => {
-                let snapshot_opt = self
-                    .game_state
-                    .entry_snapshot_stage_positions()
-                    .or_else(|| self.game_state.stage_position_snapshot.as_ref());
-                let snapshot = match snapshot_opt {
-                    Some(s) => Some(s),
-                    None => {
-                        // Fallback: no snapshot available (e.g. TAS scan in
-                        // resume_queue_with_choice after sub-choices cleared it).
-                        // Use position_change_occurred + cards_moved_this_turn
-                        // as secondary signal, matching what "moves" does.
-                        if !self.position_change_occurred {
+                let events = &self.game_state.position_change_events;
+                if events.is_empty() {
+                    return false;
+                }
+                let card_db = &self.game_state.card_database;
+                let pos_names = ["left_side", "center", "right_side"];
+                let is_from = condition.area_direction.as_deref() == Some("from");
+                let has_event = events.iter().any(|event| {
+                    // Self-target filter: only the activating card
+                    if condition.self_target.unwrap_or(false)
+                        && self.activating_card_id != Some(event.moved_card_id)
+                    {
+                        return false;
+                    }
+                    // Group filter: the moved card must match
+                    if let Some(ref groups) = condition.group_names {
+                        if !groups.is_empty()
+                            && !groups.iter().any(|g| {
+                                crate::ability::util::card_matches_group_str(
+                                    card_db,
+                                    event.moved_card_id,
+                                    Some(g),
+                                )
+                            })
+                        {
                             return false;
                         }
-                        None
                     }
-                };
-                let card_db = &self.game_state.card_database;
-                let position_changed =
-                    player
-                        .stage
-                        .stage
-                        .iter()
-                        .enumerate()
-                        .any(|(new_pos, &cid)| {
-                            if cid == -1 {
-                                return false;
-                            }
-                            if let Some(ref groups) = condition.group_names {
-                                if !groups.is_empty()
-                                    && !groups.iter().any(|g| {
-                                        crate::ability::util::card_matches_group_str(
-                                            card_db,
-                                            cid,
-                                            Some(g),
-                                        )
-                                    })
-                                {
-                                    return false;
-                                }
-                            }
-                            if condition.self_target.unwrap_or(false)
-                                && self.activating_card_id != Some(cid)
-                            {
-                                return false;
-                            }
-                            let has_moved = match snapshot {
-                                Some(snap) => {
-                                    // Snapshot comparison: check if this card's
-                                    // position differs from the pre-move snapshot.
-                                    let old_pos = snap.get(&cid);
-                                    old_pos.is_some_and(|&old| old != new_pos)
-                                }
-                                None => {
-                                    // Fallback: no snapshot — check
-                                    // cards_moved_this_turn for a persistent
-                                    // signal that this card moved areas.
-                                    self.game_state.has_card_moved_this_turn(cid)
-                                }
-                            };
-                            if !has_moved {
-                                return false;
-                            }
-                            // Check position: "from" = source (was AT this pos),
-                            // "to"/absent = destination (moved TO this pos).
-                            let is_from = condition.area_direction.as_deref() == Some("from");
-                            if let Some(req_pos) =
-                                condition.position.as_ref().and_then(|p| p.get_position())
-                            {
-                                let pos_names = ["left_side", "center", "right_side"];
-                                let check_pos = if is_from {
-                                    match snapshot {
-                                        Some(snap) => *snap.get(&cid).unwrap_or(&usize::MAX),
-                                        None => usize::MAX, // can't determine source in fallback
-                                    }
-                                } else {
-                                    new_pos
-                                };
-                                if check_pos >= pos_names.len() || pos_names[check_pos] != req_pos {
-                                    return false;
-                                }
-                            }
-                            true
-                        });
-                if !position_changed {
+                    // Position filter: "from" = old position, "to" = new position
+                    if let Some(req_pos) =
+                        condition.position.as_ref().and_then(|p| p.get_position())
+                    {
+                        let check_pos = if is_from {
+                            event.old_position
+                        } else {
+                            event.new_position
+                        };
+                        if check_pos >= pos_names.len() || pos_names[check_pos] != req_pos {
+                            return false;
+                        }
+                    }
+                    true
+                });
+                if !has_event {
                     return false;
                 }
                 if let Some(cost_limit) = condition.cost_limit {
@@ -830,10 +789,9 @@ impl<'a> ConditionContext<'a> {
         }
     }
 
-    /// Evaluate whether the activating card changed its stage position since
-    /// the pre-resolution snapshot was taken. This replaces the old flag-based
-    /// check (position_change_occurred_this_turn + cards_moved_this_turn) with
-    /// a direct position comparison.
+    /// Evaluate whether the activating card changed its stage position by
+    /// checking the explicit PositionChangeEvent list. Replaces the fragile
+    /// snapshot-based detection with direct event lookups.
     ///
     /// Per Q126: ステージに登場しているこの能力を持つメンバーが、
     /// レフトサイドエリア、センターエリア、ライトサイドエリアの
@@ -849,34 +807,13 @@ impl<'a> ConditionContext<'a> {
     /// Japanese text forms that map to this evaluation:
     ///   移動したとき (past tense) — "has_moved" standalone
     ///   登場か、エリアを移動したとき — "has_moved" with appearance OR
-    fn evaluate_has_moved(&self, condition: &Condition, player: &crate::player::Player) -> bool {
-        let card_moved_position = self
-            .activating_card_id
-            .and_then(|cid| {
-                let snapshot = self
-                    .game_state
-                    .entry_snapshot_stage_positions()
-                    .or_else(|| self.game_state.stage_position_snapshot.as_ref());
-                match snapshot {
-                    Some(snap) => {
-                        let old_pos = snap.get(&cid)?;
-                        let new_pos = player.stage.stage.iter().position(|&id| id == cid)?;
-                        Some(*old_pos != new_pos)
-                    }
-                    None => {
-                        // Fallback: no snapshot — use position_change_occurred
-                        // + cards_moved_this_turn as secondary signal.
-                        if self.position_change_occurred
-                            && self.game_state.has_card_moved_this_turn(cid)
-                        {
-                            Some(true)
-                        } else {
-                            None
-                        }
-                    }
-                }
-            })
-            .unwrap_or(false);
+    fn evaluate_has_moved(&self, condition: &Condition, _player: &crate::player::Player) -> bool {
+        let card_moved_position = self.activating_card_id.is_some_and(|cid| {
+            self.game_state
+                .position_change_events
+                .iter()
+                .any(|e| e.moved_card_id == cid)
+        });
 
         if condition.text.contains("登場") {
             let has_appeared = self

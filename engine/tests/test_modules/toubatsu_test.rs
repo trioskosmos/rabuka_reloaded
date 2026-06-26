@@ -133,19 +133,29 @@ fn toubatsu_q263_center_to_area_move_triggers_auto() {
     // Place on center (index 1)
     game.state.player1.stage.stage[1] = toubatsu;
 
-    // Set stage position snapshot to record old position (center)
-    let mut snapshot = std::collections::HashMap::new();
-    snapshot.insert(toubatsu, 1usize);
-    game.state.stage_position_snapshot = Some(snapshot);
-
     // Simulate area move: center → left (index 0)
+    let old_pos = 1usize;
+    let new_pos = 0usize;
     game.state.player1.stage.stage[1] = -1;
     game.state.player1.stage.stage[0] = toubatsu;
+    game.state
+        .position_change_events
+        .push(rabuka_engine::types::PositionChangeEvent {
+            moved_card_id: toubatsu,
+            old_position: old_pos,
+            new_position: new_pos,
+            cause_card_id: None,
+            cause_player_id: "p1".to_string(),
+            effect_only: false,
+        });
     game.state.record_card_movement(toubatsu);
+    game.state
+        .push_movement_event(toubatsu, "stage", "stage", None, "p1", false);
     game.state.position_change_occurred_this_turn = true;
 
     let pid = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
+    // TAS scan: finds non-self_target position_change abilities
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &pid);
     game.state.process_pending_auto_abilities(&pid);
 
     // Auto should fire with a 3-option choice (blades / wait / draw)

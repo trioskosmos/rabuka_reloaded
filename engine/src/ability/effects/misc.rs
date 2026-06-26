@@ -2013,6 +2013,33 @@ impl AbilityResolver {
                 player.stage.stage[current_idx],
             );
             if player.stage.position_change(from_area, to_area).is_ok() {
+                // Push events BEFORE push_movement_event so the
+                // PositionChangeEvent list captures the change before the
+                // self-trigger fires from within push_movement_event.
+                let source_old = current_idx;
+                let source_new = target_index;
+                if source_id != -1 {
+                    gs.position_change_events
+                        .push(crate::types::PositionChangeEvent {
+                            moved_card_id: source_id,
+                            old_position: source_old,
+                            new_position: source_new,
+                            cause_card_id: cause_cid,
+                            cause_player_id: mover_pid.clone(),
+                            effect_only: true,
+                        });
+                }
+                if target_id != -1 {
+                    gs.position_change_events
+                        .push(crate::types::PositionChangeEvent {
+                            moved_card_id: target_id,
+                            old_position: source_new,
+                            new_position: source_old,
+                            cause_card_id: cause_cid,
+                            cause_player_id: mover_pid.clone(),
+                            effect_only: true,
+                        });
+                }
                 let moved_ids = [target_id, source_id];
                 for &cid in &moved_ids {
                     if cid != -1 {
@@ -2147,11 +2174,57 @@ impl AbilityResolver {
                 _ => crate::zones::MemberArea::RightSide,
             };
             let player = gs.resolve_target_player_mut(target);
+            let dest_card_id = player.stage.stage[*dest_idx];
             if let Err(e) = player.stage.position_change(from_area, to_area) {
                 log::debug!("formation_change swap failed: {}", e);
                 continue;
             }
+            // Push events BEFORE push_movement_event so the
+            // PositionChangeEvent list captures the change before the
+            // self-trigger fires from within push_movement_event.
+            gs.position_change_events
+                .push(crate::types::PositionChangeEvent {
+                    moved_card_id: *member_id,
+                    old_position: *from_idx,
+                    new_position: *dest_idx,
+                    cause_card_id: cause_cid,
+                    cause_player_id: mover_pid.clone(),
+                    effect_only: true,
+                });
+            if dest_card_id != -1 {
+                gs.position_change_events
+                    .push(crate::types::PositionChangeEvent {
+                        moved_card_id: dest_card_id,
+                        old_position: *dest_idx,
+                        new_position: *from_idx,
+                        cause_card_id: cause_cid,
+                        cause_player_id: mover_pid.clone(),
+                        effect_only: true,
+                    });
+            }
             gs.push_movement_event(*member_id, "stage", "stage", cause_cid, &mover_pid, true);
+            gs.push_movement_event(*member_id, "stage", "stage", cause_cid, &mover_pid, true);
+            // Record explicit position change events for both swapped cards
+            gs.position_change_events
+                .push(crate::types::PositionChangeEvent {
+                    moved_card_id: *member_id,
+                    old_position: *from_idx,
+                    new_position: *dest_idx,
+                    cause_card_id: cause_cid,
+                    cause_player_id: mover_pid.clone(),
+                    effect_only: true,
+                });
+            if dest_card_id != -1 {
+                gs.position_change_events
+                    .push(crate::types::PositionChangeEvent {
+                        moved_card_id: dest_card_id,
+                        old_position: *dest_idx,
+                        new_position: *from_idx,
+                        cause_card_id: cause_cid,
+                        cause_player_id: mover_pid.clone(),
+                        effect_only: true,
+                    });
+            }
         }
         gs.position_change_occurred_this_turn = true;
         gs.recalculate_constants();
@@ -2262,6 +2335,29 @@ impl AbilityResolver {
                 .current_entry()
                 .map(|e| e.player_id.clone())
                 .unwrap_or_default();
+            // Push events BEFORE push_movement_event
+            if source_id2 != -1 {
+                gs.position_change_events
+                    .push(crate::types::PositionChangeEvent {
+                        moved_card_id: source_id2,
+                        old_position: source_idx,
+                        new_position: target_index,
+                        cause_card_id: gs.activating_card,
+                        cause_player_id: mover_pid.clone(),
+                        effect_only: true,
+                    });
+            }
+            if target_id2 != -1 {
+                gs.position_change_events
+                    .push(crate::types::PositionChangeEvent {
+                        moved_card_id: target_id2,
+                        old_position: target_index,
+                        new_position: source_idx,
+                        cause_card_id: gs.activating_card,
+                        cause_player_id: mover_pid.clone(),
+                        effect_only: true,
+                    });
+            }
             gs.push_movement_event(
                 source_id2,
                 "stage",
@@ -2317,6 +2413,29 @@ impl AbilityResolver {
                         .current_entry()
                         .map(|e| e.player_id.clone())
                         .unwrap_or_default();
+                    // Push events BEFORE push_movement_event
+                    if source_id != -1 {
+                        gs.position_change_events
+                            .push(crate::types::PositionChangeEvent {
+                                moved_card_id: source_id,
+                                old_position: current_idx,
+                                new_position: target_index,
+                                cause_card_id: gs.activating_card,
+                                cause_player_id: mover_pid.clone(),
+                                effect_only: true,
+                            });
+                    }
+                    if target_id != -1 {
+                        gs.position_change_events
+                            .push(crate::types::PositionChangeEvent {
+                                moved_card_id: target_id,
+                                old_position: target_index,
+                                new_position: current_idx,
+                                cause_card_id: gs.activating_card,
+                                cause_player_id: mover_pid.clone(),
+                                effect_only: true,
+                            });
+                    }
                     gs.push_movement_event(
                         source_id,
                         "stage",
@@ -2369,6 +2488,27 @@ impl AbilityResolver {
                         .current_entry()
                         .map(|e| e.player_id.clone())
                         .unwrap_or_default();
+                    // Push events BEFORE push_movement_event
+                    gs.position_change_events
+                        .push(crate::types::PositionChangeEvent {
+                            moved_card_id: activating_card_id,
+                            old_position: current_idx,
+                            new_position: target_index,
+                            cause_card_id: gs.activating_card,
+                            cause_player_id: mover_pid.clone(),
+                            effect_only: true,
+                        });
+                    if target_id3 != -1 {
+                        gs.position_change_events
+                            .push(crate::types::PositionChangeEvent {
+                                moved_card_id: target_id3,
+                                old_position: target_index,
+                                new_position: current_idx,
+                                cause_card_id: gs.activating_card,
+                                cause_player_id: mover_pid.clone(),
+                                effect_only: true,
+                            });
+                    }
                     gs.push_movement_event(
                         activating_card_id,
                         "stage",
@@ -2399,7 +2539,7 @@ impl AbilityResolver {
         target: &str,
     ) -> Result<(), String> {
         let tgt = if target == "both" { "self" } else { target };
-        let moved_card_ids: Vec<i16> = {
+        let (moved_card_ids, original_positions): (Vec<i16>, Vec<(usize, usize)>) = {
             let player = gs.resolve_target_player_mut(tgt);
 
             // Snapshot current stage
@@ -2416,6 +2556,7 @@ impl AbilityResolver {
             }
 
             let mut moved = Vec::new();
+            let mut positions = Vec::new();
             // Place rotated members
             for src_idx in 0..3 {
                 let card_id = snapshot_cards[src_idx];
@@ -2426,12 +2567,25 @@ impl AbilityResolver {
                 player.stage.stage[dest_idx] = card_id;
                 player.stage.under_cards[dest_idx] = snapshot_under[src_idx].clone();
                 moved.push(card_id);
+                positions.push((src_idx, dest_idx));
             }
-            moved
+            (moved, positions)
         };
 
         for &cid in &moved_card_ids {
             gs.record_card_movement(cid);
+        }
+        for (i, &cid) in moved_card_ids.iter().enumerate() {
+            let (old_pos, new_pos) = original_positions[i];
+            gs.position_change_events
+                .push(crate::types::PositionChangeEvent {
+                    moved_card_id: cid,
+                    old_position: old_pos,
+                    new_position: new_pos,
+                    cause_card_id: gs.activating_card,
+                    cause_player_id: String::new(),
+                    effect_only: true,
+                });
         }
 
         gs.position_change_occurred_this_turn = true;

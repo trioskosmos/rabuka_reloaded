@@ -35,9 +35,8 @@ fn chisato_q126_area_move_triggers_energy_placement() {
     let _chisato_id = game.state.player1.stage.stage[0];
     let _filler_id = game.state.player1.stage.stage[2];
 
-    // Snapshot positions BEFORE the move so the TAS scan can
-    // detect the position change by comparing pre vs post state.
-    game.state.stage_position_snapshot = Some(game.state.capture_stage_positions());
+    let old_left_id = game.state.player1.stage.stage[0];
+    let old_right_id = game.state.player1.stage.stage[2];
 
     game.state
         .player1
@@ -45,9 +44,43 @@ fn chisato_q126_area_move_triggers_energy_placement() {
         .position_change(MemberArea::LeftSide, MemberArea::RightSide)
         .expect("Position change should succeed");
 
-    // Manually trigger auto abilities for the player
+    // Push position change events for both swapped cards
+    if old_left_id != -1 {
+        game.state
+            .position_change_events
+            .push(rabuka_engine::types::PositionChangeEvent {
+                moved_card_id: old_left_id,
+                old_position: 0,
+                new_position: 2,
+                cause_card_id: None,
+                cause_player_id: "p1".to_string(),
+                effect_only: false,
+            });
+    }
+    if old_right_id != -1 {
+        game.state
+            .position_change_events
+            .push(rabuka_engine::types::PositionChangeEvent {
+                moved_card_id: old_right_id,
+                old_position: 2,
+                new_position: 0,
+                cause_card_id: None,
+                cause_player_id: "p1".to_string(),
+                effect_only: false,
+            });
+    }
+    if old_left_id != -1 {
+        game.state
+            .push_movement_event(old_left_id, "stage", "stage", None, "p1", false);
+    }
+    if old_right_id != -1 {
+        game.state
+            .push_movement_event(old_right_id, "stage", "stage", None, "p1", false);
+    }
+
+    // TAS scan finds position_change auto abilities via position_change_events
     let player_id = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
     game.state.process_pending_auto_abilities(&player_id);
 
     // Q126: area move should trigger the auto ability,
