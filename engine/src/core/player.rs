@@ -5,7 +5,7 @@ use crate::zones::{
 };
 
 use crate::card::CardDatabase;
-use crate::core::game_modifiers::ModifierEntry;
+use crate::core::game_modifiers::{GameModifiers, ModifierEntry};
 
 use std::collections::VecDeque;
 
@@ -177,6 +177,7 @@ impl Player {
         stage_area: crate::zones::MemberArea,
         use_baton_touch: bool,
         card_db: &CardDatabase,
+        mods: &GameModifiers,
     ) -> Result<(u32, bool, Option<u32>, Option<i16>), String> {
         // Rule 8.2: Main Phase - Play member card from hand to stage
 
@@ -254,10 +255,13 @@ impl Player {
                     } else {
                         // Get the member card ID and cost first
                         let member_card_id = existing_member;
-                        let replaced_member_cost = card_db
+                        let base_cost = card_db
                             .get_card(member_card_id)
                             .map(|c| c.cost.unwrap_or(1))
                             .unwrap_or(1);
+                        // Include cost modifiers from constant abilities (e.g. +3 cost)
+                        let cost_mod = mods.get_cost_modifier(member_card_id);
+                        let replaced_member_cost = (base_cost as i32 + cost_mod).max(1) as u32;
 
                         // Store the replaced member cost for later use
                         baton_touch_replaced_cost = Some(replaced_member_cost);

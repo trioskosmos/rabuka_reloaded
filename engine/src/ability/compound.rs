@@ -363,6 +363,22 @@ impl AbilityResolver {
                                             == Some(crate::ability::enums::ConditionType::OtherwiseCondition))
                                     });
                                 }
+                                // Strip AllRevealedMatchHeartColor conditions from
+                                // saved pending actions only when the sequential loop
+                                // already evaluated a condition and it passed
+                                // (condition_failed == Some(false)). When condition_failed
+                                // is None, no conditions have been evaluated yet — the
+                                // gating must be preserved for proper re-evaluation
+                                // during resume_pending_actions.
+                                if condition_failed == Some(false) {
+                                    for a in &mut remaining {
+                                        if a.condition.as_ref().and_then(|c| c.condition_type)
+                                            == Some(crate::ability::enums::ConditionType::AllRevealedMatchHeartColor)
+                                        {
+                                            a.condition = None;
+                                        }
+                                    }
+                                }
                                 // Store remaining repeats on the resolver for
                                 // one-at-a-time feeding after each iteration completes.
                                 // We DON'T pre-load them into pending_commands — that

@@ -568,6 +568,7 @@ impl super::TurnEngine {
         game_state.clear_baton_touch_tracking();
 
         let card_db = game_state.card_database.clone();
+        let mods = game_state.mods.clone();
 
         // Recalculate constant cost modifiers (hand-based cost reductions, etc.)
         // BEFORE paying cost, so the modifiers are in effect.
@@ -745,7 +746,7 @@ impl super::TurnEngine {
         }
 
         let (cost_paid, baton_touch_used, replaced_member_cost, replaced_member_id) =
-            player.move_card_from_hand_to_stage(idx, area, use_baton_touch, &card_db)?;
+            player.move_card_from_hand_to_stage(idx, area, use_baton_touch, &card_db, &mods)?;
         game_state.baton_touch_zero_cost = baton_touch_used && cost_paid == 0;
         game_state.baton_touch_replaced_member_cost = replaced_member_cost;
         game_state.baton_touch_replaced_member_id = replaced_member_id;

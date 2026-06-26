@@ -71,7 +71,24 @@ impl super::resolver::AbilityResolver {
                 // aren't lost when a sub-action creates its own pending_choice.
                 if idx + 1 < pending.len() {
                     let mut existing = gs.ability_queue.take_pending_actions();
-                    existing.extend(pending[idx + 1..].to_vec());
+                    let mut remaining: Vec<AbilityEffect> = pending[idx + 1..].to_vec();
+                    // If the current effect had a condition type and it passed
+                    // (the action ran to completion and created a choice), strip
+                    // the same condition type from remaining actions. This prevents
+                    // re-evaluation against stale game state (e.g. revealed_cards
+                    // mutated by select_cards filtering).
+                    if let Some(cond_type) =
+                        effect.condition.as_ref().and_then(|c| c.condition_type)
+                    {
+                        for a in &mut remaining {
+                            if a.condition.as_ref().and_then(|c| c.condition_type)
+                                == Some(cond_type)
+                            {
+                                a.condition = None;
+                            }
+                        }
+                    }
+                    existing.extend(remaining);
                     gs.ability_queue.set_pending_actions(existing);
                 }
                 return Ok(());

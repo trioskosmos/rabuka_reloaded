@@ -384,6 +384,9 @@ impl<'a> ConditionContext<'a> {
             Some(ConditionType::OtherwiseCondition) => true,
             Some(ConditionType::ActionSuccessCondition) => true,
             Some(ConditionType::BothCondition) => self.evaluate_both_condition(condition),
+            Some(ConditionType::AllRevealedMatchHeartColor) => {
+                self.evaluate_all_revealed_match_heart_color(condition)
+            }
             Some(ConditionType::Custom) => true,
             Some(ConditionType::NotMoved) | Some(ConditionType::HasMoved) => false,
             // Compound & OrCondition handled above via early return — never reachable here
@@ -431,6 +434,53 @@ impl<'a> ConditionContext<'a> {
         }
 
         final_result
+    }
+
+    /// Evaluates whether all cards in the revealed zone match the specified heart color.
+    /// Reads the chosen heart color from conditional_choice (set by specify_heart_color action).
+    /// Member cards must have the color in base_heart; live cards must have it in need_heart.
+    pub fn evaluate_all_revealed_match_heart_color(&self, condition: &Condition) -> bool {
+        let chosen_color = self
+            .game_state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.conditional_choice.clone());
+        let color = match chosen_color {
+            Some(ref c) => c.clone(),
+            None => {
+                if let Some(cid) = self.activating_card_id {
+                    if let Some(&override_color) =
+                        self.game_state.mods.heart_color_multiplier.get(&cid)
+                    {
+                        format!("{}", override_color)
+                    } else {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+        };
+        let cards = &self.game_state.revealed_cards;
+        let count = condition.count.unwrap_or(1) as usize;
+        let operator = condition.operator.as_deref().unwrap_or(">=");
+        let card_db = &self.game_state.card_database;
+
+        let matching = cards
+            .iter()
+            .filter(|&&cid| {
+                crate::ability::util::card_matches_heart_colors(card_db, cid, &[color.clone()])
+            })
+            .count();
+
+        match operator {
+            ">=" => matching >= count,
+            ">" => matching > count,
+            "=" => matching == count,
+            "<=" => matching <= count,
+            "<" => matching < count,
+            _ => matching >= count,
+        }
     }
 
     /// Evaluate condition and return structured actual value for debug display.

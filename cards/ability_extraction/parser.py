@@ -5882,6 +5882,21 @@ def _try_heart_select_reveal(text):
     if not reveal_m:
         return None
     reveal_count = int(reveal_m.group(1))
+    # Parse the "合計N枚含まれる場合" condition from the before-text
+    # "公開されたカードの中に...合計N枚含まれる場合"
+    heart_match_condition = None
+    cond_m = re.search(
+        r"公開されたカードの中に.+?合計(\d+)枚含まれる場合",
+        before,
+    )
+    if cond_m:
+        cond_count = int(cond_m.group(1))
+        heart_match_condition = {
+            "type": "all_revealed_match_heart_color",
+            "count": cond_count,
+            "operator": ">=",
+            "text": f"公開されたカードの中に指定した色に合致するカードが合計{cond_count}枚含まれる場合",
+        }
     # Parse the after-text for the followup actions
     # after = "『μ's』のカードを1枚手札に加え、...公開した残りのカードを控え室に置く"
     select_actions = _build_look_select_actions(after) or {}
@@ -5918,24 +5933,27 @@ def _try_heart_select_reveal(text):
             "source": "revealed_cards",
             "count": select_actions.get("count", 1),
             "destination": select_actions.get("destination", "hand"),
-            "discard_remaining": select_actions.get("discard_remaining", False),
+            # No discard_remaining — explicit move_cards step handles cleanup
         }
         if select_actions.get("group_names"):
             sel["group_names"] = select_actions["group_names"]
         if select_actions.get("card_type"):
             sel["card_type"] = select_actions["card_type"]
+        if heart_match_condition:
+            sel["condition"] = heart_match_condition
         seq.append(sel)
     # Step 4: gain_resource blade if present
     if blade_count > 0:
-        seq.append(
-            {
-                "action": "gain_resource",
-                "resource": "blade",
-                "count": blade_count,
-                "duration": "live_end",
-                "text": "ブレードを得る",
-            }
-        )
+        gr = {
+            "action": "gain_resource",
+            "resource": "blade",
+            "count": blade_count,
+            "duration": "live_end",
+            "text": "ブレードを得る",
+        }
+        if heart_match_condition:
+            gr["condition"] = heart_match_condition
+        seq.append(gr)
     # Step 5: discard remaining revealed cards
     seq.append(
         {
@@ -7903,6 +7921,14 @@ def _normalize_effect_tree(effect, original_text=None):
                                 and sub.get("action") == "gain_resource"
                             ):
                                 continue
+                            # Don't propagate group_names to specify_heart_color or
+                            # reveal sub-actions — group filtering doesn't apply to
+                            # color selection or deck revelation (only to selection).
+                            if f == "group_names" and sub.get("action") in (
+                                "specify_heart_color",
+                                "reveal",
+                            ):
+                                continue
                             # Don't propagate group_names to modify_cost sub-actions
                             # UNLESS it's a per-unit cost modifier (which needs the
                             # group filter to count the right cards on stage).
@@ -9187,6 +9213,39 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                         eff["condition"] = copy.deepcopy(tc)
                         fix_stats["auto_trigger"] += 1
                         break
+
+        # FIX N: All-revealed-match-heart-color condition for specify_heart_color+reveal+select_cards
+        if (
+            eff.get("action") == "sequential"
+            and "公開されたカードの中に" in t
+            and "合計" in t
+            and "枚含まれる場合" in t
+        ):
+            acts = eff.get("actions", [])
+            cond_m = re.search(r"合計(\d+)枚含まれる場合", t)
+            if cond_m:
+                cond_count = int(cond_m.group(1))
+                cond = {
+                    "type": "all_revealed_match_heart_color",
+                    "count": cond_count,
+                    "operator": ">=",
+                    "text": f"公開されたカードの中に指定した色に合致するカードが合計{cond_count}枚含まれる場合",
+                }
+                for sub in acts:
+                    if isinstance(sub, dict) and sub.get("action") in (
+                        "select_cards",
+                        "gain_resource",
+                    ):
+                        if not sub.get("condition"):
+                            sub["condition"] = cond
+                        if sub.get("action") == "select_cards":
+                            sub.pop("discard_remaining", None)
+                    # Remove leaked group_names from actions that don't need them
+                    if isinstance(sub, dict) and sub.get("action") in (
+                        "specify_heart_color",
+                        "reveal",
+                    ):
+                        sub.pop("group_names", None)
 
     # FIX 14: appearance_source — add "discard" for 控え室から登場 conditions
     def _add_appearance_source(d):

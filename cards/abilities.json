@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-27T00:09:04.779831",
+  "generated_at": "2026-06-27T00:47:36.621493",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -5439,10 +5439,7 @@
                 "choice": true,
                 "target": "self",
                 "position": "center",
-                "activation_position": "center",
-                "group_names": [
-                  "μ's"
-                ]
+                "activation_position": "center"
               },
               {
                 "text": "そのハートを1つ得る",
@@ -5529,30 +5526,29 @@
             "action": "specify_heart_color",
             "choice": true,
             "target": "self",
-            "text": "好きなハートの色を1つ指定する",
-            "group_names": [
-              "μ's"
-            ]
+            "text": "好きなハートの色を1つ指定する"
           },
           {
             "action": "reveal",
             "source": "deck_top",
             "count": 5,
             "target": "self",
-            "text": "自分のデッキの上からカードを5枚公開する",
-            "group_names": [
-              "μ's"
-            ]
+            "text": "自分のデッキの上からカードを5枚公開する"
           },
           {
             "action": "select_cards",
             "source": "revealed_cards",
             "count": 1,
             "destination": "hand",
-            "discard_remaining": true,
             "group_names": [
               "μ's"
             ],
+            "condition": {
+              "type": "all_revealed_match_heart_color",
+              "count": 5,
+              "operator": ">=",
+              "text": "公開されたカードの中に指定した色に合致するカードが合計5枚含まれる場合"
+            },
             "text": "好きなハートの色を1つ指定する。その後、自分のデッキの上からカードを5枚公開する。公開されたカードの中に指定した色のハートを持つメンバーカードと必要ハートに指定した色を含むライブカードが合計5枚含まれる場合、その中から『μ's』のカードを1枚手札に加え、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。公開した残りのカードを控え室に置く"
           },
           {
@@ -5560,7 +5556,13 @@
             "resource": "blade",
             "count": 3,
             "duration": "live_end",
-            "text": "ブレードを得る"
+            "text": "ブレードを得る",
+            "condition": {
+              "type": "all_revealed_match_heart_color",
+              "count": 5,
+              "operator": ">=",
+              "text": "公開されたカードの中に指定した色に合致するカードが合計5枚含まれる場合"
+            }
           },
           {
             "action": "move_cards",
@@ -12256,10 +12258,7 @@
             "count": 1,
             "action": "specify_heart_color",
             "choice": true,
-            "target": "self",
-            "group_names": [
-              "虹ヶ咲"
-            ]
+            "target": "self"
           },
           {
             "text": "自分のステージにいるこのメンバー以外の『虹ヶ咲』のメンバー1人は、そのハートを1つ得る",
@@ -12620,10 +12619,7 @@
             "card_type": "live_card",
             "target": "self",
             "action": "reveal",
-            "self_target": true,
-            "group_names": [
-              "虹ヶ咲"
-            ]
+            "self_target": true
           }
         ],
         "group_names": [

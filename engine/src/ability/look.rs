@@ -520,6 +520,7 @@ impl AbilityResolver {
             .cost_limit(effect.cost_limit, effect.cost_limit_operator.clone())
             .group(effect.group_names.as_ref().and_then(|v| v.first().cloned()))
             .characters(effect.characters.clone())
+            .destination(effect.destination.clone())
             .build();
             self.pending_choice = Some(choice);
             return Ok(());

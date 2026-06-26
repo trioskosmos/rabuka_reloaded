@@ -472,6 +472,7 @@ pub enum ConditionType {
     ActionSuccessCondition,
     AllCostComparisonCondition,
     BothCondition,
+    AllRevealedMatchHeartColor,
     Custom,
 }
 
@@ -508,6 +509,7 @@ impl ConditionType {
             "resource_condition" => Some(Self::ResourceCondition),
             "action_success_condition" => Some(Self::ActionSuccessCondition),
             "all_cost_comparison_condition" => Some(Self::AllCostComparisonCondition),
+            "all_revealed_match_heart_color" => Some(Self::AllRevealedMatchHeartColor),
             "custom" => Some(Self::Custom),
             _ => None,
         }
@@ -545,6 +547,7 @@ impl ConditionType {
             Self::ActionSuccessCondition => "action_success_condition",
             Self::AllCostComparisonCondition => "all_cost_comparison_condition",
             Self::BothCondition => "both_condition",
+            Self::AllRevealedMatchHeartColor => "all_revealed_match_heart_color",
             Self::Custom => "custom",
         }
     }
