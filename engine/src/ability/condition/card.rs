@@ -983,8 +983,8 @@ impl<'a> ConditionContext<'a> {
                 let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
                 for &cid in cards.iter() {
                     if let Some(card) = card_db.get_card(cid) {
-                        if let Some(ref unit) = card.unit {
-                            seen.insert(unit.clone());
+                        if !card.group.is_empty() {
+                            seen.insert(card.group.clone());
                         }
                     }
                 }
@@ -1604,8 +1604,8 @@ impl<'a> ConditionContext<'a> {
                             continue;
                         }
                         if let Some(card) = card_db.get_card(cid) {
-                            if let Some(ref unit) = card.unit {
-                                distinct_groups.insert(unit.clone());
+                            if !card.group.is_empty() {
+                                distinct_groups.insert(card.group.clone());
                             }
                         }
                     }

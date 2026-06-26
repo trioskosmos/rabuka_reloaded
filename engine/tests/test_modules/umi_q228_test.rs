@@ -25,8 +25,8 @@ fn umi_q228_four_unique_groups_cost_zero() {
     assert_eq!(active, 0, "Cost=0, no active energy consumed");
 }
 
-/// umi + 2 fillers (Printemps) → 2 unique units → cost=4-2=2.
-/// 2 energy → all consumed.
+/// umi + 2 fillers — all 3 are μ's (1 group) → cost=4-1=3.
+/// 2 energy given → insufficient → cost payment fails.
 #[test]
 fn umi_q228_two_groups_cost_2() {
     let db = load_real_database();
@@ -46,10 +46,13 @@ fn umi_q228_two_groups_cost_2() {
 
     let active = game.state.player1.energy_zone.active_count();
     eprintln!(
-        "[UMI] active energy remaining: {} (expected 0 — spent 2)",
+        "[UMI] active energy remaining: {} (expected 2 — cost=3 > 2 affording)",
         active
     );
-    assert_eq!(active, 0, "Active energy consumed: 2 of 2");
+    assert_eq!(
+        active, 2,
+        "Active energy unspent — cost=3 can't be paid with 2"
+    );
 }
 
 /// 1 energy given → insufficient for cost=2.

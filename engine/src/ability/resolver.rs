@@ -1064,8 +1064,8 @@ impl AbilityResolver {
                             continue;
                         }
                         if let Some(card) = card_db.get_card(cid) {
-                            if let Some(ref unit) = card.unit {
-                                groups.insert(unit.clone());
+                            if !card.group.is_empty() {
+                                groups.insert(card.group.clone());
                             }
                         }
                     }
