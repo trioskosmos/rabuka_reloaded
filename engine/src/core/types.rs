@@ -275,7 +275,7 @@ pub struct MovementEvent {
 /// Captures the old/new positions and what caused the move.
 /// Replaces the fragile snapshot-based position change detection with
 /// explicit event-based tracking.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PositionChangeEvent {
     /// The card that changed position.
     pub moved_card_id: i16,

@@ -995,21 +995,22 @@ impl<'a> ConditionContext<'a> {
                 }
             }
             _ => {
-                let mut seen_names: std::collections::HashSet<String> =
-                    std::collections::HashSet::new();
-                let mut name_collision = false;
-                for &cid in cards.iter() {
-                    let names = card_db.get_card_names(cid);
-                    for name in names {
-                        if !seen_names.insert(name) {
-                            name_collision = true;
-                        }
-                    }
-                }
+                // Collect each card's possible names (multi-name cards contribute
+                // all constituent names from get_card_names).
+                let name_sets: Vec<Vec<String>> = cards
+                    .iter()
+                    .map(|&cid| card_db.get_card_names(cid))
+                    .filter(|ns| !ns.is_empty())
+                    .collect();
+
+                // Brute-force: try every combination of picking one name per card
+                // to find the maximum distinct count.  At most 3 stage positions ×
+                // 3 names each = 27 combos — easily fits in a small stack.
+                let best = util::max_distinct_names(&name_sets);
                 if let Some(n) = distinct_only {
-                    seen_names.len() >= n
+                    best.distinct >= n
                 } else {
-                    !name_collision
+                    !best.collision
                 }
             }
         };
@@ -1613,8 +1614,7 @@ impl<'a> ConditionContext<'a> {
                     compare_counts(operator, count, count_threshold)
                 }
                 _ => {
-                    let mut distinct_names: std::collections::HashSet<String> =
-                        std::collections::HashSet::new();
+                    let mut name_sets: Vec<Vec<String>> = Vec::new();
                     for &cid in &combined {
                         if cid == -1 {
                             continue;
@@ -1629,12 +1629,10 @@ impl<'a> ConditionContext<'a> {
                         if !passes_type || !passes_group {
                             continue;
                         }
-                        for name in card_db.get_card_names(cid) {
-                            distinct_names.insert(name);
-                        }
+                        name_sets.push(card_db.get_card_names(cid));
                     }
-                    let count = distinct_names.len() as u32;
-                    compare_counts(operator, count, count_threshold)
+                    let best = util::max_distinct_names(&name_sets);
+                    compare_counts(operator, best.distinct as u32, count_threshold)
                 }
             }
         } else {
@@ -2412,8 +2410,10 @@ impl<'a> ConditionContext<'a> {
                 if cid == -1 {
                     continue;
                 }
-                if let Some(card) = card_db.get_card(cid) {
-                    *name_counts.entry(card.name.clone()).or_insert(0) += 1;
+                // Multi-name cards (e.g. "A&B&C") contribute each constituent
+                // name — two cards share a name if any constituent overlaps.
+                for name in card_db.get_card_names(cid) {
+                    *name_counts.entry(name).or_insert(0) += 1;
                 }
             }
             passed = name_counts.values().any(|&c| c >= 2);
@@ -3291,13 +3291,11 @@ impl<'a> ConditionContext<'a> {
                 seen.len() as u32
             }
             _ => {
-                let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-                for &cid in &matching {
-                    for name in card_db.get_card_names(cid) {
-                        seen.insert(name);
-                    }
-                }
-                seen.len() as u32
+                let name_sets: Vec<Vec<String>> = matching
+                    .iter()
+                    .map(|&cid| card_db.get_card_names(cid))
+                    .collect();
+                util::max_distinct_names(&name_sets).distinct as u32
             }
         }
     }

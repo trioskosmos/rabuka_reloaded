@@ -117,6 +117,7 @@ pub mod miyashita_ai_pr_test;
 pub mod miyashita_ai_test;
 pub mod modify_required_hearts_global_test;
 pub mod movement_condition_test;
+pub mod multiname_card_test;
 pub mod mymai_tonight_test;
 pub mod nagi_live_card_draw_test;
 pub mod natsumi_bp5_test;

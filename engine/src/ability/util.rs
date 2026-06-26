@@ -531,11 +531,92 @@ pub fn card_matches_name_constraint(
     name_constraint: Option<&str>,
 ) -> bool {
     match name_constraint {
-        Some(name) => card_db
-            .get_card(card_id)
-            .map(|c| CardDatabase::normalize_name(&c.name) == CardDatabase::normalize_name(name))
-            .unwrap_or(false),
+        Some(name) => {
+            let norm = CardDatabase::normalize_name(name);
+            card_db
+                .get_card_names(card_id)
+                .iter()
+                .any(|cn| CardDatabase::normalize_name(cn) == norm)
+        }
         None => true,
+    }
+}
+
+/// Result of computing the maximum distinct name count across a set of cards,
+/// where each multi-name card contributes exactly ONE of its constituent names
+/// (the player chooses optimally).  With at most 3 names per card this is
+/// computed by exhaustive search.
+#[derive(Debug, Copy, Clone)]
+pub struct DistinctNamesResult {
+    /// Maximum number of distinct names achievable by choosing one name per card.
+    pub distinct: usize,
+    /// Whether a collision-free assignment exists (all cards can pick a unique name).
+    pub collision: bool,
+}
+
+/// Brute-force search for the optimal name assignment across cards.
+///
+/// Each entry in `name_sets` is the list of constituent names for one card
+/// (multi-name cards produce multiple entries via get_card_names, single-name
+/// cards produce one entry).  Picks exactly one name per card, tries every
+/// combination when ≤ 12 cards (≤ 3¹² = 531k — fast in practice), and falls
+/// back to a greedy first-unused heuristic for larger collections.
+pub fn max_distinct_names(name_sets: &[Vec<String>]) -> DistinctNamesResult {
+    if name_sets.is_empty() {
+        return DistinctNamesResult {
+            distinct: 0,
+            collision: false,
+        };
+    }
+    if name_sets.len() <= 12 {
+        // Exhaustive search — tries all combinations of picking one name per card.
+        let mut best_distinct = 0usize;
+        let mut found_no_collision = false;
+        let mut stack: Vec<(usize, std::collections::HashSet<String>, bool)> =
+            vec![(0, std::collections::HashSet::new(), false)];
+        while let Some((idx, seen, collided)) = stack.pop() {
+            if idx == name_sets.len() {
+                best_distinct = best_distinct.max(seen.len());
+                if !collided {
+                    found_no_collision = true;
+                }
+                continue;
+            }
+            for name in &name_sets[idx] {
+                let new_collided = collided || seen.contains(name.as_str());
+                let mut next = seen.clone();
+                next.insert(name.clone());
+                stack.push((idx + 1, next, new_collided));
+            }
+        }
+        DistinctNamesResult {
+            distinct: best_distinct,
+            collision: !found_no_collision,
+        }
+    } else {
+        // Greedy fallback: for each card pick the first name not yet used.
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut had_collision = false;
+        for names in name_sets {
+            let mut picked = false;
+            for name in names {
+                if seen.insert(name.clone()) {
+                    picked = true;
+                    break;
+                }
+            }
+            if !picked {
+                // All names already in set — take the first (already seen).
+                if let Some(first) = names.first() {
+                    seen.insert(first.clone());
+                }
+                had_collision = true;
+            }
+        }
+        DistinctNamesResult {
+            distinct: seen.len(),
+            collision: had_collision,
+        }
     }
 }
 
@@ -991,7 +1072,11 @@ impl<'a> CardFilter<'a> {
             need_heart_total: effect.need_heart_total,
             need_heart_operator: effect.need_heart_operator.as_deref(),
             need_heart_color: effect.need_heart_color.as_deref(),
-            name_fragments: None,
+            name_fragments: if effect.card_names.is_empty() {
+                None
+            } else {
+                Some(&effect.card_names)
+            },
             distinct: effect.distinct.as_deref(),
             exclude_self: if effect.exclude_self.unwrap_or(false) {
                 Some(-1)

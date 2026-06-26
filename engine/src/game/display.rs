@@ -241,6 +241,30 @@ pub struct GameStateDisplay {
     pub last_energy_placed_by_player: Option<String>,
     #[serde(default)]
     pub position_change_occurred_this_turn: bool,
+    /// Batch-level stage-area-to-stage-area position changes in execution
+    /// order. Each entry records one card's movement between left/center/right
+    /// positions on stage. A swap between two cards produces 2 entries.
+    /// Cleared per ability batch (after all triggered abilities resolve).
+    ///
+    /// UI use: drive position-change animations on the stage display. Iterate
+    /// in order and animate each card from old_position → new_position
+    /// (0=left, 1=center, 2=right). All entries in this list are one batch
+    /// and should animate together (e.g. a formation change where all 3 cards
+    /// rearrange produces 4-6 entries).
+    #[serde(default)]
+    pub position_changes: Vec<crate::types::PositionChangeEvent>,
+    /// Same data as position_changes but keyed by card ID for per-card
+    /// lookups. Each card's entry is its full position-change history
+    /// within this batch — useful when a card moves multiple times
+    /// (e.g. left→center in one swap, then center→right in another).
+    ///
+    /// UI use: display a "card moved" badge/tooltip on individual member
+    /// cards showing where it moved. Check if a card ID appears here to
+    /// highlight it as "moved this batch". The Vec length tells you how
+    /// many times it moved (usually 1, up to 3 for a full rotation).
+    #[serde(default)]
+    pub position_changes_by_card:
+        std::collections::HashMap<i16, Vec<crate::types::PositionChangeEvent>>,
     #[serde(default)]
     pub formation_change_occurred_this_turn: bool,
     #[serde(default)]
@@ -1289,6 +1313,16 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .last_energy_placed_by_player()
             .map(|s| s.to_string()),
         position_change_occurred_this_turn: game_state.position_change_occurred_this_turn,
+        position_changes: game_state.position_change_events.clone(),
+        position_changes_by_card: {
+            let mut map = std::collections::HashMap::new();
+            for event in &game_state.position_change_events {
+                map.entry(event.moved_card_id)
+                    .or_insert_with(Vec::new)
+                    .push(event.clone());
+            }
+            map
+        },
         formation_change_occurred_this_turn: game_state.formation_change_occurred_this_turn,
         opponent_live_success_this_turn: game_state.opponent_live_success_this_turn,
         opponent_live_no_excess_heart_this_turn: game_state.opponent_live_no_excess_heart_this_turn,
