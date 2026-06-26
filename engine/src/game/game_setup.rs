@@ -111,6 +111,8 @@ pub struct ActionParameters {
     pub card_name: Option<String>,
     pub card_no: Option<String>,
     pub ability_index: Option<usize>, // Which ability on the card (for use_ability actions)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_ability: Option<String>, // Full ability text block (for display)
     pub base_cost: Option<u32>,
     pub final_cost: Option<u32>,
     pub available_areas: Option<Vec<AreaInfo>>,
@@ -171,6 +173,7 @@ fn make_params() -> ActionParameters {
         card_name: None,
         card_no: None,
         ability_index: None,
+        source_ability: None,
         base_cost: None,
         final_cost: None,
         available_areas: None,
@@ -1115,14 +1118,6 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     continue;
                 }
 
-                let ability_name = if ability.full_text.chars().count() > 30 {
-                    format!(
-                        "{}...",
-                        ability.full_text.chars().take(30).collect::<String>()
-                    )
-                } else {
-                    ability.full_text.clone()
-                };
                 let ability_cost = ability
                     .cost
                     .as_ref()
@@ -1138,7 +1133,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     ActionType::UseAbility,
                     &format!(
                         "Use ability on {} ({}): {}{} - Cost: {}",
-                        card.name, area_name, ability_name, trigger_info, ability_cost
+                        card.name, area_name, ability.full_text, trigger_info, ability_cost
                     ),
                     ActionParameters {
                         card_id: Some(card_id),
@@ -1146,6 +1141,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         card_name: Some(card.name.clone()),
                         card_no: Some(card.card_no.clone()),
                         ability_index: Some(ability_index),
+                        source_ability: Some(ability.full_text.clone()),
                         base_cost: Some(ability_cost),
                         final_cost: Some(ability_cost),
                         ..make_params()
@@ -1191,14 +1187,6 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     continue;
                 }
 
-                let ability_name = if ability.full_text.chars().count() > 30 {
-                    format!(
-                        "{}...",
-                        ability.full_text.chars().take(30).collect::<String>()
-                    )
-                } else {
-                    ability.full_text.clone()
-                };
                 let ability_cost = ability
                     .cost
                     .as_ref()
@@ -1209,13 +1197,14 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     ActionType::UseAbility,
                     &format!(
                         "Use ability on {} (discard): {} (起動) - Cost: {}",
-                        card.name, ability_name, ability_cost
+                        card.name, ability.full_text, ability_cost
                     ),
                     ActionParameters {
                         card_id: Some(card_id),
                         card_name: Some(card.name.clone()),
                         card_no: Some(card.card_no.clone()),
                         ability_index: Some(ability_index),
+                        source_ability: Some(ability.full_text.clone()),
                         base_cost: Some(ability_cost),
                         final_cost: Some(ability_cost),
                         ..make_params()

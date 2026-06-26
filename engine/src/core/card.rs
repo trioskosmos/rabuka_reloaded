@@ -614,6 +614,7 @@ impl<'de> serde::Deserialize<'de> for AbilityCost {
                             effect.compound.actions =
                                 Some(sub.into_iter().map(AbilityCost::into_effect).collect());
                         }
+                        "group_reference" => effect.group_reference = map.next_value()?,
                         // Ignore unknown legacy cost fields rather than failing
                         // — the parser has been adding fields over time.
                         _ => {

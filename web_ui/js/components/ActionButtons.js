@@ -28,12 +28,17 @@ export const ActionButtons = {
         }
         // For ability actions, show only the specific ability being activated
         if (a.action_type === 'use_ability' && displayCard) {
-            const abilityText = Tooltips.extractRelevantAbility(displayCard, null, params.ability_index);
-            if (abilityText && abilityText.length >= 5) {
-                name = abilityText;
+            // Prefer source_ability from the engine (authoritative full text block)
+            if (params.source_ability && params.source_ability.length >= 5) {
+                name = params.source_ability;
             } else {
-                const fallback = Tooltips.getEffectiveRawText(displayCard);
-                if (fallback && fallback.length >= 5) name = fallback;
+                const abilityText = Tooltips.extractRelevantAbility(displayCard, null, params.ability_index);
+                if (abilityText && abilityText.length >= 5) {
+                    name = abilityText;
+                } else {
+                    const fallback = Tooltips.getEffectiveRawText(displayCard);
+                    if (fallback && fallback.length >= 5) name = fallback;
+                }
             }
         }
         // For EN mode, translate Japanese card names to English

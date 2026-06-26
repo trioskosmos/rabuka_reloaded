@@ -183,6 +183,7 @@ fn output_actions() {
                     card_name: p.card_name,
                     card_no: p.card_no,
                     ability_index: p.ability_index,
+                    source_ability: p.source_ability,
                     base_cost: p.base_cost,
                     final_cost: p.final_cost,
                     double_baton_pairs: p.double_baton_pairs.map(|pairs| {

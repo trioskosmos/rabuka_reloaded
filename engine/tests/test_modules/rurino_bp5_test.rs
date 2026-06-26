@@ -168,3 +168,153 @@ fn rurino_bp5_cross_unit_same_group_all_selectable() {
     );
     assert!(!game.has_pending_choice(), "No pending choices after setup");
 }
+
+/// Cost with group_reference: "same_group_name" — only hand cards whose group
+/// matches the activating card's group are selectable. Different-group and
+/// no-group cards must be excluded from the choice.
+#[test]
+fn himeno_bp5_same_group_cost_filters_hand_cards() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    // Activating card: 安養寺 姫芽 (PL!HS-bp5-006-R, group=蓮ノ空)
+    let himeno = game.id("PL!HS-bp5-006-R");
+    // Same-group hand cards (蓮ノ空)
+    let same1 = game.new_id("PL!HS-bp6-011-R");
+    let same2 = game.new_id("PL!HS-bp6-011-R");
+    // Different-group hand card (μ's)
+    let wrong = game.id("PL!-sd1-010-SD");
+    // Live card (μ's, no group match needed — just triggers live start)
+    let live = game.id("PL!-sd1-020-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // Put activating card on stage (center area)
+    game.state.player1.stage.stage = [-1, himeno, -1];
+
+    fill_decks(&mut game, filler);
+    game.give_energy(10);
+
+    advance_to_live_set(&mut game);
+    // Set hand explicitly — no draw-phase interference
+    // Hand layout before set_live_card:
+    //   [0]=same1(蓮ノ空), [1]=same2(蓮ノ空), [2]=live, [3]=wrong(μ's)
+    game.state.player1.hand.cards.clear();
+    game.state.player1.hand.cards.push(same1);
+    game.state.player1.hand.cards.push(same2);
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(wrong);
+    game.set_live_card(live); // removes live from hand to live zone
+    finish_live_setup(&mut game);
+
+    // Hand after set_live_card: [same1@0(蓮ノ空), same2@1(蓮ノ空), wrong@2(μ's)]
+    // Live start triggers himeno's ability → cost prompt
+    assert!(game.has_pending_choice(), "Cost prompt should appear");
+    assert_eq!(game.pending_choice_type(), Some("SelectCard".to_string()));
+
+    // filtered_indices must only include same-group hand cards (0,1)
+    if let rabuka_engine::ability::types::Choice::SelectCard {
+        filtered_indices: Some(fi),
+        group,
+        ..
+    } = game.get_pending_choice()
+    {
+        assert_eq!(
+            fi.as_slice(),
+            &[0usize, 1],
+            "Only 蓮ノ空 cards (indices 0,1) should be selectable"
+        );
+        assert_eq!(
+            group.as_deref(),
+            Some("蓮ノ空"),
+            "Choice group should be 蓮ノ空"
+        );
+    } else {
+        panic!("Expected SelectCard with filtered_indices");
+    }
+
+    // Select first same-group card (index 0 in filtered = hand index 0)
+    game.select_indices(&[0]);
+
+    // Second prompt: select the remaining same-group card
+    assert!(
+        game.has_pending_choice(),
+        "Second selection prompt should appear"
+    );
+    assert_eq!(game.pending_choice_type(), Some("SelectCard".to_string()));
+
+    // Hand after first discard: [same2@0(蓮ノ空), wrong@1(μ's)]
+    // Only same2 at index 0 is valid
+    game.select_indices(&[0]);
+
+    // Verify both same-group cards were discarded, wrong group still in hand
+    assert!(
+        game.state.player1.waitroom.cards.contains(&same1),
+        "same1 should be in waitroom"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&same2),
+        "same2 should be in waitroom"
+    );
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&wrong),
+        "wrong group card should NOT be in waitroom"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&wrong),
+        "wrong group card should remain in hand"
+    );
+
+    // Verify 2 heart01 granted to activating card
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(himeno, rabuka_engine::card::HeartColor::Heart01),
+        2,
+        "Activating card should gain 2 heart01"
+    );
+}
+
+/// Cost with group_reference: "same_group_name" + no matching cards in hand
+/// → optional cost auto-skips with no choice prompt.
+#[test]
+fn himeno_bp5_same_group_cost_auto_skips_when_no_match() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let himeno = game.id("PL!HS-bp5-006-R");
+    // Only wrong-group cards in hand (μ's)
+    let wrong1 = game.new_id("PL!-sd1-010-SD");
+    let wrong2 = game.new_id("PL!-sd1-010-SD");
+    let live = game.id("PL!-sd1-020-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [-1, himeno, -1];
+
+    fill_decks(&mut game, filler);
+    game.give_energy(10);
+
+    advance_to_live_set(&mut game);
+    // Hand: [wrong1(μ's), wrong2(μ's), live]
+    game.state.player1.hand.cards.clear();
+    game.state.player1.hand.cards.push(wrong1);
+    game.state.player1.hand.cards.push(wrong2);
+    game.state.player1.hand.cards.push(live);
+    game.set_live_card(live);
+    finish_live_setup(&mut game);
+
+    // No cost prompt — auto-skipped because no same-group cards in hand
+    // The ability fires but optional cost was skipped, so no effect.
+    assert!(
+        !game.has_pending_choice(),
+        "No cost prompt when no same-group cards in hand"
+    );
+
+    // No heart01 modifier should be granted
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(himeno, rabuka_engine::card::HeartColor::Heart01),
+        0,
+        "No heart01 should be granted when cost is skipped"
+    );
+}

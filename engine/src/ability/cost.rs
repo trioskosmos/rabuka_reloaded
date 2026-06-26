@@ -178,7 +178,24 @@ impl AbilityResolver {
                     let mut filter = cost.filter_subset();
                     filter.card_type = card_type_filter;
                     filter.cost_limit = cost_limit;
-                    let matching_indices: Vec<usize> = pl
+                    let resolved_group: Option<String> =
+                        if cost.group_reference.as_deref() == Some("same_group_name") {
+                            self.activating_card_id
+                                .and_then(|cid| card_db.get_card(cid))
+                                .and_then(|c| {
+                                    if c.group.is_empty() {
+                                        None
+                                    } else {
+                                        Some(c.group.clone())
+                                    }
+                                })
+                        } else {
+                            None
+                        };
+                    if let Some(ref g) = resolved_group {
+                        filter.group = Some(g.as_str());
+                    }
+                    let mut matching_indices: Vec<usize> = pl
                         .hand
                         .cards
                         .iter()
@@ -186,6 +203,12 @@ impl AbilityResolver {
                         .filter(|(_, &cid)| filter.matches(card_db, cid, false))
                         .map(|(i, _)| i)
                         .collect();
+                    // Activating card has no group — no cards can satisfy "same_group_name"
+                    if cost.group_reference.as_deref() == Some("same_group_name")
+                        && resolved_group.is_none()
+                    {
+                        matching_indices.clear();
+                    }
                     let is_optional = (optional || is_any_number) && !is_activation;
                     let match_names: Vec<String> = matching_indices
                         .iter()
@@ -280,6 +303,11 @@ impl AbilityResolver {
                                 entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
                             }
                         }
+                        let filtered = if resolved_group.is_some() {
+                            Some(matching_indices.clone())
+                        } else {
+                            None
+                        };
                         self.pending_choice = Some(
                             Choice::select_cards(
                                 source.to_string(),
@@ -289,11 +317,16 @@ impl AbilityResolver {
                             )
                             .card_type(card_type.clone())
                             .cost_limit(cost.cost_limit, cost.cost_limit_operator.clone())
-                            .group(cost.group_names.clone().map(|v| v.join(",")))
+                            .group(
+                                resolved_group
+                                    .clone()
+                                    .or_else(|| cost.group_names.clone().map(|v| v.join(","))),
+                            )
                             .characters(cost.characters.clone())
                             .target_player_id(Some(
                                 cost.target.clone().unwrap_or_else(|| "self".to_string()),
                             ))
+                            .filtered_indices(filtered)
                             .build(),
                         );
                         return Ok(());
