@@ -1025,8 +1025,13 @@ impl GameState {
         if (moved_marker || self.last_energy_placed_by_effect())
             && self.current_phase == crate::types::Phase::Main
         {
+            let batch_ids: Vec<i16> = self
+                .batch_movements
+                .iter()
+                .map(|m| m.moved_card_id)
+                .collect();
             let event = crate::ability::types::TriggerEvent {
-                moved_cards: Vec::new(),
+                moved_cards: batch_ids,
                 energy_placed_by_effect: self.last_energy_placed_by_effect(),
                 ..Default::default()
             };

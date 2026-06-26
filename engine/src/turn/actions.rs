@@ -555,10 +555,14 @@ impl super::TurnEngine {
                 game_state.depth_first_cutoff = Some(cutoff);
                 game_state.ability_queue.promote_entry_by_abs(queue_index);
                 if game_state.ability_queue.start_next() {
-                    game_state.recently_moved_cards = None;
-                    game_state.recently_moved_from_zone = None;
+                    let saved_moved = game_state.recently_moved_cards.take();
+                    let saved_from_zone = game_state.recently_moved_from_zone.take();
                     game_state.recently_state_changed.clear();
                     game_state.process_current_ability();
+                    if game_state.recently_moved_cards.is_none() {
+                        game_state.recently_moved_cards = saved_moved;
+                        game_state.recently_moved_from_zone = saved_from_zone;
+                    }
                 }
                 // If the ability completed without pausing, drain newly-queued
                 // entries (each_time watchers) immediately. If it paused (e.g.,
