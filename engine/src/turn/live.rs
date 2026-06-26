@@ -9,6 +9,12 @@ use std::collections::HashMap;
 
 const EMPTY_H8: [u32; 8] = [0u32; 8];
 
+/// Effective heart need for a live card during allocation.
+struct CardNeed {
+    name: String,
+    need: [u32; 8],
+}
+
 impl super::TurnEngine {
     fn score_delta_since(
         current: &HashMap<i16, i32>,
@@ -1306,230 +1312,749 @@ impl super::TurnEngine {
     /// Build heart allocations for live cards from the available heart pool.
     /// Shared between the yell phase and check_live_success (which recomputes
     /// owned_hearts after ability-granted hearts are added at 8.3.13).
+    ///
+    /// Strategy (in order per card):
+    ///   1a_colored       — matching colored hearts → specific color req
+    ///   1b_h00_wild      — Heart00 wildcard → remaining color deficit (NO icon_all yet)
+    ///   2_wildcard       — remaining Heart00 wild → color deficit (second pass)
+    ///   3a_colored_surplus — leftover colored hearts → Heart00 req (demand-aware:
+    ///                        prefers colors with most surplus vs future demand)
+    ///   3b_h00           — Heart00 → remaining Heart00 req
+    ///   4_all_cleanup    — icon_all → ANY remaining deficit (color first, then heart00)
+    ///                     NO icon_all is used before this phase.
+    ///
+    /// If smart greedy fails, falls back to exhaustive backtracking over
+    /// Phase 3a / Phase 4 choices to guarantee a solution when one exists.
     pub fn compute_allocations(
         owned_hearts: &BaseHeart,
         live_card_ids: &[i16],
         card_db: &CardDatabase,
         need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
     ) -> Vec<Allocation> {
-        let mut remaining = owned_hearts.clone();
-        let mut allocations = Vec::new();
-        for live_idx in 0..live_card_ids.len() {
-            if let Some(card) = card_db.get_card(live_card_ids[live_idx]) {
-                let effective_need = card.need_heart.as_ref().map(|nh| {
-                    let has_set = need_heart_modifiers
-                        .get(&live_card_ids[live_idx])
-                        .is_some_and(|m| m.values().any(|e| e.set != 0));
-                    let mut adjusted = if has_set {
-                        BaseHeart {
-                            hearts: HashMap::new(),
+        // Build normalized card needs array + future demand
+        let card_needs = Self::build_card_needs(live_card_ids, card_db, need_heart_modifiers);
+        let future_demand = Self::compute_future_demand(&card_needs);
+
+        // Initialize pool as array for deterministic access
+        let mut pool = [0u32; 8];
+        for (color, count) in &owned_hearts.hearts {
+            pool[color.index()] += count;
+        }
+
+        // Try smart greedy first
+        let mut pool_copy = pool;
+        let greedy = Self::greedy_allocate(&mut pool_copy, &card_needs, &future_demand);
+        if Self::allocations_pass(&greedy, &card_needs) {
+            return greedy;
+        }
+
+        // Greedy failed — backtrack over Phase 3a + icon_all choices
+        let pool_arr = pool;
+        if let Some(bt) = Self::backtrack_allocate(&pool_arr, &card_needs) {
+            return bt;
+        }
+
+        // Fallback: return greedy result even if some cards failed
+        greedy
+    }
+
+    fn build_card_needs(
+        live_card_ids: &[i16],
+        card_db: &CardDatabase,
+        need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
+    ) -> Vec<CardNeed> {
+        let mut needs = Vec::new();
+        for &lc_id in live_card_ids {
+            if let Some(card) = card_db.get_card(lc_id) {
+                let mut need = [0u32; 8];
+                let has_set = need_heart_modifiers
+                    .get(&lc_id)
+                    .is_some_and(|m| m.values().any(|e| e.set != 0));
+                if let Some(ref nh) = card.need_heart {
+                    if has_set {
+                        for (color, me) in need_heart_modifiers.get(&lc_id).into_iter().flatten() {
+                            if me.set != 0 {
+                                need[color.index()] = me.set as u32;
+                            }
                         }
                     } else {
-                        nh.clone()
-                    };
-                    if let Some(card_mods) = need_heart_modifiers.get(&live_card_ids[live_idx]) {
-                        for (color, me) in card_mods {
-                            if me.set != 0 {
-                                adjusted.hearts.insert(*color, me.set as u32);
+                        for (color, count) in &nh.hearts {
+                            let idx = color.index();
+                            let mut val = *count as i32;
+                            if let Some(mods) = need_heart_modifiers.get(&lc_id) {
+                                if let Some(me) = mods.get(color) {
+                                    val = (val + me.additive).max(0);
+                                }
                             }
-                            if me.additive != 0 {
-                                let entry = adjusted.hearts.entry(*color).or_insert(0);
-                                *entry = (*entry as i32 + me.additive).max(0) as u32;
-                            }
+                            need[idx] = val as u32;
                         }
                     }
-                    adjusted
+                }
+                needs.push(CardNeed {
+                    name: card.name.clone(),
+                    need,
                 });
-                let use_need = effective_need.clone().or_else(|| card.need_heart.clone());
-                if let Some(ref nh) = use_need {
-                    for (color, needed) in &nh.hearts {
-                        if *color == HeartColor::Heart00 {
-                            continue;
-                        }
-                        let c_idx = color.index();
-                        let avail = *remaining.hearts.get(color).unwrap_or(&0);
-                        let used = avail.min(*needed);
-                        if used > 0 {
-                            allocations.push(Allocation {
-                                target_idx: live_idx,
-                                target_name: card.name.clone(),
-                                source_type: "stage".into(),
-                                source_name: "Stage hearts".into(),
-                                source_slot: None,
-                                wildcard: false,
-                                color: c_idx,
-                                amount: used,
-                                is_bonus: false,
-                                phase: "1a_colored".into(),
-                            });
-                            *remaining.hearts.entry(*color).or_insert(0) -= used;
-                        }
-                        // Phase 1 also accepts Heart00 and icon_all hearts as wildcards
-                        let still_needed = needed.saturating_sub(used);
-                        if still_needed > 0 {
-                            let h00_avail =
-                                *remaining.hearts.get(&HeartColor::Heart00).unwrap_or(&0);
-                            let h00_use = h00_avail.min(still_needed);
-                            if h00_use > 0 {
-                                allocations.push(Allocation {
-                                    target_idx: live_idx,
-                                    target_name: card.name.clone(),
-                                    source_type: "stage".into(),
-                                    source_name: "Wildcard (Heart00)".into(),
-                                    source_slot: None,
-                                    wildcard: true,
-                                    color: c_idx,
-                                    amount: h00_use,
-                                    is_bonus: false,
-                                    phase: "1b_h00_wild".into(),
-                                });
-                                *remaining.hearts.entry(HeartColor::Heart00).or_insert(0) -=
-                                    h00_use;
-                            }
-                            let still = still_needed.saturating_sub(h00_use);
-                            if still > 0 {
-                                let all_avail =
-                                    *remaining.hearts.get(&HeartColor::All).unwrap_or(&0);
-                                if all_avail > 0 {
-                                    let fill = all_avail.min(still);
-                                    allocations.push(Allocation {
-                                        target_idx: live_idx,
-                                        target_name: card.name.clone(),
-                                        source_type: "stage".into(),
-                                        source_name: "All heart (icon_all)".into(),
-                                        source_slot: None,
-                                        wildcard: true,
-                                        color: c_idx,
-                                        amount: fill,
-                                        is_bonus: false,
-                                        phase: "1c_all_wild".into(),
-                                    });
-                                    *remaining.hearts.entry(HeartColor::All).or_insert(0) -= fill;
-                                }
-                            }
-                        }
+            }
+        }
+        needs
+    }
+
+    /// Compute future demand per card: for cards i+1..N, sum of non-heart00 needs.
+    fn compute_future_demand(card_needs: &[CardNeed]) -> Vec<[u32; 8]> {
+        let n = card_needs.len();
+        let mut demand = vec![[0u32; 8]; n];
+        let mut running = [0u32; 8];
+        for i in (0..n).rev() {
+            if i + 1 < n {
+                for c in 1..7 {
+                    demand[i][c] = running[c];
+                }
+            }
+            for c in 1..7 {
+                running[c] += card_needs[i].need[c];
+            }
+        }
+        demand
+    }
+
+    /// Smart greedy allocation: demand-aware Phase 3a + icon_all-last Phase 4.
+    fn greedy_allocate(
+        pool: &mut [u32; 8],
+        card_needs: &[CardNeed],
+        future_demand: &[[u32; 8]],
+    ) -> Vec<Allocation> {
+        let mut allocs = Vec::new();
+        for (live_idx, cn) in card_needs.iter().enumerate() {
+            let need = cn.need;
+            // Track per-color totals for this card (direct + wildcard already assigned)
+            let mut filled = [0u32; 8];
+            let card_name = &cn.name;
+
+            // Phase 1a: matching colored hearts → specific color req
+            for c in 1..7 {
+                if need[c] > 0 && pool[c] > 0 {
+                    let take = pool[c].min(need[c]);
+                    allocs.push(Allocation {
+                        target_idx: live_idx,
+                        target_name: card_name.clone(),
+                        source_type: "stage".into(),
+                        source_name: "Stage hearts".into(),
+                        source_slot: None,
+                        wildcard: false,
+                        color: c,
+                        amount: take,
+                        is_bonus: false,
+                        phase: "1a_colored".into(),
+                    });
+                    pool[c] -= take;
+                    filled[c] += take;
+                }
+            }
+
+            // Phase 1b: Heart00 wild → remaining color deficit (no icon_all)
+            for c in 1..7 {
+                if need[c] > filled[c] && pool[0] > 0 {
+                    let deficit = need[c] - filled[c];
+                    let take = pool[0].min(deficit);
+                    allocs.push(Allocation {
+                        target_idx: live_idx,
+                        target_name: card_name.clone(),
+                        source_type: "stage".into(),
+                        source_name: "Wildcard (Heart00)".into(),
+                        source_slot: None,
+                        wildcard: true,
+                        color: c,
+                        amount: take,
+                        is_bonus: false,
+                        phase: "1b_h00_wild".into(),
+                    });
+                    pool[0] -= take;
+                    filled[c] += take;
+                }
+            }
+
+            // Phase 2: remaining Heart00 wild → color deficit (second pass for multi-deficit)
+            for c in 1..7 {
+                if need[c] > filled[c] && pool[0] > 0 {
+                    let deficit = need[c] - filled[c];
+                    let take = pool[0].min(deficit);
+                    allocs.push(Allocation {
+                        target_idx: live_idx,
+                        target_name: card_name.clone(),
+                        source_type: "stage".into(),
+                        source_name: "Wildcard (Heart00)".into(),
+                        source_slot: None,
+                        wildcard: true,
+                        color: c,
+                        amount: take,
+                        is_bonus: false,
+                        phase: "2_wildcard".into(),
+                    });
+                    pool[0] -= take;
+                    filled[c] += take;
+                }
+            }
+
+            // Phase 3a: total remaining deficit = total_required - total_filled_so_far.
+            // Need[0] is the "any" portion, but the total must also be met.
+            let total_filled_so_far: u32 = filled.iter().sum();
+            let total_required: u32 = need.iter().sum();
+            let h00_deficit = total_required.saturating_sub(total_filled_so_far);
+            if h00_deficit > 0 {
+                // Demand-aware: sort colors by (pool - future_demand) descending
+                // so colors with most surplus vs. future cards get consumed first.
+                let mut surplus_colors: Vec<usize> = (1..7).collect();
+                surplus_colors.sort_by(|&a, &b| {
+                    let score_a = pool[a] as i32 - future_demand[live_idx][a] as i32;
+                    let score_b = pool[b] as i32 - future_demand[live_idx][b] as i32;
+                    score_b.cmp(&score_a)
+                });
+                let mut filled_h00 = 0u32;
+                for &c in &surplus_colors {
+                    if filled_h00 >= h00_deficit {
+                        break;
                     }
-                    let wildcard_avail = *remaining.hearts.get(&HeartColor::Heart00).unwrap_or(&0)
-                        + *remaining.hearts.get(&HeartColor::All).unwrap_or(&0);
-                    if wildcard_avail > 0 {
-                        let mut wildcard_used = 0u32;
-                        for (color, needed) in &nh.hearts {
-                            if *color == HeartColor::Heart00 {
-                                continue;
-                            }
-                            let c_idx = color.index();
-                            let already_filled = allocations
-                                .iter()
-                                .filter(|a| {
-                                    a.target_idx == live_idx && a.color == c_idx && !a.wildcard
-                                })
-                                .map(|a| a.amount)
-                                .sum::<u32>();
-                            let still_needed = needed.saturating_sub(already_filled);
-                            if still_needed > 0 && wildcard_avail > wildcard_used {
-                                let fill = still_needed.min(wildcard_avail - wildcard_used);
-                                allocations.push(Allocation {
-                                    target_idx: live_idx,
-                                    target_name: card.name.clone(),
-                                    source_type: "stage".into(),
-                                    source_name: "Wildcard (Heart00)".into(),
-                                    source_slot: None,
-                                    wildcard: true,
-                                    color: c_idx,
-                                    amount: fill,
-                                    is_bonus: false,
-                                    phase: "2_wildcard".into(),
-                                });
-                                wildcard_used += fill;
-                            }
-                        }
-                        if wildcard_used > 0 {
-                            let h00 = remaining.hearts.entry(HeartColor::Heart00).or_insert(0);
-                            let deduct_from_h00 = (*h00).min(wildcard_used);
-                            *h00 -= deduct_from_h00;
-                            let remaining_wild = wildcard_used - deduct_from_h00;
-                            if remaining_wild > 0 {
-                                *remaining.hearts.entry(HeartColor::All).or_insert(0) = remaining
-                                    .hearts
-                                    .get(&HeartColor::All)
-                                    .copied()
-                                    .unwrap_or(0)
-                                    .saturating_sub(remaining_wild);
-                            }
-                        }
+                    if pool[c] > 0 {
+                        let take = pool[c].min(h00_deficit - filled_h00);
+                        allocs.push(Allocation {
+                            target_idx: live_idx,
+                            target_name: card_name.clone(),
+                            source_type: "stage".into(),
+                            source_name: "Stage hearts".into(),
+                            source_slot: None,
+                            wildcard: false,
+                            color: c,
+                            amount: take,
+                            is_bonus: false,
+                            phase: "3a_colored_surplus".into(),
+                        });
+                        pool[c] -= take;
+                        filled_h00 += take;
+                        filled[c] += take;
                     }
-                    let any_needed = *nh.hearts.get(&HeartColor::Heart00).unwrap_or(&0);
-                    if any_needed > 0 {
-                        let mut any_filled = 0u32;
-                        for color_idx in 1..7usize {
-                            let hc = HeartColor::from_index(color_idx);
-                            let avail = *remaining.hearts.get(&hc).unwrap_or(&0);
-                            if avail > 0 && any_filled < any_needed {
-                                let fill = avail.min(any_needed - any_filled);
-                                allocations.push(Allocation {
-                                    target_idx: live_idx,
-                                    target_name: card.name.clone(),
-                                    source_type: "stage".into(),
-                                    source_name: "Stage hearts".into(),
-                                    source_slot: None,
-                                    wildcard: false,
-                                    color: color_idx,
-                                    amount: fill,
-                                    is_bonus: false,
-                                    phase: "3a_colored_surplus".into(),
-                                });
-                                *remaining.hearts.entry(hc).or_insert(0) -= fill;
-                                any_filled += fill;
-                            }
-                        }
-                        if any_filled < any_needed {
-                            let h00_avail =
-                                *remaining.hearts.get(&HeartColor::Heart00).unwrap_or(&0);
-                            let all_avail = *remaining.hearts.get(&HeartColor::All).unwrap_or(&0);
-                            let avail = h00_avail + all_avail;
-                            let fill = avail.min(any_needed - any_filled);
-                            if fill > 0 {
-                                let h00_use = h00_avail.min(fill);
-                                if h00_use > 0 {
-                                    allocations.push(Allocation {
-                                        target_idx: live_idx,
-                                        target_name: card.name.clone(),
-                                        source_type: "stage".into(),
-                                        source_name: "Stage hearts".into(),
-                                        source_slot: None,
-                                        wildcard: false,
-                                        color: 0,
-                                        amount: h00_use,
-                                        is_bonus: false,
-                                        phase: "3b_h00".into(),
-                                    });
-                                    *remaining.hearts.entry(HeartColor::Heart00).or_insert(0) -=
-                                        h00_use;
-                                }
-                                let all_use = fill - h00_use;
-                                if all_use > 0 {
-                                    allocations.push(Allocation {
-                                        target_idx: live_idx,
-                                        target_name: card.name.clone(),
-                                        source_type: "stage".into(),
-                                        source_name: "All heart (icon_all)".into(),
-                                        source_slot: None,
-                                        wildcard: false,
-                                        color: 7,
-                                        amount: all_use,
-                                        is_bonus: false,
-                                        phase: "3c_all".into(),
-                                    });
-                                    *remaining.hearts.entry(HeartColor::All).or_insert(0) -=
-                                        all_use;
-                                }
-                            }
-                        }
+                }
+
+                // Phase 3b: Heart00 → remaining Heart00 deficit
+                if filled_h00 < h00_deficit && pool[0] > 0 {
+                    let take = pool[0].min(h00_deficit - filled_h00);
+                    allocs.push(Allocation {
+                        target_idx: live_idx,
+                        target_name: card_name.clone(),
+                        source_type: "stage".into(),
+                        source_name: "Stage hearts".into(),
+                        source_slot: None,
+                        wildcard: false,
+                        color: 0,
+                        amount: take,
+                        is_bonus: false,
+                        phase: "3b_h00".into(),
+                    });
+                    pool[0] -= take;
+                    filled_h00 += take;
+                }
+            }
+
+            // Phase 4: icon_all → ANY remaining deficit (color deficits first, then heart00)
+            if pool[7] > 0 {
+                // Color deficits first (otherwise they'd need heart00 which we might not have)
+                for c in 1..7 {
+                    if need[c] > filled[c] && pool[7] > 0 {
+                        let deficit = need[c] - filled[c];
+                        let take = pool[7].min(deficit);
+                        allocs.push(Allocation {
+                            target_idx: live_idx,
+                            target_name: card_name.clone(),
+                            source_type: "stage".into(),
+                            source_name: "All heart (icon_all)".into(),
+                            source_slot: None,
+                            wildcard: true,
+                            color: c,
+                            amount: take,
+                            is_bonus: false,
+                            phase: "4_all_cleanup".into(),
+                        });
+                        pool[7] -= take;
+                        filled[c] += take;
+                    }
+                }
+                // Remaining icon_all → heart00 deficit
+                let total_colored: u32 = filled[1..7].iter().sum();
+                let h00_remaining = need[0].saturating_sub(total_colored);
+                if h00_remaining > 0 && pool[7] > 0 {
+                    // Also include any previous filled[0] from Phase 3b
+                    let already_filled_h00 = filled[0];
+                    let h00_still_needed = h00_remaining.saturating_sub(already_filled_h00);
+                    if h00_still_needed > 0 && pool[7] > 0 {
+                        let take = pool[7].min(h00_still_needed);
+                        allocs.push(Allocation {
+                            target_idx: live_idx,
+                            target_name: card_name.clone(),
+                            source_type: "stage".into(),
+                            source_name: "All heart (icon_all)".into(),
+                            source_slot: None,
+                            wildcard: false,
+                            color: 7,
+                            amount: take,
+                            is_bonus: false,
+                            phase: "4_all_cleanup".into(),
+                        });
+                        pool[7] -= take;
+                        filled[0] += take;
                     }
                 }
             }
         }
-        allocations
+        allocs
+    }
+
+    /// Check whether all cards' heart requirements are satisfied by the allocations.
+    /// Uses the same logic as the pass/fail check in execute_live_victory_determination.
+    fn allocations_pass(allocs: &[Allocation], card_needs: &[CardNeed]) -> bool {
+        if card_needs.is_empty() {
+            return true;
+        }
+        // Build per-card filled arrays
+        let num_cards = card_needs.len();
+        let mut per_card_filled = vec![[0u32; 8]; num_cards];
+        for a in allocs {
+            if a.target_idx < num_cards {
+                per_card_filled[a.target_idx][a.color] += a.amount;
+            }
+        }
+        // Check each card
+        for (i, cn) in card_needs.iter().enumerate() {
+            let filled = per_card_filled[i];
+            let req = cn.need;
+            let mut wildcard = filled[0] + filled[7];
+            let mut ok = true;
+            let total_filled: u32 = filled.iter().sum();
+            let total_required: u32 = req.iter().sum();
+            if total_filled < total_required {
+                ok = false;
+            }
+            if ok && req[0] > 0 {
+                let h00_satisfied: u32 = filled[1..7].iter().sum();
+                if h00_satisfied + wildcard < req[0] {
+                    ok = false;
+                } else {
+                    wildcard = wildcard.saturating_sub(req[0].saturating_sub(h00_satisfied));
+                }
+            }
+            if ok {
+                for idx in 1..7 {
+                    if filled[idx] < req[idx] {
+                        let deficit = req[idx] - filled[idx];
+                        if wildcard >= deficit {
+                            wildcard -= deficit;
+                        } else {
+                            ok = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            if !ok {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Exhaustive backtracking search over Phase 3a + Phase 4 choices.
+    /// Tries all valid ways to extract hearts from the pool per card.
+    fn backtrack_allocate(pool: &[u32; 8], card_needs: &[CardNeed]) -> Option<Vec<Allocation>> {
+        let mut allocs = Vec::new();
+        let mut current_pool = *pool;
+        if Self::bt_search(&mut current_pool, card_needs, 0, &mut allocs) {
+            Some(allocs)
+        } else {
+            None
+        }
+    }
+
+    /// Recursive backtracking: try all valid allocations for card `idx` then recurse.
+    fn bt_search(
+        pool: &mut [u32; 8],
+        card_needs: &[CardNeed],
+        idx: usize,
+        allocs: &mut Vec<Allocation>,
+    ) -> bool {
+        if idx >= card_needs.len() {
+            return true;
+        }
+        let saved_pool = *pool;
+        let saved_len = allocs.len();
+        let cn = &card_needs[idx];
+        let need = cn.need;
+        let card_name = &cn.name;
+
+        // ----- Forced phases (no choice) -----
+
+        // Phase 1a: matching colored hearts → color req (no choice)
+        let mut filled = [0u32; 8];
+        for c in 1..7 {
+            if need[c] > 0 && pool[c] > 0 {
+                let take = pool[c].min(need[c]);
+                allocs.push(Allocation {
+                    target_idx: idx,
+                    target_name: card_name.clone(),
+                    source_type: "stage".into(),
+                    source_name: "Stage hearts".into(),
+                    source_slot: None,
+                    wildcard: false,
+                    color: c,
+                    amount: take,
+                    is_bonus: false,
+                    phase: "1a_colored".into(),
+                });
+                pool[c] -= take;
+                filled[c] += take;
+            }
+        }
+
+        // Phase 1b: Heart00 → color deficit (no choice, uses only heart00)
+        for c in 1..7 {
+            if need[c] > filled[c] && pool[0] > 0 {
+                let deficit = need[c] - filled[c];
+                let take = pool[0].min(deficit);
+                allocs.push(Allocation {
+                    target_idx: idx,
+                    target_name: card_name.clone(),
+                    source_type: "stage".into(),
+                    source_name: "Wildcard (Heart00)".into(),
+                    source_slot: None,
+                    wildcard: true,
+                    color: c,
+                    amount: take,
+                    is_bonus: false,
+                    phase: "1b_h00_wild".into(),
+                });
+                pool[0] -= take;
+                filled[c] += take;
+            }
+        }
+
+        // Phase 2: second pass Heart00 → color deficit
+        for c in 1..7 {
+            if need[c] > filled[c] && pool[0] > 0 {
+                let deficit = need[c] - filled[c];
+                let take = pool[0].min(deficit);
+                allocs.push(Allocation {
+                    target_idx: idx,
+                    target_name: card_name.clone(),
+                    source_type: "stage".into(),
+                    source_name: "Wildcard (Heart00)".into(),
+                    source_slot: None,
+                    wildcard: true,
+                    color: c,
+                    amount: take,
+                    is_bonus: false,
+                    phase: "2_wildcard".into(),
+                });
+                pool[0] -= take;
+                filled[c] += take;
+            }
+        }
+
+        // ----- Choice phases: Phase 3a (which surplus colors → heart00) -----
+        let total_filled_so_far: u32 = filled.iter().sum();
+        let total_required: u32 = need.iter().sum();
+        let h00_deficit = total_required.saturating_sub(total_filled_so_far);
+
+        // Collect available surplus colors
+        let mut surplus_colors: Vec<usize> = (1..7).filter(|&c| pool[c] > 0).collect();
+        surplus_colors.sort();
+        let total_surplus: u32 = surplus_colors.iter().map(|&c| pool[c]).sum();
+        let h00_from_surplus = h00_deficit.min(total_surplus);
+
+        let found = Self::try_surplus_compositions(
+            pool,
+            card_needs,
+            idx,
+            &surplus_colors,
+            h00_from_surplus,
+            0,
+            allocs,
+            filled,
+        );
+        if found {
+            return true;
+        }
+
+        // Undo: restore pool and truncate allocs
+        *pool = saved_pool;
+        allocs.truncate(saved_len);
+        false
+    }
+
+    /// Recursively enumerate all compositions of `remaining` hearts from `colors[color_idx..]`.
+    fn try_surplus_compositions(
+        pool: &mut [u32; 8],
+        card_needs: &[CardNeed],
+        idx: usize,
+        colors: &[usize],
+        remaining: u32,
+        color_idx: usize,
+        allocs: &mut Vec<Allocation>,
+        filled: [u32; 8],
+    ) -> bool {
+        let cn = &card_needs[idx];
+        let card_name = &cn.name;
+
+        if color_idx >= colors.len() {
+            if remaining > 0 {
+                return false;
+            }
+            return Self::try_phase4(pool, card_needs, idx, allocs, filled);
+        }
+
+        let saved_pool = *pool;
+        let saved_len = allocs.len();
+        let c = colors[color_idx];
+        let max_take = pool[c].min(remaining);
+        for take in 0..=max_take {
+            let mut new_filled = filled;
+            if take > 0 {
+                allocs.push(Allocation {
+                    target_idx: idx,
+                    target_name: card_name.clone(),
+                    source_type: "stage".into(),
+                    source_name: "Stage hearts".into(),
+                    source_slot: None,
+                    wildcard: false,
+                    color: c,
+                    amount: take,
+                    is_bonus: false,
+                    phase: "3a_colored_surplus".into(),
+                });
+                pool[c] -= take;
+                new_filled[c] += take;
+            }
+
+            let result = Self::try_surplus_compositions(
+                pool,
+                card_needs,
+                idx,
+                colors,
+                remaining - take,
+                color_idx + 1,
+                allocs,
+                new_filled,
+            );
+            if result {
+                return true;
+            }
+
+            // Undo
+            *pool = saved_pool;
+            allocs.truncate(saved_len);
+        }
+        false
+    }
+
+    /// After Phase 3a choices are made, try Phase 3b (heart00 → heart00 deficit)
+    /// and Phase 4 (icon_all → remaining deficits).
+    fn try_phase4(
+        pool: &mut [u32; 8],
+        card_needs: &[CardNeed],
+        idx: usize,
+        allocs: &mut Vec<Allocation>,
+        mut filled: [u32; 8],
+    ) -> bool {
+        let saved_pool = *pool;
+        let saved_len = allocs.len();
+        let cn = &card_needs[idx];
+        let card_name = &cn.name;
+        let need = cn.need;
+
+        // Count all hearts allocated so far (1a + 3a)
+        let total_filled_so_far: u32 = filled.iter().sum();
+        let total_required: u32 = need.iter().sum();
+        let h00_deficit = total_required.saturating_sub(total_filled_so_far);
+
+        // Phase 3b: Heart00 → remaining deficit (no choice, forced)
+        if h00_deficit > 0 && pool[0] > 0 {
+            let take = pool[0].min(h00_deficit);
+            allocs.push(Allocation {
+                target_idx: idx,
+                target_name: card_name.clone(),
+                source_type: "stage".into(),
+                source_name: "Stage hearts".into(),
+                source_slot: None,
+                wildcard: false,
+                color: 0,
+                amount: take,
+                is_bonus: false,
+                phase: "3b_h00".into(),
+            });
+            pool[0] -= take;
+            filled[0] += take;
+        }
+
+        // Now compute all remaining deficits
+        let total_filled_now: u32 = filled.iter().sum();
+        let total_required: u32 = need.iter().sum();
+        let h00_still_needed = total_required.saturating_sub(total_filled_now);
+
+        let mut color_deficits: Vec<(usize, u32)> = Vec::new();
+        for c in 1..7 {
+            if filled[c] < need[c] {
+                color_deficits.push((c, need[c] - filled[c]));
+            }
+        }
+        if h00_still_needed > 0 {
+            color_deficits.push((0, h00_still_needed));
+        }
+
+        // Phase 4: icon_all → try all distributions to deficits
+        let all_count = pool[7];
+        if all_count == 0 && color_deficits.is_empty() {
+            if Self::card_ok_with_wildcard(filled, need) {
+                return Self::bt_search(pool, card_needs, idx + 1, allocs);
+            }
+        } else if all_count == 0 {
+            // No icon_all but deficits exist
+            *pool = saved_pool;
+            allocs.truncate(saved_len);
+            return false;
+        } else {
+            let deficit_indices: Vec<usize> = {
+                let mut v: Vec<usize> = color_deficits.iter().map(|&(c, _)| c).collect();
+                v.sort();
+                v
+            };
+            if Self::try_all_distribution(
+                pool,
+                card_needs,
+                idx,
+                allocs,
+                filled,
+                &deficit_indices,
+                &color_deficits,
+                all_count,
+                0,
+            ) {
+                return true;
+            }
+        }
+
+        // Undo
+        *pool = saved_pool;
+        allocs.truncate(saved_len);
+        false
+    }
+
+    /// Try all distributions of `remaining` icon_all hearts to deficit types starting at `di`.
+    fn try_all_distribution(
+        pool: &mut [u32; 8],
+        card_needs: &[CardNeed],
+        idx: usize,
+        allocs: &mut Vec<Allocation>,
+        filled: [u32; 8],
+        deficit_indices: &[usize],
+        deficits: &[(usize, u32)],
+        remaining: u32,
+        di: usize,
+    ) -> bool {
+        let saved_pool = *pool;
+        let saved_len = allocs.len();
+        let cn = &card_needs[idx];
+        let card_name = &cn.name;
+
+        if di >= deficit_indices.len() {
+            if remaining > 0 {
+                // icon_all left but no deficits → use for heart00 surplus
+                *pool = saved_pool;
+                allocs.truncate(saved_len);
+                return false;
+            }
+            if Self::card_ok_with_wildcard(filled, cn.need) {
+                return Self::bt_search(pool, card_needs, idx + 1, allocs);
+            }
+            *pool = saved_pool;
+            allocs.truncate(saved_len);
+            return false;
+        }
+
+        let target_color = deficit_indices[di];
+        let deficit_amt = deficits
+            .iter()
+            .find(|&&(c, _)| c == target_color)
+            .map(|&(_, d)| d)
+            .unwrap_or(0);
+
+        let max_take = remaining.min(deficit_amt);
+        for take in 0..=max_take {
+            let mut new_filled = filled;
+            if take > 0 {
+                let alloc_color = if target_color == 0 { 7 } else { target_color };
+                allocs.push(Allocation {
+                    target_idx: idx,
+                    target_name: card_name.clone(),
+                    source_type: "stage".into(),
+                    source_name: "All heart (icon_all)".into(),
+                    source_slot: None,
+                    wildcard: target_color == 0,
+                    color: alloc_color,
+                    amount: take,
+                    is_bonus: false,
+                    phase: "4_all_cleanup".into(),
+                });
+                pool[7] -= take;
+                if target_color == 0 {
+                    new_filled[0] += take;
+                } else {
+                    new_filled[target_color] += take;
+                }
+            }
+
+            let result = Self::try_all_distribution(
+                pool,
+                card_needs,
+                idx,
+                allocs,
+                new_filled,
+                deficit_indices,
+                deficits,
+                remaining - take,
+                di + 1,
+            );
+            if result {
+                return true;
+            }
+
+            *pool = saved_pool;
+            allocs.truncate(saved_len);
+        }
+        false
+    }
+
+    /// Check if a single card's requirements are satisfied with its filled array.
+    fn card_ok_with_wildcard(filled: [u32; 8], need: [u32; 8]) -> bool {
+        let mut wildcard = filled[0] + filled[7];
+        let total_filled: u32 = filled.iter().sum();
+        let total_required: u32 = need.iter().sum();
+        if total_filled < total_required {
+            return false;
+        }
+        if need[0] > 0 {
+            let h00_satisfied: u32 = filled[1..7].iter().sum();
+            if h00_satisfied + wildcard < need[0] {
+                return false;
+            }
+            wildcard = wildcard.saturating_sub(need[0].saturating_sub(h00_satisfied));
+        }
+        for idx in 1..7 {
+            if filled[idx] < need[idx] {
+                let deficit = need[idx] - filled[idx];
+                if wildcard >= deficit {
+                    wildcard -= deficit;
+                } else {
+                    return false;
+                }
+            }
+        }
+        true
     }
 
     /// Rule 8.3.14-8.3.16: Check heart requirements, determine live success/failure,

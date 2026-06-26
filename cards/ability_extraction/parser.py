@@ -900,7 +900,7 @@ def _enrich_card_count_condition(result, text):
                         result["comparison_target"] = cmp_tgt
                         break
     # Live card zone
-    if "ライブ中のカード" in text and not result.get("location"):
+    if "ライブ中の" in text and not result.get("location"):
         result["location"] = "live_card_zone"
     # Energy zone
     if (
@@ -1900,6 +1900,8 @@ def _try_live_mid(text):
         result["card_type"] = "live_card"
         result["target"] = "self"
         result["temporal"] = "during_live"
+        if "ライブ中の" in text:
+            result["location"] = "live_card_zone"
     else:
         result["type"] = "temporal_condition"
         result["temporal"] = "during_live"
@@ -2525,8 +2527,10 @@ def _enrich_or_location(cond, text):
         zones_seen = []
         for p in parts:
             p = p.strip()
-            if "成功" in p or "ライブカード置き場" in p:
+            if "成功" in p:
                 zones_seen.append("success_live_card_zone")
+            elif "ライブカード置き場" in p:
+                zones_seen.append("live_card_zone")
             elif "エネルギー置き場" in p:
                 zones_seen.append("energy_zone")
             elif "ライブ中" in p:
@@ -3219,6 +3223,7 @@ def parse_action(text: str) -> Dict[str, Any]:
             per_unit_type = None
             if (
                 "ライブ中のカード" in per_unit_text
+                or "ライブ中のライブカード" in per_unit_text
                 or "ライブカード置き場" in per_unit_text
             ):
                 per_unit_type = "live_card_zone"
@@ -4815,7 +4820,7 @@ def _try_per_unit(text):
     if pm:
         result["per_unit_count"] = int(pm.group(1))
         result["per_unit_type"] = pm.group(2)
-        if "ライブ中のカード" in text:
+        if "ライブ中のカード" in text or "ライブ中のライブカード" in text:
             result["per_unit_type"] = "live_card_zone"
     else:
         # Handle "コストNにつき" (cost-based scaling without explicit counter unit)

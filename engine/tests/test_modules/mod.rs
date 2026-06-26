@@ -248,6 +248,7 @@ pub mod target_selection_test;
 // New test files for parser/engine fix coverage
 pub mod ability_trigger_fix_test;
 pub mod ally_appear_each_time_test;
+pub mod ayumu_pb1_constant_test;
 pub mod card_filter_test;
 pub mod condition_evaluation_test;
 pub mod deep_resonance_bp3_test;

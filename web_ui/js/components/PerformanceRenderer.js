@@ -244,13 +244,14 @@ function renderAggregateHeartSummary(result) {
                 </div>`;
 
     // Phase tags emitted by the engine (engine/src/turn/live.rs compute_allocations):
-    //   1a_colored       — colored hearts → colored req (matching color, capped at req)
-    //   1b_h00_wild      — Heart00 wildcard → remaining colored deficit
-    //   1c_all_wild      — All (icon_all) wildcard → remaining colored deficit
-    //   2_wildcard       — remaining wildcards (H00+All) → remaining colored deficit
-    //   3a_colored_surplus — leftover colored hearts → Heart00 req (conversion step)
-    //   3b_h00           — Heart00 wildcards → remaining Heart00 req
-    //   3c_all           — All wildcards → remaining Heart00 req
+    //   1a_colored        — colored hearts → colored req (matching color, capped at req)
+    //   1b_h00_wild       — Heart00 wildcard → remaining colored deficit
+    //   2_wildcard        — remaining Heart00 wild → remaining colored deficit (second pass)
+    //   3a_colored_surplus — leftover colored hearts → Heart00 req (demand-aware: prefers
+    //                        colors with most surplus vs future cards' needs)
+    //   3b_h00            — Heart00 wildcards → remaining Heart00 req
+    //   4_all_cleanup     — icon_all → ANY remaining deficit (color deficits first,
+    //                        then heart00). Uses texticon images to show conversion.
 
     const remaining = totalHearts.map(v => v);
     for (let liveIdx = 0; liveIdx < lives.length; liveIdx++) {
@@ -267,11 +268,12 @@ function renderAggregateHeartSummary(result) {
         const liveAllocs = allocations.filter(a => a.target_idx === liveIdx);
         const phase1aAllocs = liveAllocs.filter(a => a.phase === '1a_colored');
         const phase1bAllocs = liveAllocs.filter(a => a.phase === '1b_h00_wild');
-        const phase1cAllocs = liveAllocs.filter(a => a.phase === '1c_all_wild');
+        const phase1cAllocs = liveAllocs.filter(a => a.phase === '1c_all_wild'); // legacy (old engine)
         const phase2Allocs = liveAllocs.filter(a => a.phase === '2_wildcard');
         const phase3aAllocs = liveAllocs.filter(a => a.phase === '3a_colored_surplus');
         const phase3bAllocs = liveAllocs.filter(a => a.phase === '3b_h00');
-        const phase3cAllocs = liveAllocs.filter(a => a.phase === '3c_all');
+        const phase3cAllocs = liveAllocs.filter(a => a.phase === '3c_all'); // legacy (old engine)
+        const phase4Allocs = liveAllocs.filter(a => a.phase === '4_all_cleanup');
 
         const sumAllocs = (arr) => arr.reduce((s, a) => s + a.amount, 0);
         const sumPhase1a = sumAllocs(phase1aAllocs);
@@ -281,6 +283,7 @@ function renderAggregateHeartSummary(result) {
         const sumPhase3a = sumAllocs(phase3aAllocs);
         const sumPhase3b = sumAllocs(phase3bAllocs);
         const sumPhase3c = sumAllocs(phase3cAllocs);
+        const sumPhase4 = sumAllocs(phase4Allocs);
         const totalWildToColored = sumPhase1b + sumPhase1c + sumPhase2;
         const totalWildToH00 = sumPhase3b + sumPhase3c;
 
@@ -307,6 +310,12 @@ function renderAggregateHeartSummary(result) {
         const detail3a = phase3aAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
         const detail3b = phase3bAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
         const detail3c = phase3cAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
+        const detail4 = phase4Allocs.map(a => {
+            const heartIcon = a.wildcard
+                ? `<img src="img/texticon/icon_all.png" class="heart-mini-icon"> → ${HEART_LABELS[a.color] || a.color}`
+                : `<img src="img/texticon/icon_all.png" class="heart-mini-icon"> → Heart00 (any)`;
+            return `${a.amount}×${heartIcon}`;
+        }).join(', ');
 
         // Color deficits still exist after Phase 1a only
         const colDeficit = [1,2,3,4,5,6].reduce((sum, c) => sum + Math.max(0, (req[c] || 0) - (live.filled?.[c] || 0)), 0);
@@ -351,6 +360,13 @@ function renderAggregateHeartSummary(result) {
                         <span class="perf-agg-step-stat">+${totalWildToH00}</span>
                         ${detail3b ? `<div class="perf-agg-alloc-detail">Heart00 wild: ${detail3b}</div>` : ''}
                         ${detail3c ? `<div class="perf-agg-alloc-detail">icon_all wild: ${detail3c}</div>` : ''}
+                    </div>` : ''}
+                    ${sumPhase4 > 0 ? `
+                    <div class="perf-agg-step done">
+                        <span class="perf-agg-marker">④</span>
+                        <span><img src="img/texticon/icon_all.png" class="heart-mini-icon"> icon_all → remaining deficits</span>
+                        <span class="perf-agg-step-stat">${sumPhase4}</span>
+                        ${detail4 ? `<div class="perf-agg-alloc-detail">${detail4}</div>` : ''}
                     </div>` : ''}
                 </div>
                 <div class="perf-agg-card-after">After: ${renderHeartsCompact(afterDisplay)} = ${afterSum}</div>
