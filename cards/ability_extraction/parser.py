@@ -3896,6 +3896,18 @@ def parse_action(text: str) -> Dict[str, Any]:
     )
     R(lambda t: "移動させ" in t and "エリア" in t, "position_change", None)
     R(lambda t: "移動させ" in t and "エリア" not in t, "move_cards", None)
+    R(
+        lambda t: "エリアを移動" in t
+        and ("{{icon_blade.png|ブレード}}" in t or "ブレードを得る" in t),
+        "gain_resource",
+        lambda t, a: a.update(
+            {
+                "resource": "blade",
+                "count": t.count("{{icon_blade.png|ブレード}}") or 1,
+                "timing_condition": "moved_this_turn",
+            }
+        ),
+    )
     R(lambda t: "移動する" in t or "移動し" in t, "position_change", None)
     R(
         lambda t: ("置く" in t or "置いて" in t) or ("置き" in t and "置き場" not in t),
@@ -4898,7 +4910,7 @@ def _try_per_unit(text):
     elif "このターン中に登場" in per_text:
         result["timing_condition"] = "appeared_this_turn"
     elif "エリアを移動した" in per_text:
-        result["timing_condition"] = "moved_areas_this_turn"
+        result["timing_condition"] = "moved_this_turn"
 
     if "ウェイト状態" in per_text:
         result["state"] = "wait"
@@ -7425,14 +7437,15 @@ def _try_heart_choice(text):
 
 
 def _try_timing_condition_gain(text):
-    """このターン中にエリアを移動した全てのXのメンバーはYを得る — gain with timing_condition."""
+    """このターン中にエリアを移動した(全ての)メンバーはYを得る — gain with timing_condition."""
     m = re.search(
-        r"このターン中にエリアを移動した(?:全て|すべて)の(.+?)のメンバーは、(.+?)を得る",
+        r"このターン中にエリアを移動した(?:(?:全て|すべて)の)?(?:(.+?)の)?メンバー[は、]+(.+?)を得る",
         text,
     )
     if not m:
         return None
-    group_name = m.group(1).strip("｢「『　 ").rstrip("｣」』　 ")
+    has_all = bool(re.search(r"このターン中にエリアを移動した(?:全て|すべて)の", text))
+    group_name = m.group(1)
     resource_text = m.group(2)
     blade_count = resource_text.count("{{icon_blade.png|ブレード}}")
     full_resource_text = resource_text + "を得る"
@@ -7443,13 +7456,15 @@ def _try_timing_condition_gain(text):
         "action": "gain_resource",
         "resource": "blade",
         "count": blade_count,
-        "group_names": [group_name],
-        "all": True,
         "card_type": "member_card",
         "timing_condition": "moved_this_turn",
         "target": "self",
-        "duration": "live_end",
     }
+    if has_all:
+        result["all"] = True
+    if group_name:
+        gn = group_name.strip("｢「『　 ").rstrip("｣」』　 ")
+        result["group_names"] = [gn]
     return result
 
 

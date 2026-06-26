@@ -404,6 +404,53 @@ impl<'a> ConditionContext<'a> {
     ///   on_baton_touch    ("バトンタッチして控え室に置かれた") → movement: "baton_touch"
     ///   on_move_or_energy ("エリアを移動するかエネルギーが置かれた") → movement: "moves" + energy check
     ///   on_appear_or_move ("登場か、エリアを移動するたび") → movement: "moves" + appearance check
+    /// Core helper: given a slice of PositionChangeEvents, check if any event
+    /// matches the condition's filters (self_target, group_names, position).
+    /// Used by "position_change", "moved", and "moves" (via entry snapshot).
+    fn position_event_matches_filters(
+        &self,
+        events: &[crate::types::PositionChangeEvent],
+        condition: &Condition,
+    ) -> bool {
+        if events.is_empty() {
+            return false;
+        }
+        let card_db = &self.game_state.card_database;
+        let pos_names = ["left_side", "center", "right_side"];
+        let is_from = condition.area_direction.as_deref() == Some("from");
+        events.iter().any(|event| {
+            if condition.self_target.unwrap_or(false)
+                && self.activating_card_id != Some(event.moved_card_id)
+            {
+                return false;
+            }
+            if let Some(ref groups) = condition.group_names {
+                if !groups.is_empty()
+                    && !groups.iter().any(|g| {
+                        crate::ability::util::card_matches_group_str(
+                            card_db,
+                            event.moved_card_id,
+                            Some(g),
+                        )
+                    })
+                {
+                    return false;
+                }
+            }
+            if let Some(req_pos) = condition.position.as_ref().and_then(|p| p.get_position()) {
+                let check_pos = if is_from {
+                    event.old_position
+                } else {
+                    event.new_position
+                };
+                if check_pos >= pos_names.len() || pos_names[check_pos] != req_pos {
+                    return false;
+                }
+            }
+            true
+        })
+    }
+
     pub(crate) fn evaluate_movement_condition(&self, condition: &Condition) -> bool {
         let movement = condition.movement.as_deref().unwrap_or("");
         let te = condition.trigger_event.as_ref();
@@ -443,50 +490,10 @@ impl<'a> ConditionContext<'a> {
                 true
             }
             "position_change" => {
-                let events = &self.game_state.position_change_events;
-                if events.is_empty() {
-                    return false;
-                }
-                let card_db = &self.game_state.card_database;
-                let pos_names = ["left_side", "center", "right_side"];
-                let is_from = condition.area_direction.as_deref() == Some("from");
-                let has_event = events.iter().any(|event| {
-                    // Self-target filter: only the activating card
-                    if condition.self_target.unwrap_or(false)
-                        && self.activating_card_id != Some(event.moved_card_id)
-                    {
-                        return false;
-                    }
-                    // Group filter: the moved card must match
-                    if let Some(ref groups) = condition.group_names {
-                        if !groups.is_empty()
-                            && !groups.iter().any(|g| {
-                                crate::ability::util::card_matches_group_str(
-                                    card_db,
-                                    event.moved_card_id,
-                                    Some(g),
-                                )
-                            })
-                        {
-                            return false;
-                        }
-                    }
-                    // Position filter: "from" = old position, "to" = new position
-                    if let Some(req_pos) =
-                        condition.position.as_ref().and_then(|p| p.get_position())
-                    {
-                        let check_pos = if is_from {
-                            event.old_position
-                        } else {
-                            event.new_position
-                        };
-                        if check_pos >= pos_names.len() || pos_names[check_pos] != req_pos {
-                            return false;
-                        }
-                    }
-                    true
-                });
-                if !has_event {
+                if !self.position_event_matches_filters(
+                    &self.game_state.position_change_events,
+                    condition,
+                ) {
                     return false;
                 }
                 if let Some(cost_limit) = condition.cost_limit {
@@ -733,11 +740,11 @@ impl<'a> ConditionContext<'a> {
                 let this_card_moved = self.game_state.activating_card.map_or(false, |activating| {
                     self.game_state.cards_moved_this_turn.contains(&activating)
                 });
-                let area_ok = if !this_card_moved {     
+                let area_ok = if !this_card_moved {
                     // "このメンバーがエリアを移動する" — THIS card must have moved.
                     // The area_ok shortcut (self_effect_only=None) does NOT apply
                     // because a different card moving does not satisfy "this member".
-               
+
                     false
                 } else {
                     self_effect_only.is_none_or(|_| {
@@ -754,7 +761,7 @@ impl<'a> ConditionContext<'a> {
                     } else if !self.game_state.last_energy_placed_by_effect() {
                         false
                     } else {
-                          // snapshot is false but global is true — use global
+                        // snapshot is false but global is true — use global
                         true
                     };
                     let energy_player = snapshot_energy_player

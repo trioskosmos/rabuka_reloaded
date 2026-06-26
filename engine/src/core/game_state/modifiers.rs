@@ -1352,8 +1352,15 @@ impl GameState {
                 };
                 let value = effect.value_or_count(1) as i32;
                 let op = effect.operation.as_deref().unwrap_or("add");
-                let live_cards = player.live_card_zone.cards.to_vec();
-                for &target_id in &live_cards {
+                // When self_target is true, apply the score modifier to the
+                // success zone card itself (e.g. Angelic Angel's +5 self buff).
+                // Otherwise, target cards in the live set zone.
+                let targets: Vec<i16> = if effect.self_target.unwrap_or(false) {
+                    vec![cid]
+                } else {
+                    player.live_card_zone.cards.to_vec()
+                };
+                for &target_id in &targets {
                     match op {
                         "set" => {
                             self.mods.set_score_modifier(target_id, value);

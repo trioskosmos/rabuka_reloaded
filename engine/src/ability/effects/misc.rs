@@ -684,11 +684,27 @@ impl AbilityResolver {
                     .copied()
                     .collect()
             } else if effect.timing_condition.as_deref() == Some("moved_this_turn") {
+                let area_moved_ids: std::collections::HashSet<i16> = gs
+                    .turn_area_movements
+                    .iter()
+                    .map(|m| m.moved_card_id)
+                    .collect();
                 let p = gs.resolve_target_player(&target);
                 p.stage
                     .stage
                     .iter()
-                    .filter(|&&cid| cid != -1 && gs.cards_moved_this_turn.contains(&cid))
+                    .filter(|&&cid| {
+                        if cid == -1 {
+                            return false;
+                        }
+                        // Prefer turn_area_movements (precise area-move tracking),
+                        // fall back to cards_moved_this_turn for backward compat.
+                        if !area_moved_ids.is_empty() {
+                            area_moved_ids.contains(&cid)
+                        } else {
+                            gs.cards_moved_this_turn.contains(&cid)
+                        }
+                    })
                     .copied()
                     .collect()
             } else {
@@ -2366,6 +2382,16 @@ impl AbilityResolver {
                 &mover_pid,
                 true,
             );
+            if target_id2 != -1 {
+                gs.push_movement_event(
+                    target_id2,
+                    "stage",
+                    "stage",
+                    gs.activating_card,
+                    &mover_pid,
+                    true,
+                );
+            }
             return Ok(());
         }
         // Handle specific card_no (for "multiple_targets" each-member pattern)
@@ -2444,6 +2470,16 @@ impl AbilityResolver {
                         &mover_pid,
                         true,
                     );
+                    if target_id != -1 {
+                        gs.push_movement_event(
+                            target_id,
+                            "stage",
+                            "stage",
+                            gs.activating_card,
+                            &mover_pid,
+                            true,
+                        );
+                    }
                     return Ok(());
                 }
             }
@@ -2517,6 +2553,16 @@ impl AbilityResolver {
                         &mover_pid,
                         true,
                     );
+                    if target_id3 != -1 {
+                        gs.push_movement_event(
+                            target_id3,
+                            "stage",
+                            "stage",
+                            gs.activating_card,
+                            &mover_pid,
+                            true,
+                        );
+                    }
                 } else {
                     return Err(format!(
                         "Activating card {} not found on stage",

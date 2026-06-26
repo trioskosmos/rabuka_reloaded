@@ -2,6 +2,7 @@ pub mod ability_engine_fixes_test;
 pub mod ability_from_source_test;
 pub mod abundant_test;
 pub mod action_coverage_test;
+pub mod angelic_angel_test;
 pub mod aurora_flower_identity_test;
 pub mod aurora_flower_test;
 pub mod awake_test;
@@ -288,3 +289,6 @@ pub mod live_cards_disappear_test;
 
 // ノンフィクション!! (PL!SP-bp4-024) — LiveStart cost comparison (ab#0)
 pub mod nonfiction_cost_comparison_test;
+
+// SELF CONTROL!! + 鹿角聖良: position_change triggers moved-this-turn blade grant
+pub mod self_control_position_change_test;
