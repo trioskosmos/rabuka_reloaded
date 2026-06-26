@@ -717,3 +717,80 @@ fn sayaka_rule_1053_under_members_go_to_waitroom() {
         0
     );
 }
+
+// ====================================================================
+// PL!N-bp3-025-L Awakening Promise — LiveStart: under_member → energy_deck → hearts
+// ====================================================================
+
+/// 1 member center with 2 energy under. Select 1 → 1 moves to energy_deck.
+#[test]
+fn awakening_move_1_of_2() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let a = g.id("PL!N-bp3-025-L");
+    let t = g.id("PL!-sd1-010-SD");
+    g.state.player1.stage.stage = [-1, t, -1];
+    place_energy_under(&mut g, MemberArea::Center, 2);
+    g.state.player1.hand.cards.push(a);
+    let energy_before = g.state.player1.energy_deck.cards.len();
+    advance_to_live_card_set_p1(&mut g);
+    g.set_live_card(a);
+    advance_to_live_start(&mut g);
+    assert!(g.has_pending_choice(), "choice expected");
+    g.select_indices(&[0]);
+    if g.has_pending_choice() {
+        g.select_indices(&[]);
+    }
+    assert_eq!(
+        g.state.player1.energy_deck.cards.len(),
+        energy_before + 1,
+        "1 energy moved"
+    );
+    assert_eq!(
+        g.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .len(),
+        1,
+        "1 remains"
+    );
+}
+
+/// Skip → 0 moved.
+#[test]
+fn awakening_skip_all() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let a = g.id("PL!N-bp3-025-L");
+    let t = g.id("PL!-sd1-010-SD");
+    g.state.player1.stage.stage = [-1, t, -1];
+    place_energy_under(&mut g, MemberArea::Center, 2);
+    g.state.player1.hand.cards.push(a);
+    let energy_before = g.state.player1.energy_deck.cards.len();
+    advance_to_live_card_set_p1(&mut g);
+    g.set_live_card(a);
+    advance_to_live_start(&mut g);
+    assert!(g.has_pending_choice(), "choice expected");
+    g.select_indices(&[]);
+    assert_eq!(
+        g.state.player1.energy_deck.cards.len(),
+        energy_before,
+        "0 moved on skip"
+    );
+}
+
+/// No energy under → no choice.
+#[test]
+fn awakening_no_energy_nothing_happens() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let a = g.id("PL!N-bp3-025-L");
+    let t = g.id("PL!-sd1-010-SD");
+    g.state.player1.stage.stage = [-1, t, -1];
+    g.state.player1.hand.cards.push(a);
+    advance_to_live_card_set_p1(&mut g);
+    g.set_live_card(a);
+    advance_to_live_start(&mut g);
+    assert!(!g.has_pending_choice(), "no choice when 0 energy under");
+}

@@ -1467,11 +1467,6 @@ impl AbilityResolver {
         source: Option<&str>,
         any_number: bool,
     ) {
-        // Check if we're moving from under_member to energy_deck (Awakening case)
-        println!(
-            "DEBUG: execute_place_energy_under_member - source: {:?}",
-            source
-        );
         let activating_pos = gs.activating_card.and_then(|c| {
             gs.resolve_target_player(target)
                 .stage
@@ -1480,62 +1475,23 @@ impl AbilityResolver {
                 .position(|&id| id == c)
         });
         if Zone::from_str(source.unwrap_or("")) == Some(Zone::UnderMember) {
-            // Handle moving from under_member to energy_deck
+            // Collect ALL energy cards from ALL stage positions
             let player = gs.resolve_target_player_mut(target);
-            let target_index = match position.and_then(|p| p.get_position()) {
-                Some("center") | Some("中央") => 1,
-                Some("left") | Some("左側") => 0,
-                Some("right") | Some("右側") => 2,
-                None => {
-                    // Default to activating card's position
-                    if let Some(idx) = activating_pos {
-                        if player.stage.stage[idx] != -1 {
-                            idx
-                        } else {
-                            return;
-                        }
-                    } else if player.stage.stage[1] != -1 {
-                        1
-                    } else if player.stage.stage[0] != -1 {
-                        0
-                    } else if player.stage.stage[2] != -1 {
-                        2
-                    } else {
-                        return;
-                    }
+            let mut all_under: Vec<i16> = Vec::new();
+            for si in 0..3 {
+                for &cid in &player.stage.under_cards[si] {
+                    all_under.push(cid);
                 }
-                _ => 1,
-            };
-
-            if player.stage.stage[target_index] == -1 {
+            }
+            if all_under.is_empty() {
                 return;
             }
 
-            let area = match target_index {
-                0 => crate::zones::MemberArea::LeftSide,
-                1 => crate::zones::MemberArea::Center,
-                _ => crate::zones::MemberArea::RightSide,
-            };
-
-            let under_cards = player.stage.get_under_cards(area);
-            if under_cards.is_empty() {
-                return;
-            }
-
-            // Create choice to select cards to move
             let max_count = if any_number {
-                under_cards.len()
+                all_under.len()
             } else {
-                under_cards.len().min(count as usize)
+                all_under.len().min(count as usize)
             };
-            eprintln!(
-                "[DEBUG] execute_place_energy_under_member: under={} any={} count={} max={} opt={}",
-                under_cards.len(),
-                any_number,
-                count,
-                max_count,
-                optional,
-            );
             self.pending_choice = Some(
                 Choice::select_cards(
                     Zone::UnderMember.to_str(),

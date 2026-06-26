@@ -755,12 +755,17 @@ impl super::resolver::AbilityResolver {
                     .destination
                     .clone()
                     .or(edst)
-                    .unwrap_or_else(|| Zone::EnergyDeck.to_string());
+                    .unwrap_or_else(|| Zone::EnergyDeck.to_str().to_string());
                 let tgt = target_player_id
                     .clone()
                     .unwrap_or_else(|| "self".to_string());
-                let moved =
-                    self.move_from_under_member(gs, indices, &mut validate_card, &dst_str, &tgt)?;
+                let moved = self.move_from_under_member(
+                    gs,
+                    &ctx.indices,
+                    &mut validate_card,
+                    &dst_str,
+                    &tgt,
+                )?;
                 if !moved.is_empty() {
                     self.moved_cards.extend(&moved);
                     gs.recently_moved_cards = Some(moved);

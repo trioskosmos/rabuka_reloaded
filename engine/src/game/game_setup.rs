@@ -525,6 +525,15 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         .copied()
                         .enumerate()
                         .collect(),
+                    Some(Zone::UnderMember) => {
+                        let mut ids = Vec::new();
+                        for si in 0..3 {
+                            for &cid in &player.stage.under_cards[si] {
+                                ids.push((ids.len(), cid));
+                            }
+                        }
+                        ids
+                    }
                     Some(Zone::LookedAt) => game_state
                         .looked_at_cards
                         .iter()
