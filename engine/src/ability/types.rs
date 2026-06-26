@@ -82,6 +82,8 @@ pub enum Choice {
         is_reveal: bool,
         #[serde(default)]
         destination: Option<String>,
+        #[serde(default)]
+        discard_remaining: Option<bool>,
     },
     SelectTarget {
         target: String,
@@ -198,6 +200,7 @@ pub struct ChoiceBuilder {
     blind: bool,
     is_reveal: bool,
     destination: Option<String>,
+    discard_remaining: Option<bool>,
 }
 
 impl ChoiceBuilder {
@@ -222,6 +225,7 @@ impl ChoiceBuilder {
             blind: self.blind,
             is_reveal: self.is_reveal,
             destination: self.destination,
+            discard_remaining: self.discard_remaining,
         }
     }
 
@@ -261,6 +265,10 @@ impl ChoiceBuilder {
     }
     pub fn destination(mut self, v: Option<String>) -> Self {
         self.destination = v;
+        self
+    }
+    pub fn discard_remaining(mut self, v: Option<bool>) -> Self {
+        self.discard_remaining = v;
         self
     }
     pub fn is_select_action(mut self, v: bool) -> Self {
@@ -335,6 +343,7 @@ impl Choice {
             blind: false,
             is_reveal: false,
             destination: None,
+            discard_remaining: None,
         }
     }
 

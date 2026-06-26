@@ -126,6 +126,7 @@ impl AbilityResolver {
                 ))
                 .filtered_indices(filtered_indices)
                 .destination(effect.destination.clone())
+                .discard_remaining(effect.discard_remaining)
                 .build(),
         );
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
@@ -879,6 +880,19 @@ impl AbilityResolver {
                     .collect();
 
                 if matching.is_empty() {
+                    Ok(vec![])
+                } else if effect.optional.unwrap_or(false) && count > 0 {
+                    // Optional discard: prompt player to choose which (if any)
+                    // looked-at cards to take, instead of auto-taking.
+                    let filter = util::CardFilter::from_effect(effect);
+                    self.prompt_card_selection(
+                        Zone::LookedAt.to_str(),
+                        count.min(matching.len()),
+                        true,
+                        effect,
+                        &filter,
+                        None,
+                    );
                     Ok(vec![])
                 } else {
                     // For LookedAt, cards are ordered: [0] = matched target,
@@ -2169,6 +2183,8 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         indices: &[usize],
+        ctx_destination: Option<String>,
+        ctx_discard_remaining: Option<bool>,
     ) -> Result<(), String> {
         let target = self
             .spawn_context
@@ -2192,11 +2208,13 @@ impl AbilityResolver {
                 .as_ref()
                 .and_then(|sa| sa.destination.clone())
                 .or_else(|| current.and_then(|c| c.destination.clone()))
+                .or_else(|| ctx_destination)
                 .unwrap_or_else(|| Zone::Hand.to_str().to_string()),
             select_action
                 .as_ref()
                 .and_then(|sa| sa.discard_remaining)
                 .or_else(|| current.and_then(|c| c.discard_remaining))
+                .or_else(|| ctx_discard_remaining)
                 .unwrap_or(true),
             select_action
                 .as_ref()
@@ -2306,9 +2324,10 @@ impl AbilityResolver {
         }
 
         let player = gs.resolve_target_player_mut(&target);
-        for card_id in selected_cards {
+        for &card_id in &selected_cards {
             util::place_card_in_zone(player, card_id, &destination, None, false, 1);
         }
+        self.moved_cards.extend(selected_cards.iter());
 
         let any_number = select_action
             .as_ref()
@@ -2374,14 +2393,16 @@ impl AbilityResolver {
         let dest_zone = if discard_remaining {
             Zone::Discard.to_str()
         } else {
-            Zone::DeckBottom.to_str()
+            Zone::DeckTop.to_str()
         };
         for &card_id in &remaining_cards {
             util::place_card_in_zone(player, card_id, dest_zone, None, false, 1);
         }
-        // Track the discarded cards so each_time watchers (e.g. Hazuki Ren ab#1)
-        // can react to them as a single batch discard event.
-        self.finalize_card_movement(gs, &remaining_cards, dest_zone, "deck_top", &None, None);
+        if discard_remaining {
+            // Track the discarded cards so each_time watchers (e.g. Hazuki Ren ab#1)
+            // can react to them as a single batch discard event.
+            self.finalize_card_movement(gs, &remaining_cards, dest_zone, "deck_top", &None, None);
+        }
 
         // Clear the stale looked_at choice now that all cards have been
         // processed (selected cards → hand, remaining → waitroom).

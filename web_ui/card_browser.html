@@ -269,7 +269,8 @@ function applyFilters() {
     const seen = new Set();
     const deduped = [];
     for (const card of results) {
-      const key = card.name + '|' + card.type + '|' + (card.series || '');
+      const baseNo = card.card_no ? card.card_no.replace(/-[^-]+$/, '') : card.card_no;
+      const key = baseNo + '|' + card.type + '|' + (card.series || '');
       if (!seen.has(key)) {
         seen.add(key);
         deduped.push(card);

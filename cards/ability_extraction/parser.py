@@ -2824,6 +2824,8 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
             elif dest in ("discard",):
                 if "このカード" in text:
                     action["source"] = "deck_top"
+                elif "そのカード" in text:
+                    action["source"] = "looked_at"
                 elif "エネルギー" not in text:
                     action["source"] = "hand"
         if "destination" not in action:
@@ -8761,15 +8763,33 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                             sub["action"] = "sequential"
         # Post-processing for sequential action chaining: if a select_cards action is
         # followed by a move_cards action, the move should use "selected_cards" as source
-        # (Issue 3: hallucinated sources)
+        # (Issue 3: hallucinated sources). Also handles look_at → move_cards chains.
         if eff.get("action") == "sequential":
             prev_was_select = False
+            prev_was_look_at = False
             for sub in eff.get("actions", []):
                 if not isinstance(sub, dict):
                     prev_was_select = False
+                    prev_was_look_at = False
                     continue
                 if sub.get("action") in ("select_cards", "look_and_select", "select"):
                     prev_was_select = True
+                    prev_was_look_at = False
+                elif sub.get("action") == "look_at":
+                    prev_was_look_at = True
+                    prev_was_select = False
+                elif sub.get("action") == "move_cards" and prev_was_look_at:
+                    if sub.get("source") != "looked_at":
+                        sub["source"] = "looked_at"
+                    # For discard destinations: don't auto-discard remaining
+                    # looked-at cards (they go back to deck top). Skip for
+                    # deck_top / rearrangement moves.
+                    if (
+                        sub.get("destination") == "discard"
+                        and sub.get("discard_remaining") is not False
+                    ):
+                        sub["discard_remaining"] = False
+                    prev_was_look_at = False
                 elif sub.get("action") == "move_cards" and prev_was_select:
                     if sub.get("source") != "selected_cards":
                         sub["source"] = "selected_cards"
@@ -8781,6 +8801,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     prev_was_select = False
                 else:
                     prev_was_select = False
+                    prev_was_look_at = False
 
     # ====================================================================
     # TARGETED FIXES

@@ -26,6 +26,7 @@ pub(crate) struct SelectionContext {
     pub is_select_action: bool,
     pub target_player_id: Option<String>,
     pub destination: Option<String>,
+    pub discard_remaining: Option<bool>,
     pub blind: bool,
     pub is_reveal: bool,
 }
@@ -226,6 +227,7 @@ impl super::resolver::AbilityResolver {
                     ref target_player_id,
                     blind,
                     destination,
+                    discard_remaining,
                     ..
                 }),
                 ChoiceResult::CardSelected { indices },
@@ -258,6 +260,7 @@ impl super::resolver::AbilityResolver {
                         }
                     )
                 }),
+                *discard_remaining,
             ),
             (Some(Choice::SelectCard { .. }), ChoiceResult::Skip) => {
                 // Clear pending commands saved by sequential conditional handlers
@@ -334,6 +337,7 @@ impl super::resolver::AbilityResolver {
         destination: Option<String>,
         blind: bool,
         is_reveal: bool,
+        discard_remaining: Option<bool>,
     ) -> Result<(), String> {
         if ABILITY_DEBUG.load(Ordering::Relaxed) {
             eprintln!(
@@ -366,6 +370,7 @@ impl super::resolver::AbilityResolver {
             is_select_action,
             target_player_id: target_player_id.clone(),
             destination,
+            discard_remaining,
             blind,
             is_reveal,
         };
@@ -1302,7 +1307,7 @@ impl super::resolver::AbilityResolver {
         }
 
         if is_select_cards {
-            self.handle_select_cards_looked_at(gs, &valid)?;
+            self.handle_select_cards_looked_at(gs, &valid, None, None)?;
 
             if matches!(self.pending_choice, Some(Choice::SelectTarget { ref target, .. }) if super::enums::SelectTargetKind::from_str(target) == Some(super::enums::SelectTargetKind::Order))
             {
@@ -1345,7 +1350,12 @@ impl super::resolver::AbilityResolver {
                 }
             }
         } else {
-            self.handle_select_cards_looked_at(gs, &valid)?;
+            self.handle_select_cards_looked_at(
+                gs,
+                &valid,
+                ctx.destination.clone(),
+                ctx.discard_remaining,
+            )?;
         }
         self.finalize_choice(gs, context)
     }

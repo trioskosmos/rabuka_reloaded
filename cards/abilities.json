@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-26T13:33:37.267921",
+  "generated_at": "2026-06-26T15:25:37.924150",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -13943,7 +13943,7 @@
                 "destination": "discard",
                 "optional": true,
                 "action": "move_cards",
-                "source": "hand",
+                "source": "looked_at",
                 "card_type": "card",
                 "count": 1
               }
@@ -29604,7 +29604,7 @@
             "destination": "deck_top",
             "placement_order": "any_order",
             "action": "move_cards",
-            "source": "selected_cards",
+            "source": "looked_at",
             "card_type": "card",
             "count": 1
           }
@@ -31317,9 +31317,10 @@
             "destination": "discard",
             "optional": true,
             "action": "move_cards",
-            "source": "hand",
+            "source": "looked_at",
             "card_type": "card",
-            "count": 1
+            "count": 1,
+            "discard_remaining": false
           }
         ]
       }
