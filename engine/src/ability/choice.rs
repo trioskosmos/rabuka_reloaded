@@ -1157,6 +1157,17 @@ impl super::resolver::AbilityResolver {
         dst_str: &str,
     ) -> Result<(), String> {
         let moved = self.move_from_revealed(gs, &ctx.indices, validate_card, dst_str);
+        // Apply resource_on_select if present — grants resource (e.g. blade)
+        // automatically when a card is selected from revealed_cards.
+        if let Some(ref res) = self
+            .current_effect
+            .as_ref()
+            .and_then(|e| e.resource_on_select.clone())
+        {
+            // Don't cache this execution — the resource is granted at selection
+            // time, not through the condition-evaluation path.
+            self.execute_effect(gs, &res)?;
+        }
         if self
             .current_effect
             .as_ref()

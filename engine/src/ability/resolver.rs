@@ -181,6 +181,18 @@ impl AbilityResolver {
             {
                 // skip — condition is a branch selector, not a gate
             } else {
+                // Check cache first — avoids re-evaluation against stale state
+                // (e.g. revealed_cards modified by a prior select_cards filter).
+                if condition.cache.unwrap_or(false) {
+                    if let Some(entry) = gs.ability_queue.current_entry() {
+                        if let Some(cached) = entry.condition_cache.get(&condition.text) {
+                            if *cached {
+                                return true;
+                            }
+                            return false;
+                        }
+                    }
+                }
                 let mut cond = condition.clone();
                 if cond.position.is_none() && cond.positions_characters.is_none() {
                     if let Some(ref pos) = effect.position {
@@ -215,7 +227,14 @@ impl AbilityResolver {
                 }
                 let gns = effect.group_names.as_ref();
                 merge_group_names(&mut cond, gns);
-                if !ctx.evaluate_condition(&cond) {
+                let passed = ctx.evaluate_condition(&cond);
+                // Cache the result if the condition asks for it
+                if condition.cache.unwrap_or(false) {
+                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                        entry.condition_cache.insert(condition.text.clone(), passed);
+                    }
+                }
+                if !passed {
                     log::debug!("[CAN_ACTIVATE] condition FAILED for {}: type={:?} location={:?} group={:?} exclude={:?}",
                         effect.action, condition.condition_type, condition.location, condition.group_names, condition.exclude_characters);
                     return false;

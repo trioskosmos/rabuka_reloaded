@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::ability::resolver::AbilityResolver;
 use crate::ability::types::Choice;
 use crate::card::{Ability, AbilityEffect};
@@ -80,6 +82,11 @@ pub struct AbilityQueueEntry {
     /// The original effect text of a choice-type ability, stored so the frontend
     /// can use it as the choice prompt (separate from the option labels).
     pub choice_effect_text: Option<String>,
+    /// Cache for condition results that should be evaluated once and reused.
+    /// Keyed by condition text. Populated by the first evaluation; subsequent
+    /// evaluations return the cached value. The parser sets `"cache": true` on
+    /// conditions that depend on mutable state (e.g. revealed_cards).
+    pub condition_cache: HashMap<String, bool>,
 }
 
 /// Unified ability queue with proper state management
@@ -277,6 +284,7 @@ impl AbilityQueue {
                     snapshot_energy_placed_by_effect: false,
                     snapshot_energy_placed_by_player: None,
                     choice_effect_text: None,
+                    condition_cache: HashMap::new(),
                 };
                 self.entries.push(dummy_entry);
                 self.state = QueueState::WaitingForChoice {

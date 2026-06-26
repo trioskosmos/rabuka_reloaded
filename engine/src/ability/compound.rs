@@ -172,8 +172,35 @@ impl AbilityResolver {
                                 continue 'action_loop;
                             }
                         } else {
-                            let ctx = ConditionContext::with_moved_cards(gs, &self.moved_cards);
-                            let passed = ctx.evaluate_condition(action.condition.as_ref().unwrap());
+                            let cond = action.condition.as_ref().unwrap();
+                            // Check cache first — avoids re-evaluation against stale
+                            // game state after a choice round-trip.
+                            let passed = if cond.cache.unwrap_or(false) {
+                                if let Some(entry) = gs.ability_queue.current_entry() {
+                                    if let Some(&cached) = entry.condition_cache.get(&cond.text) {
+                                        cached
+                                    } else {
+                                        false // not cached yet — evaluate below
+                                    }
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            };
+                            let passed = if passed {
+                                true
+                            } else {
+                                let ctx = ConditionContext::with_moved_cards(gs, &self.moved_cards);
+                                let p = ctx.evaluate_condition(cond);
+                                // Cache the result if condition asks for it
+                                if cond.cache.unwrap_or(false) {
+                                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                                        entry.condition_cache.insert(cond.text.clone(), p);
+                                    }
+                                }
+                                p
+                            };
                             condition_failed = Some(!passed);
                             if !passed {
                                 continue 'action_loop;
