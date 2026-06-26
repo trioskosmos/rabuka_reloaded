@@ -718,6 +718,11 @@ pub struct AbilityEffect {
     pub target: Option<String>,
     pub duration: Option<String>,
     pub resource: Option<String>,
+    /// Resource (e.g. blade) to grant when a select_cards choice resolves.
+    /// Collapses the common "select → gain_resource" pattern into one action,
+    /// avoiding stale-state re-evaluation of a separate gain_resource step.
+    #[serde(default)]
+    pub resource_on_select: Option<Box<AbilityEffect>>,
     pub position: Option<PositionInfo>,
     pub state_change: Option<String>,
     pub optional: Option<bool>,
@@ -1495,6 +1500,13 @@ pub struct Condition {
     /// reads from `trigger_event` when the corresponding flat field is absent.
     #[serde(default)]
     pub trigger_event: Option<TriggerEvent>,
+    /// When true, the condition result is cached on the ability queue entry
+    /// after the first evaluation. Subsequent evaluations (e.g. after a choice
+    /// round-trip) return the cached value instead of re-evaluating against
+    /// potentially modified game state. The parser sets this on conditions
+    /// that depend on mutable state (e.g. all_revealed_match_heart_color).
+    #[serde(default)]
+    pub cache: Option<bool>,
 }
 
 /// Rich description of what event triggers a condition.

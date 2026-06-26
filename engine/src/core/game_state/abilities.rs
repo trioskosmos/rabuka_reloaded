@@ -93,6 +93,7 @@ impl GameState {
             snapshot_energy_placed_by_effect: false,
             snapshot_energy_placed_by_player: None,
             choice_effect_text: None,
+            condition_cache: std::collections::HashMap::new(),
         }
     }
 

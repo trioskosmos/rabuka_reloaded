@@ -5907,6 +5907,7 @@ def _try_heart_select_reveal(text):
             "type": "all_revealed_match_heart_color",
             "count": cond_count,
             "operator": ">=",
+            "cache": True,
             "text": f"公開されたカードの中に指定した色に合致するカードが合計{cond_count}枚含まれる場合",
         }
     # Parse the after-text for the followup actions
@@ -9252,6 +9253,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     "type": "all_revealed_match_heart_color",
                     "count": cond_count,
                     "operator": ">=",
+                    "cache": True,
                     "text": f"公開されたカードの中に指定した色に合致するカードが合計{cond_count}枚含まれる場合",
                 }
                 for sub in acts:
@@ -10005,6 +10007,46 @@ def _validate_semantic(abilities):
                             issues.append(
                                 f"  #{i}: heart_colors on select parent but not on reveal sub-action"
                             )
+        # --- Structural validation: sequential action patterns ---
+        if eff.get("action") == "sequential":
+            acts = eff.get("actions", [])
+            for j, sub in enumerate(acts):
+                if not isinstance(sub, dict):
+                    continue
+                # Flag: group_names on specify_heart_color or reveal (should not happen)
+                if sub.get("action") in ("specify_heart_color", "reveal"):
+                    if sub.get("group_names"):
+                        issues.append(
+                            f"  #{i} ({card_lbl}) [{j}]: sub-action '{sub['action']}' "
+                            f"has leaked group_names={sub['group_names']}"
+                        )
+                # Flag: select_cards with discard_remaining when also followed by move_cards
+                if sub.get("action") == "select_cards" and sub.get("discard_remaining"):
+                    for k in range(j + 1, len(acts)):
+                        if (
+                            isinstance(acts[k], dict)
+                            and acts[k].get("action") == "move_cards"
+                        ):
+                            issues.append(
+                                f"  #{i} ({card_lbl}) [{j}]: select_cards with "
+                                f"discard_remaining=True conflicts with explicit move_cards at [{k}]"
+                            )
+                            break
+                # Flag: consecutive conditional actions sharing the same condition text
+                # without cache:true — the second won't re-evaluate correctly after
+                # the first modifies game state (e.g. revealed_cards filtered by select).
+                if sub.get("condition") and j > 0:
+                    prev = acts[j - 1]
+                    if isinstance(prev, dict) and prev.get("condition"):
+                        prev_text = prev["condition"].get("text")
+                        cur_text = sub["condition"].get("text")
+                        if prev_text and cur_text and prev_text == cur_text:
+                            if not sub["condition"].get("cache"):
+                                issues.append(
+                                    f"  #{i} ({card_lbl}) [{j}]: actions {j - 1} and {j} share "
+                                    f"condition text but the second lacks cache:true "
+                                    f"(sub.action={sub.get('action')}, prev.action={prev.get('action')})"
+                                )
     if issues:
         print(f"[Semantic] {len(issues)} issues:")
         for issue in issues[:15]:

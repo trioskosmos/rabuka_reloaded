@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-27T03:23:53.795589",
+  "generated_at": "2026-06-27T03:36:21.911406",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -5542,6 +5542,7 @@
               "type": "all_revealed_match_heart_color",
               "count": 5,
               "operator": ">=",
+              "cache": true,
               "text": "公開されたカードの中に指定した色に合致するカードが合計5枚含まれる場合"
             },
             "followup_action": {
