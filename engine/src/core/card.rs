@@ -615,6 +615,11 @@ impl<'de> serde::Deserialize<'de> for AbilityCost {
                                 Some(sub.into_iter().map(AbilityCost::into_effect).collect());
                         }
                         "group_reference" => effect.group_reference = map.next_value()?,
+                        "exclude_group_names" => effect.exclude_group_names = map.next_value()?,
+                        "cost_total" => effect.cost_total = map.next_value()?,
+                        "cost_total_operator" => effect.cost_total_operator = map.next_value()?,
+                        "cost_reference" => effect.cost_reference = map.next_value()?,
+                        "cost_offset" => effect.cost_offset = map.next_value()?,
                         // Ignore unknown legacy cost fields rather than failing
                         // — the parser has been adding fields over time.
                         _ => {

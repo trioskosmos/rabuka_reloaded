@@ -318,3 +318,108 @@ fn himeno_bp5_same_group_cost_auto_skips_when_no_match() {
         "No heart01 should be granted when cost is skipped"
     );
 }
+
+/// Cost with group_reference: "same_group_name" — hand cards with no group
+/// (empty series) must be excluded from selection, just like wrong-group cards.
+#[test]
+fn himeno_bp5_same_group_cost_excludes_no_group_cards() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let himeno = game.id("PL!HS-bp5-006-R"); // group=蓮ノ空
+                                             // No-group hand cards (empty series → empty group)
+    let nogroup = game.new_id("PL!-bp5-111-R");
+    // Same-group hand cards (蓮ノ空) — need 2 to meet count=2 cost
+    let same1 = game.new_id("PL!HS-bp6-011-R");
+    let same2 = game.new_id("PL!HS-bp6-011-R");
+    let live = game.id("PL!-sd1-020-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [-1, himeno, -1];
+
+    fill_decks(&mut game, filler);
+    game.give_energy(10);
+
+    advance_to_live_set(&mut game);
+    // Hand before set_live_card: [nogroup(no group)@0, same1(蓮ノ空)@1, same2(蓮ノ空)@2, live@3]
+    game.state.player1.hand.cards.clear();
+    game.state.player1.hand.cards.push(nogroup);
+    game.state.player1.hand.cards.push(same1);
+    game.state.player1.hand.cards.push(same2);
+    game.state.player1.hand.cards.push(live);
+    game.set_live_card(live);
+    // Hand after: [nogroup@0, same1@1, same2@2]
+    finish_live_setup(&mut game);
+
+    // Cost prompt should appear (2 same-group cards in hand)
+    assert!(game.has_pending_choice(), "Cost prompt should appear");
+    assert_eq!(game.pending_choice_type(), Some("SelectCard".to_string()));
+
+    // filtered_indices must only include same-group cards (indices 1,2).
+    // No-group card at index 0 must be excluded.
+    if let rabuka_engine::ability::types::Choice::SelectCard {
+        filtered_indices: Some(fi),
+        group,
+        ..
+    } = game.get_pending_choice()
+    {
+        assert_eq!(
+            fi.as_slice(),
+            &[1usize, 2],
+            "Only 蓮ノ空 cards (indices 1,2) should be selectable, not no-group@0"
+        );
+        assert_eq!(
+            group.as_deref(),
+            Some("蓮ノ空"),
+            "Choice group should be 蓮ノ空"
+        );
+    } else {
+        panic!("Expected SelectCard with filtered_indices");
+    }
+
+    // Select both same-group cards
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "Second selection should appear");
+    game.select_indices(&[0]);
+}
+
+/// Cost with group_reference: "same_group_name" — ALL hand cards are no-group
+/// (empty series), none match the activating card's group → optional cost auto-skips.
+#[test]
+fn himeno_bp5_same_group_cost_auto_skips_when_only_no_group_cards() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let himeno = game.id("PL!HS-bp5-006-R"); // group=蓮ノ空
+    let nogroup1 = game.new_id("PL!-bp5-111-R");
+    let nogroup2 = game.new_id("PL!-bp5-111-R");
+    let live = game.id("PL!-sd1-020-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [-1, himeno, -1];
+
+    fill_decks(&mut game, filler);
+    game.give_energy(10);
+
+    advance_to_live_set(&mut game);
+    game.state.player1.hand.cards.clear();
+    game.state.player1.hand.cards.push(nogroup1);
+    game.state.player1.hand.cards.push(nogroup2);
+    game.state.player1.hand.cards.push(live);
+    game.set_live_card(live);
+    finish_live_setup(&mut game);
+
+    // No cost prompt — auto-skipped because no same-group cards in hand
+    assert!(
+        !game.has_pending_choice(),
+        "No cost prompt when only no-group cards in hand"
+    );
+
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(himeno, rabuka_engine::card::HeartColor::Heart01),
+        0,
+        "No heart01 should be granted when cost is skipped"
+    );
+}
