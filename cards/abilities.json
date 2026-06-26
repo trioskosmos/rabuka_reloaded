@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-26T18:23:33.349717",
+  "generated_at": "2026-06-26T19:44:44.455066",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -10488,8 +10488,8 @@
       }
     },
     {
-      "full_text": "{{jidou.png|自動}}［ターン1回］エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、ライブ終了時まで、［緑ハート］を得る。",
-      "triggerless_text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、ライブ終了時まで、［緑ハート］を得る。",
+      "full_text": "{{jidou.png|自動}}［ターン1回］エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、ライブ終了時まで、{{heart_04.png|heart04}}を得る。",
+      "triggerless_text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、ライブ終了時まで、{{heart_04.png|heart04}}を得る。",
       "card_count": 2,
       "cards": [
         "PL!S-bp2-003-R | 松浦果南 (ab#0)",
@@ -10500,7 +10500,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、ライブ終了時まで、［緑ハート］を得る",
+        "text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、ライブ終了時まで、{{heart_04.png|heart04}}を得る",
         "condition": {
           "type": "card_count_condition",
           "count": 1,
@@ -10514,6 +10514,9 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
+        "heart_colors": [
+          "heart04"
+        ],
         "duration": "live_end",
         "target": "self"
       }
@@ -23328,8 +23331,8 @@
       }
     },
     {
-      "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数エネルギーデッキに置いてもよい。そうした場合、ライブ終了時まで、そのメンバーは、これによって置いたエネルギーカード1枚につき、［赤ハート］［赤ハート］［赤ハート］を得る。",
-      "triggerless_text": "自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数エネルギーデッキに置いてもよい。そうした場合、ライブ終了時まで、そのメンバーは、これによって置いたエネルギーカード1枚につき、［赤ハート］［赤ハート］［赤ハート］を得る。",
+      "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数エネルギーデッキに置いてもよい。そうした場合、ライブ終了時まで、そのメンバーは、これによって置いたエネルギーカード1枚につき、{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る。",
+      "triggerless_text": "自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数エネルギーデッキに置いてもよい。そうした場合、ライブ終了時まで、そのメンバーは、これによって置いたエネルギーカード1枚につき、{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る。",
       "card_count": 1,
       "cards": [
         "PL!N-bp3-025-L | Awakening Promise (ab#0)"
@@ -23339,7 +23342,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数エネルギーデッキに置いてもよい。そうした場合、ライブ終了時まで、そのメンバーは、これによって置いたエネルギーカード1枚につき、［赤ハート］［赤ハート］［赤ハート］を得る",
+        "text": "自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数エネルギーデッキに置いてもよい。そうした場合、ライブ終了時まで、そのメンバーは、これによって置いたエネルギーカード1枚につき、{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る",
         "action": "sequential",
         "actions": [
           {
@@ -23350,13 +23353,19 @@
             "optional": true,
             "action": "move_cards",
             "destination": null,
-            "any_number": true
+            "any_number": true,
+            "heart_colors": [
+              "heart02"
+            ]
           },
           {
-            "text": "そのメンバーは、これによって置いたエネルギーカード1枚につき、［赤ハート］［赤ハート］［赤ハート］を得る",
+            "text": "そのメンバーは、これによって置いたエネルギーカード1枚につき、{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る",
             "action": "gain_resource",
             "resource": "heart",
-            "count": 1,
+            "count": 3,
+            "heart_colors": [
+              "heart02"
+            ],
             "per_unit": true,
             "per_unit_count": 1,
             "per_unit_type": "枚",
@@ -23364,7 +23373,10 @@
             "duration": "live_end"
           }
         ],
-        "conditional": true
+        "conditional": true,
+        "heart_colors": [
+          "heart02"
+        ]
       }
     },
     {

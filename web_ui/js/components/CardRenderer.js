@@ -806,11 +806,8 @@ export const CardRenderer = {
                     slot.appendChild(inner);
                 }
                 
-                const rawText = Tooltips.getEffectiveRawText(card);
-                if (rawText) DOMUtils.patchAttributes(slot, { 'data-text': rawText });
-                DOMUtils.patchAttributes(slot, { 'data-card-id': card.card_no });
-                if (isValid) slot.setAttribute('data-action-id', action.index);
-                else slot.removeAttribute('data-action-id');
+                Tooltips.attachCardData(slot, card, isValid ? action.index : undefined);
+                if (!isValid) slot.removeAttribute('data-action-id');
 
                 if (!isCardHidden) {
                     CardRenderer.renderCardBonuses(slot, card, true);

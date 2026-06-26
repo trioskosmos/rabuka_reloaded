@@ -283,6 +283,34 @@ def extract_abilities_from_card(card_id: str, card: dict) -> list:
     return abilities
 
 
+# Japanese color → heartXX mapping (matches BladeColor enum order 0-5 = heart01-06)
+_JP_HEART_MAP = {
+    "\u6843": "01",  # 桃 → heart01
+    "\u8d64": "02",  # 赤 → heart02
+    "\u9ec4": "03",  # 黄 → heart03
+    "\u7dd1": "04",  # 緑 → heart04
+    "\u9752": "05",  # 青 → heart05
+    "\u7d2b": "06",  # 紫 → heart06
+}
+_JP_HEART_PATTERN = (
+    r"\uff3b([\u6843\u8d64\u9ec4\u7dd1\u9752\u7d2b])\u30cf\u30fc\u30c8\uff3d"
+)
+_JP_HEART_RE = re.compile(_JP_HEART_PATTERN)
+
+
+def _normalize_heart_notation(text: str) -> str:
+    """Replace ［色名ハート］ with {{heart_XX.png|heartXX}}."""
+
+    def _repl(m):
+        color = m.group(1)
+        num = _JP_HEART_MAP.get(color)
+        if num:
+            return f"{{{{heart_{num}.png|heart{num}}}}}"
+        return m.group(0)
+
+    return _JP_HEART_RE.sub(_repl, text)
+
+
 def _enrich_effect_type(effect, triggerless=""):
     """Extract heart colors from ability text. effect_type is NOT set here
     (the trigger field already implies whether it's continuous or triggered)."""
@@ -328,6 +356,10 @@ def extract_all_abilities(cards_file: Path) -> dict:
     for card_id, card in cards_dict.items():
         abilities = extract_abilities_from_card(card_id, card)
         for ability in abilities:
+            ability["full_text"] = _normalize_heart_notation(ability["full_text"])
+            ability["triggerless_text"] = _normalize_heart_notation(
+                ability["triggerless_text"]
+            )
             all_abilities.append(ability)
             card_example = (
                 f"{card_id} | {card.get('name', '')} (ab#{ability['ability_index']})"
