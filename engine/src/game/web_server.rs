@@ -1254,6 +1254,13 @@ async fn exec_code(
         }
     }
 
+    if code.contains("remove_success") {
+        with_player!(p, {
+            p.success_live_card_zone.cards.clear();
+        });
+        game_state.recalculate_constants();
+    }
+
     if code.contains("to_discard") {
         let card_no = parse_param(code, "card_no").unwrap_or_default();
         if let Some(card_id) = game_state.card_database.get_card_id(&card_no) {

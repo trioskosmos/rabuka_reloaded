@@ -742,6 +742,10 @@ impl AbilityResolver {
                         &card_db,
                         &filter,
                     );
+                } else if per_unit_type_str.as_deref() == Some("energy_deck") {
+                    if let Some(moved) = recently_moved.as_ref().or(entry_snapshot.as_ref()) {
+                        matching_count = util::count_matching(moved, &card_db, &filter, false);
+                    }
                 }
                 let mut units = matching_count / per_unit_count_val;
                 if effect.max.unwrap_or(false) {
@@ -1461,6 +1465,7 @@ impl AbilityResolver {
         position: Option<&PositionInfo>,
         optional: bool,
         source: Option<&str>,
+        any_number: bool,
     ) {
         // Check if we're moving from under_member to energy_deck (Awakening case)
         println!(
@@ -1518,10 +1523,23 @@ impl AbilityResolver {
             }
 
             // Create choice to select cards to move
+            let max_count = if any_number {
+                under_cards.len()
+            } else {
+                under_cards.len().min(count as usize)
+            };
+            eprintln!(
+                "[DEBUG] execute_place_energy_under_member: under={} any={} count={} max={} opt={}",
+                under_cards.len(),
+                any_number,
+                count,
+                max_count,
+                optional,
+            );
             self.pending_choice = Some(
                 Choice::select_cards(
                     Zone::UnderMember.to_str(),
-                    under_cards.len().min(count as usize),
+                    max_count,
                     "Select energy cards to move from under member to energy deck",
                     optional,
                 )

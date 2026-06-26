@@ -189,7 +189,7 @@ def extract_destination(text: str) -> Optional[str]:
     ):
         return "empty_area"
     if "ウェイト状態で置く" in text or (
-        "エネルギーカードを" in text and "置く" in text
+        "エネルギーカードを" in text and ("置く" in text or "置いてもよい" in text)
     ):
         return "energy_zone"
     if "登場させる" in text:
@@ -3249,6 +3249,10 @@ def parse_action(text: str) -> Dict[str, Any]:
             # Extract card_type from per_unit source text
             if "エネルギーカード" in per_unit_text:
                 per_unit_info["card_type"] = "energy_card"
+                # When per-unit counts energy cards and the preceding action moves
+                # to energy_deck, the count should reference recently_moved cards.
+                if "エネルギーデッキ" in text:
+                    per_unit_info["per_unit_type"] = "energy_deck"
             elif "メンバーカード" in per_unit_text:
                 per_unit_info["card_type"] = "member_card"
             # Extract card_property from per_unit source text

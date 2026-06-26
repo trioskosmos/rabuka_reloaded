@@ -727,6 +727,7 @@ impl AbilityResolver {
                     cost.position.as_ref(),
                     cost.optional.unwrap_or(false),
                     cost.source.as_deref(),
+                    cost.any_number.unwrap_or(false),
                 );
                 Ok(())
             }
@@ -739,6 +740,7 @@ impl AbilityResolver {
                         cost.position.as_ref(),
                         cost.optional.unwrap_or(false),
                         None,
+                        cost.any_number.unwrap_or(false),
                     );
                 }
                 Ok(())
@@ -902,6 +904,7 @@ impl AbilityResolver {
                         cost.position.as_ref(),
                         false,
                         cost.source.as_deref(),
+                        cost.any_number.unwrap_or(false),
                     );
                 }
             }
@@ -941,6 +944,7 @@ impl AbilityResolver {
                             effect.position.as_ref(),
                             false,
                             effect.source.as_deref(),
+                            effect.any_number.unwrap_or(false),
                         );
                     } else if let Err(e) = self.execute_effect(gs, &effect) {
                         log::debug!("Failed to execute effect after optional cost: {}", e);
@@ -963,6 +967,7 @@ impl AbilityResolver {
                         effect.position.as_ref(),
                         false,
                         effect.source.as_deref(),
+                        effect.any_number.unwrap_or(false),
                     );
                 }
             }

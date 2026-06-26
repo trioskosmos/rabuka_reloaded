@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-26T21:03:11.580553",
+  "generated_at": "2026-06-26T21:59:23.260696",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -23349,16 +23349,15 @@
         "actions": [
           {
             "text": "自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数エネルギーデッキに置いてもよい。",
-            "source": "stage",
+            "source": "under_member",
+            "destination": "energy_deck",
             "card_type": "member_card",
             "target": "self",
             "optional": true,
-            "action": "move_cards",
-            "destination": null,
-            "any_number": true,
-            "heart_colors": [
-              "heart02"
-            ]
+            "action": "place_energy_under_member",
+            "energy_count": 1,
+            "target_member": "this_member",
+            "any_number": true
           },
           {
             "text": "そのメンバーは、これによって置いたエネルギーカード1枚につき、{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る",

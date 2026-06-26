@@ -569,6 +569,7 @@ impl AbilityResolver {
                         effect.position.as_ref(),
                         effect.optional.unwrap_or(false),
                         effect.source.as_deref(),
+                        effect.any_number.unwrap_or(false),
                     );
                 } else {
                     self.execute_place_energy_under_member(
@@ -578,6 +579,7 @@ impl AbilityResolver {
                         effect.position.as_ref(),
                         effect.optional.unwrap_or(false),
                         effect.source.as_deref(),
+                        effect.any_number.unwrap_or(false),
                     );
                 }
                 Ok(())

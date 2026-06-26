@@ -1031,6 +1031,7 @@ impl AbilityResolver {
                     effect.position.as_ref(),
                     effect.optional.unwrap_or(false),
                     Some(Zone::UnderMember.to_str()),
+                    effect.any_number.unwrap_or(false),
                 );
                 Ok(vec![])
             }

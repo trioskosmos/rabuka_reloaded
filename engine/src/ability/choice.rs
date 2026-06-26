@@ -759,7 +759,12 @@ impl super::resolver::AbilityResolver {
                 let tgt = target_player_id
                     .clone()
                     .unwrap_or_else(|| "self".to_string());
-                self.move_from_under_member(gs, indices, &mut validate_card, &dst_str, &tgt)?;
+                let moved =
+                    self.move_from_under_member(gs, indices, &mut validate_card, &dst_str, &tgt)?;
+                if !moved.is_empty() {
+                    self.moved_cards.extend(&moved);
+                    gs.recently_moved_cards = Some(moved);
+                }
             }
             Some(Zone::SuccessLiveZone) => {
                 return self.handle_success_live_zone_selection(gs, &ctx, &mut validate_card);
