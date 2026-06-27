@@ -315,7 +315,21 @@ impl AbilityResolver {
                 );
                 Ok(None)
             }
-            util::SelectionOutcome::Skip => Ok(Some(vec![])),
+            util::SelectionOutcome::Skip => {
+                if can_skip && !filtered_indices.is_empty() {
+                    self.prompt_card_selection(
+                        zone_name,
+                        filtered_indices.len(),
+                        can_skip,
+                        effect,
+                        filter,
+                        Some(filtered_indices),
+                    );
+                    Ok(None)
+                } else {
+                    Ok(Some(vec![]))
+                }
+            }
         }
     }
 

@@ -3655,6 +3655,9 @@ def parse_action(text: str) -> Dict[str, Any]:
             action["text"] = action.get("text", text).replace(
                 "コスト", "{{icon_energy.png|E}}", 1
             )
+        # "このメンバーのコストを+Nする" → self_target (modifies only the activating card)
+        if "このメンバー" in text:
+            action["self_target"] = True
         return action
 
     def _set_score_op(t, a):

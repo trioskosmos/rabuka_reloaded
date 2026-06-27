@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-27T17:09:52.425495",
+  "generated_at": "2026-06-27T17:45:02.465160",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -5990,6 +5990,7 @@
             "operation": "add",
             "value": 6,
             "count": 6,
+            "self_target": true,
             "duration": "live_end"
           },
           {
@@ -10230,7 +10231,8 @@
         "action": "modify_cost",
         "operation": "add",
         "value": 4,
-        "count": 4
+        "count": 4,
+        "self_target": true
       }
     },
     {
@@ -13331,7 +13333,8 @@
         "operation": "subtract",
         "location": "hand",
         "value": 2,
-        "count": 2
+        "count": 2,
+        "self_target": true
       }
     },
     {
@@ -13754,7 +13757,8 @@
         "action": "modify_cost",
         "operation": "add",
         "value": 3,
-        "count": 3
+        "count": 3,
+        "self_target": true
       }
     },
     {
@@ -15165,7 +15169,8 @@
         "operation": "subtract",
         "location": "hand",
         "value": 2,
-        "count": 2
+        "count": 2,
+        "self_target": true
       }
     },
     {
@@ -18774,6 +18779,7 @@
         "operation": "add",
         "value": 1,
         "count": 1,
+        "self_target": true,
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
@@ -22982,6 +22988,7 @@
         "operation": "add",
         "value": 1,
         "count": 1,
+        "self_target": true,
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
@@ -26746,7 +26753,8 @@
         "operation": "subtract",
         "location": "hand",
         "value": 2,
-        "count": 2
+        "count": 2,
+        "self_target": true
       }
     },
     {
