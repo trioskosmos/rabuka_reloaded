@@ -1746,17 +1746,28 @@ def _handle_position_change_fields(text, action):
 
     Clears pre-set 'position' from the keyword loop when setting source
     or exclude, to avoid ambiguity in the engine.
+
+    Also sets exclude_self for single-target position changes per Rule 11.10.1:
+    "ポジションチェンジするとは、そのメンバーを今いるエリア以外のエリアに移動させることである。"
     """
     if "センターエリア以外" in text or "センター以外" in text:
         action["exclude_position"] = "center"
         action.pop("position", None)
-        return
-    if "センター" in text:
+    elif "センター" in text:
         if "にいる" in text:
             action["source_position"] = "center"
             action.pop("position", None)
         else:
             action["position"] = "center"
+
+    # Rule 11.10.1: Position change MUST move to a different area.
+    # Exclude the member's current position for single-target moves.
+    # NOT for "メンバー1人を" (where the player selects a target first)
+    # and NOT for formation change ("それぞれ" / multiple_targets).
+    if "それぞれ" not in text and not (
+        "メンバー" in text and ("1人" in text or "N人" in text)
+    ):
+        action["exclude_self"] = True
 
 
 def _try_position(text):
@@ -9249,6 +9260,18 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                         eff["condition"] = copy.deepcopy(tc)
                         fix_stats["auto_trigger"] += 1
                         break
+
+        # FIX 15: Backfill exclude_self for single-target position_change effects
+        # Rule 11.10.1: Position change MUST move to a different area.
+        if eff.get("action") == "position_change" and not eff.get("exclude_self"):
+            et = eff.get("text", "") or t
+            # Only for single-target moves (not "メンバー1人を" or "それぞれ" formation change)
+            if "それぞれ" not in et and not (
+                "メンバー" in et and ("1人" in et or "N人" in et)
+            ):
+                eff["exclude_self"] = True
+                fix_stats.setdefault("exclude_self", 0)
+                fix_stats["exclude_self"] += 1
 
         # FIX N: All-revealed-match-heart-color condition for specify_heart_color+reveal+select_cards
         if (

@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-27T03:36:21.911406",
+  "generated_at": "2026-06-27T16:28:05.580249",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -794,6 +794,7 @@
         "optional": true,
         "action": "position_change",
         "target": null,
+        "exclude_self": true,
         "parenthetical": [
           "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
         ]
@@ -3085,6 +3086,7 @@
         "action": "position_change",
         "target": null,
         "exclude_position": "center",
+        "exclude_self": true,
         "parenthetical": [
           "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
         ]
@@ -3728,6 +3730,7 @@
         "optional": true,
         "action": "position_change",
         "target": null,
+        "exclude_self": true,
         "parenthetical": [
           "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
         ]
@@ -5271,7 +5274,8 @@
           "SaintSnow"
         ],
         "action": "position_change",
-        "target": null
+        "target": null,
+        "exclude_self": true
       }
     },
     {
@@ -8090,6 +8094,7 @@
         "card_type": "member_card",
         "action": "position_change",
         "target": null,
+        "exclude_self": true,
         "parenthetical": [
           "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
         ]
@@ -8293,6 +8298,7 @@
         "target": "both",
         "action": "position_change",
         "source_position": "center",
+        "exclude_self": true,
         "parenthetical": [
           "センターにいるメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはセンターエリアに移動させる。"
         ],
@@ -14700,7 +14706,8 @@
         "multiple_targets": true,
         "parenthetical": [
           "メンバーをそれぞれ好きなエリアに移動させる。この効果で1つのエリアに2人以上のメンバーを移動させることはできない。"
-        ]
+        ],
+        "exclude_self": true
       }
     },
     {
@@ -14997,6 +15004,7 @@
             "card_type": "member_card",
             "action": "position_change",
             "target": null,
+            "exclude_self": true,
             "condition": {
               "text": "公開したカードがコスト9以下のメンバーカードの場合",
               "location": "revealed_cards",
@@ -18274,7 +18282,8 @@
         "text": "このメンバーをポジションチェンジする",
         "card_type": "member_card",
         "action": "position_change",
-        "target": null
+        "target": null,
+        "exclude_self": true
       }
     },
     {
@@ -19060,7 +19069,8 @@
         "card_type": "member_card",
         "optional": true,
         "action": "position_change",
-        "target": null
+        "target": null,
+        "exclude_self": true
       }
     },
     {
@@ -19149,7 +19159,8 @@
         "multiple_targets": true,
         "parenthetical": [
           "メンバーをそれぞれ好きなエリアに移動させてもよい。"
-        ]
+        ],
+        "exclude_self": true
       }
     },
     {
@@ -25812,13 +25823,13 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "人",
-        "location": "stage",
-        "target": "self",
-        "value": 1,
         "exclude_heart_colors": [
           "heart01",
           "heart06"
-        ]
+        ],
+        "location": "stage",
+        "target": "self",
+        "value": 1
       }
     },
     {
@@ -29518,6 +29529,7 @@
         "card_type": "member_card",
         "action": "position_change",
         "target": null,
+        "exclude_self": true,
         "position": "center"
       }
     },
@@ -32536,7 +32548,8 @@
         "multiple_targets": true,
         "parenthetical": [
           "メンバーをそれぞれ好きなエリアに移動させてもよい。"
-        ]
+        ],
+        "exclude_self": true
       }
     },
     {

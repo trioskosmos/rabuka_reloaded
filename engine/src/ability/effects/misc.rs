@@ -2107,6 +2107,13 @@ impl AbilityResolver {
                 continue;
             }
 
+            // Exclude explicitly excluded positions (e.g. "センターエリア以外" → exclude center).
+            if let Some(ref exclude_pos) = effect.exclude_position {
+                if pos_name == exclude_pos {
+                    continue;
+                }
+            }
+
             // Exclude the activating card's own position when exclude_self is set.
             if exclude_self && Some(card_id) == activating_card_id {
                 continue;
