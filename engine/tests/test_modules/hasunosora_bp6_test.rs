@@ -104,6 +104,27 @@ fn kosuzu_bp6_condition_met_gains_heart05_and_blade() {
     let blade = game.state.mods.get_blade_modifier(kosuzu);
     assert!(blade > 0, "Condition met: should gain blade, got {}", blade);
 
+    // Cost modifier +6 should apply ONLY to kosuzu (self_target),
+    // NOT to other 蓮ノ空 members on stage.
+    let cost_mod_suzu = game.state.mods.get_cost_modifier(kosuzu);
+    assert_eq!(
+        cost_mod_suzu, 6,
+        "Kosuzu should have +6 cost, got {}",
+        cost_mod_suzu
+    );
+    let cost_mod_kanoha = game.state.mods.get_cost_modifier(kanoha);
+    assert_eq!(
+        cost_mod_kanoha, 0,
+        "Kanoha should NOT have cost modified (self_target), got {}",
+        cost_mod_kanoha
+    );
+    let cost_mod_lili = game.state.mods.get_cost_modifier(lilienthal);
+    assert_eq!(
+        cost_mod_lili, 0,
+        "Lilienthal should NOT have cost modified (self_target), got {}",
+        cost_mod_lili
+    );
+
     let heart05 = game
         .state
         .mods

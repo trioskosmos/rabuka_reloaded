@@ -1096,6 +1096,13 @@ impl AbilityResolver {
                 None,
             );
         }
+        // When self_target is set, only the activating card receives the modifier
+        // (e.g. "このメンバーのコストを+Nする" — only this member, not all matching).
+        if effect.self_target.unwrap_or(false) {
+            if let Some(cid) = gs.activating_card {
+                card_ids.retain(|&id| id == cid);
+            }
+        }
         let delta = match operation {
             "add" => value as i32,
             "subtract" => -(value as i32),
