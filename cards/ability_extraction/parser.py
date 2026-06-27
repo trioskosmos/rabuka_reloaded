@@ -2798,7 +2798,7 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
             action["timing_condition"] = "appeared_this_turn"
     if "original_value" not in action and ("元々持つ" in text or "元々" in text):
         action["original_value"] = True
-    if "このカード" in text or "このメンバー" in text:
+    if "このカード" in text:
         action["self_target"] = True
     # Position from text (for ALL action types, not just appearance_condition)
     if (

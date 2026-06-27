@@ -1771,6 +1771,33 @@ impl<'a> ConditionContext<'a> {
             }
             return present.len() >= required_colors.len();
         }
+        // When multiple group_names are specified, check EACH group has at least `count` members
+        if let Some(ref groups) = condition.group_names {
+            if groups.len() > 1 && condition.aggregate.as_deref() != Some("total") {
+                let target_count = condition.count.unwrap_or(1);
+                let ct = condition.card_type.as_deref();
+                let exc = condition.exclude_characters.as_deref();
+                let location = condition.location.as_deref().unwrap_or("");
+                let cards: &[i16] = match Zone::from_str(location) {
+                    Some(Zone::Stage) => &g_player.stage.stage,
+                    Some(Zone::Hand) => &g_player.hand.cards,
+                    Some(Zone::Discard) | Some(Zone::Waitroom) => &g_player.waitroom.cards,
+                    Some(Zone::LiveCardZone) => &g_player.live_card_zone.cards,
+                    Some(Zone::SuccessLiveZone) => &g_player.success_live_card_zone.cards,
+                    Some(Zone::Energy) => &g_player.energy_zone.cards,
+                    _ => return false,
+                };
+                for group_name in groups {
+                    let group_slice = [group_name.clone()];
+                    let count =
+                        self.count_group_cards_in_cards(cards, Some(&group_slice[..]), ct, exc);
+                    if count < target_count {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
         let mut count = self.get_group_card_count(condition);
         if condition.exclude_self.unwrap_or(false) {
             if let Some(aid) = self.activating_card_id {

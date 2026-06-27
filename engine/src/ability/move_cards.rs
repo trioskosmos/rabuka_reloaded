@@ -795,6 +795,9 @@ impl AbilityResolver {
                     _ => false,
                 };
 
+                let has_effect_groups =
+                    effect.group_names.as_ref().map_or(false, |g| !g.is_empty());
+                let filter_group_name = if has_effect_groups { None } else { group_name };
                 let mut filter = util::filter_from_parts_full(
                     if src_zone == Some(Zone::LiveCardZone)
                         || (src_zone == Some(Zone::SuccessLiveZone) && card_type_filter.is_some())
@@ -808,7 +811,7 @@ impl AbilityResolver {
                     if src_zone == Some(Zone::Energy) {
                         None
                     } else {
-                        group_name
+                        filter_group_name
                     },
                     if src_zone == Some(Zone::Energy) {
                         None
@@ -843,6 +846,9 @@ impl AbilityResolver {
                 filter.need_heart_operator = effect.need_heart_operator.as_deref();
                 filter.need_heart_color = effect.need_heart_color.as_deref();
                 filter.heart_colors = &effect.heart_colors;
+                if has_effect_groups {
+                    filter.groups = effect.group_names.as_ref();
+                }
                 filter.card_property = effect.card_property.as_deref();
                 log::debug!(
                     "[NEED_HEART] filter: color={:?} total={:?} op={:?} src={:?} card_type={:?}",

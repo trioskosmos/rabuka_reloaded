@@ -6,6 +6,7 @@ pub mod angelic_angel_test;
 pub mod aurora_flower_identity_test;
 pub mod aurora_flower_test;
 pub mod awake_test;
+pub mod awaken_the_power_test;
 pub mod ayumu_azuna_test;
 pub mod ayumu_pb1_test;
 pub mod b7_constant_ability_test;
