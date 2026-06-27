@@ -1236,6 +1236,7 @@ impl GameState {
                     effect.original_operator.as_deref(),
                     effect.exclude_self.unwrap_or(false),
                     effect.self_target.unwrap_or(false),
+                    effect.exclude_heart_colors.as_deref().unwrap_or(&[]),
                 );
                 self.activating_card = prev;
             }

@@ -335,6 +335,7 @@ impl AbilityResolver {
                 effect.original_operator.as_deref(),
                 effect.exclude_self.unwrap_or(false),
                 effect.self_target.unwrap_or(false),
+                effect.exclude_heart_colors.as_deref().unwrap_or(&[]),
             ),
             ActionType::SetCost => {
                 self.execute_set_cost(gs, effect, effect.value.unwrap_or(0));

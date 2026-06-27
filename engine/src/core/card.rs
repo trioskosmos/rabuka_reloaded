@@ -916,6 +916,11 @@ pub struct AbilityEffect {
     pub card_property: Option<String>,
     #[serde(default)]
     pub exclude_group_names: Option<Vec<String>>,
+    /// Heart colors to exclude from per-unit counting.
+    /// e.g. "{{heart_01.png|heart01}}と{{heart_06.png|heart06}}以外の色のハートを持つ"
+    /// → exclude members whose base_heart contains ONLY these colors.
+    #[serde(default)]
+    pub exclude_heart_colors: Option<Vec<String>>,
     #[serde(default)]
     pub heart_selection: Option<bool>,
     #[serde(default)]

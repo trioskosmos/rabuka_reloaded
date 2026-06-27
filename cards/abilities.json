@@ -25814,7 +25814,11 @@
         "per_unit_type": "人",
         "location": "stage",
         "target": "self",
-        "value": 1
+        "value": 1,
+        "exclude_heart_colors": [
+          "heart01",
+          "heart06"
+        ]
       }
     },
     {

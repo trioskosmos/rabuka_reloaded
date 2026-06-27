@@ -230,6 +230,7 @@ impl AbilityResolver {
         original_operator: Option<&str>,
         exclude_self: bool,
         self_target: bool,
+        exclude_heart_colors: &[String],
     ) -> Result<(), String> {
         if per_unit {
             let card_db = &gs.card_database;
@@ -269,6 +270,25 @@ impl AbilityResolver {
                         let moved = gs.has_card_moved_this_turn(card_id);
                         let appeared = gs.has_card_appeared_this_turn(card_id);
                         if !moved && !appeared {
+                            continue;
+                        }
+                    }
+                }
+                // Exclude members whose ALL base_heart colors are in the exclusion list.
+                // e.g. exclude_heart_colors=["heart01","heart06"] means a member with
+                // only {heart01, heart06} is excluded, but {heart01, heart03, heart06} counts
+                // because heart03 is NOT in the exclusion list.
+                if !exclude_heart_colors.is_empty() {
+                    let card = card_db.get_card(card_id);
+                    if let Some(card) = card {
+                        let all_excluded = card.base_heart.as_ref().map_or(false, |base| {
+                            base.hearts.keys().all(|hc| {
+                                exclude_heart_colors
+                                    .iter()
+                                    .any(|exc| &hc.to_string() == exc)
+                            })
+                        });
+                        if all_excluded {
                             continue;
                         }
                     }

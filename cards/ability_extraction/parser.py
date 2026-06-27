@@ -4866,6 +4866,15 @@ def _try_per_unit(text):
     exc_gns = re.findall(r"『([^』]+)』以外", per_text)
     if exc_gns:
         result["exclude_group_names"] = exc_gns
+    # Extract exclude_heart_colors from per_text
+    # Pattern: "{{heart_01.png|heart01}}と{{heart_06.png|heart06}}以外の色のハートを持つ"
+    if "以外" in per_text:
+        before_igai = per_text.split("以外")[0]
+        hc_ids = re.findall(r"heart_(\d+)", before_igai)
+        if hc_ids:
+            result["exclude_heart_colors"] = [
+                f"heart{m.zfill(2)}" for m in dict.fromkeys(hc_ids)
+            ]
     # Extract included groups only (groups NOT followed by 以外)
     remaining_per_text = re.sub(r"『[^』]+』以外", "", per_text)
     gm = re.search(r"『([^』]+)』", remaining_per_text)
@@ -4995,6 +5004,7 @@ def _try_per_unit(text):
                 "card_type",
                 "group_names",
                 "exclude_group_names",
+                "exclude_heart_colors",
                 "distinct",
                 "timing_condition",
                 "state",
@@ -5084,6 +5094,7 @@ def _propagate(src, dst):
         "card_type",
         "group_names",
         "exclude_group_names",
+        "exclude_heart_colors",
         "distinct",
         "timing_condition",
         "state",
@@ -5111,6 +5122,7 @@ def _propagate_if_missing(src, dst):
         "card_type",
         "group_names",
         "exclude_group_names",
+        "exclude_heart_colors",
         "distinct",
         "timing_condition",
         "state",
