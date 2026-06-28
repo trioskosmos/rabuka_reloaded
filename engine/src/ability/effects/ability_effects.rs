@@ -214,9 +214,23 @@ impl AbilityResolver {
                 .push(ability_text.to_string());
         }
 
-        // LIVE_SUCCESS trigger → store as a proper Ability so the trigger pipeline
-        // picks it up.  For all other triggers (or no trigger) preserve the original
-        // behaviour: fall back to the text-based score-modifier parsing below.
+        // ── Texticon display for GainAbility effects ──────────────
+        //
+        // LIVE_SUCCESS trigger: stores a proper Ability struct in
+        // gained_card_abilities.  The display pipeline scans this and
+        // adds "live_success" to CardDisplay.bonus_triggers → the
+        // frontend shows a live_success.png texticon on the card.
+        //
+        // All other triggers (e.g. 常時/constant): the gained ability's
+        // trigger type is NOT stored in gained_card_abilities here.
+        // Instead, the recalculate_constants scanner reads the source
+        // card's ability_gain_trigger field directly and applies the
+        // score_modifier + bonus_triggers for display.
+        //
+        // Without bonus_triggers, a "gain ability 【常時】+1 score"
+        // would show only icon_score.png with no indication that it's
+        // a constant (jyouji) ability.
+        //
         if trigger == Some(crate::triggers::LIVE_SUCCESS) {
             if let (Some(gained), Some(card_id)) = (gained_effect, gs.activating_card) {
                 let gained_ability = Ability {

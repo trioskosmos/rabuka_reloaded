@@ -155,12 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isResizingLeft) {
             isResizingLeft = false;
             if (resizerLeft) resizerLeft.classList.remove('resizing');
-            if (leftSidebar) localStorage.setItem(STORAGE_KEY_LEFT, parseInt(leftSidebar.style.width));
+            if (leftSidebar) localStorage.setItem(STORAGE_KEY_LEFT, parseInt(leftSidebar.style.width) || 0);
         }
         if (isResizingRight) {
             isResizingRight = false;
             if (resizerRight) resizerRight.classList.remove('resizing');
-            if (rightSidebar) localStorage.setItem(STORAGE_KEY_RIGHT, parseInt(rightSidebar.style.width));
+            if (rightSidebar) localStorage.setItem(STORAGE_KEY_RIGHT, parseInt(rightSidebar.style.width) || 0);
         }
 
         document.body.style.cursor = '';

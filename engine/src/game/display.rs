@@ -82,16 +82,88 @@ pub struct CardDisplay {
     pub ability_text: Option<String>,
     #[serde(default)]
     pub hidden: bool,
+
+    // ════════════════════════════════════════════════════════════════
+    // Texticon / status badge fields
+    //
+    // These are rendered as small image badges on the card in the UI.
+    // There are TWO categories:
+    //
+    //  1. Additive bonuses (bonus_*) — from Modify* / GainResource actions
+    //     → shown with +/- prefix: e.g. "+2 Blade", "-1 Cost", "+3 Score"
+    //     → appears when the value is non-zero
+    //
+    //  2. Set/override values (set_*) — from Set* actions
+    //     → shown with PLAIN number (no +/-): e.g. "5 Blade", "3 Hearts"
+    //     → represents an absolute override, not an incremental change
+    //
+    //  3. Trigger badges (bonus_triggers) — from GainAbility actions
+    //     → shown as trigger-type texticon: jyouji.png, live_success.png, etc.
+    //     → no numeric value, just the icon
+    //
+    // ════════════════════════════════════════════════════════════════
+
+    // ── Additive bonuses (ModifyBlade, GainResource blade) ──
+    // Shows icon_blade.png with "+N" or "-N"
     #[serde(default)]
     pub bonus_blade: i32,
+
+    // ── Additive heart bonuses (ModifyHeart, GainResource heart) ──
+    // Shows per-color heart icons with "+N" or "-N"
     #[serde(default)]
     pub bonus_hearts: Vec<i32>,
+
+    // ── Additive score bonus (ModifyScore, GainAbility score) ──
+    // Shows icon_score.png with "+N" or "-N"
+    // NOTE: GainAbility(constant trigger) contributes to this via
+    // recalculate_constants → score_modifier, but does NOT add a
+    // jyouji.png trigger icon. The trigger type is in bonus_triggers.
     #[serde(default)]
     pub bonus_score: i32,
+
+    // ── Additive cost modifier (ModifyCost) ──
+    // Shows icon_energy.png with "+N" or "-N"
     #[serde(default)]
     pub bonus_cost: i32,
+
+    // ── Set/override blade (SetBladeCount, SetBladeType) ──
+    // Shows icon_blade.png with plain "N" (no +/-)
+    // Separate from bonus_blade so both can appear simultaneously:
+    // e.g. set_blade=5 (base) + bonus_blade=+2 (modifier)
+    #[serde(default)]
+    pub set_blade: i32,
+
+    // ── Set/override hearts (SetHeartType) ──
+    // Shows per-color heart icons with plain "N" (no +/-)
+    #[serde(default)]
+    pub set_hearts: Vec<i32>,
+
+    // ── Set/override score (SetScore) ──
+    // Shows icon_score.png with plain "N" (no +/-)
+    #[serde(default)]
+    pub set_score: i32,
+
+    // ── Set/override cost (SetCost, SetCostToUse) ──
+    // Shows icon_energy.png with plain "N" (no +/-)
+    #[serde(default)]
+    pub set_cost: i32,
+
+    // ── Gained ability trigger texticons (GainAbility) ──
+    // Populated from gained_card_abilities in game_state_to_display.
+    // Each entry is a trigger type name like "jyouji", "live_success",
+    // "toujyou", "kidou", "jidou" — the frontend maps these to texticon
+    // images.
+    // Without this field, gain_ability effects would have NO texticon
+    // indicator on the card, even though they grant persistent abilities.
+    #[serde(default)]
+    pub bonus_triggers: Vec<String>,
+
+    // ── Heart color transform (SetHeartType → "transform heart to X") ──
+    // Shows a heart texticon overlay indicating all hearts now count as
+    // that color.
     #[serde(default)]
     pub heart_transform: Option<String>,
+
     #[serde(default)]
     pub cost: Option<u32>,
 }
@@ -481,6 +553,11 @@ pub fn card_to_display(
             bonus_hearts: Vec::new(),
             bonus_score: 0,
             bonus_cost: 0,
+            set_blade: 0,
+            set_hearts: Vec::new(),
+            set_score: 0,
+            set_cost: 0,
+            bonus_triggers: Vec::new(),
             heart_transform: None,
             hidden: false,
             cost: card.cost,
@@ -488,15 +565,56 @@ pub fn card_to_display(
     })
 }
 
+/// Build a CardDisplay with both additive and set/override modifiers.
+///
+/// ── Texticon status indicator summary ──
+///
+/// Ability Action          | bonus_* (with +/-) | set_* (plain) | bonus_triggers
+/// ────────────────────────┼────────────────────┼───────────────┼───────────────
+/// ModifyBlade             | bonus_blade        | —             | —
+/// GainResource(blade)     | bonus_blade        | —             | —
+/// SetBladeCount           | —                  | set_blade     | —
+/// SetBladeType            | —                  | set_blade     | —
+/// ModifyHeart             | bonus_hearts       | —             | —
+/// GainResource(heart)     | bonus_hearts       | —             | —
+/// SetHeartType            | —                  | set_hearts    | —
+/// ModifyScore             | bonus_score        | —             | —
+/// SetScore                | —                  | set_score     | —
+/// ModifyCost              | bonus_cost         | —             | —
+/// SetCost / SetCostToUse  | —                  | set_cost      | —
+/// GainAbility(constant)   | bonus_score*       | —             | "jyouji"
+/// GainAbility(live_start) | —                  | —             | "live_start"
+/// GainAbility(live_success)| —                 | —             | "live_success"
+/// GainAbility(debut)      | —                  | —             | "toujyou"
+///
+/// * GainAbility with constant trigger also adds bonus_score in
+///   recalculate_constants (via score_modifier), but the trigger
+///   texticon is only in bonus_triggers.
+///
+/// One-shot actions (Draw, Discard, Look, Reveal, Charge, Move,
+/// PositionChange, ChangeState, etc.) produce NO texticon because
+/// they have no persistent status on the card.
+///
+/// Restriction / Prohibition actions affect game rules but are tracked
+/// in prohibition_effects internally, not as card texticons.
+///
 pub fn card_to_display_full(
     card_id: i16,
     card_db: &CardDatabase,
     orientation: Option<Orientation>,
-    blade_modifier: i32,
-    score_modifier: i32,
-    heart_modifiers: &std::collections::HashMap<crate::card::HeartColor, i32>,
+    // Additive modifiers (accumulated via add_* / +=) — shown with +/- prefix
+    blade_additive: i32,
+    score_additive: i32,
+    heart_additive: &std::collections::HashMap<crate::card::HeartColor, i32>,
+    // Absolute set/override modifiers (set via set_*) — shown without +/- prefix
+    blade_set: i32,
+    score_set: i32,
+    heart_set: &std::collections::HashMap<crate::card::HeartColor, i32>,
+    cost_additive: i32,
+    cost_set: i32,
     heart_transform: Option<crate::card::HeartColor>,
-    cost_modifier: i32,
+    // Trigger texticon badges for gained abilities (e.g. "jyouji", "live_success")
+    bonus_triggers: &[String],
 ) -> Option<CardDisplay> {
     card_db.get_card(card_id).map(|card| {
         let base_heart = card.base_heart.as_ref().map(|bh| {
@@ -520,8 +638,9 @@ pub fn card_to_display_full(
                 })
                 .collect()
         });
+        // Additive hearts (shown with +/-)
         let mut bonus_hearts = vec![0i32; 8];
-        for (color, &val) in heart_modifiers {
+        for (color, &val) in heart_additive {
             let idx = match color {
                 crate::card::HeartColor::Heart00 => 0,
                 crate::card::HeartColor::Heart01 => 1,
@@ -535,6 +654,23 @@ pub fn card_to_display_full(
             };
             bonus_hearts[idx] += val;
         }
+        // Set/override hearts (shown without +/-)
+        let mut set_hearts = vec![0i32; 8];
+        for (color, &val) in heart_set {
+            let idx = match color {
+                crate::card::HeartColor::Heart00 => 0,
+                crate::card::HeartColor::Heart01 => 1,
+                crate::card::HeartColor::Heart02 => 2,
+                crate::card::HeartColor::Heart03 => 3,
+                crate::card::HeartColor::Heart04 => 4,
+                crate::card::HeartColor::Heart05 => 5,
+                crate::card::HeartColor::Heart06 => 6,
+                crate::card::HeartColor::All => 7,
+                _ => continue,
+            };
+            set_hearts[idx] += val;
+        }
+        let total_blade_mod = blade_additive + blade_set;
         let transform_str = heart_transform.map(|hc| {
             let s = match hc {
                 crate::card::HeartColor::Heart00 => "heart00",
@@ -559,14 +695,35 @@ pub fn card_to_display_full(
             total_blade: if orientation == Some(Orientation::Wait) {
                 0
             } else {
-                ((card.blade as i32) + blade_modifier).max(0) as u32
+                ((card.blade as i32) + total_blade_mod).max(0) as u32
             },
             id: card_id,
             ability_text: Some(card.ability.clone()),
-            bonus_blade: blade_modifier,
+            // ── Additive bonuses (shown with +/- prefix) ──────────────
+            // ModifyBlade / GainResource(blade) → icon_blade.png "+N"/"-N"
+            bonus_blade: blade_additive,
+            // ModifyHeart / GainResource(heart) → heart_X.png "+N"/"-N"
             bonus_hearts,
-            bonus_score: score_modifier,
-            bonus_cost: cost_modifier,
+            // ModifyScore / GainAbility(score)   → icon_score.png "+N"/"-N"
+            // GainAbility(constant) sets this via recalculate_constants.
+            bonus_score: score_additive,
+            // ModifyCost → icon_energy.png "+N"/"-N"
+            bonus_cost: cost_additive,
+            // ── Set/override values (shown as plain number, no +/-) ──
+            // SetBladeCount/SetBladeType → icon_blade.png "N"
+            set_blade: blade_set,
+            // SetHeartType → heart_X.png "N"
+            set_hearts,
+            // SetScore → icon_score.png "N"
+            set_score: score_set,
+            // SetCost/SetCostToUse → icon_energy.png "N"
+            set_cost: cost_set,
+            // ── Gained ability trigger texticons ─────────────────────
+            // gain_ability → e.g. jyouji.png, live_success.png, etc.
+            // Populated from game_state.gained_card_abilities.
+            bonus_triggers: bonus_triggers.to_vec(),
+            // ── Heart transform overlay ──────────────────────────────
+            // SetHeartType("transform heart to X") → heart_X.png overlay
             heart_transform: transform_str,
             hidden: false,
             cost: card.cost,
@@ -586,14 +743,22 @@ pub fn zone_to_display(card_ids: &[i16], card_db: &CardDatabase) -> ZoneDisplay 
 pub fn zone_to_display_full(
     card_ids: &[i16],
     card_db: &CardDatabase,
-    blade_modifiers: &std::collections::HashMap<i16, i32>,
-    score_modifiers: &std::collections::HashMap<i16, i32>,
-    heart_modifiers: &std::collections::HashMap<
+    blade_additive: &std::collections::HashMap<i16, i32>,
+    blade_set: &std::collections::HashMap<i16, i32>,
+    score_additive: &std::collections::HashMap<i16, i32>,
+    score_set: &std::collections::HashMap<i16, i32>,
+    heart_additive: &std::collections::HashMap<
+        i16,
+        std::collections::HashMap<crate::card::HeartColor, i32>,
+    >,
+    heart_set: &std::collections::HashMap<
         i16,
         std::collections::HashMap<crate::card::HeartColor, i32>,
     >,
     heart_color_multiplier: &std::collections::HashMap<i16, crate::card::HeartColor>,
-    cost_modifiers: &std::collections::HashMap<i16, i32>,
+    cost_additive: &std::collections::HashMap<i16, i32>,
+    cost_set: &std::collections::HashMap<i16, i32>,
+    bonus_triggers: &std::collections::HashMap<i16, Vec<String>>,
 ) -> ZoneDisplay {
     ZoneDisplay {
         cards: card_ids
@@ -603,11 +768,18 @@ pub fn zone_to_display_full(
                     id,
                     card_db,
                     None,
-                    blade_modifiers.get(&id).copied().unwrap_or(0),
-                    score_modifiers.get(&id).copied().unwrap_or(0),
-                    &heart_modifiers.get(&id).cloned().unwrap_or_default(),
+                    blade_additive.get(&id).copied().unwrap_or(0),
+                    score_additive.get(&id).copied().unwrap_or(0),
+                    &heart_additive.get(&id).cloned().unwrap_or_default(),
+                    blade_set.get(&id).copied().unwrap_or(0),
+                    score_set.get(&id).copied().unwrap_or(0),
+                    &heart_set.get(&id).cloned().unwrap_or_default(),
+                    cost_additive.get(&id).copied().unwrap_or(0),
+                    cost_set.get(&id).copied().unwrap_or(0),
                     heart_color_multiplier.get(&id).copied(),
-                    cost_modifiers.get(&id).copied().unwrap_or(0),
+                    bonus_triggers
+                        .get(&id)
+                        .map_or(&[] as &[String], |v| v.as_slice()),
                 )
             })
             .collect(),
@@ -617,21 +789,38 @@ pub fn zone_to_display_full(
 pub fn stage_to_display(
     stage: &crate::zones::Stage,
     card_db: &CardDatabase,
-    blade_modifiers: &std::collections::HashMap<i16, i32>,
+    blade_additive: &std::collections::HashMap<i16, i32>,
+    blade_set: &std::collections::HashMap<i16, i32>,
     orientation_modifiers: &std::collections::HashMap<i16, String>,
-    heart_modifiers: &std::collections::HashMap<
+    heart_additive: &std::collections::HashMap<
         i16,
         std::collections::HashMap<crate::card::HeartColor, i32>,
     >,
-    score_modifiers: &std::collections::HashMap<i16, i32>,
+    heart_set: &std::collections::HashMap<
+        i16,
+        std::collections::HashMap<crate::card::HeartColor, i32>,
+    >,
+    score_additive: &std::collections::HashMap<i16, i32>,
+    score_set: &std::collections::HashMap<i16, i32>,
     heart_color_multiplier: &std::collections::HashMap<i16, crate::card::HeartColor>,
-    cost_modifiers: &std::collections::HashMap<i16, i32>,
+    cost_additive: &std::collections::HashMap<i16, i32>,
+    cost_set: &std::collections::HashMap<i16, i32>,
+    bonus_triggers: &std::collections::HashMap<i16, Vec<String>>,
 ) -> StageDisplay {
-    let blade_mod = |cid: i16| blade_modifiers.get(&cid).copied().unwrap_or(0);
-    let score_mod = |cid: i16| score_modifiers.get(&cid).copied().unwrap_or(0);
-    let heart_mod = |cid: i16| heart_modifiers.get(&cid).cloned().unwrap_or_default();
+    let blade_add = |cid: i16| blade_additive.get(&cid).copied().unwrap_or(0);
+    let blade_set_fn = |cid: i16| blade_set.get(&cid).copied().unwrap_or(0);
+    let score_add = |cid: i16| score_additive.get(&cid).copied().unwrap_or(0);
+    let score_set_fn = |cid: i16| score_set.get(&cid).copied().unwrap_or(0);
+    let heart_add = |cid: i16| heart_additive.get(&cid).cloned().unwrap_or_default();
+    let heart_set_fn = |cid: i16| heart_set.get(&cid).cloned().unwrap_or_default();
     let heart_xform = |cid: i16| heart_color_multiplier.get(&cid).copied();
-    let cost_mod = |cid: i16| cost_modifiers.get(&cid).copied().unwrap_or(0);
+    let cost_add = |cid: i16| cost_additive.get(&cid).copied().unwrap_or(0);
+    let cost_set_fn = |cid: i16| cost_set.get(&cid).copied().unwrap_or(0);
+    let triggers_fn = |cid: i16| {
+        bonus_triggers
+            .get(&cid)
+            .map_or(&[] as &[String], |v| v.as_slice())
+    };
     let orientation = |cid: i16| {
         orientation_modifiers.get(&cid).map(|o| match o.as_str() {
             "wait" => Orientation::Wait,
@@ -644,11 +833,16 @@ pub fn stage_to_display(
                 stage.stage[0],
                 card_db,
                 orientation(stage.stage[0]),
-                blade_mod(stage.stage[0]),
-                score_mod(stage.stage[0]),
-                &heart_mod(stage.stage[0]),
+                blade_add(stage.stage[0]),
+                score_add(stage.stage[0]),
+                &heart_add(stage.stage[0]),
+                blade_set_fn(stage.stage[0]),
+                score_set_fn(stage.stage[0]),
+                &heart_set_fn(stage.stage[0]),
+                cost_add(stage.stage[0]),
+                cost_set_fn(stage.stage[0]),
                 heart_xform(stage.stage[0]),
-                cost_mod(stage.stage[0]),
+                triggers_fn(stage.stage[0]),
             )
         } else {
             None
@@ -658,11 +852,16 @@ pub fn stage_to_display(
                 stage.stage[1],
                 card_db,
                 orientation(stage.stage[1]),
-                blade_mod(stage.stage[1]),
-                score_mod(stage.stage[1]),
-                &heart_mod(stage.stage[1]),
+                blade_add(stage.stage[1]),
+                score_add(stage.stage[1]),
+                &heart_add(stage.stage[1]),
+                blade_set_fn(stage.stage[1]),
+                score_set_fn(stage.stage[1]),
+                &heart_set_fn(stage.stage[1]),
+                cost_add(stage.stage[1]),
+                cost_set_fn(stage.stage[1]),
                 heart_xform(stage.stage[1]),
-                cost_mod(stage.stage[1]),
+                triggers_fn(stage.stage[1]),
             )
         } else {
             None
@@ -672,11 +871,16 @@ pub fn stage_to_display(
                 stage.stage[2],
                 card_db,
                 orientation(stage.stage[2]),
-                blade_mod(stage.stage[2]),
-                score_mod(stage.stage[2]),
-                &heart_mod(stage.stage[2]),
+                blade_add(stage.stage[2]),
+                score_add(stage.stage[2]),
+                &heart_add(stage.stage[2]),
+                blade_set_fn(stage.stage[2]),
+                score_set_fn(stage.stage[2]),
+                &heart_set_fn(stage.stage[2]),
+                cost_add(stage.stage[2]),
+                cost_set_fn(stage.stage[2]),
                 heart_xform(stage.stage[2]),
-                cost_mod(stage.stage[2]),
+                triggers_fn(stage.stage[2]),
             )
         } else {
             None
@@ -699,9 +903,20 @@ pub fn stage_to_display(
 pub fn player_to_display(
     player: &Player,
     card_db: &CardDatabase,
+    // Combined modifier totals (additive + set) — used for score/stat computations
     blade_modifiers: &std::collections::HashMap<i16, i32>,
     score_modifiers: &std::collections::HashMap<i16, i32>,
     heart_modifiers: &std::collections::HashMap<
+        i16,
+        std::collections::HashMap<crate::card::HeartColor, i32>,
+    >,
+    // ── Set/override maps ──────────────────────────────────────────
+    // These hold the "set" portion of ModifierEntry (absolute overrides).
+    // Extracted separately so card badges can display them without +/-.
+    // See CardDisplay doc for the full additive-vs-set breakdown.
+    blade_set: &std::collections::HashMap<i16, i32>,
+    score_set: &std::collections::HashMap<i16, i32>,
+    heart_set: &std::collections::HashMap<
         i16,
         std::collections::HashMap<crate::card::HeartColor, i32>,
     >,
@@ -716,7 +931,14 @@ pub fn player_to_display(
     mulligan_selection: Option<&[usize]>,
     live_card_selection: Option<&[usize]>,
     heart_color_multiplier: &std::collections::HashMap<i16, crate::card::HeartColor>,
+    // Cost modifier totals (additive + set)
     cost_modifiers: &std::collections::HashMap<i16, i32>,
+    cost_set: &std::collections::HashMap<i16, i32>,
+    // ── Gained ability trigger texticon badges ─────────────────────
+    // Populated from gained_card_abilities in game_state_to_display.
+    // Each entry is a trigger type name → frontend renders texticon.
+    // gain_ability without this would leave no icon on the card.
+    bonus_triggers: &std::collections::HashMap<i16, Vec<String>>,
 ) -> PlayerDisplay {
     let energy_cards: Vec<(i16, Option<Orientation>)> = player
         .energy_zone
@@ -945,44 +1167,92 @@ pub fn player_to_display(
             .collect()
     });
 
+    // Compute additive maps = total - set (for bonus_* display)
+    let blade_additive: std::collections::HashMap<i16, i32> = blade_modifiers
+        .iter()
+        .map(|(&k, &total)| (k, total - blade_set.get(&k).copied().unwrap_or(0)))
+        .collect();
+    let score_additive: std::collections::HashMap<i16, i32> = score_modifiers
+        .iter()
+        .map(|(&k, &total)| (k, total - score_set.get(&k).copied().unwrap_or(0)))
+        .collect();
+    let heart_additive: std::collections::HashMap<
+        i16,
+        std::collections::HashMap<crate::card::HeartColor, i32>,
+    > = heart_modifiers
+        .iter()
+        .map(|(&k, colors)| {
+            let set_colors = heart_set.get(&k).cloned().unwrap_or_default();
+            let add: std::collections::HashMap<crate::card::HeartColor, i32> = colors
+                .iter()
+                .map(|(&c, &total)| (c, total - set_colors.get(&c).copied().unwrap_or(0)))
+                .collect();
+            (k, add)
+        })
+        .collect();
+    let cost_additive: std::collections::HashMap<i16, i32> = cost_modifiers
+        .iter()
+        .map(|(&k, &total)| (k, total - cost_set.get(&k).copied().unwrap_or(0)))
+        .collect();
+
     PlayerDisplay {
         energy: energy_display,
         hand: zone_to_display_full(
             &player.hand.cards,
             card_db,
-            blade_modifiers,
-            score_modifiers,
-            heart_modifiers,
+            &blade_additive,
+            blade_set,
+            &score_additive,
+            score_set,
+            &heart_additive,
+            heart_set,
             heart_color_multiplier,
-            cost_modifiers,
+            &cost_additive,
+            cost_set,
+            bonus_triggers,
         ),
         stage: stage_to_display(
             &player.stage,
             card_db,
-            blade_modifiers,
+            &blade_additive,
+            blade_set,
             orientation_modifiers,
-            heart_modifiers,
-            score_modifiers,
+            &heart_additive,
+            heart_set,
+            &score_additive,
+            score_set,
             heart_color_multiplier,
-            cost_modifiers,
+            &cost_additive,
+            cost_set,
+            bonus_triggers,
         ),
         live_zone: zone_to_display_full(
             &player.live_card_zone.cards,
             card_db,
-            blade_modifiers,
-            score_modifiers,
-            heart_modifiers,
+            &blade_additive,
+            blade_set,
+            &score_additive,
+            score_set,
+            &heart_additive,
+            heart_set,
             heart_color_multiplier,
-            cost_modifiers,
+            &cost_additive,
+            cost_set,
+            bonus_triggers,
         ),
         success_live_card_zone: zone_to_display_full(
             &player.success_live_card_zone.cards,
             card_db,
-            blade_modifiers,
-            score_modifiers,
-            heart_modifiers,
+            &blade_additive,
+            blade_set,
+            &score_additive,
+            score_set,
+            &heart_additive,
+            heart_set,
             heart_color_multiplier,
-            cost_modifiers,
+            &cost_additive,
+            cost_set,
+            bonus_triggers,
         ),
         waitroom: waitroom_display.clone(),
         discard: waitroom_display,
@@ -1170,11 +1440,23 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         .iter()
         .map(|(&k, v)| (k, v.total()))
         .collect();
+    let blade_set_flat: std::collections::HashMap<i16, i32> = game_state
+        .mods
+        .blade_modifiers
+        .iter()
+        .map(|(&k, v)| (k, v.set))
+        .collect();
     let score_flat: std::collections::HashMap<i16, i32> = game_state
         .mods
         .score_modifiers
         .iter()
         .map(|(&k, v)| (k, v.total()))
+        .collect();
+    let score_set_flat: std::collections::HashMap<i16, i32> = game_state
+        .mods
+        .score_modifiers
+        .iter()
+        .map(|(&k, v)| (k, v.set))
         .collect();
     let heart_flat: std::collections::HashMap<
         i16,
@@ -1186,6 +1468,19 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         .map(|(&k, colors)| {
             let flat: std::collections::HashMap<crate::card::HeartColor, i32> =
                 colors.iter().map(|(&c, e)| (c, e.total())).collect();
+            (k, flat)
+        })
+        .collect();
+    let heart_set_flat: std::collections::HashMap<
+        i16,
+        std::collections::HashMap<crate::card::HeartColor, i32>,
+    > = game_state
+        .mods
+        .heart_modifiers
+        .iter()
+        .map(|(&k, colors)| {
+            let flat: std::collections::HashMap<crate::card::HeartColor, i32> =
+                colors.iter().map(|(&c, e)| (c, e.set)).collect();
             (k, flat)
         })
         .collect();
@@ -1204,16 +1499,68 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         .collect();
 
     let blade_flat2 = blade_flat.clone();
+    let blade_set_flat2 = blade_set_flat.clone();
     let score_flat2 = score_flat.clone();
+    let score_set_flat2 = score_set_flat.clone();
     let cost_flat: std::collections::HashMap<i16, i32> = game_state
         .mods
         .cost_modifiers
         .iter()
         .map(|(&k, v)| (k, v.total()))
         .collect();
+    let cost_set_flat: std::collections::HashMap<i16, i32> = game_state
+        .mods
+        .cost_modifiers
+        .iter()
+        .map(|(&k, v)| (k, v.set))
+        .collect();
     let cost_flat2 = cost_flat.clone();
+    let cost_set_flat2 = cost_set_flat.clone();
     let heart_flat2 = heart_flat.clone();
+    let heart_set_flat2 = heart_set_flat.clone();
     let need_heart_flat2 = need_heart_flat.clone();
+
+    // ── Build bonus_triggers map from gained_card_abilities ────────
+    // gain_ability and gain_ability_from_source store the gained ability
+    // as an Ability struct in gained_card_abilities.  Each ability has a
+    // triggers field ("常時", "ライブ成功時", etc.) that maps to a
+    // texticon filename via trigger_to_texticon().
+    //
+    // The frontend renders these as trigger texticon badges on the card.
+    // Without this, gain_ability effects would leave NO visible indicator
+    // that the card has a gained ability, even though the effect (e.g.
+    // +1 score, extra blade) applies.
+    let mut bonus_triggers: std::collections::HashMap<i16, Vec<String>> =
+        std::collections::HashMap::new();
+    // Also scan gained_abilities (flat strings, used by older code path)
+    // for trigger keywords and record matching texticons.
+    for (&card_id, texts) in &game_state.gained_abilities {
+        for text in texts {
+            if text.contains("【常時】") || text.contains("[Always]") || text.contains("常時")
+            {
+                bonus_triggers
+                    .entry(card_id)
+                    .or_default()
+                    .push("jyouji".to_string());
+            } else if text.contains("【ライブ成功時】") || text.contains("live_success") {
+                bonus_triggers
+                    .entry(card_id)
+                    .or_default()
+                    .push("live_success".to_string());
+            }
+        }
+    }
+    // Prefer structured Ability entries (LIVE_SUCCESS trigger path in
+    // execute_gain_ability) over the flat text scan above.
+    for (&card_id, abilities) in &game_state.gained_card_abilities {
+        for ability in abilities {
+            if let Some(ref triggers) = ability.triggers {
+                let icon_name = crate::triggers::trigger_to_texticon(triggers);
+                bonus_triggers.entry(card_id).or_default().push(icon_name);
+            }
+        }
+    }
+    let bonus_triggers2 = bonus_triggers.clone();
 
     let temp_effects: Vec<TempEffectDisplay> = game_state
         .temporary_effects
@@ -1338,6 +1685,9 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             &blade_flat,
             &score_flat,
             &heart_flat,
+            &blade_set_flat,
+            &score_set_flat,
+            &heart_set_flat,
             &game_state.mods.orientation_modifiers,
             &game_state.gained_abilities,
             &need_heart_flat,
@@ -1347,6 +1697,8 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             p1_live_selection,
             &game_state.mods.heart_color_multiplier,
             &cost_flat,
+            &cost_set_flat,
+            &bonus_triggers,
         ),
         player2: player_to_display(
             &game_state.player2,
@@ -1354,6 +1706,9 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             &blade_flat2,
             &score_flat2,
             &heart_flat2,
+            &blade_set_flat2,
+            &score_set_flat2,
+            &heart_set_flat2,
             &game_state.mods.orientation_modifiers,
             &game_state.gained_abilities,
             &need_heart_flat2,
@@ -1363,6 +1718,8 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             p2_live_selection,
             &game_state.mods.heart_color_multiplier,
             &cost_flat2,
+            &cost_set_flat2,
+            &bonus_triggers2,
         ),
         pending_choice: game_state.get_pending_choice_json(),
         looked_cards: zone_to_display(&looked_ids, &game_state.card_database),

@@ -1001,6 +1001,34 @@ export const CardRenderer = {
         });
     },
 
+    // ════════════════════════════════════════════════════════════════
+    // renderCardBonuses — renders texticon status badges on a card
+    //
+    // This shows runtime modifiers as small texticon badges overlaying
+    // the card image.  The badges come from 3 sources in CardDisplay:
+    //
+    //   1. bonus_* (additive, with +/-):
+    //      - ModifyBlade, GainResource(blade)          → +N icon_blade.png
+    //      - ModifyHeart, GainResource(heart)           → +N heart_X.png
+    //      - ModifyScore, GainAbility(score)             → +N icon_score.png
+    //      - ModifyCost                                  → +N icon_energy.png
+    //
+    //   2. set_* (absolute/override, no +/-):
+    //      - SetBladeCount, SetBladeType                 → N icon_blade.png
+    //      - SetHeartType                                 → N heart_X.png
+    //      - SetScore                                     → N icon_score.png
+    //      - SetCost, SetCostToUse                        → N icon_energy.png
+    //
+    //   3. bonus_triggers (no number, just icon):
+    //      - GainAbility(constant)                       → jyouji.png
+    //      - GainAbility(live_success)                   → live_success.png
+    //      - GainAbility(live_start)                     → live_start.png
+    //      - GainAbility(debut)                          → toujyou.png
+    //
+    // One-shot effects (Draw, Discard, Move, etc.) produce NO badges.
+    // Energy-under-member is visible as stacked cards (not a badge).
+    // Restrictions are tracked in prohibition_effects (no badge).
+    // ════════════════════════════════════════════════════════════════
     renderCardBonuses: (slotEl, card, overlay = false) => {
         if (!card) return;
         let existing = slotEl.querySelector('.card-bonuses');
@@ -1008,29 +1036,71 @@ export const CardRenderer = {
 
         const bonuses = [];
 
+        // Additive bonuses — shown with +/- prefix (e.g. "+2 Blade")
         if (card.bonus_blade && card.bonus_blade !== 0) {
-            bonuses.push({ type: 'bonus-blade', value: card.bonus_blade, icon: 'icon_blade.png' });
+            bonuses.push({ type: 'bonus-blade', value: card.bonus_blade, icon: 'icon_blade.png', isAdditive: true });
         }
 
         const heartIcons = ['heart_00.png','heart_01.png','heart_02.png','heart_03.png','heart_04.png','heart_05.png','heart_06.png','icon_all.png'];
         if (card.bonus_hearts && Array.isArray(card.bonus_hearts)) {
             card.bonus_hearts.forEach((val, idx) => {
                 if (val && val !== 0 && idx < heartIcons.length) {
-                    bonuses.push({ type: 'bonus-heart', value: val, icon: heartIcons[idx] });
+                    bonuses.push({ type: 'bonus-heart', value: val, icon: heartIcons[idx], isAdditive: true });
+                }
+            });
+        }
+
+        if (card.bonus_score && card.bonus_score !== 0) {
+            bonuses.push({ type: 'bonus-score', value: card.bonus_score, icon: 'icon_score.png', isAdditive: true });
+        }
+
+        if (card.bonus_cost && card.bonus_cost !== 0) {
+            bonuses.push({ type: 'bonus-cost', value: card.bonus_cost, icon: 'icon_energy.png', isAdditive: true });
+        }
+
+        // Set/override values from Set* actions — shown without +/- (e.g. "5 Blade" not "+5")
+        // SetBladeCount → set_blade shows blade icon with plain number
+        if (card.set_blade && card.set_blade !== 0) {
+            bonuses.push({ type: 'set-blade', value: card.set_blade, icon: 'icon_blade.png', isAdditive: false });
+        }
+        // SetHeartType → set_hearts shows heart icons with plain number
+        if (card.set_hearts && Array.isArray(card.set_hearts)) {
+            card.set_hearts.forEach((val, idx) => {
+                if (val && val !== 0 && idx < heartIcons.length) {
+                    bonuses.push({ type: 'set-heart', value: val, icon: heartIcons[idx], isAdditive: false });
+                }
+            });
+        }
+        // SetScore → set_score shows score icon with plain number
+        if (card.set_score && card.set_score !== 0) {
+            bonuses.push({ type: 'set-score', value: card.set_score, icon: 'icon_score.png', isAdditive: false });
+        }
+        // SetCost → set_cost shows energy icon with plain number
+        if (card.set_cost && card.set_cost !== 0) {
+            bonuses.push({ type: 'set-cost', value: card.set_cost, icon: 'icon_energy.png', isAdditive: false });
+        }
+
+        // Trigger texticon badges from gained abilities (e.g. jyouji.png, live_success.png)
+        // gain_ability populates bonus_triggers with the trigger type of the gained ability.
+        if (card.bonus_triggers && Array.isArray(card.bonus_triggers)) {
+            const triggerIconMap = {
+                'jyouji': 'jyouji.png',
+                'live_success': 'live_success.png',
+                'live_start': 'live_start.png',
+                'toujyou': 'toujyou.png',
+                'kidou': 'kidou.png',
+                'jidou': 'jidou.png',
+            };
+            card.bonus_triggers.forEach(trigger => {
+                const icon = triggerIconMap[trigger];
+                if (icon) {
+                    bonuses.push({ type: 'bonus-trigger', value: null, icon: icon, isAdditive: false });
                 }
             });
         }
 
         if (card.heart_transform) {
-            bonuses.push({ type: 'bonus-transform', value: null, icon: card.heart_transform.replace('heart', 'heart_') + '.png' });
-        }
-
-        if (card.bonus_score && card.bonus_score !== 0) {
-            bonuses.push({ type: 'bonus-score', value: card.bonus_score, icon: 'icon_score.png' });
-        }
-
-        if (card.bonus_cost && card.bonus_cost !== 0) {
-            bonuses.push({ type: 'bonus-cost', value: card.bonus_cost, icon: 'icon_energy.png' });
+            bonuses.push({ type: 'bonus-transform', value: null, icon: card.heart_transform.replace('heart', 'heart_') + '.png', isAdditive: false });
         }
 
         if (bonuses.length === 0) return;
@@ -1044,7 +1114,8 @@ export const CardRenderer = {
             if (b.value !== null) {
                 const valSpan = document.createElement('span');
                 valSpan.className = 'bonus-value';
-                valSpan.textContent = b.value > 0 ? `+${b.value}` : `${b.value}`;
+                // Additive = +/- prefix, Set = plain number
+                valSpan.textContent = b.isAdditive && b.value > 0 ? `+${b.value}` : `${b.value}`;
                 badge.appendChild(valSpan);
             }
             if (b.icon) {
@@ -1056,7 +1127,7 @@ export const CardRenderer = {
             if (b.type === 'bonus-transform') {
                 badge.title = `Heart transform → ${card.heart_transform}`;
             } else if (b.value !== null) {
-                badge.title = `${b.type.replace('bonus-', '')} ${b.value > 0 ? '+' : ''}${b.value}`;
+                badge.title = `${b.type.replace('bonus-', '').replace('set-', '')} ${b.isAdditive && b.value > 0 ? '+' : ''}${b.value}`;
             }
             container.appendChild(badge);
         });

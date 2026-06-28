@@ -185,6 +185,20 @@ export const LogRenderer = {
         section.appendChild(header);
 
         // Jyouji (constant/常時) ability status bar at the top of the log
+        //
+        // ════ Texticon / status bar notes ════
+        //
+        // This status bar shows 常時 abilities scanned by
+        // recalculate_constants() from the card's original abilities.
+        //
+        // Gained abilities from gain_ability() with constant trigger
+        // are NOT included here — they are tracked via bonus_triggers
+        // on the card display instead (CardRenderer.renderCardBonuses).
+        //
+        // The ability text in each pill is enriched by
+        // TextEnricher.enrichAbilityText(), which renders {{jyouji.png}}
+        // etc. as texticon images.
+        //
         const constantStatuses = state.constant_ability_statuses || [];
         if (constantStatuses.length > 0) {
             const jyoujiBar = document.createElement('div');

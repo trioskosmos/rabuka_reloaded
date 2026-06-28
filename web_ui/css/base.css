@@ -60,8 +60,8 @@
     --card-w-compact: calc(var(--card-w) * 0.35);
 
     /* --- Effects --- */
-    --transition-fast: 0s;
-    --transition-base: 0s;
+    --transition-fast: 0.15s;
+    --transition-base: 0.3s;
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 10px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5);

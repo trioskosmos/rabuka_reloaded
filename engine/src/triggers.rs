@@ -46,6 +46,20 @@ pub const LIVE_SUCCESS_EN: &str = "live_success";
 // 16. on_energy_placed_each    — "エネルギー置き場に...置かれるたび"
 // 17. on_baton_touch_to_discard— "バトンタッチして控え室に置かれた"
 
+/// Map a trigger string to its texticon filename for card badge display.
+/// Used by gain_ability to show the gained ability's trigger type as a texticon on the card.
+pub fn trigger_to_texticon(trigger: &str) -> String {
+    match trigger {
+        CONSTANT => "jyouji".to_string(),
+        LIVE_SUCCESS => "live_success".to_string(),
+        LIVE_START => "live_start".to_string(),
+        DEBUT | DEBUT_EN => "toujyou".to_string(),
+        ACTIVATION => "kidou".to_string(),
+        AUTO => "jidou".to_string(),
+        _ => "jyouji".to_string(), // fallback
+    }
+}
+
 // Substrings for each_time watchers on live cards (used in trigger_each_time_abilities):
 // 登場  → matches debut/ally appearance watchers
 // ライブ開始時 → matches live start watchers

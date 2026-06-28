@@ -273,6 +273,19 @@ impl GameState {
                                     }
                                 }
                             }
+                            // ── gain_ability ──────────────────────────────────
+                            // This produces a persistent effect that shows on the
+                            // card via bonus_triggers texticon (in game_state_to_display).
+                            // The trigger type (常時 → jyouji.png, ライブ成功時 → live_success.png)
+                            // is read from ability_gain_trigger and rendered on the card.
+                            //
+                            // Texticon display for this action:
+                            //   - All-heart case: bonus_heart "all" → icon_all.png badge
+                            //   - ModifyScore via gained_effect: bonus_score → icon_score.png badge
+                            //     PLUS bonus_triggers → trigger texticon (e.g. jyouji.png)
+                            //   - ConditionalAlternative: deferred, no immediate texticon
+                            //   - Legacy text parse: bonus_score → icon_score.png badge
+                            //     PLUS bonus_triggers → trigger texticon
                             Some(crate::ability::enums::ActionType::GainAbility) => {
                                 if effect.ability_gain.as_deref() == Some("{{icon_all.png|ハート}}")
                                     || effect

@@ -114,6 +114,34 @@ const REGEX_PSEUDOCODE = /^(TRIGGER|COST|CONDITION|EFFECT|SELECT|PLAY|JUMP|RETUR
 
 // Map action trigger IDs to icon filenames matching {{icon.png|label}} in card text.
 // Used by extractRelevantAbility to find the correct ability block by icon match.
+//
+// ════ Texticon display notes ════
+//
+// Texticons appear via TWO mechanisms:
+//
+//   1) Embedded in ability_text via {{icon.png|label}} syntax → enrichAbilityText()
+//      This covers ALL trigger types in the ICON_MAP above (登場, 自動, 永続, etc.).
+//      Any ability text with {{jyouji.png|常時}} will show the jyouji texticon.
+//
+//   2) Card bonus badges via CardRenderer.renderCardBonuses()
+//      Uses card.bonus_* fields from the CardDisplay JSON (sent by display.rs).
+//      Currently rendered badges:
+//        - bonus_blade  → icon_blade.png ("+N" or "-N")
+//        - bonus_hearts → heart_X.png      ("+N" or "-N")
+//        - bonus_score  → icon_score.png   ("+N" or "-N")
+//        - bonus_cost   → icon_energy.png  ("+N" or "-N")
+//        - set_blade    → icon_blade.png   ("N" — no +/-)
+//        - set_hearts   → heart_X.png      ("N" — no +/-)
+//        - set_score    → icon_score.png   ("N" — no +/-)
+//        - set_cost     → icon_energy.png  ("N" — no +/-)
+//        - bonus_triggers → jyouji.png / live_success.png / etc.
+//        - heart_transform → heart_X.png overlay
+//
+//   gain_ability: trigger texticon via bonus_triggers (mechanism 2).
+//   Set* actions: absolute value via set_* (mechanism 2).
+//   Modify*/GainResource actions: additive via bonus_* (mechanism 2).
+//   One-shot actions (Draw, Discard, Move, etc.): NO texticon badge.
+//
 const TRIGGER_ID_TO_ICON = {
     1: 'toujyou',
     2: 'live_start',
