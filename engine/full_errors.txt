@@ -1,0 +1,481 @@
+   Compiling rabuka_engine v0.1.0 (C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine)
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\core\game_state\abilities.rs:902:30
+    |
+902 |                 let choice = crate::ability::types::Choice::SelectAutoAbility {
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0027]: pattern does not mention fields `description_en`, `description_ja`
+   --> src\game\game_setup.rs:747:9
+    |
+747 | /         Choice::SelectHeartColor {
+748 | |             count: _,
+749 | |             options,
+750 | |             description,
+751 | |         }
+    | |_________^ missing fields `description_en`, `description_ja`
+    |
+help: include the missing fields in the pattern
+    |
+750 -             description,
+751 -         }
+750 +             description, description_en, description_ja }
+    |
+help: if you don't care about these missing fields, you can explicitly ignore them
+    |
+750 -             description,
+751 -         }
+750 +             description, description_en: _, description_ja: _ }
+    |
+help: or always ignore missing fields here
+    |
+750 -             description,
+751 -         }
+750 +             description, .. }
+    |
+
+error[E0027]: pattern does not mention fields `description_en`, `description_ja`
+   --> src\game\game_setup.rs:752:11
+    |
+752 |           | Choice::SelectHeartType {
+    |  ___________^
+753 | |             count: _,
+754 | |             options,
+755 | |             description,
+756 | |         } => options
+    | |_________^ missing fields `description_en`, `description_ja`
+    |
+help: include the missing fields in the pattern
+    |
+755 -             description,
+756 -         } => options
+755 +             description, description_en, description_ja } => options
+    |
+help: if you don't care about these missing fields, you can explicitly ignore them
+    |
+755 -             description,
+756 -         } => options
+755 +             description, description_en: _, description_ja: _ } => options
+    |
+help: or always ignore missing fields here
+    |
+755 -             description,
+756 -         } => options
+755 +             description, .. } => options
+    |
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\choice.rs:119:40
+    |
+119 |             self.pending_choice = Some(Choice::SelectTarget {
+    |                                        ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\choice.rs:1838:69
+     |
+1838 | ...                   self.pending_reprompt_choice = Some(Choice::SelectTarget {
+     |                                                           ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\choice.rs:2155:52
+     |
+2155 |                         self.pending_choice = Some(Choice::SelectTarget {
+     |                                                    ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\compound.rs:491:56
+    |
+491 | ...                   self.pending_choice = Some(Choice::SelectTarget {
+    |                                                  ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\compound.rs:610:40
+    |
+610 |             self.pending_choice = Some(Choice::SelectTarget {
+    |                                        ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\compound.rs:805:40
+    |
+805 |             self.pending_choice = Some(Choice::SelectTarget {
+    |                                        ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\cost.rs:199:44
+    |
+199 |                 self.pending_choice = Some(Choice::SelectTarget {
+    |                                            ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\cost.rs:548:48
+    |
+548 |                     self.pending_choice = Some(Choice::SelectTarget {
+    |                                                ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\cost.rs:666:48
+    |
+666 |                     self.pending_choice = Some(Choice::SelectTarget {
+    |                                                ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0308]: `if` and `else` have incompatible types
+   --> src\ability\describe.rs:570:17
+    |
+567 |               let count_str = if count == 1 {
+    |  _____________________________-
+568 | |                 "1枚"
+    | |                 ----- expected because of this
+569 | |             } else {
+570 | |                 format!("{}枚", count)
+    | |                 ^^^^^^^^^^^^^^^^^^^^^^ expected `&str`, found `String`
+571 | |             };
+    | |_____________- `if` and `else` have incompatible types
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\effects\draw.rs:409:40
+    |
+409 |             self.pending_choice = Some(Choice::SelectTarget {
+    |                                        ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\effects\draw.rs:526:36
+    |
+526 |         self.pending_choice = Some(Choice::SelectHeartColor {
+    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\effects\draw.rs:552:36
+    |
+552 |         self.pending_choice = Some(Choice::SelectTarget {
+    |                                    ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\effects\draw.rs:598:36
+    |
+598 |         self.pending_choice = Some(Choice::SelectTarget {
+    |                                    ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\effects\draw.rs:653:40
+    |
+653 |             self.pending_choice = Some(Choice::SelectHeartColor {
+    |                                        ^^^^^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+  --> src\ability\effects\misc.rs:19:44
+   |
+19 |                 self.pending_choice = Some(Choice::SelectTarget {
+   |                                            ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\effects\misc.rs:142:40
+    |
+142 |             self.pending_choice = Some(Choice::SelectTarget {
+    |                                        ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\effects\misc.rs:1469:40
+     |
+1469 |             self.pending_choice = Some(Choice::SelectTarget {
+     |                                        ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\effects\misc.rs:1550:48
+     |
+1550 |                     self.pending_choice = Some(Choice::SelectTarget {
+     |                                                ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\effects\misc.rs:1681:44
+     |
+1681 |                 self.pending_choice = Some(Choice::SelectTarget {
+     |                                            ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\effects\misc.rs:1737:40
+     |
+1737 |             self.pending_choice = Some(Choice::SelectTarget {
+     |                                        ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\effects\misc.rs:1837:44
+     |
+1837 |                 self.pending_choice = Some(Choice::SelectTarget {
+     |                                            ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\effects\misc.rs:1879:44
+     |
+1879 |                 self.pending_choice = Some(Choice::SelectTarget {
+     |                                            ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\effects\misc.rs:1926:40
+     |
+1926 |             self.pending_choice = Some(Choice::SelectTarget {
+     |                                        ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\effects\misc.rs:1986:44
+     |
+1986 |                 self.pending_choice = Some(Choice::SelectTarget {
+     |                                            ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\effects\misc.rs:2725:40
+     |
+2725 |             self.pending_choice = Some(Choice::SelectTarget {
+     |                                        ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\effects\misc.rs:2735:40
+     |
+2735 |             self.pending_choice = Some(Choice::SelectTarget {
+     |                                        ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\effects\misc.rs:2742:40
+     |
+2742 |             self.pending_choice = Some(Choice::SelectTarget {
+     |                                        ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\effects\misc.rs:2892:36
+     |
+2892 |         self.pending_choice = Some(Choice::SelectTarget {
+     |                                    ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\effects\misc.rs:2910:36
+     |
+2910 |         self.pending_choice = Some(Choice::SelectTarget {
+     |                                    ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\effects\state.rs:112:40
+    |
+112 |             self.pending_choice = Some(Choice::SelectTarget {
+    |                                        ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\effects\state.rs:987:40
+    |
+987 |             self.pending_choice = Some(Choice::SelectHeartColor {
+    |                                        ^^^^^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\effects\mod.rs:111:48
+    |
+111 |                     self.pending_choice = Some(Choice::SelectTarget {
+    |                                                ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\look.rs:327:44
+    |
+327 |                 self.pending_choice = Some(Choice::SelectTarget {
+    |                                            ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\look.rs:624:40
+    |
+624 |             self.pending_choice = Some(Choice::SelectTarget {
+    |                                        ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\move_cards.rs:198:44
+    |
+198 |                 self.pending_choice = Some(Choice::SelectPosition {
+    |                                            ^^^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\move_cards.rs:637:52
+    |
+637 |                         self.pending_choice = Some(Choice::SelectTarget {
+    |                                                    ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\move_cards.rs:1092:52
+     |
+1092 |                         self.pending_choice = Some(Choice::SelectTarget {
+     |                                                    ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\move_cards.rs:1218:40
+     |
+1218 |             self.pending_choice = Some(Choice::SelectTarget {
+     |                                        ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\move_cards.rs:1340:48
+     |
+1340 |                     self.pending_choice = Some(Choice::SelectTarget {
+     |                                                ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\move_cards.rs:2041:56
+     |
+2041 | ...                   self.pending_choice = Some(Choice::SelectTarget {
+     |                                                  ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+    --> src\ability\move_cards.rs:2344:40
+     |
+2344 |             self.pending_choice = Some(Choice::SelectTarget {
+     |                                        ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\types.rs:338:9
+    |
+338 |         Choice::SelectTarget {
+    |         ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\ability\types.rs:352:9
+    |
+352 |         Choice::SelectTarget {
+    |         ^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+error[E0027]: pattern does not mention fields `description_en`, `description_ja`
+   --> src\ability\types.rs:512:13
+    |
+512 | /             Choice::SelectTarget {
+513 | |                 target: _,
+514 | |                 description,
+515 | |                 allow_skip,
+516 | |                 options,
+517 | |             } => {
+    | |_____________^ missing fields `description_en`, `description_ja`
+    |
+help: include the missing fields in the pattern
+    |
+516 -                 options,
+517 -             } => {
+516 +                 options, description_en, description_ja } => {
+    |
+help: if you don't care about these missing fields, you can explicitly ignore them
+    |
+516 -                 options,
+517 -             } => {
+516 +                 options, description_en: _, description_ja: _ } => {
+    |
+help: or always ignore missing fields here
+    |
+516 -                 options,
+517 -             } => {
+516 +                 options, .. } => {
+    |
+
+error[E0027]: pattern does not mention fields `description_en`, `description_ja`
+   --> src\ability\types.rs:536:13
+    |
+536 | /             Choice::SelectPosition {
+537 | |                 position: _,
+538 | |                 description,
+539 | |                 allow_skip,
+540 | |             } => {
+    | |_____________^ missing fields `description_en`, `description_ja`
+    |
+help: include the missing fields in the pattern
+    |
+539 -                 allow_skip,
+540 -             } => {
+539 +                 allow_skip, description_en, description_ja } => {
+    |
+help: if you don't care about these missing fields, you can explicitly ignore them
+    |
+539 -                 allow_skip,
+540 -             } => {
+539 +                 allow_skip, description_en: _, description_ja: _ } => {
+    |
+help: or always ignore missing fields here
+    |
+539 -                 allow_skip,
+540 -             } => {
+539 +                 allow_skip, .. } => {
+    |
+
+error[E0027]: pattern does not mention fields `description_en`, `description_ja`
+   --> src\turn\actions.rs:484:13
+    |
+484 | /             crate::ability::types::Choice::SelectHeartColor {
+485 | |                 count: _,
+486 | |                 options,
+487 | |                 description: _,
+488 | |             } => {
+    | |_____________^ missing fields `description_en`, `description_ja`
+    |
+help: include the missing fields in the pattern
+    |
+487 -                 description: _,
+488 -             } => {
+487 +                 description: _, description_en, description_ja } => {
+    |
+help: if you don't care about these missing fields, you can explicitly ignore them
+    |
+487 -                 description: _,
+488 -             } => {
+487 +                 description: _, description_en: _, description_ja: _ } => {
+    |
+help: or always ignore missing fields here
+    |
+487 -                 description: _,
+488 -             } => {
+487 +                 description: _, .. } => {
+    |
+
+error[E0027]: pattern does not mention fields `description_en`, `description_ja`
+   --> src\turn\actions.rs:499:13
+    |
+499 | /             crate::ability::types::Choice::SelectHeartType {
+500 | |                 count: _,
+501 | |                 options,
+502 | |                 description: _,
+503 | |             } => {
+    | |_____________^ missing fields `description_en`, `description_ja`
+    |
+help: include the missing fields in the pattern
+    |
+502 -                 description: _,
+503 -             } => {
+502 +                 description: _, description_en, description_ja } => {
+    |
+help: if you don't care about these missing fields, you can explicitly ignore them
+    |
+502 -                 description: _,
+503 -             } => {
+502 +                 description: _, description_en: _, description_ja: _ } => {
+    |
+help: or always ignore missing fields here
+    |
+502 -                 description: _,
+503 -             } => {
+502 +                 description: _, .. } => {
+    |
+
+error[E0063]: missing fields `description_en` and `description_ja` in initializer of `Choice`
+   --> src\turn\live.rs:720:22
+    |
+720 |         let choice = crate::ability::types::Choice::SelectLiveSuccess {
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `description_en` and `description_ja`
+
+warning: value assigned to `filled` is never read
+    --> src\turn\live.rs:1606:25
+     |
+1606 |                         filled[0] += take;
+     |                         ^^^^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+     = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `filled_h00` is never read
+    --> src\turn\live.rs:1557:21
+     |
+1557 |                     filled_h00 += take;
+     |                     ^^^^^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+Some errors have detailed explanations: E0027, E0063, E0308.
+For more information about an error, try `rustc --explain E0027`.
+warning: `rabuka_engine` (lib) generated 2 warnings
+error: could not compile `rabuka_engine` (lib) due to 52 previous errors; 2 warnings emitted

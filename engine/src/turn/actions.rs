@@ -485,6 +485,7 @@ impl super::TurnEngine {
                 count: _,
                 options,
                 description: _,
+                ..
             } => {
                 let idx = card_id.unwrap_or(0) as usize;
                 let chosen = if idx < options.len() {
@@ -500,6 +501,7 @@ impl super::TurnEngine {
                 count: _,
                 options,
                 description: _,
+                ..
             } => {
                 let idx = card_id.unwrap_or(0) as usize;
                 let chosen = if idx < options.len() {

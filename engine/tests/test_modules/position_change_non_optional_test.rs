@@ -20,7 +20,6 @@
 /// - PL!HS-bp2-006-R (藤島慈 ab#0): 登場 自分のステージにいるメンバーを、それぞれ好きなエリアに移動させてもよい。
 ///   → formation change (multiple_targets) — NOT affected by exclude_self
 use crate::helpers::*;
-use rabuka_engine::zones::MemberArea;
 
 fn fill_deck_and_energy(game: &mut TestGame) {
     let filler = game.id("PL!-sd1-010-SD");
@@ -189,7 +188,7 @@ fn non_optional_pc_executes_move_correctly() {
 
     // Select left (where filler is) — they should swap
     let left_idx = positions.iter().position(|p| p == "left").unwrap();
-    let actions = game.generated_actions();
+    let _actions = game.generated_actions();
     game.select_generated(left_idx);
     game.drain_auto_ability_choices();
 

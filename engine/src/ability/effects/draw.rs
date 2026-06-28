@@ -409,6 +409,8 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "draw_any_number".to_string(),
                 description: format!("Choose how many cards to draw (0-{})", available),
+                description_en: None,
+                description_ja: None,
                 allow_skip: effect.optional.unwrap_or(false),
                 options: None,
             });
@@ -527,6 +529,8 @@ impl AbilityResolver {
             count: count as usize,
             options: unique_colors,
             description: "Choose a heart color".to_string(),
+            description_en: None,
+            description_ja: None,
         });
     }
 
@@ -563,6 +567,8 @@ impl AbilityResolver {
                     options.join(", ")
                 }
             ),
+            description_en: None,
+            description_ja: None,
             allow_skip: effect.optional.unwrap_or(false),
             options: Some(options),
         });
@@ -598,6 +604,8 @@ impl AbilityResolver {
         self.pending_choice = Some(Choice::SelectTarget {
             target: "area_select".to_string(),
             description: "Choose an area".to_string(),
+            description_en: None,
+            description_ja: None,
             allow_skip: effect.optional.unwrap_or(false),
             options: Some(valid),
         });
@@ -654,6 +662,8 @@ impl AbilityResolver {
                 count: count as usize,
                 options: unique_colors,
                 description: "Choose a heart color".to_string(),
+                description_en: None,
+                description_ja: None,
             });
             Ok(None)
         }

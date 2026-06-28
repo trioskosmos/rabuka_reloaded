@@ -111,6 +111,8 @@ impl AbilityResolver {
                     self.pending_choice = Some(Choice::SelectTarget {
                         target: "apply_replacement".to_string(),
                         description,
+                        description_en: None,
+                        description_ja: None,
                         allow_skip: false,
                         options: None,
                     });

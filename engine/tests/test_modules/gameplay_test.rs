@@ -3162,6 +3162,8 @@ fn choice_condition_shows_proper_labels_in_actions() {
         target: "choice_condition".to_string(),
         description: "Choose cost option: このメンバーをウェイトにする OR 手札を1枚控え室に置く"
             .to_string(),
+        description_en: None,
+        description_ja: None,
         allow_skip: false,
         options: Some(vec![
             "このメンバーをウェイトにする".to_string(),

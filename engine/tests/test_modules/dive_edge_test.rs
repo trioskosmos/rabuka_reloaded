@@ -9,6 +9,7 @@ fn blade_mod(g: &TestGame, cid: i16) -> i32 {
         .map_or(0, |e| e.total())
 }
 
+#[allow(dead_code)]
 fn count_dive_in_hand(g: &TestGame, pid: &str) -> usize {
     let player = if pid == "p1" {
         &g.state.player1

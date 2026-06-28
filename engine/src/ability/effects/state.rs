@@ -112,6 +112,8 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "pay_optional_cost:skip_optional_cost".to_string(),
                 description: format!("Change state to {} (pay optional cost)?", state_change),
+                description_en: None,
+                description_ja: None,
                 allow_skip: optional,
                 options: None,
             });
@@ -995,6 +997,8 @@ impl AbilityResolver {
                     "heart06".into(),
                 ],
                 description: "Choose a heart color".to_string(),
+                description_en: None,
+                description_ja: None,
             });
         }
     }

@@ -410,6 +410,20 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
             format!("Repeat up to {} times", max)
         }
 
+        "sequential_cost" => {
+            if let Some(ref costs) = effect.compound.actions {
+                let parts: Vec<String> = costs.iter().map(|c| describe_cost_en(c)).collect();
+                let combined = parts.join(" + ");
+                if costs.last().and_then(|c| c.optional).unwrap_or(false) {
+                    format!("{} (or skip)", combined)
+                } else {
+                    combined
+                }
+            } else {
+                effect.text.clone()
+            }
+        }
+
         "reveal_until_live_card" => "Reveal from deck until a live card appears".to_string(),
 
         "gain_ability_from_source" => "Copy an ability".to_string(),
@@ -472,6 +486,120 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         }
 
         _ => effect.text.clone(),
+    }
+}
+
+/// Describe a single cost item in English (used for combined cost prompts).
+pub fn describe_cost_en(cost: &AbilityEffect) -> String {
+    match cost.action.as_str() {
+        "pay_energy" => {
+            let count = cost.energy_count.unwrap_or(1);
+            format!("Pay {} energy", count)
+        }
+        "change_state" => {
+            if cost.self_cost == Some(true) {
+                let state = cost.state_change.as_deref().unwrap_or("wait");
+                match state {
+                    "wait" => "Rest this member".to_string(),
+                    s => format!("Change this member to {}", s),
+                }
+            } else {
+                describe_effect_en(cost)
+            }
+        }
+        "move_cards" => {
+            let src = zone_label(cost.source.as_deref());
+            let dest = zone_label(cost.destination.as_deref());
+            let card_type = card_type_label(cost.card_type.as_deref());
+            let count = cost.count.unwrap_or(1);
+            if cost.self_cost == Some(true) && cost.source.as_deref() == Some("those_cards") {
+                format!("Move that card to {}", dest)
+            } else {
+                format!("Place {} {} from {} to {}", count, card_type, src, dest)
+            }
+        }
+        "reveal" => {
+            let count = cost.count.unwrap_or(1);
+            let source = cost.source.as_deref().unwrap_or("hand");
+            format!("Reveal {} card(s) from {}", count, zone_label(Some(source)))
+        }
+        _ => describe_effect_en(cost),
+    }
+}
+
+/// Describe a single cost item in Japanese.
+pub fn describe_cost_ja(cost: &AbilityEffect) -> String {
+    match cost.action.as_str() {
+        "pay_energy" => {
+            let count = cost.energy_count.unwrap_or(1);
+            format!("{{{{icon_energy.png|E}}}}を{}払う", count)
+        }
+        "change_state" => {
+            if cost.self_cost == Some(true) {
+                let state = cost.state_change.as_deref().unwrap_or("wait");
+                match state {
+                    "wait" => "このメンバーをウェイト".to_string(),
+                    s => format!("このメンバーを{}にする", s),
+                }
+            } else {
+                describe_effect_ja(cost)
+            }
+        }
+        "move_cards" => {
+            let src = zone_label_ja(cost.source.as_deref());
+            let dest = zone_label_ja(cost.destination.as_deref());
+            let ct = card_type_label_ja(cost.card_type.as_deref());
+            let count = cost.count.unwrap_or(1);
+            if cost.self_cost == Some(true) && cost.source.as_deref() == Some("those_cards") {
+                format!("そのカードを{}に置く", dest)
+            } else {
+                let count_str = if count == 1 {
+                    format!("{}の{}", 1, ct)
+                } else {
+                    format!("{}枚の{}", count, ct)
+                };
+                format!("{}を{}から{}に置く", count_str, src, dest)
+            }
+        }
+        "reveal" => {
+            let count = cost.count.unwrap_or(1);
+            let source = cost.source.as_deref().unwrap_or("hand");
+            let count_str = if count == 1 {
+                "1枚".to_string()
+            } else {
+                format!("{}枚", count)
+            };
+            format!("{}を{}から公開する", count_str, zone_label_ja(Some(source)))
+        }
+        _ => describe_effect_ja(cost),
+    }
+}
+
+/// Build a combined English description for a sequential_cost up to the choice sub-cost.
+/// Binary costs before the choice are included; the choice cost's "(or skip)" is appended
+/// at the end if the choice sub-cost is optional.
+pub fn describe_sequential_cost_en(costs: &[AbilityEffect], choice_index: usize) -> String {
+    let parts: Vec<String> = (0..=choice_index)
+        .map(|i| describe_cost_en(&costs[i]))
+        .collect();
+    let combined = parts.join(" + ");
+    if costs[choice_index].optional.unwrap_or(false) {
+        format!("{} (or skip)", combined)
+    } else {
+        combined
+    }
+}
+
+/// Build a combined Japanese description for a sequential_cost up to the choice sub-cost.
+pub fn describe_sequential_cost_ja(costs: &[AbilityEffect], choice_index: usize) -> String {
+    let parts: Vec<String> = (0..=choice_index)
+        .map(|i| describe_cost_ja(&costs[i]))
+        .collect();
+    let combined = parts.join(" + ");
+    if costs[choice_index].optional.unwrap_or(false) {
+        format!("{}（またはスキップ）", combined)
+    } else {
+        combined
     }
 }
 
@@ -852,6 +980,20 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
             let max = effect.repeat_limit.unwrap_or(c.unwrap_or(1));
             format!("最大{}回繰り返す", max)
         }
+        "sequential_cost" => {
+            if let Some(ref costs) = effect.compound.actions {
+                let parts: Vec<String> = costs.iter().map(|c| describe_cost_ja(c)).collect();
+                let combined = parts.join(" + ");
+                if costs.last().and_then(|c| c.optional).unwrap_or(false) {
+                    format!("{}（またはスキップ）", combined)
+                } else {
+                    combined
+                }
+            } else {
+                effect.text.clone()
+            }
+        }
+
         "reveal_until_live_card" => "ライブカードが出るまでデッキを公開する".to_string(),
         "gain_ability_from_source" => "アビリティをコピーする".to_string(),
         "conditional_on_optional" => {

@@ -203,6 +203,8 @@ impl AbilityResolver {
                             .get_card(card_id)
                             .map_or("card", |c| c.name.as_str())
                     ),
+                    description_en: None,
+                    description_ja: None,
                     allow_skip: false,
                 });
                 self.execution_context = ExecutionContext::MoveCardsPosition {
@@ -637,6 +639,8 @@ impl AbilityResolver {
                         self.pending_choice = Some(Choice::SelectTarget {
                             target: "pay_optional_cost:skip_optional_cost".to_string(),
                             description: "Place top card of deck to waiting room?".to_string(),
+                            description_en: None,
+                            description_ja: None,
                             allow_skip: true,
                             options: Some(vec!["No".to_string(), "Yes".to_string()]),
                         });
@@ -1092,6 +1096,8 @@ impl AbilityResolver {
                         self.pending_choice = Some(Choice::SelectTarget {
                             target: "choice_string".to_string(),
                             description: format!("Pick card type: {:?}", or_types),
+                            description_en: None,
+                            description_ja: None,
                             allow_skip: false,
                             options: None,
                         });
@@ -1218,6 +1224,8 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "order".to_string(),
                 description: format!("Choose order for cards on deck ({} cards)", taken_count),
+                description_en: None,
+                description_ja: None,
                 allow_skip: false,
                 options: None,
             });
@@ -1340,6 +1348,8 @@ impl AbilityResolver {
                     self.pending_choice = Some(Choice::SelectTarget {
                         target: "position|destination".to_string(),
                         description: "Choose deck top or bottom".to_string(),
+                        description_en: None,
+                        description_ja: None,
                         allow_skip: can_skip,
                         options: Some(vec![
                             Zone::DeckTop.to_str().to_string(),
@@ -2041,6 +2051,8 @@ impl AbilityResolver {
                             self.pending_choice = Some(Choice::SelectTarget {
                                 target: "position|destination".to_string(),
                                 description: "Choose deck top or bottom".to_string(),
+                                description_en: None,
+                                description_ja: None,
                                 allow_skip: false,
                                 options: Some(vec![
                                     Zone::DeckTop.to_str().to_string(),
@@ -2344,6 +2356,8 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "order".to_string(),
                 description: format!("Choose order for cards on deck ({} cards)", card_count),
+                description_en: None,
+                description_ja: None,
                 allow_skip: false,
                 options: None,
             });

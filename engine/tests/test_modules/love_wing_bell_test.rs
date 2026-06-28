@@ -7,7 +7,6 @@
 /// While this card is in your success live card zone, your center area
 /// μ's member gains blade.
 use crate::helpers::*;
-use rabuka_engine::zones::MemberArea;
 
 /// Debug: check what abilities the card actually has
 #[test]

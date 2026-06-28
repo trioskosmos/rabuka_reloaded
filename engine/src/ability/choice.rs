@@ -119,6 +119,8 @@ impl super::resolver::AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "pay_optional_cost:skip_optional_cost".to_string(),
                 description: "Repeat effect?".to_string(),
+                description_en: None,
+                description_ja: None,
                 allow_skip: true,
                 options: Some(vec!["Stop".to_string(), "Continue".to_string()]),
             });
@@ -1838,6 +1840,8 @@ impl super::resolver::AbilityResolver {
                                 self.pending_reprompt_choice = Some(Choice::SelectTarget {
                                     target: "choice".to_string(),
                                     description: desc.join(" / "),
+                                    description_en: None,
+                                    description_ja: None,
                                     allow_skip: true,
                                     options: None,
                                 });
@@ -2158,6 +2162,8 @@ impl super::resolver::AbilityResolver {
                                 "Choose destination for {} (currently at {})",
                                 next_cname, pos_name
                             ),
+                            description_en: None,
+                            description_ja: None,
                             allow_skip: effect.optional.unwrap_or(false),
                             options: Some(valid_destinations),
                         });

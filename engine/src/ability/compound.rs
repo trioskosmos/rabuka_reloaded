@@ -491,6 +491,8 @@ impl AbilityResolver {
                             self.pending_choice = Some(Choice::SelectTarget {
                                 target: "pay_optional_cost:skip_optional_cost".to_string(),
                                 description: "Repeat effect?".to_string(),
+                                description_en: None,
+                                description_ja: None,
                                 allow_skip: true,
                                 options: Some(vec!["Stop".to_string(), "Continue".to_string()]),
                             });
@@ -610,6 +612,8 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "primary|alternative".to_string(),
                 description,
+                description_en: None,
+                description_ja: None,
                 allow_skip: effect.optional.unwrap_or(false),
                 options: None,
             });
@@ -805,6 +809,8 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "conditional_optional".to_string(),
                 description: "Pay optional cost or skip".to_string(),
+                description_en: None,
+                description_ja: None,
                 allow_skip: true,
                 options: Some(vec!["Skip".to_string(), "Pay".to_string()]),
             });

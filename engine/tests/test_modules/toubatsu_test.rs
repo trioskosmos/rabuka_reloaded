@@ -8,7 +8,6 @@
 /// can you still select 1 and add it to hand? A: No — the effect requires 2 distinct
 /// names to proceed.
 use crate::helpers::*;
-use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
 
 /// Positive: 2 distinct live cards in discard → ability proceeds.

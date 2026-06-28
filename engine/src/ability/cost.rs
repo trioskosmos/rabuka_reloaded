@@ -6,12 +6,12 @@ use super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 
-/// Returns true if the given cost is "binary" — no card selection needed
-/// when paid. Binary costs (pay_energy with fixed count, change_state with
-/// self_cost=true) don't require choosing *which* card — they just apply
-/// a fixed effect. In sequential_cost, binary costs before a choice-based
-/// cost are auto-paid without a "pay or skip" prompt.
-fn is_binary_cost(cost: &AbilityEffect) -> bool {
+/// Returns true if the given cost type creates a "pay or skip" prompt.
+/// Costs without a prompt (pay_energy with fixed count, change_state with
+/// self_cost=true) don't require choosing — they just apply a fixed effect.
+/// In sequential_cost, prompt-less costs before a choice-based cost are
+/// auto-paid without a "pay or skip" prompt.
+fn has_skip_prompt(cost: &AbilityEffect) -> bool {
     match cost.action.as_str() {
         "pay_energy" => !cost.any_number.unwrap_or(false),
         "change_state" => cost.self_cost == Some(true),
@@ -144,6 +144,7 @@ impl AbilityResolver {
                             return Err(format!("Cannot pay sequential cost: {}", e));
                         }
                     }
+                    let mut had_binary_auto_pay = false;
                     for i in start_idx..costs.len() {
                         let sub_cost = &costs[i];
                         // Rule 9.4.2.2: costs execute in order.
@@ -152,13 +153,14 @@ impl AbilityResolver {
                         // sub-cost are auto-paid without a "pay or skip" prompt.
                         // The choice sub-cost's skip handles skipping the entire cost.
                         let is_binary =
-                            sub_cost.optional.unwrap_or(false) && is_binary_cost(sub_cost);
+                            sub_cost.optional.unwrap_or(false) && has_skip_prompt(sub_cost);
                         let has_choice_ahead =
-                            (i + 1..costs.len()).any(|j| !is_binary_cost(&costs[j]));
+                            (i + 1..costs.len()).any(|j| !has_skip_prompt(&costs[j]));
                         if is_binary && has_choice_ahead {
                             let mut auto = sub_cost.clone();
                             auto.optional = Some(false);
                             self.pay_cost(gs, &auto)?;
+                            had_binary_auto_pay = true;
                         } else {
                             self.pay_cost(gs, sub_cost)?;
                         }
@@ -166,6 +168,21 @@ impl AbilityResolver {
                             entry.cost_paid_index = i + 1;
                         }
                         if self.pending_choice.is_some() {
+                            // If we auto-paid binary costs before this choice, override
+                            // the choice description to show the combined cost.
+                            if had_binary_auto_pay {
+                                let combined_en =
+                                    crate::ability::describe::describe_sequential_cost_en(costs, i);
+                                let combined_ja =
+                                    crate::ability::describe::describe_sequential_cost_ja(costs, i);
+                                if let Some(ref mut choice) = self.pending_choice {
+                                    choice.set_description(combined_en.clone());
+                                    choice.set_bilingual_descriptions(
+                                        Some(combined_en),
+                                        Some(combined_ja),
+                                    );
+                                }
+                            }
                             return Ok(());
                         }
                     }
@@ -182,6 +199,8 @@ impl AbilityResolver {
                 self.pending_choice = Some(Choice::SelectTarget {
                     target: "choice_condition".to_string(),
                     description: format!("Choose cost option: {}", texts.join(" OR ")),
+                    description_en: None,
+                    description_ja: None,
                     allow_skip: false,
                     options: Some(texts),
                 });
@@ -534,6 +553,8 @@ impl AbilityResolver {
                             "Pay optional cost: {}? (pay or skip)",
                             cost_description
                         ),
+                        description_en: None,
+                        description_ja: None,
                         allow_skip: true,
                         options: None,
                     });
@@ -649,6 +670,8 @@ impl AbilityResolver {
                     self.pending_choice = Some(Choice::SelectTarget {
                         target: "pay_optional_cost:skip_optional_cost".to_string(),
                         description: format!("Pay {} energy (or skip)?", energy),
+                        description_en: None,
+                        description_ja: None,
                         allow_skip: true,
                         options: None,
                     });

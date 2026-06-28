@@ -181,7 +181,7 @@ fn multiname_and_single_share_name() {
 #[test]
 fn multiname_matches_name_constraint_by_constituent() {
     let db = load_real_database();
-    let mut game = TestGame::new(db);
+    let game = TestGame::new(db);
 
     let multi = game.id("LL-bp1-001-R\u{ff0b}");
 

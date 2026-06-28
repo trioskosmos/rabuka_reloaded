@@ -6,7 +6,6 @@
 /// Q126: Does moving from stage→waitroom (zone change) trigger this?
 /// A: No — only area-to-area movement (position change) on stage.
 use crate::helpers::*;
-use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
 
 fn setup_energy_deck(game: &mut TestGame) {

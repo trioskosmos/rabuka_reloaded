@@ -59,6 +59,10 @@ pub enum Choice {
         card_type: Option<String>,
         count: usize,
         description: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description_en: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description_ja: Option<String>,
         allow_skip: bool,
         cost_limit: Option<u32>,
         cost_limit_operator: Option<String>,
@@ -88,6 +92,10 @@ pub enum Choice {
     SelectTarget {
         target: String,
         description: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description_en: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description_ja: Option<String>,
         allow_skip: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         options: Option<Vec<String>>,
@@ -95,23 +103,39 @@ pub enum Choice {
     SelectPosition {
         position: String,
         description: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description_en: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description_ja: Option<String>,
         allow_skip: bool,
     },
     SelectHeartColor {
         count: usize,
         options: Vec<String>,
         description: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description_en: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description_ja: Option<String>,
     },
     SelectHeartType {
         count: usize,
         options: Vec<String>,
         description: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description_en: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description_ja: Option<String>,
     },
     /// Player chooses which of their standby auto abilities resolves first (Rule 9.5.3).
     SelectAutoAbility {
         player_id: String,
         options: Vec<AutoAbilityOption>,
         description: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description_en: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description_ja: Option<String>,
     },
     /// Player chooses which live card goes to success zone (Rule 8.4.7).
     SelectLiveSuccess {
@@ -119,6 +143,10 @@ pub enum Choice {
         count: usize,
         options: Vec<LiveSuccessOption>,
         description: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description_en: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description_ja: Option<String>,
     },
 }
 
@@ -185,6 +213,8 @@ pub struct ChoiceBuilder {
     card_type: Option<String>,
     count: usize,
     description: String,
+    description_en: Option<String>,
+    description_ja: Option<String>,
     allow_skip: bool,
     cost_limit: Option<u32>,
     cost_limit_operator: Option<String>,
@@ -210,6 +240,8 @@ impl ChoiceBuilder {
             card_type: self.card_type,
             count: self.count,
             description: self.description,
+            description_en: self.description_en,
+            description_ja: self.description_ja,
             allow_skip: self.allow_skip,
             cost_limit: self.cost_limit,
             cost_limit_operator: self.cost_limit_operator,
@@ -287,6 +319,14 @@ impl ChoiceBuilder {
         self.is_reveal = v;
         self
     }
+    pub fn description_en(mut self, v: Option<String>) -> Self {
+        self.description_en = v;
+        self
+    }
+    pub fn description_ja(mut self, v: Option<String>) -> Self {
+        self.description_ja = v;
+        self
+    }
 }
 
 impl Choice {
@@ -298,6 +338,8 @@ impl Choice {
         Choice::SelectTarget {
             target: target.into(),
             description: description.into(),
+            description_en: None,
+            description_ja: None,
             allow_skip,
             options: None,
         }
@@ -312,6 +354,8 @@ impl Choice {
         Choice::SelectTarget {
             target: target.into(),
             description: description.into(),
+            description_en: None,
+            description_ja: None,
             allow_skip,
             options: Some(options),
         }
@@ -328,6 +372,8 @@ impl Choice {
             card_type: None,
             count,
             description: description.into(),
+            description_en: None,
+            description_ja: None,
             allow_skip,
             cost_limit: None,
             cost_limit_operator: None,
@@ -392,6 +438,63 @@ impl Choice {
         }
     }
 
+    /// Replace the description field (used by sequential_cost to set combined cost text).
+    pub fn set_description(&mut self, desc: String) {
+        match self {
+            Choice::SelectCard { description, .. } => *description = desc,
+            Choice::SelectTarget { description, .. } => *description = desc,
+            Choice::SelectPosition { description, .. } => *description = desc,
+            Choice::SelectHeartColor { description, .. } => *description = desc,
+            Choice::SelectHeartType { description, .. } => *description = desc,
+            Choice::SelectAutoAbility { description, .. } => *description = desc,
+            Choice::SelectLiveSuccess { description, .. } => *description = desc,
+        }
+    }
+
+    /// Replace both bilingual prompt fields.
+    pub fn set_bilingual_descriptions(&mut self, en: Option<String>, ja: Option<String>) {
+        match self {
+            Choice::SelectCard {
+                ref mut description_en,
+                ref mut description_ja,
+                ..
+            }
+            | Choice::SelectTarget {
+                ref mut description_en,
+                ref mut description_ja,
+                ..
+            }
+            | Choice::SelectPosition {
+                ref mut description_en,
+                ref mut description_ja,
+                ..
+            }
+            | Choice::SelectHeartColor {
+                ref mut description_en,
+                ref mut description_ja,
+                ..
+            }
+            | Choice::SelectHeartType {
+                ref mut description_en,
+                ref mut description_ja,
+                ..
+            }
+            | Choice::SelectAutoAbility {
+                ref mut description_en,
+                ref mut description_ja,
+                ..
+            }
+            | Choice::SelectLiveSuccess {
+                ref mut description_en,
+                ref mut description_ja,
+                ..
+            } => {
+                *description_en = en;
+                *description_ja = ja;
+            }
+        }
+    }
+
     /// Convert to the JSON format expected by the frontend.
     /// Flattens enum variants and adds frontend-specific fields (choose_count, v_remaining, title).
     pub fn to_frontend_json(&self) -> Option<Value> {
@@ -415,6 +518,7 @@ impl Choice {
                 description,
                 allow_skip,
                 options,
+                ..
             } => {
                 if let Some(obj) = json.as_object_mut() {
                     if let Some(inner) = obj.remove("SelectTarget") {
@@ -438,6 +542,7 @@ impl Choice {
                 position: _,
                 description,
                 allow_skip,
+                ..
             } => {
                 if let Some(obj) = json.as_object_mut() {
                     if let Some(inner) = obj.remove("SelectPosition") {
@@ -518,6 +623,53 @@ impl Choice {
                             );
                             *obj = fields;
                         }
+                    }
+                }
+            }
+        }
+        // Inject bilingual prompts from Choice-level description_en/description_ja
+        if let Some(obj) = json.as_object_mut() {
+            match self {
+                Choice::SelectCard {
+                    ref description_en,
+                    ref description_ja,
+                    ..
+                }
+                | Choice::SelectTarget {
+                    ref description_en,
+                    ref description_ja,
+                    ..
+                }
+                | Choice::SelectPosition {
+                    ref description_en,
+                    ref description_ja,
+                    ..
+                }
+                | Choice::SelectHeartColor {
+                    ref description_en,
+                    ref description_ja,
+                    ..
+                }
+                | Choice::SelectHeartType {
+                    ref description_en,
+                    ref description_ja,
+                    ..
+                }
+                | Choice::SelectAutoAbility {
+                    ref description_en,
+                    ref description_ja,
+                    ..
+                }
+                | Choice::SelectLiveSuccess {
+                    ref description_en,
+                    ref description_ja,
+                    ..
+                } => {
+                    if let Some(en) = description_en {
+                        obj.insert("prompt_en".into(), Value::String(en.clone()));
+                    }
+                    if let Some(ja) = description_ja {
+                        obj.insert("prompt_ja".into(), Value::String(ja.clone()));
                     }
                 }
             }

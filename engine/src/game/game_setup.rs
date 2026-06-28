@@ -748,11 +748,13 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             count: _,
             options,
             description,
+            ..
         }
         | Choice::SelectHeartType {
             count: _,
             options,
             description,
+            ..
         } => options
             .iter()
             .enumerate()

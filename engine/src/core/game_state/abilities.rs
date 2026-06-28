@@ -905,6 +905,8 @@ impl GameState {
                     description:
                         "複数の自動能力が同時に発動しました。使用する順番を選択してください。"
                             .to_string(),
+                    description_en: None,
+                    description_ja: None,
                 };
 
                 self.ability_queue.pause_for_auto_ability_choice(choice);
@@ -1482,26 +1484,32 @@ impl GameState {
                     "ability_text".into(),
                     serde_json::Value::String(entry.ability.full_text.clone()),
                 );
-                let prompt_en = if entry.choice_effect_text.is_some() {
-                    if let Some(ref effect) = entry.ability.effect {
-                        crate::ability::describe::describe_effect_en(effect)
+                // Only inject prompt_en/prompt_ja if the Choice-level fields are absent.
+                // Choice-level fields are set by to_frontend_json() from description_en/description_ja.
+                if !obj.contains_key("prompt_en") {
+                    let prompt_en = if entry.choice_effect_text.is_some() {
+                        if let Some(ref effect) = entry.ability.effect {
+                            crate::ability::describe::describe_effect_en(effect)
+                        } else {
+                            existing_title.clone()
+                        }
                     } else {
                         existing_title.clone()
-                    }
-                } else {
-                    existing_title.clone()
-                };
-                let prompt_ja = if entry.choice_effect_text.is_some() {
-                    if let Some(ref effect) = entry.ability.effect {
-                        crate::ability::describe::describe_effect_ja(effect)
+                    };
+                    obj.insert("prompt_en".into(), serde_json::Value::String(prompt_en));
+                }
+                if !obj.contains_key("prompt_ja") {
+                    let prompt_ja = if entry.choice_effect_text.is_some() {
+                        if let Some(ref effect) = entry.ability.effect {
+                            crate::ability::describe::describe_effect_ja(effect)
+                        } else {
+                            existing_title.clone()
+                        }
                     } else {
                         existing_title.clone()
-                    }
-                } else {
-                    existing_title.clone()
-                };
-                obj.insert("prompt_ja".into(), serde_json::Value::String(prompt_ja));
-                obj.insert("prompt_en".into(), serde_json::Value::String(prompt_en));
+                    };
+                    obj.insert("prompt_ja".into(), serde_json::Value::String(prompt_ja));
+                }
                 obj.insert(
                     "trigger_type".into(),
                     serde_json::Value::String(format!("{:?}", entry.trigger_type)),

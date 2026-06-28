@@ -327,6 +327,8 @@ impl AbilityResolver {
                 self.pending_choice = Some(Choice::SelectTarget {
                     target: "choice_string".to_string(),
                     description: format!("Choose: {}", desc_parts.join(", or ")),
+                    description_en: None,
+                    description_ja: None,
                     allow_skip: false,
                     options: Some(desc_parts.clone()),
                 });
@@ -624,6 +626,8 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "pay_optional_cost:skip_optional_cost".to_string(),
                 description: format!("Look at {} card(s) (optional cost)?", count),
+                description_en: None,
+                description_ja: None,
                 allow_skip: true,
                 options: None,
             });

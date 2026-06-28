@@ -722,6 +722,8 @@ impl super::TurnEngine {
             count: 1,
             options,
             description: "Choose which live card goes to your success zone".to_string(),
+            description_en: None,
+            description_ja: None,
         };
         game_state.ability_queue.pause_for_choice(choice);
         true
