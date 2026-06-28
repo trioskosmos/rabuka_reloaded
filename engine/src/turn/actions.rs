@@ -121,6 +121,16 @@ impl super::TurnEngine {
             crate::game_setup::ActionType::SetLiveCard => {
                 Self::handle_set_live_card(game_state, card_id)
             }
+            crate::game_setup::ActionType::LiveCardHeader => Ok(()),
+            crate::game_setup::ActionType::SelectLiveCard => {
+                Self::handle_live_card_selection(game_state, card_id, card_indices)
+            }
+            crate::game_setup::ActionType::ConfirmLiveCardSet => {
+                Self::handle_live_card_confirmation(game_state, card_indices.clone())
+            }
+            crate::game_setup::ActionType::SkipLiveCardSet => {
+                Self::handle_live_card_skip(game_state)
+            }
             crate::game_setup::ActionType::FinishLiveCardSet => {
                 Err("FinishLiveCardSet action is obsolete - use Pass instead".into())
             }

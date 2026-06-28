@@ -129,6 +129,8 @@ pub struct PlayerDisplay {
     #[serde(default)]
     pub mulligan_selection: Option<Vec<usize>>,
     #[serde(default)]
+    pub live_card_selection: Option<Vec<usize>>,
+    #[serde(default)]
     pub blade_buffs: Vec<i32>,
     #[serde(default)]
     pub heart_buffs: Vec<Vec<i32>>,
@@ -706,6 +708,7 @@ pub fn player_to_display(
     prohibition_effects: &[String],
     cannot_activate_members: &[String],
     mulligan_selection: Option<&[usize]>,
+    live_card_selection: Option<&[usize]>,
     heart_color_multiplier: &std::collections::HashMap<i16, crate::card::HeartColor>,
     cost_modifiers: &std::collections::HashMap<i16, i32>,
 ) -> PlayerDisplay {
@@ -927,6 +930,7 @@ pub fn player_to_display(
         active_restrictions: restrictions.clone(),
         need_heart_modifiers: nh_mods,
         mulligan_selection: mulligan_selection.map(|v| v.to_vec()),
+        live_card_selection: live_card_selection.map(|v| v.to_vec()),
         // Derive display fields from existing modifier data
         blade_buffs: player
             .stage
@@ -1064,6 +1068,28 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         .as_ref()
         .is_some_and(|id| *id == game_state.player2.id)
         .then_some(game_state.mulligan_selected_indices.as_slice());
+
+    let live_card_player_id = match game_state.current_phase {
+        crate::game_state::Phase::LiveCardSetFirstAttacker => {
+            Some(game_state.first_attacker().id.clone())
+        }
+        crate::game_state::Phase::LiveCardSetSecondAttacker => {
+            Some(if game_state.first_attacker().id == game_state.player1.id {
+                game_state.player2.id.clone()
+            } else {
+                game_state.player1.id.clone()
+            })
+        }
+        _ => None,
+    };
+    let p1_live_selection = live_card_player_id
+        .as_ref()
+        .is_some_and(|id| *id == game_state.player1.id)
+        .then_some(game_state.live_card_selected_indices.as_slice());
+    let p2_live_selection = live_card_player_id
+        .as_ref()
+        .is_some_and(|id| *id == game_state.player2.id)
+        .then_some(game_state.live_card_selected_indices.as_slice());
 
     let blade_flat: std::collections::HashMap<i16, i32> = game_state
         .mods
@@ -1245,6 +1271,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             &game_state.prohibition_effects,
             &game_state.cannot_activate_members,
             p1_mulligan,
+            p1_live_selection,
             &game_state.mods.heart_color_multiplier,
             &cost_flat,
         ),
@@ -1260,6 +1287,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             &game_state.prohibition_effects,
             &game_state.cannot_activate_members,
             p2_mulligan,
+            p2_live_selection,
             &game_state.mods.heart_color_multiplier,
             &cost_flat2,
         ),

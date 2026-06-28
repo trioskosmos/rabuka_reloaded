@@ -546,6 +546,83 @@ impl super::TurnEngine {
         }
     }
 
+    pub(crate) fn handle_live_card_selection(
+        game_state: &mut GameState,
+        card_id: Option<i16>,
+        _card_indices: Option<Vec<usize>>,
+    ) -> Result<(), String> {
+        let idx = if let Some(indices) = _card_indices {
+            indices.first().copied().unwrap_or(0)
+        } else if let Some(cid) = card_id {
+            game_state
+                .active_player()
+                .get_card_index_by_id(cid)
+                .unwrap_or(0)
+        } else {
+            0
+        };
+        if let Some(pos) = game_state
+            .live_card_selected_indices
+            .iter()
+            .position(|&x| x == idx)
+        {
+            game_state.live_card_selected_indices.remove(pos);
+        } else {
+            game_state.live_card_selected_indices.push(idx);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn handle_live_card_confirmation(
+        game_state: &mut GameState,
+        card_indices: Option<Vec<usize>>,
+    ) -> Result<(), String> {
+        let is_second = matches!(game_state.current_phase, Phase::LiveCardSetSecondAttacker);
+        let live_indices =
+            card_indices.unwrap_or_else(|| game_state.live_card_selected_indices.clone());
+        let mut sorted_indices: Vec<usize> = live_indices.clone();
+        sorted_indices.sort_unstable();
+        sorted_indices.dedup();
+        let player = game_state.active_player_mut();
+        let max_live = MAX_LIVE_CARDS - player.live_card_zone.cards.len();
+        let mut placed = 0usize;
+        for &idx in sorted_indices.iter().rev() {
+            if placed >= max_live {
+                break;
+            }
+            if idx < player.hand.cards.len() {
+                let card = player.hand.cards.remove(idx);
+                player.live_card_zone.cards.push(card);
+                placed += 1;
+            }
+        }
+        for _ in 0..placed {
+            let _ = player.draw_card();
+        }
+        game_state.live_card_selected_indices.clear();
+        if is_second {
+            Self::advance_phase(game_state);
+        } else {
+            game_state.current_phase = Phase::LiveCardSetSecondAttacker;
+        }
+        log::debug!("Live card confirmation: {} cards placed", placed);
+        Ok(())
+    }
+
+    pub(crate) fn handle_live_card_skip(game_state: &mut GameState) -> Result<(), String> {
+        game_state.live_card_selected_indices.clear();
+        match game_state.current_phase {
+            Phase::LiveCardSetFirstAttacker => {
+                game_state.current_phase = Phase::LiveCardSetSecondAttacker;
+            }
+            Phase::LiveCardSetSecondAttacker => {
+                Self::advance_phase(game_state);
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
     #[allow(clippy::too_many_arguments)]
     // Q70: An area that had a member placed in it this turn cannot have another
     // member placed in it by any means. Q71: If the member leaves the area,

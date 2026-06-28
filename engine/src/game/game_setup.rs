@@ -20,6 +20,10 @@ pub enum ActionType {
     SelectMulligan,
     ConfirmMulligan,
     SkipMulligan,
+    LiveCardHeader,
+    SelectLiveCard,
+    ConfirmLiveCardSet,
+    SkipLiveCardSet,
     PlayMemberToStage,
     UseAbility,
     SetLiveCard,
@@ -47,6 +51,10 @@ impl std::fmt::Display for ActionType {
             ActionType::SelectMulligan => write!(f, "select_mulligan"),
             ActionType::ConfirmMulligan => write!(f, "confirm_mulligan"),
             ActionType::SkipMulligan => write!(f, "skip_mulligan"),
+            ActionType::LiveCardHeader => write!(f, "live_card_header"),
+            ActionType::SelectLiveCard => write!(f, "select_live_card"),
+            ActionType::ConfirmLiveCardSet => write!(f, "confirm_live_card_set"),
+            ActionType::SkipLiveCardSet => write!(f, "skip_live_card_set"),
             ActionType::PlayMemberToStage => write!(f, "play_member_to_stage"),
             ActionType::UseAbility => write!(f, "use_ability"),
             ActionType::SetLiveCard => write!(f, "set_live_card"),
@@ -77,6 +85,10 @@ impl std::str::FromStr for ActionType {
             "select_mulligan" => Ok(ActionType::SelectMulligan),
             "confirm_mulligan" => Ok(ActionType::ConfirmMulligan),
             "skip_mulligan" => Ok(ActionType::SkipMulligan),
+            "live_card_header" => Ok(ActionType::LiveCardHeader),
+            "select_live_card" => Ok(ActionType::SelectLiveCard),
+            "confirm_live_card_set" => Ok(ActionType::ConfirmLiveCardSet),
+            "skip_live_card_set" => Ok(ActionType::SkipLiveCardSet),
             "play_member_to_stage" => Ok(ActionType::PlayMemberToStage),
             "use_ability" => Ok(ActionType::UseAbility),
             "set_live_card" => Ok(ActionType::SetLiveCard),
@@ -1228,9 +1240,26 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 
 fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
     let active_player = game_state.active_player();
+
+    let is_first = matches!(
+        game_state.current_phase,
+        crate::game_state::Phase::LiveCardSetFirstAttacker
+    );
+    let player_name = if is_first {
+        if game_state.first_attacker().id == game_state.player1.id {
+            "Player 1"
+        } else {
+            "Player 2"
+        }
+    } else if game_state.first_attacker().id == game_state.player1.id {
+        "Player 2"
+    } else {
+        "Player 1"
+    };
+
     let mut actions = vec![make_action(
-        ActionType::Pass,
-        "Pass - Finished setting live cards",
+        ActionType::LiveCardHeader,
+        &format!("{}'s Live Card Set", player_name),
     )];
 
     let max_live_cards =
@@ -1238,14 +1267,19 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
     let can_add_more = active_player.live_card_zone.cards.len() < max_live_cards.max(0) as usize;
     if can_add_more {
         for (hand_index, card_id) in active_player.hand.cards.iter().enumerate() {
+            let is_selected = game_state.live_card_selected_indices.contains(&hand_index);
             let card_name = game_state
                 .card_database
                 .get_card(*card_id)
                 .map(|c| c.name.as_str())
                 .unwrap_or("Unknown");
             actions.push(make_action_params(
-                ActionType::SetLiveCard,
-                &format!("Place {} to live zone", card_name),
+                ActionType::SelectLiveCard,
+                &format!(
+                    "{} {} for live set",
+                    if is_selected { "Deselect" } else { "Select" },
+                    card_name
+                ),
                 ActionParameters {
                     card_id: Some(*card_id),
                     card_index: Some(hand_index),
@@ -1255,5 +1289,18 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
             ));
         }
     }
+
+    actions.push(make_action_params(
+        ActionType::ConfirmLiveCardSet,
+        &format!("Confirm {}'s live card set", player_name),
+        ActionParameters {
+            card_indices: Some(vec![]),
+            ..make_params()
+        },
+    ));
+    actions.push(make_action(
+        ActionType::SkipLiveCardSet,
+        &format!("Skip {}'s live card set (set no cards)", player_name),
+    ));
     actions
 }
