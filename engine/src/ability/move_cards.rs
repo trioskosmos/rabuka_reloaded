@@ -494,6 +494,16 @@ impl AbilityResolver {
                 })
                 .collect();
             gs.remove_from_source_hands(&taken);
+            // Remove from deck too — the reveal only peeked, not drained.
+            // If the card was from a deck-top reveal, it's still in the
+            // deck and must be removed here to avoid duplication.
+            for &id in &taken {
+                if let Some(pos) = gs.player1.main_deck.cards.iter().position(|&c| c == id) {
+                    gs.player1.main_deck.cards.remove(pos);
+                } else if let Some(pos) = gs.player2.main_deck.cards.iter().position(|&c| c == id) {
+                    gs.player2.main_deck.cards.remove(pos);
+                }
+            }
             return Ok(taken);
         }
 

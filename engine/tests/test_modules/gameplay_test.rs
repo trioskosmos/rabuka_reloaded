@@ -3565,6 +3565,10 @@ fn kosuzu_choose_number_gains_blade() {
     game.select_generated(9);
     assert!(!game.has_pending_choice());
     assert!(!game.state.player1.hand.cards.contains(&top_card));
+    assert_eq!(
+        game.state.player1.main_deck.cards[0], top_card,
+        "card returned to top of deck"
+    );
     assert!(game.state.mods.get_blade_modifier(kosuzu) > 0);
 }
 

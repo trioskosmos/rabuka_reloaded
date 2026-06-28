@@ -2484,6 +2484,15 @@ def parse_condition(text: str) -> Dict[str, Any]:
                 matched.discard(result["position"])
                 if matched:
                     result["position_compare"] = sorted(matched)[0]
+            # require_position_cards: when text says members "are in" multiple
+            # positions (e.g. "右サイドエリアと左サイドエリアにいる"), both
+            # positions must have cards.  Empty slot should not count as cost 0.
+            if result.get("position") and result.get("position_compare"):
+                if re.search(
+                    r"(?:センターエリア|左サイドエリア|右サイドエリア|センター|左サイド|右サイド).*にいる",
+                    text,
+                ):
+                    result["require_position_cards"] = True
             # OR-location: zone1かzone2 pattern → add locations array
             _enrich_or_location(result, text)
             # Heart-content filter: 必要ハートに含まれるheartXXがN → add heart_colors
@@ -2518,6 +2527,13 @@ def parse_condition(text: str) -> Dict[str, Any]:
         matched.discard(condition.get("position"))
         if matched:
             condition["position_compare"] = sorted(matched)[0]
+    # require_position_cards: same detection as handler path above
+    if condition.get("position") and condition.get("position_compare"):
+        if re.search(
+            r"(?:センターエリア|左サイドエリア|右サイドエリア|センター|左サイド|右サイド).*にいる",
+            text,
+        ):
+            condition["require_position_cards"] = True
     # OR-location and heart-content enrichment for fallthrough path
     _enrich_or_location(condition, text)
     _enrich_heart_content(condition, text)

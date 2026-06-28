@@ -244,8 +244,11 @@ impl AbilityResolver {
                 Some(Zone::Hand) => player.hand.cards.iter().copied().collect(),
                 Some(Zone::Deck) | Some(Zone::DeckTop) => {
                     let take_count = count.min(player.main_deck.cards.len() as u32) as usize;
-                    let ids: Vec<i16> = player.main_deck.cards.drain(..take_count).collect();
-                    ids
+                    // Peek only — don't drain from deck here. The card stays
+                    // in the deck until the conditional move_cards consumes it.
+                    // If the condition fails, the card remains on top of the
+                    // deck (the parenthetical "nothing happens" behavior).
+                    player.main_deck.cards[..take_count].to_vec()
                 }
                 Some(Zone::LookedAt) => gs
                     .looked_at_cards

@@ -1366,6 +1366,12 @@ pub struct Condition {
     /// Cross-position comparison target (e.g. "right_side" when position is "left_side")
     #[serde(default)]
     pub position_compare: Option<String>,
+    /// When true, cross-position equality checks require both positions to have
+    /// cards.  Empty slots return false instead of treating cost as 0.
+    /// Set by Python parser when "にいる" appears near position keywords
+    /// (e.g. "右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合").
+    #[serde(default)]
+    pub require_position_cards: Option<bool>,
     /// Direction for area move: "from" = position is source (was AT this pos),
     /// "to" or absent = position is destination (moved TO this pos).
     #[serde(default)]

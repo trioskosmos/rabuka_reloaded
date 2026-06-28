@@ -1159,6 +1159,14 @@ impl<'a> ConditionContext<'a> {
                 let pos_a_str = pos_a.get_position().unwrap_or("");
                 let card_a = util::card_at_position(player, pos_a_str);
                 let card_b = util::card_at_position(player, pos_b);
+                // When require_position_cards is set, both positions must have
+                // cards for the comparison to be meaningful (e.g. "右サイドエリアと
+                // 左サイドエリアにいるメンバーのコストが同じ場合").
+                if condition.require_position_cards.unwrap_or(false) {
+                    if card_a.is_none() || card_b.is_none() {
+                        return false;
+                    }
+                }
                 let cost_a = card_a
                     .and_then(|id| card_db.get_card(id))
                     .and_then(|c| c.cost)

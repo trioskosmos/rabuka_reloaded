@@ -45,7 +45,7 @@ export const Tooltips = {
             return;
         }
 
-        if ((card.id === undefined && card.card_id === undefined) && card.card_no) {
+        if (card.card_no) {
             const resolved = State.resolveCardData(card.card_no);
             if (resolved) card = resolved;
         }

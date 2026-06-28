@@ -107,6 +107,11 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
 <div id="app">
   <aside id="sidebar">
     <h1><span>&#128269;</span> Card Browser</h1>
+    <div id="search-bar" style="display:flex;gap:4px;margin-bottom:6px;">
+      <input type="search" data-fid="search" placeholder="Search by ID or name..."
+             style="flex:1;padding:6px 8px;background:#1a1a2e;color:#e0e0e0;border:1px solid #0f3460;border-radius:4px;font-size:12px;outline:none;">
+      <button id="clear-all" style="padding:6px 10px;background:#e94560;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;white-space:nowrap;">Clear</button>
+    </div>
     <div id="filters"></div>
     <div id="result-count">Select filters to browse</div>
   </aside>
@@ -184,6 +189,7 @@ function isDefaultFilters() {
   for (const el of els) {
     if (el.tagName === 'SELECT' && el.value !== 'All') return false;
     if (el.tagName === 'INPUT' && el.type === 'number' && el.value !== '' && el.value !== '0') return false;
+    if (el.tagName === 'INPUT' && el.type === 'search' && el.value.trim() !== '') return false;
     if (el.classList.contains('btn-group') && getBtnVal(el.dataset.fid) !== 'All') return false;
   }
   const cbs = document.querySelectorAll('input[type="checkbox"]');
@@ -191,6 +197,20 @@ function isDefaultFilters() {
     if (cb.checked) return false;
   }
   return true;
+}
+
+function clearAllFilters() {
+  document.querySelectorAll('[data-fid]').forEach(el => {
+    if (el.tagName === 'SELECT') el.value = 'All';
+    if (el.tagName === 'INPUT' && (el.type === 'number' || el.type === 'search')) el.value = '';
+  });
+  document.querySelectorAll('.btn-opt').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.btn-group').forEach(g => {
+    const first = g.querySelector('.btn-opt');
+    if (first) first.classList.add('active');
+  });
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+  onFilterChange();
 }
 
 function applyFilters() {
@@ -204,7 +224,7 @@ function applyFilters() {
 
   const vals = {};
   document.querySelectorAll('[data-fid]').forEach(el => {
-    if (el.tagName === 'SELECT' || (el.tagName === 'INPUT' && el.type === 'number')) {
+    if (el.tagName === 'SELECT' || (el.tagName === 'INPUT' && (el.type === 'number' || el.type === 'text' || el.type === 'search'))) {
       vals[el.dataset.fid] = el.value;
     }
     if (el.classList.contains('btn-group')) {
@@ -215,7 +235,9 @@ function applyFilters() {
     vals[cb.name] = cb.checked;
   });
 
-  const results = allCardsArr.filter(card => {
+  const searchQ = (vals.search || '').trim().toLowerCase();
+
+  let results = allCardsArr.filter(card => {
     if (vals.type && vals.type !== 'All' && card.type !== vals.type) return false;
     if (vals.series && vals.series !== 'All' && card.series !== vals.series) return false;
     if (vals.unit && vals.unit !== 'All' && (card.unit || '') !== vals.unit) return false;
@@ -261,8 +283,20 @@ function applyFilters() {
       const info = abilityIndex && abilityIndex.get(card.card_no);
       if (!info || !info.some(a => a.useLimit === limit)) return false;
     }
+    if (searchQ) {
+      const inId = (card.card_no || '').toLowerCase().includes(searchQ);
+      const inName = (card.name || '').toLowerCase().includes(searchQ);
+      if (!inId && !inName) return false;
+      card._searchScore = (inId ? 2 : 0) + (inName ? 1 : 0);
+    } else {
+      card._searchScore = 0;
+    }
     return true;
   });
+
+  if (searchQ) {
+    results.sort((a, b) => b._searchScore - a._searchScore);
+  }
 
   let displayCards = results;
   if (!vals.showAllRarities) {
@@ -483,6 +517,15 @@ function populateFilters() {
     btn.classList.add('active');
     onFilterChange();
   });
+
+  const searchInput = document.querySelector('[data-fid="search"]');
+  if (searchInput) {
+    searchInput.addEventListener('input', onFilterChange);
+  }
+  const clearBtn = document.getElementById('clear-all');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', clearAllFilters);
+  }
 
   filterActive = false;
   applyFilters();
