@@ -741,12 +741,18 @@ impl AbilityResolver {
                 let tracked_moved = recently_moved.as_ref().or(entry_snapshot.as_ref());
                 if Zone::from_str(per_unit_type_str.as_deref().unwrap_or("")) == Some(Zone::Discard)
                 {
+                    let tm_len = tracked_moved.map(|v| v.len()).unwrap_or(0);
+                    eprintln!(
+                        "[DBG_GR] tracked_moved.len={} last_discard_count={}",
+                        tm_len, last_discard_count,
+                    );
                     matching_count = util::resolve_discard_per_unit_count(
                         tracked_moved,
                         last_discard_count,
                         &card_db,
                         &filter,
                     );
+                    eprintln!("[DBG_GR] resolve result: matching_count={}", matching_count);
                 } else if (Zone::from_str(per_unit_type_str.as_deref().unwrap_or(""))
                     == Some(Zone::Waitroom)
                     || per_unit_type_str.as_deref() == Some("waitroom_card"))

@@ -58,6 +58,7 @@ fn test_q246_partial_overlap_dedup() {
 
     // Discard both eligible cards (indices 0=kosuzu, 1=dia)
     game.try_select_indices(&[0, 1]).unwrap();
+    game.select_indices(&[]); // skip re-prompt, finalize
 
     assert!(
         !game.has_pending_choice(),
@@ -238,6 +239,7 @@ fn test_q246_single_card() {
 
     // Discard the only eligible card
     game.try_select_indices(&[0]).unwrap();
+    game.select_indices(&[]); // skip re-prompt, finalize
 
     assert!(
         !game.has_pending_choice(),

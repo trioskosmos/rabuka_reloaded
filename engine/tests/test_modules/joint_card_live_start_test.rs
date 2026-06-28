@@ -183,6 +183,7 @@ fn test_bp2_live_start_discard_any_number_gains_blade_per_card() {
 
     // Select both matching cards (indices 0 and 1)
     game.try_select_indices(&[0, 1]).unwrap();
+    game.select_indices(&[]); // skip re-prompt, finalize
 
     assert!(
         !game.has_pending_choice(),
@@ -656,6 +657,7 @@ fn test_bp6_live_start_two_distinct_colors_gain_two_hearts() {
 
     // Discard both cards
     game.try_select_indices(&[0, 1]).unwrap();
+    game.select_indices(&[]); // skip re-prompt, finalize
 
     assert!(
         !game.has_pending_choice(),
@@ -742,6 +744,7 @@ fn test_bp6_live_start_same_color_deduplicates() {
 
     // Discard both copies
     game.try_select_indices(&[0, 1]).unwrap();
+    game.select_indices(&[]); // skip re-prompt, finalize
 
     // Determine the exact colors from the card.
     // Member cards store their heart colors in base_heart; need_heart is only on live cards.

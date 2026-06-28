@@ -474,6 +474,11 @@ impl super::resolver::AbilityResolver {
                         self.selected_cards.push(cid);
                     }
                 }
+                eprintln!(
+                    "[DBG_HSC] moved {} cards, moved_cards.len={}",
+                    new_card_ids.len(),
+                    self.moved_cards.len()
+                );
             }
             if new_card_ids.is_empty() {
                 if !self.moved_cards.is_empty() {
@@ -493,10 +498,9 @@ impl super::resolver::AbilityResolver {
                 self.pending_choice = None;
                 return Ok(());
             }
+            // Rule 9.4.2.3: cost must be paid in full. Once a player selects the
+            // first card for a fixed-count cost, they are committed — no bail-out.
             if count > 0 && new_card_ids.len() < count {
-                let is_any_number = gs
-                    .entry_cost()
-                    .is_some_and(|c| c.count.is_none() || c.any_number.unwrap_or(false));
                 let remaining = count - new_card_ids.len();
                 let hand_now: Vec<i16> = {
                     let p = gs.resolve_target_player_mut(&target);
@@ -533,7 +537,7 @@ impl super::resolver::AbilityResolver {
                         Zone::Hand.to_str(),
                         remaining,
                         format!("Select {} more card(s) from hand for cost", remaining),
-                        is_any_number || allow_skip,
+                        false, // Rule 9.4.2.3: no bail-out once committed
                         fi,
                         Some(target.clone()),
                         cost_total,
@@ -600,35 +604,34 @@ impl super::resolver::AbilityResolver {
                     }
                 }
             }
+            // Re-prompt for any_number costs: after each selection, ask
+            // if the player wants to select more cards or skip to finish.
             if count == 0 && allow_skip {
                 let hand_now: Vec<i16> = {
                     let p = gs.resolve_target_player_mut(&target);
                     p.hand.cards.to_vec()
                 };
                 let available_idxs: Vec<usize> = (0..hand_now.len())
-                    .filter(|i| validate_card(hand_now[*i]))
+                    .filter(|i| {
+                        let cid = hand_now[*i];
+                        validate_card(cid)
+                    })
                     .collect();
-                if available_idxs.is_empty() && !self.moved_cards.is_empty() {
-                    let final_count = self.moved_cards.len() as u32;
-                    gs.mods.last_cost_discard_count = final_count;
-                    gs.recently_moved_cards = Some(self.moved_cards.clone());
-                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                        entry.cost_paid = true;
-                        entry.optional_cost_result = Some(true);
-                    }
-                    self.pending_choice = None;
-                    return Ok(());
-                }
                 let fi = if available_idxs.is_empty() {
                     None
                 } else {
                     Some(available_idxs)
                 };
+                let desc = if fi.as_ref().map_or(0, |v| v.len()) > 0 {
+                    "Select more card(s) from hand for cost (or skip to finish)".to_string()
+                } else {
+                    "No more matching cards in hand (skip to finish)".to_string()
+                };
                 self.pending_choice = Some(
                     common_re(
                         Zone::Hand.to_str(),
                         0,
-                        "Select more card(s) from hand for cost (or skip to finish)".to_string(),
+                        desc,
                         true,
                         fi,
                         Some(target.clone()),
@@ -640,6 +643,10 @@ impl super::resolver::AbilityResolver {
                 self.store_pending_choice(gs);
                 return Ok(());
             }
+            eprintln!(
+                "[DBG_HSC] finalizing with {} moved cards",
+                self.moved_cards.len()
+            );
             let final_count = self.moved_cards.len() as u32;
             gs.mods.last_cost_discard_count = final_count;
             gs.recently_moved_cards = Some(self.moved_cards.clone());

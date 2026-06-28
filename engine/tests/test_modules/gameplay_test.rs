@@ -2142,6 +2142,7 @@ fn you_live_start_optional_cost_triggers() {
 
     // Pay cost: discard the named copy, gain blade on keke
     game.select_indices(&[0]);
+    game.select_indices(&[]); // skip re-prompt, finalize
 
     // Verify blade modifier was applied on the activating card
     let blade_mod = game.state.mods.get_blade_modifier(keke);

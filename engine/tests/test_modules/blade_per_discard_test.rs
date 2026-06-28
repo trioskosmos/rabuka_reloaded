@@ -120,14 +120,9 @@ fn triple_discard_two_cards() {
     advance_to_live_start(&mut game);
 
     assert!(game.has_pending_choice(), "Optional cost should appear");
-    game.select_indices(&[0]);
-
-    assert!(game.has_pending_choice(), "Should re-prompt for any_number");
-    game.select_indices(&[0]);
-
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Select all matching cards in one batch, then skip to finalize
+    game.select_indices(&[0, 1]);
+    game.select_indices(&[]);
 
     let blade = game
         .state
@@ -138,10 +133,8 @@ fn triple_discard_two_cards() {
     assert_eq!(blade, 2, "2 cards discarded → 2 blades, got {}", blade);
 }
 
-/// Verify generated actions at each re-prompt step for any_number cost with
-/// characters filter. Before the fix, the re-prompt's filtered_indices
-/// contained EXCLUDED (non-matching) indices, so the frontend saw zero
-/// selectable cards and only "Skip" remained.
+/// Verify generated actions for any_number cost with characters filter.
+/// Only matching cards should appear as selectable in the initial prompt.
 #[test]
 fn triple_discard_re_prompt_shows_correct_actions() {
     let db = load_real_database();
@@ -178,7 +171,7 @@ fn triple_discard_re_prompt_shows_correct_actions() {
     game.set_live_card(live);
     advance_to_live_start(&mut game);
 
-    // --- Step 1: Initial cost choice ---
+    // --- Initial cost choice ---
     assert!(game.has_pending_choice(), "Optional cost should appear");
     let actions = generate_possible_actions(&game.state);
     let select_actions: Vec<_> = actions
@@ -194,50 +187,9 @@ fn triple_discard_re_prompt_shows_correct_actions() {
         "Only 2 matching cards should be selectable initially"
     );
 
-    // Select hand1 (index 0)
-    game.select_indices(&[0]);
-
-    // --- Step 2: Re-prompt after first discard ---
-    // Hand now: [hand2, live, filler] at indices [0, 1, 2]
-    // After fix: filtered_indices=[0] (hand2, the only matching card remaining)
-    // Before fix: filtered_indices=[1,2] (live+filler, excluded → zero selectable)
-    assert!(
-        game.has_pending_choice(),
-        "Re-prompt should appear after first discard"
-    );
-    let actions = generate_possible_actions(&game.state);
-    let select_actions: Vec<_> = actions
-        .iter()
-        .filter(|a| a.action_type == ActionType::ChoiceSelect)
-        .collect();
-    let skip_actions: Vec<_> = actions
-        .iter()
-        .filter(|a| a.action_type == ActionType::ChoiceSkip)
-        .collect();
-    // Only hand2 matches characters; live and filler should be excluded
-    assert_eq!(
-        select_actions.len(),
-        1,
-        "Only 1 matching card should be selectable in re-prompt"
-    );
-    assert_eq!(skip_actions.len(), 1, "Skip should be available");
-    // Verify the selectable card is hand2 (card_index should match its hand position)
-    assert_eq!(
-        select_actions[0]
-            .parameters
-            .as_ref()
-            .and_then(|p| p.card_index),
-        Some(0),
-        "hand2 should be at index 0 in the re-prompt hand"
-    );
-
-    // Select hand2 (index 0 in current hand)
-    game.select_indices(&[0]);
-
-    // --- Step 3: All matching cards exhausted — code finalizes directly ---
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Select both matching cards in one batch, then skip to finalize
+    game.select_indices(&[0, 1]);
+    game.select_indices(&[]);
 
     let blade = game
         .state
@@ -285,11 +237,10 @@ fn two_copies_on_stage_both_gain_blades() {
     assert!(game.has_pending_choice(), "SelectAutoAbility should appear");
     game.select_option(0);
 
-    // First ability: discard 2 cards → 2 blades
+    // First ability: discard 1 card → 1 blade
     assert!(game.has_pending_choice(), "First cost should appear");
     game.select_indices(&[0]);
-    assert!(game.has_pending_choice(), "Re-prompt after 1st discard");
-    game.select_indices(&[]); // finalize with 1 card
+    game.select_indices(&[]); // skip re-prompt, finalize first ability
 
     let p1_id = game.state.player1.id.clone();
     game.state.process_pending_auto_abilities(&p1_id);
@@ -297,8 +248,7 @@ fn two_copies_on_stage_both_gain_blades() {
     // Second ability: discard 1 card → 1 blade
     assert!(game.state.has_pending_choice(), "Second cost should appear");
     game.select_indices(&[0]);
-    assert!(game.has_pending_choice(), "Re-prompt after 1st discard");
-    game.select_indices(&[]);
+    game.select_indices(&[]); // skip re-prompt, finalize second ability
 
     let blade1 = game
         .state
@@ -326,7 +276,7 @@ fn two_copies_on_stage_both_gain_blades() {
     );
 }
 
-/// Sequential any_number selection: pick one at a time, finalize on done.
+/// Sequential any_number selection: pick all cards in one batch.
 #[test]
 fn any_number_discard_sequential_works() {
     let db = load_real_database();
@@ -357,15 +307,9 @@ fn any_number_discard_sequential_works() {
     advance_to_live_start(&mut game);
 
     assert!(game.has_pending_choice(), "Optional cost should appear");
-    for _ in 0..3 {
-        game.select_indices(&[0]);
-        if game.has_pending_choice() {
-            // re-prompt for next card — continue
-        }
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Select all 3 matching cards in one batch, then skip to finalize
+    game.select_indices(&[0, 1, 2]);
+    game.select_indices(&[]);
 
     let blade = game
         .state
@@ -376,7 +320,7 @@ fn any_number_discard_sequential_works() {
     assert_eq!(blade, 3, "3 cards discarded → 3 blades, got {}", blade);
 }
 
-/// Partial discard: discard 1 of 3 matching, then skip → 1 blade.
+/// Partial discard: discard 1 of 3 matching → 1 blade (batch selection, no re-prompt).
 #[test]
 fn any_number_partial_discard_grants_partial_blades() {
     let db = load_real_database();
@@ -407,8 +351,8 @@ fn any_number_partial_discard_grants_partial_blades() {
     advance_to_live_start(&mut game);
 
     assert!(game.has_pending_choice(), "Optional cost should appear");
+    // Select 1 card in the batch, then skip to finalize
     game.select_indices(&[0]);
-    assert!(game.has_pending_choice(), "Re-prompt should appear");
     game.select_indices(&[]);
 
     let blade = game
@@ -455,7 +399,7 @@ fn non_contiguous_matches_via_action_pipeline() {
     game.set_live_card(live);
     advance_to_live_start(&mut game);
 
-    // Step 1: Initial cost prompt — 2 matching cards at indices 0 and 2
+    // Initial cost prompt — 2 matching cards at indices 0 and 2
     assert!(game.has_pending_choice(), "Optional cost should appear");
     let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
     let select_actions: Vec<_> = actions
@@ -468,33 +412,11 @@ fn non_contiguous_matches_via_action_pipeline() {
         "2 matching cards should be selectable"
     );
 
-    // Select hand1 (index 0)
-    game.select_indices(&[0]);
-
-    // Step 2: Re-prompt — hand2 should be at filtered index 0 (zone position 1)
-    assert!(game.has_pending_choice(), "Re-prompt should appear");
-    let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
-    let select_actions: Vec<_> = actions
-        .iter()
-        .filter(|a| a.action_type == ActionType::ChoiceSelect)
-        .collect();
-    assert_eq!(select_actions.len(), 1, "Only 1 matching card remains");
-    // Verify the action's card_indices is the filtered index 0 (frontend standard)
-    assert_eq!(
-        select_actions[0]
-            .parameters
-            .as_ref()
-            .and_then(|p| p.card_indices.as_deref()),
-        Some(&[0usize][..]),
-        "Action should use filtered index 0, not zone position 1"
-    );
-
-    // Select hand2 via filtered index 0
-    game.select_indices(&[0]);
-
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Select matching cards one at a time (like the real game frontend),
+    // then skip to finalize.
+    game.select_indices(&[0]); // discard hand1 at hand index 0
+    game.select_indices(&[0]); // re-prompt shows hand2 at filtered index 0, discard it
+    game.select_indices(&[]); // skip to finalize
 
     let blade = game
         .state

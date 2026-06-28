@@ -65,65 +65,41 @@
 
 /* --- Unified Orientation & Rotation --- */
 .card.orientation-landscape {
-    width: var(--card-h) !important;
-    height: var(--card-w) !important;
+    width: var(--card-h);
+    height: var(--card-w);
     aspect-ratio: 720 / 512;
-    overflow: visible !important; /* Ensure content like shadows or rotated images aren't clipped */
+    overflow: visible;
 }
 
-
-
 .card.card-mini.orientation-landscape {
-    width: var(--card-h-mini) !important;
-    height: var(--card-w-mini) !important;
+    width: var(--card-h-mini);
+    height: var(--card-w-mini);
 }
 
 .card.card-compact.orientation-landscape {
-    width: var(--card-h-compact) !important;
-    height: var(--card-w-compact) !important;
+    width: var(--card-h-compact);
+    height: var(--card-w-compact);
 }
-
-
-
-
 
 /* Image-level rotation logic */
 .card.rotate-img-90 img {
     position: absolute;
     top: 50%;
     left: 50%;
-    /* Native portrait dimensions - these remain same so after 90deg rotation they fit landscape container */
-    width: var(--card-w) !important;
-    height: var(--card-h) !important;
-    transform: translate(-50%, -50%) rotate(90deg) !important;
+    width: var(--card-w);
+    height: var(--card-h);
+    transform: translate(-50%, -50%) rotate(90deg);
     object-fit: cover;
 }
 
-.card.orientation-landscape.rotate-img-90 img {
-    /* When box is landscape, the image (native portrait) must be sized to original portrait dimensions 
-       so that its rotated form (landscape) fills the landscape container (swapped W/H). */
-    width: var(--card-w) !important;
-    height: var(--card-h) !important;
-}
-
 .card.card-mini.rotate-img-90 img {
-    width: var(--card-w-mini) !important;
-    height: var(--card-h-mini) !important;
-}
-
-.card.orientation-landscape.card-mini.rotate-img-90 img {
-    width: var(--card-w-mini) !important;
-    height: var(--card-h-mini) !important;
+    width: var(--card-w-mini);
+    height: var(--card-h-mini);
 }
 
 .card.card-compact.rotate-img-90 img {
-    width: var(--card-w-compact) !important;
-    height: var(--card-h-compact) !important;
-}
-
-.card.orientation-landscape.card-compact.rotate-img-90 img {
-    width: var(--card-w-compact) !important;
-    height: var(--card-h-compact) !important;
+    width: var(--card-w-compact);
+    height: var(--card-h-compact);
 }
 
 
@@ -413,6 +389,10 @@
 }
 
 .live-zone-cards .card {
+    height: 100%;
+    max-height: var(--card-w);
+    width: auto;
+    aspect-ratio: 720 / 512;
     flex-shrink: 0;
     margin: 0 var(--space-xxs);
 }
@@ -489,6 +469,8 @@
     width: 100%;
     max-width: 100%;
     max-height: 100%;
+    height: auto;
+    aspect-ratio: 512 / 720;
     border: 2px dashed var(--border);
     border-radius: var(--radius-sm);
     position: relative;
