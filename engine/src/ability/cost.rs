@@ -6,6 +6,19 @@ use super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 
+/// Returns true if the given cost is "binary" — no card selection needed
+/// when paid. Binary costs (pay_energy with fixed count, change_state with
+/// self_cost=true) don't require choosing *which* card — they just apply
+/// a fixed effect. In sequential_cost, binary costs before a choice-based
+/// cost are auto-paid without a "pay or skip" prompt.
+fn is_binary_cost(cost: &AbilityEffect) -> bool {
+    match cost.action.as_str() {
+        "pay_energy" => !cost.any_number.unwrap_or(false),
+        "change_state" => cost.self_cost == Some(true),
+        _ => false,
+    }
+}
+
 fn get_change_state_candidates(
     gs: &GameState,
     target: &str,
@@ -132,7 +145,23 @@ impl AbilityResolver {
                         }
                     }
                     for i in start_idx..costs.len() {
-                        self.pay_cost(gs, &costs[i])?;
+                        let sub_cost = &costs[i];
+                        // Rule 9.4.2.2: costs execute in order.
+                        // Binary sub-costs (pay_energy w/ fixed count, change_state w/
+                        // self_cost=true) that are optional AND precede a choice-based
+                        // sub-cost are auto-paid without a "pay or skip" prompt.
+                        // The choice sub-cost's skip handles skipping the entire cost.
+                        let is_binary =
+                            sub_cost.optional.unwrap_or(false) && is_binary_cost(sub_cost);
+                        let has_choice_ahead =
+                            (i + 1..costs.len()).any(|j| !is_binary_cost(&costs[j]));
+                        if is_binary && has_choice_ahead {
+                            let mut auto = sub_cost.clone();
+                            auto.optional = Some(false);
+                            self.pay_cost(gs, &auto)?;
+                        } else {
+                            self.pay_cost(gs, sub_cost)?;
+                        }
                         if let Some(entry) = gs.ability_queue.current_entry_mut() {
                             entry.cost_paid_index = i + 1;
                         }

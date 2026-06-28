@@ -26,11 +26,7 @@ fn eli_bp5_sequential_wait_then_discard_works() {
     game.state.player1.stage.stage = [-1, -1, -1];
     game.play_to_stage(eli, rabuka_engine::zones::MemberArea::Center);
 
-    // Choice 1: wait cost — pay
-    assert!(game.has_pending_choice(), "Wait cost prompt");
-    game.select_option(1);
-
-    // Choice 2: discard — verify it's a hand SelectCard, not a SelectTarget
+    // Choice 1: wait is auto-paid (binary cost), discard prompt shows directly
     assert!(game.has_pending_choice(), "Discard prompt");
     assert_eq!(
         game.state
