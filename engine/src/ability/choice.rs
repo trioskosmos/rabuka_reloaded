@@ -1385,6 +1385,21 @@ impl super::resolver::AbilityResolver {
                 if can_reprompt && max_count > selected_count && remaining > 0 {
                     let remaining_max = max_count - selected_count;
                     let ct = ctx.card_type.clone();
+                    // Compute filtered_indices for remaining looked_at cards
+                    let remaining_indices: Vec<usize> = {
+                        let card_db = &gs.card_database;
+                        let filter = sa.map(|s| super::util::CardFilter::from_effect(s));
+                        match filter {
+                            Some(ref f) if f.has_filter() => gs
+                                .looked_at_cards
+                                .iter()
+                                .enumerate()
+                                .filter(|&(_, &cid)| f.matches(card_db, cid, false))
+                                .map(|(i, _)| i)
+                                .collect(),
+                            _ => (0..gs.looked_at_cards.len()).collect(),
+                        }
+                    };
                     self.pending_choice = Some(
                         Choice::select_cards(
                             Zone::LookedAt.to_str(),
@@ -1399,6 +1414,7 @@ impl super::resolver::AbilityResolver {
                         )
                         .group(sa.and_then(|s| s.group_names.as_ref()).and_then(|v| v.first().cloned()))
                         .characters(sa.and_then(|s| s.characters.clone()))
+                        .filtered_indices(Some(remaining_indices))
                         .build(),
                     );
                     self.execution_context = context.clone();

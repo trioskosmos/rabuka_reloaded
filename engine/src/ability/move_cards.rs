@@ -2403,9 +2403,25 @@ impl AbilityResolver {
             && !remaining_cards.is_empty()
         {
             gs.looked_at_cards = remaining_cards.clone();
-            gs.looked_at_cards = remaining_cards.clone();
             let remaining_available = gs.looked_at_cards.len();
             let remaining_selections = (max_select - selected_count).min(remaining_available);
+            // Compute filtered_indices for remaining cards
+            let remaining_indices: Vec<usize> = {
+                let card_db = &gs.card_database;
+                let filter = select_action
+                    .as_ref()
+                    .map(|sa| util::CardFilter::from_effect(sa));
+                match filter {
+                    Some(ref f) if f.has_filter() => gs
+                        .looked_at_cards
+                        .iter()
+                        .enumerate()
+                        .filter(|&(_, &cid)| f.matches(card_db, cid, false))
+                        .map(|(i, _)| i)
+                        .collect(),
+                    _ => (0..gs.looked_at_cards.len()).collect(),
+                }
+            };
             let description = format!(
                 "Select up to {} more card(s) from the {} remaining looked-at cards",
                 remaining_selections, remaining_available
@@ -2431,6 +2447,7 @@ impl AbilityResolver {
                         .and_then(|v| v.first().cloned()),
                 )
                 .characters(select_action.as_ref().and_then(|sa| sa.characters.clone()))
+                .filtered_indices(Some(remaining_indices))
                 .build(),
             );
             return Ok(());

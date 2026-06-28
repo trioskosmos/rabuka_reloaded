@@ -127,12 +127,20 @@ fn ayase_accepts_jyouji_rejects_debut() {
         "Must have a choice when a 常時 μ's card is available"
     );
 
-    // Only 1 card should pass the filter (the 常時 one)
+    // All looked-at cards remain visible; non-matching ones are greyed out
     let looked_at = game.state.looked_at_cards.clone();
-    assert_eq!(looked_at.len(), 1, "Only 1 card should pass filter");
+    assert_eq!(looked_at.len(), 2, "All looked-at cards should be visible");
+    // Verify the choice has filtered_indices (only matching cards are selectable)
+    let pending = game.state.get_pending_choice_json();
+    let filtered = pending
+        .as_ref()
+        .and_then(|v| v.get("filtered_indices"))
+        .and_then(|v| v.as_array());
+    assert!(filtered.is_some(), "Choice should have filtered_indices");
     assert_eq!(
-        looked_at[0], jyouji_mus,
-        "The 常時 card must be the one available"
+        filtered.unwrap().len(),
+        1,
+        "Only 1 card should be selectable"
     );
 
     // Select it

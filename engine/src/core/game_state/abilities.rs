@@ -1545,6 +1545,7 @@ impl GameState {
                         ref cost_limit_operator,
                         ref target_player_id,
                         ref group,
+                        ref filtered_indices,
                         ..
                     } = choice
                     {
@@ -1575,50 +1576,57 @@ impl GameState {
                                 .unwrap_or_default(),
                             _ => Vec::new(),
                         };
-                        let filtered: Vec<i16> = card_ids
-                            .into_iter()
-                            .filter(|&cid| {
-                                let type_ok = match card_type.as_deref() {
-                                    Some("member_card") => self
-                                        .card_database
-                                        .get_card(cid)
-                                        .map(|c| c.is_member())
-                                        .unwrap_or(false),
-                                    Some("live_card") => self
-                                        .card_database
-                                        .get_card(cid)
-                                        .map(|c| c.is_live())
-                                        .unwrap_or(false),
-                                    Some("energy_card") => self
-                                        .card_database
-                                        .get_card(cid)
-                                        .map(|c| c.is_energy())
-                                        .unwrap_or(false),
-                                    None => true,
-                                    _ => true,
-                                };
-                                let group_ok = match group.as_ref() {
-                                    Some(g) => crate::ability::util::card_matches_group_str(
-                                        &self.card_database,
-                                        cid,
-                                        Some(g),
-                                    ),
-                                    None => true,
-                                };
-                                type_ok
-                                    && group_ok
-                                    && if let Some(lim) = cost_limit {
-                                        crate::ability::util::card_matches_cost_limit_op(
+                        // When filtered_indices is set (look_and_select with greyed-out cards),
+                        // include ALL cards in selection_cards — filtered_indices restricts
+                        // selection on the frontend. Otherwise, filter by choice criteria.
+                        let filtered: Vec<i16> = if filtered_indices.is_some() {
+                            card_ids
+                        } else {
+                            card_ids
+                                .into_iter()
+                                .filter(|&cid| {
+                                    let type_ok = match card_type.as_deref() {
+                                        Some("member_card") => self
+                                            .card_database
+                                            .get_card(cid)
+                                            .map(|c| c.is_member())
+                                            .unwrap_or(false),
+                                        Some("live_card") => self
+                                            .card_database
+                                            .get_card(cid)
+                                            .map(|c| c.is_live())
+                                            .unwrap_or(false),
+                                        Some("energy_card") => self
+                                            .card_database
+                                            .get_card(cid)
+                                            .map(|c| c.is_energy())
+                                            .unwrap_or(false),
+                                        None => true,
+                                        _ => true,
+                                    };
+                                    let group_ok = match group.as_ref() {
+                                        Some(g) => crate::ability::util::card_matches_group_str(
                                             &self.card_database,
                                             cid,
-                                            Some(*lim),
-                                            cost_limit_operator.as_deref(),
-                                        )
-                                    } else {
-                                        true
-                                    }
-                            })
-                            .collect();
+                                            Some(g),
+                                        ),
+                                        None => true,
+                                    };
+                                    type_ok
+                                        && group_ok
+                                        && if let Some(lim) = cost_limit {
+                                            crate::ability::util::card_matches_cost_limit_op(
+                                                &self.card_database,
+                                                cid,
+                                                Some(*lim),
+                                                cost_limit_operator.as_deref(),
+                                            )
+                                        } else {
+                                            true
+                                        }
+                                })
+                                .collect()
+                        };
                         let sel: Vec<serde_json::Value> = filtered.iter().map(|&cid| {
                             let card_ref = self.card_database.get_card(cid);
                             let card_type_val = card_ref.map(|c| serde_json::to_value(&c.card_type).unwrap_or_default());

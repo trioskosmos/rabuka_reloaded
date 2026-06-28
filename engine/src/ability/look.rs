@@ -14,12 +14,7 @@ impl AbilityResolver {
         self.current_effect = Some(effect.clone());
 
         if let Some(ref look_action) = effect.compound.look_action {
-            println!("DEBUG: Executing look_action: {:?}", look_action);
             self.execute_effect(gs, look_action)?;
-            println!(
-                "DEBUG: After look_action - looked_at_cards.len(): {}",
-                gs.looked_at_cards.len()
-            );
         }
 
         if let Some(ref select_action) = effect.compound.select_action {
@@ -29,46 +24,62 @@ impl AbilityResolver {
             let optional = select_action.optional.unwrap_or(false);
 
             let card_db = &gs.card_database;
-            // Support OR filter via options — card matches if ANY option matches
-            if let Some(opts) = &select_action.options {
-                if !opts.is_empty() {
-                    let (matching, non_matching): (Vec<_>, Vec<_>) =
-                        gs.looked_at_cards.iter().partition(|&&card_id| {
+            let total_count = gs.looked_at_cards.len();
+
+            // Compute which looked-at card indices match the filter.
+            // Keep ALL cards in looked_at_cards — non-matching ones appear
+            // Compute which looked-at card indices match the filter.
+            // Keep ALL cards in looked_at_cards — non-matching ones appear
+            // greyed out in the choice. filtered_indices restricts selection.
+            let matching_indices: Vec<usize> = if let Some(opts) = &select_action.options {
+                if opts.is_empty() {
+                    // Empty options → skip OR filter, use regular filter below
+                    let filter = super::util::CardFilter::from_effect(select_action);
+                    if filter.has_filter() {
+                        gs.looked_at_cards
+                            .iter()
+                            .enumerate()
+                            .filter(|&(_, &card_id)| filter.matches(card_db, card_id, false))
+                            .map(|(i, _)| i)
+                            .collect()
+                    } else {
+                        (0..total_count).collect()
+                    }
+                } else {
+                    gs.looked_at_cards
+                        .iter()
+                        .enumerate()
+                        .filter(|&(_, &card_id)| {
                             opts.iter().any(|opt| {
                                 let f = super::util::CardFilter::from_effect(opt);
                                 f.matches(card_db, card_id, false)
                             })
-                        });
-                    gs.looked_at_cards = matching;
-                    let player_target = effect.target_name();
-                    let player = gs.resolve_target_player_mut(player_target);
-                    for &card_id in &non_matching {
-                        player.waitroom.add_card(card_id);
-                    }
+                        })
+                        .map(|(i, _)| i)
+                        .collect()
                 }
             } else {
                 let filter = super::util::CardFilter::from_effect(select_action);
                 if filter.has_filter() {
-                    let (matching, non_matching): (Vec<_>, Vec<_>) = gs
-                        .looked_at_cards
+                    gs.looked_at_cards
                         .iter()
-                        .partition(|&&card_id| filter.matches(card_db, card_id, false));
-                    gs.looked_at_cards = matching;
-                    let player_target = effect.target_name();
-                    let player = gs.resolve_target_player_mut(player_target);
-                    for &card_id in &non_matching {
-                        player.waitroom.add_card(card_id);
-                    }
+                        .enumerate()
+                        .filter(|&(_, &card_id)| filter.matches(card_db, card_id, false))
+                        .map(|(i, _)| i)
+                        .collect()
+                } else {
+                    (0..total_count).collect()
                 }
-            }
+            };
 
-            println!(
-                "DEBUG: Synced to game_state.looked_at_cards.len(): {}",
-                gs.looked_at_cards.len()
-            );
-
-            let available_count = gs.looked_at_cards.len();
-            if available_count == 0 {
+            let matching_count = matching_indices.len();
+            if matching_count == 0 {
+                let cards = std::mem::take(&mut gs.looked_at_cards);
+                let player_target = effect.target_name();
+                let player = gs.resolve_target_player_mut(player_target);
+                for &card_id in &cards {
+                    player.waitroom.add_card(card_id);
+                }
                 if let Some(ref followup) = effect.compound.followup_action {
                     let mut existing = gs.ability_queue.take_pending_actions();
                     existing.push(followup.as_ref().clone());
@@ -78,26 +89,24 @@ impl AbilityResolver {
             }
             let is_max = select_action.max.unwrap_or(false);
             let max_select = if any_number {
-                available_count
+                matching_count
             } else if is_max || optional {
-                // When max: true or optional: true, allow up to count cards
-                std::cmp::min(count as usize, available_count)
+                std::cmp::min(count as usize, matching_count)
             } else {
-                // When neither max nor optional, require exactly count cards
-                std::cmp::min(count as usize, available_count)
+                std::cmp::min(count as usize, matching_count)
             };
 
             let description = if any_number {
                 format!("Select any number of cards from the {} looked-at cards (or skip) (placement_order: {})",
-                    available_count, placement_order.unwrap_or("default"))
+                    total_count, placement_order.unwrap_or("default"))
             } else if is_max || optional {
                 format!("Select up to {} card(s) from the {} looked-at cards (or skip) (placement_order: {})",
-                    max_select, available_count, placement_order.unwrap_or("default"))
+                    max_select, total_count, placement_order.unwrap_or("default"))
             } else {
                 format!(
                     "Select {} card(s) from the {} looked-at cards (placement_order: {})",
                     max_select,
-                    available_count,
+                    total_count,
                     placement_order.unwrap_or("default")
                 )
             };
@@ -120,11 +129,8 @@ impl AbilityResolver {
                     .and_then(|v| v.first().cloned()),
             )
             .characters(select_action.characters.clone())
+            .filtered_indices(Some(matching_indices))
             .build();
-            println!(
-                "DEBUG: Creating choice - available_count: {}, max_select: {}, description: {}",
-                available_count, max_select, description
-            );
             self.pending_choice = Some(choice);
             self.execution_context = ExecutionContext::LookAndSelect {
                 step: LookAndSelectStep::Select {
@@ -132,14 +138,6 @@ impl AbilityResolver {
                     max_per_group: select_action.per_group_count,
                 },
             };
-
-            println!(
-                "DEBUG: Choice created and stored - pending_choice.is_some(): {}",
-                self.pending_choice.is_some()
-            );
-
-            // Sequential actions will be stored after user makes the choice
-            // Don't store them immediately to prevent premature execution
 
             return Ok(());
         }
@@ -529,67 +527,84 @@ impl AbilityResolver {
         }
 
         let card_db = &gs.card_database;
-        // Support OR filter via options — card matches if ANY option matches
-        if let Some(opts) = &effect.options {
-            if !opts.is_empty() {
-                let (matching, non_matching): (Vec<_>, Vec<_>) =
-                    gs.looked_at_cards.iter().partition(|&&card_id| {
+        let total_count = gs.looked_at_cards.len();
+
+        // Compute matching indices without removing cards from looked_at_cards.
+        let matching_indices: Vec<usize> = if let Some(opts) = &effect.options {
+            if opts.is_empty() {
+                // Empty options → skip OR filter, use regular filter below
+                let filter = util::CardFilter::from_effect(effect);
+                if filter.has_filter() {
+                    gs.looked_at_cards
+                        .iter()
+                        .enumerate()
+                        .filter(|&(_, &card_id)| filter.matches(card_db, card_id, false))
+                        .map(|(i, _)| i)
+                        .collect()
+                } else {
+                    (0..total_count).collect()
+                }
+            } else {
+                gs.looked_at_cards
+                    .iter()
+                    .enumerate()
+                    .filter(|&(_, &card_id)| {
                         opts.iter().any(|opt| {
                             let f = util::CardFilter::from_effect(opt);
                             f.matches(card_db, card_id, false)
                         })
-                    });
-                gs.looked_at_cards = matching;
-                let player_target = effect.target_name();
-                let player = gs.resolve_target_player_mut(player_target);
-                for &card_id in &non_matching {
-                    player.waitroom.add_card(card_id);
-                }
+                    })
+                    .map(|(i, _)| i)
+                    .collect()
             }
         } else {
             let filter = util::CardFilter::from_effect(effect);
             if filter.has_filter() {
-                let (matching, non_matching): (Vec<_>, Vec<_>) = gs
-                    .looked_at_cards
+                gs.looked_at_cards
                     .iter()
-                    .partition(|&&card_id| filter.matches(card_db, card_id, false));
-                gs.looked_at_cards = matching;
-                let player_target = effect.target_name();
-                let player = gs.resolve_target_player_mut(player_target);
-                for &card_id in &non_matching {
-                    player.waitroom.add_card(card_id);
-                }
+                    .enumerate()
+                    .filter(|&(_, &card_id)| filter.matches(card_db, card_id, false))
+                    .map(|(i, _)| i)
+                    .collect()
+            } else {
+                (0..total_count).collect()
             }
-        }
+        };
 
-        let available_count = gs.looked_at_cards.len();
-        if available_count == 0 {
+        let matching_count = matching_indices.len();
+        if matching_count == 0 {
+            let cards = std::mem::take(&mut gs.looked_at_cards);
+            let player_target = effect.target_name();
+            let player = gs.resolve_target_player_mut(player_target);
+            for &card_id in &cards {
+                player.waitroom.add_card(card_id);
+            }
             return Ok(());
         }
         let is_max = effect.max.unwrap_or(false);
         let max_select = if any_number {
-            available_count
+            matching_count
         } else if is_max || optional {
-            std::cmp::min(count, available_count)
+            std::cmp::min(count, matching_count)
         } else {
-            std::cmp::min(count, available_count)
+            std::cmp::min(count, matching_count)
         };
 
         let description = if any_number {
             format!(
                 "Select any number of cards from the {} looked-at cards (or skip) (placement_order: {})",
-                available_count, placement_order.unwrap_or("default")
+                total_count, placement_order.unwrap_or("default")
             )
         } else if is_max || optional {
             format!(
                 "Select up to {} card(s) from the {} looked-at cards (or skip) (placement_order: {})",
-                max_select, available_count, placement_order.unwrap_or("default")
+                max_select, total_count, placement_order.unwrap_or("default")
             )
         } else {
             format!(
                 "Select {} card(s) from the {} looked-at cards (placement_order: {})",
                 max_select,
-                available_count,
+                total_count,
                 placement_order.unwrap_or("default")
             )
         };
@@ -604,6 +619,7 @@ impl AbilityResolver {
         .cost_limit(effect.cost_limit, effect.cost_limit_operator.clone())
         .group(effect.group_names.as_ref().and_then(|v| v.first().cloned()))
         .characters(effect.characters.clone())
+        .filtered_indices(Some(matching_indices))
         .build();
         self.pending_choice = Some(choice);
         self.execution_context = ExecutionContext::LookAndSelect {
