@@ -39,6 +39,10 @@ pub struct AbilityResolver {
     /// output map, last-draw-count, and looked-at-total-count fields.
     pub step_state: StepState,
     pub pending_energy_payment: Option<u32>,
+    /// Binary sub-costs (e.g. change_state self_cost) in a sequential_cost that
+    /// were deferred until the choice sub-cost is confirmed by the player.
+    /// Paid on confirm, cleared on skip.
+    pub pending_deferred_costs: Vec<AbilityEffect>,
     pub cancel_remaining_commands: bool,
     /// Repeat actions fed one-at-a-time after each iteration completes.
     pub pending_repeat_actions: Vec<AbilityEffect>,
@@ -73,6 +77,7 @@ impl AbilityResolver {
             pipeline: { EffectPipeline::new() },
             step_state: StepState::new(),
             pending_energy_payment: None,
+            pending_deferred_costs: Vec::new(),
             cancel_remaining_commands: false,
             pending_repeat_actions: Vec::new(),
             pending_reprompt_choice: None,

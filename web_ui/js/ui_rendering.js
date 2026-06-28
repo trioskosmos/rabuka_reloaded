@@ -7,7 +7,7 @@ import { CardRenderer, ImageLoader, resolveCardImagePath } from './components/Ca
 import { BoardRenderer } from './components/BoardRenderer.js';
 import { ActionMenu } from './components/ActionMenu.js';
 
-import { Phase, isMulliganPhase } from './constants.js';
+import { Phase, isMulliganPhase, isLiveCardSetPhase } from './constants.js';
 import * as i18n from './i18n/index.js';
 import { Tooltips } from './ui_tooltips.js';
 import { InteractionAdapter } from './interaction_adapter.js';
@@ -236,7 +236,7 @@ export const Rendering = {
         if (phaseLower === 'energy') return 'energy';
         if (phaseLower === 'draw') return 'draw';
         if (phaseLower === 'main') return 'main';
-        if (phaseLower === 'livecardset') return 'live_card_set';
+        if (isLiveCardSetPhase(phase)) return 'live_card_set';
         if (phaseLower === 'firstattackerperformance') return (perspectivePlayer === 0) ? 'perf_p1' : 'perf_p2';
         if (phaseLower === 'secondattackerperformance') return (perspectivePlayer === 1) ? 'perf_p1' : 'perf_p2';
         if (phaseLower === 'livevictorydetermination') return 'live_victory_determination';

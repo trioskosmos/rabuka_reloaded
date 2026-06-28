@@ -1429,7 +1429,8 @@ impl AbilityResolver {
         target: &str,
     ) -> Result<(), String> {
         log::debug!("play_baton_touch: count={}, target={}", count, target);
-        if gs.baton_touch_count > 0 {
+        let player_id = gs.resolve_target_player(target).id.clone();
+        if gs.get_baton_touch_count(&player_id) > 0 {
             // Already performed baton touch during play action — no-op now.
             return Ok(());
         }

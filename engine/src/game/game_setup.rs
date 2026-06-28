@@ -1266,30 +1266,34 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
 
     let max_live_cards =
         3i32 - i32::try_from(active_player.live_card_set_limit_reduction).unwrap_or(0);
-    let can_add_more = active_player.live_card_zone.cards.len() < max_live_cards.max(0) as usize;
-    if can_add_more {
-        for (hand_index, card_id) in active_player.hand.cards.iter().enumerate() {
-            let is_selected = game_state.live_card_selected_indices.contains(&hand_index);
-            let card_name = game_state
-                .card_database
-                .get_card(*card_id)
-                .map(|c| c.name.as_str())
-                .unwrap_or("Unknown");
-            actions.push(make_action_params(
-                ActionType::SelectLiveCard,
-                &format!(
-                    "{} {} for live set",
-                    if is_selected { "Deselect" } else { "Select" },
-                    card_name
-                ),
-                ActionParameters {
-                    card_id: Some(*card_id),
-                    card_index: Some(hand_index),
-                    card_indices: Some(vec![hand_index]),
-                    ..make_params()
-                },
-            ));
+    let already_selected = game_state.live_card_selected_indices.len();
+    let already_placed = active_player.live_card_zone.cards.len();
+    let max_allowed = max_live_cards.max(0) as usize;
+    for (hand_index, card_id) in active_player.hand.cards.iter().enumerate() {
+        let is_selected = game_state.live_card_selected_indices.contains(&hand_index);
+        let at_limit = already_selected + already_placed >= max_allowed;
+        if at_limit && !is_selected {
+            continue;
         }
+        let card_name = game_state
+            .card_database
+            .get_card(*card_id)
+            .map(|c| c.name.as_str())
+            .unwrap_or("Unknown");
+        actions.push(make_action_params(
+            ActionType::SelectLiveCard,
+            &format!(
+                "{} {} for live set",
+                if is_selected { "Deselect" } else { "Select" },
+                card_name
+            ),
+            ActionParameters {
+                card_id: Some(*card_id),
+                card_index: Some(hand_index),
+                card_indices: Some(vec![hand_index]),
+                ..make_params()
+            },
+        ));
     }
 
     actions.push(make_action_params(
@@ -1299,10 +1303,6 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
             card_indices: Some(vec![]),
             ..make_params()
         },
-    ));
-    actions.push(make_action(
-        ActionType::SkipLiveCardSet,
-        &format!("Skip {}'s live card set (set no cards)", player_name),
     ));
     actions
 }

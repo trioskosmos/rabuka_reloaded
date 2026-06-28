@@ -105,28 +105,28 @@
 
 
 
-/* --- Hand Row Refined --- */
+/* --- Hand Row --- */
+.hand {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+    overflow: auto;
+    align-self: stretch;
+}
+
+.hand-row {
+    height: calc((100dvh - 40px) * 0.12 / var(--section-count, 1));
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+}
+
 .hand-group {
     display: flex;
     align-items: center;
     gap: 4px;
     width: 100%;
-    height: 100%;
-}
-
-.hand {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-}
-
-.hand-row {
-    flex: 0 0 calc(10dvh + 2px);
-    display: flex;
-    align-items: center;
+    align-self: stretch;
 }
 
 .hand-row .card {
@@ -134,8 +134,7 @@
     flex-shrink: 0;
     margin-right: 0;
     z-index: 1;
-    height: 100%;
-    max-height: var(--card-h);
+    height: calc((100dvh - 40px) * 0.12 / var(--section-count, 1));
     width: auto;
     aspect-ratio: 512 / 720;
     box-sizing: border-box;
@@ -157,13 +156,14 @@
 .area-count {
     background: var(--accent-blue);
     color: white;
-    width: 24px;
-    height: 24px;
+    height: 50%;
+    width: auto;
+    aspect-ratio: 1;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.75rem;
+    font-size: clamp(0.35rem, 1.2cqw, 0.75rem);
     font-weight: bold;
     flex-shrink: 0;
     box-shadow: 0 0 5px rgba(0,0,0,0.5);
@@ -213,8 +213,9 @@
 .successful-live-area-container .card {
     box-shadow: var(--shadow-lg);
     margin: 4px 0;
-    width: min(110px, 90%) !important; /* Cap width and ensure it stays inside */
-    height: auto !important;
+    max-width: 110px;
+    width: 90%;
+    height: auto;
     aspect-ratio: 720 / 512;
     flex-shrink: 0;
 }
@@ -281,12 +282,35 @@
 
 /* --- Energy & Misc --- */
 .energy-row-hud {
+    height: calc((100dvh - 40px) * 0.10 / var(--section-count, 1));
     flex-shrink: 0;
-    height: calc(var(--card-h-compact) + 10px);
     background: rgba(0, 0, 0, 0.2);
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
     margin-bottom: 2px;
+    overflow-y: hidden;
+}
+
+.energy-area-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-start;
+    align-items: center;
+    height: 100%;
+}
+
+.energy-pip {
+    height: calc((100dvh - 44px) * 0.10 * 0.8 / var(--section-count, 1));
+    width: auto;
+    aspect-ratio: 512 / 720;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    overflow: hidden;
+    flex-shrink: 0;
+    position: relative;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s;
 }
 
 .energy-area-container {
@@ -392,7 +416,6 @@
     border: none;
     min-height: 0;
     width: 100%;
-    align-items: center;
     justify-content: center;
     flex-wrap: nowrap; 
     flex: 1;
@@ -402,8 +425,7 @@
 }
 
 .live-zone-cards .card {
-    height: 100%;
-    max-height: var(--card-w);
+    height: calc((100dvh - 44px) * 0.18 / var(--section-count, 1));
     width: auto;
     aspect-ratio: 720 / 512;
     flex-shrink: 0;
@@ -422,12 +444,11 @@
 
 /* Live card inner wrapper */
 .live-card-inner {
-    position: relative;
+    position: absolute;
+    inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 100%;
-    height: 100%;
 }
 
 .live-card-inner img {
@@ -735,7 +756,7 @@
 }
 
 .utility-column-right {
-    width: 120px;
+    width: 20%;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
@@ -744,6 +765,7 @@
     padding: 0;
     border-radius: var(--radius-md);
     border: 1px solid var(--border);
+    font-size: clamp(0.5rem, 1.5cqw, 0.8rem);
 }
 
 .deck-discard-group.simplified {

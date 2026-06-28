@@ -127,3 +127,197 @@ fn baton_touch_hanaho_auto_ability_triggers() {
         after
     );
 }
+
+/// Baton touch count is tracked per-player, not globally.
+#[test]
+fn baton_touch_count_per_player() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let hanaho = game.id("PL!HS-sd1-001-SD");
+    let arriver = game.id("PL!HS-sd1-006-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = hanaho;
+    game.give_energy(25);
+    game.state.player1.hand.cards.push(arriver);
+    game.state.player1.hand.cards.push(filler);
+
+    assert_eq!(
+        game.state.get_baton_touch_count("p1"),
+        0,
+        "p1 count starts at 0"
+    );
+    assert_eq!(
+        game.state.get_baton_touch_count("p2"),
+        0,
+        "p2 count starts at 0"
+    );
+
+    game.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert_eq!(
+        game.state.get_baton_touch_count("p1"),
+        1,
+        "p1 count is 1 after p1's baton touch"
+    );
+    assert_eq!(
+        game.state.get_baton_touch_count("p2"),
+        0,
+        "p2 count remains 0 after p1's baton touch"
+    );
+}
+
+/// Baton touch arriving card IDs are tracked in baton_touch_arriving_card_ids.
+#[test]
+fn baton_touch_arriving_card_ids_tracked() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let hanaho = game.id("PL!HS-sd1-001-SD");
+    let arriver = game.id("PL!HS-sd1-006-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = hanaho;
+    game.give_energy(25);
+    game.state.player1.hand.cards.push(arriver);
+    game.state.player1.hand.cards.push(filler);
+
+    assert!(
+        game.state.baton_touch_arriving_card_ids.is_empty(),
+        "starts empty"
+    );
+
+    game.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert!(
+        game.state.baton_touch_arriving_card_ids.contains(&arriver),
+        "arriving card ID is stored"
+    );
+}
+
+/// Opponent's card with baton touch discard ability does NOT trigger
+/// when the active player performs the baton touch.
+#[test]
+fn opponent_baton_touch_discard_does_not_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    // 花帆 (PL!HS-sd1-001-SD) has: when baton-touched to waitroom by cost 10+ 蓮ノ空 → activate 2 energy
+    let hanaho = game.id("PL!HS-sd1-001-SD");
+    let arriver = game.id("PL!HS-sd1-006-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // Put hanaho on Player 1's stage (she will be replaced by baton touch)
+    game.state.player1.stage.stage[1] = hanaho;
+    // Also put a copy of hanaho in Player 2's waitroom (as if P2 had their own replaced card)
+    // But the baton touch was performed by P1, so P2's hanaho should NOT trigger.
+    let p2_hanaho = game.id("PL!HS-sd1-001-SD");
+    game.state.player2.waitroom.cards.push(p2_hanaho);
+
+    // Give energy to P1 for the baton touch cost
+    game.give_energy(25);
+
+    game.state.player1.hand.cards.push(arriver);
+    game.state.player1.hand.cards.push(filler);
+
+    let p2_energy_before = game.state.player2.energy_zone.active_count();
+
+    // Perform baton touch from P1's hand
+    game.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // P1's hanaho was replaced and should have triggered (activate 2 energy for P1)
+    // P2's hanaho should NOT have triggered even though it's in the waitroom,
+    // because the baton touch was performed by P1, not P2.
+
+    let p2_energy_after = game.state.player2.energy_zone.active_count();
+    assert_eq!(
+        p2_energy_after, p2_energy_before,
+        "P2's energy should not change — P2's hanaho should not trigger on P1's baton touch"
+    );
+
+    // Also verify baton touch is attributed correctly
+    assert_eq!(
+        game.state.get_baton_touch_count("p1"),
+        1,
+        "P1 has 1 baton touch"
+    );
+    assert_eq!(
+        game.state.get_baton_touch_count("p2"),
+        0,
+        "P2 has 0 baton touches"
+    );
+}
+
+/// card_count_condition with baton_touch_trigger correctly filters stage cards
+/// to only those that arrived via baton touch.
+#[test]
+fn card_count_condition_baton_touch_filter() {
+    use rabuka_engine::ability::condition::ConditionContext;
+    use rabuka_engine::ability::enums::ConditionType;
+    use rabuka_engine::card::Condition;
+
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let member1 = game.id("PL!HS-sd1-006-SD"); // 蓮ノ空 member
+    let member2 = game.id("PL!HS-sd1-008-SD"); // 蓮ノ空 member
+
+    // Place 2 蓮ノ空 members on stage directly (no baton touch)
+    game.state.player1.stage.stage[0] = member1;
+    game.state.player1.stage.stage[1] = member2;
+
+    // Create a card_count_condition that checks stage for 蓮ノ空 members
+    // with baton_touch_trigger and min_baton_touch_count=2
+    let condition = Condition {
+        condition_type: Some(ConditionType::CardCountCondition),
+        card_type: Some("member_card".to_string()),
+        location: Some("stage".to_string()),
+        target: Some("self".to_string()),
+        group_names: Some(vec!["蓮ノ空".to_string()]),
+        baton_touch_trigger: Some(true),
+        min_baton_touch_count: Some(2),
+        count: Some(2),
+        operator: Some(">=".to_string()),
+        ..Default::default()
+    };
+
+    // Without any baton touches, the condition should fail
+    let ctx = ConditionContext::new(&game.state);
+    assert!(
+        !ctx.evaluate_condition(&condition),
+        "card_count_condition with baton_touch_trigger should fail with 0 baton touches"
+    );
+
+    // Now record 2 baton touches with arriving card IDs
+    game.state.record_baton_touch("p1", Some(member1));
+    game.state.record_baton_touch("p1", Some(member2));
+
+    // Since record_baton_touch pushed member1 and member2 into
+    // baton_touch_arriving_card_ids, and both are on stage,
+    // the condition should pass.
+    let ctx2 = ConditionContext::new(&game.state);
+    assert!(
+        ctx2.evaluate_condition(&condition),
+        "card_count_condition with baton_touch_trigger=2 should pass with 2 baton touched members on stage"
+    );
+
+    // Remove one member from baton_touch_arriving_card_ids — condition should fail
+    game.state
+        .baton_touch_arriving_card_ids
+        .retain(|&id| id != member2);
+    let ctx3 = ConditionContext::new(&game.state);
+    assert!(
+        !ctx3.evaluate_condition(&condition),
+        "Should fail when only 1 of 2 stage members arrived via baton touch"
+    );
+}

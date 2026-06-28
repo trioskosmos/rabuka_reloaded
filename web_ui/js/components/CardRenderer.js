@@ -776,7 +776,7 @@ export const CardRenderer = {
         const existingSlots = Array.from(el.children);
 
         for (let i = 0; i < 3; i++) {
-            const card = shouldHideCards ? { card_no: -1, hidden: true } : liveCards[i];
+            const card = (shouldHideCards && liveCards[i]) ? { card_no: -1, hidden: true } : liveCards[i];
             const action = validActionMap[i];
             const isValid = action !== undefined;
             const validClass = isValid ? ' valid-target' : '';

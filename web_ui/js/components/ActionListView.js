@@ -61,7 +61,6 @@ export const ActionListView = {
                 a.action_type === 'confirm_mulligan' ||
                 a.action_type === 'finish_live_card_set' ||
                 a.action_type === 'confirm_live_card_set' ||
-                a.action_type === 'skip_live_card_set' ||
                 a.action_type === 'choose_first_attacker' ||
                 a.action_type === 'choose_second_attacker') {
                 systemActions.push(a);

@@ -8,7 +8,8 @@ export const Phase = {
     ENERGY: "Energy",
     DRAW: "Draw",
     MAIN: "Main",
-    LIVE_CARD_SET: "LiveCardSet",
+    LIVE_CARD_SET_FIRST_ATTACKER: "LiveCardSetFirstAttacker",
+    LIVE_CARD_SET_SECOND_ATTACKER: "LiveCardSetSecondAttacker",
     FIRST_ATTACKER_PERFORMANCE: "FirstAttackerPerformance",
     SECOND_ATTACKER_PERFORMANCE: "SecondAttackerPerformance",
     LIVE_VICTORY_DETERMINATION: "LiveVictoryDetermination",
@@ -21,6 +22,12 @@ export const isMulliganPhase = (phase) => {
     return lower === "mulligan" ||
         lower === "mulliganp1turn" || lower === "mulliganp2turn" ||
         lower === "mulliganfirstattacker" || lower === "mulligansecondattacker";
+};
+
+export const isLiveCardSetPhase = (phase) => {
+    if (!phase) return false;
+    const lower = String(phase).toLowerCase();
+    return lower === "livecardsetfirstattacker" || lower === "livecardsetsecondattacker";
 };
 
 const isStaticHost = window.location.hostname.includes('github.io') ||

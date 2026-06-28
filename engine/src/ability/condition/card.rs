@@ -646,11 +646,15 @@ impl<'a> ConditionContext<'a> {
         if !condition.baton_touch_trigger.unwrap_or(false) {
             return true;
         }
-        if self.game_state.baton_touch_count == 0 {
+        // Resolve the player to check baton touch count for
+        let target = condition.target.as_deref().unwrap_or("self");
+        let player = self.resolve_condition_player(target);
+        let player_id = player.id.as_str();
+        if self.game_state.get_baton_touch_count(player_id) == 0 {
             return false;
         }
         if let Some(min_count) = condition.min_baton_touch_count {
-            if self.game_state.baton_touch_count < min_count {
+            if self.game_state.get_baton_touch_count(player_id) < min_count {
                 return false;
             }
         }
@@ -1904,74 +1908,76 @@ impl<'a> ConditionContext<'a> {
                     Vec::new()
                 };
                 if !event_cards.is_empty() {
-                    // Self-target + zone_change: the card moved. It's in
-                    // event_cards because the TAS scan found it. The zone
-                    // transition is defined statically in the condition;
-                    // turn_movements cross-referencing adds nothing here.
-                    if condition.self_target.unwrap_or(false) {
-                        event_cards
-                    } else {
-                        // Cross-reference event cards with turn_movements for zone-
-                        // transition filtering. This ensures we only count cards
-                        // from the current event/trigger, not ALL movements this turn.
-                        let from_tm: Vec<i16> = self
-                            .game_state
-                            .turn_movements
-                            .iter()
-                            .filter(|m| {
+                    // cause_player_id filter: for self_target, the card's own
+                    // movement counts regardless of who caused it (unless
+                    // self_effect_only restricts to own effects). For
+                    // non-self_target, movements are scoped to the target
+                    // player's cause_player_id for backward compatibility.
+                    let require_self_effect = condition.get_self_effect_only().unwrap_or(false);
+                    // Cross-reference event cards with turn_movements for zone-
+                    // transition filtering. This ensures we only count cards
+                    // whose movement matches the expected source → destination
+                    // zones, not cards that moved through other paths.
+                    let from_tm: Vec<i16> = self
+                        .game_state
+                        .turn_movements
+                        .iter()
+                        .filter(|m| {
+                            let src_ok = m.source_zone == source_zone
+                                || (source_zone == "discard" && m.source_zone == "waitroom")
+                                || (source_zone == "waitroom" && m.source_zone == "discard");
+                            let cause_ok = (condition.self_target.unwrap_or(false)
+                                && !require_self_effect)
+                                || m.cause_player_id == target_id;
+                            src_ok
+                                && cause_ok
+                                && (m.dest_zone == dest_zone
+                                    || (dest_zone == "discard" && m.dest_zone == "waitroom")
+                                    || (dest_zone == "waitroom" && m.dest_zone == "discard"))
+                                && event_cards.contains(&m.moved_card_id)
+                        })
+                        .map(|m| m.moved_card_id)
+                        .collect();
+                    // For each event card, check if turn_movements has zone
+                    // data for it.  If yes, apply the zone/player filter.  If
+                    // no (movement path skipped push_movement_event), include
+                    // the card directly.
+                    let result: Vec<i16> = event_cards
+                        .iter()
+                        .filter(|&&cid| {
+                            let tm: Vec<_> = self
+                                .game_state
+                                .turn_movements
+                                .iter()
+                                .filter(|m| m.moved_card_id == cid)
+                                .collect();
+                            if tm.is_empty() {
+                                return true; // no zone data → assume match
+                            }
+                            tm.iter().any(|m| {
                                 let src_ok = m.source_zone == source_zone
                                     || (source_zone == "discard" && m.source_zone == "waitroom")
                                     || (source_zone == "waitroom" && m.source_zone == "discard");
+                                let cause_ok = (condition.self_target.unwrap_or(false)
+                                    && !require_self_effect)
+                                    || m.cause_player_id == target_id;
                                 src_ok
-                                    && m.cause_player_id == target_id
+                                    && cause_ok
                                     && (m.dest_zone == dest_zone
                                         || (dest_zone == "discard" && m.dest_zone == "waitroom")
                                         || (dest_zone == "waitroom" && m.dest_zone == "discard"))
-                                    && event_cards.contains(&m.moved_card_id)
                             })
-                            .map(|m| m.moved_card_id)
-                            .collect();
-                        // For each event card, check if turn_movements has zone
-                        // data for it.  If yes, apply the zone/player filter.  If
-                        // no (movement path skipped push_movement_event), include
-                        // the card directly.
-                        let result: Vec<i16> = event_cards
-                            .iter()
-                            .filter(|&&cid| {
-                                let tm: Vec<_> = self
-                                    .game_state
-                                    .turn_movements
-                                    .iter()
-                                    .filter(|m| m.moved_card_id == cid)
-                                    .collect();
-                                if tm.is_empty() {
-                                    return true; // no zone data → assume match
-                                }
-                                tm.iter().any(|m| {
-                                    let src_ok = m.source_zone == source_zone
-                                        || (source_zone == "discard"
-                                            && m.source_zone == "waitroom")
-                                        || (source_zone == "waitroom"
-                                            && m.source_zone == "discard");
-                                    src_ok
-                                        && m.cause_player_id == target_id
-                                        && (m.dest_zone == dest_zone
-                                            || (dest_zone == "discard"
-                                                && m.dest_zone == "waitroom")
-                                            || (dest_zone == "waitroom"
-                                                && m.dest_zone == "discard"))
-                                })
-                            })
-                            .copied()
-                            .collect();
-                        if !from_tm.is_empty() {
-                            from_tm
-                        } else {
-                            result
-                        }
+                        })
+                        .copied()
+                        .collect();
+                    if !from_tm.is_empty() {
+                        from_tm
+                    } else {
+                        result
                     }
                 } else if !self.game_state.turn_movements.is_empty() {
                     // No event data — use turn_movements directly (original behavior)
+                    let require_self_effect = condition.get_self_effect_only().unwrap_or(false);
                     self.game_state
                         .turn_movements
                         .iter()
@@ -1979,8 +1985,11 @@ impl<'a> ConditionContext<'a> {
                             let src_ok = m.source_zone == source_zone
                                 || (source_zone == "discard" && m.source_zone == "waitroom")
                                 || (source_zone == "waitroom" && m.source_zone == "discard");
+                            let cause_ok = (condition.self_target.unwrap_or(false)
+                                && !require_self_effect)
+                                || m.cause_player_id == target_id;
                             src_ok
-                                && m.cause_player_id == target_id
+                                && cause_ok
                                 && (m.dest_zone == dest_zone
                                     || (dest_zone == "discard" && m.dest_zone == "waitroom")
                                     || (dest_zone == "waitroom" && m.dest_zone == "discard"))
@@ -2102,6 +2111,38 @@ impl<'a> ConditionContext<'a> {
                         if !zone_match {
                             return false;
                         }
+                        // Source-zone verification: also check that the card
+                        // moved from the expected source zone, not just that
+                        // it's currently in the destination zone. Catches
+                        // cases like deck→waitroom when trigger expects
+                        // stage→waitroom.
+                        let expected_source = condition.location.as_deref().or_else(|| {
+                            condition
+                                .get_source()
+                                .filter(|&s| s != "preceding_moved" && s != "previous_moved_cards")
+                        });
+                        if let Some(src_zone) = expected_source {
+                            let card_movements: Vec<_> = self
+                                .game_state
+                                .turn_movements
+                                .iter()
+                                .filter(|m| m.moved_card_id == cid)
+                                .collect();
+                            if !card_movements.is_empty() {
+                                let src_match = card_movements.iter().any(|m| {
+                                    let src_ok = m.source_zone == src_zone
+                                        || (src_zone == "discard" && m.source_zone == "waitroom")
+                                        || (src_zone == "waitroom" && m.source_zone == "discard");
+                                    src_ok
+                                        && (m.dest_zone == *dest
+                                            || (*dest == "discard" && m.dest_zone == "waitroom")
+                                            || (*dest == "waitroom" && m.dest_zone == "discard"))
+                                });
+                                if !src_match {
+                                    return false;
+                                }
+                            }
+                        }
                     }
 
                     true
@@ -2202,6 +2243,31 @@ impl<'a> ConditionContext<'a> {
                                 .map_or(state == "active", |o| o.as_str() == state)
                         })
                         .collect()
+                } else {
+                    stage_cards
+                };
+                // Baton touch filter: when baton_touch_trigger is set on a
+                // card_count_condition with location=stage, only count cards
+                // that arrived via baton touch this turn.
+                let stage_cards: Vec<i16> = if condition.baton_touch_trigger.unwrap_or(false) {
+                    let player_id = player.id.as_str();
+                    let bt_ids = &self.game_state.baton_touch_arriving_card_ids;
+                    // Also gate on per-player baton touch count
+                    if let Some(min_count) = condition.min_baton_touch_count {
+                        if self.game_state.get_baton_touch_count(player_id) < min_count {
+                            Vec::new()
+                        } else {
+                            stage_cards
+                                .into_iter()
+                                .filter(|cid| bt_ids.contains(cid))
+                                .collect()
+                        }
+                    } else {
+                        stage_cards
+                            .into_iter()
+                            .filter(|cid| bt_ids.contains(cid))
+                            .collect()
+                    }
                 } else {
                     stage_cards
                 };
@@ -2513,19 +2579,15 @@ impl<'a> ConditionContext<'a> {
 
         if baton_touch_trigger {
             if let Some(ref _activating_card) = self.game_state.activating_card {
-                if self.game_state.baton_touch_count == 0 {
+                let player_id = player.id.as_str();
+                let bt_count = self.game_state.get_baton_touch_count(player_id);
+                if bt_count == 0 {
                     push_rich("バトンタッチ未実行", false);
                     return false;
                 }
                 if let Some(min_count) = condition.min_baton_touch_count {
-                    if self.game_state.baton_touch_count < min_count {
-                        push_rich(
-                            &format!(
-                                "バトンタッチ回数不足({})",
-                                self.game_state.baton_touch_count
-                            ),
-                            false,
-                        );
+                    if bt_count < min_count {
+                        push_rich(&format!("バトンタッチ回数不足({})", bt_count), false);
                         return false;
                     }
                 }

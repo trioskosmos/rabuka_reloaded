@@ -2272,7 +2272,7 @@ fn test_baton_touch_discard_ability_triggers() {
     game_state.current_phase = Phase::Main;
     game_state.turn_number = 2;
 
-    game_state.baton_touch_count = 1;
+    game_state.baton_touch_count.insert("p1".to_string(), 1);
     game_state.baton_touch_replaced_member_id = Some(target_id);
     game_state.baton_touch_arriving_card_id = Some(arriving_id);
     game_state.recently_moved_cards = Some(vec![target_id]);
@@ -2348,7 +2348,7 @@ fn test_baton_touch_discard_ability_skipped_low_cost() {
     game_state.current_phase = Phase::Main;
     game_state.turn_number = 2;
 
-    game_state.baton_touch_count = 1;
+    game_state.baton_touch_count.insert("p1".to_string(), 1);
     game_state.baton_touch_replaced_member_id = Some(target_id);
     game_state.baton_touch_arriving_card_id = Some(low_cost_id);
     game_state.recently_moved_cards = Some(vec![target_id]);

@@ -6,6 +6,18 @@ use super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 
+impl AbilityResolver {
+    /// Pay all deferred costs that were stored during sequential_cost handler.
+    /// Clears the list after paying. Returns error if any cost cannot be paid.
+    pub fn pay_deferred_costs(&mut self, gs: &mut GameState) -> Result<(), String> {
+        let costs = std::mem::take(&mut self.pending_deferred_costs);
+        for cost in &costs {
+            self.pay_cost(gs, cost)?;
+        }
+        Ok(())
+    }
+}
+
 /// Returns true if the given cost type creates a "pay or skip" prompt.
 /// Costs without a prompt (pay_energy with fixed count, change_state with
 /// self_cost=true) don't require choosing — they just apply a fixed effect.
@@ -159,7 +171,7 @@ impl AbilityResolver {
                         if is_binary && has_choice_ahead {
                             let mut auto = sub_cost.clone();
                             auto.optional = Some(false);
-                            self.pay_cost(gs, &auto)?;
+                            self.pending_deferred_costs.push(auto);
                             had_binary_auto_pay = true;
                         } else {
                             self.pay_cost(gs, sub_cost)?;

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Trap: intercepts "cargo build", redirects to "cargo test"
+# Works when this script's directory is in PATH before real cargo.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REAL_CARGO=""
+for dir in $(echo "$PATH" | tr ':' ' '); do
+    d="$(cd "$dir" 2>/dev/null && pwd)"
+    [ "$d" = "$SCRIPT_DIR" ] && continue
+    if [ -x "$d/cargo.exe" ]; then REAL_CARGO="$d/cargo.exe"; break; fi
+    if [ -x "$d/cargo" ] && [ ! -L "$d/cargo" ]; then REAL_CARGO="$d/cargo"; break; fi
+done
+if [ -z "$REAL_CARGO" ]; then REAL_CARGO="$(command -v cargo.exe)"; fi
+if [ "$1" = "build" ]; then
+    echo ""
+    echo "===== CARGO BUILD TRAP ====="
+    echo "Redirecting to: cargo test"
+    echo ""
+    exec "$REAL_CARGO" test "${@:2}"
+fi
+exec "$REAL_CARGO" "$@"

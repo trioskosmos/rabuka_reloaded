@@ -138,10 +138,13 @@ export const GameService = {
         const state = State.data;
         if (!state) return;
 
-        // For mulligan confirm, inject the locally-selected indices into card_indices
+        // For mulligan/live card confirm, inject the locally-selected indices into card_indices
         let extraCardIndices = action.parameters?.card_indices;
         if (action.action_type === 'confirm_mulligan' || action.action_type === 'ConfirmMulligan') {
             extraCardIndices = Array.from(State.localMulliganSelection);
+        }
+        if (action.action_type === 'confirm_live_card_set' || action.action_type === 'ConfirmLiveCardSet') {
+            extraCardIndices = Array.from(State.localLiveCardSelection);
         }
 
         // Optimistic local prediction — apply deterministic state changes immediately

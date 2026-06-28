@@ -34,74 +34,44 @@
 
     <header class="header">
         <div class="info-bar">
-            <!-- Group: Game Connectivity/Meta -->
-
-            <div class="stat-group">
-                <span class="stat" title="Connection"><span class="stat-icon"></span> <strong id="header-debug-info"
-                        class="debug-badge" data-i18n="sandbox">Sandbox</strong></span>
-                <span id="room-display" class="stat" title="Room Code" style="display: none;">
-                    <span class="stat-icon"></span> <span data-i18n="room">Room</span> <strong id="room-code-header">----</strong>
-                </span>
-                <span class="stat" title="System Status" style="display: none;"><span class="stat-icon"></span> <strong
-                        id="system-status-badge" class="debug-badge" data-i18n="checking">Checking...</strong></span>
-                <span class="stat"><span class="stat-icon">#</span> <strong
-                        id="frame-counter" title="Frame">0</strong>
-                    <span class="stat-separator"></span>
-                    <span class="stat-icon">⏱</span> <strong id="action-latency" title="Last action latency">---</strong></span>
+            <!-- Column 1: Turn/Phase (stacked vert) -->
+            <div class="header-col col-meta">
+                <div class="header-stat-row"><span class="stat-icon"></span> <strong id="turn">1</strong></div>
+                <div class="header-stat-row"><span class="stat-icon"></span> <strong id="active-player">P1</strong></div>
+                <div class="header-stat-row"><strong id="phase">MAIN</strong></div>
             </div>
 
-            <!-- Group: Turn & Phase -->
-            <div class="stat-group main-game-stats">
-                <span class="stat" title="Turn"><span class="stat-icon"></span> <span class="stat-label"
-                        data-i18n="turn">ターン</span> <strong id="turn">1</strong></span>
-                <span class="stat" title="Active Player"><span class="stat-icon">🎤</span> <strong
-                        id="active-player">P1</strong></span>
-                <span class="stat" title="Phase"><span class="stat-icon"></span> <span class="stat-label"
-                        data-i18n="phase">フェーズ</span> <strong id="phase">MAIN</strong></span>
+            <!-- Column 2: Hand Counts -->
+            <div class="header-col col-hand">
+                <div class="header-stat-row"><span class="stat-label" data-i18n="player1">P1</span> <span class="stat-label">Hand</span> <strong id="player1-hand-count">0</strong></div>
+                <div class="header-stat-row"><span class="stat-label" data-i18n="player2">P2</span> <span class="stat-label">Hand</span> <strong id="player2-hand-count">0</strong></div>
             </div>
 
-            <!-- Group: Score & Progress -->
-            <div class="stat-group score-stats">
-                <div class="score-rows">
-                    <div class="score-row player1-row">
-                        <span class="stat-label" data-i18n="player1">P1</span>
-                        <strong id="player1-score">0 +0</strong>
-                        <span class="stat summary-pips" title="P1 Hearts">
-                            <div id="player1-hearts-summary"></div>
-                        </span>
-                        <span class="stat summary-pips" title="P1 Blades">
-                            <div id="player1-blades-summary"></div>
-                        </span>
-                    </div>
-                    <div class="score-row player2-row">
-                        <span class="stat-label" data-i18n="player2">P2</span>
-                        <strong id="player2-score">0 +0</strong>
-                        <span class="stat summary-pips" title="P2 Hearts">
-                            <div id="player2-hearts-summary"></div>
-                        </span>
-                        <span class="stat summary-pips" title="P2 Blades">
-                            <div id="player2-blades-summary"></div>
-                        </span>
-                    </div>
+            <!-- Column 3: Energy -->
+            <div class="header-col col-energy">
+                <div class="header-stat-row"><span class="stat-label" data-i18n="player1">P1</span> <span class="stat-icon">En</span> <strong id="player1-energy">0 / 0</strong></div>
+                <div class="header-stat-row"><span class="stat-label" data-i18n="player2">P2</span> <span class="stat-icon">En</span> <strong id="player2-energy">0 / 0</strong></div>
+            </div>
+
+            <!-- Column 4: P1 Stats -->
+            <div class="header-col col-p1">
+                <div class="header-stat-row"><span class="stat-label">Score</span> <strong id="player1-score">0</strong></div>
+                <div class="header-stat-row hearts-blades-row">
+                    <span class="summary-pips" title="Hearts"><div id="player1-hearts-summary"></div></span>
+                    <span class="summary-pips" title="Blades"><div id="player1-blades-summary"></div></span>
                 </div>
             </div>
 
-            <!-- Group: Energy -->
-            <div class="stat-group energy-stats">
-                <div class="energy-rows">
-                    <div class="energy-row player1-energy">
-                        <span class="stat-label" data-i18n="player1">P1</span>
-                        <span class="stat" title="P1 Energy"><span class="stat-icon">En</span>
-                            <strong id="player1-energy">0 / 0</strong></span>
-                    </div>
-                    <div class="energy-row player2-energy">
-                        <span class="stat-label" data-i18n="player2">P2</span>
-                        <span class="stat" title="P2 Energy"><span class="stat-icon">En</span>
-                            <strong id="player2-energy">0 / 0</strong></span>
-                    </div>
+            <!-- Column 5: P2 Stats -->
+            <div class="header-col col-p2">
+                <div class="header-stat-row"><span class="stat-label">Score</span> <strong id="player2-score">0</strong></div>
+                <div class="header-stat-row hearts-blades-row">
+                    <span class="summary-pips" title="Hearts"><div id="player2-hearts-summary"></div></span>
+                    <span class="summary-pips" title="Blades"><div id="player2-blades-summary"></div></span>
                 </div>
             </div>
 
+            <!-- Column 6: Controls -->
             <div class="controls">
                 <button id="undo-btn" class="btn btn-secondary btn-sm" data-action="rewind" data-i18n="undo">Undo</button>
                 <button id="redo-btn" class="btn btn-secondary btn-sm" data-action="redo" data-i18n="redo">Redo</button>
@@ -109,36 +79,6 @@
                         style="border:1px solid #aaa;">English</button>
                 <button id="exit-room-btn" class="btn btn-accent-red btn-sm" data-action="leave-room" data-i18n="exit">Exit</button>
             </div>
-        </div>
-
-        <div class="replay-controls" id="replay-controls" style="display: none;">
-            <button class="btn" data-action="click-target" data-target-id="replay-file-input"
-                style="font-size:0.8rem; padding:2px 8px;">Open</button>
-            <input type="file" id="replay-file-input" accept=".json" style="display:none"
-                onchange="loadReplayFromFile(this)">
-            <button class="btn" data-action="open-paste-replay-modal" style="font-size:0.8rem; padding:2px 8px;">
-                Paste</button>
-            <button class="btn" data-action="load-replay" style="font-size:0.8rem; padding:2px 8px;">Load</button>
-            <input type="text" id="replay-file" value="ai_match.json" placeholder="ai_match.json"
-                style="width:120px; padding:2px 6px; background:rgba(0,0,0,0.5); border:1px solid #444; color:white; border-radius:4px; font-size: 0.8rem;">
-            <div style="width:1px; height:20px; background:#555; margin:0 4px;"></div>
-            <button class="btn" data-action="replay-prev-turn"
-                style="font-size:0.75rem; padding:2px 6px; background:#444;">[Turn]</button>
-            <button class="btn" data-action="replay-prev-phase"
-                style="font-size:0.75rem; padding:2px 6px; background:#555;">[Phase]</button>
-            <button class="btn" data-action="replay-prev" style="font-size:0.8rem; padding:2px 10px;">Prev</button>
-            <button class="btn" id="play-btn" data-action="toggle-play"
-                style="font-size:0.8rem; padding:2px 10px; min-width:60px; background:#4a9eff;">Play / Pause</button>
-            <button class="btn" data-action="replay-next" style="font-size:0.8rem; padding:2px 10px;">Next</button>
-            <button class="btn" data-action="replay-next-phase"
-                style="font-size:0.75rem; padding:2px 6px; background:#555;">Phase [Next]</button>
-            <button class="btn" data-action="replay-next-turn"
-                style="font-size:0.75rem; padding:2px 6px; background:#444;">Turn [Next]</button>
-            <span style="color:#aaa; font-size:0.8rem; margin-left:8px;">Fr: <span id="frame-num">0</span>/<span
-                    id="total-frames">0</span></span>
-            <input type="number" id="jump-frame" placeholder="#"
-                style="width:50px; padding:2px 4px; background:rgba(0,0,0,0.5); border:1px solid #444; color:white; border-radius:4px; font-size:0.8rem;"
-                onchange="window.jumpToFrame(this.value)">
         </div>
     </header>
 
@@ -213,7 +153,6 @@
                     <!-- MINIMIZED ENERGY HUD -->
                     <div class="energy-row-hud">
                         <div class="energy-area-container horizontal">
-                            <span class="area-count" id="opp-energy-count">0</span>
                             <div class="card-area energy" id="opp-energy"></div>
                         </div>
                     </div>
@@ -221,7 +160,6 @@
                     <!-- HAND -->
                     <div class="hand-row">
                         <div class="hand-group">
-                            <span class="area-count" id="opp-hand-count">0</span>
                             <div class="card-area hand" id="opp-hand"></div>
                         </div>
                     </div>
@@ -265,7 +203,6 @@
                     <!-- MINIMIZED ENERGY HUD -->
                     <div class="energy-row-hud">
                         <div class="energy-area-container horizontal">
-                            <span class="area-count" id="my-energy-count">0</span>
                             <div class="card-area energy" id="my-energy"></div>
                         </div>
                     </div>
@@ -273,7 +210,6 @@
                     <!-- HAND -->
                     <div class="hand-row">
                         <div class="hand-group">
-                            <span class="area-count" id="my-hand-count">0</span>
                             <div class="card-area hand" id="my-hand"></div>
                         </div>
                     </div>

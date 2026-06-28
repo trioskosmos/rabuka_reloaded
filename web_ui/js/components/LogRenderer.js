@@ -141,7 +141,8 @@ export const LogRenderer = {
             case Phase.ENERGY: return 'energy';
             case Phase.DRAW: return 'draw';
             case Phase.MAIN: return 'main';
-            case Phase.LIVE_CARD_SET: return 'live_set';
+            case Phase.LIVE_CARD_SET_FIRST_ATTACKER:
+            case Phase.LIVE_CARD_SET_SECOND_ATTACKER: return 'live_set';
             case Phase.FIRST_ATTACKER_PERFORMANCE: return perspectivePlayer === 0 ? 'perf_p1' : 'perf_p2';
             case Phase.SECOND_ATTACKER_PERFORMANCE: return perspectivePlayer === 1 ? 'perf_p1' : 'perf_p2';
             case Phase.LIVE_VICTORY_DETERMINATION: return 'live_result';

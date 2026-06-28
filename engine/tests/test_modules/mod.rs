@@ -72,6 +72,7 @@ pub mod himeno_front_test;
 pub mod himeno_test;
 pub mod hinoshita_test;
 pub mod honoka_test;
+pub mod izumi_bp5_test;
 pub mod izumi_bp6_test;
 pub mod izumi_pb1_test;
 pub mod jellyfish_test;

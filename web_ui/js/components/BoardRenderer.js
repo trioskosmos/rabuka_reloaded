@@ -59,12 +59,6 @@ export const BoardRenderer = {
         updateCount('my-discard-count', (p0.waitroom?.cards?.length || p0.discard?.cards?.length || 0));
         updateCount('opp-discard-count', (p1.waitroom?.cards?.length || p1.discard?.cards?.length || 0));
 
-        const myHandCount = p0.hand.cards.length;
-        const oppHandCount = p1.hand.cards.length;
-        
-        updateCount('my-hand-count', myHandCount);
-        updateCount('opp-hand-count', oppHandCount);
-
         const da = State.deckAnalysis;
         const updateSummary = (id, m, l, p) => {
             const el = document.getElementById(id);

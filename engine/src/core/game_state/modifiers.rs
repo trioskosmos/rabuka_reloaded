@@ -846,16 +846,23 @@ impl GameState {
         self.card_instance_counter = 0;
     }
 
-    pub fn record_baton_touch(&mut self) {
-        self.baton_touch_count += 1;
+    pub fn record_baton_touch(&mut self, player_id: &str, arriving_card_id: Option<i16>) {
+        *self
+            .baton_touch_count
+            .entry(player_id.to_string())
+            .or_insert(0) += 1;
+        if let Some(cid) = arriving_card_id {
+            self.baton_touch_arriving_card_ids.push(cid);
+        }
     }
 
-    pub fn get_baton_touch_count(&self) -> u32 {
-        self.baton_touch_count
+    pub fn get_baton_touch_count(&self, player_id: &str) -> u32 {
+        self.baton_touch_count.get(player_id).copied().unwrap_or(0)
     }
 
     pub fn clear_baton_touch_tracking(&mut self) {
-        self.baton_touch_count = 0;
+        self.baton_touch_count.clear();
+        self.baton_touch_arriving_card_ids.clear();
         self.baton_touch_zero_cost = false;
         self.baton_touch_replaced_member_cost = None;
         self.baton_touch_replaced_member_id = None;

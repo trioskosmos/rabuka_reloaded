@@ -568,6 +568,13 @@ impl super::TurnEngine {
         {
             game_state.live_card_selected_indices.remove(pos);
         } else {
+            let player = game_state.active_player();
+            let reduction = i32::try_from(player.live_card_set_limit_reduction).unwrap_or(0);
+            let max_allowed = (MAX_LIVE_CARDS as i32 - reduction).max(0) as usize;
+            let already_placed = player.live_card_zone.cards.len();
+            if already_placed + game_state.live_card_selected_indices.len() >= max_allowed {
+                return Err("Cannot select more live cards: limit reached".to_string());
+            }
             game_state.live_card_selected_indices.push(idx);
         }
         Ok(())
@@ -578,8 +585,9 @@ impl super::TurnEngine {
         card_indices: Option<Vec<usize>>,
     ) -> Result<(), String> {
         let is_second = matches!(game_state.current_phase, Phase::LiveCardSetSecondAttacker);
-        let live_indices =
-            card_indices.unwrap_or_else(|| game_state.live_card_selected_indices.clone());
+        let live_indices = card_indices
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| game_state.live_card_selected_indices.clone());
         let mut sorted_indices: Vec<usize> = live_indices.clone();
         sorted_indices.sort_unstable();
         sorted_indices.dedup();
@@ -783,7 +791,7 @@ impl super::TurnEngine {
             }
             // Record 2 baton touches
             for _ in 0..2 {
-                game_state.record_baton_touch();
+                game_state.record_baton_touch(&player_id, Some(card_id));
             }
             game_state.baton_touch_replaced_member_id =
                 double_baton_areas.as_ref().and_then(|_areas| {
@@ -832,7 +840,7 @@ impl super::TurnEngine {
         game_state.record_card_appearance(card_id, "hand");
 
         if baton_touch_used {
-            game_state.record_baton_touch();
+            game_state.record_baton_touch(&player_id, Some(card_id));
             game_state.baton_touch_arriving_card_id = Some(card_id);
             // The replaced member moved stage→waitroom; record it so that
             // "手札から控え室に置かれるたび" auto-abilities do NOT fire.

@@ -64,7 +64,8 @@ fn sumire_q193_q194_baton_touch_draw_and_deploy() {
 
     // Q194: Double baton touch replaced 2 members
     assert_eq!(
-        game.state.baton_touch_count, 2,
+        game.state.baton_touch_count.get("p1").copied().unwrap_or(0),
+        2,
         "Q194: 2 baton touches recorded (double baton)"
     );
 
@@ -225,7 +226,8 @@ fn sumire_q194_locked_member_excluded_from_double_baton() {
     // ab#1 should NOT trigger because min_baton_touch_count=2
     let _on_stage = game.state.player1.stage.stage;
     assert_eq!(
-        game.state.baton_touch_count, 1,
+        game.state.baton_touch_count.get("p1").copied().unwrap_or(0),
+        1,
         "Q194: Only 1 baton touch — LeftSide was locked (debuted this turn)"
     );
     // Only 1 Liella member in waitroom (the replaced center one)
@@ -286,7 +288,8 @@ fn sumire_only_one_occupied_area_triggers_single_baton_touch() {
     }
 
     assert_eq!(
-        game.state.baton_touch_count, 1,
+        game.state.baton_touch_count.get("p1").copied().unwrap_or(0),
+        1,
         "Only 1 baton touch (only 1 occupied area)"
     );
     // ab#1 should NOT trigger (only 1 baton touch, needs 2)
@@ -338,7 +341,11 @@ fn sumire_double_baton_to_left_does_not_activate_debut() {
     }
 
     // Double baton occurred (2 replacements)
-    assert_eq!(game.state.baton_touch_count, 2, "Double baton occurred");
+    assert_eq!(
+        game.state.baton_touch_count.get("p1").copied().unwrap_or(0),
+        2,
+        "Double baton occurred"
+    );
 
     // Sumire placed at Left (non-Center) — ab#1 should NOT trigger (position check fails)
     // Hand should only have the filler card (1 card), no draw from ab#1
@@ -446,7 +453,8 @@ fn sumire_single_baton_stays_single_no_auto_promote() {
 
     // Only 1 baton touch — no auto-promotion
     assert_eq!(
-        game.state.baton_touch_count, 1,
+        game.state.baton_touch_count.get("p1").copied().unwrap_or(0),
+        1,
         "Single baton stays single — 1 baton touch, not 2"
     );
 
@@ -573,7 +581,8 @@ fn sumire_double_baton_integration_via_string_path() {
     }
 
     assert_eq!(
-        game.state.baton_touch_count, 2,
+        game.state.baton_touch_count.get("p1").copied().unwrap_or(0),
+        2,
         "2 baton touches via button integration path"
     );
     assert_eq!(
@@ -643,7 +652,11 @@ fn sumire_explicit_double_baton_via_card_indices() {
         game.select_indices(&[0]);
     }
 
-    assert_eq!(game.state.baton_touch_count, 2, "2 baton touches");
+    assert_eq!(
+        game.state.baton_touch_count.get("p1").copied().unwrap_or(0),
+        2,
+        "2 baton touches"
+    );
     assert_eq!(
         game.state.baton_touch_arriving_card_id,
         Some(sumire),
@@ -740,7 +753,11 @@ fn sumire_explicit_double_baton_to_left_no_debut() {
         game.select_indices(&[0]);
     }
 
-    assert_eq!(game.state.baton_touch_count, 2, "2 baton touches");
+    assert_eq!(
+        game.state.baton_touch_count.get("p1").copied().unwrap_or(0),
+        2,
+        "2 baton touches"
+    );
 
     assert_eq!(
         game.state.player1.hand.cards.len(),

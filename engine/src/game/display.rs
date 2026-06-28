@@ -123,6 +123,8 @@ pub struct PlayerDisplay {
     #[serde(default)]
     pub selected_need_hearts: Vec<u32>,
     #[serde(default)]
+    pub current_score: u32,
+    #[serde(default)]
     pub live_card_scores: std::collections::HashMap<String, u32>,
     #[serde(default)]
     pub gained_abilities: Vec<String>,
@@ -796,17 +798,38 @@ pub fn player_to_display(
         }
     }
 
+    // Apply need_heart_modifiers to live_need_hearts
+    for (&cid, colors) in need_heart_modifiers {
+        if player.live_card_zone.cards.contains(&cid) {
+            for (color, &val) in colors {
+                if let Some(idx) = heart_color_index(color) {
+                    live_need_hearts[idx] = (live_need_hearts[idx] as i32 + val).max(0) as u32;
+                }
+            }
+        }
+    }
+
     // Compute selected_need_hearts: sum of need_heart from selected hand cards (preview)
     let mut selected_need_hearts = vec![0u32; 8];
     if let Some(selected) = live_card_selection {
         for &idx in selected {
             if idx < player.hand.cards.len() {
-                if let Some(card) = card_db.get_card(player.hand.cards[idx]) {
+                let cid = player.hand.cards[idx];
+                if let Some(card) = card_db.get_card(cid) {
                     if let Some(ref need) = card.need_heart {
                         for (color, count) in &need.hearts {
                             if let Some(ci) = heart_color_index(color) {
                                 selected_need_hearts[ci] += count;
                             }
+                        }
+                    }
+                }
+                // Apply need_heart_modifiers to selected hand card
+                if let Some(colors) = need_heart_modifiers.get(&cid) {
+                    for (color, &val) in colors {
+                        if let Some(ci) = heart_color_index(color) {
+                            selected_need_hearts[ci] =
+                                (selected_need_hearts[ci] as i32 + val).max(0) as u32;
                         }
                     }
                 }
@@ -829,6 +852,17 @@ pub fn player_to_display(
             let bonus = score_modifiers.get(&cid).copied().unwrap_or(0);
             live_card_scores.insert(card.card_no.clone(), (base as i32 + bonus).max(0) as u32);
         }
+    }
+
+    // Compute current_score: sum of stage member base scores + all score modifiers
+    let mut current_score = 0u32;
+    for &cid in &player.stage.stage {
+        if let Some(card) = card_db.get_card(cid) {
+            current_score += card.score.unwrap_or(0) as u32;
+        }
+    }
+    for (_, &val) in score_modifiers {
+        current_score = (current_score as i32 + val).max(0) as u32;
     }
 
     // Collect gained abilities for this player's cards
@@ -963,6 +997,7 @@ pub fn player_to_display(
         total_hearts,
         live_need_hearts,
         selected_need_hearts,
+        current_score,
         live_card_scores,
         gained_abilities: my_gained,
         active_restrictions: restrictions.clone(),
@@ -1355,7 +1390,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         game_result: game_result_str,
         is_first_turn: game_state.is_first_turn,
         turn_order_changed: game_state.turn_order_changed,
-        baton_touch_count: game_state.baton_touch_count,
+        baton_touch_count: game_state.baton_touch_count.values().sum(),
         baton_touch_zero_cost: game_state.baton_touch_zero_cost,
         baton_touch_replaced_member_cost: game_state.baton_touch_replaced_member_cost,
         baton_touch_replaced_member_id: game_state.baton_touch_replaced_member_id,

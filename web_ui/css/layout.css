@@ -50,17 +50,13 @@
 }
 
 .header {
-    height: 36px;
-    min-height: 36px;
     display: flex;
-    align-items: center;
-    padding: 0 4px;
+    flex-direction: column;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border);
     z-index: var(--z-header);
     position: sticky;
     top: 0;
-    gap: 8px;
 }
 
 .header-main-row {
@@ -98,13 +94,11 @@
 
 .info-bar {
     display: flex;
-    align-items: center;
+    align-items: stretch;
     gap: 8px;
-    flex: 1;
-    justify-content: space-between;
     flex-wrap: nowrap;
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: visible;
     scrollbar-width: thin;
 }
 
@@ -116,69 +110,92 @@
     border-radius: 2px;
 }
 
-.stat-group {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-}
-
-.score-stats .score-rows {
+.header-col {
     display: flex;
     flex-direction: column;
+    justify-content: center;
     gap: 1px;
+    flex-shrink: 0;
+    font-size: clamp(0.5rem, 1.2vw, 0.7rem);
+    white-space: nowrap;
+    color: var(--text-dim);
+    padding: 1px 4px;
+    border-right: 1px solid rgba(255,255,255,0.05);
+}
+.header-col:last-of-type {
+    border-right: none;
+}
+.controls {
+    margin-left: auto;
 }
 
-.score-stats .score-row {
+.header-col .stat-group {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: clamp(0.55rem, 1.5vw, 0.7rem);
-    white-space: nowrap;
-    color: var(--text-dim);
+    flex-wrap: wrap;
 }
 
-.score-stats .score-row .stat-label {
-    font-weight: 600;
-    min-width: 16px;
+.header-stat-row {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    line-height: 1.2;
 }
 
-.score-stats .score-row strong {
+.header-stat-row strong {
     color: var(--text);
     font-weight: 700;
-    margin-right: 4px;
 }
 
-.score-stats .score-row .summary-pips {
+.header-stat-row .stat-label {
+    font-weight: 600;
+    min-width: 14px;
+}
+
+
+
+.hearts-blades-row {
     display: flex;
     align-items: center;
     gap: 2px;
 }
 
-.score-stats .score-row .summary-pips div {
+.summary-pips {
     display: flex;
     align-items: center;
     gap: 1px;
 }
 
-.energy-stats .energy-rows {
+.summary-pips div {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 1px;
 }
 
-.energy-stats .energy-row {
+.summary-hearts-row {
     display: flex;
     align-items: center;
-    gap: 4px;
-    font-size: clamp(0.55rem, 1.5vw, 0.7rem);
-    white-space: nowrap;
-    color: var(--text-dim);
+    gap: 1px;
+    min-height: 20px;
 }
 
-.energy-stats .energy-row .stat-label {
-    font-weight: 600;
-    min-width: 16px;
+.summary-need-hearts {
+    margin-top: 2px;
+}
+
+.controls {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
+}
+
+.stat-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
 }
 
 .stat {
@@ -253,6 +270,7 @@
 
 .board-inner {
     flex: 1;
+    height: 100%;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -262,6 +280,7 @@
 
 .live-group-row {
     width: 100%;
+    height: calc((100dvh - 40px) * 0.18 / var(--section-count, 1));
     flex-shrink: 0;
     background: rgba(0, 0, 0, 0.2);
     border-bottom: 1px solid var(--border);
@@ -271,6 +290,8 @@
 
 .live-group {
     width: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Board Toggle (Tabbed View) */
@@ -305,21 +326,20 @@
 
 /* Both-mode: sections split remaining space after board-toggle equally */
 .game-board.both-mode {
-    --card-h: clamp(40px, 6dvh, 80px);
-    --card-h-mini: calc(var(--card-h) * 0.6);
-    --card-w: calc(var(--card-h) * (512 / 720));
-    --card-w-mini: calc(var(--card-w) * 0.6);
+    --section-count: 2;
     overflow: hidden;
 }
 
 .game-board.both-mode .player-section {
     flex: 1;
+    height: 100%;
     min-height: 0;
     overflow: hidden;
 }
 
 .game-board.both-mode .board-inner {
     flex: 1;
+    height: 100%;
     min-height: 0;
     overflow: hidden;
 }
@@ -327,42 +347,6 @@
 /* Reverse opponent layout: hand at top, live at bottom */
 .game-board.both-mode .player-section.opponent .board-inner {
     flex-direction: column-reverse;
-}
-
-/* Hand gets more space in both-mode */
-.game-board.both-mode .hand-row {
-    flex: 0 1 auto;
-    max-height: 28%;
-}
-
-/* Live zone capped */
-.game-board.both-mode .live-group-row {
-    flex-shrink: 1;
-    flex-basis: auto;
-    max-height: 18%;
-}
-
-/* Energy compact */
-.game-board.both-mode .energy-row-hud {
-    flex-shrink: 1;
-    height: calc(var(--card-h-compact) * 0.5 + 6px);
-    overflow-y: hidden;
-}
-
-.game-board.both-mode .energy-area-container {
-    height: auto;
-    min-height: calc(var(--card-h-compact) * 0.5 + 4px);
-}
-
-.game-board.both-mode .energy-pip {
-    width: calc(var(--card-w-compact) * 0.5);
-    height: calc(var(--card-h-compact) * 0.5);
-}
-
-/* Stage takes remaining space */
-.game-board.both-mode .field-row {
-    flex: 1;
-    min-height: 0;
 }
 
 /* Mirror opponent stage so their left is on the right side (real-life perspective) */
@@ -386,6 +370,7 @@
 
 .main-content {
     flex: 1;
+    height: 100%;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -463,6 +448,7 @@
 
 .game-board {
     flex: 1;
+    height: 100%;
     min-width: 0;
     display: flex;
     flex-direction: column;

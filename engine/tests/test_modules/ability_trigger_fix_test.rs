@@ -464,7 +464,8 @@ fn baton_touch_cleared_between_actions() {
 
     // Verify tracking fields are clean after action 2
     assert_eq!(
-        game.state.baton_touch_count, 0,
+        game.state.baton_touch_count.get("p1").copied().unwrap_or(0),
+        0,
         "baton_touch_count must be 0 after cleared second action"
     );
     assert_eq!(

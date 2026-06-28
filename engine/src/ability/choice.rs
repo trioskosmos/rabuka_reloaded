@@ -170,6 +170,10 @@ impl super::resolver::AbilityResolver {
             );
         let should_preserve = is_initial_looked_at && has_pending_sequential;
 
+        // Pay any deferred costs (from sequential_cost binary sub-costs) now
+        // that the player confirmed the choice.
+        self.pay_deferred_costs(gs)?;
+
         let sub_choice = self.sub_choice_created;
         self.sub_choice_created = false;
         if !should_preserve && !sub_choice {
@@ -649,6 +653,7 @@ impl super::resolver::AbilityResolver {
                 "[DBG_HSC] finalizing with {} moved cards",
                 self.moved_cards.len()
             );
+            self.pay_deferred_costs(gs)?;
             let final_count = self.moved_cards.len() as u32;
             gs.mods.last_cost_discard_count = final_count;
             gs.recently_moved_cards = Some(self.moved_cards.clone());
@@ -2413,8 +2418,18 @@ impl super::resolver::AbilityResolver {
             p1.stage.stage[idx2] = -1;
             p1.areas_locked_this_turn.insert(area_enums[idx2]);
         }
-        gs.record_baton_touch();
-        gs.record_baton_touch();
+        let p1_id = gs.player1.id.clone();
+        // For double baton via choice, the arriving card has already been placed on stage
+        // before this handler runs. Get it from the stage placement.
+        let arriving = gs
+            .player1
+            .stage
+            .stage
+            .iter()
+            .find(|&&cid| cid != -1)
+            .copied();
+        gs.record_baton_touch(&p1_id, arriving);
+        gs.record_baton_touch(&p1_id, arriving);
         // Place the activating card (Sumire) in the player's chosen placement area.
         // The play_baton_touch constant ability fires after PlayMemberToStage has already
         // placed the card, so at this point the card is already on stage. If this is triggered
@@ -2587,6 +2602,8 @@ impl super::resolver::AbilityResolver {
             entry.choice_card_no = None;
             entry.conditional_choice = None;
         }
+        // On skip/clear, drop deferred costs so they aren't paid.
+        self.pending_deferred_costs.clear();
     }
 
     fn clear_choice_state(&mut self, gs: &mut GameState) {

@@ -4,7 +4,7 @@
  * snapshot emitted by the Rust engine.
  */
 import { State } from '../state.js';
-import { fixImg, Phase, isMulliganPhase } from '../constants.js';
+import { fixImg, Phase, isMulliganPhase, isLiveCardSetPhase } from '../constants.js';
 import { resolveCardImagePath } from './CardRenderer.js';
 import * as i18n from '../i18n/index.js';
 import { Tooltips } from '../ui_tooltips.js';
@@ -1416,7 +1416,7 @@ export const PerformanceRenderer = {
         if (phase === Phase.ENERGY) return 'energy';
         if (phase === Phase.DRAW) return 'draw';
         if (phase === Phase.MAIN) return 'main';
-        if (phase === Phase.LIVE_CARD_SET) return 'live_set';
+        if (isLiveCardSetPhase(phase)) return 'live_set';
         if (phase === Phase.FIRST_ATTACKER_PERFORMANCE) return perspectivePlayer === 0 ? 'perf_p1' : 'perf_p2';
         if (phase === Phase.SECOND_ATTACKER_PERFORMANCE) return perspectivePlayer === 1 ? 'perf_p1' : 'perf_p2';
         if (phase === Phase.LIVE_VICTORY_DETERMINATION) return 'live_result';

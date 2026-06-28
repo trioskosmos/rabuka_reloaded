@@ -1603,6 +1603,12 @@ impl Condition {
             .as_deref()
             .or_else(|| self.trigger_event.as_ref()?.to_state.as_deref())
     }
+
+    /// Helper: resolve `self_effect_only` from the flat field or `trigger_event`.
+    pub fn get_self_effect_only(&self) -> Option<bool> {
+        self.self_effect_only
+            .or_else(|| self.trigger_event.as_ref()?.self_effect_only)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

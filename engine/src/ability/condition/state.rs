@@ -523,14 +523,17 @@ impl<'a> ConditionContext<'a> {
                 if !triggered {
                     return false;
                 }
-                if self.game_state.baton_touch_count == 0 {
+                // Check per-player baton touch count
+                let player_id = player.id.as_str();
+                let bt_count = self.game_state.get_baton_touch_count(player_id);
+                if bt_count == 0 {
                     return false;
                 }
                 if let Some(min_count) = condition
                     .min_baton_touch_count
                     .or_else(|| te.and_then(|t| t.min_count))
                 {
-                    if self.game_state.baton_touch_count < min_count {
+                    if bt_count < min_count {
                         return false;
                     }
                 }
@@ -538,50 +541,17 @@ impl<'a> ConditionContext<'a> {
                     Some(id) => id,
                     None => return false,
                 };
-                if !location.is_empty() {
-                    if Zone::from_str(location) == Some(Zone::Discard)
-                        || Zone::from_str(location) == Some(Zone::Waitroom)
-                    {
-                        let in_discard = self
-                            .game_state
-                            .player1
-                            .waitroom
-                            .cards
-                            .contains(&replaced_id)
-                            || self
-                                .game_state
-                                .player2
-                                .waitroom
-                                .cards
-                                .contains(&replaced_id);
-                        if !in_discard {
-                            return false;
-                        }
-                    }
-                }
-                if self.game_state.baton_touch_count == 0 {
-                    eprintln!("[BT_DEBUG] baton_touch_count=0");
+                // Verify the baton touch belongs to this player: the replaced
+                // card must be in this player's waitroom (baton touch always
+                // moves the replaced member to the owner's waitroom).
+                let own_waitroom = if player_id == self.game_state.player1.id {
+                    &self.game_state.player1.waitroom.cards
+                } else {
+                    &self.game_state.player2.waitroom.cards
+                };
+                if !own_waitroom.contains(&replaced_id) {
                     return false;
                 }
-                if let Some(min_count) = condition
-                    .min_baton_touch_count
-                    .or_else(|| te.and_then(|t| t.min_count))
-                {
-                    if self.game_state.baton_touch_count < min_count {
-                        eprintln!(
-                            "[BT_DEBUG] min_count={} < count={}",
-                            min_count, self.game_state.baton_touch_count
-                        );
-                        return false;
-                    }
-                }
-                let replaced_id = match self.game_state.baton_touch_replaced_member_id {
-                    Some(id) => id,
-                    None => {
-                        eprintln!("[BT_DEBUG] replaced_member_id=None");
-                        return false;
-                    }
-                };
                 if !location.is_empty() {
                     if Zone::from_str(location) == Some(Zone::Discard)
                         || Zone::from_str(location) == Some(Zone::Waitroom)
@@ -599,7 +569,6 @@ impl<'a> ConditionContext<'a> {
                                 .cards
                                 .contains(&replaced_id);
                         if !in_discard {
-                            eprintln!("[BT_DEBUG] replaced_id={} not in waitroom", replaced_id);
                             return false;
                         }
                     }
