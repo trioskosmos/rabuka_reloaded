@@ -176,6 +176,9 @@ impl super::TurnEngine {
             }
 
             // P2 trigger block (shared between first entry and re-entry paths)
+            // Set flag BEFORE triggering so that if P2's ability creates a choice
+            // and the function returns early, P2 is not re-triggered on re-entry.
+            game_state.live_success_p2_fired = true;
             Self::trigger_live_success_abilities(game_state, &player2_id);
             game_state.process_pending_auto_abilities(&player2_id);
             if game_state.has_pending_choice() {

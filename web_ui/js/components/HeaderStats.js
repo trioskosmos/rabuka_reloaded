@@ -22,6 +22,8 @@ export const HeaderStats = {
         player2Hearts: null,
         player1Blades: null,
         player2Blades: null,
+        player1NeedHearts: null,
+        player2NeedHearts: null,
         player1Energy: null,
         player2Energy: null,
         player1HandCount: null,
@@ -45,6 +47,8 @@ export const HeaderStats = {
         HeaderStats.cache.player2Hearts = document.getElementById('player2-hearts-summary');
         HeaderStats.cache.player1Blades = document.getElementById('player1-blades-summary');
         HeaderStats.cache.player2Blades = document.getElementById('player2-blades-summary');
+        HeaderStats.cache.player1NeedHearts = document.getElementById('player1-need-hearts');
+        HeaderStats.cache.player2NeedHearts = document.getElementById('player2-need-hearts');
         HeaderStats.cache.player1Energy = document.getElementById('player1-energy');
         HeaderStats.cache.player2Energy = document.getElementById('player2-energy');
         HeaderStats.cache.player1HandCount = document.getElementById('player1-hand-count');
@@ -150,11 +154,8 @@ export const HeaderStats = {
             HeaderStats.cache.player2HandCount.textContent = (p1.hand?.cards || []).length;
         }
 
-        // Helper: render hearts section with stage + need hearts
-        const renderHeartsSection = (player, heartsEl, bladesEl, label) => {
-            if (!heartsEl) return;
-
-            // Stage hearts
+        // Helper: compute stage hearts from player data
+        const getStageHearts = (player) => {
             let hearts = player.total_hearts;
             if (!hearts || hearts.length === 0) {
                 hearts = [0, 0, 0, 0, 0, 0, 0];
@@ -176,58 +177,75 @@ export const HeaderStats = {
                     });
                 }
             }
-
-            heartsEl.style.flexDirection = 'column';
-
-            let html = '<div class="summary-hearts-row">' + PerformanceRenderer.renderHeartsCompact(hearts) + '</div>';
-
-            // Need hearts: backend live_need_hearts (after confirm) or local preview (during set phase)
-            let needHearts = null;
-            if (isSetPhase && State.localLiveCardSelection.size > 0) {
-                needHearts = HeaderStats.computeLocalNeedHearts(player);
-            } else if (player.live_need_hearts && player.live_need_hearts.some(v => v > 0)) {
-                needHearts = player.live_need_hearts;
-            }
-
-            if (needHearts) {
-                html += '<div class="summary-hearts-row summary-need-hearts">' + PerformanceRenderer.renderHeartsCompact(needHearts) + '</div>';
-            }
-
-            heartsEl.innerHTML = html;
-
-            // Blades
-            if (bladesEl) {
-                let bladesCount = player.total_blades;
-                if (bladesCount === undefined) {
-                    bladesCount = 0;
-                    if (player.stage) {
-                        const members = [player.stage.left_side, player.stage.center, player.stage.right_side];
-                        members.forEach(member => {
-                            if (member) {
-                                if (member.total_blade !== undefined) {
-                                    bladesCount += member.total_blade;
-                                } else if (member.card_no) {
-                                    const card = State.resolveCardData(member.card_no);
-                                    if (card && (card.blade || card.blades)) {
-                                        bladesCount += card.blade || card.blades || 0;
-                                    }
-                                }
-                            }
-                        });
-                    }
-                }
-                bladesEl.innerHTML = `<span class="stat-item" title="${label} Blades">
-                    <img src="img/texticon/icon_blade.png" class="heart-mini-icon">
-                    <span class="stat-value">${bladesCount}</span>
-                </span>`;
-            }
+            return hearts;
         };
 
-        // P1 Hearts and Blades
-        renderHeartsSection(p0, HeaderStats.cache.player1Hearts, HeaderStats.cache.player1Blades, 'P1');
+        // Helper: compute blades count
+        const getBladesCount = (player) => {
+            let bladesCount = player.total_blades;
+            if (bladesCount === undefined) {
+                bladesCount = 0;
+                if (player.stage) {
+                    const members = [player.stage.left_side, player.stage.center, player.stage.right_side];
+                    members.forEach(member => {
+                        if (member) {
+                            if (member.total_blade !== undefined) {
+                                bladesCount += member.total_blade;
+                            } else if (member.card_no) {
+                                const card = State.resolveCardData(member.card_no);
+                                if (card && (card.blade || card.blades)) {
+                                    bladesCount += card.blade || card.blades || 0;
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+            return bladesCount;
+        };
 
-        // P2 Hearts and Blades
-        renderHeartsSection(p1, HeaderStats.cache.player2Hearts, HeaderStats.cache.player2Blades, 'P2');
+        // Helper: get need hearts (backend or local preview)
+        const getNeedHearts = (player) => {
+            if (isSetPhase && State.localLiveCardSelection.size > 0) {
+                return HeaderStats.computeLocalNeedHearts(player);
+            }
+            if (player.live_need_hearts && player.live_need_hearts.some(v => v > 0)) {
+                return player.live_need_hearts;
+            }
+            return null;
+        };
+
+        // --- P1: stage hearts + blades (row 1), score + need hearts (row 2) ---
+        if (HeaderStats.cache.player1Hearts) {
+            HeaderStats.cache.player1Hearts.innerHTML = PerformanceRenderer.renderHeartsCompact(getStageHearts(p0));
+        }
+        if (HeaderStats.cache.player1Blades) {
+            const b = getBladesCount(p0);
+            HeaderStats.cache.player1Blades.innerHTML = `<span class="stat-item" title="P1 Blades">
+                <img src="img/texticon/icon_blade.png" class="heart-mini-icon">
+                <span class="stat-value">${b}</span>
+            </span>`;
+        }
+        if (HeaderStats.cache.player1NeedHearts) {
+            const nh = getNeedHearts(p0);
+            HeaderStats.cache.player1NeedHearts.innerHTML = nh ? '<span class="stat-separator"></span>' + PerformanceRenderer.renderHeartsCompact(nh) : '';
+        }
+
+        // --- P2: stage hearts + blades (row 1), score + need hearts (row 2) ---
+        if (HeaderStats.cache.player2Hearts) {
+            HeaderStats.cache.player2Hearts.innerHTML = PerformanceRenderer.renderHeartsCompact(getStageHearts(p1));
+        }
+        if (HeaderStats.cache.player2Blades) {
+            const b = getBladesCount(p1);
+            HeaderStats.cache.player2Blades.innerHTML = `<span class="stat-item" title="P2 Blades">
+                <img src="img/texticon/icon_blade.png" class="heart-mini-icon">
+                <span class="stat-value">${b}</span>
+            </span>`;
+        }
+        if (HeaderStats.cache.player2NeedHearts) {
+            const nh = getNeedHearts(p1);
+            HeaderStats.cache.player2NeedHearts.innerHTML = nh ? '<span class="stat-separator"></span>' + PerformanceRenderer.renderHeartsCompact(nh) : '';
+        }
 
         // Deck / Energy / Discard counts
         if (state.player1) {

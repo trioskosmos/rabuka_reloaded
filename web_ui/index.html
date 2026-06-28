@@ -34,40 +34,46 @@
 
     <header class="header">
         <div class="info-bar">
-            <!-- Column 1: Turn/Phase (stacked vert) -->
+            <!-- Column 1: Turn/Phase -->
             <div class="header-col col-meta">
-                <div class="header-stat-row"><span class="stat-icon"></span> <strong id="turn">1</strong></div>
-                <div class="header-stat-row"><span class="stat-icon"></span> <strong id="active-player">P1</strong></div>
-                <div class="header-stat-row"><strong id="phase">MAIN</strong></div>
+                <div class="header-stat-row"><span class="stat-label">Turn</span> <strong id="turn">1</strong></div>
+                <div class="header-stat-row"><span class="stat-label">Active</span> <strong id="active-player">P1</strong></div>
+                <div class="header-stat-row"><span class="stat-label">Phase</span> <strong id="phase">MAIN</strong></div>
             </div>
 
             <!-- Column 2: Hand Counts -->
             <div class="header-col col-hand">
-                <div class="header-stat-row"><span class="stat-label" data-i18n="player1">P1</span> <span class="stat-label">Hand</span> <strong id="player1-hand-count">0</strong></div>
-                <div class="header-stat-row"><span class="stat-label" data-i18n="player2">P2</span> <span class="stat-label">Hand</span> <strong id="player2-hand-count">0</strong></div>
+                <div class="header-stat-row"><span class="stat-label" data-i18n="player1">P1</span> <strong id="player1-hand-count">0</strong></div>
+                <div class="header-stat-row"><span class="stat-label" data-i18n="player2">P2</span> <strong id="player2-hand-count">0</strong></div>
             </div>
 
             <!-- Column 3: Energy -->
             <div class="header-col col-energy">
-                <div class="header-stat-row"><span class="stat-label" data-i18n="player1">P1</span> <span class="stat-icon">En</span> <strong id="player1-energy">0 / 0</strong></div>
-                <div class="header-stat-row"><span class="stat-label" data-i18n="player2">P2</span> <span class="stat-icon">En</span> <strong id="player2-energy">0 / 0</strong></div>
+                <div class="header-stat-row"><span class="stat-label" data-i18n="player1">P1</span> <img src="img/texticon/icon_energy.png" class="heart-mini-icon"> <strong id="player1-energy">0 / 0</strong></div>
+                <div class="header-stat-row"><span class="stat-label" data-i18n="player2">P2</span> <img src="img/texticon/icon_energy.png" class="heart-mini-icon"> <strong id="player2-energy">0 / 0</strong></div>
             </div>
 
             <!-- Column 4: P1 Stats -->
             <div class="header-col col-p1">
-                <div class="header-stat-row"><span class="stat-label">Score</span> <strong id="player1-score">0</strong></div>
                 <div class="header-stat-row hearts-blades-row">
                     <span class="summary-pips" title="Hearts"><div id="player1-hearts-summary"></div></span>
                     <span class="summary-pips" title="Blades"><div id="player1-blades-summary"></div></span>
+                </div>
+                <div class="header-stat-row score-need-row">
+                    <span class="stat-label">Score</span> <strong id="player1-score">0</strong>
+                    <span id="player1-need-hearts"></span>
                 </div>
             </div>
 
             <!-- Column 5: P2 Stats -->
             <div class="header-col col-p2">
-                <div class="header-stat-row"><span class="stat-label">Score</span> <strong id="player2-score">0</strong></div>
                 <div class="header-stat-row hearts-blades-row">
                     <span class="summary-pips" title="Hearts"><div id="player2-hearts-summary"></div></span>
                     <span class="summary-pips" title="Blades"><div id="player2-blades-summary"></div></span>
+                </div>
+                <div class="header-stat-row score-need-row">
+                    <span class="stat-label">Score</span> <strong id="player2-score">0</strong>
+                    <span id="player2-need-hearts"></span>
                 </div>
             </div>
 
