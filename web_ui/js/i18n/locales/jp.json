@@ -117,6 +117,7 @@
     "heart_buff": "ピース上昇",
     "until_end_of_turn": "ターン終了まで",
     "cannot_baton_touch": "バトンタッチ不可",
+    "double_baton": "ダブルバトン",
     "cannot_activate_member": "能力発動不可",
     "restriction": "制約",
     "shared_screen": "共有画面",

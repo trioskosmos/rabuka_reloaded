@@ -117,6 +117,7 @@
     "heart_buff": "Heart Buff",
     "until_end_of_turn": "Until end of turn",
     "cannot_baton_touch": "Cannot Baton Touch",
+    "double_baton": "DOUBLE BATON",
     "cannot_activate_member": "Cannot Activate Abilities",
     "restriction": "Restriction",
     "shared_screen": "Shared Screen",

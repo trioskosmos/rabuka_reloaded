@@ -157,48 +157,54 @@ export const ActionListView = {
 
                 const availableAreas = firstA.parameters?.available_areas;
 
-                if (availableAreas && availableAreas.length > 0) {
-                    const areasDiv = document.createElement('div');
-                    areasDiv.className = 'action-group-buttons grid-3';
-                    
+                const doubleBatonPairs = firstA.parameters?.double_baton_pairs;
+                const hasDoubleBaton = doubleBatonPairs && doubleBatonPairs.length > 0;
+                const anySingleAvailable = availableAreas && availableAreas.some(a => a.available);
+
+                if (anySingleAvailable || hasDoubleBaton) {
                     const areaLabels = { 'left': i18n.t('area_left'), 'center': i18n.t('area_center'), 'right': i18n.t('area_right') };
-                    
-                    // Always render 3 slots (left, center, right)
                     const areaOrder = ['left', 'center', 'right'];
-                    areaOrder.forEach((expectedArea) => {
-                        const areaInfo = availableAreas.find(a => a.area === expectedArea);
-                        if (areaInfo && areaInfo.available) {
-                            const areaName = areaInfo.area;
-                            const label = areaLabels[areaName] || areaName;
-                            const cost = areaInfo.cost;
-                            const isBaton = areaInfo.is_baton_touch;
-                            
-                            const areaActionCopy = { ...firstA };
-                            areaActionCopy.parameters = { ...firstA.parameters, stage_area: areaName };
-                            
-                            const btn = ActionButtons.createActionButton(areaActionCopy, true, '', state);
-                            const costText = isBaton ? `${label} (${cost} - Baton)` : `${label} (${cost})`;
-                            btn.innerHTML = `<span>${costText}</span>`;
-                            btn.style.width = '100%';
-                            areasDiv.appendChild(btn);
-                        } else {
-                            const spacer = document.createElement('div');
-                            spacer.style.visibility = 'hidden';
-                            spacer.style.minHeight = '36px';
-                            areasDiv.appendChild(spacer);
-                        }
-                    });
-                    groupDiv.appendChild(areasDiv);
+                    const areaIndexMap = { 'left': 0, 'center': 1, 'right': 2 };
+                    
+                    if (anySingleAvailable) {
+                        const areasDiv = document.createElement('div');
+                        areasDiv.className = 'action-group-buttons grid-3';
+                        
+                        // Always render 3 slots (left, center, right)
+                        areaOrder.forEach((expectedArea) => {
+                            const areaInfo = availableAreas.find(a => a.area === expectedArea);
+                            if (areaInfo && areaInfo.available) {
+                                const areaName = areaInfo.area;
+                                const label = areaLabels[areaName] || areaName;
+                                const cost = areaInfo.cost;
+                                const isBaton = areaInfo.is_baton_touch;
+                                
+                                const areaActionCopy = { ...firstA };
+                                areaActionCopy.parameters = { ...firstA.parameters, stage_area: areaName };
+                                
+                                const btn = ActionButtons.createActionButton(areaActionCopy, true, '', state);
+                                const costText = isBaton ? `${label} (${cost} - Baton)` : `${label} (${cost})`;
+                                btn.innerHTML = `<span>${costText}</span>`;
+                                btn.style.width = '100%';
+                                areasDiv.appendChild(btn);
+                            } else {
+                                const spacer = document.createElement('div');
+                                spacer.style.visibility = 'hidden';
+                                spacer.style.minHeight = '36px';
+                                areasDiv.appendChild(spacer);
+                            }
+                        });
+                        groupDiv.appendChild(areasDiv);
+                    }
 
                     // Double Baton grid: render pair+placement buttons if available
-                    const doubleBatonPairs = firstA.parameters?.double_baton_pairs;
-                    if (doubleBatonPairs && doubleBatonPairs.length > 0) {
+                    if (hasDoubleBaton) {
                         const dbDiv = document.createElement('div');
                         dbDiv.style.cssText = 'margin-top: 6px; border-top: 1px dashed rgba(255, 215, 0, 0.3); background: rgba(0,0,0,0.15); padding: 6px; border-radius: 4px;';
                         
                         const dbLabel = document.createElement('div');
                         dbLabel.style.cssText = 'font-size: 0.7em; color: #ffda79; margin-bottom: 4px; font-weight: bold;';
-                        dbLabel.textContent = 'DOUBLE BATON';
+                        dbLabel.textContent = i18n.t('double_baton') || 'DOUBLE BATON';
                         dbDiv.appendChild(dbLabel);
 
                         // Group pairs by their 2 replacement areas
@@ -209,7 +215,6 @@ export const ActionListView = {
                             pairGroups[key].push(pair);
                         });
 
-                        const areaOrder = ['left', 'center', 'right'];
                         Object.keys(pairGroups).forEach(key => {
                             const row = document.createElement('div');
                             row.className = 'action-group-buttons grid-3';
@@ -219,17 +224,11 @@ export const ActionListView = {
                             areaOrder.forEach(expectedArea => {
                                 const pairForPlacement = pairGroups[key].find(p => p.placement === expectedArea);
                                 if (pairForPlacement) {
-                                    const btn = document.createElement('button');
-                                    btn.className = 'action-btn';
-                                    btn.style.cssText = 'background: linear-gradient(180deg, rgba(255,215,0,0.2) 0%, rgba(255,215,0,0.1) 100%); border: 1px solid rgba(255,215,0,0.3); width: 100%; padding: 6px; min-height: 40px; color: #ffda79; border-radius: 4px; cursor: pointer; font-size: 0.75em;';
+                                    const labelA = areaLabels[areas[0]] || areas[0];
+                                    const labelB = areaLabels[areas[1]] || areas[1];
+                                    const placeLabel = areaLabels[expectedArea] || expectedArea;
                                     
-                                    const areaA = areas[0].charAt(0).toUpperCase() + areas[0].slice(1, 2);
-                                    const areaB = areas[1].charAt(0).toUpperCase() + areas[1].slice(1, 2);
-                                    const placeLabel = expectedArea.charAt(0).toUpperCase() + expectedArea.slice(1);
-                                    btn.innerHTML = `<div style="font-size:0.7em;">(${areaA}&${areaB})→${placeLabel}</div><div>♡${pairForPlacement.cost}</div>`;
-                                    
-                                    // On click: send PlayMemberToStage with card_indices specifying the 2 areas
-                                    const areaIndexMap = { 'left': 0, 'center': 1, 'right': 2 };
+                                    // Build action params
                                     const replaceIndices = areas.map(a => areaIndexMap[a]);
                                     const placement = areaIndexMap[expectedArea];
                                     
@@ -242,6 +241,14 @@ export const ActionListView = {
                                         card_name: firstA.parameters?.card_name,
                                         card_no: firstA.parameters?.card_no,
                                     };
+                                    
+                                    const btn = ActionButtons.createActionButton(
+                                        { action_type: 'play_member_to_stage', parameters: dbActionParams },
+                                        true, '', state
+                                    );
+                                    const costText = `${labelA}&${labelB} → ${placeLabel} (${pairForPlacement.cost} - Double)`;
+                                    btn.innerHTML = `<span>${costText}</span>`;
+                                    btn.style.width = '100%';
                                     btn.onclick = () => {
                                         if (window.doAction) window.doAction({ action_type: 'play_member_to_stage', parameters: dbActionParams });
                                     };
@@ -259,7 +266,9 @@ export const ActionListView = {
                         groupDiv.appendChild(dbDiv);
                     }
                 } else {
-                    console.warn('[ActionListView] No available_areas found for action:', firstA);
+                    if (firstA) {
+                        console.warn('[ActionListView] No available options for action:', firstA);
+                    }
                 }
 
                 listDiv.appendChild(groupDiv);

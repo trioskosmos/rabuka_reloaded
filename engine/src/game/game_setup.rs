@@ -980,7 +980,68 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         available_areas.push(area_info);
                     }
 
-                    if has_any_available {
+                    // Check if this card has play_baton_touch with count > 1 (double baton)
+                    let has_double_baton = card.abilities.iter().any(|a| {
+                        a.effect.as_ref().is_some_and(|ef| {
+                            ef.action == "play_baton_touch" && ef.count.unwrap_or(1) > 1
+                        })
+                    });
+
+                    let (double_baton_pairs, any_double_baton_available) = if has_double_baton {
+                        let area_enums = [
+                            crate::zones::MemberArea::LeftSide,
+                            crate::zones::MemberArea::Center,
+                            crate::zones::MemberArea::RightSide,
+                        ];
+                        let occupied: Vec<(usize, &str, i16)> = [0, 1, 2]
+                            .iter()
+                            .filter(|&&idx| stage_card_ids[idx] != -1)
+                            .filter(|&&idx| {
+                                !active_player
+                                    .areas_locked_this_turn
+                                    .contains(&area_enums[idx])
+                            })
+                            .map(|&idx| {
+                                let area_names = ["left", "center", "right"];
+                                (idx, area_names[idx], stage_card_ids[idx])
+                            })
+                            .collect();
+                        let mut pairs = Vec::new();
+                        for i in 0..occupied.len() {
+                            for j in (i + 1)..occupied.len() {
+                                let (_idx1, name1, cid1) = occupied[i];
+                                let (_idx2, name2, cid2) = occupied[j];
+                                let cost1 = game_state
+                                    .card_database
+                                    .get_card(cid1)
+                                    .and_then(|c| c.cost)
+                                    .unwrap_or(0);
+                                let cost2 = game_state
+                                    .card_database
+                                    .get_card(cid2)
+                                    .and_then(|c| c.cost)
+                                    .unwrap_or(0);
+                                let combined = cost1 + cost2;
+                                let pair_cost = effective_cost.saturating_sub(combined);
+                                let area_names = [name1.to_string(), name2.to_string()];
+                                for placement in [name1.to_string(), name2.to_string()] {
+                                    if (active_energy_count as u32) >= pair_cost {
+                                        pairs.push(DoubleBatonPair {
+                                            areas: area_names.to_vec(),
+                                            placement,
+                                            cost: pair_cost,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        let available = !pairs.is_empty();
+                        (if available { Some(pairs) } else { None }, available)
+                    } else {
+                        (None, false)
+                    };
+
+                    if has_any_available || any_double_baton_available {
                         let cost_details: Vec<String> = available_areas
                             .iter()
                             .filter(|a| a.available)
@@ -1003,74 +1064,27 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                 }
                             })
                             .collect();
-                        let cost_str = if cost_details.is_empty() {
-                            format!("Cost: {}", card_cost)
-                        } else {
-                            format!("Cost: {}", cost_details.join(", "))
-                        };
-
-                        // Check if this card has play_baton_touch with count > 1 (double baton)
-                        let has_double_baton = card.abilities.iter().any(|a| {
-                            a.effect.as_ref().is_some_and(|ef| {
-                                ef.action == "play_baton_touch" && ef.count.unwrap_or(1) > 1
-                            })
-                        });
-
-                        let double_baton_pairs = if has_double_baton {
-                            let area_enums = [
-                                crate::zones::MemberArea::LeftSide,
-                                crate::zones::MemberArea::Center,
-                                crate::zones::MemberArea::RightSide,
-                            ];
-                            let occupied: Vec<(usize, &str, i16)> = [0, 1, 2]
+                        let db_cost_str = double_baton_pairs.as_ref().map(|pairs| {
+                            let parts: Vec<String> = pairs
                                 .iter()
-                                .filter(|&&idx| stage_card_ids[idx] != -1)
-                                .filter(|&&idx| {
-                                    !active_player
-                                        .areas_locked_this_turn
-                                        .contains(&area_enums[idx])
-                                })
-                                .map(|&idx| {
-                                    let area_names = ["left", "center", "right"];
-                                    (idx, area_names[idx], stage_card_ids[idx])
+                                .map(|p| {
+                                    format!(
+                                        "{} (baton touch {}): {}",
+                                        p.placement,
+                                        p.areas.join(" & "),
+                                        p.cost
+                                    )
                                 })
                                 .collect();
-                            let mut pairs = Vec::new();
-                            for i in 0..occupied.len() {
-                                for j in (i + 1)..occupied.len() {
-                                    let (_idx1, name1, cid1) = occupied[i];
-                                    let (_idx2, name2, cid2) = occupied[j];
-                                    let cost1 = game_state
-                                        .card_database
-                                        .get_card(cid1)
-                                        .and_then(|c| c.cost)
-                                        .unwrap_or(0);
-                                    let cost2 = game_state
-                                        .card_database
-                                        .get_card(cid2)
-                                        .and_then(|c| c.cost)
-                                        .unwrap_or(0);
-                                    let combined = cost1 + cost2;
-                                    let pair_cost = effective_cost.saturating_sub(combined);
-                                    let area_names = [name1.to_string(), name2.to_string()];
-                                    for placement in [name1.to_string(), name2.to_string()] {
-                                        if (active_energy_count as u32) >= pair_cost {
-                                            pairs.push(DoubleBatonPair {
-                                                areas: area_names.to_vec(),
-                                                placement,
-                                                cost: pair_cost,
-                                            });
-                                        }
-                                    }
-                                }
+                            parts.join(", ")
+                        });
+                        let cost_str = match (cost_details.is_empty(), &db_cost_str) {
+                            (true, None) => format!("Cost: {}", card_cost),
+                            (true, Some(db)) => format!("Cost: {} (Double: {})", card_cost, db),
+                            (false, None) => format!("Cost: {}", cost_details.join(", ")),
+                            (false, Some(db)) => {
+                                format!("Cost: {} (Double: {})", cost_details.join(", "), db)
                             }
-                            if pairs.is_empty() {
-                                None
-                            } else {
-                                Some(pairs)
-                            }
-                        } else {
-                            None
                         };
 
                         actions.push(make_action_params(
