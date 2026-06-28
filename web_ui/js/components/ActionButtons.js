@@ -81,6 +81,12 @@ export const ActionButtons = {
                 'confirm_mulligan': i18n.t('confirm'),
                 'FinishLiveCardSet': i18n.t('finish_live_card_set'),
                 'finish_live_card_set': i18n.t('finish_live_card_set'),
+                'LiveCardHeader': i18n.t('live_card_set'),
+                'live_card_header': i18n.t('live_card_set'),
+                'ConfirmLiveCardSet': i18n.t('confirm'),
+                'confirm_live_card_set': i18n.t('confirm'),
+                'SkipLiveCardSet': i18n.t('skip'),
+                'skip_live_card_set': i18n.t('skip'),
                 'SelectPosition': i18n.t('select_position'),
                 'select_position': i18n.t('select_position'),
                 'SelectCard': i18n.t('select'),
@@ -128,6 +134,18 @@ export const ActionButtons = {
             return `<div class="action-title">${Tooltips.enrichAbilityText(displayName)}</div>`;
         }
 
+        if (a.action_type === 'select_live_card') {
+            const ci = params.card_index;
+            let isSelected = ci !== undefined && State.localLiveCardSelection.has(ci);
+            const cardName = displayCard
+                ? (currentLang === 'en' ? i18n.translateCard(displayCard).name : StringUtils.cleanCardName(displayCard.name))
+                : (name || '?');
+            const prefix = isSelected ? '✓ ' : '';
+            const displayName = prefix + cardName;
+            if (isMini) return `<span class="truncate-name">${displayName}</span>`;
+            return `<div class="action-title">${Tooltips.enrichAbilityText(displayName)}</div>`;
+        }
+
         if (isMini) {
             if (a.action_type === 'play_member_to_stage') return `<span>${cost !== null ? cost : 0}</span>${isBaton ? ' [B]' : ''}`;
             let label = `${energyIcon}${cost !== null ? cost : 0}`;
@@ -163,7 +181,7 @@ export const ActionButtons = {
         btn.innerHTML = ActionButtons.getActionLabel(a, isMini, state);
 
         // Show a small card thumbnail to the left for action types that have an associated card
-        const thumbTypes = ['play_member_to_stage', 'use_ability', 'select_mulligan', 'set_live_card'];
+        const thumbTypes = ['play_member_to_stage', 'use_ability', 'select_mulligan', 'set_live_card', 'select_live_card'];
         if (!isMini && thumbTypes.includes(a.action_type) && displayCard?.card_no) {
             const thumbSrc = resolveCardImagePath(displayCard.card_no);
             if (thumbSrc) {
@@ -172,6 +190,21 @@ export const ActionButtons = {
                 img.draggable = false;
                 img.src = thumbSrc;
                 btn.prepend(img);
+            }
+        }
+
+        // For live card selection actions: track buttons for hand card sync
+        if (a.action_type === 'select_live_card') {
+            const ci = (a.parameters || a.params || {}).card_index;
+            if (ci !== undefined) {
+                btn.dataset.cardIndex = ci;
+                State.liveCardButtons.set(ci, btn);
+                if (State.localLiveCardSelection.has(ci)) {
+                    const thumb = btn.querySelector('.action-card-thumb');
+                    if (thumb) {
+                        thumb.classList.add('live-card-selected');
+                    }
+                }
             }
         }
 
@@ -204,6 +237,20 @@ export const ActionButtons = {
                     if (cardEl) cardEl.classList.toggle('mulligan-selected');
                     const thumb = btn.querySelector('.action-card-thumb');
                     if (thumb) thumb.classList.toggle('mulligan-selected');
+                }
+            } else if (a.action_type === 'select_live_card') {
+                const params = a.parameters || a.params || {};
+                const handIdx = params.card_index ?? params.card_indices?.[0];
+                if (handIdx !== undefined) {
+                    if (State.localLiveCardSelection.has(handIdx)) {
+                        State.localLiveCardSelection.delete(handIdx);
+                    } else {
+                        State.localLiveCardSelection.add(handIdx);
+                    }
+                    const cardEl = document.getElementById(`my-hand-card-${handIdx}`);
+                    if (cardEl) cardEl.classList.toggle('live-card-selected');
+                    const thumb = btn.querySelector('.action-card-thumb');
+                    if (thumb) thumb.classList.toggle('live-card-selected');
                 }
             } else if (window.doAction && a.index !== undefined) {
                 window.doAction(a);

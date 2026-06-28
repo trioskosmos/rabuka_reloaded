@@ -39,11 +39,13 @@ export const ActionListView = {
 
         const playActionsByHand = {};
         const mulliganActions = {};
+        const liveCardActions = {};
         const abilityActions = [];
         const systemActions = [];
 
         // Clear stale button references before re-render
         State.mulliganButtons.clear();
+        State.liveCardButtons.clear();
 
         state.legal_actions.forEach(a => {
             const category = a.category || a.type;
@@ -58,9 +60,10 @@ export const ActionListView = {
                 a.action_type === 'pass' ||
                 a.action_type === 'confirm_mulligan' ||
                 a.action_type === 'finish_live_card_set' ||
+                a.action_type === 'confirm_live_card_set' ||
+                a.action_type === 'skip_live_card_set' ||
                 a.action_type === 'choose_first_attacker' ||
-                a.action_type === 'choose_second_attacker' ||
-                a.action_type === 'set_live_card') {
+                a.action_type === 'choose_second_attacker') {
                 systemActions.push(a);
             } else if (a.action_type === 'play_member_to_stage' && cardNo !== undefined) {
                 if (!playActionsByHand[cardNo]) playActionsByHand[cardNo] = [];
@@ -69,6 +72,11 @@ export const ActionListView = {
                 if (handIdx !== undefined) {
                     if (!mulliganActions[handIdx]) mulliganActions[handIdx] = [];
                     mulliganActions[handIdx].push(a);
+                }
+            } else if (a.action_type === 'select_live_card' || a.action_type === 'live_card_header') {
+                if (handIdx !== undefined) {
+                    if (!liveCardActions[handIdx]) liveCardActions[handIdx] = [];
+                    liveCardActions[handIdx].push(a);
                 }
             } else if (category === 'ABILITY' || a.action_type === 'use_ability') {
                 abilityActions.push(a);
@@ -110,8 +118,22 @@ export const ActionListView = {
                     if (thumb) thumb.classList.add('mulligan-selected');
                 }
             });
+        }
 
+        const allLiveCardActions = Object.values(liveCardActions).flat();
+        if (allLiveCardActions.length > 0) {
+            addHeader(i18n.t('live_card_set').toUpperCase(), 'var(--accent-cyan)');
+            allLiveCardActions.forEach(a => listDiv.appendChild(ActionButtons.createActionButton(a, false, '', state)));
 
+            // Post-render: apply live-card-selected class to thumbnails based on
+            // local selection state.
+            listDiv.querySelectorAll('.action-btn[data-card-index]').forEach(btn => {
+                const ci = parseInt(btn.dataset.cardIndex, 10);
+                if (!isNaN(ci) && State.localLiveCardSelection.has(ci)) {
+                    const thumb = btn.querySelector('.action-card-thumb');
+                    if (thumb) thumb.classList.add('live-card-selected');
+                }
+            });
         }
 
         if (Object.keys(playActionsByHand).length > 0) {

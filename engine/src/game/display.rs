@@ -119,6 +119,10 @@ pub struct PlayerDisplay {
     #[serde(default)]
     pub total_hearts: Vec<u32>,
     #[serde(default)]
+    pub live_need_hearts: Vec<u32>,
+    #[serde(default)]
+    pub selected_need_hearts: Vec<u32>,
+    #[serde(default)]
     pub live_card_scores: std::collections::HashMap<String, u32>,
     #[serde(default)]
     pub gained_abilities: Vec<String>,
@@ -778,6 +782,38 @@ pub fn player_to_display(
         }
     }
 
+    // Compute live_need_hearts: sum of need_heart from cards in live_card_zone
+    let mut live_need_hearts = vec![0u32; 8];
+    for &cid in &player.live_card_zone.cards {
+        if let Some(card) = card_db.get_card(cid) {
+            if let Some(ref need) = card.need_heart {
+                for (color, count) in &need.hearts {
+                    if let Some(idx) = heart_color_index(color) {
+                        live_need_hearts[idx] += count;
+                    }
+                }
+            }
+        }
+    }
+
+    // Compute selected_need_hearts: sum of need_heart from selected hand cards (preview)
+    let mut selected_need_hearts = vec![0u32; 8];
+    if let Some(selected) = live_card_selection {
+        for &idx in selected {
+            if idx < player.hand.cards.len() {
+                if let Some(card) = card_db.get_card(player.hand.cards[idx]) {
+                    if let Some(ref need) = card.need_heart {
+                        for (color, count) in &need.hearts {
+                            if let Some(ci) = heart_color_index(color) {
+                                selected_need_hearts[ci] += count;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Compute live_card_scores: card_no -> total score
     let mut live_card_scores = std::collections::HashMap::new();
     for &cid in &player.live_card_zone.cards {
@@ -925,6 +961,8 @@ pub fn player_to_display(
             .collect(),
         score_modifiers: score_modifiers.clone(),
         total_hearts,
+        live_need_hearts,
+        selected_need_hearts,
         live_card_scores,
         gained_abilities: my_gained,
         active_restrictions: restrictions.clone(),

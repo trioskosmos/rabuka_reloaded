@@ -135,7 +135,13 @@ export const HeaderStats = {
                     });
                 }
             }
-            HeaderStats.cache.player1Hearts.innerHTML = PerformanceRenderer.renderHeartsCompact(hearts);
+            let html = PerformanceRenderer.renderHeartsCompact(hearts);
+            // Show live need hearts (what live cards consume)
+            if (p0.live_need_hearts && p0.live_need_hearts.some(v => v > 0)) {
+                html += '<span class="stat-separator"></span><span class="stat-label" title="Live need hearts">→</span>';
+                html += PerformanceRenderer.renderHeartsCompact(p0.live_need_hearts);
+            }
+            HeaderStats.cache.player1Hearts.innerHTML = html;
         }
 
         if (HeaderStats.cache.player1Blades && p0) {
@@ -187,7 +193,12 @@ export const HeaderStats = {
                     });
                 }
             }
-            HeaderStats.cache.player2Hearts.innerHTML = PerformanceRenderer.renderHeartsCompact(hearts);
+            let html = PerformanceRenderer.renderHeartsCompact(hearts);
+            if (p1.live_need_hearts && p1.live_need_hearts.some(v => v > 0)) {
+                html += '<span class="stat-separator"></span><span class="stat-label" title="Live need hearts">→</span>';
+                html += PerformanceRenderer.renderHeartsCompact(p1.live_need_hearts);
+            }
+            HeaderStats.cache.player2Hearts.innerHTML = html;
         }
 
         if (HeaderStats.cache.player2Blades && p1) {

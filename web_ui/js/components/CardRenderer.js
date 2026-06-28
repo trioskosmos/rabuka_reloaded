@@ -544,8 +544,22 @@ export const CardRenderer = {
                     }
                     return;
                 }
-                if (action.action_type === 'set_live_card') {
-                    if (window.doAction) window.doAction(action);
+                if (action.action_type === 'select_live_card') {
+                    const handIdx = action.parameters?.card_index ?? action.parameters?.card_indices?.[0];
+                    if (handIdx !== undefined) {
+                        if (State.localLiveCardSelection.has(handIdx)) {
+                            State.localLiveCardSelection.delete(handIdx);
+                        } else {
+                            State.localLiveCardSelection.add(handIdx);
+                        }
+                        const cardEl = document.getElementById(`${containerId}-card-${handIdx}`);
+                        if (cardEl) cardEl.classList.toggle('live-card-selected');
+                        const lBtn = State.liveCardButtons.get(handIdx);
+                        if (lBtn) {
+                            const thumb = lBtn.querySelector('.action-card-thumb');
+                            if (thumb) thumb.classList.toggle('live-card-selected');
+                        }
+                    }
                     return;
                 }
                 if (window.selectedAction?.index === action.index) {
@@ -753,10 +767,16 @@ export const CardRenderer = {
         const el = DOMUtils.getElement(containerId);
         if (!el) return;
 
+        // Hide opponent's live zone cards during set phase (not revealed until performance)
+        const phase = state?.phase;
+        const isSetPhase = phase === 'LiveCardSetFirstAttacker' || phase === 'LiveCardSetSecondAttacker';
+        const isOpponentZone = containerId === 'opp-live';
+        const shouldHideCards = isSetPhase && isOpponentZone;
+
         const existingSlots = Array.from(el.children);
 
         for (let i = 0; i < 3; i++) {
-            const card = liveCards[i];
+            const card = shouldHideCards ? { card_no: -1, hidden: true } : liveCards[i];
             const action = validActionMap[i];
             const isValid = action !== undefined;
             const validClass = isValid ? ' valid-target' : '';

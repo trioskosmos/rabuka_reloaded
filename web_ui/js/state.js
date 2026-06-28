@@ -69,6 +69,8 @@ const stateInternal = {
     // Maps card_index → button element for mulligan action thumbnails.
     // Populated by ActionButtons.js, consumed by CardRenderer.js.
     mulliganButtons: new Map(),
+    localLiveCardSelection: new Set(),
+    liveCardButtons: new Map(),
     lastMulliganCards: [],
     showMulliganReturn: false,
 
@@ -154,9 +156,25 @@ const stateInternal = {
         const isMulliganOld = isMulliganPhase(State.lastPhase);
         const isMulliganNew = isMulliganPhase(newData.phase);
 
-        // Clear local selection on any phase change (including between mulligan players)
+        const isLiveCardSetOld = State.lastPhase === 'LiveCardSetFirstAttacker' || State.lastPhase === 'LiveCardSetSecondAttacker';
+        const isLiveCardSetNew = newData.phase === 'LiveCardSetFirstAttacker' || newData.phase === 'LiveCardSetSecondAttacker';
+
+        // Clear local selection on any phase change
         if (State.lastPhase !== newData.phase) {
             State.localMulliganSelection.clear();
+            State.localLiveCardSelection.clear();
+        }
+
+        // During live card set, keep local selection in sync with server
+        if (isLiveCardSetOld || isLiveCardSetNew) {
+            const pNew = State.perspectivePlayer === 0 ? newData.player1 : newData.player2;
+            if (pNew && pNew.live_card_selection) {
+                State.localLiveCardSelection.clear();
+                const sel = pNew.live_card_selection;
+                if (Array.isArray(sel)) {
+                    sel.forEach(i => State.localLiveCardSelection.add(i));
+                }
+            }
         }
 
         // During mulligan, keep local selection in sync with server
