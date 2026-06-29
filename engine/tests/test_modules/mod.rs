@@ -300,3 +300,7 @@ pub mod nonfiction_cost_comparison_test;
 
 // SELF CONTROL!! + 鹿角聖良: position_change triggers moved-this-turn blade grant
 pub mod self_control_position_change_test;
+
+// 桜内梨子 (PL!S-bp5-002) — LiveStart center: left_cost == right_cost → wait opponent low-blade
+// Verifies require_position_cards: both positions must have cards (empty = no trigger)
+pub mod riko_bp5_center_cost_equal_test;

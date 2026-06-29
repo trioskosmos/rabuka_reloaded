@@ -7633,7 +7633,19 @@ def _merge_parenthetical(target, parenthetical):
                 positions.append("right_side")
             if len(positions) == 1:
                 target["activation_position"] = positions[0]
-            # If multiple or zero positions mentioned, leave unset (trigger system handles it)
+            elif len(positions) > 1:
+                # Multiple positions (e.g. "左サイドエリアか右サイドエリア") → set as
+                # comma-separated activation_position.  Also fix the condition_parsed:
+                # when parse_condition created position + position_compare (treating it
+                # as a cross-comparison), replace those with activation_position so the
+                # engine checks "left OR right" rather than "compare left vs right".
+                target["activation_position"] = ",".join(sorted(positions))
+                if "activation_condition_parsed" in target:
+                    acp = target["activation_condition_parsed"]
+                    if acp.get("position") or acp.get("position_compare"):
+                        del acp["position"]
+                        del acp["position_compare"]
+                        acp["activation_position"] = target["activation_position"]
             break
 
 

@@ -70,8 +70,12 @@
 }
 
 .deck-preview-grid::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.25);
     border-radius: 10px;
+}
+
+.deck-preview-grid::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.35);
 }
 
 .preview-item {
@@ -81,7 +85,6 @@
     border-radius: 6px;
     padding: 4px;
     text-align: center;
-    transition: transform 0.15s;
     cursor: default;
 }
 

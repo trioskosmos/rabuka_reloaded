@@ -282,7 +282,6 @@
 /* Card thumbnail in log entries */
 .log-revealed-thumb {
     cursor: pointer;
-    transition: transform 0.15s ease;
 }
 .log-revealed-thumb:hover {
     transform: scale(1.15);
@@ -488,7 +487,6 @@
 /* Clickable log entries (open detail modals) */
 .log-entry.clickable-log {
     cursor: pointer;
-    transition: background 0.15s ease;
 }
 
 .log-entry.clickable-log:hover {
@@ -513,7 +511,6 @@
     cursor: pointer;
     border-radius: var(--radius-sm);
     padding: 4px;
-    transition: background 0.15s ease;
     max-width: 120px;
 }
 
@@ -565,7 +562,7 @@
     background-size: cover;
     background-position: center;
     cursor: pointer;
-    transition: transform 0.12s ease, border-color 0.12s ease;
+    transition: border-color 0.12s ease;
     flex-shrink: 0;
     overflow: hidden;
 }
@@ -768,7 +765,6 @@
     font-size: 0.8rem;
     font-weight: bold;
     margin-left: auto;
-    transition: all 0.2s ease;
     flex-shrink: 0;
 }
 
@@ -811,18 +807,6 @@
     display: flex;
     flex-direction: column;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
-    animation: slideUp 0.3s ease-out;
-}
-
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 .log-viewer-modal-header {
@@ -861,7 +845,6 @@
     align-items: center;
     justify-content: center;
     border-radius: 4px;
-    transition: all 0.2s ease;
 }
 
 .log-viewer-close-btn:hover {
@@ -929,7 +912,6 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
     overflow: hidden;
-    transition: all 0.2s ease;
 }
 
 .log-viewer-block:hover {
@@ -951,7 +933,6 @@
     border-left: 4px solid var(--accent-pink);
     cursor: pointer;
     user-select: none;
-    transition: all 0.2s ease;
 }
 
 .log-viewer-header:hover {
@@ -1001,7 +982,6 @@
     font-size: 0.7rem;
     color: var(--text-dim);
     margin-left: 8px;
-    transition: transform 0.3s ease;
     transform: rotate(0deg);
 }
 
@@ -1017,7 +997,6 @@
     background: rgba(0, 0, 0, 0.2);
     max-height: 1000px;
     overflow: hidden;
-    transition: max-height 0.3s ease-out, opacity 0.2s ease;
     opacity: 1;
 }
 
@@ -1095,7 +1074,6 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 6px;
     border-left: 3px solid var(--accent-gold);
-    transition: all 0.2s ease;
 }
 
 .log-viewer-standalone:hover {
@@ -1115,16 +1093,16 @@
 }
 
 .log-viewer-content::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.02);
+    background: transparent;
 }
 
 .log-viewer-content::-webkit-scrollbar-thumb {
-    background: rgba(74, 158, 255, 0.3);
+    background: rgba(255, 255, 255, 0.25);
     border-radius: 4px;
 }
 
 .log-viewer-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(74, 158, 255, 0.5);
+    background: rgba(255, 255, 255, 0.35);
 }
 
 /* Responsive Design */

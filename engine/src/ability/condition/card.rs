@@ -2754,55 +2754,64 @@ impl<'a> ConditionContext<'a> {
                             }
                         }
                     }
-                    eprintln!("[REACHED] pos=is_some={}", condition.position.is_some());
-                    if condition.position.is_none() {
-                        if let Some(ref act_pos) = condition.activation_position {
-                            let card_id = self.activating_card_id;
-                            let passes = act_pos.split(',').any(|p| {
-                                let trimmed = p.trim();
-                                let idx = match trimmed {
-                                    "left" | "left_side" => 0,
-                                    "center" => 1,
-                                    "right" | "right_side" => 2,
-                                    _ => return false,
-                                };
-                                idx < player.stage.stage.len()
-                                    && card_id.is_some()
-                                    && player.stage.stage[idx] == card_id.unwrap()
-                            });
-                            if !passes {
-                                push_rich(&format!("位置不一致: {}", act_pos), false);
-                                return false;
-                            }
+                    // activation_position: independent position requirement for the
+                    // activating card itself (e.g. "center" means ability only works
+                    // when the card is at center).  This is distinct from the `position`
+                    // field, which may be a cross-comparison reference (with position_compare).
+                    if let Some(ref act_pos) = condition.activation_position {
+                        let card_id = self.activating_card_id;
+                        let passes = act_pos.split(',').any(|p| {
+                            let trimmed = p.trim();
+                            let idx = match trimmed {
+                                "left" | "left_side" => 0,
+                                "center" => 1,
+                                "right" | "right_side" => 2,
+                                _ => return false,
+                            };
+                            idx < player.stage.stage.len()
+                                && card_id.is_some()
+                                && player.stage.stage[idx] == card_id.unwrap()
+                        });
+                        if !passes {
+                            push_rich(&format!("位置不一致: {}", act_pos), false);
+                            return false;
                         }
                     }
 
                     if let Some(ref pos) = condition.position {
-                        eprintln!(
-                            "[POS_CHECK] pos={:?} get_position={:?}",
-                            pos,
-                            pos.get_position()
-                        );
-                        let pos_str = pos.get_position();
-                        let pos_idx = match pos_str {
-                            Some("left") | Some("leftside") | Some("left_side") => 0,
-                            Some("center") | Some("centre") => 1,
-                            Some("right") | Some("rightside") | Some("right_side") => 2,
-                            _ => {
-                                log::debug!("[APPEARANCE] unknown position: {:?}", pos_str);
-                                push_rich(&format!("不明な位置: {:?}", pos_str), false);
+                        // When position_compare is set, `position` is a cross-comparison
+                        // reference (e.g. compare cost at left_side vs right_side), not
+                        // a requirement that the activating card be at that position.
+                        // Skip the card-own-position check in that case.
+                        if condition.position_compare.is_some() {
+                            // position is for cross-comparison, not card positioning
+                        } else {
+                            eprintln!(
+                                "[POS_CHECK] pos={:?} get_position={:?}",
+                                pos,
+                                pos.get_position()
+                            );
+                            let pos_str = pos.get_position();
+                            let pos_idx = match pos_str {
+                                Some("left") | Some("leftside") | Some("left_side") => 0,
+                                Some("center") | Some("centre") => 1,
+                                Some("right") | Some("rightside") | Some("right_side") => 2,
+                                _ => {
+                                    log::debug!("[APPEARANCE] unknown position: {:?}", pos_str);
+                                    push_rich(&format!("不明な位置: {:?}", pos_str), false);
+                                    return false;
+                                }
+                            };
+
+                            let expected = self.activating_card_id;
+                            if pos_idx >= player.stage.stage.len()
+                                || expected.is_none()
+                                || player.stage.stage[pos_idx] != expected.unwrap()
+                            {
+                                push_rich(&format!("位置不一致(idx={})", pos_idx), false);
                                 return false;
                             }
-                        };
-
-                        let expected = self.activating_card_id;
-                        if pos_idx >= player.stage.stage.len()
-                            || expected.is_none()
-                            || player.stage.stage[pos_idx] != expected.unwrap()
-                        {
-                            push_rich(&format!("位置不一致(idx={})", pos_idx), false);
-                            return false;
-                        }
+                        } // end else (position without position_compare)
                     }
                     eprintln!(
                         "[PCOND] position={:?} pc_some={} chars={:?} type={:?}",

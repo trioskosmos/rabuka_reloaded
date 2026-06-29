@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-29T07:56:09.607508",
+  "generated_at": "2026-06-29T16:50:56.093682",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -14277,8 +14277,7 @@
             "position": "left_side"
           },
           "location": "stage",
-          "position": "left_side",
-          "position_compare": "right_side"
+          "activation_position": "left_side,right_side"
         },
         "activation_position": "left_side,right_side",
         "position": "left_side"
