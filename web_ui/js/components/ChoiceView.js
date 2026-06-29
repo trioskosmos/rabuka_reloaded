@@ -274,7 +274,7 @@ export const ChoiceView = {
                 // Auto-ability option: show card image + name + ability text
                 if (item.desc) {
                     choiceEl = document.createElement('div');
-                    choiceEl.className = 'compact-choice-card text-option auto-ability';
+                    choiceEl.className = 'choice-item text-option auto-ability';
                     choiceEl.style.cssText = `
                         display: flex;
                         flex-direction: row;
@@ -297,7 +297,6 @@ export const ChoiceView = {
                     if (cardData && cardData.card_no) {
                         const vm = CardRenderer.getCardViewModel(cardData, { mini: true });
                         const cardPortion = CardRenderer.createCardDOM(vm, cardData);
-                        cardPortion.classList.remove('rotate-img-90');
                         choiceEl.appendChild(cardPortion);
                     }
                     const textWrap = document.createElement('div');
@@ -309,7 +308,7 @@ export const ChoiceView = {
                     choiceEl.appendChild(textWrap);
                 } else if (item.isText) {
                     choiceEl = document.createElement('div');
-                    choiceEl.className = 'compact-choice-card text-option';
+                    choiceEl.className = 'choice-item text-option';
                     choiceEl.style.cssText = `
                         display: flex;
                         align-items: center;
@@ -335,7 +334,7 @@ export const ChoiceView = {
                 } else if (item.name.startsWith('♥') || item.name.match(/heart\d{2}/)) {
                     const heartIdx = parseInt(item.name.replace(/\D/g, '')) || 1;
                     choiceEl = document.createElement('div');
-                    choiceEl.className = 'compact-choice-card has-image heart-option';
+                    choiceEl.className = 'choice-item heart-option';
                     choiceEl.style.cssText = `
                         background: none;
                         border: 2px solid var(--border);
@@ -357,7 +356,7 @@ export const ChoiceView = {
                 } else if (cardData && cardData.card_no) {
                     if (choice.blind) {
                         choiceEl = document.createElement('div');
-                        choiceEl.className = 'compact-choice-card has-image card card-compact';
+                        choiceEl.className = 'card card-compact card-back';
                         const backImg = document.createElement('img');
                         backImg.src = fixImg('img/texticon/lltcg-back.png');
                         backImg.style.width = '100%';
@@ -369,12 +368,11 @@ export const ChoiceView = {
                     } else {
                         const vm = CardRenderer.getCardViewModel(cardData, { mini: true });
                         choiceEl = CardRenderer.createCardDOM(vm, cardData);
-                        choiceEl.classList.remove('rotate-img-90');
-                        choiceEl.classList.add('compact-choice-card', 'has-image');
+                        choiceEl.classList.add('card-choice');
                     }
                 } else {
                     choiceEl = document.createElement('div');
-                    choiceEl.className = 'compact-choice-card text-option';
+                    choiceEl.className = 'choice-item text-option';
                     choiceEl.style.cssText = `
                         display: flex;
                         align-items: center;

@@ -363,19 +363,12 @@ impl super::TurnEngine {
                             for (color, entry) in color_mods {
                                 let total = entry.total();
                                 if total != 0 {
-                                    let label = format!("{:?}", color);
-                                    let op_type = if entry.set != 0 {
-                                        "set"
-                                    } else if entry.additive > 0 {
-                                        "add"
-                                    } else {
-                                        "sub"
-                                    };
                                     let card_name = card.name.clone();
+                                    let color_label = format!("{:?}", color);
                                     adjustments.push(crate::types::Adjustment {
                                         adjustment_type: "requirement".to_string(),
                                         desc: format!(
-                                            "{} {} ({})",
+                                            "{} {}",
                                             if entry.set != 0 {
                                                 "="
                                             } else if total > 0 {
@@ -384,11 +377,13 @@ impl super::TurnEngine {
                                                 ""
                                             },
                                             total,
-                                            op_type
                                         ),
                                         value: total,
                                         color: color.index(),
-                                        source: format!("{} req modifier ({})", card_name, label),
+                                        source: format!(
+                                            "{} req modifier ({})",
+                                            card_name, color_label
+                                        ),
                                     });
                                 }
                             }
@@ -399,7 +394,7 @@ impl super::TurnEngine {
                         snap.lives[i].passed = passed;
                         // Populate breakdown.requirements for Step 7 display
                         if let Some(color_mods) = game_state.mods.need_heart_modifiers.get(&lc_id) {
-                            for (color, me) in color_mods {
+                            for (_color, me) in color_mods {
                                 let total = me.total();
                                 if total != 0 {
                                     let op_str = if me.set != 0 {
@@ -410,9 +405,9 @@ impl super::TurnEngine {
                                         format!("{}", me.additive)
                                     };
                                     snap.breakdown.requirements.push(crate::types::EffectEntry {
-                                        source: format!("{} req modifier", color),
+                                        source: format!("{} req modifier", card.name),
                                         value: op_str.clone(),
-                                        desc: format!("Requirement {} {}", color, op_str),
+                                        desc: format!("Requirement {}", op_str),
                                     });
                                 }
                             }
@@ -540,16 +535,25 @@ impl super::TurnEngine {
         // available hearts are less than required.
         let mut p2_surplus = 0u32;
         let mut p1_surplus = 0u32;
-        for snap in &game_state.performance_snapshots {
+        for snap in &mut game_state.performance_snapshots {
             let total_available: u32 = snap.total_hearts.iter().sum();
             let total_filled: u32 = snap.lives.iter().flat_map(|l| l.filled.iter()).sum();
             let surplus = total_available.saturating_sub(total_filled);
+            // Compute per-color surplus
+            let mut per_color_surplus = [0u32; 8];
+            for color in 0..8 {
+                let total_color = snap.total_hearts[color];
+                let filled_color: u32 = snap.lives.iter().map(|l| l.filled[color]).sum();
+                per_color_surplus[color] = total_color.saturating_sub(filled_color);
+            }
+            snap.surplus_hearts = per_color_surplus;
             log::debug!(
-                "[SURPLUS] player={} total_avail={} total_filled={} surplus={} lives={}",
+                "[SURPLUS] player={} total_avail={} total_filled={} surplus={} per_color={:?} lives={}",
                 snap.player_id,
                 total_available,
                 total_filled,
                 surplus,
+                per_color_surplus,
                 snap.lives.len()
             );
             for (i, l) in snap.lives.iter().enumerate() {
@@ -2385,6 +2389,8 @@ pub fn build_snapshot(
             }
             tas
         },
+        surplus_hearts: [0; 8],
+        revealed_ids: perf.revealed_ids.clone(),
         p0_wins: false,
         p1_wins: false,
         performance_need_heart_modifiers: performance_need_heart_modifiers.clone(),

@@ -247,7 +247,7 @@ export const CardRenderer = {
         if (!card) return null;
 
         const state = State.data;
-        const { isSelected, isValid, mini, compact, containerId } = options;
+        const { isSelected, isValid, mini, compact, micro, containerId } = options;
 
         // Resolve card data if it's just a number or missing name
         let resolvedCard = card;
@@ -272,31 +272,18 @@ export const CardRenderer = {
 
         // 1. Determine CSS Classes
         const classNames = ['card'];
-        if (compact) classNames.push('card-compact');
+        if (micro) classNames.push('card-micro');
+        else if (compact) classNames.push('card-compact');
         else if (mini) classNames.push('card-mini');
         if (resolvedCard.is_new) classNames.push('new-card');
         if (isLive) classNames.push('type-live');
 
-        // Orientation Logic (Consolidated Matrix)
-        // Live cards are natively landscape (wider than tall) unlike member/energy
-        // cards which are portrait. Force landscape containers for live cards
-        // everywhere, and for any card in live/success/selection zones.
-        const targetLandscape = isLive || (containerId && (
+        if (containerId && (
             containerId.includes('live') ||
             containerId.includes('success') ||
             containerId.includes('selection')
-        ));
-        // All cards are physically portrait images, but live cards are printed in landscape,
-        // so they do not need additional rotation to fill a landscape container.
-        const nativeLandscape = isLive;
-
-        if (targetLandscape) {
+        )) {
             classNames.push('orientation-landscape');
-        }
-
-        // Image rotation is needed if native orientation doesn't match target orientation
-        if (targetLandscape !== nativeLandscape) {
-            classNames.push('rotate-img-90');
         }
 
         if (isSelected) {
@@ -452,7 +439,7 @@ export const CardRenderer = {
         return el;
     },
 
-    renderCards: (containerId, cards, clickable = false, mini = false, selectedIndices = [], validActionMap = {}, hasGlobalSelection = false, filter = null) => {
+    renderCards: (containerId, cards, clickable = false, mini = false, selectedIndices = [], validActionMap = {}, hasGlobalSelection = false, filter = null, micro = false) => {
         const el = DOMUtils.getElement(containerId);
         if (!el) return;
         if (!cards) {
@@ -550,6 +537,10 @@ export const CardRenderer = {
                         if (State.localLiveCardSelection.has(handIdx)) {
                             State.localLiveCardSelection.delete(handIdx);
                         } else {
+                            const pp = State.perspectivePlayer;
+                            const p = pp === 0 ? State.data?.player1 : State.data?.player2;
+                            const alreadyPlaced = p?.live_zone?.cards?.length || 0;
+                            if (State.localLiveCardSelection.size + alreadyPlaced >= 3) return;
                             State.localLiveCardSelection.add(handIdx);
                         }
                         const cardEl = document.getElementById(`${containerId}-card-${handIdx}`);
@@ -560,6 +551,7 @@ export const CardRenderer = {
                             if (thumb) thumb.classList.toggle('live-card-selected');
                         }
                     }
+                    window.render?.();
                     return;
                 }
                 if (window.selectedAction?.index === action.index) {
@@ -575,7 +567,7 @@ export const CardRenderer = {
             } : null;
 
             const viewModel = CardRenderer.getCardViewModel(card, {
-                isSelected, isValid, mini, containerId, actionId: action?.index
+                isSelected, isValid, mini, micro, containerId, actionId: action?.index
             });
 
             if (existingChild && !existingChild.classList.contains('placeholder')) {

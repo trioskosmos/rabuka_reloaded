@@ -23,6 +23,32 @@ fn advance_to_live_victory(game: &mut TestGame) {
 }
 
 #[test]
+fn kanata_does_not_block_manual_ability_activation() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let kanata = game.id("PL!N-bp5-006-R");
+    let other = game.id("PL!N-bp1-006-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [kanata, other, -1];
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.give_energy(4);
+    game.state.current_phase = rabuka_engine::types::Phase::Main;
+    game.state.recalculate_constants();
+    assert!(
+        game.state
+            .constant_cannot_activate_members
+            .contains(&kanata.to_string()),
+        "Kanata should be in constant_cannot_activate_members"
+    );
+    game.activate_ability(other);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+}
+
+#[test]
 fn kanata_not_auto_activated_in_active_phase_but_others_are() {
     let db = load_real_database();
     let mut game = TestGame::new(db);

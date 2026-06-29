@@ -231,10 +231,17 @@ impl GameState {
                                         .get_card(*card_id)
                                         .map(|c| c.name.clone())
                                         .unwrap_or_default();
-                                    exp_prohibition.push(format!(
-                                        "const_restriction:{},card={},cardname={}:",
-                                        rt, card_id, card_name
-                                    ));
+                                    // Do NOT push `cannot_activate` to prohibition_effects:
+                                    // the auto-activation blocking is already handled by
+                                    // constant_cannot_activate_members in phases.rs. Pushing
+                                    // to prohibition_effects would incorrectly block manual
+                                    // ability activation via is_action_prohibited.
+                                    if rt != "cannot_activate" {
+                                        exp_prohibition.push(format!(
+                                            "const_restriction:{},card={},cardname={}:",
+                                            rt, card_id, card_name
+                                        ));
+                                    }
                                     let tgt = effect.target.as_deref().unwrap_or("self");
                                     if rt == "cannot_activate_by_effect" {
                                         let resolved = self.resolve_target_player(tgt).id.clone();

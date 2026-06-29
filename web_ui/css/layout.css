@@ -265,7 +265,7 @@
 
 .live-group-row {
     width: 100%;
-    flex: 0 0 calc(var(--avail-h) * 0.18 / var(--section-count, 1));
+    flex: 0 0 var(--card-h);
     background: rgba(0, 0, 0, 0.2);
     border-bottom: 1px solid var(--border);
     display: flex;

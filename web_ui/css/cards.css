@@ -6,9 +6,18 @@
     gap: 8px;
 }
 
+/*
+ * Card sizing uses a priority chain:
+ *   --card-loc-h  = set by container (location) e.g. live-zone, hand
+ *   --card-sz-h   = set by size modifier  e.g. card-mini, card-compact
+ *   --card-h      = root default (clamp)
+ *
+ * Priority: location > size-modifier > root default
+ */
 .card {
-    width: var(--card-w);
-    height: var(--card-h);
+    width: auto;
+    height: var(--card-loc-h, var(--card-sz-h, var(--card-h)));
+    aspect-ratio: 512 / 720;
     position: relative;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
@@ -16,6 +25,7 @@
     cursor: pointer;
     flex-shrink: 0;
     overflow: hidden;
+    box-sizing: border-box;
 }
 
 /* --- Base Image & Aspect Handling --- */
@@ -27,15 +37,8 @@
 }
 
 /* --- Card Size Variants --- */
-.card.card-mini {
-    width: var(--card-w-mini);
-    height: var(--card-h-mini);
-}
-
-.card.card-compact {
-    width: var(--card-w-compact);
-    height: var(--card-h-compact);
-}
+.card.card-mini { --card-sz-h: var(--card-h-mini); }
+.card.card-compact { --card-sz-h: var(--card-h-compact); }
 
 /* --- Card Type Cosmetics --- */
 .card.type-standard {
@@ -52,8 +55,6 @@
     box-shadow: 0 0 10px rgba(233, 30, 99, 0.3);
 }
 
-
-
 .card.card-back {
     background: #2a1a1a;
     border: 1px solid #666;
@@ -63,46 +64,54 @@
     object-fit: cover;
 }
 
+/* --- Card Micro (Performance modal thumbnails) --- */
+.card.card-micro {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    --card-sz-h: 50px;
+}
+.card.card-micro.md { --card-sz-h: 40px; }
+.card.card-micro.sm { --card-sz-h: 30px; }
+.card.card-micro img {
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+}
+
+/* --- Choice Item (non-card choice options: text, hearts) --- */
+.choice-item {
+    cursor: pointer;
+    transition: border-color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
+}
+.choice-item:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-gold);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.choice-item.text-option {
+    width: auto;
+    height: auto;
+    flex-shrink: 1;
+}
+
+/* --- Card Choice (Choice view items) --- */
+.card.card-choice {
+    transition: border-color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
+}
+.card.card-choice:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-gold);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
 /* --- Unified Orientation & Rotation --- */
 .card.orientation-landscape {
-    width: var(--card-h);
-    height: var(--card-w);
+    width: var(--card-loc-h, var(--card-sz-h, var(--card-h)));
+    height: auto;
     aspect-ratio: 720 / 512;
-    overflow: hidden;
-}
-
-.card.card-mini.orientation-landscape {
-    width: var(--card-h-mini);
-    height: var(--card-w-mini);
-}
-
-.card.card-compact.orientation-landscape {
-    width: var(--card-h-compact);
-    height: var(--card-w-compact);
-}
-
-/* Image-level rotation logic */
-.card.rotate-img-90 img,
-.card.rotate-img-90 .live-card-inner img {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: var(--card-w);
-    height: var(--card-h);
-    transform: translate(-50%, -50%) rotate(90deg);
-    object-fit: cover;
-}
-
-.card.card-mini.rotate-img-90 img,
-.card.card-mini.rotate-img-90 .live-card-inner img {
-    width: var(--card-w-mini);
-    height: var(--card-h-mini);
-}
-
-.card.card-compact.rotate-img-90 img,
-.card.card-compact.rotate-img-90 .live-card-inner img {
-    width: var(--card-w-compact);
-    height: var(--card-h-compact);
 }
 
 
@@ -122,6 +131,7 @@
     display: flex;
     align-items: center;
     min-height: 0;
+    --card-loc-h: calc(var(--avail-h) * 0.12 / var(--section-count, 1));
 }
 
 .hand-group {
@@ -137,9 +147,6 @@
     flex-shrink: 0;
     margin-right: 0;
     z-index: 1;
-    height: calc(var(--avail-h) * 0.12 / var(--section-count, 1));
-    width: auto;
-    aspect-ratio: 512 / 720;
     box-sizing: border-box;
     overflow: hidden;
 }
@@ -381,12 +388,8 @@
 }
 
 .live-zone-cards .card {
-    height: calc((var(--avail-h) - 4px) * 0.18 / var(--section-count, 1));
-    width: auto;
-    aspect-ratio: 720 / 512;
     flex-shrink: 0;
     margin: 0 var(--space-xxs);
-    overflow: visible;
 }
 
 .live-zone-cards .card:hover {
@@ -411,7 +414,7 @@
 .live-card-inner img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
 }
 
 .live-card-inner img.contain-fit {

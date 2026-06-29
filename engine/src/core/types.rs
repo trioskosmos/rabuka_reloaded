@@ -146,6 +146,11 @@ pub struct PerformanceSnapshot {
     /// evaluate_success_zone_heart_reductions during victory determination).
     /// Merged back during snapshot finalization for correct required/adjustments/passed.
     pub performance_need_heart_modifiers: HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
+    /// Per-color surplus hearts remaining after filling all live card requirements.
+    /// Computed as total_hearts[color] - sum(live.filled[color]) across all lives.
+    pub surplus_hearts: [u32; 8],
+    /// Card IDs revealed during yell/cheer (from resolution zone).
+    pub revealed_ids: Vec<i16>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

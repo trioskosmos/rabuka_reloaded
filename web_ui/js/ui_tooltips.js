@@ -314,7 +314,7 @@ export const Tooltips = {
 // Global Event Listeners for Tooltips
 if (typeof document !== 'undefined') {
     document.body.addEventListener('mouseover', (e) => {
-        const selector = '.card, .member-slot, .member-area, .board-slot-container, .energy-pip, .modifier-line, .action-btn, .action-group, .btn, .active-ability-tag, .perf-guide-entry, .perf-yell-card, .log-entry, .turn-event-item, .active-effect, .turn-event-hover-container, .active-effect-hover-container, .compact-choice-card';
+        const selector = '.card, .member-slot, .member-area, .board-slot-container, .energy-pip, .modifier-line, .action-btn, .action-group, .btn, .active-ability-tag, .perf-guide-entry, .perf-yell-card, .log-entry, .turn-event-item, .active-effect, .turn-event-hover-container, .active-effect-hover-container, .choice-item';
         const target = e.target.closest(selector);
 
         if (target) {
@@ -329,7 +329,7 @@ if (typeof document !== 'undefined') {
     });
 
     document.body.addEventListener('mouseout', (e) => {
-        const selector = '.card, .member-slot, .member-area, .board-slot-container, .energy-pip, .modifier-line, .action-btn, .action-group, .btn, .active-ability-tag, .perf-guide-entry, .perf-yell-card, .log-entry, .turn-event-item, .active-effect, .compact-choice-card';
+        const selector = '.card, .member-slot, .member-area, .board-slot-container, .energy-pip, .modifier-line, .action-btn, .action-group, .btn, .active-ability-tag, .perf-guide-entry, .perf-yell-card, .log-entry, .turn-event-item, .active-effect, .choice-item';
         const target = e.target.closest(selector);
         if (target) {
             const nextTarget = e.relatedTarget ? e.relatedTarget.closest(selector) : null;

@@ -114,7 +114,6 @@ export const ZoneViewer = {
         if (!card) return document.createElement('div');
         const vm = CardRenderer.getCardViewModel(card, { mini: true });
         const el = CardRenderer.createCardDOM(vm, card);
-        el.classList.remove('rotate-img-90');
         return el;
     }
 };

@@ -30,6 +30,8 @@ pub struct TempEffectDisplay {
     pub created_turn: u32,
     pub target_player_id: String,
     pub description: String,
+    #[serde(default)]
+    pub effect_data: Option<serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -1571,6 +1573,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             created_turn: te.created_turn,
             target_player_id: te.target_player_id.clone(),
             description: te.description.clone(),
+            effect_data: te.effect_data.clone(),
         })
         .collect();
 

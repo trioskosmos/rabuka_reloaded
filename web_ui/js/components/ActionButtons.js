@@ -245,12 +245,17 @@ export const ActionButtons = {
                     if (State.localLiveCardSelection.has(handIdx)) {
                         State.localLiveCardSelection.delete(handIdx);
                     } else {
+                        const pp = State.perspectivePlayer;
+                        const p = pp === 0 ? State.data?.player1 : State.data?.player2;
+                        const alreadyPlaced = p?.live_zone?.cards?.length || 0;
+                        if (State.localLiveCardSelection.size + alreadyPlaced >= 3) return;
                         State.localLiveCardSelection.add(handIdx);
                     }
                     const cardEl = document.getElementById(`my-hand-card-${handIdx}`);
                     if (cardEl) cardEl.classList.toggle('live-card-selected');
                     const thumb = btn.querySelector('.action-card-thumb');
                     if (thumb) thumb.classList.toggle('live-card-selected');
+                    window.render?.();
                 }
             } else if (window.doAction && a.index !== undefined) {
                 window.doAction(a);

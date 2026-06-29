@@ -285,6 +285,22 @@
 .perf-agg-row.surplus.zero .perf-agg-surplus-value {
     color: var(--text-dim);
 }
+.perf-agg-row.surplus-removed {
+    padding: 2px 8px;
+    border-left: 3px solid var(--accent-red, #e74c3c);
+    background: rgba(231, 76, 60, 0.08);
+    margin-top: 2px;
+}
+.perf-agg-row.surplus-removed .perf-agg-label {
+    font-size: 0.75rem;
+    color: var(--accent-red, #e74c3c);
+}
+.perf-agg-row.surplus-removed .perf-agg-surplus-value.negative {
+    color: var(--accent-red, #e74c3c);
+    font-weight: 700;
+    font-size: 0.9rem;
+    margin-left: auto;
+}
 .perf-agg-divider {
     border-top: 1px solid rgba(255,255,255,0.06);
     margin: 3px 0;
@@ -363,6 +379,26 @@
     font-size: 0.6rem;
     color: var(--text-dim);
     margin-top: 1px;
+}
+
+/* ── Revealed member cards from yell ── */
+.perf-revealed-members {
+    margin: 2px 0 6px;
+    padding: 4px 8px;
+}
+.perf-revealed-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.perf-revealed-member-card .perf-live-art {
+    height: 60px;
+    width: auto;
+    aspect-ratio: 512 / 720;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
 }
 .perf-contrib-card.perf-total-row {
     border: none;
@@ -880,37 +916,6 @@
     display: flex;
     flex-direction: column;
     gap: 3px;
-}
-
-/* --- Live Card Rotation Wrappers for Performance Modal --- */
-.perf-live-art-wrapper {
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.perf-live-art-wrapper img {
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--bg-tertiary);
-    object-fit: cover;
-    display: block;
-}
-
-.perf-live-art-wrapper.lg img {
-    width: 36px;
-    height: 50px;
-}
-
-.perf-live-art-wrapper.md img {
-    width: 28px;
-    height: 40px;
-}
-
-.perf-live-art-wrapper.sm img {
-    width: 22px;
-    height: 30px;
 }
 
 /* Performance modal layout — tab content fills available space */

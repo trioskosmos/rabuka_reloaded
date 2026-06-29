@@ -164,7 +164,7 @@ export const HeaderStats = {
                     members.forEach(member => {
                         if (member && member.card_no) {
                             const card = State.resolveCardData(member.card_no);
-                            const heartData = card.base_heart || card.hearts || card.required_hearts;
+                            const heartData = card.base_heart || card.hearts;
                             if (heartData) {
                                 for (const [heartType, count] of Object.entries(heartData)) {
                                     if (count && !heartType.startsWith('b_heart')) {
@@ -205,8 +205,8 @@ export const HeaderStats = {
         };
 
         // Helper: get need hearts (backend or local preview)
-        const getNeedHearts = (player) => {
-            if (isSetPhase && State.localLiveCardSelection.size > 0) {
+        const getNeedHearts = (player, isPerspectivePlayer) => {
+            if (isSetPhase && isPerspectivePlayer && State.localLiveCardSelection.size > 0) {
                 return HeaderStats.computeLocalNeedHearts(player);
             }
             if (player.live_need_hearts && player.live_need_hearts.some(v => v > 0)) {
@@ -227,7 +227,7 @@ export const HeaderStats = {
             </span>`;
         }
         if (HeaderStats.cache.player1NeedHearts) {
-            const nh = getNeedHearts(p0);
+            const nh = getNeedHearts(p0, perspective === 0);
             HeaderStats.cache.player1NeedHearts.innerHTML = nh ? '<span class="stat-separator"></span>' + PerformanceRenderer.renderHeartsCompact(nh) : '';
         }
 
@@ -243,7 +243,7 @@ export const HeaderStats = {
             </span>`;
         }
         if (HeaderStats.cache.player2NeedHearts) {
-            const nh = getNeedHearts(p1);
+            const nh = getNeedHearts(p1, perspective === 1);
             HeaderStats.cache.player2NeedHearts.innerHTML = nh ? '<span class="stat-separator"></span>' + PerformanceRenderer.renderHeartsCompact(nh) : '';
         }
 
