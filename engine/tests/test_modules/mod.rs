@@ -278,6 +278,7 @@ pub mod nozomi_bp4_aggregate_test;
 pub mod on_energy_placed_test;
 pub mod on_hand_to_discard_test;
 pub mod pl_hs_bp1_003_test;
+pub mod pl_hs_bp6_004_test;
 pub mod pl_hs_sd1_008_test;
 pub mod trigger_card_integration_test;
 pub mod upper_batch_on_yell_test;

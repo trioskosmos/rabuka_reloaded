@@ -2029,6 +2029,9 @@ impl<'a> ConditionContext<'a> {
                 if !hc.is_empty() && !util::card_matches_heart_colors(card_db, cid, hc) {
                     return false;
                 }
+                if !util::card_matches_characters(card_db, cid, condition.characters.as_ref()) {
+                    return false;
+                }
                 // Zone-transition filter: if destination zone is specified,
                 // only count cards that are currently in that zone.
                 if let Some(ref dest) = dest_zone {
@@ -3943,6 +3946,9 @@ impl<'a> ConditionContext<'a> {
                         }
                     }
                     if !hc.is_empty() && !util::card_matches_heart_colors(card_db, cid, hc) {
+                        return false;
+                    }
+                    if !util::card_matches_characters(card_db, cid, condition.characters.as_ref()) {
                         return false;
                     }
                     true
