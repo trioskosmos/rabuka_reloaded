@@ -1246,6 +1246,15 @@ impl GameState {
             Some(ActionType::ModifyRequiredHearts) => {
                 let prev = self.activating_card;
                 self.activating_card = Some(cid);
+                // Set queue context so resolve_target_player("self") targets
+                // the correct owner, not always player1.
+                let owner_id = match player_idx {
+                    0 => "player1",
+                    1 => "player2",
+                    _ => "player1",
+                };
+                self.ability_queue
+                    .push_constant_context(owner_id.to_string());
                 let mut resolver = AbilityResolver::new(self.card_database.clone(), Some(cid));
                 let _ = resolver.execute_modify_required_hearts(
                     self,
@@ -1265,6 +1274,7 @@ impl GameState {
                     effect.self_target.unwrap_or(false),
                     effect.exclude_heart_colors.as_deref().unwrap_or(&[]),
                 );
+                self.ability_queue.pop_constant_context();
                 self.activating_card = prev;
             }
             Some(ActionType::GainResource) => {

@@ -728,6 +728,7 @@ function renderLiveCards(result) {
             </div>
             ${noLives ? `<div class="perf-empty-state">${tr('perf_no_live_snapshot')}</div>` : ''}
             ${renderAggregateHeartSummary(result)}
+            ${noLives && result?.member_contributions?.length > 0 ? `<div class="perf-heart-legend" style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;">${tr('perf_members_on_stage_only')}</div>` : ''}
             ${memberImgSection}
             <div class="perf-live-grid">
                 ${noLives ? '' : lives.map((live, index) => {

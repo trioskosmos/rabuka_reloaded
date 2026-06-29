@@ -1024,29 +1024,8 @@ impl super::TurnEngine {
             };
         }
 
-        // Q32/Rule 8.3.6: If the live card zone is empty, no yell, no card processing.
-        if player.live_card_zone.cards.is_empty() {
-            return LivePerformanceData {
-                yell_count: 0,
-                note_icons: 0,
-                revealed_ids: Vec::new(),
-                member_contributions: Vec::new(),
-                yell_cards: Vec::new(),
-                total_hearts: [0; 8],
-                allocations: Vec::new(),
-                heart_sources: Vec::new(),
-                blade_sources: Vec::new(),
-                draw_effects_occurred: false,
-                live_card_ids: vec![],
-            };
-        }
-
-        let total_blade =
-            player
-                .stage
-                .total_blades(card_db, blade_modifiers, orientation_modifiers);
-
         // Capture member contributions (base values + modifiers)
+        // Always computed — even if live card zone is empty, stage members still contribute.
         let mut member_contributions = Vec::new();
         for i in 0..3 {
             let cid = player.stage.stage[i];
@@ -1131,6 +1110,40 @@ impl super::TurnEngine {
                 is_wait,
             });
         }
+
+        // Q32/Rule 8.3.6: If the live card zone is empty, no yell, no live card processing.
+        // But member contributions and stage hearts are still returned.
+        if player.live_card_zone.cards.is_empty() {
+            let mut total_hearts_arr = EMPTY_H8;
+            for mc in &member_contributions {
+                for c in 0..8 {
+                    total_hearts_arr[c] += mc.base_hearts[c] + mc.bonus_hearts[c];
+                }
+            }
+            let total_blade: u32 = member_contributions
+                .iter()
+                .filter(|m| !m.is_wait)
+                .map(|m| m.base_blades + m.bonus_blades)
+                .sum();
+            return LivePerformanceData {
+                yell_count: total_blade,
+                note_icons: 0,
+                revealed_ids: Vec::new(),
+                member_contributions,
+                yell_cards: Vec::new(),
+                total_hearts: total_hearts_arr,
+                allocations: Vec::new(),
+                heart_sources: Vec::new(),
+                blade_sources: Vec::new(),
+                draw_effects_occurred: false,
+                live_card_ids: vec![],
+            };
+        }
+
+        let total_blade =
+            player
+                .stage
+                .total_blades(card_db, blade_modifiers, orientation_modifiers);
 
         // Q40: Yell must complete ALL checks — even if hearts are already satisfied,
         // the full blade-count of yell cards is always revealed.

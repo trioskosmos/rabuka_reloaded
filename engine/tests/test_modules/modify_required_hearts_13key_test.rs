@@ -262,3 +262,141 @@ fn as_long_as_expiration_on_zone_exit() {
         "After removal → heart00 should be 0 (no activator), got {mod_val2}"
     );
 }
+
+/// Dreamin' Go! Go!! in P1's success zone → P1's score ≥5 μ's live gets -2,
+/// P2's score ≥5 μ's live is UNAFFECTED (target "self" = owner only).
+#[test]
+fn p1_activator_does_not_affect_p2() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let activator = game.id("PL!-bp6-022-L");
+    let p1_live = game.id("PL!-bp3-021-L"); // μ's, score 6
+    let p2_live = game.id("PL!-bp3-021-L"); // μ's, score 6
+
+    game.state
+        .player1
+        .success_live_card_zone
+        .cards
+        .push(activator);
+    game.state.player1.live_card_zone.cards.push(p1_live);
+    game.state.player2.live_card_zone.cards.push(p2_live);
+
+    game.state.evaluate_success_zone_constant_abilities();
+
+    let p1_mod = game
+        .state
+        .mods
+        .get_need_heart_modifier(p1_live, HeartColor::Heart00);
+    assert_eq!(
+        p1_mod, -2,
+        "P1's score 6 μ's live → heart00 should be -2, got {p1_mod}"
+    );
+    let p2_mod = game
+        .state
+        .mods
+        .get_need_heart_modifier(p2_live, HeartColor::Heart00);
+    assert_eq!(
+        p2_mod, 0,
+        "P2's score 6 μ's live should NOT be affected, got {p2_mod}"
+    );
+}
+
+/// Dreamin' Go! Go!! in P2's success zone → P2's score ≥5 μ's live gets -2,
+/// P1's score ≥5 μ's live is UNAFFECTED (regression test for
+/// resolve_target_player("self") incorrectly defaulting to player1).
+#[test]
+fn p2_activator_targets_p2_not_p1() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let activator = game.id("PL!-bp6-022-L");
+    let p1_live = game.id("PL!-bp3-021-L"); // μ's, score 6
+    let p2_live = game.id("PL!-bp3-021-L"); // μ's, score 6
+
+    // Activator in P2's success zone
+    game.state
+        .player2
+        .success_live_card_zone
+        .cards
+        .push(activator);
+    game.state.player1.live_card_zone.cards.push(p1_live);
+    game.state.player2.live_card_zone.cards.push(p2_live);
+
+    game.state.evaluate_success_zone_constant_abilities();
+
+    let p2_mod = game
+        .state
+        .mods
+        .get_need_heart_modifier(p2_live, HeartColor::Heart00);
+    assert_eq!(
+        p2_mod, -2,
+        "P2's score 6 μ's live → heart00 should be -2 (P2 owns activator), got {p2_mod}"
+    );
+    let p1_mod = game
+        .state
+        .mods
+        .get_need_heart_modifier(p1_live, HeartColor::Heart00);
+    assert_eq!(
+        p1_mod, 0,
+        "P1's score 6 μ's live should NOT be affected (activator is P2's), got {p1_mod}"
+    );
+}
+
+/// Dreamin' Go! Go!! in P2's success zone → score filter still works:
+/// P2's score <5 μ's live gets NO reduction.
+#[test]
+fn p2_activator_respects_score_threshold() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let activator = game.id("PL!-bp6-022-L");
+    let low_score = game.id("PL!-sd1-020-SD"); // μ's, score 2
+
+    game.state
+        .player2
+        .success_live_card_zone
+        .cards
+        .push(activator);
+    game.state.player2.live_card_zone.cards.push(low_score);
+
+    game.state.evaluate_success_zone_constant_abilities();
+
+    let mod_val = game
+        .state
+        .mods
+        .get_need_heart_modifier(low_score, HeartColor::Heart00);
+    assert_eq!(
+        mod_val, 0,
+        "P2's score 2 μ's live → should have no modifier, got {mod_val}"
+    );
+}
+
+/// Dreamin' Go! Go!! in P2's success zone → group filter still works:
+/// P2's non-μ's score ≥5 live gets NO reduction.
+#[test]
+fn p2_activator_respects_group_filter() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let activator = game.id("PL!-bp6-022-L");
+    let non_mus = game.id("PL!S-PR-024-PR"); // Aqours, score 5
+
+    game.state
+        .player2
+        .success_live_card_zone
+        .cards
+        .push(activator);
+    game.state.player2.live_card_zone.cards.push(non_mus);
+
+    game.state.evaluate_success_zone_constant_abilities();
+
+    let mod_val = game
+        .state
+        .mods
+        .get_need_heart_modifier(non_mus, HeartColor::Heart00);
+    assert_eq!(
+        mod_val, 0,
+        "P2's Aqours score 5 live → should have no modifier, got {mod_val}"
+    );
+}

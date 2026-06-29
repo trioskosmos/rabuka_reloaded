@@ -346,6 +346,57 @@ impl AbilityQueue {
         }
     }
 
+    /// Push a temporary context entry for constant ability evaluation.
+    /// This gives resolve_target_player (which reads ability_master_id)
+    /// the correct player context when evaluating success zone constants
+    /// outside the normal ability queue flow.
+    pub fn push_constant_context(&mut self, player_id: String) {
+        let idx = self.entries.len();
+        self.entries.push(AbilityQueueEntry {
+            id: AbilityId::new("", 0, "const_eval"),
+            card_no: String::new(),
+            player_id,
+            ability: Ability {
+                full_text: String::new(),
+                triggerless_text: String::new(),
+                triggers: None,
+                use_limit: None,
+                is_null: true,
+                cost: None,
+                effect: None,
+                keywords: None,
+            },
+            ability_index: 0,
+            card_id: None,
+            trigger_type: AbilityTrigger::Auto,
+            completed: false,
+            cost_paid: false,
+            cost_paid_index: 0,
+            pending_choice_result: None,
+            choice_card_no: None,
+            conditional_choice: None,
+            effect_started: false,
+            optional_cost_result: None,
+            choice_player_id: None,
+            pending_actions: Vec::new(),
+            resolver: None,
+            trigger_moved_cards: None,
+            triggering_member_id: None,
+            snapshot_movements: Vec::new(),
+            snapshot_energy_placed_by_effect: false,
+            snapshot_energy_placed_by_player: None,
+            choice_effect_text: None,
+            condition_cache: HashMap::new(),
+        });
+        self.state = QueueState::ExecutingEffect { entry_index: idx };
+    }
+
+    /// Pop the temporary constant evaluation context and restore idle.
+    pub fn pop_constant_context(&mut self) {
+        self.entries.pop();
+        self.state = QueueState::Idle;
+    }
+
     /// Get queue state for debugging
     pub fn get_state(&self) -> &QueueState {
         &self.state
