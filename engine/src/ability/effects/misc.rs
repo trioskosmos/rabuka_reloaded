@@ -2706,8 +2706,34 @@ impl AbilityResolver {
                 }
             }
         }
-        let options_json = options
+        // Propagate parent choice's group_names to each child option when the
+        // group_names is a selection filter (not a condition threshold).  We detect
+        // this by checking for alternative_count_type — when set, the group_names is
+        // used as a condition (e.g. "if X group is present, pick any number"), not
+        // as a filter on the options themselves.  Fixes Kanon pb2-001-R's followup
+        // choice where group_names=["Liella!"] was lost after option selection.
+        let should_propagate_group = effect.group_names.is_some()
+            && effect.alternative_count_type.is_none()
+            && effect.compound.alternative_condition.is_none();
+        let propagated_options: Option<Vec<AbilityEffect>> = if should_propagate_group {
+            options.map(|opts| {
+                opts.iter()
+                    .map(|opt| {
+                        let mut p = opt.clone();
+                        if p.group_names.is_none() {
+                            p.group_names = effect.group_names.clone();
+                        }
+                        p
+                    })
+                    .collect()
+            })
+        } else {
+            None
+        };
+        let options_json = propagated_options
+            .as_ref()
             .and_then(|opts| serde_json::to_string(opts).ok())
+            .or_else(|| options.and_then(|opts| serde_json::to_string(opts).ok()))
             .or_else(|| choice_options.and_then(|opts| serde_json::to_string(opts).ok()));
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
             entry.choice_card_no = if options.is_some() {

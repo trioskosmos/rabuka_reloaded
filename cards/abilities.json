@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-29T22:39:20.016770",
+  "generated_at": "2026-06-29T23:37:19.415071",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -18524,6 +18524,27 @@
           "destination": "hand",
           "count": 1,
           "card_type": "member_card",
+          "max": true,
+          "group_names": [
+            "Liella!"
+          ],
+          "cost_limit": 4,
+          "cost_limit_operator": "<="
+        },
+        "followup_action": {
+          "action": "choice",
+          "optional": true,
+          "text": "コスト4以下の『Liella!』のメンバーカードを1枚まで公開する。そのカードを自分のステージのメンバーのいないエリアに登場させるか、手札に加える。残りを控え室に置く",
+          "options": [
+            {
+              "action": "move_cards",
+              "source": "hand",
+              "destination": "stage",
+              "card_type": "member_card",
+              "count": 1,
+              "text": "自分のステージのメンバーのいないエリアに登場させる"
+            }
+          ],
           "group_names": [
             "Liella!"
           ]
@@ -22400,7 +22421,9 @@
             "live_card",
             "member_card"
           ],
-          "optional": true
+          "card_type": "member_card",
+          "optional": true,
+          "cost_limit_operator": ">="
         },
         "optional": true,
         "heart_colors": [
@@ -22450,7 +22473,9 @@
             "live_card",
             "member_card"
           ],
-          "optional": true
+          "card_type": "member_card",
+          "optional": true,
+          "cost_limit_operator": ">="
         },
         "optional": true,
         "heart_colors": [
@@ -22500,7 +22525,9 @@
             "live_card",
             "member_card"
           ],
-          "optional": true
+          "card_type": "member_card",
+          "optional": true,
+          "cost_limit_operator": ">="
         },
         "optional": true,
         "heart_colors": [

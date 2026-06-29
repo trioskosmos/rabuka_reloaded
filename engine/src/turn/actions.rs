@@ -845,6 +845,13 @@ impl super::TurnEngine {
                         }
                     }
                 }
+                // Don't complete if a pending choice (e.g. SelectPosition) was
+                // created by the current effect — it would be orphaned.
+                if game_state.has_pending_choice() {
+                    log::debug!("[RWC] skipping complete_current — pending choice exists");
+                    eprintln!("[RWC] skipping complete_current — pending choice exists");
+                    return Ok(());
+                }
                 // Post-resolution TAS scan for movement-based triggers.
                 // Mirrors process_current_ability's post-resolution scan (line ~1072)
                 // which is NOT called when a resolver completes via this path.

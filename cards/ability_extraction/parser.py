@@ -5818,11 +5818,44 @@ def _apply_or_select_criteria(result, select_text):
             result["options"] = parsed_parts
 
 
+def _build_or_destination_followup(select_text):
+    """Generate a followup_action for 'debut to stage OR add to hand' pattern.
+
+    The select_action handles the default (destination=hand). The followup
+    presents an optional choice to debut the selected card to an empty stage
+    area instead, using a move from hand → stage.
+    """
+    result = {
+        "action": "choice",
+        "optional": True,
+        "text": select_text,
+        "options": [
+            {
+                "action": "move_cards",
+                "source": "hand",
+                "destination": "stage",
+                "card_type": "member_card",
+                "count": 1,
+                "text": "自分のステージのメンバーのいないエリアに登場させる",
+            }
+        ],
+    }
+    return result
+
+
 def _build_look_select_actions(select_text):
     res = _build_look_select_actions_inner(select_text)
     if isinstance(res, dict):
         _apply_or_select_criteria(res, select_text)
     return res
+
+
+def _build_look_select_with_followup(select_text, effect_result):
+    """Build select_action and promote followup_action to the effect level."""
+    sa = _build_look_select_actions(select_text) or {}
+    effect_result["select_action"] = sa
+    if isinstance(sa, dict) and "followup_action" in sa:
+        effect_result["followup_action"] = sa.pop("followup_action")
 
 
 def _build_look_select_actions_inner(select_text):
@@ -5856,8 +5889,15 @@ def _build_look_select_actions_inner(select_text):
                 if ct:
                     result["card_type"] = ct
                 _add_or_card_types_if_needed(result, select_text)
+                _enrich_from_text(result, select_text)
                 if extract_optional(select_text):
                     result["optional"] = True
+                # Check for "か" (OR) between 'debut to stage' and 'add to hand'
+                # e.g. "カードを...エリアに登場させるか、手札に加える"
+                if "登場させる" in select_text and "手札に加え" in select_text:
+                    followup = _build_or_destination_followup(select_text)
+                    if followup:
+                        result["followup_action"] = followup
                 return result
 
     # Pattern: any number → deck_top → discard remaining
@@ -6092,16 +6132,14 @@ def _try_look_and_select(text):
         # executed after the look_and_select completes.
         sonogo_parts = re.split(r"[。、]?\s*その後[、。]?\s*", select_text, maxsplit=1)
         if len(sonogo_parts) > 1:
-            result["select_action"] = _build_look_select_actions(
-                sonogo_parts[0].strip()
-            )
+            _build_look_select_with_followup(sonogo_parts[0].strip(), result)
             followup_text = sonogo_parts[1].strip()
             if followup_text:
                 parsed = parse_effect(followup_text)
                 if parsed:
                     result["followup_action"] = parsed
         else:
-            result["select_action"] = _build_look_select_actions(select_text)
+            _build_look_select_with_followup(select_text, result)
         if cond_followup:
             parsed_cond = parse_effect(cond_followup)
             if parsed_cond and parsed_cond.get("action") != "custom":
