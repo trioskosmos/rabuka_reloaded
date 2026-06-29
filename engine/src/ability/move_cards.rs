@@ -1765,7 +1765,6 @@ impl AbilityResolver {
                 return Err(format!("Card at index {} not found in under_member", idx));
             }
         }
-        let selected_ids: Vec<i16> = cards_to_move.iter().map(|&(_, cid)| cid).collect();
         for (si, card_id) in &cards_to_move {
             if let Some(pos) = player.stage.under_cards[*si]
                 .iter()
@@ -1776,7 +1775,9 @@ impl AbilityResolver {
             }
         }
         gs.recalculate_constants();
-        self.selected_cards = selected_ids;
+        // Don't save energy card IDs in selected_cards — they would leak
+        // into downstream sequential actions (e.g. gain_resource heart targets).
+        // moved_cards already tracks these via the caller.
         Ok(cards_to_move.iter().map(|&(_, cid)| cid).collect())
     }
 

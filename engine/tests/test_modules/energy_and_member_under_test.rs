@@ -722,7 +722,7 @@ fn sayaka_rule_1053_under_members_go_to_waitroom() {
 // PL!N-bp3-025-L Awakening Promise — LiveStart: under_member → energy_deck → hearts
 // ====================================================================
 
-/// 1 member center with 2 energy under. Select 1 → 1 moves to energy_deck.
+/// 1 member center with 2 energy under. Select 1 → 1 moves, gain heart02×3.
 #[test]
 fn awakening_move_1_of_2() {
     let db = load_real_database();
@@ -755,9 +755,14 @@ fn awakening_move_1_of_2() {
         1,
         "1 remains"
     );
+    let heart = g
+        .state
+        .mods
+        .get_heart_modifier(t, rabuka_engine::card::HeartColor::Heart02);
+    assert_eq!(heart, 3, "3 heart02 (1 energy × 3 per card)");
 }
 
-/// Skip → 0 moved.
+/// Skip → 0 moved, no heart bonus.
 #[test]
 fn awakening_skip_all() {
     let db = load_real_database();
@@ -778,9 +783,14 @@ fn awakening_skip_all() {
         energy_before,
         "0 moved on skip"
     );
+    let heart = g
+        .state
+        .mods
+        .get_heart_modifier(t, rabuka_engine::card::HeartColor::Heart02);
+    assert_eq!(heart, 0, "no heart bonus when skipped");
 }
 
-/// No energy under → no choice.
+/// No energy under → no choice, no bonus.
 #[test]
 fn awakening_no_energy_nothing_happens() {
     let db = load_real_database();
@@ -793,4 +803,52 @@ fn awakening_no_energy_nothing_happens() {
     g.set_live_card(a);
     advance_to_live_start(&mut g);
     assert!(!g.has_pending_choice(), "no choice when 0 energy under");
+    let heart = g
+        .state
+        .mods
+        .get_heart_modifier(t, rabuka_engine::card::HeartColor::Heart02);
+    assert_eq!(heart, 0, "no heart bonus when no energy under");
+}
+
+/// Move 2 energy → 6 heart02 (2 × 3).
+#[test]
+fn awakening_move_all_energy() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let a = g.id("PL!N-bp3-025-L");
+    let t = g.id("PL!-sd1-010-SD");
+    g.state.player1.stage.stage = [-1, t, -1];
+    place_energy_under(&mut g, MemberArea::Center, 2);
+    g.state.player1.hand.cards.push(a);
+    let energy_before = g.state.player1.energy_deck.cards.len();
+    advance_to_live_card_set_p1(&mut g);
+    g.set_live_card(a);
+    advance_to_live_start(&mut g);
+    assert!(g.has_pending_choice(), "choice expected");
+    g.select_indices(&[0]);
+    if g.has_pending_choice() {
+        g.select_indices(&[0]);
+    }
+    if g.has_pending_choice() {
+        g.select_indices(&[]);
+    }
+    assert_eq!(
+        g.state.player1.energy_deck.cards.len(),
+        energy_before + 2,
+        "2 energy moved"
+    );
+    assert_eq!(
+        g.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .len(),
+        0,
+        "0 remains"
+    );
+    let heart = g
+        .state
+        .mods
+        .get_heart_modifier(t, rabuka_engine::card::HeartColor::Heart02);
+    assert_eq!(heart, 6, "6 heart02 (2 energy × 3 per card)");
 }

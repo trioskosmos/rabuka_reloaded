@@ -285,6 +285,19 @@ impl super::resolver::AbilityResolver {
                 }),
                 *discard_remaining,
             ),
+            (
+                Some(Choice::SelectCard {
+                    count: 0,
+                    allow_skip: true,
+                    ..
+                }),
+                ChoiceResult::Skip,
+            ) => {
+                // any_number re-prompt skip: cards were already moved in a
+                // previous sub-selection. Resume pending actions so
+                // downstream actions (e.g. gain_resource) still execute.
+                self.clear_choice_state_and_resume(gs)
+            }
             (Some(Choice::SelectCard { .. }), ChoiceResult::Skip) => {
                 // Clear pending commands saved by sequential conditional handlers
                 // so that skipped optional sub-actions don't re-execute as mandatory.
@@ -799,7 +812,43 @@ impl super::resolver::AbilityResolver {
                 )?;
                 if !moved.is_empty() {
                     self.moved_cards.extend(&moved);
-                    gs.recently_moved_cards = Some(moved);
+                    // Accumulate across any_number re-prompts unconditionally
+                    // (same card ID can appear multiple times under a member).
+                    let combined = gs.recently_moved_cards.get_or_insert_with(Vec::new);
+                    combined.extend(&moved);
+                }
+                // any_number re-prompt: after each selection, show remaining cards
+                // Empty indices = player chose to stop selecting (skip).
+                if ctx.indices.is_empty() {
+                    // Done selecting — fall through to handle_selection_epilogue
+                } else if ctx.count == 0 && ctx.allow_skip {
+                    let player = gs.resolve_target_player_mut(&tgt);
+                    let mut remaining_idxs: Vec<usize> = Vec::new();
+                    let mut global_idx = 0;
+                    for si in 0..3 {
+                        for &cid in &player.stage.under_cards[si] {
+                            if validate_card(cid) {
+                                remaining_idxs.push(global_idx);
+                            }
+                            global_idx += 1;
+                        }
+                    }
+                    if !remaining_idxs.is_empty() {
+                        self.pending_choice = Some(
+                            Choice::select_cards(
+                                Zone::UnderMember.to_str(),
+                                0,
+                                "Select more energy cards (or skip to finish)",
+                                true,
+                            )
+                            .card_type(Some("energy_card".to_string()))
+                            .target_player_id(Some(tgt.clone()))
+                            .filtered_indices(Some(remaining_idxs))
+                            .build(),
+                        );
+                        self.store_pending_choice(gs);
+                        return Ok(());
+                    }
                 }
             }
             Some(Zone::SuccessLiveZone) => {

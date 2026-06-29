@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-30T02:50:08.238641",
+  "generated_at": "2026-06-30T03:24:14.813383",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -23414,7 +23414,7 @@
             "text": "自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数エネルギーデッキに置いてもよい。",
             "source": "under_member",
             "destination": "energy_deck",
-            "card_type": "member_card",
+            "card_type": "energy_card",
             "target": "self",
             "optional": true,
             "action": "place_energy_under_member",
@@ -23432,8 +23432,8 @@
             ],
             "per_unit": true,
             "per_unit_count": 1,
-            "per_unit_type": "枚",
-            "card_type": "energy_card",
+            "per_unit_type": "energy_deck",
+            "card_type": "member_card",
             "duration": "live_end"
           }
         ],
@@ -25656,6 +25656,7 @@
         "per_unit": true,
         "per_unit_count": 2,
         "per_unit_type": "つ",
+        "card_type": "member_card",
         "condition": {
           "text": "自分のセンターエリアに『μ's』のメンバーがいる場合",
           "group_names": [

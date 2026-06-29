@@ -3000,6 +3000,11 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
         a = "place_energy_under_member"
         action.setdefault("energy_count", 1)
         action.setdefault("target_member", "this_member")
+        # Cards under a member going to energy_deck are energy cards.
+        # Cards going elsewhere (e.g. empty_area for member deployment)
+        # keep whatever card_type the text parsing determined.
+        if action.get("destination") == "energy_deck":
+            action["card_type"] = "energy_card"
     if (
         a == "move_cards"
         and action.get("source") in ("revealed_remaining", "revealed_cards")
@@ -3286,9 +3291,10 @@ def parse_action(text: str) -> Dict[str, Any]:
             # Extract card_type from per_unit source text
             if "エネルギーカード" in per_unit_text:
                 per_unit_info["card_type"] = "energy_card"
-                # When per-unit counts energy cards and the preceding action moves
-                # to energy_deck, the count should reference recently_moved cards.
-                if "エネルギーデッキ" in text:
+                # When per-unit counts energy cards placed by this effect
+                # ("これによって置いたエネルギーカード"), the count should
+                # reference recently_moved cards (energy_deck destination).
+                if "エネルギーデッキ" in text or "これによって置いた" in per_unit_text:
                     per_unit_info["per_unit_type"] = "energy_deck"
             elif "メンバーカード" in per_unit_text:
                 per_unit_info["card_type"] = "member_card"
@@ -4902,6 +4908,11 @@ def _try_per_unit(text):
     if "控え室に置" in per_text:
         result["per_unit_type"] = "discard"
 
+    # "これによって置いたエネルギーカード" = energy cards placed by this effect
+    # → count from recently_moved_cards (energy_deck destination)
+    if "これによって置いた" in per_text and "エネルギーカード" in per_text:
+        result["per_unit_type"] = "energy_deck"
+
     # Check for excluded groups: 『group』以外
     exc_gns = re.findall(r"『([^』]+)』以外", per_text)
     if exc_gns:
@@ -4975,6 +4986,11 @@ def _try_per_unit(text):
     if "エネルギーカード" in per_text:
         result["card_type"] = "energy_card"
     elif "メンバーカード" in per_text:
+        result["card_type"] = "member_card"
+    # "そのメンバー" (that member) targets a stage member, not energy cards.
+    # Override card_type to member_card for targeting — per_unit counting
+    # uses per_unit_type (e.g. "energy_deck") independently.
+    if per_text.startswith("そのメンバー"):
         result["card_type"] = "member_card"
 
     for kw, loc in [

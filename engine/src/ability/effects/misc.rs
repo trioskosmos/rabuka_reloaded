@@ -785,8 +785,15 @@ impl AbilityResolver {
                         &filter,
                     );
                 } else if per_unit_type_str.as_deref() == Some("energy_deck") {
-                    if let Some(moved) = recently_moved.as_ref().or(entry_snapshot.as_ref()) {
-                        matching_count = util::count_matching(moved, &card_db, &filter, false);
+                    // Cards placed in energy deck are always energy cards,
+                    // so don't filter by card_type (which may differ from
+                    // the gain_resource's target card_type for member targeting).
+                    // Only count recently_moved (from the current effect),
+                    // NOT entry_snapshot (which may contain trigger-setup cards).
+                    if let Some(moved) = recently_moved.as_ref() {
+                        matching_count = moved.len() as u32;
+                    } else {
+                        matching_count = 0;
                     }
                 }
                 let mut units = matching_count / per_unit_count_val;
@@ -1532,15 +1539,18 @@ impl AbilityResolver {
                 return;
             }
 
-            let max_count = if any_number {
-                all_under.len()
+            // any_number → count=0 so the player can select any subset
+            // (the choice handler re-prompts after each selection).
+            // Fixed count → require exactly that many (up to max available).
+            let choice_count = if any_number {
+                0
             } else {
                 all_under.len().min(count as usize)
             };
             self.pending_choice = Some(
                 Choice::select_cards(
                     Zone::UnderMember.to_str(),
-                    max_count,
+                    choice_count,
                     "Select energy cards to move from under member to energy deck",
                     optional,
                 )
