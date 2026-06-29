@@ -790,6 +790,63 @@ impl super::resolver::AbilityResolver {
                     self.selected_cards
                 );
             }
+            Some(Zone::LiveCardZone) => {
+                if is_select_action {
+                    let target = target_player_id
+                        .clone()
+                        .unwrap_or_else(|| "self".to_string());
+                    let player = gs.resolve_target_player_mut(&target);
+                    let mapped_indices = mfi(indices);
+                    let mut cards: Vec<i16> = Vec::new();
+                    for &i in mapped_indices.iter() {
+                        if i < player.live_card_zone.cards.len() {
+                            let cid = player.live_card_zone.cards[i];
+                            if !self.selected_cards.contains(&cid) {
+                                self.selected_cards.push(cid);
+                                cards.push(cid);
+                            }
+                        }
+                    }
+                    player.live_card_zone.cards.retain(|c| !cards.contains(c));
+                    log::debug!(
+                        "[LIVE_CARD_SELECTION] selected_cards={:?} removed from live_card_zone",
+                        self.selected_cards
+                    );
+                } else {
+                    let edst = gs.entry_destination().map(|s| s.to_string());
+                    let dst_str = ctx
+                        .destination
+                        .clone()
+                        .or(edst)
+                        .unwrap_or_else(|| Zone::Discard.to_string());
+                    let tgt = target_player_id
+                        .clone()
+                        .unwrap_or_else(|| "self".to_string());
+                    let player = gs.resolve_target_player_mut(&tgt);
+                    let card_ids: Vec<i16> = mfi(indices)
+                        .iter()
+                        .filter_map(|&i| player.live_card_zone.cards.get(i).copied())
+                        .filter(|&cid| validate_card(cid))
+                        .collect();
+                    let moved = util::move_cards(
+                        player,
+                        &card_ids,
+                        Zone::LiveCardZone.to_str(),
+                        &dst_str,
+                        None,
+                        &card_db,
+                    );
+                    if moved > 0 {
+                        for &cid in &card_ids {
+                            if !self.selected_cards.contains(&cid) {
+                                self.selected_cards.push(cid);
+                            }
+                        }
+                        gs.recently_moved_cards = Some(card_ids.to_vec());
+                        gs.recently_moved_from_zone = Some(Zone::LiveCardZone.to_string());
+                    }
+                }
+            }
             Some(Zone::Stage) => {
                 self.handle_stage_selection(gs, &ctx, &mut validate_card)?;
             }

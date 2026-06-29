@@ -95,6 +95,7 @@ pub mod kinako_test;
 pub mod konata_bp4_test;
 pub mod konata_test;
 pub mod kotori_test;
+pub mod kuroe_dia_bp6_test;
 pub mod ladybug_test;
 pub mod link_to_future_test;
 pub mod live_success_rules_test;

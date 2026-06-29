@@ -113,7 +113,6 @@ DURATION_PREFIX_MAP = {
 # ======================================================================
 
 
-
 def _strip_duration_prefix(text):
     """Strip duration prefix from start of text. Returns (rest_text, code_or_None)."""
     for pat, code in DURATION_PREFIX_MAP.items():
@@ -684,10 +683,10 @@ def _try_duration_prefix(text):
         return {"text": rest, "duration": code, "_rest": rest}
     return None
 
+
 # ======================================================================
 # CORE PARSING ENTRY POINTS
 # ======================================================================
-
 
 
 def parse_ability(triggerless_text: str) -> Dict[str, Any]:
@@ -1420,10 +1419,7 @@ def _handle_cost_modification(text, action):
     if "減る" in text or "減らす" in text or "マイナス" in text:
         action["operation"] = "subtract"
     elif (
-        "増える" in text
-        or "増やす" in text
-        or "プラス" in text
-        or "コストを+" in text
+        "増える" in text or "増やす" in text or "プラス" in text or "コストを+" in text
     ):
         action["operation"] = "add"
     # Set location for hand-based cost reductions (手札にある/手札から)
@@ -1932,8 +1928,6 @@ def parse_action(text: str) -> Dict[str, Any]:
     # Each rule: (condition_text_or_fn, action_type, field_setter_fn_or_None)
     # Order matches original if/elif priority.
 
-
-
     _R = []
 
     def R(cond, act, setter=None):
@@ -2403,7 +2397,6 @@ def parse_action(text: str) -> Dict[str, Any]:
 
     # If "コスト" text contains heart icons, it's about required hearts (not energy cost)
 
-
     R(
         lambda t: ("コストを" in t or "コストが" in t or "コストは" in t)
         and "{{heart_" in t,
@@ -2635,10 +2628,10 @@ def parse_action(text: str) -> Dict[str, Any]:
     _fill_defaults(action, text, _cached_source=source, _cached_dest=destination)
     return action
 
+
 # ======================================================================
 # CONDITION MATCHING HANDLERS & HELPERS
 # ======================================================================
-
 
 
 # ====================================================================
@@ -5112,10 +5105,10 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
         action["need_heart_total"] = int(nh2.group(1))
         action["need_heart_operator"] = ">="
 
+
 # ======================================================================
 # EFFECT MATCHING HANDLERS & HELPERS
 # ======================================================================
-
 
 
 # ====================================================================
@@ -6953,7 +6946,7 @@ def _try_conditional_sequential(text):
     # (e.g. "選び、デッキの一番上に置いてもよい"), insert a move_cards step
     # between the select and the followup so the selected card actually moves.
     move_step = None
-    if fa.get("action") == "select" and "置く" in fp:
+    if fa.get("action") == "select" and ("置く" in fp or "置いて" in fp):
         if "デッキの一番上" in fp:
             fa["destination"] = "deck_top"
         if fa.get("destination"):
@@ -8038,7 +8031,6 @@ _EFFECT_HANDLERS = [
 # ======================================================================
 
 
-
 def _has_position_keywords(text):
     for keyword, position in POSITION_KEYWORDS.items():
         if keyword in text:
@@ -8119,10 +8111,7 @@ def _clean_action_list(actions, parent_effect=None, parent_text=""):
                         # ability text explicitly says "Groupのメンバーにブレードを与える".
                         # Leaked group_names cause the engine to distribute resources
                         # to ALL matching group members instead of the activating card.
-                        if (
-                            f == "group_names"
-                            and sub.get("action") == "gain_resource"
-                        ):
+                        if f == "group_names" and sub.get("action") == "gain_resource":
                             continue
                         # Don't propagate group_names to specify_heart_color or
                         # reveal sub-actions — group filtering doesn't apply to
@@ -8146,10 +8135,7 @@ def _clean_action_list(actions, parent_effect=None, parent_text=""):
                             continue
                         # Don't propagate heart_colors to gain_resource actions
                         # (the heart color was selected by a previous select action)
-                        if (
-                            f == "heart_colors"
-                            and sub.get("action") == "gain_resource"
-                        ):
+                        if f == "heart_colors" and sub.get("action") == "gain_resource":
                             continue
                         sub[f] = parent_effect[f]
         # Propagate card_type from parent to sub-actions that don't have it
@@ -8411,10 +8397,7 @@ def _walk(d, full_text, original_text, ctx_text=None):
                         if (
                             d.get("action") != "gain_resource"
                             and d.get("type") != "card_count_condition"
-                            and (
-                                d.get("action") != "modify_cost"
-                                or d.get("per_unit")
-                            )
+                            and (d.get("action") != "modify_cost" or d.get("per_unit"))
                         ):
                             d["group_names"] = gms
 
@@ -8443,8 +8426,7 @@ def _walk(d, full_text, original_text, ctx_text=None):
                     search_text = ctx_text
         hc = list(
             dict.fromkeys(
-                f"heart{m.zfill(2)}"
-                for m in re.findall(r"heart_(\d+)", search_text)
+                f"heart{m.zfill(2)}" for m in re.findall(r"heart_(\d+)", search_text)
             )
         )
         if hc or "heart_00" in search_text:
@@ -8508,9 +8490,7 @@ def _walk(d, full_text, original_text, ctx_text=None):
     if (
         "all" not in d
         and d_ctx
-        and re.search(
-            r"すべての|全ての|全部の|全て|全員|全体|カードをすべて", d_ctx
-        )
+        and re.search(r"すべての|全ての|全部の|全て|全員|全体|カードをすべて", d_ctx)
     ):
         d["all"] = True
 
@@ -8558,10 +8538,7 @@ def _walk(d, full_text, original_text, ctx_text=None):
                 "すべて" in cond_text or "全部" in cond_text
             ) and prev_count is not None:
                 if cond.get("type") == "card_count_condition":
-                    if (
-                        cond.get("count", 1) == 1
-                        and cond.get("operator", ">=") == ">="
-                    ):
+                    if cond.get("count", 1) == 1 and cond.get("operator", ">=") == ">=":
                         cond["count"] = prev_count
                         cond["operator"] = "="
                         cond["source"] = "preceding_moved"
@@ -8600,11 +8577,7 @@ def _walk(d, full_text, original_text, ctx_text=None):
                         cond[_key] = prev_pm_cond[_key]
 
     # Collapse single-action sequential wrappers (preserve condition + trigger_type + text)
-    if (
-        d.get("action") == "sequential"
-        and d.get("actions")
-        and len(d["actions"]) == 1
-    ):
+    if d.get("action") == "sequential" and d.get("actions") and len(d["actions"]) == 1:
         inner = d["actions"][0]
         if not d.get("condition") and not d.get("conditional"):
             outer_fields = {}
@@ -8757,7 +8730,6 @@ def _walk(d, full_text, original_text, ctx_text=None):
     return d
 
 
-
 def _normalize_effect_tree(effect, original_text=None):
     """Post-processing pass to fix common parser artifacts:
     - Remove do_nothing actions between real actions
@@ -8770,7 +8742,6 @@ def _normalize_effect_tree(effect, original_text=None):
 
     # Scan the full text once for field hints
     _full_text = effect.get("text") or original_text or ""
-
 
     effect = _walk(effect, _full_text, original_text, original_text)
 
@@ -9026,24 +8997,16 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
             node["target"] = ctx["target"]
     # draw_card: only inherit duration if context has it and action type
     # is not a setup step (drawing itself is instantaneous)
-    if (
-        action == "draw_card"
-        and not node.get("duration")
-        and ctx.get("duration")
-    ):
+    if action == "draw_card" and not node.get("duration") and ctx.get("duration"):
         act_text = node.get("text", "") or ""
         if "得る" in act_text or "を得る" in act_text or "得られる" in act_text:
             node["duration"] = ctx["duration"]
         if not node.get("target") and ctx.get("target"):
             node["target"] = ctx["target"]
         if not node.get("all") and ctx.get("all"):
-            ap = node.get("activation_position") or ctx.get(
-                "activation_position"
-            )
+            ap = node.get("activation_position") or ctx.get("activation_position")
             if ap not in ("center", "left_side"):
-                if action == "move_cards" and ctx.get("source") == node.get(
-                    "source"
-                ):
+                if action == "move_cards" and ctx.get("source") == node.get("source"):
                     pass
                 elif node.get("count"):
                     pass
@@ -9146,9 +9109,7 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
         if "ブレードハートを持たない" in nct or "ブレードハートがない" in nct:
             if not nc.get("card_property"):
                 nc["card_property"] = "has_blade_heart"
-        if "{{icon_score.png|スコア}}を持つ" in nct and not nc.get(
-            "card_property"
-        ):
+        if "{{icon_score.png|スコア}}を持つ" in nct and not nc.get("card_property"):
             nc["card_property"] = "has_score_icon"
         _infer_heart_source(nc, nct)
         _infer_baton_touch(nc, nct)
@@ -9167,9 +9128,7 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
         if "ブレードハートを持たない" in nct or "ブレードハートがない" in nct:
             if not node.get("card_property"):
                 node["card_property"] = "has_blade_heart"
-        if "{{icon_score.png|スコア}}を持つ" in nct and not node.get(
-            "card_property"
-        ):
+        if "{{icon_score.png|スコア}}を持つ" in nct and not node.get("card_property"):
             node["card_property"] = "has_score_icon"
         _infer_heart_source(node, nct)
         _infer_baton_touch(node, nct)
@@ -9177,9 +9136,7 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
     # Strip parenthetical from sub-conditions of compound conditions
     if node.get("type") == "compound" and "conditions" in node:
         for sub in node["conditions"]:
-            if isinstance(sub, dict) and isinstance(
-                sub.get("parenthetical"), list
-            ):
+            if isinstance(sub, dict) and isinstance(sub.get("parenthetical"), list):
                 sub.pop("parenthetical", None)
 
     # movement_condition card_type
@@ -9219,10 +9176,14 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
 
 def _apply_recursive_fixes(d, fix_stats):
     if isinstance(d, dict):
-        if d.get("type") == "appearance_condition" and "控え室から" in d.get("text", ""):
+        if d.get("type") == "appearance_condition" and "控え室から" in d.get(
+            "text", ""
+        ):
             if "appearance_source" not in d:
                 d["appearance_source"] = "discard"
-                fix_stats["appearance_source"] = fix_stats.get("appearance_source", 0) + 1
+                fix_stats["appearance_source"] = (
+                    fix_stats.get("appearance_source", 0) + 1
+                )
 
         if d.get("action") == "move_cards":
             t = d.get("text", "")
@@ -9240,7 +9201,9 @@ def _apply_recursive_fixes(d, fix_stats):
             t = d.get("text", "")
             if "色につき" in t:
                 d["per_unit_type"] = "heart_colors"
-                fix_stats["heart_colors_per_unit"] = fix_stats.get("heart_colors_per_unit", 0) + 1
+                fix_stats["heart_colors_per_unit"] = (
+                    fix_stats.get("heart_colors_per_unit", 0) + 1
+                )
 
         for v in d.values():
             if isinstance(v, (dict, list)):
@@ -9298,7 +9261,9 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     if key in reparse and key not in cond:
                         cond[key] = reparse[key]
                 # Merge movement and direction fields.
-                if "movement" in reparse and reparse["movement"] != cond.get("movement"):
+                if "movement" in reparse and reparse["movement"] != cond.get(
+                    "movement"
+                ):
                     cond["movement"] = reparse["movement"]
                 if "area_direction" in reparse and "area_direction" not in cond:
                     cond["area_direction"] = reparse["area_direction"]
@@ -9363,7 +9328,9 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 elif sub.get("action") == "move_cards" and prev_was_select:
                     if sub.get("source") != "selected_cards":
                         sub["source"] = "selected_cards"
-                    if sub.get("count") is not None and "count" not in sub.get("text", ""):
+                    if sub.get("count") is not None and "count" not in sub.get(
+                        "text", ""
+                    ):
                         sub.pop("count", None)
                     prev_was_select = False
                 else:
