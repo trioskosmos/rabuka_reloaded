@@ -178,6 +178,149 @@ fn nonfiction_cost_equal_costs_no_score() {
     );
 }
 
+/// P2: high-cost Liella! center (cost 11) > P1: low-cost center (cost 4)
+/// → condition passes → score +1
+/// Tests that the fix for target:both→self works for p2's abilities.
+#[test]
+fn nonfiction_cost_p2_high_vs_p1_low_scores() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let nonfiction = game.id("PL!SP-bp4-024-L");
+    let p2_center = game.id("PL!SP-pb1-001-R"); // Kanon, cost=11, Liella!
+    let filler = game.id("PL!-sd1-010-SD"); // cost=4, not Liella!
+    let p1_live_card = game.id("PL!-sd1-020-SD"); // filler live card
+
+    // Set up stages: P2 has high-cost Liella! center, P1 has low-cost center
+    game.state.player1.stage.stage[1] = filler;
+    game.state.player2.stage.stage[1] = p2_center;
+    // Put nonfiction in P2's hand
+    game.state.player2.hand.cards.push(nonfiction);
+    // Put P1's live card filler in P1's hand
+    game.state.player1.hand.cards.push(p1_live_card);
+    fill_both_decks(&mut game, filler);
+
+    // Advance through phases to LiveCardSetFirstAttacker
+    advance_to_live_card_set_p1(&mut game);
+    // P1 sets a live card
+    game.set_live_card(p1_live_card);
+    game.pass(); // → LiveCardSetSecondAttacker
+                 // P2 sets the nonfiction live card
+    game.set_live_card(nonfiction);
+    game.pass(); // → FirstAttackerPerformance (triggers P1's LiveStart)
+    game.pass(); // → SecondAttackerPerformance (triggers P2's LiveStart)
+    drain_auto_choices(&mut game);
+
+    let score_mod = game.state.mods.get_score_modifier(nonfiction);
+    assert_eq!(
+        score_mod, 1,
+        "P2 cost=11 > P1 cost=4 → score should be +1, got {}",
+        score_mod
+    );
+}
+
+/// P2: high-cost Liella! (cost 11) > P1: empty center (cost 0)
+/// → condition passes → score +1
+#[test]
+fn nonfiction_cost_p2_high_vs_p1_empty_scores() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let nonfiction = game.id("PL!SP-bp4-024-L");
+    let p2_center = game.id("PL!SP-pb1-001-R"); // cost=11, Liella!
+    let filler = game.id("PL!-sd1-010-SD");
+    let p1_live_card = game.id("PL!-sd1-020-SD");
+
+    game.state.player1.stage.stage[1] = -1; // empty center
+    game.state.player2.stage.stage[1] = p2_center;
+    game.state.player2.hand.cards.push(nonfiction);
+    game.state.player1.hand.cards.push(p1_live_card);
+    fill_both_decks(&mut game, filler);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(p1_live_card);
+    game.pass();
+    game.set_live_card(nonfiction);
+    game.pass();
+    game.pass();
+    drain_auto_choices(&mut game);
+
+    let score_mod = game.state.mods.get_score_modifier(nonfiction);
+    assert_eq!(
+        score_mod, 1,
+        "P2 cost=11 > P1 empty (cost=0) → score should be +1, got {}",
+        score_mod
+    );
+}
+
+/// P2: low-cost center (cost 4) < P1: high-cost (cost 11)
+/// → condition fails → score unchanged
+#[test]
+fn nonfiction_cost_p2_low_vs_p1_high_no_score() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let nonfiction = game.id("PL!SP-bp4-024-L");
+    let p1_center = game.id("PL!SP-pb1-001-R"); // cost=11, Liella!
+    let filler = game.id("PL!-sd1-010-SD"); // cost=4
+    let p1_live_card = game.id("PL!-sd1-020-SD");
+
+    game.state.player1.stage.stage[1] = p1_center; // cost=11
+    game.state.player2.stage.stage[1] = filler; // cost=4
+    game.state.player2.hand.cards.push(nonfiction);
+    game.state.player1.hand.cards.push(p1_live_card);
+    fill_both_decks(&mut game, filler);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(p1_live_card);
+    game.pass();
+    game.set_live_card(nonfiction);
+    game.pass();
+    game.pass();
+    drain_auto_choices(&mut game);
+
+    let score_mod = game.state.mods.get_score_modifier(nonfiction);
+    assert_eq!(
+        score_mod, 0,
+        "P2 cost=4 < P1 cost=11 → score should be 0, got {}",
+        score_mod
+    );
+}
+
+/// P2: Liella! center cost 11, P2: equal-cost P1 center
+/// → condition fails (11 > 11 is false) → score unchanged
+#[test]
+fn nonfiction_cost_p2_equal_costs_no_score() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let nonfiction = game.id("PL!SP-bp4-024-L");
+    let p2_center = game.id("PL!SP-pb1-001-R"); // cost=11, Liella!
+    let filler = game.id("PL!-sd1-010-SD");
+    let p1_live_card = game.id("PL!-sd1-020-SD");
+
+    game.state.player1.stage.stage[1] = game.new_id("PL!SP-pb1-001-R"); // also cost=11
+    game.state.player2.stage.stage[1] = p2_center;
+    game.state.player2.hand.cards.push(nonfiction);
+    game.state.player1.hand.cards.push(p1_live_card);
+    fill_both_decks(&mut game, filler);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(p1_live_card);
+    game.pass();
+    game.set_live_card(nonfiction);
+    game.pass();
+    game.pass();
+    drain_auto_choices(&mut game);
+
+    let score_mod = game.state.mods.get_score_modifier(nonfiction);
+    assert_eq!(
+        score_mod, 0,
+        "P2 cost=11 == P1 cost=11 → score should be 0, got {}",
+        score_mod
+    );
+}
+
 /// P1: Liella! center cost 11, P2: Liella! center cost 22
 /// → condition fails (11 > 22 is false) → score unchanged
 #[test]

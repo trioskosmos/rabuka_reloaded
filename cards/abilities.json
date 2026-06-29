@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-30T01:03:56.668971",
+  "generated_at": "2026-06-30T01:29:48.465038",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -7056,7 +7056,7 @@
           "group_names": [
             "Liella!"
           ],
-          "target": "both",
+          "target": "self",
           "card_type": "member_card",
           "comparison_target": "opponent",
           "operator": ">",
@@ -11681,7 +11681,7 @@
         "text": "このターン、ライブに勝利するプレイヤーを決定するとき、自分と相手のライブの合計スコアが同じ場合、ライブ終了時まで、自分と相手は成功ライブカード置き場にカードを置くことができない",
         "condition": {
           "text": "このターン、ライブに勝利するプレイヤーを決定するとき、自分と相手のライブの合計スコアが同じ場合",
-          "target": "both",
+          "target": "self",
           "comparison_type": "score",
           "aggregate": "total",
           "comparison_target": "opponent",
@@ -22997,7 +22997,7 @@
         "text": "自分のステージにいるメンバーが持つハートの総数が、相手のステージにいるメンバーが持つハートの総数より多い場合、このカードのスコアを+1する",
         "condition": {
           "text": "自分のステージにいるメンバーが持つハートの総数が、相手のステージにいるメンバーが持つハートの総数より多い場合",
-          "target": "both",
+          "target": "self",
           "location": "stage",
           "card_type": "member_card",
           "operator": ">",
@@ -27701,7 +27701,7 @@
         "text": "エールにより公開されている自分のライブカードの枚数が、エールにより公開されている相手のライブカードの枚数より多い場合、このカードのスコアを+1する",
         "condition": {
           "text": "エールにより公開されている自分のライブカードの枚数が、エールにより公開されている相手のライブカードの枚数より多い場合",
-          "target": "both",
+          "target": "self",
           "card_type": "live_card",
           "operator": ">",
           "comparison_target": "opponent",
@@ -31481,7 +31481,7 @@
         "text": "自分と相手のライブの合計スコアが同じ場合、エールにより公開された自分のカードの中から、コスト9以上のメンバーカードを1枚手札に加える",
         "condition": {
           "text": "自分と相手のライブの合計スコアが同じ場合",
-          "target": "both",
+          "target": "self",
           "comparison_type": "score",
           "aggregate": "total",
           "comparison_target": "opponent",

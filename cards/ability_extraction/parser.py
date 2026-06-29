@@ -899,6 +899,10 @@ def _enrich_card_count_condition(result, text):
                     if noun_pos >= 0 and marker_pos > noun_pos:
                         result["comparison_target"] = cmp_tgt
                         break
+    # Fix: when target=both AND comparison_target is set, the comparison_target
+    # already handles the opponent side, so target should be self
+    if result.get("target") == "both" and result.get("comparison_target"):
+        result["target"] = "self"
     # Live card zone
     if "ライブ中の" in text and not result.get("location"):
         result["location"] = "live_card_zone"
@@ -2079,6 +2083,10 @@ def _extract_generic_fields(condition, text):
                     if noun_pos >= 0 and marker_pos > noun_pos:
                         condition["comparison_target"] = tgt
                         break
+    # Fix: when target=both AND comparison_target is set, the comparison_target
+    # already handles the opponent side, so target should be self
+    if condition.get("target") == "both" and condition.get("comparison_target"):
+        condition["target"] = "self"
     for op_text, op in COMPARISON_OPERATORS.items():
         if op_text in text:
             condition["operator"] = op
@@ -8937,6 +8945,16 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 )
                 if cond.get("yell_trigger") is None and has_yell_text:
                     cond["yell_trigger"] = True
+
+    # Global fix: when target=both AND comparison_target is set, the
+    # comparison_target already handles the opponent side, so target should be self
+    for ability in data["unique_abilities"]:
+        eff = ability.get("effect")
+        if isinstance(eff, dict):
+            cond = eff.get("condition")
+            if isinstance(cond, dict):
+                if cond.get("target") == "both" and cond.get("comparison_target"):
+                    cond["target"] = "self"
 
     # Post-processing: infer action for any effect with empty action,
     # plus apply sequential action chaining fixes for ALL abilities

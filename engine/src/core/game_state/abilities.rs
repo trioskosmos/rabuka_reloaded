@@ -640,9 +640,12 @@ impl GameState {
             };
             if let Some(card) = card {
                 // Check original abilities
+                let expected_id = |ability: &crate::card::Ability| -> String {
+                    format!("{}_{}", card_no, ability.full_text)
+                };
                 for (ability_index, ability) in card.abilities.iter().enumerate() {
                     if Self::ability_matches_trigger(ability, &trigger_type)
-                        && ability_id.contains(&ability.full_text)
+                        && ability_id == expected_id(ability)
                     {
                         let entry = self.build_ability_queue_entry(
                             card_no.clone(),

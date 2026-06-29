@@ -43,6 +43,12 @@ impl<'a> ConditionContext<'a> {
                     }
                 })
                 .unwrap_or_else(|| self.game_state.resolve_target_player(target))
+        } else if target == "both" {
+            // For "both" scope in comparison conditions (comparing self vs opponent),
+            // resolve to the activating card's owner (self). The comparison_target
+            // field handles the opponent side of the comparison.
+            self.self_player
+                .unwrap_or_else(|| self.game_state.resolve_target_player("self"))
         } else {
             self.game_state.resolve_target_player(target)
         }
