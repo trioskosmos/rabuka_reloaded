@@ -8811,6 +8811,304 @@ def _collapse_to_effect_steps(effect):
 # ====================================================================
 
 
+def _clean_gain_resource(node):
+    """Recursively remove inappropriate fields from gain_resource action nodes."""
+    if isinstance(node, dict):
+        if node.get("action") == "gain_resource":
+            res = node.get("resource")
+            if res in ("blade", "ブレード"):
+                node.pop("heart_colors", None)
+            node.pop("source", None)
+            # Remove position from gain_resource when the condition also has the
+            # same position — it leaked from _extract_generic_fields parsing the
+            # full text (condition + effect) at the same time. Constant abilities
+            # (常時) may legitimately use position for targeting, so left alone.
+            cond = node.get("condition", {})
+            if node.get("position") and cond.get("position") == node.get("position"):
+                node.pop("position", None)
+        for v in node.values():
+            _clean_gain_resource(v)
+    elif isinstance(node, list):
+        for item in node:
+            _clean_gain_resource(item)
+
+
+def _clean_per_unit_source(d):
+    """Recursively remove redundant fields on perform_yell with per_unit_source.
+
+    When per_unit_source is 'previous_moved_cards', the engine sums costs from
+    self.moved_cards directly — per_unit_type and count are unused for yell.
+    """
+    if isinstance(d, dict):
+        if (
+            d.get("per_unit")
+            and d.get("action") == "perform_yell"
+            and d.get("per_unit_source") == "previous_moved_cards"
+        ):
+            d.pop("per_unit_type", None)
+            d.pop("count", None)
+        for v in d.values():
+            _clean_per_unit_source(v)
+    elif isinstance(d, list):
+        for item in d:
+            _clean_per_unit_source(item)
+
+
+def _propagate_context(node, ctx=None, *, t="", eff_root=None):
+    if not isinstance(node, dict):
+        return
+    if ctx is None:
+        ctx = {}
+
+    action = node.get("action")
+    ct = node.get("condition_type") or node.get("type")
+
+    # Apply operator inference for condition-type nodes
+    if ct in (
+        "comparison_condition",
+        "card_count_condition",
+        "location_condition",
+    ):
+        _text = node.get("text", "")
+        if node.get("count") is not None and not node.get("comparison_target"):
+            if "以上" in _text:
+                node["operator"] = ">="
+            elif "以下" in _text:
+                node["operator"] = "<="
+            elif "operator" not in node:
+                node["operator"] = "="
+        if "operator" not in node:
+            if node.get("values"):
+                node["operator"] = "in"
+            elif node.get("comparison_target"):
+                if "高い" in _text or "多い" in _text or "大きい" in _text:
+                    node["operator"] = ">"
+                elif "低い" in _text or "少ない" in _text or "小さい" in _text:
+                    node["operator"] = "<"
+        # Infer count from cost_limit for score-based comparisons
+        if (
+            ct == "comparison_condition"
+            and "count" not in node
+            and node.get("cost_limit") is not None
+            and node.get("comparison_type") != "cost"
+        ):
+            node["count"] = node["cost_limit"]
+
+    # Inherit location into conditions
+    if isinstance(node.get("condition"), dict):
+        nc = node["condition"]
+        if nc.get("type") in ("comparison_condition", "card_count_condition"):
+            if not nc.get("location") and ctx.get("location"):
+                nc["location"] = ctx["location"]
+            if not nc.get("target") and ctx.get("target"):
+                nc["target"] = ctx["target"]
+            if not nc.get("card_type") and ctx.get("card_type"):
+                nc["card_type"] = ctx["card_type"]
+
+    # Inherit duration and target into action-type dicts
+    if action in (
+        "gain_resource",
+        "change_state",
+        "move_cards",
+        "select",
+    ):
+        if not node.get("duration") and ctx.get("duration"):
+            node["duration"] = ctx["duration"]
+        if not node.get("target") and ctx.get("target"):
+            node["target"] = ctx["target"]
+    # draw_card: only inherit duration if context has it and action type
+    # is not a setup step (drawing itself is instantaneous)
+    if (
+        action == "draw_card"
+        and not node.get("duration")
+        and ctx.get("duration")
+    ):
+        act_text = node.get("text", "") or ""
+        if "得る" in act_text or "を得る" in act_text or "得られる" in act_text:
+            node["duration"] = ctx["duration"]
+        if not node.get("target") and ctx.get("target"):
+            node["target"] = ctx["target"]
+        if not node.get("all") and ctx.get("all"):
+            ap = node.get("activation_position") or ctx.get(
+                "activation_position"
+            )
+            if ap not in ("center", "left_side"):
+                if action == "move_cards" and ctx.get("source") == node.get(
+                    "source"
+                ):
+                    pass
+                elif node.get("count"):
+                    pass
+                else:
+                    node["all"] = ctx.get("all")
+
+    # Inherit timing_condition into gain_resource actions
+    if action == "gain_resource":
+        if not node.get("timing_condition") and ctx.get("timing_condition"):
+            node["timing_condition"] = ctx["timing_condition"]
+
+    # Build context for children
+    new_ctx = dict(ctx)
+    for f in (
+        "location",
+        "target",
+        "card_type",
+        "duration",
+        "timing_condition",
+        "all",
+    ):
+        if f in node:
+            new_ctx[f] = node[f]
+
+    # Inherit location into compound sub-conditions (from compound's own context)
+    if node.get("type") == "compound" and "conditions" in node:
+        for sub in node["conditions"]:
+            if isinstance(sub, dict):
+                if new_ctx.get("location") and not sub.get("location"):
+                    # Don't propagate location to score comparison conditions
+                    # — they need live_card_zone / success_live_zone, not stage
+                    if (
+                        not sub.get("temporal")
+                        and not sub.get("resource_type")
+                        and sub.get("comparison_type") != "score"
+                    ):
+                        sub["location"] = new_ctx["location"]
+                _propagate_context(sub, new_ctx, t=t, eff_root=eff_root)
+
+    # Restore duration for sequential sub-actions when the parser lost it
+    # during sequential creation (e.g., "と" split targets).
+    if action == "sequential" and not new_ctx.get("duration") and t:
+        if "ライブ終了時まで" in t:
+            for act in node.get("actions", []):
+                if isinstance(act, dict) and act.get("action") in (
+                    "gain_resource",
+                    "change_state",
+                    "move_cards",
+                ):
+                    if act.get("duration") is None and "得る" in (
+                        act.get("text", "") or ""
+                    ):
+                        act["duration"] = "live_end"
+
+    for ck in (
+        "condition",
+        "primary_effect",
+        "followup_action",
+        "optional_action",
+        "conditional_action",
+        "alternative_effect",
+    ):
+        ch = node.get(ck)
+        if isinstance(ch, dict):
+            _propagate_context(ch, new_ctx, t=t, eff_root=eff_root)
+            # Propagate location from condition back to the parent
+            # context so sibling actions in a sequential inherit it.
+            # Only propagate location — target and card_type are too
+            # context-dependent and would be incorrectly injected.
+            for f in ("location",):
+                if f in ch and f not in node and f not in ctx:
+                    ctx[f] = ch[f]
+            # Also inherit missing location from parent context into condition
+            for f in ("location",):
+                if f not in ch and f in ctx:
+                    ch[f] = ctx[f]
+
+    for ak in ("actions", "options"):
+        arr = node.get(ak, [])
+        if isinstance(arr, list):
+            for item in arr:
+                _propagate_context(item, new_ctx, t=t, eff_root=eff_root)
+
+    # Baton touch trigger on action nodes (e.g. gain_resource with
+    # "このターンにバトンタッチして登場した" in a choice option)
+    node_text = node.get("text", "") or ""
+    _infer_baton_touch(node, node_text)
+
+    # heart_type:all for gain_resource actions
+    if action == "gain_resource" and node.get("resource") == "heart":
+        if "{{icon_all.png|ハート}}" in (node.get("text", "") or t or ""):
+            if not node.get("heart_type") and not node.get("heart_colors"):
+                node["heart_type"] = "all"
+
+    # card_property enrichment and heart_colors cleanup for card_count_conditions
+    # Check node.get("condition") — works for effect/action nodes
+    nc = node.get("condition")
+    if isinstance(nc, dict) and nc.get("type") == "card_count_condition":
+        nct = nc.get("text", "")
+        if "ブレードハートを持たない" in nct or "ブレードハートがない" in nct:
+            if not nc.get("card_property"):
+                nc["card_property"] = "has_blade_heart"
+        if "{{icon_score.png|スコア}}を持つ" in nct and not nc.get(
+            "card_property"
+        ):
+            nc["card_property"] = "has_score_icon"
+        _infer_heart_source(nc, nct)
+        _infer_baton_touch(nc, nct)
+        # Strip heart_colors from preceding_moved conditions that have a
+        # specific location — the move already filtered by heart color.
+        if (
+            nc.get("source") == "preceding_moved"
+            and nc.get("location")
+            and nc.get("heart_colors")
+        ):
+            nc.pop("heart_colors", None)
+    # Also check if node itself IS a card_count_condition (sub-condition
+    # of a compound — no "condition" child, it IS the condition).
+    if node.get("type") == "card_count_condition" and node is not nc:
+        nct = node.get("text", "")
+        if "ブレードハートを持たない" in nct or "ブレードハートがない" in nct:
+            if not node.get("card_property"):
+                node["card_property"] = "has_blade_heart"
+        if "{{icon_score.png|スコア}}を持つ" in nct and not node.get(
+            "card_property"
+        ):
+            node["card_property"] = "has_score_icon"
+        _infer_heart_source(node, nct)
+        _infer_baton_touch(node, nct)
+
+    # Strip parenthetical from sub-conditions of compound conditions
+    if node.get("type") == "compound" and "conditions" in node:
+        for sub in node["conditions"]:
+            if isinstance(sub, dict) and isinstance(
+                sub.get("parenthetical"), list
+            ):
+                sub.pop("parenthetical", None)
+
+    # movement_condition card_type
+    nc = node.get("condition")
+    if isinstance(nc, dict) and nc.get("type") == "movement_condition":
+        if nc.get("ability_filter") and not nc.get("card_type"):
+            nc["card_type"] = "member_card"
+
+    # temporal_condition location — for aggregate conditions about live card
+    # required hearts (all 6 heart colors, not per-color totals)
+    nc = node.get("condition")
+    if isinstance(nc, dict) and nc.get("type") == "temporal_condition":
+        ct = nc.get("text", "") or ""
+        if nc.get("aggregate") == "total" and "必要ハート" in ct:
+            if "成功" not in ct and not nc.get("location"):
+                hc = nc.get("heart_colors") or []
+                if len(hc) >= 6 or "{{icon_all.png" in ct:
+                    nc["location"] = "live_card_zone"
+
+    # Inherit target from condition into gain_resource effect (each_time
+    # abilities: the condition's target identifies the member that triggered
+    # the each_time, and the gain_resource effect needs it to know which card
+    # receives the modifier).
+    # NOTE: "both" is NOT inherited — a condition's "both" means checking
+    # both sides (e.g. "self and opponent's success zones"), NOT applying
+    # the effect to both players.
+    if isinstance(eff_root, dict) and eff_root.get("action") == "gain_resource":
+        if not eff_root.get("target") and eff_root.get("resource") == "heart":
+            nc = eff_root.get("condition")
+            if isinstance(nc, dict) and nc.get("target"):
+                ct = nc["target"]
+                if ct == "both":
+                    eff_root["target"] = "self"
+                else:
+                    eff_root["target"] = ct
+
+
 def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
     """Post-process already-parsed abilities: infer actions, apply targeted fixes."""
 
@@ -8819,35 +9117,33 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
         "DO NOT EDIT THIS MANUALLY. Run cards/ability_extraction/parser.py to regenerate."
     )
 
-    # Re-parse condition texts to pick up fields that newer parser versions extract
-    # (e.g. cost_limit, cost_limit_operator) from card_count_condition and other types.
+    # ─── Pre-fix pass (merged from 3 separate loops) ───────────────────────────
+    # 1. Re-parse condition texts to pick up newer parser fields (cost_limit etc.)
+    # 2. Fix target=both when comparison_target is set → target should be self.
+    # 3. Infer action for effects with no action; apply sequential chain fixes.
+    # ─────────────────────────────────────────────────────────────────────────────
     for ability in data["unique_abilities"]:
         eff = ability.get("effect")
         if not isinstance(eff, dict):
             continue
         cond = eff.get("condition")
+
+        # --- 1. Condition re-parse ---
         if isinstance(cond, dict) and cond.get("text"):
             cond_text = cond["text"]
             reparse = parse_condition(cond_text)
             if reparse:
-                # Merge missing fields from the fresh parse into the existing condition.
-                # Never overwrite existing values — only fill in None/missing fields.
+                # Merge missing fields — never overwrite existing values.
                 for key in ("cost_limit", "cost_limit_operator"):
                     if key in reparse and key not in cond:
                         cond[key] = reparse[key]
-                # Merge movement and direction fields — the fresh parse may detect
-                # area_direction ("from"/"to") that the old parse didn't have.
-                if "movement" in reparse and reparse["movement"] != cond.get(
-                    "movement"
-                ):
+                # Merge movement and direction fields.
+                if "movement" in reparse and reparse["movement"] != cond.get("movement"):
                     cond["movement"] = reparse["movement"]
                 if "area_direction" in reparse and "area_direction" not in cond:
                     cond["area_direction"] = reparse["area_direction"]
-            # Fix missing yell_trigger: "エールにより公開された" cards (平安名すみれ,
-            # 鬼塚夏美, ウィーン・マルガレーテ) were missed by _fill_defaults which
-            # only checks "エールしたとき". Apply only to auto abilities (自動) —
-            # non-auto triggers like ライブ成功時 must NOT get yell_trigger (Q264
-            # only applies to auto abilities that fire at yell timing).
+            # Fix missing yell_trigger for "エールにより公開された" cards.
+            # Only applies to auto abilities (自動) — not ライブ成功時 etc.
             if ability.get("triggers") == "自動":
                 has_yell_text = (
                     "エールしたとき" in cond_text
@@ -8856,57 +9152,39 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 if cond.get("yell_trigger") is None and has_yell_text:
                     cond["yell_trigger"] = True
 
-    # Global fix: when target=both AND comparison_target is set, the
-    # comparison_target already handles the opponent side, so target should be self
-    for ability in data["unique_abilities"]:
-        eff = ability.get("effect")
-        if isinstance(eff, dict):
-            cond = eff.get("condition")
-            if isinstance(cond, dict):
-                if cond.get("target") == "both" and cond.get("comparison_target"):
-                    cond["target"] = "self"
+        # --- 2. Fix target=both when comparison_target is set ---
+        # comparison_target handles the opponent side, so target should be self.
+        if isinstance(cond, dict):
+            if cond.get("target") == "both" and cond.get("comparison_target"):
+                cond["target"] = "self"
 
-    # Post-processing: infer action for any effect with empty action,
-    # plus apply sequential action chaining fixes for ALL abilities
-    for ability in data["unique_abilities"]:
-        eff = ability.get("effect")
-        if not isinstance(eff, dict):
-            continue
-        # --- Action inference (only for abilities without an action set) ---
+        # --- 3. Action inference ---
         if not eff.get("action"):
-            # source + destination → move_cards
             if eff.get("source") and eff.get("destination"):
                 eff["action"] = "move_cards"
-            # actions array → sequential
             elif eff.get("actions"):
                 eff["action"] = "sequential"
-            # opponent_action wrapper
             elif eff.get("opponent_action"):
                 eff["action"] = "opponent_action"
-        # --- Universal fixes (apply to ALL abilities) ---
-        # Fix nested actions: ensure each sub-action has card_type propagated
+
+        # --- 4. Sequential chain fixes ---
         if eff.get("action") == "sequential":
             parent_card_type = eff.get("card_type")
-            for sub in eff.get("actions", []):
-                if isinstance(sub, dict):
-                    if not sub.get("card_type") and parent_card_type:
-                        sub["card_type"] = parent_card_type
-                    if not sub.get("action"):
-                        if sub.get("source") and sub.get("destination"):
-                            sub["action"] = "move_cards"
-                        elif sub.get("actions"):
-                            sub["action"] = "sequential"
-        # Post-processing for sequential action chaining: if a select_cards action is
-        # followed by a move_cards action, the move should use "selected_cards" as source
-        # (Issue 3: hallucinated sources). Also handles look_at → move_cards chains.
-        if eff.get("action") == "sequential":
             prev_was_select = False
             prev_was_look_at = False
             for sub in eff.get("actions", []):
                 if not isinstance(sub, dict):
-                    prev_was_select = False
-                    prev_was_look_at = False
+                    prev_was_select = prev_was_look_at = False
                     continue
+                # Propagate card_type from parent and infer missing sub-action.
+                if not sub.get("card_type") and parent_card_type:
+                    sub["card_type"] = parent_card_type
+                if not sub.get("action"):
+                    if sub.get("source") and sub.get("destination"):
+                        sub["action"] = "move_cards"
+                    elif sub.get("actions"):
+                        sub["action"] = "sequential"
+                # Chain select→move and look_at→move source inference.
                 if sub.get("action") in ("select_cards", "look_and_select", "select"):
                     prev_was_select = True
                     prev_was_look_at = False
@@ -8916,9 +9194,6 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 elif sub.get("action") == "move_cards" and prev_was_look_at:
                     if sub.get("source") != "looked_at":
                         sub["source"] = "looked_at"
-                    # For discard destinations: don't auto-discard remaining
-                    # looked-at cards (they go back to deck top). Skip for
-                    # deck_top / rearrangement moves.
                     if (
                         sub.get("destination") == "discard"
                         and sub.get("discard_remaining") is not False
@@ -8928,15 +9203,11 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 elif sub.get("action") == "move_cards" and prev_was_select:
                     if sub.get("source") != "selected_cards":
                         sub["source"] = "selected_cards"
-                    # Remove hardcoded count; it's dynamic from selection
-                    if sub.get("count") is not None and "count" not in sub.get(
-                        "text", ""
-                    ):
+                    if sub.get("count") is not None and "count" not in sub.get("text", ""):
                         sub.pop("count", None)
                     prev_was_select = False
                 else:
-                    prev_was_select = False
-                    prev_was_look_at = False
+                    prev_was_select = prev_was_look_at = False
 
     # ====================================================================
     # TARGETED FIXES
@@ -8946,8 +9217,6 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
     # - Fix trigger_condition → condition field naming
     # - Card reference validation
     # ====================================================================
-    import re
-
     fix_stats = {
         "movement": 0,
         "heart_type": 0,
@@ -9007,30 +9276,6 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     sub.pop("optional", None)
 
         # FIX 4: Clean gain_resource — remove inappropriate fields
-        def _clean_gain_resource(node):
-            if isinstance(node, dict):
-                if node.get("action") == "gain_resource":
-                    res = node.get("resource")
-                    if res in ("blade", "ブレード"):
-                        node.pop("heart_colors", None)
-                    node.pop("source", None)
-                    # Remove position from gain_resource when the condition
-                    # also has the same position — it leaked from
-                    # _extract_generic_fields parsing the full text (condition
-                    # + effect) at the same time.  Constant abilities (常時)
-                    # may legitimately use position for targeting and have
-                    # no condition dict, so they are left alone.
-                    cond = node.get("condition", {})
-                    if node.get("position") and cond.get("position") == node.get(
-                        "position"
-                    ):
-                        node.pop("position", None)
-                for v in node.values():
-                    _clean_gain_resource(v)
-            elif isinstance(node, list):
-                for item in node:
-                    _clean_gain_resource(item)
-
         _clean_gain_resource(eff)
         cost = ability.get("cost")
         if isinstance(cost, dict):
@@ -9669,275 +9914,9 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     eff.pop("followup_action", None)
 
         # ---- B: Scoped context propagation (inherits specific fields) ----
+        _propagate_context(eff, t=t, eff_root=eff)
 
-        def _propagate_context(node, ctx=None):
-            if not isinstance(node, dict):
-                return
-            if ctx is None:
-                ctx = {}
-
-            action = node.get("action")
-            ct = node.get("condition_type") or node.get("type")
-
-            # Apply operator inference for condition-type nodes
-            if ct in (
-                "comparison_condition",
-                "card_count_condition",
-                "location_condition",
-            ):
-                _text = node.get("text", "")
-                if node.get("count") is not None and not node.get("comparison_target"):
-                    if "以上" in _text:
-                        node["operator"] = ">="
-                    elif "以下" in _text:
-                        node["operator"] = "<="
-                    elif "operator" not in node:
-                        node["operator"] = "="
-                if "operator" not in node:
-                    if node.get("values"):
-                        node["operator"] = "in"
-                    elif node.get("comparison_target"):
-                        if "高い" in _text or "多い" in _text or "大きい" in _text:
-                            node["operator"] = ">"
-                        elif "低い" in _text or "少ない" in _text or "小さい" in _text:
-                            node["operator"] = "<"
-                # Infer count from cost_limit for score-based comparisons
-                if (
-                    ct == "comparison_condition"
-                    and "count" not in node
-                    and node.get("cost_limit") is not None
-                    and node.get("comparison_type") != "cost"
-                ):
-                    node["count"] = node["cost_limit"]
-
-            # Inherit location into conditions
-            if isinstance(node.get("condition"), dict):
-                nc = node["condition"]
-                if nc.get("type") in ("comparison_condition", "card_count_condition"):
-                    if not nc.get("location") and ctx.get("location"):
-                        nc["location"] = ctx["location"]
-                    if not nc.get("target") and ctx.get("target"):
-                        nc["target"] = ctx["target"]
-                    if not nc.get("card_type") and ctx.get("card_type"):
-                        nc["card_type"] = ctx["card_type"]
-
-            # Inherit duration and target into action-type dicts
-            if action in (
-                "gain_resource",
-                "change_state",
-                "move_cards",
-                "select",
-            ):
-                if not node.get("duration") and ctx.get("duration"):
-                    node["duration"] = ctx["duration"]
-                if not node.get("target") and ctx.get("target"):
-                    node["target"] = ctx["target"]
-            # draw_card: only inherit duration if context has it and action type
-            # is not a setup step (drawing itself is instantaneous)
-            if (
-                action == "draw_card"
-                and not node.get("duration")
-                and ctx.get("duration")
-            ):
-                act_text = node.get("text", "") or ""
-                if "得る" in act_text or "を得る" in act_text or "得られる" in act_text:
-                    node["duration"] = ctx["duration"]
-                if not node.get("target") and ctx.get("target"):
-                    node["target"] = ctx["target"]
-                if not node.get("all") and ctx.get("all"):
-                    ap = node.get("activation_position") or ctx.get(
-                        "activation_position"
-                    )
-                    if ap not in ("center", "left_side"):
-                        if action == "move_cards" and ctx.get("source") == node.get(
-                            "source"
-                        ):
-                            pass
-                        elif node.get("count"):
-                            pass
-                        else:
-                            node["all"] = ctx.get("all")
-
-            # Inherit timing_condition into gain_resource actions
-            if action == "gain_resource":
-                if not node.get("timing_condition") and ctx.get("timing_condition"):
-                    node["timing_condition"] = ctx["timing_condition"]
-
-            # Build context for children
-            new_ctx = dict(ctx)
-            for f in (
-                "location",
-                "target",
-                "card_type",
-                "duration",
-                "timing_condition",
-                "all",
-            ):
-                if f in node:
-                    new_ctx[f] = node[f]
-
-            # Inherit location into compound sub-conditions (from compound's own context)
-            if node.get("type") == "compound" and "conditions" in node:
-                for sub in node["conditions"]:
-                    if isinstance(sub, dict):
-                        if new_ctx.get("location") and not sub.get("location"):
-                            # Don't propagate location to score comparison conditions
-                            # — they need live_card_zone / success_live_zone, not stage
-                            if (
-                                not sub.get("temporal")
-                                and not sub.get("resource_type")
-                                and sub.get("comparison_type") != "score"
-                            ):
-                                sub["location"] = new_ctx["location"]
-                        _propagate_context(sub, new_ctx)
-
-            # Restore duration for sequential sub-actions when the parser lost it
-            # during sequential creation (e.g., "と" split targets).
-            if action == "sequential" and not new_ctx.get("duration") and t:
-                if "ライブ終了時まで" in t:
-                    for act in node.get("actions", []):
-                        if isinstance(act, dict) and act.get("action") in (
-                            "gain_resource",
-                            "change_state",
-                            "move_cards",
-                        ):
-                            if act.get("duration") is None and "得る" in (
-                                act.get("text", "") or ""
-                            ):
-                                act["duration"] = "live_end"
-
-            for ck in (
-                "condition",
-                "primary_effect",
-                "followup_action",
-                "optional_action",
-                "conditional_action",
-                "alternative_effect",
-            ):
-                ch = node.get(ck)
-                if isinstance(ch, dict):
-                    _propagate_context(ch, new_ctx)
-                    # Propagate location from condition back to the parent
-                    # context so sibling actions in a sequential inherit it.
-                    # Only propagate location — target and card_type are too
-                    # context-dependent and would be incorrectly injected.
-                    for f in ("location",):
-                        if f in ch and f not in node and f not in ctx:
-                            ctx[f] = ch[f]
-                    # Also inherit missing location from parent context into condition
-                    for f in ("location",):
-                        if f not in ch and f in ctx:
-                            ch[f] = ctx[f]
-
-            for ak in ("actions", "options"):
-                arr = node.get(ak, [])
-                if isinstance(arr, list):
-                    for item in arr:
-                        _propagate_context(item, new_ctx)
-
-            # Baton touch trigger on action nodes (e.g. gain_resource with
-            # "このターンにバトンタッチして登場した" in a choice option)
-            node_text = node.get("text", "") or ""
-            _infer_baton_touch(node, node_text)
-
-            # heart_type:all for gain_resource actions
-            if action == "gain_resource" and node.get("resource") == "heart":
-                if "{{icon_all.png|ハート}}" in (node.get("text", "") or t or ""):
-                    if not node.get("heart_type") and not node.get("heart_colors"):
-                        node["heart_type"] = "all"
-
-            # card_property enrichment and heart_colors cleanup for card_count_conditions
-            # Check node.get("condition") — works for effect/action nodes
-            nc = node.get("condition")
-            if isinstance(nc, dict) and nc.get("type") == "card_count_condition":
-                nct = nc.get("text", "")
-                if "ブレードハートを持たない" in nct or "ブレードハートがない" in nct:
-                    if not nc.get("card_property"):
-                        nc["card_property"] = "has_blade_heart"
-                if "{{icon_score.png|スコア}}を持つ" in nct and not nc.get(
-                    "card_property"
-                ):
-                    nc["card_property"] = "has_score_icon"
-                _infer_heart_source(nc, nct)
-                _infer_baton_touch(nc, nct)
-                # Strip heart_colors from preceding_moved conditions that have a
-                # specific location — the move already filtered by heart color.
-                if (
-                    nc.get("source") == "preceding_moved"
-                    and nc.get("location")
-                    and nc.get("heart_colors")
-                ):
-                    nc.pop("heart_colors", None)
-            # Also check if node itself IS a card_count_condition (sub-condition
-            # of a compound — no "condition" child, it IS the condition).
-            if node.get("type") == "card_count_condition" and node is not nc:
-                nct = node.get("text", "")
-                if "ブレードハートを持たない" in nct or "ブレードハートがない" in nct:
-                    if not node.get("card_property"):
-                        node["card_property"] = "has_blade_heart"
-                if "{{icon_score.png|スコア}}を持つ" in nct and not node.get(
-                    "card_property"
-                ):
-                    node["card_property"] = "has_score_icon"
-                _infer_heart_source(node, nct)
-                _infer_baton_touch(node, nct)
-
-            # Strip parenthetical from sub-conditions of compound conditions
-            if node.get("type") == "compound" and "conditions" in node:
-                for sub in node["conditions"]:
-                    if isinstance(sub, dict) and isinstance(
-                        sub.get("parenthetical"), list
-                    ):
-                        sub.pop("parenthetical", None)
-
-            # movement_condition card_type
-            nc = node.get("condition")
-            if isinstance(nc, dict) and nc.get("type") == "movement_condition":
-                if nc.get("ability_filter") and not nc.get("card_type"):
-                    nc["card_type"] = "member_card"
-
-            # temporal_condition location — for aggregate conditions about live card
-            # required hearts (all 6 heart colors, not per-color totals)
-            nc = node.get("condition")
-            if isinstance(nc, dict) and nc.get("type") == "temporal_condition":
-                ct = nc.get("text", "") or ""
-                if nc.get("aggregate") == "total" and "必要ハート" in ct:
-                    if "成功" not in ct and not nc.get("location"):
-                        hc = nc.get("heart_colors") or []
-                        if len(hc) >= 6 or "{{icon_all.png" in ct:
-                            nc["location"] = "live_card_zone"
-
-            # Inherit target from condition into gain_resource effect (each_time
-            # abilities: the condition's target identifies the member that triggered
-            # the each_time, and the gain_resource effect needs it to know which card
-            # receives the modifier).
-            # NOTE: "both" is NOT inherited — a condition's "both" means checking
-            # both sides (e.g. "self and opponent's success zones"), NOT applying
-            # the effect to both players.
-            if isinstance(eff, dict) and eff.get("action") == "gain_resource":
-                if not eff.get("target") and eff.get("resource") == "heart":
-                    nc = eff.get("condition")
-                    if isinstance(nc, dict) and nc.get("target"):
-                        ct = nc["target"]
-                        if ct == "both":
-                            eff["target"] = "self"
-                        else:
-                            eff["target"] = ct
-
-        _propagate_context(eff)
-
-    # ====================================================================
-    # POST-HOC FIXES & MAIN
-    # ====================================================================
-    # _fix_mari_gain_ability — targeted fix for a known parser gap
-    # _validate_semantic — validates parsed JSON against text patterns
-    # Main entry point for standalone parser.py execution
-    # ====================================================================
-    # Q76 rule: self-revival from discard to stage can place on occupied areas
-    for ability in data["unique_abilities"]:
-        eff = ability.get("effect")
-        if not isinstance(eff, dict):
-            continue
+        # Q76 rule: self-revival from discard to stage can place on occupied areas
         if (
             eff.get("action") == "move_cards"
             and eff.get("source") == "discard"
@@ -9952,18 +9931,9 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             if "既にメンバーがいるエリア" in text + parenthetical:
                 eff["allow_occupied_stage"] = True
 
-    # FIX: 小原鞠莉 (PL!S-bp2-008) ab#1 — constant conditional_alternative is
-    # actually a gain_ability.  _try_sequential splices the text before
-    # parse_action's gain_ability fallback runs, so we fix it post-hoc.
-    _fix_mari_gain_ability(data, fix_stats)
-
-    # FIX: Parser misclassifies "ライブカードセットフェイズ..." as
-    # set_card_identity because "セット" matches. Re-classify to
-    # reduce_live_card_set_limit.
-    for ability in data["unique_abilities"]:
-        eff = ability.get("effect")
-        if not isinstance(eff, dict):
-            continue
+        # FIX: Parser misclassifies "ライブカードセットフェイズ..." as
+        # set_card_identity because "セット" matches. Re-classify to
+        # reduce_live_card_set_limit.
         if eff.get("action") == "sequential":
             for sub in eff.get("actions", []):
                 if isinstance(sub, dict) and sub.get("action") == "set_card_identity":
@@ -9976,24 +9946,22 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                         sub["action"] = "reduce_live_card_set_limit"
                         sub.pop("card_type", None)
 
+    # ====================================================================
+    # POST-HOC FIXES & MAIN
+    # ====================================================================
+    # _fix_mari_gain_ability — targeted fix for a known parser gap
+    # _validate_semantic — validates parsed JSON against text patterns
+    # Main entry point for standalone parser.py execution
+    # ====================================================================
+
+    # FIX: 小原鞠莉 (PL!S-bp2-008) ab#1 — constant conditional_alternative is
+    # actually a gain_ability.  _try_sequential splices the text before
+    # parse_action's gain_ability fallback runs, so we fix it post-hoc.
+    _fix_mari_gain_ability(data, fix_stats)
+
     # FIX 17: Clean up redundant fields on perform_yell actions with per_unit_source
     # When per_unit_source is "previous_moved_cards", the engine sums costs from
     # self.moved_cards directly — per_unit_type and count are not used for yell.
-    def _clean_per_unit_source(d):
-        if isinstance(d, dict):
-            if (
-                d.get("per_unit")
-                and d.get("action") == "perform_yell"
-                and d.get("per_unit_source") == "previous_moved_cards"
-            ):
-                d.pop("per_unit_type", None)
-                d.pop("count", None)
-            for v in d.values():
-                _clean_per_unit_source(v)
-        elif isinstance(d, list):
-            for item in d:
-                _clean_per_unit_source(item)
-
     _clean_per_unit_source(data["unique_abilities"])
 
     # Group/unit filter fields are validated in extract_card_abilities.py
