@@ -480,7 +480,12 @@ fn skip_placement_then_new_retrieval_still_triggers() {
     g.state.process_pending_auto_abilities(&pid);
 
     assert!(g.has_pending_choice(), "ab#0 should fire for dive_b");
-    g.select_indices(&[0]); // accept placement
+    // Select dive_b (filtered index 1 = actual hand position 2).
+    // In the old code, the buggy re-execution of move_cards would place
+    // an ADDITIONAL matching card, accidentally making dive_b appear in
+    // the live zone even when filtered index [0] (dive_a) was selected.
+    // With the fix, only the chosen card is placed, so we must pick dive_b.
+    g.select_indices(&[1]);
 
     // ab#1 should fire (or auto-select blade)
     while g.has_pending_choice() {
