@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-30T03:24:14.813383",
+  "generated_at": "2026-06-30T03:40:13.967558",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -5757,7 +5757,37 @@
       "cost": null,
       "effect": {
         "text": "自分のライブカード置き場にカードが2枚以上ある場合、その中から{{live_start.png|ライブ開始時}}能力を持たない『Aqours』のライブカードを1枚選び、デッキの一番上に置いてもよい。そうした場合、ライブ終了時まで、{{heart_02.png|heart02}}と{{heart_04.png|heart04}}を得る",
-        "action": "look_and_select",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "その中から{{live_start.png|ライブ開始時}}能力を持たない『Aqours』のライブカードを1枚選び、デッキの一番上に置いてもよい。",
+            "destination": "deck_top",
+            "count": 1,
+            "card_type": "live_card",
+            "group_names": [
+              "Aqours"
+            ],
+            "optional": true,
+            "action": "select",
+            "source": "live_card_zone",
+            "ability_filter": "no_ability_type",
+            "ability_filter_triggers": [
+              "ライブ開始時"
+            ]
+          },
+          {
+            "text": "{{heart_02.png|heart02}}と{{heart_04.png|heart04}}を得る",
+            "duration": "live_end",
+            "action": "gain_resource",
+            "resource": "heart",
+            "count": 2,
+            "heart_colors": [
+              "heart02",
+              "heart04"
+            ]
+          }
+        ],
+        "conditional": true,
         "condition": {
           "type": "card_count_condition",
           "count": 2,
@@ -5765,45 +5795,6 @@
           "text": "自分のライブカード置き場にカードが2枚以上ある場合",
           "location": "live_card_zone",
           "target": "self"
-        },
-        "look_action": {
-          "action": "look_at",
-          "source": "live_card_zone",
-          "target": "self",
-          "all": true,
-          "text": "自分のライブカード置き場にカードが2枚以上ある場合、その中から{{live_start.png|ライブ開始時}}能力を持たない『Aqours』のライブカードを1枚選び、デッキの一番上に置いてもよい。そうした場合、ライブ終了時まで、{{heart_02.png|heart02}}と{{heart_04.png|heart04}}を得る",
-          "group_names": [
-            "Aqours"
-          ]
-        },
-        "select_action": {
-          "action": "select_cards",
-          "discard_remaining": true,
-          "text": "{{live_start.png|ライブ開始時}}能力を持たない『Aqours』のライブカードを1枚選び、デッキの一番上に置いてもよい",
-          "reveal": false,
-          "destination": "deck_top",
-          "count": 1,
-          "card_type": "live_card",
-          "optional": true,
-          "group_names": [
-            "Aqours"
-          ],
-          "ability_filter": "no_ability_type",
-          "ability_filter_triggers": [
-            "ライブ開始時"
-          ]
-        },
-        "followup_action": {
-          "text": "{{heart_02.png|heart02}}と{{heart_04.png|heart04}}を得る",
-          "duration": "live_end",
-          "action": "gain_resource",
-          "resource": "heart",
-          "count": 2,
-          "heart_colors": [
-            "heart02",
-            "heart04"
-          ],
-          "location": "live_card_zone"
         },
         "group_names": [
           "Aqours"

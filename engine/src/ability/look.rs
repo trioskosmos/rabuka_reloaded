@@ -376,6 +376,7 @@ impl AbilityResolver {
                 .copied()
                 .collect(),
             Some(Zone::LookedAt) => gs.looked_at_cards.clone(),
+            Some(Zone::LiveCardZone) => player.live_card_zone.cards.iter().copied().collect(),
             Some(Zone::SelectedCards) => self.selected_cards.clone(),
             _ => vec![],
         };

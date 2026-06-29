@@ -2860,7 +2860,7 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
             elif "それら" in text:
                 action["source"] = "selected_cards"
             elif dest in ("deck_top", "deck_bottom", "deck"):
-                if "メンバー" not in text:
+                if "メンバー" not in text and "選ぶ" not in text and "選び" not in text:
                     action["source"] = "hand"
             elif dest in ("discard",):
                 if "このカード" in text:
@@ -3808,7 +3808,9 @@ def parse_action(text: str) -> Dict[str, Any]:
         lambda t, a: "source" in a
         and a.get("source")
         and "destination" in a
-        and a.get("destination"),
+        and a.get("destination")
+        and "選ぶ" not in t
+        and "選び" not in t,
         "move_cards",
         None,
     )
@@ -3956,7 +3958,11 @@ def parse_action(text: str) -> Dict[str, Any]:
     )
     R(lambda t: "移動する" in t or "移動し" in t, "position_change", None)
     R(
-        lambda t: ("置く" in t or "置いて" in t) or ("置き" in t and "置き場" not in t),
+        lambda t: (
+            ("置く" in t or "置いて" in t) or ("置き" in t and "置き場" not in t)
+        )
+        and "選ぶ" not in t
+        and "選び" not in t,
         "move_cards",
         lambda t, a: a.update({"destination": extract_destination(t)})
         if "destination" not in a
@@ -6103,6 +6109,13 @@ def _try_look_and_select(text):
     """その中から — look_at + select + action."""
     if "その中から" not in text:
         return None
+    # When "その中から" follows a zone+count condition (e.g. "ライブカード置き場に
+    # カードが2枚以上ある場合、その中から..."), the selection operates directly
+    # on that zone's cards — not on a previously looked-at set. Skip this handler
+    # so the text falls through to _try_conditional_sequential which correctly
+    # extracts the condition and produces a non-look-based sequential output.
+    if re.search(r"にカードが\d+枚以上ある場合", text.split("その中から")[0]):
+        return None
     result = {"text": text, "action": "look_and_select"}
     lm = re.search(r"(.+?)その中から", text)
     if lm:
@@ -6543,6 +6556,12 @@ def _try_conditional_sequential(text):
         fa = parse_action(fat)
         fa["text"] = fat
         cond = parse_condition(fc)
+        # Propagate the condition's zone to the action's source when the
+        # action text no longer mentions the zone explicitly (e.g. the
+        # condition says "ライブカード置き場" but the action only says
+        # "その中から" — the zone is implied by the condition).
+        if cond and cond.get("location") and "source" not in fa:
+            fa["source"] = cond["location"]
     else:
         fa = parse_action(fp)
         cond = None
@@ -6596,6 +6615,22 @@ def _try_conditional_sequential(text):
             else:
                 sa["source"] = "selected_cards"
 
+    # For select actions with an explicit destination in the first-part text
+    # (e.g. "選び、デッキの一番上に置いてもよい"), insert a move_cards step
+    # between the select and the followup so the selected card actually moves.
+    move_step = None
+    if fa.get("action") == "select" and "置く" in fp:
+        if "デッキの一番上" in fp:
+            fa["destination"] = "deck_top"
+        if fa.get("destination"):
+            move_step = {
+                "action": "move_cards",
+                "source": "selected_cards",
+                "destination": fa.pop("destination"),
+                "count": 0,
+                "all": True,
+            }
+
     # NOTE: Returning `conditional_on_optional` would be semantically cleaner
     # (optional_action = do X, conditional_action = if done, do Y), but the
     # engine's `execute_conditional_on_optional` handler treats optional_action
@@ -6603,10 +6638,13 @@ def _try_conditional_sequential(text):
     # on Pay). Action-based optionals (like DIVE! where the optional IS the
     # effect) must remain as `sequential` + `conditional: true` for the engine
     # to handle them correctly via the sequential pipeline.
+    actions = [fa, middle_pay, sa] if middle_pay else [fa, sa]
+    if move_step:
+        actions.insert(1, move_step)
     result = {
         "text": text,
         "action": "sequential",
-        "actions": [fa, middle_pay, sa] if middle_pay else [fa, sa],
+        "actions": actions,
         "conditional": True,
     }
     if cond:
@@ -9159,6 +9197,19 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             if eff.get("action") == "modify_cost" and not eff.get("ability_filter"):
                 eff["ability_filter"] = "no_ability"
                 fix_stats["ability_filter"] += 1
+
+        # FIX 7b: Ability filter for select actions within sequential compounds
+        # (e.g. 黒澤ダイヤ: "ライブ開始時能力を持たない" → select action filter)
+        if eff.get("action") == "sequential":
+            for sub in eff.get("actions", []):
+                if isinstance(sub, dict) and sub.get("action") in (
+                    "select",
+                    "select_cards",
+                ):
+                    sub_text = sub.get("text", "")
+                    if "能力を持たない" in sub_text or "能力も持たない" in sub_text:
+                        _enrich_from_text(sub, sub_text)
+                        fix_stats["ability_filter"] += 1
 
         # FIX 8: Condition fixes — card_property + enrichment
         cond = eff.get("condition")
