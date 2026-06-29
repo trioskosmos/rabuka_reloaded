@@ -184,30 +184,12 @@ export const Rendering = {
             switchBoard('both');
         }
 
-        // Track active player for auto-switch (set after first render)
+        // Track active player for reference (no auto-switch)
         if (_lastActivePlayer === -1 && state.active_player !== undefined) {
             _lastActivePlayer = activePlayerNum;
         }
         _viewInitialized = true;
-
-        // Auto-switch board tab when active player changes (skip initial render)
-        const gb = document.getElementById('game-board');
-        const activePlayerChanged = _lastActivePlayer !== -1 && state.active_player !== undefined && activePlayerNum !== _lastActivePlayer;
-        if (activePlayerChanged) {
-            _lastActivePlayer = activePlayerNum;
-            if (bothBtn?.classList.contains('active')) {
-                const isFlipped = gb?.classList.contains('both-mode-flipped');
-                const activeOnBottom = isFlipped ? activePlayerNum !== viewState.perspectivePlayer : activePlayerNum === viewState.perspectivePlayer;
-                if (!activeOnBottom) switchBoard('both');
-            } else if (playerBtn?.classList.contains('active') && isSelfActive) {
-                // Already showing player view with active player — correct
-            } else if (oppBtn?.classList.contains('active') && !isSelfActive) {
-                // Already showing opponent view with active player — correct
-            } else {
-                // Switch single view to match current active player
-                switchBoard(isSelfActive ? 'player' : 'opponent');
-            }
-        }
+        _lastActivePlayer = activePlayerNum;
 
         Tooltips.highlightPendingSource();
 

@@ -278,11 +278,11 @@ export const CardRenderer = {
         if (resolvedCard.is_new) classNames.push('new-card');
         if (isLive) classNames.push('type-live');
 
-        if (containerId && (
+        if (isLive || (containerId && (
             containerId.includes('live') ||
             containerId.includes('success') ||
             containerId.includes('selection')
-        )) {
+        ))) {
             classNames.push('orientation-landscape');
         }
 

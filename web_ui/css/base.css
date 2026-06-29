@@ -107,6 +107,8 @@ body {
     color: var(--text);
     overflow: hidden;
     height: 100dvh;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Scrollbars */

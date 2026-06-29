@@ -127,11 +127,11 @@
 }
 
 .hand-row {
-    flex: 0 0 calc(var(--avail-h) * 0.12 / var(--section-count, 1));
+    flex: 0 0 calc(var(--card-h) * 0.45 / var(--section-count, 1));
     display: flex;
     align-items: center;
     min-height: 0;
-    --card-loc-h: calc(var(--avail-h) * 0.12 / var(--section-count, 1));
+    --card-loc-h: calc(var(--card-h) * 0.45 / var(--section-count, 1));
 }
 
 .hand-group {
@@ -291,7 +291,7 @@
 
 /* --- Energy & Misc --- */
 .energy-row-hud {
-    flex: 0 0 calc(var(--avail-h) * 0.10 / var(--section-count, 1));
+    flex: 0 0 calc(var(--card-h) * 0.37 / var(--section-count, 1));
     background: rgba(0, 0, 0, 0.2);
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
@@ -328,7 +328,7 @@
 }
 
 .energy-pip {
-    height: calc((var(--avail-h) - 4px) * 0.10 * 0.8 / var(--section-count, 1));
+    height: calc(var(--card-h-mini) * 0.5 / var(--section-count, 1));
     width: auto;
     aspect-ratio: 512 / 720;
     border-radius: var(--radius-sm);
