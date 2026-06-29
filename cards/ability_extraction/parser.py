@@ -6580,6 +6580,31 @@ def _try_sequential(text):
     return {"text": text, "action": "sequential", "actions": [fa, sa]}
 
 
+def _resolve_preceding_moved_condition(cond, src_text):
+    """Post-process a choice condition to detect preceding_moved references.
+
+    When the condition text contains "これにより" + "置い" (referring to a
+    card placed/discarded by the preceding cost action), unwrap any
+    complex_condition wrapping and set source: "preceding_moved" so the
+    engine checks the recently-moved card rather than a static zone.
+    """
+    if "これにより" in src_text and ("置いた" in src_text or "置かれ" in src_text):
+        if cond.get("type") == "complex_condition":
+            effect = cond.get("effect", {})
+            if effect:
+                effect["source"] = "preceding_moved"
+                effect.pop("location", None)
+                if effect.get("type") in ("location_condition",):
+                    effect["type"] = "card_count_condition"
+                return effect
+        elif cond:
+            cond["source"] = "preceding_moved"
+            cond.pop("location", None)
+            if cond.get("type") in ("location_condition",):
+                cond["type"] = "card_count_condition"
+    return cond
+
+
 def _try_choice(text):
     """以下から1つを選ぶ — choice effects."""
     if CHOICE_MARKER not in text:
@@ -6604,6 +6629,7 @@ def _try_choice(text):
     if cond_mod and cond_mod not in ("。", "."):
         result["choice_modifier"] = cond_mod
         cond = parse_condition(cond_mod)
+        cond = _resolve_preceding_moved_condition(cond, cond_mod)
         if cond.get("type") != "custom":
             result["choice_condition"] = cond
 
@@ -6645,6 +6671,7 @@ def _try_choice(text):
             # Extract the actual condition part from the before text.
             # The before text includes stuff like "1つを選ぶ。" prefix.
             alt_cond = parse_condition(before)
+            alt_cond = _resolve_preceding_moved_condition(alt_cond, before)
             if alt_cond.get("type") != "custom":
                 result["alternative_condition"] = alt_cond
             # Count becomes 1 by default (pick exactly one).
@@ -6948,6 +6975,11 @@ def _try_baton_touch_effect(text):
 def _try_kore_niyori_result(text):
     """これにより～した場合/とき — conditional on result (invalidation follow-up, discard follow-up, etc.)."""
     if "これにより" not in text:
+        return None
+    # If the text contains a choice marker (以下から1つを選ぶ), the choice handler
+    # should process this instead — this is a "choose from options with conditional
+    # count upgrade" pattern, not a "do X, then if result condition Y, do Z" pattern.
+    if CHOICE_MARKER in text:
         return None
     # Support both 場合 and とき as condition markers
     cond_marker = None

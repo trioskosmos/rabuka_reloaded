@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-29T19:13:29.945584",
+  "generated_at": "2026-06-29T19:59:36.999144",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -18562,39 +18562,58 @@
       },
       "effect": {
         "text": "以下から1つを選ぶ。これにより控え室に置いたカードがブレードハートを持たないメンバーカードの場合、代わりに1つ以上を選ぶ。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n・ライブ終了時まで、自分のステージにいるこのメンバー以外の『Liella!』のメンバー1人は、{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る",
-        "action": "conditional_on_result",
-        "primary_effect": {
-          "text": "以下から1つを選ぶ",
-          "count": 1,
-          "action": "select"
-        },
-        "result_condition": {
+        "action": "choice",
+        "choice_modifier": "。これにより控え室に置いたカードがブレードハートを持たないメンバーカードの場合、代わりに1つ以上を選ぶ。",
+        "choice_condition": {
           "type": "card_count_condition",
           "card_type": "member_card",
-          "text": "これにより控え室に置いたカードがブレードハートを持たないメンバーカードの場合",
+          "text": "控え室に置いたカードがブレードハートを持たないメンバーカードの場合、代わりに1つ以上を選ぶ。",
           "negation": true,
           "card_property": "has_blade_heart",
           "source": "preceding_moved"
         },
-        "followup_action": {
-          "text": "代わりに1つ以上を選ぶ。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n・ライブ終了時まで、自分のステージにいるこのメンバー以外の『Liella!』のメンバー1人は、{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る",
-          "duration": "live_end",
-          "source": "stage",
-          "destination": "energy_zone",
-          "state_change": "wait",
-          "count": 1,
+        "alternative_condition": {
+          "type": "card_count_condition",
           "card_type": "member_card",
-          "target": "self",
-          "exclude_self": true,
-          "group_names": [
-            "Liella!"
-          ],
-          "target_count": 1,
-          "action": "move_cards",
-          "heart_colors": [
-            "heart06"
-          ]
+          "text": "控え室に置いたカードがブレードハートを持たないメンバーカードの場合",
+          "negation": true,
+          "card_property": "has_blade_heart",
+          "source": "preceding_moved"
         },
+        "alternative_count_type": "any_number",
+        "options": [
+          {
+            "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。",
+            "source": "energy_deck",
+            "destination": "energy_zone",
+            "state_change": "wait",
+            "count": 1,
+            "card_type": "energy_card",
+            "target": "self",
+            "action": "move_cards",
+            "heart_colors": [
+              "heart06"
+            ]
+          },
+          {
+            "text": "ライブ終了時まで、自分のステージにいるこのメンバー以外の『Liella!』のメンバー1人は、{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る",
+            "duration": "live_end",
+            "count": 2,
+            "card_type": "member_card",
+            "target": "self",
+            "exclude_self": true,
+            "group_names": [
+              "Liella!"
+            ],
+            "target_count": 1,
+            "action": "gain_resource",
+            "resource": "heart",
+            "heart_colors": [
+              "heart06"
+            ]
+          }
+        ],
+        "count": 1,
         "exclude_self": true,
         "group_names": [
           "Liella!"
