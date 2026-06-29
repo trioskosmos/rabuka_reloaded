@@ -747,7 +747,7 @@ impl super::TurnEngine {
         true
     }
 
-    fn move_live_to_success_and_handle_wins(
+    pub fn move_live_to_success_and_handle_wins(
         game_state: &mut GameState,
         player1_won: bool,
         player2_won: bool,
@@ -953,6 +953,13 @@ impl super::TurnEngine {
         .target_player_id(Some("self".to_string()))
         .build();
         game_state.ability_queue.pause_for_choice(choice);
+        if let Some(entry) = game_state.ability_queue.current_entry_mut() {
+            entry.card_id = Some(card_id);
+            entry.player_id = player_id.to_string();
+            if let Some(card) = game_state.card_database.get_card(card_id) {
+                entry.card_no = card.card_no.clone();
+            }
+        }
         true
     }
 

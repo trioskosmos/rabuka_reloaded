@@ -851,6 +851,79 @@ impl TestGame {
         );
     }
 
+    /// Assert the pending choice JSON has the expected card_id and card_name.
+    /// This validates the identity metadata the frontend uses to render the header.
+    /// Panics if there's no pending choice or the fields don't match.
+    pub fn assert_choice_identity(
+        &self,
+        expected_card_id: i16,
+        expected_card_name: &str,
+        expected_player_id: &str,
+    ) {
+        let json = self
+            .state
+            .get_pending_choice_json()
+            .expect("No pending choice JSON available");
+        let actual_id = json["card_id"].as_i64().map(|v| v as i16);
+        assert_eq!(
+            actual_id,
+            Some(expected_card_id),
+            "choice JSON card_id: expected {:?}, got {:?}",
+            expected_card_id,
+            actual_id
+        );
+        let actual_name = json["card_name"].as_str().unwrap_or("");
+        assert_eq!(
+            actual_name, expected_card_name,
+            "choice JSON card_name: expected '{}', got '{}'",
+            expected_card_name, actual_name
+        );
+        let actual_pid = json["choice_player_id"].as_str().unwrap_or("");
+        assert_eq!(
+            actual_pid, expected_player_id,
+            "choice JSON choice_player_id: expected '{}', got '{}'",
+            expected_player_id, actual_pid
+        );
+    }
+
+    /// Assert the pending choice JSON's selection_cards contain a card with the
+    /// given card_no and name.  Panics if the card isn't found.
+    pub fn assert_selection_contains(&self, expected_card_no: &str, expected_name: &str) {
+        let json = self
+            .state
+            .get_pending_choice_json()
+            .expect("No pending choice JSON available");
+        let cards = json["selection_cards"]
+            .as_array()
+            .expect("No selection_cards in choice JSON");
+        let found = cards.iter().any(|c| {
+            c["card_no"].as_str() == Some(expected_card_no)
+                && c["name"].as_str() == Some(expected_name)
+        });
+        assert!(
+            found,
+            "selection_cards should contain card_no='{}' name='{}', but it doesn't. Cards: {:?}",
+            expected_card_no, expected_name, cards
+        );
+    }
+
+    /// Assert the pending choice JSON's selection_cards do NOT contain the given card_no.
+    pub fn assert_selection_not_contains(&self, card_no: &str) {
+        let json = self
+            .state
+            .get_pending_choice_json()
+            .expect("No pending choice JSON available");
+        let cards = json["selection_cards"]
+            .as_array()
+            .expect("No selection_cards in choice JSON");
+        let found = cards.iter().any(|c| c["card_no"].as_str() == Some(card_no));
+        assert!(
+            !found,
+            "selection_cards should NOT contain '{}', but it does",
+            card_no
+        );
+    }
+
     /// Assert pending choice type matches expected variant name.
     pub fn assert_pending_choice_type(&self, expected: &str, msg: &str) {
         if let Some(choice) = self.state.ability_queue.is_waiting_for_choice() {

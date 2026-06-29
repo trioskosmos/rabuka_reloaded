@@ -153,6 +153,7 @@ pub mod qa_new_tests253;
 pub mod qa_new_tests254;
 pub mod qa_new_tests255;
 pub mod qa_new_tests256;
+pub mod qa_new_tests257;
 pub mod qa_remaining_tests2;
 
 pub mod remaining_quick_test;
