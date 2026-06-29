@@ -50,6 +50,11 @@ pub(crate) fn draw_cards_for_player(
                 player.main_deck.cards.push(card);
             }
         } else {
+            // Q104 / Rule 10.2.1: deck empty mid-draw → refresh from waitroom
+            if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
+                player.refresh();
+                continue;
+            }
             break;
         }
     }

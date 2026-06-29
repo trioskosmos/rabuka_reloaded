@@ -15,14 +15,33 @@ fn baton_touch_moves_replaced_member_to_waitroom() {
 
     // Place target on stage directly (avoids area lock from play_to_stage)
     game.state.player1.stage.stage[1] = target;
+    // Filler cards in deck so the debut "draw 2" succeeds without needing refresh
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
     game.give_energy(25);
 
     // Baton touch: play arriver to occupied center
     game.state.player1.hand.cards.push(arriver);
     game.state.player1.hand.cards.push(filler);
     game.play_to_stage(arriver, rabuka_engine::zones::MemberArea::Center);
+    // Handle debut "draw 2, discard 1" choice (required, can't skip)
     while game.has_pending_choice() {
-        game.select_indices(&[]);
+        let is_required_discard = game.state.get_pending_choice().is_some_and(|c| {
+            matches!(
+                c,
+                rabuka_engine::ability::types::Choice::SelectCard {
+                    count: 1,
+                    allow_skip: false,
+                    ..
+                }
+            )
+        });
+        if is_required_discard {
+            game.select_indices(&[0]);
+        } else {
+            game.select_indices(&[]);
+        }
     }
 
     assert!(
