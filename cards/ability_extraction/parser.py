@@ -2807,6 +2807,8 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
                 action["per_unit_source"] = "previous_moved_cards"
         # Issue 15: max_repeats from "N枚までしか" / "N回までしか" patterns
         max_m = re.search(r"(\d+)(枚|回)までしか", text)
+        if not max_m:
+            max_m = re.search(r"(\d+)までしか", text)
         if max_m:
             action["max_repeats"] = int(max_m.group(1))
         # Issue 6: Detect timing constraint for gain_resource
@@ -5108,6 +5110,8 @@ def _try_per_unit(text):
         action["per_unit_source"] = "previous_moved_cards"
     # Issue 15: Extract max_repeats from "N枚/回までしか" patterns
     max_m = re.search(r"(\d+)(枚|回)までしか", text)
+    if not max_m:
+        max_m = re.search(r"(\d+)までしか", text)
     if max_m:
         action["max_repeats"] = int(max_m.group(1))
 

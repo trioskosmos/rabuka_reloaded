@@ -98,6 +98,11 @@ impl AbilityResolver {
                 };
                 // per_unit_count: apply value once per N units (e.g. 4 energy = +1)
                 let effective_units = matching_count / per_unit_count_val.max(1);
+                let effective_units = if let Some(cap) = effect.repeat_limit {
+                    effective_units.min(cap)
+                } else {
+                    effective_units
+                };
                 value * effective_units
             } else {
                 value

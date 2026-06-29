@@ -287,6 +287,7 @@ pub mod multi_color_heart_test;
 pub mod modify_required_hearts_exclude_heart_test;
 
 // modify_score + per_unit + need_heart_total filtering (PL!SP-pb2-045-L)
+pub mod wakana_shiki_test;
 pub mod zettai_lover_test;
 
 // KALEIDOSCORE debut: discard → energy wait + conditional draw (PL!SP-pb2-013-R)

@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-29T20:24:55.763361",
+  "generated_at": "2026-06-29T21:10:20.033285",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -18894,6 +18894,7 @@
         "action": "modify_score",
         "value": 1,
         "operation": "add",
+        "max_repeats": 2,
         "per_unit": true,
         "per_unit_count": 2,
         "per_unit_type": "枚",
