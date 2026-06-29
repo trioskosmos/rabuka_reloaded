@@ -470,15 +470,34 @@ impl AbilityResolver {
             ActionType::Select => self.execute_select_effect(gs, effect),
             ActionType::SelectNumber => self.execute_select_number(gs, effect),
             ActionType::Look | ActionType::LookAt => {
-                let count = if let Some(ref dc) = effect.dynamic_count {
+                let base_count = if let Some(ref dc) = effect.dynamic_count {
                     self.resolve_dynamic_count(gs, dc)
                 } else {
                     effect.count_or(1)
                 };
+                let final_count = if effect.per_unit.unwrap_or(false) {
+                    use crate::ability::util;
+                    use std::collections::HashMap;
+                    let player = gs.resolve_target_player(effect.target_name());
+                    let filter = util::CardFilter::from_effect(effect);
+                    let per_mult = util::resolve_per_unit_count(
+                        true,
+                        effect.per_unit_type.as_deref(),
+                        player,
+                        &gs.card_database,
+                        &filter,
+                        &effect.heart_colors,
+                        None,
+                        &HashMap::new(),
+                    );
+                    base_count * per_mult
+                } else {
+                    base_count
+                };
                 self.execute_look_at(
                     gs,
                     effect,
-                    count,
+                    final_count,
                     effect.target_name(),
                     effect.source_or(Zone::Deck.to_str()),
                 )

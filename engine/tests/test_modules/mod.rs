@@ -197,6 +197,7 @@ pub mod takaramono_test;
 pub mod tokimeki_test;
 pub mod totemari_test;
 pub mod toubatsu_test;
+pub mod tsunagaru_connect_test;
 pub mod turn_number_condition_test;
 pub mod umi_bp3_test;
 pub mod umi_q228_test;

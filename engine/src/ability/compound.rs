@@ -225,6 +225,8 @@ impl AbilityResolver {
                             | Some(crate::ability::enums::ActionType::ModifyRequiredHearts)
                             | Some(crate::ability::enums::ActionType::GainAbility)
                             | Some(crate::ability::enums::ActionType::SetBladeCount)
+                            | Some(crate::ability::enums::ActionType::Look)
+                            | Some(crate::ability::enums::ActionType::LookAt)
                     );
                     if supports_per_unit {
                         if action_to_execute.per_unit.is_none() && effect.per_unit.is_some() {

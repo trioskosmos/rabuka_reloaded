@@ -54,7 +54,23 @@ impl AbilityResolver {
             effect.card_type.as_deref(),
             &effect.heart_colors,
             effect.blind.unwrap_or(false),
-        )
+        )?;
+
+        if effect.self_target.unwrap_or(false) {
+            if let Some(ref ct) = effect.card_type {
+                let card_db = &gs.card_database;
+                let has_matching = gs.revealed_cards.iter().any(|&cid| {
+                    crate::ability::util::card_matches_type(card_db, cid, Some(ct.as_str()))
+                });
+                if has_matching {
+                    if let Some(cid) = gs.activating_card {
+                        gs.mods.add_score_modifier(cid, 1);
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub(crate) fn execute_custom(
