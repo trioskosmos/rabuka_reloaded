@@ -9048,6 +9048,17 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     if res in ("blade", "ブレード"):
                         node.pop("heart_colors", None)
                     node.pop("source", None)
+                    # Remove position from gain_resource when the condition
+                    # also has the same position — it leaked from
+                    # _extract_generic_fields parsing the full text (condition
+                    # + effect) at the same time.  Constant abilities (常時)
+                    # may legitimately use position for targeting and have
+                    # no condition dict, so they are left alone.
+                    cond = node.get("condition", {})
+                    if node.get("position") and cond.get("position") == node.get(
+                        "position"
+                    ):
+                        node.pop("position", None)
                 for v in node.values():
                     _clean_gain_resource(v)
             elif isinstance(node, list):

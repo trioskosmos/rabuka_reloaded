@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-29T21:49:20.187534",
+  "generated_at": "2026-06-29T21:57:53.246193",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -5347,8 +5347,7 @@
         "resource": "blade",
         "all": true,
         "duration": "live_end",
-        "activation_position": "center",
-        "position": "center"
+        "activation_position": "center"
       }
     },
     {
@@ -6591,8 +6590,7 @@
         },
         "action": "gain_resource",
         "resource": "blade",
-        "count": 5,
-        "position": "center"
+        "count": 5
       }
     },
     {
@@ -7109,8 +7107,7 @@
         "card_type": "member_card",
         "action": "gain_resource",
         "resource": "blade",
-        "count": 2,
-        "position": "left_side"
+        "count": 2
       }
     },
     {
@@ -10754,7 +10751,6 @@
         "heart_colors": [
           "heart03"
         ],
-        "position": "center",
         "target": "self"
       }
     },
@@ -17059,8 +17055,7 @@
           "position": "center",
           "activation_position": "center"
         },
-        "activation_position": "center",
-        "position": "center"
+        "activation_position": "center"
       }
     },
     {
@@ -19401,8 +19396,7 @@
         "action": "gain_resource",
         "resource": "blade",
         "count": 4,
-        "duration": "live_end",
-        "position": "center"
+        "duration": "live_end"
       }
     },
     {
@@ -24992,8 +24986,7 @@
           "position": "left_side",
           "text": "この能力は左サイドエリアにいる場合のみ発動する。"
         },
-        "activation_position": "left_side",
-        "position": "left_side"
+        "activation_position": "left_side"
       }
     },
     {
@@ -25072,8 +25065,7 @@
           "position": "right_side",
           "text": "この能力は右サイドエリアにいる場合のみ発動する。"
         },
-        "activation_position": "right_side",
-        "position": "right_side"
+        "activation_position": "right_side"
       }
     },
     {

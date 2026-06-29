@@ -90,13 +90,67 @@ fn syncrise_member_moves_to_center_triggers_blade_gain() {
         MemberArea::Center,
     );
     let before = game.state.mods.get_blade_modifier(conditional);
+    let kinako_before = game.state.mods.get_blade_modifier(kinako);
     trigger_position_change_via_kinako(&mut game, "left");
     let after = game.state.mods.get_blade_modifier(conditional);
+    let kinako_after = game.state.mods.get_blade_modifier(kinako);
     assert!(
         after >= before + 4,
         "Syncri5e member → center → gain 4 blades (was {}, now {})",
         before,
         after
+    );
+    assert_eq!(
+        kinako_after, kinako_before,
+        "Kinako (the moved member) should NOT gain blades — only the ability card gains them"
+    );
+}
+
+/// Another 5yncri5e! member (not the ability card) moves to center → ability card gains blades.
+#[test]
+fn other_syncrise_member_moves_to_center_ability_card_gains_blades() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let conditional = game.id("PL!SP-pb2-022-R");
+    let kinako = game.id("PL!SP-bp5-006-R");
+    let filler = game.id("PL!SP-bp1-014-N"); // 5yncri5e! member with no auto ability
+    play_three(
+        &mut game,
+        conditional,
+        MemberArea::LeftSide,
+        filler,
+        MemberArea::Center,
+        kinako,
+        MemberArea::RightSide,
+    );
+    let before = game.state.mods.get_blade_modifier(conditional);
+    let filler_before = game.state.mods.get_blade_modifier(filler);
+    let kinako_before = game.state.mods.get_blade_modifier(kinako);
+    // Swap きな子 (right) → center. きな子 (5yncri5e!) moves TO center.
+    // conditional stays at left. The ability on conditional should fire.
+    game.activate_ability(kinako);
+    game.drain_auto_ability_choices();
+    let actions = game.generated_actions();
+    let center_idx = actions
+        .iter()
+        .position(|a| a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("center"))
+        .expect("center position not found");
+    game.select_generated(center_idx);
+    game.drain_auto_ability_choices();
+    let after = game.state.mods.get_blade_modifier(conditional);
+    let filler_after = game.state.mods.get_blade_modifier(filler);
+    let kinako_after = game.state.mods.get_blade_modifier(kinako);
+    assert!(
+        after >= before + 4,
+        "Ability card should gain 4 blades when another 5yncri5e! member moves to center"
+    );
+    assert_eq!(
+        filler_after, filler_before,
+        "Filler (moved away from center) should NOT gain blades"
+    );
+    assert_eq!(
+        kinako_after, kinako_before,
+        "Kinako (moved TO center) should NOT gain blades — only the ability card gains them"
     );
 }
 
