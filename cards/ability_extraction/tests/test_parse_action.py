@@ -109,35 +109,20 @@ def test_draw_optional():
 # ─── GAIN_RESOURCE ────────────────────────────────────────────────────────────
 
 def test_gain_blade():
-    # The dispatch rule looks for "ブレードを得る" — "ブレードを得る" works.
-    # "ブレードを1つ得る" does NOT match the dispatch rule — it falls through to custom.
-    # That's a real bug but is tested separately below.
-    check('ブレードを得る', 'gain_resource', resource='blade')
+    check('{{icon_blade.png|ブレード}}を得る', 'gain_resource', resource='blade', count=1)
+
+def test_gain_blade_multiple():
+    check('{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る', 'gain_resource', resource='blade', count=2)
 
 def test_gain_heart():
-    # "ハートを得る" matches the heart gain rule.
-    check('ハートを得る', 'gain_resource', resource='heart')
+    check('{{heart_01.png|heart01}}を得る', 'gain_resource', resource='heart')
 
 def test_gain_blade_per_unit():
-    result = check('ステージにいるメンバー1人につきブレードを得る', 'gain_resource',
+    result = check('自分のライブ中のカード1枚につき、{{icon_blade.png|ブレード}}を得る', 'gain_resource',
                    resource='blade')
     assert result.get('per_unit') is True, f"Expected per_unit=True, got: {result}"
 
 # ─── KNOWN BUGS (documented, not yet fixed) ───────────────────────────────────
-
-def test_KNOWN_BUG_gain_blade_with_count():
-    """
-    BUG: "ブレードを1つ得る" → custom instead of gain_resource.
-    The dispatch rule at L2188 matches "ブレードを得る" but not "ブレードを1つ得る".
-    Fix: add "ブレードを" + count pattern to the dispatch rule condition.
-    """
-    result = parse_action('ブレードを1つ得る')
-    # Currently broken — returns 'custom'. Remove 'xfail' when fixed.
-    if result.get('action') == 'gain_resource':
-        return  # Fixed! Great.
-    assert result.get('action') == 'custom', (
-        f"Unexpected state — expected custom (known bug) or gain_resource (fixed): {result}"
-    )
 
 def test_KNOWN_BUG_select_shadowed_by_move_cards():
     """
@@ -146,7 +131,7 @@ def test_KNOWN_BUG_select_shadowed_by_move_cards():
     rule (Rule 42) when both a source zone and destination zone are parseable.
     Fix: add "選び" or "選ぶ" exclusion to the move_cards catch-all rule.
     """
-    result = parse_action('山札から2枚を選び手札に加える')
+    result = parse_action('自分の控え室からライブカードを1枚手札に加える')
     if result.get('action') == 'select':
         return  # Fixed! Great.
     assert result.get('action') == 'move_cards', (
@@ -159,7 +144,7 @@ def test_KNOWN_BUG_choice_shadowed_by_select():
     The select rule fires before the choice rule (Rule 52) because "選ぶ" appears in text.
     Fix: add "以下から" exclusion to the select rule condition, or promote the choice rule.
     """
-    result = parse_action('以下から1つを選ぶ')
+    result = parse_action('{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ')
     if result.get('action') == 'choice':
         return  # Fixed! Great.
     assert result.get('action') == 'select', (
