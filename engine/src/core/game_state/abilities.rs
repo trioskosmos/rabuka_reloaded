@@ -379,6 +379,11 @@ impl GameState {
                             if skip_this_card_auto_key.as_deref() == Some(&ability_id) {
                                 continue;
                             }
+                            // Batch-scoped guard: prevent re-enqueue of any ability
+                            // already triggered during this movement batch.
+                            if self.this_batch_triggered_ability_ids.contains(&ability_id) {
+                                continue;
+                            }
                             // §9.7.2.1: Multi-trigger — N trigger instances → N
                             // standby entries.  All entries share the same
                             // trigger_moved_cards (full batch) because each
@@ -446,6 +451,9 @@ impl GameState {
                             }
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                             if skip_this_card_auto_key.as_deref() == Some(&ability_id) {
+                                continue;
+                            }
+                            if self.this_batch_triggered_ability_ids.contains(&ability_id) {
                                 continue;
                             }
                             abilities_to_trigger.push((ability_id, card.card_no.clone(), card_id));
@@ -519,6 +527,9 @@ impl GameState {
                             if skip_this_card_auto_key.as_deref() == Some(&ability_id) {
                                 continue;
                             }
+                            if self.this_batch_triggered_ability_ids.contains(&ability_id) {
+                                continue;
+                            }
                             abilities_to_trigger.push((
                                 ability_id,
                                 card.card_no.clone(),
@@ -531,6 +542,8 @@ impl GameState {
         }
         let moved = Some(event.moved_cards.clone());
         for (ability_id, card_no, stage_card_id) in abilities_to_trigger {
+            self.this_batch_triggered_ability_ids
+                .insert(ability_id.clone());
             self.trigger_auto_ability(
                 ability_id,
                 AbilityTrigger::Auto,
@@ -1035,6 +1048,7 @@ impl GameState {
             self.recently_moved_from_zone = None;
             self.batch_movements.clear();
             self.position_change_events.clear();
+            self.this_batch_triggered_ability_ids.clear();
             // Re-enter the loop to process any abilities just enqueued
             // by the watcher scan (e.g. Hazuki Ren each_time after discard).
             if !self.has_pending_choice() {

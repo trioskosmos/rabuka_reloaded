@@ -706,9 +706,28 @@ impl<'a> ConditionContext<'a> {
                 let snapshot_area_player =
                     self.game_state.entry_snapshot_last_area_move_by_player();
 
-                let this_card_moved = self.game_state.activating_card.map_or(false, |activating| {
-                    self.game_state.cards_moved_this_turn.contains(&activating)
+                // Check area move via position_change_events (batch-scoped, from
+                // execute_position_change/execute_position_change_with_destination).
+                let card_moved_pos = self.activating_card_id.is_some_and(|cid| {
+                    self.game_state
+                        .position_change_events
+                        .iter()
+                        .any(|e| e.moved_card_id == cid)
                 });
+                // Check area move via legacy path (turn-scoped, from
+                // push_movement_event). This catches movements that don't go
+                // through the high-level position change executor (e.g. tests,
+                // some effect paths). The this_batch_triggered_ability_ids
+                // guard prevents re-enqueue on stale turn-scoped data.
+                let card_moved_legacy = self.activating_card_id.is_some_and(|cid| {
+                    self.game_state.cards_moved_this_turn.contains(&cid)
+                        && self
+                            .game_state
+                            .turn_area_movements
+                            .iter()
+                            .any(|m| m.moved_card_id == cid)
+                });
+                let this_card_moved = card_moved_pos || card_moved_legacy;
                 let area_ok = if !this_card_moved {
                     // "このメンバーがエリアを移動する" — THIS card must have moved.
                     // The area_ok shortcut (self_effect_only=None) does NOT apply

@@ -421,6 +421,8 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub just_completed_ability_key: Option<String>,
     #[serde(default)]
+    pub this_batch_triggered_ability_ids: Vec<String>,
+    #[serde(default)]
     pub turn1_abilities_played: Vec<String>,
     #[serde(default)]
     pub turn2_abilities_played: std::collections::HashMap<String, u32>,
@@ -1821,6 +1823,11 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         activating_card: game_state.activating_card,
         activating_ability_index: game_state.activating_ability_index,
         just_completed_ability_key: game_state.just_completed_ability_key.clone(),
+        this_batch_triggered_ability_ids: game_state
+            .this_batch_triggered_ability_ids
+            .iter()
+            .cloned()
+            .collect(),
         turn1_abilities_played: game_state.turn1_abilities_played.iter().cloned().collect(),
         turn2_abilities_played: game_state.turn2_abilities_played.clone(),
         card_instance_mapping: game_state

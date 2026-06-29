@@ -126,6 +126,10 @@ pub struct GameState {
     /// to prevent re-enqueueing the exact same ability while still allowing
     /// other abilities on the same card (e.g. each_time) to fire.
     pub just_completed_ability_key: Option<String>,
+    /// Batch-scoped set of ability IDs already enqueued during the current movement batch.
+    /// Prevents each_time/movement abilities from being re-enqueued across multiple
+    /// post-resolution TAS scans within the same batch. Cleared at post-loop batch scan.
+    pub this_batch_triggered_ability_ids: std::collections::HashSet<String>,
     /// Cutoff index for depth-first each_time drain. Entries enqueued at >= this index
     /// are newly-triggered (each_time watchers) and must be force-resolved before
     /// stale entries are offered to the player. Set by process_player_abilities and
@@ -279,6 +283,7 @@ impl GameState {
             activating_card: None,
             activating_ability_index: None,
             just_completed_ability_key: None,
+            this_batch_triggered_ability_ids: std::collections::HashSet::new(),
             depth_first_cutoff: None,
             // 1-byte aligned
             rps_winner: None,
