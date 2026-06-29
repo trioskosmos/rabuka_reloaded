@@ -58,6 +58,13 @@ fn play_cost_reduction_matches(
             return false;
         }
     }
+    // ability_filter: e.g. "no_ability" means only reduce cost for members
+    // whose abilities list is empty.
+    if effect.ability_filter.as_deref() == Some("no_ability") {
+        if !card.abilities.is_empty() {
+            return false;
+        }
+    }
     true
 }
 
@@ -128,27 +135,22 @@ pub fn calculate_play_cost_reduction(
     }
 
     // ── 2. Scan stage cards for cost-reduction auras that apply to card_id ───
-    if cost_reduction == 0 {
-        for &stage_id in &stage.stage {
-            if stage_id == -1 {
-                continue;
-            }
-            if let Some(stage_card) = card_db.get_card(stage_id) {
-                if let Some(r) = scan_abilities_for_cost_reduction(
-                    &stage_card.abilities,
-                    card_id,
-                    card,
-                    card_db,
-                    stage,
-                    hand_count,
-                    true, // enforce hand-condition guard (card is on stage, not in hand)
-                ) {
-                    cost_reduction = cost_reduction.max(r);
-                    break;
-                }
-            }
-            if cost_reduction > 0 {
-                break;
+    for &stage_id in &stage.stage {
+        if stage_id == -1 {
+            continue;
+        }
+        if let Some(stage_card) = card_db.get_card(stage_id) {
+            if let Some(r) = scan_abilities_for_cost_reduction(
+                &stage_card.abilities,
+                card_id,
+                card,
+                card_db,
+                stage,
+                hand_count,
+                true, // enforce hand-condition guard (card is on stage, not in hand)
+            ) {
+                // Stack: sum reductions from all qualifying stage cards
+                cost_reduction += r;
             }
         }
     }
@@ -233,6 +235,14 @@ fn scan_abilities_for_cost_reduction(
             // Card-type guard: only applies to member/card types
             if let Some(ref ct) = effect.card_type {
                 if ct != "member_card" && ct != "card" && ct != "member" {
+                    continue;
+                }
+            }
+            // ability_filter: e.g. "no_ability" means only reduce cost for
+            // members whose abilities list is empty (the TARGET card, not
+            // the stage card providing the aura).
+            if effect.ability_filter.as_deref() == Some("no_ability") {
+                if !target_card.abilities.is_empty() {
                     continue;
                 }
             }

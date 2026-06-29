@@ -615,6 +615,41 @@ impl<'a> ConditionContext<'a> {
                         }
                     }
                 }
+                // ability_filter + card_type: apply to the same check_id as
+                // group_names (arriving or replaced member depending on location).
+                if let Some(check_card) = check_id_for_group {
+                    if let Some(card) = self.game_state.card_database.get_card(check_card) {
+                        if let Some(ref af) = condition.ability_filter {
+                            match af.as_str() {
+                                "no_ability" => {
+                                    if !card.abilities.is_empty() {
+                                        return false;
+                                    }
+                                }
+                                "has_ability" => {
+                                    if card.abilities.is_empty() {
+                                        return false;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        if let Some(ref ct) = condition.card_type {
+                            let card_type_ok = match ct.as_str() {
+                                "member_card" | "member" => card.is_member(),
+                                "live_card" => {
+                                    matches!(card.card_type, crate::card::CardType::Live)
+                                }
+                                _ => true,
+                            };
+                            if !card_type_ok {
+                                return false;
+                            }
+                        }
+                    } else {
+                        return false;
+                    }
+                }
                 let bt_source = condition
                     .baton_touch_source
                     .as_deref()

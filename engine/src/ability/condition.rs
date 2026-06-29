@@ -426,10 +426,14 @@ impl<'a> ConditionContext<'a> {
         dbg.condition(condition, dbg_actual, thresh, final_result);
 
         if let Some(ref filter) = condition.ability_filter {
-            let filtered =
-                self.evaluate_ability_filter_condition_with_card_check(condition, filter);
-            if !filtered {
-                return false;
+            // MovementCondition handles ability_filter internally (applies to
+            // the baton-touch source/replaced member, not the activating card).
+            if ct != Some(ConditionType::MovementCondition) {
+                let filtered =
+                    self.evaluate_ability_filter_condition_with_card_check(condition, filter);
+                if !filtered {
+                    return false;
+                }
             }
         }
 

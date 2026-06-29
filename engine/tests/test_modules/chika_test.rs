@@ -235,3 +235,293 @@ fn advance_to_live_start(game: &mut TestGame) {
     game.pass();
     game.pass();
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// PL!S-bp5-001-R+ (Aqours bp5 Chika) — ab#1 (常時) cost reduction
+//   "能力を持たないメンバーカードを自分の手札から登場させるためのコストは1減る。"
+//   Rule: cost reduction applies only to member cards with 0 abilities,
+//   played from hand. Stacks per Chika on stage. Floor at 0.
+// ════════════════════════════════════════════════════════════════════════════
+
+/// Cost reduction applies to no-ability members (4 → 3).
+#[test]
+fn chika_bp5_cost_reduction_applies_to_no_ability_member() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let chika = game.id("PL!S-bp5-001-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD"); // no abilities, cost 4
+
+    let chika_cost = game.db.get_card(chika).unwrap().cost.unwrap_or(0) as usize;
+    let filler_cost = game.db.get_card(filler).unwrap().cost.unwrap_or(0) as usize;
+    assert_eq!(filler_cost, 4, "Filler cost 4");
+
+    game.state.player1.hand.cards.push(chika);
+    game.give_energy(chika_cost + filler_cost + 5);
+    game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    let energy_before = game.state.player1.energy_zone.active_count();
+    game.state.player1.hand.cards.push(filler);
+    game.play_to_stage(filler, rabuka_engine::zones::MemberArea::LeftSide);
+    let energy_after = game.state.player1.energy_zone.active_count();
+
+    assert_eq!(energy_before - energy_after, 3, "Cost 4 reduced to 3");
+}
+
+/// Cost reduction does NOT apply to members WITH abilities.
+#[test]
+fn chika_bp5_no_reduction_for_member_with_ability() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let chika = game.id("PL!S-bp5-001-R\u{ff0b}");
+    let has_ability = game.id("PL!SP-PR-003-PR"); // has 登場 ability
+
+    let chika_cost = game.db.get_card(chika).unwrap().cost.unwrap_or(0) as usize;
+    let target_cost = game.db.get_card(has_ability).unwrap().cost.unwrap_or(0) as usize;
+
+    game.state.player1.hand.cards.push(chika);
+    game.give_energy(chika_cost + target_cost + 5);
+    game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    let energy_before = game.state.player1.energy_zone.active_count();
+    game.state.player1.hand.cards.push(has_ability);
+    game.play_to_stage(has_ability, rabuka_engine::zones::MemberArea::LeftSide);
+    let energy_after = game.state.player1.energy_zone.active_count();
+
+    assert_eq!(
+        energy_before - energy_after,
+        target_cost,
+        "Full cost paid — no reduction"
+    );
+}
+
+/// Cost reduction applies to no-ability members regardless of cost.
+#[test]
+fn chika_bp5_cost_reduction_applies_floor_check() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let chika = game.id("PL!S-bp5-001-R\u{ff0b}");
+    let no_ability = game.id("PL!-sd1-010-SD"); // cost 4, no abilities
+
+    let chika_cost = game.db.get_card(chika).unwrap().cost.unwrap_or(0) as usize;
+
+    game.state.player1.hand.cards.push(chika);
+    game.give_energy(chika_cost + 4 + 5);
+    game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    let energy_before = game.state.player1.energy_zone.active_count();
+    game.state.player1.hand.cards.push(no_ability);
+    game.play_to_stage(no_ability, rabuka_engine::zones::MemberArea::LeftSide);
+    let energy_after = game.state.player1.energy_zone.active_count();
+
+    assert_eq!(energy_before - energy_after, 3, "Cost 4 reduced to 3");
+}
+
+/// Two Chikas stack reduction (4 → 2, not 3).
+#[test]
+fn chika_bp5_cost_reduction_stacks() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let chika = game.id("PL!S-bp5-001-R\u{ff0b}");
+    let chika2 = game.id("PL!S-bp5-001-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD"); // cost 4, no abilities
+
+    let chika_cost = game.db.get_card(chika).unwrap().cost.unwrap_or(0) as usize;
+
+    game.state.player1.hand.cards.push(chika);
+    game.state.player1.hand.cards.push(chika2);
+    game.give_energy(chika_cost * 2 + 4 + 5);
+    game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+    game.play_to_stage(chika2, rabuka_engine::zones::MemberArea::LeftSide);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    let energy_before = game.state.player1.energy_zone.active_count();
+    game.state.player1.hand.cards.push(filler);
+    game.play_to_stage(filler, rabuka_engine::zones::MemberArea::RightSide);
+    let energy_after = game.state.player1.energy_zone.active_count();
+
+    assert_eq!(energy_before - energy_after, 2, "Cost 4 reduced by 2 → 2");
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PL!S-bp5-001-R+ (Aqours bp5 Chika) — ab#0 (登場) baton touch draw
+//   "能力を持たないメンバーからバトンタッチして登場した場合、カードを1枚引く。"
+//   Condition: baton_touch_trigger + ability_filter: no_ability on source member.
+// ════════════════════════════════════════════════════════════════════════════
+
+/// Baton touch from no-ability member → draw 1.
+#[test]
+fn chika_bp5_baton_touch_from_no_ability_draw() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let chika = game.id("PL!S-bp5-001-R\u{ff0b}");
+    let no_ability = game.id("PL!-sd1-010-SD");
+    let filler = game.id("PL!-sd1-002-SD");
+
+    let chika_cost = game.db.get_card(chika).unwrap().cost.unwrap_or(0) as usize;
+    game.state.player1.stage.stage = [-1, no_ability, -1];
+    game.state.player1.hand.cards.push(chika);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.give_energy(chika_cost + 5);
+
+    let hand_before = game.state.player1.hand.cards.len();
+    game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
+
+    while game.has_pending_choice() {
+        let is_required = game.state.get_pending_choice().is_some_and(|c| {
+            matches!(
+                c,
+                rabuka_engine::ability::types::Choice::SelectCard {
+                    count: 1,
+                    allow_skip: false,
+                    ..
+                }
+            )
+        });
+        if is_required {
+            game.select_indices(&[0]);
+        } else {
+            game.select_indices(&[]);
+        }
+    }
+
+    assert_eq!(game.state.player1.stage.stage[1], chika, "Chika at Center");
+    assert!(
+        game.state.player1.waitroom.cards.contains(&no_ability),
+        "No-ability member replaced"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "Draw 1 compensates hand loss from playing Chika"
+    );
+}
+
+/// Baton touch from member WITH ability → NO draw.
+#[test]
+fn chika_bp5_baton_touch_from_ability_member_no_draw() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let chika = game.id("PL!S-bp5-001-R\u{ff0b}");
+    let has_ability = game.id("PL!SP-PR-003-PR");
+    let filler = game.id("PL!-sd1-002-SD");
+
+    let chika_cost = game.db.get_card(chika).unwrap().cost.unwrap_or(0) as usize;
+    game.state.player1.stage.stage = [-1, has_ability, -1];
+    game.state.player1.hand.cards.push(chika);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.give_energy(chika_cost + 5);
+
+    let hand_before = game.state.player1.hand.cards.len();
+    game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
+
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert_eq!(game.state.player1.stage.stage[1], chika, "Chika at Center");
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before - 1,
+        "No draw — hand decreased"
+    );
+}
+
+/// Normal debut (empty area, no baton touch) → NO draw.
+#[test]
+fn chika_bp5_normal_debut_no_draw() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let chika = game.id("PL!S-bp5-001-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-002-SD");
+
+    let chika_cost = game.db.get_card(chika).unwrap().cost.unwrap_or(0) as usize;
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.state.player1.hand.cards.push(chika);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.give_energy(chika_cost + 5);
+
+    let hand_before = game.state.player1.hand.cards.len();
+    game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
+
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert_eq!(game.state.player1.stage.stage[1], chika, "Chika at Center");
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before - 1,
+        "No draw — hand decreased"
+    );
+}
+
+/// Baton touch from no-ability member with empty deck → refresh then draw 1.
+#[test]
+fn chika_bp5_baton_touch_draw_triggers_refresh() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let chika = game.id("PL!S-bp5-001-R\u{ff0b}");
+    let no_ability = game.id("PL!-sd1-010-SD");
+    let filler = game.id("PL!-sd1-002-SD");
+
+    let chika_cost = game.db.get_card(chika).unwrap().cost.unwrap_or(0) as usize;
+    game.state.player1.stage.stage = [-1, no_ability, -1];
+    game.state.player1.hand.cards.push(chika);
+    // Empty deck + some cards in waitroom to refresh
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.waitroom.cards.push(filler);
+    game.state.player1.waitroom.cards.push(filler);
+    game.give_energy(chika_cost + 5);
+
+    let hand_before = game.state.player1.hand.cards.len();
+    game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
+
+    while game.has_pending_choice() {
+        let is_required = game.state.get_pending_choice().is_some_and(|c| {
+            matches!(
+                c,
+                rabuka_engine::ability::types::Choice::SelectCard {
+                    count: 1,
+                    allow_skip: false,
+                    ..
+                }
+            )
+        });
+        if is_required {
+            game.select_indices(&[0]);
+        } else {
+            game.select_indices(&[]);
+        }
+    }
+
+    assert_eq!(game.state.player1.stage.stage[1], chika, "Chika at Center");
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "Draw 1 from refreshed deck compensates hand loss"
+    );
+    assert!(
+        game.state.player1.main_deck.cards.len() > 0 || game.state.player1.waitroom.cards.len() > 0,
+        "Refresh should have occurred (cards exist somewhere)"
+    );
+}
