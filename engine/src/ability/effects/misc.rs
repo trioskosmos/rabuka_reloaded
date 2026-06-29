@@ -298,63 +298,8 @@ impl AbilityResolver {
         }
     }
 
-    pub fn execute_gain_resource(
-        &mut self,
-        gs: &mut GameState,
-        effect: &AbilityEffect,
-    ) -> Result<(), String> {
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-            eprintln!("[GR_ENTER] resource={:?} count={:?} target_count={:?} source={:?} card_type={:?} target={:?} exclude_self={:?} target_from_sel={:?}",
-                effect.resource, effect.count, effect.target_count, effect.source, effect.card_type, effect.target, effect.exclude_self, effect.target_from_selection);
-        }
-        if effect.resource.as_deref() == Some("heart")
-            && effect.heart_type.as_deref() == Some("all")
-        {
-            let target_str = effect.target_name().to_string();
-            // Capture values before mutable borrow of gs
-            let triggering_member = gs
-                .ability_queue
-                .current_entry()
-                .and_then(|e| e.triggering_member_id);
-            let activating = gs.activating_card;
-            let has_explicit_target = effect.target.is_some();
-            let player = gs.resolve_target_player_mut(&target_str);
-            let card_id = triggering_member.or_else(|| {
-                if has_explicit_target {
-                    player.stage.stage.iter().find(|&&id| id != -1).copied()
-                } else {
-                    activating
-                }
-            });
-            if let Some(card_id) = card_id {
-                let amount = effect.count_or(1) as i32;
-                gs.mods.add_heart_modifier_with_trace(
-                    card_id,
-                    crate::card::HeartColor::All,
-                    amount,
-                    &mut gs.ability_applications,
-                    card_id,
-                    &effect.text,
-                );
-                if effect.duration.as_deref() == Some("live_end") {
-                    let effect_data = serde_json::json!({
-                        "card_id": card_id,
-                        "amount": amount,
-                        "color": "all",
-                    });
-                    crate::ability::util::push_temporary_effect(
-                        gs,
-                        "gain_heart",
-                        Some("live_end"),
-                        "self",
-                        &format!("Gain {} all-heart", amount),
-                        Some(effect_data),
-                    );
-                }
-            }
-            return Ok(());
-        }
 
+    pub(crate) fn handle_bp6_pattern(&self, gs: &mut GameState, effect: &AbilityEffect) -> Result<bool, String> {
         // bp6 pattern: "gain 1 heart per distinct color among discarded cards"
         // Detected by: resource=heart, per_unit=true, per_unit_type="discard", multiple_targets=true
         // For each distinct heart color present among recently_moved_cards, grant 1 heart of that color.
@@ -435,41 +380,26 @@ impl AbilityResolver {
                     );
                 }
             }
-            return Ok(());
+            return Ok(true);
         }
-        let resource = effect.resource.as_deref().unwrap_or("").to_string();
-        let count = effect.resource_icon_count.unwrap_or(effect.count_or(1));
-        let target = effect.target_name().to_string();
-        let duration = effect.duration.clone();
-        let is_temporary = duration.is_some() && duration.as_deref() != Some("permanent");
-        let card_type_filter = effect.card_type.clone();
-        let group_filter = effect.group_name().map(|s| s.to_string());
-        let per_unit_count_val = effect.per_unit_count.unwrap_or(1);
-        let per_unit_type_str = effect.per_unit_type.clone();
-        let heart_selection = effect.heart_selection.unwrap_or(false);
-        let per_unit = effect.per_unit.unwrap_or(false);
-        let sign = effect.sign.as_deref();
-        let activating_card_id = gs.activating_card;
-        let card_db = self.card_db();
-        let is_self_target = effect.self_target.unwrap_or(false);
-        let last_discard_count = gs.mods.last_cost_discard_count;
-        let is_all = effect.all.unwrap_or(false)
-            || (effect.source.is_none()
-                && effect.card_type.as_deref() == Some("member_card")
-                && (target == "self" || target == "opponent")
-                && !is_self_target
-                && effect.exclude_self.is_none())
-            // Also detect "all members" when the effect has no target_count limit
-            // and targets "self"/"opponent" members (e.g. "自分のステージにいるメンバーは")
-            || (effect.card_type.as_deref() == Some("member_card")
-                && (target == "self" || target == "opponent")
-                && effect.target_count.is_none()
-                && effect.distinct.is_none());
 
-        if resource == "surplus_heart" {
+        Ok(false)
+    }
+
+    pub(crate) fn execute_gain_surplus_heart(
+        &self,
+        gs: &mut GameState,
+        _effect: &AbilityEffect,
+        target: &str,
+        is_temporary: bool,
+        duration: Option<&str>,
+        sign: Option<&str>,
+        is_all: bool,
+    ) -> Result<(), String> {
+        
             let surplus_target = target.clone();
             let old = if sign == Some("negative") && is_all {
-                let v = match surplus_target.as_str() {
+                let v = match target {
                     "opponent" => gs.opponent_live_surplus_count,
                     _ => gs.self_live_surplus_count,
                 };
@@ -503,7 +433,205 @@ impl AbilityResolver {
                     effect_data,
                 );
             }
+            
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn calculate_gain_multiplier(
+        &self,
+        gs: &GameState,
+        effect: &AbilityEffect,
+        per_unit: bool,
+        base_count: u32,
+        per_unit_type_str: Option<&str>,
+        target: &str,
+        recently_moved: &Option<Vec<i16>>,
+        entry_snapshot: &Option<Vec<i16>>,
+        last_energy: u32,
+        last_discard_count: u32,
+        orientation_modifiers: &std::collections::HashMap<i16, String>,
+        filter: &crate::ability::util::CardFilter,
+    ) -> u32 {
+        if !per_unit {
+            return base_count;
+        }
+        let card_db = self.card_db();
+        let player = gs.resolve_target_player(target);
+
+            
+                // If the effect has an explicit location, use that as the count zone
+                // instead of the generic per_unit_type → zone mapping.
+                let effective_per_unit_type =
+                    effect.location.as_deref().or(per_unit_type_str);
+                let mut matching_count = if effective_per_unit_type == Some("つ") {
+                    last_energy
+                } else {
+                    util::resolve_per_unit_count(
+                        true,
+                        effective_per_unit_type,
+                        player,
+                        &card_db,
+                        filter,
+                        &[],
+                        effect.state.as_deref(),
+                        orientation_modifiers,
+                    )
+                };
+                // For per_unit_type="discard": always use tracked move/cost counts,
+                // never the full waitroom. Checks recently_moved first, then the
+                // enqueue-time snapshot (trigger_moved_cards) as fallback.
+                let tracked_moved = recently_moved.as_ref().or(entry_snapshot.as_ref());
+                if Zone::from_str(per_unit_type_str.unwrap_or("")) == Some(Zone::Discard)
+                {
+                    let tm_len = tracked_moved.map(|v| v.len()).unwrap_or(0);
+                    eprintln!(
+                        "[DBG_GR] tracked_moved.len={} last_discard_count={}",
+                        tm_len, last_discard_count,
+                    );
+                    matching_count = util::resolve_discard_per_unit_count(
+                        tracked_moved,
+                        last_discard_count,
+                        &card_db,
+                        filter,
+                    );
+                    eprintln!("[DBG_GR] resolve result: matching_count={}", matching_count);
+                } else if (Zone::from_str(per_unit_type_str.unwrap_or(""))
+                    == Some(Zone::Waitroom)
+                    || per_unit_type_str == Some("waitroom_card"))
+                    && (last_discard_count > 0 || recently_moved.is_some())
+                {
+                    matching_count = util::resolve_discard_per_unit_count(
+                        recently_moved.as_ref(),
+                        last_discard_count,
+                        &card_db,
+                        filter,
+                    );
+                } else if per_unit_type_str == Some("energy_deck") {
+                    // Cards placed in energy deck are always energy cards,
+                    // so don't filter by card_type (which may differ from
+                    // the gain_resource's target card_type for member targeting).
+                    // Only count recently_moved (from the current effect),
+                    // NOT entry_snapshot (which may contain trigger-setup cards).
+                    if let Some(moved) = recently_moved.as_ref() {
+                        matching_count = moved.len() as u32;
+                    } else {
+                        matching_count = 0;
+                    }
+                }
+                let per_unit_count_val = effect.per_unit_count.unwrap_or(1);
+                let mut units = matching_count / per_unit_count_val;
+                if effect.max.unwrap_or(false) {
+                    if let Some(cap) = effect.count {
+                        units = units.min(cap);
+                    }
+                }
+                // Also cap by max_repeats (aliased as repeat_limit), used
+                // when the parser sets it as the sole cap on per_unit effects
+                // (e.g. "N枚までしか数えない" text constraints).
+                if let Some(cap) = effect.repeat_limit {
+                    units = units.min(cap);
+                }
+                let per_unit_base = if effect.max.unwrap_or(false) {
+                    1
+                } else {
+                    effect.resource_icon_count.unwrap_or(effect.count_or(1))
+                };
+                units * per_unit_base
+    }
+    pub fn execute_gain_resource(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(), String> {
+        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            eprintln!("[GR_ENTER] resource={:?} count={:?} target_count={:?} source={:?} card_type={:?} target={:?} exclude_self={:?} target_from_sel={:?}",
+                effect.resource, effect.count, effect.target_count, effect.source, effect.card_type, effect.target, effect.exclude_self, effect.target_from_selection);
+        }
+        if effect.resource.as_deref() == Some("heart")
+            && effect.heart_type.as_deref() == Some("all")
+        {
+            let target_str = effect.target_name().to_string();
+            // Capture values before mutable borrow of gs
+            let triggering_member = gs
+                .ability_queue
+                .current_entry()
+                .and_then(|e| e.triggering_member_id);
+            let activating = gs.activating_card;
+            let has_explicit_target = effect.target.is_some();
+            let player = gs.resolve_target_player_mut(&target_str);
+            let card_id = triggering_member.or_else(|| {
+                if has_explicit_target {
+                    player.stage.stage.iter().find(|&&id| id != -1).copied()
+                } else {
+                    activating
+                }
+            });
+            if let Some(card_id) = card_id {
+                let amount = effect.count_or(1) as i32;
+                gs.mods.add_heart_modifier_with_trace(
+                    card_id,
+                    crate::card::HeartColor::All,
+                    amount,
+                    &mut gs.ability_applications,
+                    card_id,
+                    &effect.text,
+                );
+                if effect.duration.as_deref() == Some("live_end") {
+                    let effect_data = serde_json::json!({
+                        "card_id": card_id,
+                        "amount": amount,
+                        "color": "all",
+                    });
+                    crate::ability::util::push_temporary_effect(
+                        gs,
+                        "gain_heart",
+                        Some("live_end"),
+                        "self",
+                        &format!("Gain {} all-heart", amount),
+                        Some(effect_data),
+                    );
+                }
+            }
             return Ok(());
+        }
+
+
+        if self.handle_bp6_pattern(gs, effect)? {
+            return Ok(());
+        }
+        let resource = effect.resource.as_deref().unwrap_or("").to_string();
+        let count = effect.resource_icon_count.unwrap_or(effect.count_or(1));
+        let target = effect.target_name().to_string();
+        let duration = effect.duration.clone();
+        let is_temporary = duration.is_some() && duration.as_deref() != Some("permanent");
+        let card_type_filter = effect.card_type.clone();
+        let group_filter = effect.group_name().map(|s| s.to_string());
+        let per_unit_count_val = effect.per_unit_count.unwrap_or(1);
+        let per_unit_type_str = effect.per_unit_type.clone();
+        let heart_selection = effect.heart_selection.unwrap_or(false);
+        let per_unit = effect.per_unit.unwrap_or(false);
+        let sign = effect.sign.as_deref();
+        let activating_card_id = gs.activating_card;
+        let card_db = self.card_db();
+        let is_self_target = effect.self_target.unwrap_or(false);
+        let last_discard_count = gs.mods.last_cost_discard_count;
+        let is_all = effect.all.unwrap_or(false)
+            || (effect.source.is_none()
+                && effect.card_type.as_deref() == Some("member_card")
+                && (target == "self" || target == "opponent")
+                && !is_self_target
+                && effect.exclude_self.is_none())
+            // Also detect "all members" when the effect has no target_count limit
+            // and targets "self"/"opponent" members (e.g. "自分のステージにいるメンバーは")
+            || (effect.card_type.as_deref() == Some("member_card")
+                && (target == "self" || target == "opponent")
+                && effect.target_count.is_none()
+                && effect.distinct.is_none());
+
+
+        if resource == "surplus_heart" {
+            return self.execute_gain_surplus_heart(gs, effect, &target, is_temporary, duration.as_deref(), sign, is_all);
         }
 
         // If a preceding select action already set the heart color in
@@ -731,92 +859,25 @@ impl AbilityResolver {
                 std::collections::HashSet::new()
             };
         let (blade_targets, mut heart_targets, heart_color_str, final_count) = {
-            let player = gs.resolve_target_player_mut(&target);
-
             let mut filter = effect.filter_subset();
             filter.exclude_self = exclude_self_id;
 
-            let final_count = if per_unit {
-                // If the effect has an explicit location, use that as the count zone
-                // instead of the generic per_unit_type → zone mapping.
-                let effective_per_unit_type =
-                    effect.location.as_deref().or(per_unit_type_str.as_deref());
-                let mut matching_count = if effective_per_unit_type == Some("つ") {
-                    last_energy
-                } else {
-                    util::resolve_per_unit_count(
-                        true,
-                        effective_per_unit_type,
-                        player,
-                        &card_db,
-                        &filter,
-                        &[],
-                        effect.state.as_deref(),
-                        &orientation_modifiers,
-                    )
-                };
-                // For per_unit_type="discard": always use tracked move/cost counts,
-                // never the full waitroom. Checks recently_moved first, then the
-                // enqueue-time snapshot (trigger_moved_cards) as fallback.
-                let tracked_moved = recently_moved.as_ref().or(entry_snapshot.as_ref());
-                if Zone::from_str(per_unit_type_str.as_deref().unwrap_or("")) == Some(Zone::Discard)
-                {
-                    let tm_len = tracked_moved.map(|v| v.len()).unwrap_or(0);
-                    eprintln!(
-                        "[DBG_GR] tracked_moved.len={} last_discard_count={}",
-                        tm_len, last_discard_count,
-                    );
-                    matching_count = util::resolve_discard_per_unit_count(
-                        tracked_moved,
-                        last_discard_count,
-                        &card_db,
-                        &filter,
-                    );
-                    eprintln!("[DBG_GR] resolve result: matching_count={}", matching_count);
-                } else if (Zone::from_str(per_unit_type_str.as_deref().unwrap_or(""))
-                    == Some(Zone::Waitroom)
-                    || per_unit_type_str.as_deref() == Some("waitroom_card"))
-                    && (last_discard_count > 0 || recently_moved.is_some())
-                {
-                    matching_count = util::resolve_discard_per_unit_count(
-                        recently_moved.as_ref(),
-                        last_discard_count,
-                        &card_db,
-                        &filter,
-                    );
-                } else if per_unit_type_str.as_deref() == Some("energy_deck") {
-                    // Cards placed in energy deck are always energy cards,
-                    // so don't filter by card_type (which may differ from
-                    // the gain_resource's target card_type for member targeting).
-                    // Only count recently_moved (from the current effect),
-                    // NOT entry_snapshot (which may contain trigger-setup cards).
-                    if let Some(moved) = recently_moved.as_ref() {
-                        matching_count = moved.len() as u32;
-                    } else {
-                        matching_count = 0;
-                    }
-                }
-                let mut units = matching_count / per_unit_count_val;
-                if effect.max.unwrap_or(false) {
-                    if let Some(cap) = effect.count {
-                        units = units.min(cap);
-                    }
-                }
-                // Also cap by max_repeats (aliased as repeat_limit), used
-                // when the parser sets it as the sole cap on per_unit effects
-                // (e.g. "N枚までしか数えない" text constraints).
-                if let Some(cap) = effect.repeat_limit {
-                    units = units.min(cap);
-                }
-                let per_unit_base = if effect.max.unwrap_or(false) {
-                    1
-                } else {
-                    effect.resource_icon_count.unwrap_or(effect.count_or(1))
-                };
-                units * per_unit_base
-            } else {
-                count
-            };
+            let final_count = self.calculate_gain_multiplier(
+                gs, 
+                effect,
+                per_unit,
+                count,
+                per_unit_type_str.as_deref(),
+                &target,
+                &recently_moved,
+                &entry_snapshot,
+                last_energy,
+                last_discard_count,
+                &orientation_modifiers,
+                &filter
+            );
+            
+            let player = gs.resolve_target_player_mut(&target);
 
             let has_selection_filter = effect.target_count.is_some() || effect.distinct.is_some();
             // When a distinct choice was saved (target_count cleared), exclude
