@@ -645,9 +645,6 @@ impl super::TurnEngine {
         use_baton_touch: Option<bool>,
     ) -> Result<(), String> {
         let use_baton_touch = use_baton_touch.unwrap_or(false);
-        if use_baton_touch && game_state.is_action_prohibited("cannot_baton_touch") {
-            return Err("Baton touch is prohibited by a restriction effect".to_string());
-        }
 
         // Clear stale baton touch state from any previous action this turn
         game_state.clear_baton_touch_tracking();
@@ -756,6 +753,45 @@ impl super::TurnEngine {
                     return Err("Not enough energy to play this card".to_string());
                 }
                 player.energy_zone.pay_energy(final_cost as usize)?;
+            }
+            // Check cannot_baton_touch protection for each target member
+            {
+                let player = game_state.active_player();
+                for &area2 in &db_areas {
+                    if let Some(existing_card_id) = player.stage.get_area(area2) {
+                        let has_protection =
+                            card_db
+                                .get_card(existing_card_id)
+                                .is_some_and(|existing_card| {
+                                    existing_card.abilities.iter().any(|a| {
+                                        a.effect.as_ref().is_some_and(|ef| {
+                                            if ef.restriction_type.as_deref()
+                                                != Some("cannot_baton_touch")
+                                            {
+                                                return false;
+                                            }
+                                            if let Some(ref exclude_groups) = ef.exclude_group_names
+                                            {
+                                                if crate::ability::util::card_matches_any_group(
+                                                    &card_db,
+                                                    card_id,
+                                                    exclude_groups,
+                                                ) {
+                                                    return false;
+                                                }
+                                            }
+                                            true
+                                        })
+                                    })
+                                });
+                        if has_protection {
+                            return Err(
+                                "Cannot baton touch: member has baton touch discard protection"
+                                    .to_string(),
+                            );
+                        }
+                    }
+                }
             }
             // Replace both specified members first
             let double_replaced_ids: Vec<i16> = {

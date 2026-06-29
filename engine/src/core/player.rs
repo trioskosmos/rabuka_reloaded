@@ -293,7 +293,19 @@ impl Player {
                     let has_protection = card_db.get_card(member_id).is_some_and(|existing_card| {
                         existing_card.abilities.iter().any(|a| {
                             a.effect.as_ref().is_some_and(|ef| {
-                                ef.restriction_type.as_deref() == Some("cannot_baton_touch")
+                                if ef.restriction_type.as_deref() != Some("cannot_baton_touch") {
+                                    return false;
+                                }
+                                if let Some(ref exclude_groups) = ef.exclude_group_names {
+                                    if crate::ability::util::card_matches_any_group(
+                                        &card_db,
+                                        card_id,
+                                        exclude_groups,
+                                    ) {
+                                        return false;
+                                    }
+                                }
+                                true
                             })
                         })
                     });
