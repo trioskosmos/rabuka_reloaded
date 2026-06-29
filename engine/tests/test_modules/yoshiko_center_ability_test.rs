@@ -399,3 +399,102 @@ fn test_yoshiko_center_ability_exclude_self() {
         "Dia should be summoned to vacated area (cost 11 = 9 + 2)"
     );
 }
+
+/// Test: cost_reference uses the SACRIFICED member's cost, NOT Yoshiko's cost.
+/// Yoshiko (cost 13) in center, Chika (cost 9) on left.
+/// A card with cost 11 (9+2) in discard → correct target.
+/// A card with cost 15 (13+2) in discard → should NOT be picked (wrong cost for Chika).
+#[test]
+fn test_yoshiko_cost_reference_uses_sacrificed_not_self() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let yoshiko = game.id("PL!S-bp3-006-R＋"); // cost 13
+    let chika = game.id("PL!S-bp2-001-R"); // cost 9 — to be sacrificed
+    let correct_target = game.id("PL!S-bp2-004-R"); // Dia, cost 11 = 9+2
+    let wrong_target = game.id("PL!S-PR-014-PR"); // cost 15 = 13+2 (Yoshiko+2)
+    let hand_card = game.id("PL!-sd1-010-SD");
+
+    game.add_to_stage(MemberArea::Center, yoshiko);
+    game.add_to_stage(MemberArea::LeftSide, chika);
+    game.add_to_hand(hand_card);
+    game.add_to_discard(correct_target);
+    game.add_to_discard(wrong_target);
+    game.give_energy(15);
+
+    game.activate_ability(yoshiko);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    // Verify: the correct +2 card was summoned (cost 11 = Chika 9 + 2), NOT cost-15
+    // Dia should be deployed to left side (where Chika was)
+    assert_eq!(
+        game.player().stage.stage[0],
+        correct_target,
+        "Dia (cost 11 = 9+2) should be summoned to vacated area"
+    );
+    // Chika should be in discard
+    assert!(
+        game.player().waitroom.cards.contains(&chika),
+        "Chika should be in discard (sacrificed)"
+    );
+    // Wrong target (cost 15) stays in discard
+    assert!(
+        game.player().waitroom.cards.contains(&wrong_target),
+        "Wrong-cost target (cost 15) should remain in discard"
+    );
+    // Yoshiko stays at center
+    assert_eq!(
+        game.player().stage.stage[1],
+        yoshiko,
+        "Yoshiko should remain at center"
+    );
+}
+
+/// Test: WITHOUT the correct +2 target in discard → nothing summoned.
+/// Verifies the sacrificed member is still moved (card text says so).
+#[test]
+fn test_yoshiko_no_valid_target_after_sacrifice() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let yoshiko = game.id("PL!S-bp3-006-R＋"); // cost 13
+    let chika = game.id("PL!S-bp2-001-R"); // cost 9
+    let wrong_target = game.id("PL!S-PR-014-PR"); // cost 15 = 13+2, but need 11
+    let hand_card = game.id("PL!-sd1-010-SD");
+
+    game.add_to_stage(MemberArea::Center, yoshiko);
+    game.add_to_stage(MemberArea::LeftSide, chika);
+    game.add_to_hand(hand_card);
+    game.add_to_discard(wrong_target); // only wrong-cost card in discard
+    game.give_energy(15);
+
+    game.activate_ability(yoshiko);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    // Chika was sacrificed (first action always runs)
+    assert!(
+        game.player().waitroom.cards.contains(&chika),
+        "Chika should be in discard (sacrificed even without valid +2)"
+    );
+    // Wrong target stays in discard (not summoned)
+    assert!(
+        game.player().waitroom.cards.contains(&wrong_target),
+        "Wrong-cost target should remain in discard"
+    );
+    // Nothing was summoned to stage[0]
+    assert_eq!(
+        game.player().stage.stage[0],
+        -1,
+        "Stage left should be empty (no valid +2 card to summon)"
+    );
+    // Yoshiko stays at center
+    assert_eq!(
+        game.player().stage.stage[1],
+        yoshiko,
+        "Yoshiko should remain at center"
+    );
+}

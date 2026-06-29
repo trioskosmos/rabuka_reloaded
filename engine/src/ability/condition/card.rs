@@ -218,6 +218,8 @@ impl<'a> ConditionContext<'a> {
                 } else {
                     self.get_count_for_target(condition, target)
                 }
+            } else if condition.resource_type.is_some() {
+                self.get_count_for_target(condition, comparison_target)
             } else {
                 condition
                     .count
