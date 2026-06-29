@@ -8030,6 +8030,145 @@ _EFFECT_HANDLERS = [
 
 
 
+def _has_position_keywords(text):
+    for keyword, position in POSITION_KEYWORDS.items():
+        if keyword in text:
+            return position
+    if "center" in text.lower():
+        return "center"
+    return None
+
+
+def _has_original_modifier(text):
+    """Check if text contains 元々持つ (original/natural value)."""
+    return "元々持つ" in text or "元々" in text
+
+
+def _clean_action_list(actions, parent_effect=None, parent_text=""):
+    if not actions:
+        return actions
+    # Remove do_nothing actions
+    cleaned = []
+    for a in actions:
+        if a.get("action") == "do_nothing":
+            continue
+        cleaned.append(a)
+    if not cleaned:
+        return actions[-1:] if actions else []
+    # Propagate fields from parent to each sub-action
+    if parent_effect:
+        for f in (
+            "exclude_self",
+            "all",
+            "target",
+            "position",
+            "activation_position",
+            "source_position",
+            "exclude_position",
+            "group_names",
+            "exclude_group_names",
+            "heart_colors",
+            "shuffle",
+            "optional",
+            "duration",
+            "count",
+        ):
+            if f in parent_effect:
+                for sub in cleaned:
+                    if f not in sub:
+                        # Don't propagate exclude_self to self-targeting
+                        # sub-actions — it's contradictory.
+                        if f == "exclude_self" and (
+                            sub.get("target") == "self"
+                            or sub.get("action")
+                            in (
+                                "gain_resource",
+                                "set_heart_type",
+                                "heart_selection",
+                                "modify_score",
+                            )
+                        ):
+                            continue
+                        # Don't propagate group_names to energy change_state actions
+                        if (
+                            f == "group_names"
+                            and sub.get("action") == "change_state"
+                            and sub.get("card_type") == "energy_card"
+                        ):
+                            continue
+                        # Don't propagate group_names to move_cards sub-actions
+                        # unless the group name appears in the sub-action's own text.
+                        # This prevents parent-context groups (e.g. "μ's", "Liella!")
+                        # from leaking into generic cost payments like
+                        # "手札を1枚控え室に置く" (discard any card).
+                        if f == "group_names" and sub.get("action") == "move_cards":
+                            sub_text = sub.get("text", "")
+                            if not any(g in sub_text for g in parent_effect[f]):
+                                continue
+                        # Don't propagate group_names to gain_resource sub-actions.
+                        # group_names should only appear on gain_resource when the
+                        # ability text explicitly says "Groupのメンバーにブレードを与える".
+                        # Leaked group_names cause the engine to distribute resources
+                        # to ALL matching group members instead of the activating card.
+                        if (
+                            f == "group_names"
+                            and sub.get("action") == "gain_resource"
+                        ):
+                            continue
+                        # Don't propagate group_names to specify_heart_color or
+                        # reveal sub-actions — group filtering doesn't apply to
+                        # color selection or deck revelation (only to selection).
+                        if f == "group_names" and sub.get("action") in (
+                            "specify_heart_color",
+                            "reveal",
+                        ):
+                            continue
+                        # Don't propagate group_names to modify_cost sub-actions
+                        # UNLESS it's a per-unit cost modifier (which needs the
+                        # group filter to count the right cards on stage).
+                        # Leaked group_names on non-per-unit modify_cost would
+                        # cause the engine to apply cost changes to ALL matching
+                        # group members instead of just this card.
+                        if (
+                            f == "group_names"
+                            and sub.get("action") == "modify_cost"
+                            and not sub.get("per_unit")
+                        ):
+                            continue
+                        # Don't propagate heart_colors to gain_resource actions
+                        # (the heart color was selected by a previous select action)
+                        if (
+                            f == "heart_colors"
+                            and sub.get("action") == "gain_resource"
+                        ):
+                            continue
+                        sub[f] = parent_effect[f]
+        # Propagate card_type from parent to sub-actions that don't have it
+        pt = parent_effect.get("card_type")
+        if pt:
+            for sub in cleaned:
+                if "card_type" not in sub:
+                    # Don't propagate card_type to gain_resource sub-actions.
+                    # card_type should only appear on gain_resource when the ability
+                    # text explicitly says "メンバーカードにブレードを与える".
+                    if sub.get("action") == "gain_resource":
+                        continue
+                    sub["card_type"] = pt
+        # Propagate cost_limit from parent to sub-actions
+        cl = parent_effect.get("cost_limit")
+        if cl:
+            for sub in cleaned:
+                if "cost_limit" not in sub:
+                    sub["cost_limit"] = cl
+        # Also propagate cost_limit_operator
+        clo = parent_effect.get("cost_limit_operator")
+        if clo and cl:
+            for sub in cleaned:
+                if "cost_limit_operator" not in sub:
+                    sub["cost_limit_operator"] = clo
+    return cleaned
+
+
 def _normalize_effect_tree(effect, original_text=None):
     """Post-processing pass to fix common parser artifacts:
     - Remove do_nothing actions between real actions
@@ -8042,142 +8181,6 @@ def _normalize_effect_tree(effect, original_text=None):
 
     # Scan the full text once for field hints
     _full_text = effect.get("text") or original_text or ""
-
-    def _has_position_keywords(text):
-        for keyword, position in POSITION_KEYWORDS.items():
-            if keyword in text:
-                return position
-        if "center" in text.lower():
-            return "center"
-        return None
-
-    def _has_original_modifier(text):
-        """Check if text contains 元々持つ (original/natural value)."""
-        return "元々持つ" in text or "元々" in text
-
-    def _clean_action_list(actions, parent_effect=None, parent_text=""):
-        if not actions:
-            return actions
-        # Remove do_nothing actions
-        cleaned = []
-        for a in actions:
-            if a.get("action") == "do_nothing":
-                continue
-            cleaned.append(a)
-        if not cleaned:
-            return actions[-1:] if actions else []
-        # Propagate fields from parent to each sub-action
-        if parent_effect:
-            for f in (
-                "exclude_self",
-                "all",
-                "target",
-                "position",
-                "activation_position",
-                "source_position",
-                "exclude_position",
-                "group_names",
-                "exclude_group_names",
-                "heart_colors",
-                "shuffle",
-                "optional",
-                "duration",
-                "count",
-            ):
-                if f in parent_effect:
-                    for sub in cleaned:
-                        if f not in sub:
-                            # Don't propagate exclude_self to self-targeting
-                            # sub-actions — it's contradictory.
-                            if f == "exclude_self" and (
-                                sub.get("target") == "self"
-                                or sub.get("action")
-                                in (
-                                    "gain_resource",
-                                    "set_heart_type",
-                                    "heart_selection",
-                                    "modify_score",
-                                )
-                            ):
-                                continue
-                            # Don't propagate group_names to energy change_state actions
-                            if (
-                                f == "group_names"
-                                and sub.get("action") == "change_state"
-                                and sub.get("card_type") == "energy_card"
-                            ):
-                                continue
-                            # Don't propagate group_names to move_cards sub-actions
-                            # unless the group name appears in the sub-action's own text.
-                            # This prevents parent-context groups (e.g. "μ's", "Liella!")
-                            # from leaking into generic cost payments like
-                            # "手札を1枚控え室に置く" (discard any card).
-                            if f == "group_names" and sub.get("action") == "move_cards":
-                                sub_text = sub.get("text", "")
-                                if not any(g in sub_text for g in parent_effect[f]):
-                                    continue
-                            # Don't propagate group_names to gain_resource sub-actions.
-                            # group_names should only appear on gain_resource when the
-                            # ability text explicitly says "Groupのメンバーにブレードを与える".
-                            # Leaked group_names cause the engine to distribute resources
-                            # to ALL matching group members instead of the activating card.
-                            if (
-                                f == "group_names"
-                                and sub.get("action") == "gain_resource"
-                            ):
-                                continue
-                            # Don't propagate group_names to specify_heart_color or
-                            # reveal sub-actions — group filtering doesn't apply to
-                            # color selection or deck revelation (only to selection).
-                            if f == "group_names" and sub.get("action") in (
-                                "specify_heart_color",
-                                "reveal",
-                            ):
-                                continue
-                            # Don't propagate group_names to modify_cost sub-actions
-                            # UNLESS it's a per-unit cost modifier (which needs the
-                            # group filter to count the right cards on stage).
-                            # Leaked group_names on non-per-unit modify_cost would
-                            # cause the engine to apply cost changes to ALL matching
-                            # group members instead of just this card.
-                            if (
-                                f == "group_names"
-                                and sub.get("action") == "modify_cost"
-                                and not sub.get("per_unit")
-                            ):
-                                continue
-                            # Don't propagate heart_colors to gain_resource actions
-                            # (the heart color was selected by a previous select action)
-                            if (
-                                f == "heart_colors"
-                                and sub.get("action") == "gain_resource"
-                            ):
-                                continue
-                            sub[f] = parent_effect[f]
-            # Propagate card_type from parent to sub-actions that don't have it
-            pt = parent_effect.get("card_type")
-            if pt:
-                for sub in cleaned:
-                    if "card_type" not in sub:
-                        # Don't propagate card_type to gain_resource sub-actions.
-                        # card_type should only appear on gain_resource when the ability
-                        # text explicitly says "メンバーカードにブレードを与える".
-                        if sub.get("action") == "gain_resource":
-                            continue
-                        sub["card_type"] = pt
-            # Propagate cost_limit from parent to sub-actions
-            cl = parent_effect.get("cost_limit")
-            if cl:
-                for sub in cleaned:
-                    if "cost_limit" not in sub:
-                        sub["cost_limit"] = cl
-            # Also propagate cost_limit_operator
-            clo = parent_effect.get("cost_limit_operator")
-            if clo and cl:
-                for sub in cleaned:
-                    if "cost_limit_operator" not in sub:
-                        sub["cost_limit_operator"] = clo
-        return cleaned
 
     def _walk(d, ctx_text=None):
         if not isinstance(d, dict):
