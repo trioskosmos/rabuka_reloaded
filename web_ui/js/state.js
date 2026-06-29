@@ -435,7 +435,8 @@ const stateInternal = {
         if (!State.data) return null;
 
         if (State.cardIndex) {
-            return State.cardIndex[templateId] || State.cardIndex[cid];
+            const result = State.cardIndex[templateId] || State.cardIndex[cid];
+            if (result && result.card_no) return result;
         }
 
         const state = State.data;

@@ -159,3 +159,137 @@ fn ayase_accepts_jyouji_rejects_debut() {
         "Debut card should be discarded"
     );
 }
+
+/// 絢瀬絵里's filter ACCEPTS a μ's card with NO abilities (the no_ability branch).
+#[test]
+fn ayase_accepts_no_ability_mus() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let ayase = game.id("PL!-bp6-002-R");
+    let no_ability_mus = game.id("PL!-bp6-018-N"); // μ's, no abilities
+    let non_mus = game.id("PL!HS-sd1-010-SD"); // not μ's, will be rejected
+
+    game.state.player1.hand.cards.push(ayase);
+    game.give_energy(2);
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.main_deck.cards.push(non_mus);
+    game.state.player1.main_deck.cards.push(no_ability_mus);
+    game.state.player1.stage.stage = [-1, -1, -1];
+
+    game.play_to_stage(ayase, MemberArea::Center);
+
+    assert!(
+        game.has_pending_choice(),
+        "Must have a choice when a no-ability μ's card is available"
+    );
+
+    let pending = game.state.get_pending_choice_json();
+    let filtered = pending
+        .as_ref()
+        .and_then(|v| v.get("filtered_indices"))
+        .and_then(|v| v.as_array());
+    assert!(filtered.is_some(), "Choice should have filtered_indices");
+    assert_eq!(
+        filtered.unwrap().len(),
+        1,
+        "Only 1 card should be selectable (the no-ability one)"
+    );
+
+    game.select_indices(&[0]);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert!(
+        game.state.player1.hand.cards.contains(&no_ability_mus),
+        "No-ability μ's card should be added to hand"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&non_mus),
+        "Non-μ's card should be discarded"
+    );
+}
+
+/// Both looked-at cards match the filter (no_ability + 常時), but only 1 selectable.
+#[test]
+fn ayase_both_match_only_one_selectable() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let ayase = game.id("PL!-bp6-002-R");
+    let no_ability_mus = game.id("PL!-bp6-018-N");
+    let jyouji_mus = game.id("PL!-bp6-012-N");
+
+    game.state.player1.hand.cards.push(ayase);
+    game.give_energy(2);
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.main_deck.cards.push(no_ability_mus);
+    game.state.player1.main_deck.cards.push(jyouji_mus);
+    game.state.player1.stage.stage = [-1, -1, -1];
+
+    game.play_to_stage(ayase, MemberArea::Center);
+
+    assert!(
+        game.has_pending_choice(),
+        "Must have a choice when both cards match"
+    );
+
+    let pending = game.state.get_pending_choice_json();
+    let filtered = pending
+        .as_ref()
+        .and_then(|v| v.get("filtered_indices"))
+        .and_then(|v| v.as_array());
+    assert!(filtered.is_some(), "Choice should have filtered_indices");
+    assert_eq!(
+        filtered.unwrap().len(),
+        2,
+        "Both cards should be selectable"
+    );
+
+    game.select_indices(&[1]);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        1,
+        "count=1 enforced: only 1 card in hand"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        1,
+        "The other card should be in waitroom"
+    );
+}
+
+/// Neither card matches → no choice, auto-discard both.
+#[test]
+fn ayase_neither_matches_auto_discard() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let ayase = game.id("PL!-bp6-002-R");
+    let debut_a = game.id("PL!-bp6-004-R");
+    let debut_b = game.id("PL!-bp6-005-R");
+
+    game.state.player1.hand.cards.push(ayase);
+    game.give_energy(2);
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.main_deck.cards.push(debut_a);
+    game.state.player1.main_deck.cards.push(debut_b);
+    game.state.player1.stage.stage = [-1, -1, -1];
+
+    game.play_to_stage(ayase, MemberArea::Center);
+
+    assert!(
+        !game.has_pending_choice(),
+        "No choice when neither card matches"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&debut_a),
+        "Debut card A should be discarded"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&debut_b),
+        "Debut card B should be discarded"
+    );
+}
