@@ -125,7 +125,7 @@ impl super::TurnEngine {
                 game_state.live_success_triggered_this_turn = true;
                 game_state.live_success_p2_fired = false;
 
-                for snap in &game_state.performance_snapshots {
+                for snap in &mut game_state.performance_snapshots {
                     let total_hearts: u32 = snap.total_hearts.iter().sum();
                     let player = if snap.player_id == player1_id {
                         &game_state.player1
@@ -146,6 +146,17 @@ impl super::TurnEngine {
                     } else {
                         game_state.self_live_surplus_count = surplus;
                     }
+                    // Compute per-color surplus NOW, before LiveSuccess abilities fire.
+                    // Allocation is already finalised (performance phase completed).
+                    // snap.surplus_hearts is read by color-filtered surplus conditions
+                    // (e.g. La Bella Patria heart04 >= 1, Q174).
+                    let mut per_color = [0u32; 8];
+                    for color in 0..8 {
+                        let total_color = snap.total_hearts[color];
+                        let filled_color: u32 = snap.lives.iter().map(|l| l.filled[color]).sum();
+                        per_color[color] = total_color.saturating_sub(filled_color);
+                    }
+                    snap.surplus_hearts = per_color;
                 }
                 game_state.live_surplus_ready_this_turn = true;
 

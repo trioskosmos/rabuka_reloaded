@@ -2256,11 +2256,19 @@ fn bella_q174_no_member_on_stage_ability_does_not_fire() {
 
 #[test]
 fn bella_q174_no_heart04_surplus_ability_does_not_fire() {
+    // Q174 (2025.09.18): La Bella Patria's LiveSuccess requires surplus heart04 >= 1.
+    // Stage has a 虹ヶ咲 member with 0 heart04. Yell provides ALL (icon_all) hearts
+    // that fill the green deficit per 8.3.15.1.1, allowing the live to succeed.
+    // However, per 8.3.15.1.2 the surplus is computed from the actual pool indices:
+    // total_hearts[4]=0 → surplus[4]=0 → condition heart04 >= 1 is FALSE.
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let bella = game.id("PL!N-bp3-027-L");
-    let niji_member = game.id("PL!N-sd1-015-SD");
+    // 虹ヶ咲 member with 0 heart04, blade=3 (3 yell cards)
+    let niji_member = game.id("PL!N-bp1-018-N");
     let fill = game.id("PL!-sd1-010-SD");
+    // Yell cards with ALL blade hearts
+    let yell_all = game.id("PL!N-bp3-030-L"); // Love U my friends, b_all=1
     for _ in 0..10 {
         game.state.player1.main_deck.cards.push(fill);
     }
@@ -2268,8 +2276,12 @@ fn bella_q174_no_heart04_surplus_ability_does_not_fire() {
         game.state.player2.main_deck.cards.push(fill);
     }
 
-    // Stage has a 虹ヶ咲 member with NO heart04 (gives heart02 + heart05 only)
+    // Stage: 虹ヶ咲 member with heart03=1, heart05=1, heart06=2, blade=3, 0 heart04
     game.add_to_stage(rabuka_engine::zones::MemberArea::Center, niji_member);
+    // Top 3 cards of main deck: ALL blade hearts for yell
+    for _ in 0..3 {
+        game.state.player1.main_deck.cards.insert(0, yell_all);
+    }
 
     game.state.player1.hand.cards.push(bella);
     advance_to_live_card_set_p1(&mut game);
@@ -2282,14 +2294,74 @@ fn bella_q174_no_heart04_surplus_ability_does_not_fire() {
     game.pass(); // → LiveVictoryDetermination (phase set)
     game.pass(); // → Active (processes LiveSuccess via advance_phase)
 
-    // Q174: Stage has 虹ヶ咲 member (group condition met) but
-    // member provides heart02+heart05, no heart04 → surplus heart04 = 0
+    // Live succeeds (3 ALL fill heart03 deficit + heart04 deficit + heart00).
+    // But surplus heart04 = 0 (no green on stage) → condition fails → ability does NOT fire.
     assert_eq!(
         game.state.player1.energy_zone.cards.len(),
         energy_before,
         "No energy should be added when surplus heart04 condition not met (Q174)"
     );
     assert!(!game.has_pending_choice(), "No pending choices expected");
+    // Verify live succeeded (card moved to success zone)
+    assert_eq!(
+        game.state.player1.success_live_card_zone.cards.len(),
+        1,
+        "La Bella Patria should have succeeded"
+    );
+}
+
+#[test]
+fn bella_positive_surplus_heart04_ability_fires() {
+    // Positive test: 虹ヶ咲 member (Emma Verde) provides heart04=4, La Bella Patria
+    // needs heart04=2. Surplus heart04 = 2 ≥ 1 → condition TRUE → ability fires.
+    // Emma has no LiveSuccess ability, so no interference.
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let bella = game.id("PL!N-bp3-027-L");
+    // 虹ヶ咲 member with heart04=4, blade=6, no LiveSuccess ability
+    let niji_member = game.id("PL!N-pb1-008-R"); // エマ・ヴェルデ
+    let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // Stage: 虹ヶ咲 member with heart02=1, heart03=1, heart04=4, heart05=1, blade=6
+    game.add_to_stage(rabuka_engine::zones::MemberArea::Center, niji_member);
+
+    // Put 2 energy in energy_deck so Bella can move them on success
+    let energy = game.id("LL-E-001-SD");
+    game.state.player1.energy_deck.cards.push(energy);
+    game.state.player1.energy_deck.cards.push(energy);
+
+    game.state.player1.hand.cards.push(bella);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(bella);
+    advance_to_live_start(&mut game);
+
+    let energy_deck_before = game.state.player1.energy_deck.cards.len();
+
+    // Advance through phases, handling any pending choices
+    for _ in 0..8 {
+        game.pass();
+        while game.has_pending_choice() {
+            game.select_indices(&[]);
+        }
+    }
+
+    // Surplus heart04 = 4 - 2 = 2 ≥ 1 → condition TRUE → ability fires.
+    // La Bella moves 1 card from energy_deck → energy_zone.
+    assert!(
+        game.state.player1.energy_deck.cards.len() < energy_deck_before,
+        "Energy deck should have 1 fewer card (moved to energy zone by Bella)"
+    );
+    assert_eq!(
+        game.state.player1.success_live_card_zone.cards.len(),
+        1,
+        "La Bella Patria should have succeeded"
+    );
 }
 
 #[test]

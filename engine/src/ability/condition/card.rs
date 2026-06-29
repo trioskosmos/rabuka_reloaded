@@ -3765,6 +3765,30 @@ impl<'a> ConditionContext<'a> {
             // Prefer the stored snapshot value over a runtime recalculation
             // (includes yell ALL hearts that can fill any color gap).
             if self.game_state.live_surplus_ready_this_turn {
+                // Q174: When a heart_colors filter is present (e.g. heart04 for La Bella
+                // Patria), read the per-color surplus from the performance snapshot rather
+                // than returning the total surplus. ALL hearts (icon_all) are consumed
+                // during Phase 4 of allocation to fill color deficits and do NOT contribute
+                // to colored surplus; see rules 8.3.15.1.1-8.3.15.1.2. The "treated as any
+                // color" in 8.3.15.1.1 is a check-time fiction — surplus is computed from
+                // the actual pool indices (colored = 1..6, ALL = 7), not from the
+                // functional assignment used during the check.
+                // snap.surplus_hearts is populated at live.rs:~148 before LiveSuccess
+                // abilities fire, so it is safe to read here.
+                if let Some(ref colors) = condition.heart_colors {
+                    let player = self.resolve_condition_player(target);
+                    let player_id = &player.id;
+                    for snap in &self.game_state.performance_snapshots {
+                        if &snap.player_id == player_id {
+                            let mut total = 0u32;
+                            for hc_str in colors {
+                                let color = crate::zones::parse_heart_color(hc_str);
+                                total += snap.surplus_hearts[color.index()];
+                            }
+                            return total;
+                        }
+                    }
+                }
                 return match target {
                     "opponent" => self.game_state.opponent_live_surplus_count,
                     _ => self.game_state.self_live_surplus_count,
