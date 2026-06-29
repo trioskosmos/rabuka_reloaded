@@ -368,9 +368,23 @@ impl AbilityResolver {
                                 let current_was_optional = action.optional.unwrap_or(false);
                                 let is_opponent_action = action.action == "opponent_action"
                                     || action.action_by.as_deref() == Some("opponent");
+                                // When an optional move_cards action creates a SelectCard
+                                // choice with destination "under_member", the card movement
+                                // was already completed by the choice resolution. Re-executing
+                                // the action with optional=None would move ADDITIONAL cards
+                                // from the same zone — a bug. Skip re-execution for this case.
+                                let is_member_under_placement = action.action == "move_cards"
+                                    && action.destination.as_deref() == Some("under_member")
+                                    && self.pending_choice.as_ref().is_some_and(|c| {
+                                        matches!(
+                                            c,
+                                            crate::ability::types::Choice::SelectCard { .. }
+                                        )
+                                    });
                                 let mut remaining = if current_was_optional
                                     && i + 1 < repeat_actions.len()
                                     && !is_opponent_action
+                                    && !is_member_under_placement
                                 {
                                     let mut actions: Vec<AbilityEffect> =
                                         repeat_actions[i..].to_vec();
