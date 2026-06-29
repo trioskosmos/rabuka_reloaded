@@ -659,9 +659,21 @@ impl AbilityResolver {
                 }
                 let mut drawn = Vec::new();
                 let mut attempts = 0u32;
-                while drawn.len() < count
-                    && attempts < (count as u32 + player.main_deck.cards.len() as u32)
+                let mut remaining = count;
+                while remaining > 0
+                    && attempts < (count as u32 + player.main_deck.cards.len() as u32 + 10)
                 {
+                    // Q104 / Rule 10.2.1: deck empty mid-draw → refresh from waitroom
+                    // and continue. This handles deck-to-discard costs/effects when the
+                    // deck has fewer cards than needed. E.g. deck=2, need=3:
+                    //   [1] draw 2 from deck → deck is empty
+                    //   [2] flush drawn to waitroom, refresh (shuffle waitroom into deck)
+                    //   [3] draw remaining 1 from new deck
+                    if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
+                        // Move already-drawn cards to waitroom so refresh includes them
+                        player.waitroom.cards.extend(drawn.drain(..));
+                        player.refresh();
+                    }
                     if let Some(card) = player.main_deck.draw() {
                         attempts += 1;
                         if !util::card_matches_type(card_db, card, card_type_filter) {
@@ -673,7 +685,9 @@ impl AbilityResolver {
                             continue;
                         }
                         drawn.push(card);
+                        remaining = remaining.saturating_sub(1);
                     } else {
+                        // Both deck and waitroom are empty — cannot draw more
                         break;
                     }
                 }

@@ -478,7 +478,12 @@ impl AbilityResolver {
                     let matching_count =
                         util::count_in_zone(player, zone_name, &filter, card_db) as usize;
 
-                    if matching_count < count {
+                    // Q104 / Rule 10.2.1: For deck_top costs, if the deck has fewer
+                    // cards than needed but the waitroom has cards, allow the cost to
+                    // proceed — the drawing loop will perform a refresh mid-draw and
+                    // continue. Only fail if both deck AND waitroom are truly empty.
+                    let is_deck_top = Zone::from_str(source) == Some(Zone::DeckTop);
+                    if matching_count < count && !is_deck_top {
                         return Err(format!(
                             "Cannot pay cost: {} has only {} cards matching cost limit {}, need {}",
                             source,
@@ -488,6 +493,17 @@ impl AbilityResolver {
                                 .unwrap_or("none".to_string()),
                             count
                         ));
+                    }
+                    if matching_count < count && is_deck_top {
+                        let waitroom_matching =
+                            util::count_in_zone(player, Zone::Waitroom.to_str(), &filter, card_db)
+                                as usize;
+                        if matching_count + waitroom_matching == 0 {
+                            return Err(format!(
+                                "Cannot pay cost: {} and waitroom are both empty, need {}",
+                                source, count
+                            ));
+                        }
                     }
                 }
 

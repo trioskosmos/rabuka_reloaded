@@ -1,10 +1,19 @@
-/// Tests for PL!SP-bp5-006-R (桜小路きな子) ab#0 — Q234
+/// Tests for PL!SP-bp5-006-R (桜小路きな子) ab#0 — Q234 + Q104
 ///
 /// Ability (起動[ターン1]):
 ///   デッキの上からカードを3枚控え室に置く：このメンバーはポジションチェンジする。
 ///
 /// Q234: デッキが2枚以下の状態でも起動コストを支払えるか？
-/// Answer: いいえ、3枚以上必要。
+/// Answer: いいえ、3枚以上必要 (original answer, but Q104 overrides:
+///   deck < needed → take available, refresh, take remaining)
+///
+/// Q104: デッキが足りない場合、足りる分を控え室に置いた後、リフレッシュを行い、
+///   残りを新たなデッキから控え室に置く。
+///
+/// Rule 10.2.1: リフレッシュはチェックタイミングにかぎらず、ゲーム中の任意の時点で
+///   いずれかのプレイヤーが条件を満たしている場合に実行します。それがなんらかの処理
+///   の途中である場合、その処理を一時中断し、リフレッシュを実行した後に、その処理の
+///   続きを実行します。
 use crate::helpers::*;
 use rabuka_engine::game_setup::ActionType;
 use rabuka_engine::turn::TurnEngine;
@@ -62,24 +71,83 @@ fn kinako_bp5_q234_deck_4_activation_succeeds_position_changes() {
     );
 }
 
-/// Deck has 2 cards (< 3 needed). Activation fails → no cost paid,
-/// no position change, no pending choice.
+/// Deck has 2 cards (< 3 needed), waitroom has cards.
+/// Per Q104: take 2 from deck, refresh, take remaining 1 from new deck.
+/// Cost succeeds → position change choice appears.
 #[test]
-fn kinako_bp5_q234_deck_2_activation_fails_no_movement() {
+fn kinako_bp5_q104_deck_2_refresh_and_continue() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
     let kinako = game.id("PL!SP-bp5-006-R");
     let filler = game.id("PL!-sd1-010-SD");
 
-    // Kinako at Center, so position would be visible
+    // Kinako at LeftSide
+    game.state.player1.stage.stage = [kinako, -1, -1];
+
+    // 2 cards in deck (need 3), plus 3 cards already in waitroom
+    game.state.player1.main_deck.cards.push(filler);
+    game.state.player1.main_deck.cards.push(filler);
+    game.state.player1.waitroom.cards.push(filler);
+    game.state.player1.waitroom.cards.push(filler);
+    game.state.player1.waitroom.cards.push(filler);
+
+    game.activate_ability(kinako);
+
+    // Q104: 2 taken from deck → refresh → 1 taken from new deck
+    // Waitroom should have 1 card (the 3rd one drawn from refreshed deck)
+    // The 2 original deck cards were discarded then reshuffled back → back in deck
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        1,
+        "Q104: 1 card from refreshed deck should be in waitroom"
+    );
+    // 2 original + 3 waitroom = 5 cards, took 3, so 2 remain in deck + 2 from
+    // original discarded and reshuffled = 4
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        4,
+        "Q104: 4 cards should remain in deck after refresh"
+    );
+
+    // Position change choice should appear
+    assert!(
+        game.has_pending_choice(),
+        "Q104: Position change should appear after cost payment with refresh"
+    );
+    // Complete the choice
+    game.select_option(2);
+
+    // Kinako moved
+    assert_eq!(
+        game.state.player1.stage.stage[0], -1,
+        "LeftSide should be empty after Kinako moved"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[2], kinako,
+        "Kinako should be at RightSide"
+    );
+}
+
+/// Both deck AND waitroom are empty → cost truly cannot be paid.
+/// Activation fails, no position change.
+#[test]
+fn kinako_bp5_q104_both_deck_and_waitroom_empty_fails() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let kinako = game.id("PL!SP-bp5-006-R");
+
+    // Kinako at Center
     game.state.player1.stage.stage = [-1, kinako, -1];
 
-    // Only 2 cards in deck (need 3+)
-    game.state.player1.main_deck.cards.push(filler);
-    game.state.player1.main_deck.cards.push(filler);
+    // Both deck and waitroom are empty
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.waitroom.cards.clear();
+    assert_eq!(game.state.player1.main_deck.cards.len(), 0);
+    assert_eq!(game.state.player1.waitroom.cards.len(), 0);
 
-    // Activate — cost fails (logs "Cannot pay cost: deck_top has only 2...")
+    // Activate — cost fails
     TurnEngine::execute_main_phase_action(
         &mut game.state,
         &ActionType::UseAbility,
@@ -90,22 +158,13 @@ fn kinako_bp5_q234_deck_2_activation_fails_no_movement() {
     )
     .expect("activation request returns Ok even when cost fails");
 
-    // Q234: No cost was paid
-    assert_eq!(
-        game.state.player1.main_deck.cards.len(),
-        2,
-        "Q234: No cards should be discarded when deck < 3"
-    );
-
-    // No pending choice (no position change triggered)
+    // No cost paid, no position change
     assert!(
         !game.has_pending_choice(),
-        "Q234: No position change choice when activation fails"
+        "No position change choice when both deck and waitroom empty"
     );
-
-    // Kinako position unchanged
     assert_eq!(
         game.state.player1.stage.stage[1], kinako,
-        "Q234: Kinako should remain at original position"
+        "Kinako should remain at original position"
     );
 }
