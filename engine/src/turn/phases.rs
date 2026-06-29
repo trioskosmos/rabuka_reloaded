@@ -253,6 +253,13 @@ impl super::TurnEngine {
         }
         *game_state.cheer_blade_heart_count_mut(is_first) = note_icons;
 
+        // If cards moved from live_card_zone to waitroom during yell phase
+        // (cannot_live path), set recently_moved_cards so the 8.3.13 check
+        // captures auto abilities that trigger on that zone change (e.g. Riko BP6).
+        if !yell_data.moved_live_card_ids.is_empty() {
+            game_state.recently_moved_cards = Some(yell_data.moved_live_card_ids.clone());
+        }
+
         // Rule 8.3.13: Check timing — auto abilities fire here.
         // "When you yell" abilities grant hearts that feed into 8.3.14.
         // Set flag so on_yell abilities know a yell actually happened.
@@ -299,6 +306,17 @@ impl super::TurnEngine {
             &yell_data.heart_sources,
             &yell_data.blade_sources,
         );
+        // player borrow ends here — game_state accessible again
+
+        // If live cards moved to waitroom during the heart/live check
+        // (requirement failure path), set recently_moved_cards and re-check
+        // auto abilities so zone-change triggers fire (e.g. Riko BP6).
+        if !perf_data.moved_live_card_ids.is_empty() {
+            game_state.recently_moved_cards = Some(perf_data.moved_live_card_ids.clone());
+            game_state.trigger_auto_abilities_for_player(&performer_id);
+            game_state.process_pending_auto_abilities(&performer_id);
+        }
+
         drop(resolution_zone);
         let (perf_player_id, _perf_player) = if is_first {
             let p = game_state.first_attacker();

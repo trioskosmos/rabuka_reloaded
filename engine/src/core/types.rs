@@ -121,6 +121,10 @@ pub struct LivePerformanceData {
     pub blade_sources: Vec<BladeSource>,
     pub draw_effects_occurred: bool,
     pub live_card_ids: Vec<i16>,
+    /// Live cards that moved from live_card_zone to waitroom during this phase.
+    /// Used by caller (execute_performance_phase) to set recently_moved_cards
+    /// so auto abilities (e.g. Riko BP6) can trigger on the zone change.
+    pub moved_live_card_ids: Vec<i16>,
 }
 
 // ============== PERFORMANCE SNAPSHOT ==============

@@ -1005,6 +1005,7 @@ impl super::TurnEngine {
     ) -> LivePerformanceData {
         // Q68/Rule: "cannot_live" discards live cards during performance; no yell, no live.
         if cannot_live {
+            let moved: Vec<i16> = player.live_card_zone.cards.iter().copied().collect();
             player
                 .waitroom
                 .cards
@@ -1021,6 +1022,7 @@ impl super::TurnEngine {
                 blade_sources: Vec::new(),
                 draw_effects_occurred: false,
                 live_card_ids: vec![],
+                moved_live_card_ids: moved,
             };
         }
 
@@ -1137,6 +1139,7 @@ impl super::TurnEngine {
                 blade_sources: Vec::new(),
                 draw_effects_occurred: false,
                 live_card_ids: vec![],
+                moved_live_card_ids: Vec::new(),
             };
         }
 
@@ -1365,6 +1368,7 @@ impl super::TurnEngine {
             blade_sources,
             draw_effects_occurred,
             live_card_ids,
+            moved_live_card_ids: Vec::new(),
         }
     }
 
@@ -2240,13 +2244,17 @@ impl super::TurnEngine {
                 !ok
             })
         });
-        if any_requirement_failed {
+        let moved_live_card_ids: Vec<i16> = if any_requirement_failed {
             log::debug!("[LIVE] Heart requirement not met — sending all live cards to waitroom");
+            let moved: Vec<i16> = player.live_card_zone.cards.iter().copied().collect();
             while !player.live_card_zone.cards.is_empty() {
                 let card_id = player.live_card_zone.cards.remove(0);
                 player.waitroom.cards.push(card_id);
             }
-        }
+            moved
+        } else {
+            Vec::new()
+        };
 
         let revealed_ids: Vec<i16> = resolution_zone.cards.iter().copied().collect();
         player.last_resolution_cards = revealed_ids.clone();
@@ -2269,6 +2277,7 @@ impl super::TurnEngine {
             blade_sources: blade_sources.to_vec(),
             draw_effects_occurred,
             live_card_ids: live_card_ids.to_vec(),
+            moved_live_card_ids,
         }
     }
 }

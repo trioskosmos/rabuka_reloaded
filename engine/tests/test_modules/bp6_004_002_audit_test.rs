@@ -221,11 +221,132 @@ fn riko_bp6_auto_does_not_fire_without_live_card_zone_movement() {
     );
 }
 
-/// Engine-triggered movement: when the engine processes a card moving from
-/// live_card_zone to discard, it sets recently_moved_cards. The auto ability
-/// uses source:"preceding_moved" which checks recently_moved_cards.
+// ====================================================================
+// FULL GAME FLOW tests — Riko BP6 auto ability fires naturally when
+// live cards move from live_card_zone → waitroom during performance.
+// ====================================================================
+
+fn advance_to_live_card_set_p1(game: &mut TestGame) {
+    for _ in 0..5 {
+        game.pass();
+    }
+}
+
+/// Heart failure: MIRACLE WAVE needs h02=4, h04=4, h05=4 (total 12).
+/// Riko provides h02=2, h04=2, h05=2 (total 6) — not enough → all cards
+/// go to waitroom. Riko's auto ability should fire and offer to put the
+/// Aqours live card on deck.
 #[test]
-fn riko_bp6_auto_fires_when_card_moves_from_live_zone_to_discard() {
+fn riko_bp6_auto_e2e_heart_failure_triggers() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let riko = game.id("PL!S-bp6-002-SEC");
+    let filler = game.id("PL!-sd1-010-SD");
+    let mw = game.id("PL!S-bp3-019-L"); // Aqours, need 12 hearts
+
+    game.state.player1.stage.stage = [-1, riko, -1];
+    game.state.player1.hand.cards.push(mw);
+
+    // Fill deck for yell draws
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(mw);
+
+    // Handle any live-start triggers (e.g. P2 pass)
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // Advance: FirstAttackerPerformance (Riko BP6 auto ability fires here)
+    // P1's heart check fails → cards move to waitroom → second check fires → Riko triggers
+    game.pass();
+
+    // If Riko's auto ability created a choice, handle it
+    if game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectCard") => {
+                // Choose the first (only) Aqours live card to put on deck
+                let cards_before = game.state.player1.waitroom.cards.len();
+                game.select_indices(&[0]);
+                // The card should be removed from waitroom (moved to deck)
+                assert_eq!(
+                    game.state.player1.waitroom.cards.len(),
+                    cards_before.saturating_sub(1),
+                    "Riko BP6 should remove the Aqours live card from waitroom"
+                );
+                // Card should be on deck top or bottom
+                // (can't assert exact position since move_cards chose the slot)
+            }
+            Some("SelectPosition") => {
+                // Choose deck top
+                game.select_indices(&[0]);
+            }
+            _ => {}
+        }
+    }
+
+    // Verify the live card left the waitroom
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&mw),
+        "MIRACLE WAVE should no longer be in waitroom after Riko BP6 trigger"
+    );
+}
+
+/// Heart success: HAPPY PARTY TRAIN needs h02=1, h04=1, h05=1 (total 3).
+/// Riko provides h02=2, h04=2, h05=2 (total 6) — enough → card stays in
+/// live_card_zone / success zone. Riko's auto ability should NOT fire.
+#[test]
+fn riko_bp6_auto_e2e_heart_success_no_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let riko = game.id("PL!S-bp6-002-SEC");
+    let filler = game.id("PL!-sd1-010-SD");
+    let hpt = game.id("PL!S-PR-022-PR"); // Aqours, need 3 hearts
+
+    game.state.player1.stage.stage = [-1, riko, -1];
+    game.state.player1.hand.cards.push(hpt);
+
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(hpt);
+
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // Advance through performance phases
+    game.pass(); // FirstAttackerPerformance
+    game.pass(); // SecondAttackerPerformance
+    game.pass(); // LiveVictoryDetermination
+    game.pass(); // → Active
+
+    // The live card should NOT be in waitroom (it passed → success zone or stayed)
+    // Riko's auto ability should NOT have fired (no card moved to waitroom)
+    // Verify by checking there's no pending choice from Riko
+    let has_riko_choice = game.has_pending_choice();
+    assert!(
+        !has_riko_choice,
+        "Riko BP6 auto ability should NOT fire when live card passes"
+    );
+}
+
+/// cannot_live: Player is marked as cannot_live → all live cards go to
+/// waitroom during yell phase. Riko's auto ability should fire and move
+/// the card to deck.
+#[test]
+fn riko_bp6_auto_e2e_cannot_live_triggers() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let riko = game.id("PL!S-bp6-002-SEC");
@@ -233,33 +354,48 @@ fn riko_bp6_auto_fires_when_card_moves_from_live_zone_to_discard() {
     let live = game.id("PL!S-PR-022-PR"); // Aqours live
 
     game.state.player1.stage.stage = [-1, riko, -1];
-    game.state.player1.waitroom.cards.push(live);
-    game.state.recently_moved_cards = Some(vec![live]);
+    game.state.player1.hand.cards.push(live);
+    game.state.cannot_live_players.push("p1".to_string());
 
-    fill_decks(&mut game, filler);
-    game.give_energy(5);
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
-    trigger_ability(&mut game, riko, "自動");
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
 
-    // Drain all pending choices
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // Advance to FirstAttackerPerformance — cannot_live moves cards to waitroom,
+    // then 8.3.13 check timing fires auto abilities. Riko should trigger.
+    game.pass();
+
+    // After the performance, the live card should NOT be in waitroom —
+    // Riko's auto ability moved it to deck. If it's still in waitroom,
+    // the trigger didn't fire.
+    let in_waitroom = game.state.player1.waitroom.cards.contains(&live);
+    assert!(
+        !in_waitroom,
+        "cannot_live: Riko BP6 should have moved the live card from waitroom to deck"
+    );
+
+    // Handle any remaining pending choices (position selection etc.)
     while game.has_pending_choice() {
         match game.pending_choice_type().as_deref() {
-            Some("SelectCard") => {
+            Some("SelectPosition") => {
                 game.select_indices(&[0]);
             }
-            Some("SelectTarget") => {
-                game.select_option(0);
-            }
-            Some("SelectPosition") => {
+            Some("SelectCard") => {
                 game.select_indices(&[0]);
             }
             _ => break,
         }
     }
-
-    // The ability should have created at least one choice
-    // (condition passed with recently_moved_cards)
-    eprintln!("Auto ability flow completed");
 }
 
 /// Aqours live card in live_card_zone only (not in discard) — condition passes
@@ -960,12 +1096,6 @@ fn riko_bp6_auto_optional_skip_does_not_consume_turn_limit() {
 // LiveEnd cleanup tests — verify heart_type=all + duration=live_end
 // properly removes modifiers after the live phase ends.
 // ====================================================================
-
-fn advance_to_live_card_set_p1(game: &mut TestGame) {
-    for _ in 0..5 {
-        game.pass();
-    }
-}
 
 fn advance_to_live_start(game: &mut TestGame) {
     game.pass();
