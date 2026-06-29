@@ -3019,7 +3019,11 @@ impl AbilityResolver {
                 let player = gs.resolve_target_player_mut(target);
                 let tb = player.stage.total_blades(&card_db, &bm, &om);
                 let mut drawn: Vec<i16> = Vec::new();
+                // Q104 / Rule 10.2.1: refresh from waitroom mid-draw
                 for _ in 0..tb {
+                    if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
+                        player.refresh();
+                    }
                     if let Some(cid) = player.main_deck.draw() {
                         drawn.push(cid);
                     }

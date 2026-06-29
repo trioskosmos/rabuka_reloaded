@@ -1128,7 +1128,11 @@ impl super::TurnEngine {
         // Q40: Yell must complete ALL checks — even if hearts are already satisfied,
         // the full blade-count of yell cards is always revealed.
         let mut yell_cards = Vec::new();
+        // Q104 / Q100 / Rule 10.2.1: refresh from waitroom when deck runs out mid-draw.
         for _ in 0..total_blade {
+            if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
+                player.refresh();
+            }
             if let Some(card_id) = player.main_deck.draw() {
                 resolution_zone.cards.push(card_id);
             }
@@ -1264,7 +1268,11 @@ impl super::TurnEngine {
 
         // Q43: Each draw icon revealed during yell draws 1 card.
         // Process all deferred draw effects after all yell cards are revealed (Q42).
+        // Q104 / Rule 10.2.1: refresh from waitroom when deck runs out mid-draw.
         for _ in 0..total_draw_icons {
+            if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
+                player.refresh();
+            }
             if let Some(new_card) = player.main_deck.draw() {
                 player.hand.add_card(new_card);
             }
@@ -1291,21 +1299,28 @@ impl super::TurnEngine {
         });
 
         // Live card special hearts
+        // Collect draw counts first (immutable), then draw with refresh (mutable).
+        let mut special_draw_count = 0u32;
         for &lc_id in &player.live_card_zone.cards {
             if let Some(card) = card_db.get_card(lc_id) {
                 if let Some(ref sh) = card.special_heart {
                     for (color, count) in &sh.hearts {
                         if *color == HeartColor::Draw {
-                            for _ in 0..*count {
-                                if let Some(new_card) = player.main_deck.draw() {
-                                    player.hand.add_card(new_card);
-                                }
-                            }
+                            special_draw_count += count;
                         } else if *color == HeartColor::Score {
                             cheer_icon_count += count;
                         }
                     }
                 }
+            }
+        }
+        // Q104 / Rule 10.2.1: refresh from waitroom mid-draw
+        for _ in 0..special_draw_count {
+            if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
+                player.refresh();
+            }
+            if let Some(new_card) = player.main_deck.draw() {
+                player.hand.add_card(new_card);
             }
         }
 

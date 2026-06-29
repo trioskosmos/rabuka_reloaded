@@ -35,7 +35,11 @@ impl GameState {
             self.cheer_checks_required = blade_count;
         }
 
+        // Q104 / Rule 10.2.1: refresh from waitroom when deck runs out mid-draw.
         for _ in 0..blade_count {
+            if player.main_deck.cards.is_empty() && !player.waitroom.cards.is_empty() {
+                player.refresh();
+            }
             if let Some(card_id) = player.main_deck.draw() {
                 self.resolution_zone.cards.push(card_id);
                 self.cheer_checks_done += 1;
