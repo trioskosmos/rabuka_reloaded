@@ -535,6 +535,30 @@ pub fn card_matches_heart_colors(
     result
 }
 
+/// Like `card_matches_heart_colors` but uses AND logic: card must have ALL listed
+/// heart colors, not just any one. Used when `require_all_heart_colors` is true.
+pub fn card_matches_all_heart_colors(
+    card_db: &CardDatabase,
+    card_id: i16,
+    heart_colors: &[String],
+) -> bool {
+    if heart_colors.is_empty() {
+        return true;
+    }
+    let result = card_db.get_card(card_id).is_none_or(|card| {
+        heart_colors.iter().all(|color| {
+            let hc = parse_heart_color(color);
+            card.base_heart.as_ref().map_or(
+                card.need_heart
+                    .as_ref()
+                    .is_some_and(|need| need.hearts.contains_key(&hc)),
+                |base| base.hearts.contains_key(&hc),
+            )
+        })
+    });
+    result
+}
+
 pub fn card_matches_name_constraint(
     card_db: &CardDatabase,
     card_id: i16,
@@ -648,6 +672,9 @@ pub struct CardFilter<'a> {
     pub characters: Option<&'a Vec<String>>,
     pub exclude_characters: Option<&'a Vec<String>>,
     pub heart_colors: &'a [String],
+    /// When true, card must match ALL heart_colors (AND).
+    /// When false, card matches ANY heart_colors (OR, default).
+    pub require_all_heart_colors: bool,
     pub need_heart_total: Option<u32>,
     pub need_heart_operator: Option<&'a str>,
     pub need_heart_color: Option<&'a str>,
@@ -838,8 +865,15 @@ impl<'a> CardFilter<'a> {
                 return false;
             }
         }
-        if !self.heart_colors.is_empty() && !card_matches_heart_colors(db, id, self.heart_colors) {
-            return false;
+        if !self.heart_colors.is_empty() {
+            let matches = if self.require_all_heart_colors {
+                card_matches_all_heart_colors(db, id, self.heart_colors)
+            } else {
+                card_matches_heart_colors(db, id, self.heart_colors)
+            };
+            if !matches {
+                return false;
+            }
         }
         // Heart threshold check.
         // Per Q149 (qa_data.json:1957-1958): "ハートの総数" = 基本ハート
@@ -1079,6 +1113,7 @@ impl<'a> CardFilter<'a> {
             exclude_characters: effect.exclude_characters.as_ref(),
             exclude_group_names: effect.exclude_group_names.as_ref(),
             heart_colors: &effect.heart_colors,
+            require_all_heart_colors: effect.require_all_heart_colors.unwrap_or(false),
             need_heart_total: effect.need_heart_total,
             need_heart_operator: effect.need_heart_operator.as_deref(),
             need_heart_color: effect.need_heart_color.as_deref(),
@@ -1132,6 +1167,7 @@ impl<'a> CardFilter<'a> {
                 exclude_characters: None,
                 exclude_group_names: None,
                 heart_colors: &[],
+                require_all_heart_colors: false,
                 name_fragments: None,
                 distinct: None,
                 exclude_self: None,

@@ -12,6 +12,7 @@ import { DebugModal } from './modals/DebugModal.js';
 import { LogViewerModal } from './modals/LogViewerModal.js';
 import { LogDetailModal } from './modals/LogDetailModal.js';
 import { GameStateModal } from './modals/GameStateModal.js';
+import { LogRenderer } from './components/LogRenderer.js';
 import { DOM_IDS, COLORS, DISPLAY_VALUES } from './constants_dom.js';
 
 const POLL_DELAYS = {
@@ -104,6 +105,7 @@ const actionHandlers = {
     'show-zone-viewer': ({ owner }) => Rendering.showZoneViewer(owner === 'opponent' ? 1 - State.perspectivePlayer : State.perspectivePlayer),
     'show-discard': ({ owner }) => Rendering.showDiscardModal(owner === 'opponent' ? 1 - State.perspectivePlayer : State.perspectivePlayer),
     'show-last-performance': Modals.showLastPerformance,
+    'show-revealed-cards': () => LogRenderer.showRevealedCardsModal(),
     'close-performance-modal': Modals.closePerformanceModal,
     'show-performance-tab': ({ value }) => Rendering.showPerfTab(value),
     'close-selection-modal': () => ModalManager.hide(DOM_IDS.SELECTION_MODAL),

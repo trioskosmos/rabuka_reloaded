@@ -771,6 +771,10 @@ pub struct AbilityEffect {
     /// - Empty: use default (heart00 for single-value ops, no filter for filter ops)
     #[serde(default)]
     pub heart_colors: Vec<String>,
+    /// When true, card must have ALL listed heart_colors (AND semantics).
+    /// When false/absent, card must have ANY listed heart_colors (OR semantics, default).
+    #[serde(default)]
+    pub require_all_heart_colors: Option<bool>,
     /// Card names to filter by (e.g. `["EMOTION"]`).  When set, per-unit
     /// counting and effect targeting only consider cards whose name
     /// contains one of these strings (case-insensitive substring match).

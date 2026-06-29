@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-30T05:31:53.816320",
+  "generated_at": "2026-06-30T08:27:36.626296",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -5798,7 +5798,8 @@
             "heart_colors": [
               "heart02",
               "heart04"
-            ]
+            ],
+            "require_all_heart_colors": true
           }
         ],
         "conditional": true,
@@ -17753,6 +17754,7 @@
             "heart04",
             "heart05"
           ],
+          "require_all_heart_colors": true,
           "optional": true,
           "text": "自分のデッキの上からカードを2枚見る。その中から{{heart_02.png|heart02}}と{{heart_04.png|heart04}}と{{heart_05.png|heart05}}をすべて持つメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },

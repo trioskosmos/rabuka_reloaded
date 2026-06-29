@@ -76,6 +76,8 @@ pub enum Choice {
         is_select_action: bool,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         heart_colors: Vec<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        require_all_heart_colors: Option<bool>,
         #[serde(default)]
         name_fragments: Option<Vec<String>>,
         #[serde(default)]
@@ -225,6 +227,7 @@ pub struct ChoiceBuilder {
     filtered_indices: Option<Vec<usize>>,
     is_select_action: bool,
     heart_colors: Vec<String>,
+    require_all_heart_colors: Option<bool>,
     name_fragments: Option<Vec<String>>,
     target_player_id: Option<String>,
     blind: bool,
@@ -252,6 +255,7 @@ impl ChoiceBuilder {
             filtered_indices: self.filtered_indices,
             is_select_action: self.is_select_action,
             heart_colors: self.heart_colors,
+            require_all_heart_colors: self.require_all_heart_colors,
             name_fragments: self.name_fragments,
             target_player_id: self.target_player_id,
             blind: self.blind,
@@ -285,6 +289,10 @@ impl ChoiceBuilder {
     }
     pub fn heart_colors(mut self, v: Vec<String>) -> Self {
         self.heart_colors = v;
+        self
+    }
+    pub fn require_all_heart_colors(mut self, v: Option<bool>) -> Self {
+        self.require_all_heart_colors = v;
         self
     }
     pub fn name_fragments(mut self, v: Option<Vec<String>>) -> Self {
@@ -384,6 +392,7 @@ impl Choice {
             filtered_indices: None,
             is_select_action: false,
             heart_colors: vec![],
+            require_all_heart_colors: None,
             name_fragments: None,
             target_player_id: None,
             blind: false,
@@ -421,6 +430,7 @@ impl Choice {
                 characters: characters.as_ref(),
                 exclude_characters: None,
                 heart_colors: &[],
+                require_all_heart_colors: false,
                 name_fragments: None,
                 distinct: None,
                 exclude_self: None,

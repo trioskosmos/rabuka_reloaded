@@ -378,6 +378,30 @@ def extract_heart_types(text: str) -> List[str]:
     return re.findall(r"heart_(\d+)\.png\|heart(\d+)", text)  # type: ignore[return-value]
 
 
+def detect_require_all_hearts(text: str) -> bool:
+    """Detect if heart icons in text are joined by と (AND / all required).
+
+    Card text patterns:
+      {{heart_02.png|heart02}}と{{heart_04.png|heart04}}と{{heart_05.png|heart05}}をすべて持つ
+        → AND semantics (card must have ALL listed hearts)
+
+      {{heart_02.png|heart02}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}を持つ
+        → OR semantics (any match, this is the default)
+
+    Returns True if consecutive heart icon blocks are joined by と.
+    """
+    heart_block = r"\{\{heart_\d+\.png\|heart\d+\}\}"
+    hearts = re.findall(heart_block, text)
+    if len(hearts) < 2:
+        return False
+    for i in range(len(hearts) - 1):
+        if not re.search(
+            re.escape(hearts[i]) + r"\s*と\s*" + re.escape(hearts[i + 1]), text
+        ):
+            return False
+    return True
+
+
 def extract_quoted_text(text: str) -> List[str]:
     """Extract all text within 「」 quotes."""
     return re.findall(r"「([^」]+)」", text)
@@ -4674,6 +4698,8 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
         if hm:
             colors = sorted(set(f"heart{m.zfill(2)}" for m in hm))
             action["heart_colors"] = colors
+            if detect_require_all_hearts(text):
+                action["require_all_heart_colors"] = True
     if a == "modify_required_hearts" and "operation" not in action:
         if "減らす" in text or "減る" in text:
             action["operation"] = "decrease"
@@ -6005,6 +6031,8 @@ def _build_reveal_add_discard(fp, sa_text, select_text):
     )
     if hc:
         result["heart_colors"] = hc
+        if detect_require_all_hearts(select_text):
+            result["require_all_heart_colors"] = True
     if extract_max(select_text):
         result["max"] = True
     if extract_optional(select_text):
@@ -6062,6 +6090,8 @@ def _enrich_from_text(d, text):
     )
     if hc:
         d["heart_colors"] = hc
+        if detect_require_all_hearts(text):
+            d["require_all_heart_colors"] = True
     if extract_optional(text):
         d["optional"] = True
     gns = extract_group_names(text)
@@ -8485,6 +8515,8 @@ def _walk(d, full_text, original_text, ctx_text=None):
         )
         if hc:
             d["heart_colors"] = hc
+            if detect_require_all_hearts(node_text):
+                d["require_all_heart_colors"] = True
 
     # Propagate all from text context (must match _fill_defaults patterns)
     if (

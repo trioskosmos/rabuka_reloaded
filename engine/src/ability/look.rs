@@ -155,6 +155,11 @@ impl AbilityResolver {
         heart_colors: &[String],
         blind: bool,
     ) -> Result<(), String> {
+        let require_all_heart_colors = self
+            .current_effect
+            .as_ref()
+            .and_then(|e| e.require_all_heart_colors)
+            .unwrap_or(false);
         let card_db = gs.card_database.clone();
         let any_number = self
             .current_effect
@@ -254,12 +259,23 @@ impl AbilityResolver {
                     .looked_at_cards
                     .iter()
                     .filter(|&&card_id| {
-                        super::util::card_matches_type(&card_db, card_id, card_type)
-                            && super::util::card_matches_heart_colors(
-                                &card_db,
-                                card_id,
-                                heart_colors,
-                            )
+                        super::util::card_matches_type(&card_db, card_id, card_type) && {
+                            if heart_colors.is_empty() {
+                                true
+                            } else if require_all_heart_colors {
+                                super::util::card_matches_all_heart_colors(
+                                    &card_db,
+                                    card_id,
+                                    heart_colors,
+                                )
+                            } else {
+                                super::util::card_matches_heart_colors(
+                                    &card_db,
+                                    card_id,
+                                    heart_colors,
+                                )
+                            }
+                        }
                     })
                     .copied()
                     .collect(),
@@ -384,12 +400,16 @@ impl AbilityResolver {
         let filtered: Vec<i16> = card_ids
             .iter()
             .filter(|&&card_id| {
-                super::util::card_matches_type(&card_db, card_id, card_type)
-                    && super::util::card_matches_heart_colors(
-                        &card_db,
-                        card_id,
-                        &effect.heart_colors,
-                    )
+                super::util::card_matches_type(&card_db, card_id, card_type) && {
+                    let hc = &effect.heart_colors;
+                    if hc.is_empty() {
+                        true
+                    } else if effect.require_all_heart_colors.unwrap_or(false) {
+                        super::util::card_matches_all_heart_colors(&card_db, card_id, hc)
+                    } else {
+                        super::util::card_matches_heart_colors(&card_db, card_id, hc)
+                    }
+                }
             })
             .copied()
             .collect();

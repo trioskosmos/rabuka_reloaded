@@ -281,15 +281,181 @@ fn c12_restriction_blocks_opponent_active() {
     );
 }
 
-// ========== Card 13: PL!S-bp6-005-R look_and_select 3-heart ==========
+// =====================================================================
+// Card 13: PL!S-bp6-005-R — 登場 look_and_select 3-heart ALL required
+// =====================================================================
+// Card text:
+//   自分のデッキの上からカードを2枚見る。その中から
+//   {{heart_02.png|heart02}}と{{heart_04.png|heart04}}と
+//   {{heart_05.png|heart05}}をすべて持つメンバーカードを
+//   1枚公開して手札に加えてもよい。残りを控え室に置く。
+//
+// Hearts are joined by と (AND) + すべて持つ (has all) → require_all_heart_colors = true
+// Card must have ALL of heart02, heart04, heart05 simultaneously.
+
+fn resolve_all_up_to_20(game: &mut TestGame, max: usize) {
+    for _ in 0..max {
+        if !game.has_pending_choice() {
+            return;
+        }
+        game.select_indices(&[]);
+    }
+    panic!("resolve_all_up_to_20: exceeded {} iters", max);
+}
+
+fn setup_bp6_005(game: &mut TestGame, top_cards: Vec<i16>) {
+    let you = game.id("PL!S-bp6-005-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    // Place card on stage directly, then fill deck
+    game.state.player1.stage.stage = [-1, you, -1];
+    game.state.player1.main_deck.cards.clear();
+    for cid in top_cards {
+        game.state.player1.main_deck.cards.push(cid);
+    }
+    while game.state.player1.main_deck.cards.len() < 40 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.give_energy(5);
+    trigger(game, you, "登場");
+}
+
 #[test]
-fn c13_look_select_three_heart_filter() {
+fn c13_all_three_hearts_present_select_one() {
+    // Cards with ALL three hearts (heart02, heart04, heart05) should be selectable
     let db = load_real_database();
     let mut g = TestGame::new(db);
-    let c = g.id("PL!S-bp6-005-R");
-    let f = g.id("PL!-sd1-010-SD");
-    g.state.player1.stage.stage = [-1, c, -1];
-    deck(&mut g, f);
-    g.give_energy(5);
-    trigger(&mut g, c, "登場");
+    let qualifying = g.id("PL!S-sd1-001-SD"); // has heart02, heart04, heart05
+    let filler = g.id("PL!-sd1-010-SD"); // has heart01, heart03 — no match
+
+    setup_bp6_005(&mut g, vec![qualifying, filler]);
+    // Should prompt: optional cost? No. Should go to look_and_select
+    if g.has_pending_choice() {
+        g.select_indices(&[0]);
+    }
+    resolve_all_up_to_20(&mut g, 20);
+    assert!(
+        g.state.player1.hand.cards.contains(&qualifying),
+        "Qualifying card (all 3 hearts) should be in hand"
+    );
+}
+
+#[test]
+fn c13_two_of_three_hearts_rejected() {
+    // Cards with only 2 of the 3 required hearts should NOT be selectable
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let two_hearts = g.id("PL!S-PR-015-PR"); // has heart02, heart04 only — missing heart05
+    let filler = g.id("PL!-sd1-010-SD");
+
+    setup_bp6_005(&mut g, vec![two_hearts, filler]);
+    if g.has_pending_choice() {
+        g.select_indices(&[0]);
+    }
+    resolve_all_up_to_20(&mut g, 20);
+    assert!(
+        !g.state.player1.hand.cards.contains(&two_hearts),
+        "Card with only heart02+heart04 should NOT be selectable (missing heart05)"
+    );
+}
+
+#[test]
+fn c13_one_of_three_hearts_rejected() {
+    // Card with only heart02 (not heart04, heart05) should be rejected
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let blade_card = g.id("PL!SP-sd1-001-SD"); // has heart02, heart06 only
+    let filler = g.id("PL!-sd1-010-SD");
+
+    setup_bp6_005(&mut g, vec![blade_card, filler]);
+    if g.has_pending_choice() {
+        g.select_indices(&[0]);
+    }
+    resolve_all_up_to_20(&mut g, 20);
+    assert!(
+        !g.state.player1.hand.cards.contains(&blade_card),
+        "Card with only heart02+heart06 should NOT be selectable (missing heart04, heart05)"
+    );
+}
+
+#[test]
+fn c13_no_matching_card_optional_same_as_reject() {
+    // If neither top card matches, the ability may still resolve (optional = true)
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    // Use a PR card with heart02+heart05 (missing heart04) as the only candidate
+    let partial = g.id("PL!S-PR-017-PR"); // heart02, heart05 only — missing heart04
+    let other = g.id("PL!S-bp2-015-PR"); // heart04, heart05 only — missing heart02
+
+    setup_bp6_005(&mut g, vec![partial, other]);
+    if g.has_pending_choice() {
+        g.select_indices(&[0]);
+    }
+    resolve_all_up_to_20(&mut g, 20);
+    // Neither card should be in hand (none has all 3 hearts)
+    assert!(
+        !g.state.player1.hand.cards.contains(&partial),
+        "Partial heart card should NOT be in hand"
+    );
+    assert!(
+        !g.state.player1.hand.cards.contains(&other),
+        "Other partial heart card should NOT be in hand"
+    );
+}
+
+#[test]
+fn c13_bp2_005_or_semantics_still_works() {
+    // Verify that bp2-005 (か = OR) still works with ANY match
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let you = g.id("PL!S-bp2-005-R\u{ff0b}");
+    let filler = g.id("PL!-sd1-010-SD");
+    let blade_card = g.id("PL!SP-sd1-001-SD"); // has heart02, heart06
+    g.state.player1.hand.cards.push(you);
+    g.state.player1.hand.cards.push(filler);
+    g.state.player1.main_deck.cards.extend(vec![
+        blade_card, filler, filler, filler, filler, filler, filler,
+    ]);
+    while g.state.player1.main_deck.cards.len() < 40 {
+        g.state.player1.main_deck.cards.push(filler);
+    }
+    g.give_energy(13);
+    g.state.player1.stage.stage[0] = -1;
+    g.play_to_stage(you, rabuka_engine::zones::MemberArea::LeftSide);
+    // Pay optional cost (discard from hand)
+    if g.has_pending_choice() {
+        g.select_indices(&[0]);
+    }
+    // Select first looked-at card
+    if g.has_pending_choice() {
+        g.select_indices(&[0]);
+    }
+    resolve_all_up_to_20(&mut g, 30);
+    // With OR semantics, heart02 alone should match
+    assert!(
+        g.state.player1.hand.cards.contains(&blade_card),
+        "bp2-005 OR semantics: card with only heart02 should be selectable"
+    );
+}
+
+#[test]
+fn c13_qualifying_goes_to_hand_nonqualifying_discarded() {
+    // Qualifying card goes to hand, non-qualifying filler goes to waitroom
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let qualifying = g.id("PL!S-sd1-001-SD"); // has all 3 hearts
+    let filler = g.id("PL!-sd1-010-SD"); // heart01, heart03 — no match
+
+    setup_bp6_005(&mut g, vec![qualifying, filler]);
+    if g.has_pending_choice() {
+        g.select_indices(&[0]);
+    }
+    resolve_all_up_to_20(&mut g, 20);
+    assert!(
+        g.state.player1.hand.cards.contains(&qualifying),
+        "Qualifying card should be in hand"
+    );
+    assert!(
+        !g.state.player1.hand.cards.contains(&filler),
+        "Non-qualifying filler should NOT be in hand"
+    );
 }

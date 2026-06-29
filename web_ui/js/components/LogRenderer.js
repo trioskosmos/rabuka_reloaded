@@ -1132,12 +1132,13 @@ export const LogRenderer = {
             return `<div class="revealed-card">${img}<span class="revealed-card-name">${card.name}</span></div>`;
         };
 
-        const cardsGrid = (label, items, count) => {
+        const sectionGrid = (label, items) => {
             if (!items || items.length === 0) return '';
-            return `<div class="revealed-section"><h4>${label} (${count || items.length})</h4><div class="revealed-grid">${items.map(cardToHtml).join('')}</div></div>`;
+            return `<div class="revealed-section"><h4>${label} (${items.length})</h4><div class="revealed-grid">${items.map(cardToHtml).join('')}</div></div>`;
         };
 
-        // Determine card ownership
+        // Determine card ownership by scanning all zones (cards no longer in
+        // any zone after revealing are shown in "Unknown").
         const ownerOf = (cid) => {
             const p = (pl) => {
                 const cards = [];
@@ -1162,83 +1163,97 @@ export const LogRenderer = {
             return -1;
         };
 
-        const allRevealed = s.revealed_cards || [];
-        const p1Revealed = [];
-        const p2Revealed = [];
-        const sharedRevealed = [];
-        allRevealed.forEach(cid => {
-            const owner = ownerOf(cid);
-            if (owner === 0) p1Revealed.push(cid);
-            else if (owner === 1) p2Revealed.push(cid);
-            else sharedRevealed.push(cid);
-        });
+        // Source data — newest-first order throughout (array is in push order,
+        // last element is most recent).
+        const p1Cheer = (s.player1_cheer_revealed_cards || []).slice().reverse();
+        const p2Cheer = (s.player2_cheer_revealed_cards || []).slice().reverse();
+        const costRevealed = (s.revealed_cost_cards || []).slice().reverse();
+        const allRevealed = (s.revealed_cards || []).slice().reverse();
+        const lookedCards = (s.looked_cards?.cards || []).slice().reverse();
 
-        const p1Stage = s.player1?.stage?.stage?.filter(c => c !== -1) || [];
-        const p2Stage = s.player2?.stage?.stage?.filter(c => c !== -1) || [];
-        const p1Live = s.player1?.live_zone?.cards || [];
-        const p2Live = s.player2?.live_zone?.cards || [];
-        const p1Success = s.player1?.success_live_card_zone?.cards || [];
-        const p2Success = s.player2?.success_live_card_zone?.cards || [];
-        const p1Cheer = s.player1_cheer_revealed_cards || [];
-        const p2Cheer = s.player2_cheer_revealed_cards || [];
-        const costRevealed = s.revealed_cost_cards || [];
-        const lookedCards = s.looked_cards?.cards || [];
+        // Build dedup sets: cheer and cost are per-player/known categories.
+        const cheerIds = new Set([
+            ...(s.player1_cheer_revealed_cards || []),
+            ...(s.player2_cheer_revealed_cards || []),
+        ]);
+        const costIds = new Set(s.revealed_cost_cards || []);
+
+        // Split cost-revealed cards by owner.
+        const p1Cost = [];
+        const p2Cost = [];
+        const unknownCost = [];
+        for (const cid of costRevealed) {
+            const owner = ownerOf(cid);
+            if (owner === 0) p1Cost.push(cid);
+            else if (owner === 1) p2Cost.push(cid);
+            else unknownCost.push(cid);
+        }
+
+        // Split effect-revealed cards by owner, skipping cheer+cost duplicates.
+        const p1Effect = [];
+        const p2Effect = [];
+        const unknownEffect = [];
+        for (const cid of allRevealed) {
+            if (cheerIds.has(cid) || costIds.has(cid)) continue;
+            const owner = ownerOf(cid);
+            if (owner === 0) p1Effect.push(cid);
+            else if (owner === 1) p2Effect.push(cid);
+            else unknownEffect.push(cid);
+        }
+
+        // Split looked cards by owner.
         const p1Looked = [];
         const p2Looked = [];
-        const sharedLooked = [];
-        lookedCards.forEach(c => {
-            const cid = typeof c === 'number' ? c : (c.id || c.card_id);
-            if (cid === undefined) { sharedLooked.push(c); return; }
+        const unknownLooked = [];
+        for (const c of lookedCards) {
+            const cid = typeof c === 'number' ? c : (c.id ?? c.card_id);
+            if (cid === undefined) { unknownLooked.push(c); continue; }
             const owner = ownerOf(cid);
             if (owner === 0) p1Looked.push(c);
             else if (owner === 1) p2Looked.push(c);
-            else sharedLooked.push(c);
-        });
+            else unknownLooked.push(c);
+        }
 
         const p1Label = State.perspectivePlayer === 0 ? 'You' : 'Opponent';
         const p2Label = State.perspectivePlayer === 1 ? 'You' : 'Opponent';
 
-        title.textContent = 'Revealed / Looked Cards';
+        const hasP1 = p1Cheer.length || p1Cost.length || p1Effect.length || p1Looked.length;
+        const hasP2 = p2Cheer.length || p2Cost.length || p2Effect.length || p2Looked.length;
+        const hasUnknown = unknownCost.length || unknownEffect.length || unknownLooked.length;
 
-        const hasP1 = p1Stage.length || p1Live.length || p1Success.length || p1Cheer.length || p1Revealed.length || p1Looked.length;
-        const hasP2 = p2Stage.length || p2Live.length || p2Success.length || p2Cheer.length || p2Revealed.length || p2Looked.length;
-        const hasShared = sharedRevealed.length || sharedLooked.length || costRevealed.length;
-
-        if (!hasP1 && !hasP2 && !hasShared) {
+        if (!hasP1 && !hasP2 && !hasUnknown) {
             content.innerHTML = '<div style="opacity:0.5;padding:40px;text-align:center;">No cards have been revealed this game.</div>';
             ModalManager.show(DOM_IDS.MODAL_REVEALED);
             return;
         }
 
+        title.textContent = 'Revealed / Looked Cards';
+
         content.innerHTML = `
         <div class="revealed-two-column">
             <div class="revealed-column">
                 <h3 class="revealed-player-header">${p1Label}</h3>
-                ${cardsGrid('Stage', p1Stage)}
-                ${cardsGrid('Live Zone', p1Live)}
-                ${cardsGrid('Success Live Zone', p1Success)}
-                ${cardsGrid('Yell', p1Cheer)}
-                ${cardsGrid('Revealed', p1Revealed)}
-                ${cardsGrid('Looked', p1Looked)}
-                ${!hasP1 ? '<div class="revealed-section" style="opacity:0.4">No public cards</div>' : ''}
+                ${sectionGrid('Cheer', p1Cheer)}
+                ${sectionGrid('Cost', p1Cost)}
+                ${sectionGrid('Effect', p1Effect)}
+                ${sectionGrid('Looked', p1Looked)}
+                ${!hasP1 ? '<div class="revealed-section" style="opacity:0.4">No revealed cards</div>' : ''}
             </div>
             <div class="revealed-column">
                 <h3 class="revealed-player-header">${p2Label}</h3>
-                ${cardsGrid('Stage', p2Stage)}
-                ${cardsGrid('Live Zone', p2Live)}
-                ${cardsGrid('Success Live Zone', p2Success)}
-                ${cardsGrid('Yell', p2Cheer)}
-                ${cardsGrid('Revealed', p2Revealed)}
-                ${cardsGrid('Looked', p2Looked)}
-                ${!hasP2 ? '<div class="revealed-section" style="opacity:0.4">No public cards</div>' : ''}
+                ${sectionGrid('Cheer', p2Cheer)}
+                ${sectionGrid('Cost', p2Cost)}
+                ${sectionGrid('Effect', p2Effect)}
+                ${sectionGrid('Looked', p2Looked)}
+                ${!hasP2 ? '<div class="revealed-section" style="opacity:0.4">No revealed cards</div>' : ''}
             </div>
         </div>
-        ${sharedRevealed.length || costRevealed.length || sharedLooked.length ? `
+        ${unknownCost.length || unknownEffect.length || unknownLooked.length ? `
         <div class="revealed-shared">
-            <h3 class="revealed-player-header">Shared</h3>
-            ${cardsGrid('Revealed', sharedRevealed)}
-            ${cardsGrid('Cost Revealed', costRevealed)}
-            ${cardsGrid('Looked', sharedLooked)}
+            <h3 class="revealed-player-header">Unknown</h3>
+            ${sectionGrid('Cost', unknownCost)}
+            ${sectionGrid('Effect', unknownEffect)}
+            ${sectionGrid('Looked', unknownLooked)}
         </div>` : ''}`;
 
         ModalManager.show(DOM_IDS.MODAL_REVEALED);
