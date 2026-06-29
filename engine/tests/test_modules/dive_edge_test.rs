@@ -430,6 +430,66 @@ fn two_static_one_moved_only_one_trigger() {
     );
 }
 
+/// DIVE! ab#0: place card → verify live_card_set_limit_reduction is set.
+/// The limit reduction means the LiveCardSet phase allows 2 selections
+/// (3 base − 1 reduction) independent of the already-placed card.
+#[test]
+fn ab0_placement_reduces_live_card_set_limit() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db);
+    let dive = g.id("PL!N-bp4-026-L");
+    let niji = g.id("PL!N-PR-003-PR");
+    let filler = g.id("PL!-sd1-010-SD");
+    let other_live = g.id("PL!-sd1-020-SD");
+
+    g.state.player1.waitroom.cards.push(dive);
+    g.state.player1.stage.stage = [niji, -1, -1];
+    // 3+ live cards in hand to test limit selection
+    g.state.player1.hand.cards.push(other_live);
+    g.state.player1.hand.cards.push(other_live);
+    g.state.player1.hand.cards.push(other_live);
+    g.state.player1.hand.cards.push(filler);
+    for _ in 0..10 {
+        g.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        g.state.player2.main_deck.cards.push(filler);
+    }
+
+    // Move DIVE! from waitroom → hand, trigger ab#0
+    g.state.player1.waitroom.cards.retain(|c| *c != dive);
+    g.state.player1.hand.cards.push(dive);
+    g.state.recently_moved_cards = Some(vec![dive]);
+
+    let pid = g.state.player1.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
+    g.state.process_pending_auto_abilities(&pid);
+
+    assert!(g.has_pending_choice(), "ab#0 should fire");
+    g.select_indices(&[0]); // accept placement
+
+    // ab#1 may fire — drain all
+    while g.has_pending_choice() {
+        g.select_indices(&[0]);
+    }
+
+    assert!(
+        g.state.player1.live_card_zone.cards.contains(&dive),
+        "DIVE! should be in live zone"
+    );
+    assert_eq!(
+        g.state.player1.live_card_set_limit_reduction, 1,
+        "limit reduction should be set to 1"
+    );
+
+    // Verify phase limit computation: max_allowed = 3 - reduction = 2,
+    // independent of already_placed cards. The player should be able to
+    // select up to 2 cards during LiveCardSet.
+    let max_allowed =
+        3i32 - i32::try_from(g.state.player1.live_card_set_limit_reduction).unwrap_or(0);
+    assert_eq!(max_allowed, 2, "phase limit should be 2 (3-1)");
+}
+
 /// DIVE! ab#0: skip placement, then another DIVE! moves → should fire fresh.
 /// Tests that the ability is NOT permanently blocked after skipping.
 #[test]

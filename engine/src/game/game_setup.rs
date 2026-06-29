@@ -1332,11 +1332,10 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
     let max_live_cards =
         3i32 - i32::try_from(active_player.live_card_set_limit_reduction).unwrap_or(0);
     let already_selected = game_state.live_card_selected_indices.len();
-    let already_placed = active_player.live_card_zone.cards.len();
     let max_allowed = max_live_cards.max(0) as usize;
     for (hand_index, card_id) in active_player.hand.cards.iter().enumerate() {
         let is_selected = game_state.live_card_selected_indices.contains(&hand_index);
-        let at_limit = already_selected + already_placed >= max_allowed;
+        let at_limit = already_selected >= max_allowed;
         if at_limit && !is_selected {
             continue;
         }

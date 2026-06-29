@@ -571,8 +571,7 @@ impl super::TurnEngine {
             let player = game_state.active_player();
             let reduction = i32::try_from(player.live_card_set_limit_reduction).unwrap_or(0);
             let max_allowed = (MAX_LIVE_CARDS as i32 - reduction).max(0) as usize;
-            let already_placed = player.live_card_zone.cards.len();
-            if already_placed + game_state.live_card_selected_indices.len() >= max_allowed {
+            if game_state.live_card_selected_indices.len() >= max_allowed {
                 return Err("Cannot select more live cards: limit reached".to_string());
             }
             game_state.live_card_selected_indices.push(idx);
