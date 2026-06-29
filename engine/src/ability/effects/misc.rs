@@ -397,7 +397,7 @@ impl AbilityResolver {
         is_all: bool,
     ) -> Result<(), String> {
         
-            let surplus_target = target.clone();
+            let surplus_target = target;
             let old = if sign == Some("negative") && is_all {
                 let v = match target {
                     "opponent" => gs.opponent_live_surplus_count,
@@ -607,7 +607,6 @@ impl AbilityResolver {
         let is_temporary = duration.is_some() && duration.as_deref() != Some("permanent");
         let card_type_filter = effect.card_type.clone();
         let group_filter = effect.group_name().map(|s| s.to_string());
-        let per_unit_count_val = effect.per_unit_count.unwrap_or(1);
         let per_unit_type_str = effect.per_unit_type.clone();
         let heart_selection = effect.heart_selection.unwrap_or(false);
         let per_unit = effect.per_unit.unwrap_or(false);

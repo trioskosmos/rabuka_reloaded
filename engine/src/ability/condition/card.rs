@@ -1831,68 +1831,16 @@ impl<'a> ConditionContext<'a> {
         compare_counts(operator, count, target_count)
     }
 
-    pub(crate) fn evaluate_card_count_condition(&self, condition: &Condition) -> bool {
-        let card_type = condition.card_type.as_deref().unwrap_or("");
-        let target = self.resolve_target_for_scope(condition);
-        let is_both = target == "both";
-        let count = condition.count.unwrap_or(1);
-        let player = self.resolve_condition_player(target);
-        let exclude_self = condition.exclude_self.unwrap_or(false);
-        let activating_id = self.activating_card_id;
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn resolve_moved_cards_source(
+        &self,
+        condition: &Condition,
+        is_new_movement: bool,
+        card_type: &str,
+        hc: &[String],
+        count: u32,
+    ) -> bool {
         let card_db = &self.game_state.card_database;
-
-        let location = condition.location.as_deref().unwrap_or("");
-        let group_names_base: Option<Vec<String>> = condition.group_names.clone().or_else(|| {
-            if condition.group_reference.as_deref() == Some("same_group_name") {
-                self.activating_card_id
-                    .and_then(|cid| self.game_state.card_database.get_card(cid))
-                    .map(|c| c.group.clone())
-                    .map(|g| vec![g])
-            } else {
-                None
-            }
-        });
-        let group_names: Option<&Vec<String>> = group_names_base.as_ref();
-        let hc: &[String] = condition.heart_colors.as_deref().unwrap_or(&[]);
-
-        // Early-out for aggregate total (sum heart colors, not count cards)
-        if let Some(res) = self.check_aggregate_total(condition, player, location) {
-            return res;
-        }
-
-        let count_filtered = |zone_source: &[i16], ct: &str| -> usize {
-            let is_distinct = condition.distinct.as_ref().is_some_and(|d| d.is_distinct())
-                || condition.group_reference.as_deref() == Some("different_group_names");
-            if is_distinct {
-                self.count_distinct_in_cards(
-                    zone_source,
-                    condition,
-                    Some(ct).filter(|c| !c.is_empty()),
-                    group_names.map(|gn| gn.as_slice()),
-                ) as usize
-            } else {
-                self.count_cards_with_filters(
-                    zone_source,
-                    Some(ct),
-                    group_names.map(|gn| gn.as_slice()),
-                    hc,
-                    condition.cost_limit,
-                    condition.cost_limit_operator.as_deref(),
-                    None,
-                    false,
-                    condition,
-                ) as usize
-            }
-        };
-
-        let is_old_movement = condition.get_source() == Some("preceding_moved")
-            || condition.get_source() == Some("previous_moved_cards");
-        let is_new_movement = condition.get_source().map_or(false, |s| {
-            s != "preceding_moved" && s != "previous_moved_cards"
-        }) && condition.get_destination().is_some();
-
-        if is_old_movement || is_new_movement {
-            let card_db = &self.game_state.card_database;
             let negate = condition.negation.unwrap_or(false);
             let wants_blade_heart_prop =
                 condition.card_property.as_deref() == Some("has_blade_heart");
@@ -2186,8 +2134,48 @@ impl<'a> ConditionContext<'a> {
                 count,
                 result
             );
-            return result;
+            result
         }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn resolve_zone_card_count(
+        &self,
+        condition: &Condition,
+        location: &str,
+        hc: &[String],
+        is_both: bool,
+        player: &crate::player::Player,
+        card_type: &str,
+        group_names: Option<&Vec<String>>,
+    ) -> u32 {
+        let target = self.resolve_target_for_scope(condition);
+        let exclude_self = condition.exclude_self.unwrap_or(false);
+        let activating_id = self.activating_card_id;
+        let card_db = &self.game_state.card_database;
+        let count_filtered = |zone_source: &[i16], ct: &str| -> usize {
+            let is_distinct = condition.distinct.as_ref().is_some_and(|d| d.is_distinct())
+                || condition.group_reference.as_deref() == Some("different_group_names");
+            if is_distinct {
+                self.count_distinct_in_cards(
+                    zone_source,
+                    condition,
+                    Some(ct).filter(|c| !c.is_empty()),
+                    group_names.map(|gn| gn.as_slice()),
+                ) as usize
+            } else {
+                self.count_cards_with_filters(
+                    zone_source,
+                    Some(ct),
+                    group_names.map(|gn| gn.as_slice()),
+                    hc,
+                    condition.cost_limit,
+                    condition.cost_limit_operator.as_deref(),
+                    None,
+                    false,
+                    condition,
+                ) as usize
+            }
+        };
 
         let actual = match Zone::from_str(location) {
             Some(Zone::RevealedCards) => {
@@ -2371,7 +2359,7 @@ impl<'a> ConditionContext<'a> {
                         let from_hand =
                             self.game_state.recently_moved_from_zone.as_deref() == Some("hand");
                         if !from_hand {
-                            return false;
+                            return 0;
                         }
                         count_filtered(moved, card_type)
                     } else {
@@ -2473,6 +2461,61 @@ impl<'a> ConditionContext<'a> {
                 _ => 0,
             },
         } as u32;
+        actual
+    }
+
+    pub(crate) fn evaluate_card_count_condition(&self, condition: &Condition) -> bool {
+        let card_type = condition.card_type.as_deref().unwrap_or("");
+        let target = self.resolve_target_for_scope(condition);
+        let is_both = target == "both";
+        let count = condition.count.unwrap_or(1);
+        let player = self.resolve_condition_player(target);
+        let card_db = &self.game_state.card_database;
+
+        let location = condition.location.as_deref().unwrap_or("");
+        let group_names_base: Option<Vec<String>> = condition.group_names.clone().or_else(|| {
+            if condition.group_reference.as_deref() == Some("same_group_name") {
+                self.activating_card_id
+                    .and_then(|cid| self.game_state.card_database.get_card(cid))
+                    .map(|c| c.group.clone())
+                    .map(|g| vec![g])
+            } else {
+                None
+            }
+        });
+        let group_names: Option<&Vec<String>> = group_names_base.as_ref();
+        let hc: &[String] = condition.heart_colors.as_deref().unwrap_or(&[]);
+
+        // Early-out for aggregate total (sum heart colors, not count cards)
+        if let Some(res) = self.check_aggregate_total(condition, player, location) {
+            return res;
+        }
+
+        let is_old_movement = condition.get_source() == Some("preceding_moved")
+            || condition.get_source() == Some("previous_moved_cards");
+        let is_new_movement = condition.get_source().map_or(false, |s| {
+            s != "preceding_moved" && s != "previous_moved_cards"
+        }) && condition.get_destination().is_some();
+
+        if is_old_movement || is_new_movement {
+            return self.resolve_moved_cards_source(
+                condition,
+                is_new_movement,
+                card_type,
+                hc,
+                count,
+            );
+        }
+
+        let actual = self.resolve_zone_card_count(
+            condition,
+            location,
+            hc,
+            is_both,
+            player,
+            card_type,
+            group_names,
+        );
         let count_op =
             condition.operator.as_deref().or_else(
                 || {

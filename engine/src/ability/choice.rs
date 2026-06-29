@@ -911,7 +911,7 @@ impl super::resolver::AbilityResolver {
             Some(Zone::SuccessLiveZone) => {
                 return self.handle_success_live_zone_selection(gs, &ctx, &mut validate_card);
             }
-            _ => log::debug!("Card selection from zone '{}' not yet implemented", zone),
+            _ => return Err(format!("Card selection from zone '{}' not yet implemented or unsupported", zone)),
         }
         log::debug!(
             "▶ Select: {} card(s) selected from zone={:?} → [{}]",
