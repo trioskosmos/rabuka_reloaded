@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-30T08:27:36.626296",
+  "generated_at": "2026-06-30T08:48:47.857943",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -10588,8 +10588,11 @@
         },
         "followup_action": {
           "text": "そのエールで得たブレードハートを失い、もう一度エールを行う",
-          "action": "re_yell",
-          "lose_blade_hearts": true,
+          "action": "gain_resource",
+          "sign": "negative",
+          "resource": "heart",
+          "all": null,
+          "count": 1,
           "location": "revealed_cards"
         },
         "all": true,
@@ -23124,8 +23127,23 @@
           },
           {
             "text": "そのエールで得たブレードハートを失い、もう一度エールを行う",
-            "action": "re_yell",
-            "lose_blade_hearts": true,
+            "action": "sequential",
+            "actions": [
+              {
+                "text": "そのエールで得たブレードハートを失い",
+                "action": "gain_resource",
+                "sign": "negative",
+                "resource": "heart",
+                "all": null,
+                "count": 1
+              },
+              {
+                "text": "もう一度エールを行う",
+                "action": "re_yell",
+                "lose_blade_hearts": true,
+                "all": true
+              }
+            ],
             "all": true
           }
         ],
@@ -26134,10 +26152,23 @@
           "operator": ">=",
           "type": "comparison_condition"
         },
-        "action": "modify_score",
-        "value": 1,
-        "operation": "add",
-        "self_target": true
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "それらをすべて失い",
+            "action": "gain_resource",
+            "sign": "negative",
+            "resource": "surplus_heart",
+            "all": true
+          },
+          {
+            "text": "このカードのスコアを+1する",
+            "action": "modify_score",
+            "value": 1,
+            "operation": "add",
+            "self_target": true
+          }
+        ]
       }
     },
     {

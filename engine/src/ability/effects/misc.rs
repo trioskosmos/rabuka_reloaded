@@ -399,17 +399,19 @@ impl AbilityResolver {
         sign: Option<&str>,
         is_all: bool,
     ) -> Result<(), String> {
-        let surplus_target = target;
+        let player = gs.resolve_target_player(target);
+        let is_p1 = player.id == gs.player1.id;
         let old = if sign == Some("negative") && is_all {
-            let v = match target {
-                "opponent" => gs.opponent_live_surplus_count,
-                _ => gs.self_live_surplus_count,
+            let v = if is_p1 {
+                gs.self_live_surplus_count
+            } else {
+                gs.opponent_live_surplus_count
             };
             gs.mods.last_surplus_loss_count = v;
-            if surplus_target == "opponent" {
-                gs.opponent_live_surplus_count = 0;
-            } else {
+            if is_p1 {
                 gs.self_live_surplus_count = 0;
+            } else {
+                gs.opponent_live_surplus_count = 0;
             }
             Some(v)
         } else {
@@ -424,8 +426,7 @@ impl AbilityResolver {
                     "Gain"
                 }
             );
-            let effect_data =
-                old.map(|v| serde_json::json!({"target": surplus_target, "old_value": v}));
+            let effect_data = old.map(|v| serde_json::json!({"is_p1": is_p1, "old_value": v}));
             util::push_temporary_effect(
                 gs,
                 "gain_surplus_heart",

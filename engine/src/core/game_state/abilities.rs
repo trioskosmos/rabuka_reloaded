@@ -2161,14 +2161,14 @@ impl GameState {
                 }
                 "gain_surplus_heart" => {
                     if let Some(ref data) = effect.effect_data {
-                        if let Some(target_str) = data.get("target").and_then(|v| v.as_str()) {
-                            if let Some(old) = data.get("old_value").and_then(|v| v.as_u64()) {
-                                match target_str {
-                                    "opponent" => self.opponent_live_surplus_count = old as u32,
-                                    _ => self.self_live_surplus_count = old as u32,
-                                }
-                                log::debug!("Restored surplus count for {} to {}", target_str, old);
+                        if let Some(old) = data.get("old_value").and_then(|v| v.as_u64()) {
+                            let is_p1 = data.get("is_p1").and_then(|v| v.as_bool()).unwrap_or(true);
+                            if is_p1 {
+                                self.self_live_surplus_count = old as u32;
+                            } else {
+                                self.opponent_live_surplus_count = old as u32;
                             }
+                            log::debug!("Restored surplus count (is_p1={}) to {}", is_p1, old);
                         }
                     }
                 }

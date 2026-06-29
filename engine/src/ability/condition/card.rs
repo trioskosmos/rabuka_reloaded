@@ -1841,109 +1841,81 @@ impl<'a> ConditionContext<'a> {
         count: u32,
     ) -> bool {
         let card_db = &self.game_state.card_database;
-            let negate = condition.negation.unwrap_or(false);
-            let wants_blade_heart_prop =
-                condition.card_property.as_deref() == Some("has_blade_heart");
-            // Source of moved card IDs: for the new format (source=zone+dst),
-            // query turn_movements for all matching zone-transition events
-            // this turn. For the old format (preceding_moved), use the
-            // enqueue-time snapshot or recently_moved_cards.
-            let source_zone = condition.get_source().unwrap_or("");
-            // Build moved_source: for new format (source=zone+dst), prefer
-            // turn_movements (has zone/player metadata for filtering).  When
-            // turn_movements has any data, trust its filtered result (empty
-            // means no matching events for this player/zone — still correct).
-            // Only fall back to the trigger-context card IDs when
-            // turn_movements is completely empty (e.g. manual test setup).
-            let moved_source: Vec<i16> = if is_new_movement {
-                let dest_zone = condition.get_destination().unwrap_or("");
-                let target = condition.target.as_deref().unwrap_or("self");
-                let self_pl = self.resolve_condition_player(target);
-                let target_id = self_pl.id.as_str();
-                let event_cards: Vec<i16> = if !self.moved_cards.is_empty() {
-                    self.moved_cards.to_vec()
-                } else if let Some(enq) = self.game_state.entry_trigger_moved_cards() {
-                    enq
-                } else if let Some(global) = self.game_state.recently_moved_cards.clone() {
-                    global
-                } else {
-                    Vec::new()
-                };
-                if !event_cards.is_empty() {
-                    // cause_player_id filter: for self_target, the card's own
-                    // movement counts regardless of who caused it (unless
-                    // self_effect_only restricts to own effects). For
-                    // non-self_target, movements are scoped to the target
-                    // player's cause_player_id for backward compatibility.
-                    let require_self_effect = condition.get_self_effect_only().unwrap_or(false);
-                    // Cross-reference event cards with turn_movements for zone-
-                    // transition filtering. This ensures we only count cards
-                    // whose movement matches the expected source → destination
-                    // zones, not cards that moved through other paths.
-                    let from_tm: Vec<i16> = self
-                        .game_state
-                        .turn_movements
-                        .iter()
-                        .filter(|m| {
-                            let src_ok = m.source_zone == source_zone
-                                || (source_zone == "discard" && m.source_zone == "waitroom")
-                                || (source_zone == "waitroom" && m.source_zone == "discard");
-                            let cause_ok = (condition.self_target.unwrap_or(false)
-                                && !require_self_effect)
-                                || m.cause_player_id == target_id;
-                            src_ok
-                                && cause_ok
-                                && (m.dest_zone == dest_zone
-                                    || (dest_zone == "discard" && m.dest_zone == "waitroom")
-                                    || (dest_zone == "waitroom" && m.dest_zone == "discard"))
-                                && event_cards.contains(&m.moved_card_id)
-                        })
-                        .map(|m| m.moved_card_id)
-                        .collect();
-                    // For each event card, check if turn_movements has zone
-                    // data for it.  If yes, apply the zone/player filter.  If
-                    // no (movement path skipped push_movement_event), include
-                    // the card directly.
-                    let result: Vec<i16> = event_cards
-                        .iter()
-                        .filter(|&&cid| {
-                            let tm: Vec<_> = self
-                                .game_state
-                                .turn_movements
-                                .iter()
-                                .filter(|m| m.moved_card_id == cid)
-                                .collect();
-                            if tm.is_empty() {
-                                return true; // no zone data → assume match
-                            }
-                            tm.iter().any(|m| {
-                                let src_ok = m.source_zone == source_zone
-                                    || (source_zone == "discard" && m.source_zone == "waitroom")
-                                    || (source_zone == "waitroom" && m.source_zone == "discard");
-                                let cause_ok = (condition.self_target.unwrap_or(false)
-                                    && !require_self_effect)
-                                    || m.cause_player_id == target_id;
-                                src_ok
-                                    && cause_ok
-                                    && (m.dest_zone == dest_zone
-                                        || (dest_zone == "discard" && m.dest_zone == "waitroom")
-                                        || (dest_zone == "waitroom" && m.dest_zone == "discard"))
-                            })
-                        })
-                        .copied()
-                        .collect();
-                    if !from_tm.is_empty() {
-                        from_tm
-                    } else {
-                        result
-                    }
-                } else if !self.game_state.turn_movements.is_empty() {
-                    // No event data — use turn_movements directly (original behavior)
-                    let require_self_effect = condition.get_self_effect_only().unwrap_or(false);
-                    self.game_state
-                        .turn_movements
-                        .iter()
-                        .filter(|m| {
+        let negate = condition.negation.unwrap_or(false);
+        let wants_blade_heart_prop = condition.card_property.as_deref() == Some("has_blade_heart");
+        // Source of moved card IDs: for the new format (source=zone+dst),
+        // query turn_movements for all matching zone-transition events
+        // this turn. For the old format (preceding_moved), use the
+        // enqueue-time snapshot or recently_moved_cards.
+        let source_zone = condition.get_source().unwrap_or("");
+        // Build moved_source: for new format (source=zone+dst), prefer
+        // turn_movements (has zone/player metadata for filtering).  When
+        // turn_movements has any data, trust its filtered result (empty
+        // means no matching events for this player/zone — still correct).
+        // Only fall back to the trigger-context card IDs when
+        // turn_movements is completely empty (e.g. manual test setup).
+        let moved_source: Vec<i16> = if is_new_movement {
+            let dest_zone = condition.get_destination().unwrap_or("");
+            let target = condition.target.as_deref().unwrap_or("self");
+            let self_pl = self.resolve_condition_player(target);
+            let target_id = self_pl.id.as_str();
+            let event_cards: Vec<i16> = if !self.moved_cards.is_empty() {
+                self.moved_cards.to_vec()
+            } else if let Some(enq) = self.game_state.entry_trigger_moved_cards() {
+                enq
+            } else if let Some(global) = self.game_state.recently_moved_cards.clone() {
+                global
+            } else {
+                Vec::new()
+            };
+            if !event_cards.is_empty() {
+                // cause_player_id filter: for self_target, the card's own
+                // movement counts regardless of who caused it (unless
+                // self_effect_only restricts to own effects). For
+                // non-self_target, movements are scoped to the target
+                // player's cause_player_id for backward compatibility.
+                let require_self_effect = condition.get_self_effect_only().unwrap_or(false);
+                // Cross-reference event cards with turn_movements for zone-
+                // transition filtering. This ensures we only count cards
+                // whose movement matches the expected source → destination
+                // zones, not cards that moved through other paths.
+                let from_tm: Vec<i16> = self
+                    .game_state
+                    .turn_movements
+                    .iter()
+                    .filter(|m| {
+                        let src_ok = m.source_zone == source_zone
+                            || (source_zone == "discard" && m.source_zone == "waitroom")
+                            || (source_zone == "waitroom" && m.source_zone == "discard");
+                        let cause_ok = (condition.self_target.unwrap_or(false)
+                            && !require_self_effect)
+                            || m.cause_player_id == target_id;
+                        src_ok
+                            && cause_ok
+                            && (m.dest_zone == dest_zone
+                                || (dest_zone == "discard" && m.dest_zone == "waitroom")
+                                || (dest_zone == "waitroom" && m.dest_zone == "discard"))
+                            && event_cards.contains(&m.moved_card_id)
+                    })
+                    .map(|m| m.moved_card_id)
+                    .collect();
+                // For each event card, check if turn_movements has zone
+                // data for it.  If yes, apply the zone/player filter.  If
+                // no (movement path skipped push_movement_event), include
+                // the card directly.
+                let result: Vec<i16> = event_cards
+                    .iter()
+                    .filter(|&&cid| {
+                        let tm: Vec<_> = self
+                            .game_state
+                            .turn_movements
+                            .iter()
+                            .filter(|m| m.moved_card_id == cid)
+                            .collect();
+                        if tm.is_empty() {
+                            return true; // no zone data → assume match
+                        }
+                        tm.iter().any(|m| {
                             let src_ok = m.source_zone == source_zone
                                 || (source_zone == "discard" && m.source_zone == "waitroom")
                                 || (source_zone == "waitroom" && m.source_zone == "discard");
@@ -1956,41 +1928,69 @@ impl<'a> ConditionContext<'a> {
                                     || (dest_zone == "discard" && m.dest_zone == "waitroom")
                                     || (dest_zone == "waitroom" && m.dest_zone == "discard"))
                         })
-                        .map(|m| m.moved_card_id)
-                        .collect()
+                    })
+                    .copied()
+                    .collect();
+                if !from_tm.is_empty() {
+                    from_tm
                 } else {
-                    Vec::new()
+                    result
                 }
-            } else if self.moved_cards.is_empty() {
-                let enqueued = self.game_state.entry_trigger_moved_cards();
-                let global = self.game_state.recently_moved_cards.clone();
-                // Prefer the enqueue-time snapshot — "those cards" per the card text.
-                // Fall back to the global flag only when there is no entry (TAS pre-filter).
-                if let Some(ev) = &enqueued {
-                    if !ev.is_empty() {
-                        ev.clone()
-                    } else {
-                        global.unwrap_or_default()
-                    }
+            } else if !self.game_state.turn_movements.is_empty() {
+                // No event data — use turn_movements directly (original behavior)
+                let require_self_effect = condition.get_self_effect_only().unwrap_or(false);
+                self.game_state
+                    .turn_movements
+                    .iter()
+                    .filter(|m| {
+                        let src_ok = m.source_zone == source_zone
+                            || (source_zone == "discard" && m.source_zone == "waitroom")
+                            || (source_zone == "waitroom" && m.source_zone == "discard");
+                        let cause_ok = (condition.self_target.unwrap_or(false)
+                            && !require_self_effect)
+                            || m.cause_player_id == target_id;
+                        src_ok
+                            && cause_ok
+                            && (m.dest_zone == dest_zone
+                                || (dest_zone == "discard" && m.dest_zone == "waitroom")
+                                || (dest_zone == "waitroom" && m.dest_zone == "discard"))
+                    })
+                    .map(|m| m.moved_card_id)
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        } else if self.moved_cards.is_empty() {
+            let enqueued = self.game_state.entry_trigger_moved_cards();
+            let global = self.game_state.recently_moved_cards.clone();
+            // Prefer the enqueue-time snapshot — "those cards" per the card text.
+            // Fall back to the global flag only when there is no entry (TAS pre-filter).
+            if let Some(ev) = &enqueued {
+                if !ev.is_empty() {
+                    ev.clone()
                 } else {
                     global.unwrap_or_default()
                 }
             } else {
-                self.moved_cards.to_vec()
-            };
-            // When self_target, restrict to the activating card only —
-            // don't check ALL moved cards. Applies to all source formats.
-            let moved_source = if condition.self_target.unwrap_or(false) {
-                self.activating_card_id
-                    .filter(|id| moved_source.contains(id))
-                    .map_or(vec![], |id| vec![id])
-            } else {
-                moved_source
-            };
-            // Determine destination zone for zone-transition filtering.
-            // Prefer the explicit `destination` field (new pattern), then fall back
-            // to inferring from locations (old pattern: location=source, locations contains dest).
-            let dest_zone: Option<String> = condition
+                global.unwrap_or_default()
+            }
+        } else {
+            self.moved_cards.to_vec()
+        };
+        // When self_target, restrict to the activating card only —
+        // don't check ALL moved cards. Applies to all source formats.
+        let moved_source = if condition.self_target.unwrap_or(false) {
+            self.activating_card_id
+                .filter(|id| moved_source.contains(id))
+                .map_or(vec![], |id| vec![id])
+        } else {
+            moved_source
+        };
+        // Determine destination zone for zone-transition filtering.
+        // Prefer the explicit `destination` field (new pattern), then fall back
+        // to inferring from locations (old pattern: location=source, locations contains dest).
+        let dest_zone: Option<String> =
+            condition
                 .get_destination()
                 .map(|s| s.to_string())
                 .or_else(|| {
@@ -2000,130 +2000,130 @@ impl<'a> ConditionContext<'a> {
                         })
                     })
                 });
-            let moved_group_name = condition
-                .group_names
-                .as_ref()
-                .and_then(|g| g.first().map(|s| s.as_str()));
-            let actual = moved_source
-                .iter()
-                .filter(|&&cid| {
-                    if cid == -1 {
+        let moved_group_name = condition
+            .group_names
+            .as_ref()
+            .and_then(|g| g.first().map(|s| s.as_str()));
+        let actual = moved_source
+            .iter()
+            .filter(|&&cid| {
+                if cid == -1 {
+                    return false;
+                }
+                if let Some(gn) = moved_group_name {
+                    if !util::card_matches_group_str(card_db, cid, Some(gn)) {
                         return false;
                     }
-                    if let Some(gn) = moved_group_name {
-                        if !util::card_matches_group_str(card_db, cid, Some(gn)) {
-                            return false;
+                }
+                let type_ok =
+                    card_type.is_empty() || util::card_matches_type(card_db, cid, Some(card_type));
+                let has_bh = wants_blade_heart_prop
+                    && card_db.get_card(cid).is_some_and(|c| c.has_blade_heart());
+                let bh_reject =
+                    wants_blade_heart_prop && ((negate && has_bh) || (!negate && !has_bh));
+                if !type_ok || bh_reject {
+                    return false;
+                }
+                if !hc.is_empty() && !util::card_matches_heart_colors(card_db, cid, hc) {
+                    return false;
+                }
+                // Zone-transition filter: if destination zone is specified,
+                // only count cards that are currently in that zone.
+                if let Some(ref dest) = dest_zone {
+                    let zone_match = match Zone::from_str(dest) {
+                        Some(Zone::Discard) | Some(Zone::Waitroom) => {
+                            self.game_state.player1.waitroom.cards.contains(&cid)
+                                || self.game_state.player2.waitroom.cards.contains(&cid)
                         }
-                    }
-                    let type_ok = card_type.is_empty()
-                        || util::card_matches_type(card_db, cid, Some(card_type));
-                    let has_bh = wants_blade_heart_prop
-                        && card_db.get_card(cid).is_some_and(|c| c.has_blade_heart());
-                    let bh_reject =
-                        wants_blade_heart_prop && ((negate && has_bh) || (!negate && !has_bh));
-                    if !type_ok || bh_reject {
-                        return false;
-                    }
-                    if !hc.is_empty() && !util::card_matches_heart_colors(card_db, cid, hc) {
-                        return false;
-                    }
-                    // Zone-transition filter: if destination zone is specified,
-                    // only count cards that are currently in that zone.
-                    if let Some(ref dest) = dest_zone {
-                        let zone_match = match Zone::from_str(dest) {
-                            Some(Zone::Discard) | Some(Zone::Waitroom) => {
-                                self.game_state.player1.waitroom.cards.contains(&cid)
-                                    || self.game_state.player2.waitroom.cards.contains(&cid)
-                            }
-                            Some(Zone::Stage) => {
-                                self.game_state.player1.stage.stage.contains(&cid)
-                                    || self.game_state.player2.stage.stage.contains(&cid)
-                            }
-                            Some(Zone::Hand) => {
-                                self.game_state.player1.hand.cards.contains(&cid)
-                                    || self.game_state.player2.hand.cards.contains(&cid)
-                            }
-                            Some(Zone::EnergyZone) | Some(Zone::Energy) => {
-                                self.game_state.player1.energy_zone.cards.contains(&cid)
-                                    || self.game_state.player2.energy_zone.cards.contains(&cid)
-                            }
-                            Some(Zone::Deck) | Some(Zone::DeckTop) | Some(Zone::DeckBottom) => {
-                                self.game_state.player1.main_deck.cards.contains(&cid)
-                                    || self.game_state.player2.main_deck.cards.contains(&cid)
-                            }
-                            Some(Zone::LiveCardZone) => {
-                                self.game_state.player1.live_card_zone.cards.contains(&cid)
-                                    || self.game_state.player2.live_card_zone.cards.contains(&cid)
-                            }
-                            Some(Zone::SuccessLiveZone) => {
-                                self.game_state
-                                    .player1
+                        Some(Zone::Stage) => {
+                            self.game_state.player1.stage.stage.contains(&cid)
+                                || self.game_state.player2.stage.stage.contains(&cid)
+                        }
+                        Some(Zone::Hand) => {
+                            self.game_state.player1.hand.cards.contains(&cid)
+                                || self.game_state.player2.hand.cards.contains(&cid)
+                        }
+                        Some(Zone::EnergyZone) | Some(Zone::Energy) => {
+                            self.game_state.player1.energy_zone.cards.contains(&cid)
+                                || self.game_state.player2.energy_zone.cards.contains(&cid)
+                        }
+                        Some(Zone::Deck) | Some(Zone::DeckTop) | Some(Zone::DeckBottom) => {
+                            self.game_state.player1.main_deck.cards.contains(&cid)
+                                || self.game_state.player2.main_deck.cards.contains(&cid)
+                        }
+                        Some(Zone::LiveCardZone) => {
+                            self.game_state.player1.live_card_zone.cards.contains(&cid)
+                                || self.game_state.player2.live_card_zone.cards.contains(&cid)
+                        }
+                        Some(Zone::SuccessLiveZone) => {
+                            self.game_state
+                                .player1
+                                .success_live_card_zone
+                                .cards
+                                .contains(&cid)
+                                || self
+                                    .game_state
+                                    .player2
                                     .success_live_card_zone
                                     .cards
                                     .contains(&cid)
-                                    || self
-                                        .game_state
-                                        .player2
-                                        .success_live_card_zone
-                                        .cards
-                                        .contains(&cid)
-                            }
-                            _ => true, // Unknown zone — don't filter
-                        };
-                        if !zone_match {
-                            return false;
                         }
-                        // Source-zone verification: also check that the card
-                        // moved from the expected source zone, not just that
-                        // it's currently in the destination zone. Catches
-                        // cases like deck→waitroom when trigger expects
-                        // stage→waitroom.
-                        let expected_source = condition.location.as_deref().or_else(|| {
-                            condition
-                                .get_source()
-                                .filter(|&s| s != "preceding_moved" && s != "previous_moved_cards")
-                        });
-                        if let Some(src_zone) = expected_source {
-                            let card_movements: Vec<_> = self
-                                .game_state
-                                .turn_movements
-                                .iter()
-                                .filter(|m| m.moved_card_id == cid)
-                                .collect();
-                            if !card_movements.is_empty() {
-                                let src_match = card_movements.iter().any(|m| {
-                                    let src_ok = m.source_zone == src_zone
-                                        || (src_zone == "discard" && m.source_zone == "waitroom")
-                                        || (src_zone == "waitroom" && m.source_zone == "discard");
-                                    src_ok
-                                        && (m.dest_zone == *dest
-                                            || (*dest == "discard" && m.dest_zone == "waitroom")
-                                            || (*dest == "waitroom" && m.dest_zone == "discard"))
-                                });
-                                if !src_match {
-                                    return false;
-                                }
+                        _ => true, // Unknown zone — don't filter
+                    };
+                    if !zone_match {
+                        return false;
+                    }
+                    // Source-zone verification: also check that the card
+                    // moved from the expected source zone, not just that
+                    // it's currently in the destination zone. Catches
+                    // cases like deck→waitroom when trigger expects
+                    // stage→waitroom.
+                    let expected_source = condition.location.as_deref().or_else(|| {
+                        condition
+                            .get_source()
+                            .filter(|&s| s != "preceding_moved" && s != "previous_moved_cards")
+                    });
+                    if let Some(src_zone) = expected_source {
+                        let card_movements: Vec<_> = self
+                            .game_state
+                            .turn_movements
+                            .iter()
+                            .filter(|m| m.moved_card_id == cid)
+                            .collect();
+                        if !card_movements.is_empty() {
+                            let src_match = card_movements.iter().any(|m| {
+                                let src_ok = m.source_zone == src_zone
+                                    || (src_zone == "discard" && m.source_zone == "waitroom")
+                                    || (src_zone == "waitroom" && m.source_zone == "discard");
+                                src_ok
+                                    && (m.dest_zone == *dest
+                                        || (*dest == "discard" && m.dest_zone == "waitroom")
+                                        || (*dest == "waitroom" && m.dest_zone == "discard"))
+                            });
+                            if !src_match {
+                                return false;
                             }
                         }
                     }
+                }
 
-                    true
-                })
-                .count() as u32;
-            // negation for the count comparison only applies when card_property is not
-            // driving the per-card filter (handled above). For pure count negation
-            // ("ない場合" style), flip the compare result.
-            let op = condition.operator.as_deref().unwrap_or(">=");
-            let passed = compare_counts(Some(op), actual, count);
-            let result = if wants_blade_heart_prop {
-                // Per-card negation already applied in the filter above
-                passed
-            } else if negate {
-                !passed
-            } else {
-                passed
-            };
-            log::debug!(
+                true
+            })
+            .count() as u32;
+        // negation for the count comparison only applies when card_property is not
+        // driving the per-card filter (handled above). For pure count negation
+        // ("ない場合" style), flip the compare result.
+        let op = condition.operator.as_deref().unwrap_or(">=");
+        let passed = compare_counts(Some(op), actual, count);
+        let result = if wants_blade_heart_prop {
+            // Per-card negation already applied in the filter above
+            passed
+        } else if negate {
+            !passed
+        } else {
+            passed
+        };
+        log::debug!(
                 "[PRECEDING_MOVED] card_type={:?} prop={:?} hc={:?} negate={} actual={} op={:?} count={} -> {}",
                 card_type,
                 condition.card_property,
@@ -2134,8 +2134,8 @@ impl<'a> ConditionContext<'a> {
                 count,
                 result
             );
-            result
-        }
+        result
+    }
 
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn resolve_zone_card_count(
@@ -3840,7 +3840,14 @@ impl<'a> ConditionContext<'a> {
                 }
                 return match target {
                     "opponent" => self.game_state.opponent_live_surplus_count,
-                    _ => self.game_state.self_live_surplus_count,
+                    _ => {
+                        let player = self.resolve_condition_player(target);
+                        if player.id == self.game_state.player1.id {
+                            self.game_state.self_live_surplus_count
+                        } else {
+                            self.game_state.opponent_live_surplus_count
+                        }
+                    }
                 };
             }
             // Fallback: compute from current state (before live clearance or if snapshot

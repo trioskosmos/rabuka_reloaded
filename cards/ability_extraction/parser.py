@@ -2251,13 +2251,13 @@ def parse_action(text: str) -> Dict[str, Any]:
         ),
     )
     R(
-        lambda t: "を失う" in t or "をすべて失う" in t,
+        lambda t: bool(re.search(r"を(すべて)?失[うい]", t)),
         "gain_resource",
         lambda t, a: a.update(
             {
                 "sign": "negative",
                 "resource": "surplus_heart"
-                if "余剰ハート" in t or "余分ハート" in t
+                if "余剰ハート" in t or "余分ハート" in t or "それら" in t
                 else "heart",
                 "all": "すべて" in t or None,
             }
