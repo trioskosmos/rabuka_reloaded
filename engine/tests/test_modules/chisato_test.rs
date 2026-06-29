@@ -83,7 +83,7 @@ fn chisato_cost_hits_threshold_condition_passes() {
     // use_limit should be consumed (key: chisato_id_0_turn_number)
     let key = format!("{}_{}_{}", chisato, 0, game.state.turn_number);
     assert!(
-        game.state.turn_limited_abilities_used.contains(&key),
+        game.state.turn_limited_abilities_used.contains_key(&key),
         "use_limit should be consumed after successful activation"
     );
 }
@@ -124,7 +124,7 @@ fn chisato_cost_misses_threshold_condition_fails() {
     // (the player paid the cost, the attempt counts toward the turn limit)
     let key = format!("{}_{}_{}", chisato, 0, game.state.turn_number);
     assert!(
-        game.state.turn_limited_abilities_used.contains(&key),
+        game.state.turn_limited_abilities_used.contains_key(&key),
         "use_limit should be consumed for 起動 even when condition fails"
     );
     // No pending choice should remain

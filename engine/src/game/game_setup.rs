@@ -1198,12 +1198,15 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 
                 let ability_key =
                     format!("{}_{}_{}", card_id, ability_index, game_state.turn_number);
-                if ability.use_limit.is_some()
-                    && game_state
+                if let Some(use_limit) = ability.use_limit {
+                    let used = game_state
                         .turn_limited_abilities_used
-                        .contains(&ability_key)
-                {
-                    continue;
+                        .get(&ability_key)
+                        .copied()
+                        .unwrap_or(0);
+                    if u32::from(used) >= use_limit {
+                        continue;
+                    }
                 }
 
                 let ability_cost = ability
@@ -1267,12 +1270,15 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 
                 let ability_key =
                     format!("{}_{}_{}", card_id, ability_index, game_state.turn_number);
-                if ability.use_limit.is_some()
-                    && game_state
+                if let Some(use_limit) = ability.use_limit {
+                    let used = game_state
                         .turn_limited_abilities_used
-                        .contains(&ability_key)
-                {
-                    continue;
+                        .get(&ability_key)
+                        .copied()
+                        .unwrap_or(0);
+                    if u32::from(used) >= use_limit {
+                        continue;
+                    }
                 }
 
                 let ability_cost = ability

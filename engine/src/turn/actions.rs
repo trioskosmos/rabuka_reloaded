@@ -224,9 +224,14 @@ impl super::TurnEngine {
 
                 if can_activate {
                     // Check use limit
-                    if let Some(_use_limit) = ability.use_limit {
+                    if let Some(use_limit) = ability.use_limit {
                         let key = format!("{}_{}_{}", card_id, idx, game_state.turn_number);
-                        if game_state.turn_limited_abilities_used.contains(&key) {
+                        let used = game_state
+                            .turn_limited_abilities_used
+                            .get(&key)
+                            .copied()
+                            .unwrap_or(0);
+                        if u32::from(used) >= use_limit {
                             continue;
                         }
                     }
@@ -816,9 +821,10 @@ impl super::TurnEngine {
                         if let Some(cid) = entry.card_id {
                             let turn = game_state.turn_number;
                             let key = format!("{}_{}_{}", cid, entry.ability_index, turn);
-                            if !game_state.turn_limited_abilities_used.contains(&key) {
-                                game_state.turn_limited_abilities_used.insert(key);
-                            }
+                            *game_state
+                                .turn_limited_abilities_used
+                                .entry(key)
+                                .or_insert(0) += 1;
                         }
                     }
                 }

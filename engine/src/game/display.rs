@@ -1799,7 +1799,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         turn_limited_abilities_used: game_state
             .turn_limited_abilities_used
             .iter()
-            .cloned()
+            .map(|(k, _v)| k.clone())
             .collect(),
         auto_ability_trigger_counts: game_state.auto_ability_trigger_counts.clone(),
         turn_limit_usage: game_state.turn_limit_usage.clone(),

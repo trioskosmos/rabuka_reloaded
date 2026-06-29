@@ -911,7 +911,12 @@ impl super::resolver::AbilityResolver {
             Some(Zone::SuccessLiveZone) => {
                 return self.handle_success_live_zone_selection(gs, &ctx, &mut validate_card);
             }
-            _ => return Err(format!("Card selection from zone '{}' not yet implemented or unsupported", zone)),
+            _ => {
+                return Err(format!(
+                    "Card selection from zone '{}' not yet implemented or unsupported",
+                    zone
+                ))
+            }
         }
         log::debug!(
             "▶ Select: {} card(s) selected from zone={:?} → [{}]",
@@ -2457,7 +2462,7 @@ impl super::resolver::AbilityResolver {
                 // The player chose to place the card — insert use_limit key
                 // after the player borrow is done (avoid conflicts with gs).
                 if let Some(key) = use_limit_key {
-                    gs.turn_limited_abilities_used.insert(key);
+                    *gs.turn_limited_abilities_used.entry(key).or_insert(0) += 1;
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
                         eprintln!("[DECK_DIAG] recorded use_limit for optional effect");
                     }
@@ -2587,9 +2592,7 @@ impl super::resolver::AbilityResolver {
                         {
                             if ab.use_limit.is_some() {
                                 let key = format!("{}_{}_{}", cid, idx, turn);
-                                if !gs.turn_limited_abilities_used.contains(&key) {
-                                    gs.turn_limited_abilities_used.insert(key);
-                                }
+                                *gs.turn_limited_abilities_used.entry(key).or_insert(0) += 1;
                                 break;
                             }
                         }

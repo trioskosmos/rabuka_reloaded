@@ -59,7 +59,7 @@ fn serasu_played_to_stage_does_not_self_trigger() {
     let turn = game.state.turn_number;
     let key = format!("{}_{}_{}", serasu, 0, turn);
     assert!(
-        !game.state.turn_limited_abilities_used.contains(&key),
+        !game.state.turn_limited_abilities_used.contains_key(&key),
         "use_limit must not be consumed by a condition-failed trigger"
     );
 }
@@ -233,7 +233,7 @@ fn hanaho_played_to_stage_no_baton_touch_does_not_trigger() {
     let turn = game.state.turn_number;
     let key = format!("{}_{}_{}", hanaho, 0, turn);
     assert!(
-        !game.state.turn_limited_abilities_used.contains(&key),
+        !game.state.turn_limited_abilities_used.contains_key(&key),
         "use_limit must not be recorded for a condition-failed trigger"
     );
 }

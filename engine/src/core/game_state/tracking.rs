@@ -71,11 +71,15 @@ impl GameState {
     }
 
     pub fn record_turn_limited_ability_use(&mut self, card_id: String) {
-        self.turn_limited_abilities_used.insert(card_id);
+        *self.turn_limited_abilities_used.entry(card_id).or_insert(0) += 1;
     }
 
     pub fn has_turn_limited_ability_been_used(&self, card_id: &str) -> bool {
-        self.turn_limited_abilities_used.contains(card_id)
+        self.turn_limited_abilities_used
+            .get(card_id)
+            .copied()
+            .unwrap_or(0)
+            > 0
     }
 
     pub fn move_resolution_zone_to_waitroom(&mut self, player_id: &str) {

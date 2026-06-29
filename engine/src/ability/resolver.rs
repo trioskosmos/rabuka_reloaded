@@ -703,8 +703,16 @@ impl AbilityResolver {
 
         if let Some(ref key) = ability_key {
             if let Some(use_limit) = ability.use_limit {
-                if gs.turn_limited_abilities_used.contains(key) {
-                    let msg = format!("Ability already used this turn (use_limit: {})", use_limit);
+                let used = gs
+                    .turn_limited_abilities_used
+                    .get(key)
+                    .copied()
+                    .unwrap_or(0);
+                if u32::from(used) >= use_limit {
+                    let msg = format!(
+                        "Ability already used {} of {} times this turn",
+                        used, use_limit
+                    );
                     dbg.p("RESULT", &msg);
                     return Err(msg);
                 }
@@ -784,7 +792,9 @@ impl AbilityResolver {
                         .as_ref()
                         .is_none_or(|e| self.can_activate_effect(gs, e));
                     if can_activate {
-                        gs.turn_limited_abilities_used.insert(key.clone());
+                        *gs.turn_limited_abilities_used
+                            .entry(key.clone())
+                            .or_insert(0) += 1;
                     }
                 }
             }
@@ -888,7 +898,9 @@ impl AbilityResolver {
                         && ability.triggers.as_deref() == Some(crate::triggers::ACTIVATION)
                     {
                         if let Some(ref key) = ability_key {
-                            gs.turn_limited_abilities_used.insert(key.clone());
+                            *gs.turn_limited_abilities_used
+                                .entry(key.clone())
+                                .or_insert(0) += 1;
                         }
                     }
                     dbg.p("RESULT", "effect condition not met — skipped");
@@ -932,7 +944,9 @@ impl AbilityResolver {
                     ) || is_optional_pos;
                     if let Some(ref key) = ability_key {
                         if ability.use_limit.is_some() && !skip_use_limit {
-                            gs.turn_limited_abilities_used.insert(key.clone());
+                            *gs.turn_limited_abilities_used
+                                .entry(key.clone())
+                                .or_insert(0) += 1;
                         }
                     }
                 }
@@ -965,7 +979,9 @@ impl AbilityResolver {
                         .as_ref()
                         .is_none_or(|e| self.can_activate_effect(gs, e));
                     if can_activate {
-                        gs.turn_limited_abilities_used.insert(key.clone());
+                        *gs.turn_limited_abilities_used
+                            .entry(key.clone())
+                            .or_insert(0) += 1;
                     }
                 }
             }
@@ -989,7 +1005,7 @@ impl AbilityResolver {
                         .as_ref()
                         .is_none_or(|e| self.can_activate_effect(gs, e))
                 {
-                    gs.turn_limited_abilities_used.insert(key);
+                    *gs.turn_limited_abilities_used.entry(key).or_insert(0) += 1;
                 }
             }
         }
