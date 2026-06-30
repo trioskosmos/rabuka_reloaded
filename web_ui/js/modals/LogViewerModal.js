@@ -229,10 +229,11 @@ export const LogViewerModal = {
 
         const headerDiv = document.createElement('div');
         headerDiv.className = 'log-viewer-header';
+        const condPass = enhancedHeader.condition?.includes('✓') ? 'data-result="pass"' : enhancedHeader.condition?.includes('✗') ? 'data-result="fail"' : '';
         headerDiv.innerHTML = `
             <div class="log-viewer-turn-badge">T${group.turnNumber}</div>
             <div class="log-viewer-header-content">
-                <div class="log-viewer-condition">${enhancedHeader.condition}</div>
+                <div class="log-viewer-condition" ${condPass}>${enhancedHeader.condition}</div>
                 <div class="log-viewer-result">${enhancedHeader.result}</div>
             </div>
             <div class="log-viewer-expand-icon">▸</div>
@@ -288,10 +289,11 @@ export const LogViewerModal = {
             showFriendlyAbilities
         );
 
+        const condAttr = enhanced.condition ? (enhanced.condition.includes('✓') ? 'data-result="pass"' : enhanced.condition.includes('✗') ? 'data-result="fail"' : '') : '';
         div.innerHTML = `
             <div class="log-viewer-turn-badge">T${group.turnNumber}</div>
             <div class="log-viewer-content">
-                ${enhanced.condition ? `<div class="log-viewer-condition">${enhanced.condition}</div>` : ''}
+                ${enhanced.condition ? `<div class="log-viewer-condition" ${condAttr}>${enhanced.condition}</div>` : ''}
                 ${enhanced.result ? `<div class="log-viewer-result">${enhanced.result}</div>` : ''}
             </div>
         `;

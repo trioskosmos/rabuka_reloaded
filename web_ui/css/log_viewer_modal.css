@@ -459,11 +459,11 @@
 }
 
 /* Status: Met/Failed indicators */
-.log-viewer-condition:contains("✓") {
+.log-viewer-condition[data-result="pass"] {
     color: #4ade80;
 }
 
-.log-viewer-condition:contains("✗") {
+.log-viewer-condition[data-result="fail"] {
     color: #ef4444;
 }
 

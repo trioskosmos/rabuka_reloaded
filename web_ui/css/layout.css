@@ -504,7 +504,7 @@
     transform: translateY(-50%);
     z-index: calc(var(--z-modal) - 1);
     flex-direction: column;
-    background: #1a2332;
+    background: var(--bg-secondary);
     border: 1px solid rgba(255,255,255,0.1);
     border-right: none;
     border-radius: 6px 0 0 6px;
@@ -556,8 +556,8 @@
 }
 
 #mobile-pass-btn.mobile-toggle-btn {
-    background: #2ecc71;
-    color: #fff;
+    background: var(--accent-green);
+    color: var(--text);
 }
 #mobile-pass-btn.mobile-toggle-btn:hover { background: #27ae60; }
 

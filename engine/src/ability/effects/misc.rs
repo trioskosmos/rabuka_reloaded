@@ -5,6 +5,7 @@ use super::super::util;
 use crate::card::AbilityEffect;
 use crate::card::PositionInfo;
 use crate::game_state::GameState;
+use smallvec::SmallVec;
 
 impl AbilityResolver {
     pub(crate) fn execute_reveal_effect(
@@ -2342,93 +2343,117 @@ impl AbilityResolver {
                 .unwrap_or_default(),
         );
         let target = "self";
-        // Collect swaps first, then execute (avoids overlapping gs borrows).
-        let swaps: Vec<(usize, usize, i16)> = {
-            let player = gs.resolve_target_player_mut(target);
-            self.formation_plan
-                .iter()
-                .filter_map(|&(member_id, ref dest)| {
-                    if member_id == -1 || dest.is_empty() {
-                        return None;
-                    }
-                    let dest_idx = match dest.as_str() {
-                        "left" => 0usize,
-                        "center" => 1,
-                        "right" => 2,
-                        _ => return None,
-                    };
-                    let from_idx = player.stage.stage.iter().position(|&id| id == member_id)?;
-                    if from_idx == dest_idx {
-                        return None; // already at destination
-                    }
-                    Some((from_idx, dest_idx, member_id))
-                })
-                .collect()
-        };
-        for (from_idx, dest_idx, member_id) in &swaps {
-            let from_area = match from_idx {
-                0 => crate::zones::MemberArea::LeftSide,
-                1 => crate::zones::MemberArea::Center,
-                _ => crate::zones::MemberArea::RightSide,
-            };
-            let to_area = match dest_idx {
-                0 => crate::zones::MemberArea::LeftSide,
-                1 => crate::zones::MemberArea::Center,
-                _ => crate::zones::MemberArea::RightSide,
-            };
-            let player = gs.resolve_target_player_mut(target);
-            let dest_card_id = player.stage.stage[*dest_idx];
-            if let Err(e) = player.stage.position_change(from_area, to_area) {
-                log::debug!("formation_change swap failed: {}", e);
+
+        // Build desired final stage as a direct permutation.
+        // Strategy: for each position, determine which card belongs there.
+        // Three cases: (a) planned move into this position, (b) stay-in-place,
+        // (c) evicted card from a position that was taken by another planned move.
+        let player = gs.resolve_target_player_mut(target);
+        let old_stage = player.stage.stage;
+        let old_under = std::mem::take(&mut player.stage.under_cards);
+        let mut new_stage = [-1i16; 3];
+        let mut new_under = [
+            smallvec::SmallVec::new(),
+            smallvec::SmallVec::new(),
+            smallvec::SmallVec::new(),
+        ];
+        let mut events: Vec<(i16, usize, usize)> = Vec::new();
+
+        // Phase 1: place every planned card at its destination.
+        // Track which card got evicted from each destination.
+        let mut occupant: [i16; 3] = old_stage.clone(); // current occupant of each pos
+        for &(member_id, ref dest) in &self.formation_plan {
+            if member_id == -1 || dest.is_empty() {
                 continue;
             }
-            // Push events BEFORE push_movement_event so the
-            // PositionChangeEvent list captures the change before the
-            // self-trigger fires from within push_movement_event.
-            gs.position_change_events
-                .push(crate::types::PositionChangeEvent {
-                    moved_card_id: *member_id,
-                    old_position: *from_idx,
-                    new_position: *dest_idx,
-                    cause_card_id: cause_cid,
-                    cause_player_id: mover_pid.clone(),
-                    effect_only: true,
-                });
-            if dest_card_id != -1 {
-                gs.position_change_events
-                    .push(crate::types::PositionChangeEvent {
-                        moved_card_id: dest_card_id,
-                        old_position: *dest_idx,
-                        new_position: *from_idx,
-                        cause_card_id: cause_cid,
-                        cause_player_id: mover_pid.clone(),
-                        effect_only: true,
-                    });
+            let dest_idx = match dest.as_str() {
+                "left" => 0,
+                "center" => 1,
+                "right" => 2,
+                _ => continue,
+            };
+            let from_idx = match old_stage.iter().position(|&id| id == member_id) {
+                Some(idx) => idx,
+                None => continue,
+            };
+            if from_idx == dest_idx {
+                continue; // handled in phase 2 (stay-in-place)
             }
-            gs.push_movement_event(*member_id, "stage", "stage", cause_cid, &mover_pid, true);
-            gs.push_movement_event(*member_id, "stage", "stage", cause_cid, &mover_pid, true);
-            // Record explicit position change events for both swapped cards
-            gs.position_change_events
-                .push(crate::types::PositionChangeEvent {
-                    moved_card_id: *member_id,
-                    old_position: *from_idx,
-                    new_position: *dest_idx,
-                    cause_card_id: cause_cid,
-                    cause_player_id: mover_pid.clone(),
-                    effect_only: true,
-                });
-            if dest_card_id != -1 {
-                gs.position_change_events
-                    .push(crate::types::PositionChangeEvent {
-                        moved_card_id: dest_card_id,
-                        old_position: *dest_idx,
-                        new_position: *from_idx,
-                        cause_card_id: cause_cid,
-                        cause_player_id: mover_pid.clone(),
-                        effect_only: true,
-                    });
+            // Place member, record evicted card
+            let evicted = if new_stage[dest_idx] != -1 {
+                new_stage[dest_idx]
+            } else {
+                occupant[dest_idx]
+            };
+            new_stage[dest_idx] = member_id;
+            new_under[dest_idx] = old_under[from_idx].clone();
+            occupant[dest_idx] = member_id;
+            events.push((member_id, from_idx, dest_idx));
+        }
+
+        // Phase 2: place evicted cards / stay-in-place.
+        // Each evicted card goes to its mover's original position.
+        for &(member_id, ref dest) in &self.formation_plan {
+            if member_id == -1 || dest.is_empty() {
+                continue;
+            }
+            let dest_idx = match dest.as_str() {
+                "left" => 0,
+                "center" => 1,
+                "right" => 2,
+                _ => continue,
+            };
+            let from_idx = match old_stage.iter().position(|&id| id == member_id) {
+                Some(idx) => idx,
+                None => continue,
+            };
+            if new_stage[from_idx] != -1 {
+                continue; // slot already filled
+            }
+            if from_idx == dest_idx {
+                // Stay in place (only if no one else moved into this slot)
+                new_stage[from_idx] = member_id;
+                new_under[from_idx] = old_under[from_idx].clone();
+            } else {
+                // Evicted occupant goes to the mover's vacated position
+                let evicted_id = old_stage[dest_idx];
+                if evicted_id != -1 && evicted_id != member_id && new_stage[from_idx] == -1 {
+                    new_stage[from_idx] = evicted_id;
+                    new_under[from_idx] = old_under[dest_idx].clone();
+                    events.push((evicted_id, dest_idx, from_idx));
+                }
             }
         }
+
+        // Phase 3: unplanned cards keep their original slot if free
+        for (i, &cid) in old_stage.iter().enumerate() {
+            if new_stage[i] == -1 && cid != -1 {
+                let is_planned = self.formation_plan.iter().any(|(id, _)| *id == cid);
+                if !is_planned {
+                    new_stage[i] = cid;
+                    new_under[i] = old_under[i].clone();
+                }
+            }
+        }
+
+        // Apply atomic update
+        player.stage.stage = new_stage;
+        player.stage.under_cards = new_under;
+
+        // Record position_change_events and push_movement_event for each moved card
+        for &(moved_card_id, old_pos, new_pos) in &events {
+            gs.position_change_events
+                .push(crate::types::PositionChangeEvent {
+                    moved_card_id,
+                    old_position: old_pos,
+                    new_position: new_pos,
+                    cause_card_id: cause_cid,
+                    cause_player_id: mover_pid.clone(),
+                    effect_only: true,
+                });
+            gs.push_movement_event(moved_card_id, "stage", "stage", cause_cid, &mover_pid, true);
+        }
+
         gs.position_change_occurred_this_turn = true;
         gs.recalculate_constants();
         self.formation_plan.clear();

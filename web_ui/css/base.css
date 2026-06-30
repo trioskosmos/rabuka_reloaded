@@ -51,6 +51,7 @@
     --font-size-lg: clamp(1.1rem, 1rem + 0.5vw, 1.3rem);
     --font-size-xl: clamp(1.3rem, 1.15rem + 0.75vw, 1.6rem);
     --font-size-xxl: clamp(1.6rem, 1.4rem + 1vw, 2.2rem);
+    --font-mono: 'Courier New', Courier, monospace;
 
     /* --- Sizing - Responsive Card System --- */
     --card-h: clamp(120px, 25dvh, 260px);

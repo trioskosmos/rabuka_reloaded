@@ -74,11 +74,6 @@
 }
 
 .heart-pip.filled { background: white; border-color: white; }
-.heart-pip.color-0.filled { background: var(--accent-pink); }
-.heart-pip.color-1.filled { background: var(--accent-red); }
-.heart-pip.color-2.filled { background: var(--accent-gold); }
-.heart-pip.color-3.filled { background: var(--accent-green); }
-.heart-pip.color-4.filled { background: var(--accent-blue); }
 
 .heart-mini-icon {
     width: 16px;
@@ -580,13 +575,13 @@
     box-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
 }
 
-.heart-pip.color-0.filled { background: #ff55aa; }
+.heart-pip.color-0.filled { background: var(--accent-pink); }
 .heart-pip.color-1.filled { background: #ff4444; }
-.heart-pip.color-2.filled { background: #f59e0b; }
-.heart-pip.color-3.filled { background: #2ecc71; }
-.heart-pip.color-4.filled { background: #3b82f6; }
-.heart-pip.color-5.filled { background: #8b5cf6; }
-.heart-pip.color-6.filled { background: #ffffff; }
+.heart-pip.color-2.filled { background: var(--accent-gold); }
+.heart-pip.color-3.filled { background: var(--accent-green); }
+.heart-pip.color-4.filled { background: var(--accent-blue); }
+.heart-pip.color-5.filled { background: var(--accent-purple); }
+.heart-pip.color-6.filled { background: #fff; }
 
 @media (max-width: 900px) {
     .perf-player-grid,

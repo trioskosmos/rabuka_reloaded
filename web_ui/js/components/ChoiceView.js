@@ -172,7 +172,7 @@ export const ChoiceView = {
                         const optText = optIdx !== undefined && choice.options[optIdx] ? choice.options[optIdx] : null;
                         const name = isHeart
                             ? cardNo.replace('heart0', '♥').replace('heart', '♥')
-                            : (optText || a.parameters?.card_name || a.description || '');
+                            : (a.description || optText || a.parameters?.card_name || '');
                         optItems.push({ card: null, name, action: a, isText: !isHeart });
                     });
                 } else {
