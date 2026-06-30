@@ -390,3 +390,10 @@
 .selection-card-item.view-only {
     cursor: help;
 }
+
+/* RPS modal: disabled state after choice made */
+#rps-modal .rps-btn:disabled,
+#rps-modal .action-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}

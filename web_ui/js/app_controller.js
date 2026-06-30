@@ -363,6 +363,9 @@ export const AppController = {
         updateUiModeUI(State.uiMode);
         State.on('ui-mode-change', (e) => updateUiModeUI(e.detail?.mode || State.uiMode));
 
+        // Track mobile viewport
+        window.__isMobile = () => window.matchMedia('(orientation: portrait), (max-aspect-ratio: 13/9)').matches;
+
         // Backdrop close for mobile modals
         [
             { id: 'rps-modal' },

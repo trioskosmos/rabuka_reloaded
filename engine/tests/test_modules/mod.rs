@@ -132,6 +132,7 @@ pub mod mymai_tonight_test;
 pub mod nagi_live_card_draw_test;
 pub mod natsumi_bp5_test;
 pub mod natsumi_test;
+pub mod neutral_live_success_test;
 pub mod nico_cannot_activate_test;
 pub mod nico_recover_test;
 pub mod nozomi_test;

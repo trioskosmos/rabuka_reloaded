@@ -22,9 +22,13 @@ fn setup_p1_deck(game: &mut TestGame, live_ids: &[i16]) {
     }
 }
 
-/// Butterfly Wing suppresses live_start abilities of stage members.
+/// Q260: Suppressed LiveStart abilities do NOT count as resolved.
+///
+/// Butterfly Wing's constant ability suppresses LiveStart triggers on stage members.
+/// Those suppressed abilities are never queued → never resolved.
+/// Contrast with a non-suppressing live card where LiveStart abilities DO queue.
 #[test]
-fn butterfly_wing_suppresses_live_start() {
+fn butterfly_wing_q260_suppressed_not_resolved() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -38,8 +42,6 @@ fn butterfly_wing_suppresses_live_start() {
     game.add_to_stage(MemberArea::Center, mei_p);
     game.add_to_stage(MemberArea::RightSide, mei_r);
 
-    let energy_before = game.state.player1.energy_zone.active_count();
-
     setup_p1_deck(&mut game, &[]);
     advance_to_live_card_set_p1(&mut game);
     game.state.player1.hand.cards.push(butterfly);
@@ -47,6 +49,15 @@ fn butterfly_wing_suppresses_live_start() {
 
     // Advance to live_start phase
     advance_to_live_start(&mut game);
+
+    // Q260: Suppressed LiveStart abilities are NOT queued → NOT resolved
+    assert_eq!(
+        game.state.ability_queue.len(),
+        0,
+        "Q260: Suppressed LiveStart abilities should NOT be in the queue (length 0)"
+    );
+
+    // Drain any pending choices (should be none — LiveStart fully suppressed)
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
@@ -56,12 +67,68 @@ fn butterfly_wing_suppresses_live_start() {
         game.select_indices(&[]);
     }
 
-    // Both Meis' live_start should be suppressed — energy should NOT have increased
-    let energy_after = game.state.player1.energy_zone.active_count();
+    // Cross-check: energy didn't change (confirms suppression)
     assert_eq!(
-        energy_after, energy_before,
-        "Butterfly Wing should suppress live_start: energy should not increase (was {}, got {})",
-        energy_before, energy_after
+        game.state.player1.energy_zone.active_count(),
+        0,
+        "Q260: No LiveStart effects fired — energy unchanged"
+    );
+}
+
+/// Control: WITHOUT suppression, LiveStart abilities ARE queued and resolved.
+#[test]
+fn butterfly_wing_q260_control_live_start_resolves() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    // Use a non-suppressing live card (PL!-sd1-019-SD is a simple live card)
+    let live = game.id("PL!-sd1-019-SD");
+    let mei_r = game.id("PL!SP-pb1-007-R");
+    let mei_p = game.id("PL!SP-pb1-007-P＋");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // Same stage: 2 Meis (live_start) + 1 filler
+    game.add_to_stage(MemberArea::LeftSide, filler);
+    game.add_to_stage(MemberArea::Center, mei_p);
+    game.add_to_stage(MemberArea::RightSide, mei_r);
+
+    // Give some energy so we can detect changes
+    let ecard = game.id("LL-E-001-SD");
+    for _ in 0..2 {
+        game.state.player1.energy_zone.cards.push(ecard);
+        game.state.player1.energy_zone.set_active_count(0);
+    }
+
+    setup_p1_deck(&mut game, &[]);
+    advance_to_live_card_set_p1(&mut game);
+    game.state.player1.hand.cards.push(live);
+    game.set_live_card(live);
+
+    // Advance to live_start — LiveStart abilities should trigger
+    advance_to_live_start(&mut game);
+
+    // Meis' LiveStart abilities should be in the queue
+    assert!(
+        game.state.ability_queue.len() > 0,
+        "Without suppression: LiveStart abilities should be queued (len > 0)"
+    );
+
+    // Process all pending choices (LiveStart abilities resolve)
+    // Mei's live_start gives "エネルギーを2枚アクティブにする" — 2 Meis = 4 energy activated
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    game.pass();
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // Energy should have increased since LiveStart abilities resolved
+    assert!(
+        game.state.player1.energy_zone.active_count() >= 2,
+        "Control: LiveStart abilities resolved → energy should have been activated (got {})",
+        game.state.player1.energy_zone.active_count()
     );
 }
 

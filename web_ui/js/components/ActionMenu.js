@@ -70,8 +70,9 @@ export const ActionMenu = {
             actionsDiv.appendChild(aiDiv);
         }
 
-        // 4. System actions modal (choose first/second and similar)
-        if (!State._sysActionsDismissed && state.legal_actions) {
+        // 4. System actions modal (choose first/second and similar) — mobile only
+        const isMobileActions = typeof window.__isMobile === 'function' ? window.__isMobile() : false;
+        if (isMobileActions && !State._sysActionsDismissed && state.legal_actions) {
             const systemOnly = state.legal_actions.filter(a =>
                 a.action_type === 'choose_first_attacker' ||
                 a.action_type === 'choose_second_attacker'

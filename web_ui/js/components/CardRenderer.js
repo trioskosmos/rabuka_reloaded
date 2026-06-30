@@ -646,11 +646,13 @@ export const CardRenderer = {
                     cardEl.classList.remove('card-enter');
                 }));
             }
-            // Play selection highlight
-            const cardEl2 = existingChild || el.querySelector(`[id="${containerId}-card-${idx}"]`);
-            if (cardEl2) {
-                const isSel = window._playSel && window._playSel.cardIdx === idx;
-                cardEl2.classList.toggle('selected-for-play', isSel);
+            // Play selection highlight — only on my-hand
+            if (containerId === 'my-hand') {
+                const cardEl2 = existingChild || el.querySelector(`[id="${containerId}-card-${idx}"]`);
+                if (cardEl2) {
+                    const isSel = window._playSel && window._playSel.cardIdx === idx;
+                    cardEl2.classList.toggle('selected-for-play', isSel);
+                }
             }
         }
 
@@ -775,17 +777,17 @@ export const CardRenderer = {
                 slotDiv.removeAttribute('data-action-id');
             }
 
-            // Play selection: show cost on empty zones when a hand card is selected for play
-            const areaNames = ['left', 'center', 'right'];
+            // Play selection: show cost on my-stage only
+            const _areaNames = ['left', 'center', 'right'];
             let playTargetCost = null;
-            if (State.uiMode === 'play' && window._playSel && !slot?.card_no) {
+            if (containerId === 'my-stage' && State.uiMode === 'play' && window._playSel && !slot?.card_no) {
                 const matchAction = window._playSel.actions.find(a => {
                     const p = a.parameters || {};
-                    return p.stage_area === areaNames[i] || p.available_areas?.some(av => av.area === areaNames[i] && av.available);
+                    return p.stage_area === _areaNames[i] || p.available_areas?.some(av => av.area === _areaNames[i] && av.available);
                 });
                 if (matchAction) {
                     const params = matchAction.parameters || {};
-                    const areaInfo = params.available_areas?.find(a => a.area === areaNames[i]);
+                    const areaInfo = params.available_areas?.find(a => a.area === _areaNames[i]);
                     playTargetCost = areaInfo ? areaInfo.cost : (params.base_cost ?? 0);
                 }
             }
@@ -803,21 +805,29 @@ export const CardRenderer = {
                 slotDiv.classList.remove('play-target');
             }
 
-            // Always attach play-target click handler (independent of isValid/hasSelection)
-            if (window._playSel && State.uiMode === 'play' && !slot?.card_no) {
-                slotDiv.onclick = (e) => {
+            // Always attach play-target click handler (my-stage only)
+            if (containerId === 'my-stage' && window._playSel && State.uiMode === 'play' && !slot?.card_no) {
+                const playTargetClick = (e) => {
                     e.stopPropagation();
                     const areaNames2 = ['left', 'center', 'right'];
+                    const zoneArea = areaNames2[i];
                     const matchAction = window._playSel.actions.find(a => {
                         const p = a.parameters || {};
-                        return p.stage_area === areaNames2[i] || p.available_areas?.some(av => av.area === areaNames2[i] && av.available);
+                        return p.stage_area === zoneArea || p.available_areas?.some(av => av.area === zoneArea && av.available);
                     });
                     if (matchAction && window.doAction) {
-                        window.doAction(matchAction);
+                        // Clone action with correct stage_area
+                        const actionCopy = JSON.parse(JSON.stringify(matchAction));
+                        actionCopy.parameters = actionCopy.parameters || {};
+                        actionCopy.parameters.stage_area = zoneArea;
+                        window.doAction(actionCopy);
                         window._playSel = null;
                         if (window.render) window.render();
                     }
                 };
+                area.onclick = playTargetClick;
+                slotDiv.onclick = playTargetClick;
+                area.style.cursor = 'pointer';
                 slotDiv.style.cursor = 'pointer';
             } else if (clickable && (isValid || !hasGlobalSelection)) {
                 const clickHandler = () => {

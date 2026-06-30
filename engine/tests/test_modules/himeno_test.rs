@@ -236,8 +236,9 @@ fn himeno_bp6_cost_reduced_by_two_mirakura() {
     );
 }
 
+/// Q249: 3 みらくらぱーく！ on stage → baton touch one to debut 姫芽 → cost = 20 - 3×2 = 14
 #[test]
-fn himeno_bp6_cost_reduced_by_three_mirakura() {
+fn himeno_bp6_q249_cost_reduced_by_three_mirakura() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let himeno = game.id("PL!HS-bp6-006-R＋");

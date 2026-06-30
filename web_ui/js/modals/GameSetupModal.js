@@ -265,6 +265,11 @@ export const GameSetupModal = {
         // Paste is now default — ensure paste areas are visible
         GameSetupModal.onDeckSelectChange(0, 'paste');
         GameSetupModal.onDeckSelectChange(1, 'paste');
+        // Direct fallback in case onDeckSelectChange didn't set display properly
+        const p0pa = document.getElementById('p0-paste-area');
+        const p1pa = document.getElementById('p1-paste-area');
+        if (p0pa) p0pa.style.display = 'block';
+        if (p1pa) p1pa.style.display = 'block';
     },
 
     closeSetupModal: () => {

@@ -503,9 +503,8 @@
 }
 
 .card.selected-for-play {
-    outline: 2px solid var(--accent-gold);
-    outline-offset: 2px;
-    filter: brightness(1.1);
+    outline: 1px solid var(--accent-gold);
+    outline-offset: 1px;
 }
 
 .member-slot.play-target {
