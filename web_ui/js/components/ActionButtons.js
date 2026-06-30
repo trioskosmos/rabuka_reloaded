@@ -243,6 +243,7 @@ export const ActionButtons = {
                     } else {
                         State.localMulliganSelection.add(handIdx);
                     }
+                    window.render?.();
                 }
             } else if (a.action_type === 'select_live_card') {
                 const params = a.parameters || a.params || {};

@@ -101,8 +101,6 @@ function renderHandCard(index) {
                     const isBaton = areaInfo.is_baton_touch;
                     const areaActionCopy = { ...first };
                     areaActionCopy.parameters = { ...first.parameters, stage_area: areaInfo.area };
-                    const zoneIdx2 = -1000 - areaOrder.indexOf(areaInfo.area);
-                    areaActionCopy.index = zoneIdx2;
                     const btn = ActionButtons.createActionButton(areaActionCopy, true, '', State.data);
                     const costText = isBaton ? `${label} (${cost} - Baton)` : `${label} (${cost})`;
                     btn.innerHTML = `<span>${costText}</span>`;
@@ -110,15 +108,18 @@ function renderHandCard(index) {
                     btn.style.padding = '12px 8px';
                     btn.style.fontSize = '0.95rem';
                     btn.dataset.zoneArea = areaInfo.area;
-                    btn.addEventListener('mouseenter', () => {
-                        document.querySelectorAll('.member-slot.hover-highlight').forEach(s => s.classList.remove('hover-highlight'));
+                    // Replace hover handlers: isolate to this button + highlight stage zone
+                    btn.onmouseenter = () => {
+                        document.querySelectorAll('.action-btn.hover-highlight').forEach(s => s.classList.remove('hover-highlight'));
+                        btn.classList.add('hover-highlight');
                         const slot = document.getElementById(`my-stage-slot-${areaOrder.indexOf(areaInfo.area)}`);
                         if (slot) slot.classList.add('hover-highlight');
-                    });
-                    btn.addEventListener('mouseleave', () => {
+                    };
+                    btn.onmouseleave = () => {
+                        btn.classList.remove('hover-highlight');
                         const slot = document.getElementById(`my-stage-slot-${areaOrder.indexOf(areaInfo.area)}`);
                         if (slot) slot.classList.remove('hover-highlight');
-                    });
+                    };
                     btn.onclick = (e) => { e.stopPropagation(); closeAndDoAction(areaActionCopy); };
                     areasDiv.appendChild(btn);
                 } else {

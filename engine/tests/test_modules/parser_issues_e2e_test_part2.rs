@@ -226,35 +226,177 @@ fn issue5_kanon_invalidate_other_liella() {
 // 数に等しい枚数見る。その中から1枚を手札に加える。
 // Trigger: ライブ成功時 (LiveSuccess)
 // Nuance: dynamic_count references "total_live_score" (not raw Japanese).
+//   BUG (fixed): engine checked for "合計スコア" but JSON had "total_live_score",
+//   causing dynamic count to always resolve to 2 regardless of actual live score.
 // ====================================================================
+
+fn trigger_honoka_live_success(game: &mut TestGame, card_id: i16) {
+    let card = game.db.get_card(card_id).unwrap();
+    let live_success_ab = card
+        .abilities
+        .iter()
+        .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
+        .cloned()
+        .expect("Card must have LiveSuccess ability");
+
+    let ability_id = format!("{}_{}", card.card_no, live_success_ab.full_text);
+    game.state.trigger_auto_ability(
+        ability_id,
+        rabuka_engine::core::types::AbilityTrigger::LiveSuccess,
+        game.state.player1.id.clone(),
+        Some(card.card_no.clone()),
+        Some(card_id),
+        None,
+        None,
+    );
+    game.state.activating_card = Some(card_id);
+    let pid = game.state.player1.id.clone();
+    game.state.process_pending_auto_abilities(&pid);
+}
 
 #[test]
 fn issue8_honoka_live_score_dynamic() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let honoka = game.id("PL!-bp5-001-R\u{ff0b}");
-    let live = game.id("PL!-sd1-019-SD");
+    let live = game.id("PL!-sd1-019-SD"); // score=1
+    let filler = game.id_ref("PL!-sd1-010-SD");
 
     // Honoka on stage
     game.state.player1.stage.stage[0] = honoka;
-    game.state.player1.hand.cards.push(live);
-    fill_decks(&mut game);
+    // Place live card in success zone with its score (score=1)
+    game.state.player1.success_live_card_zone.cards.push(live);
+    // Add a card to hand so the optional cost can be paid
+    let cost_fodder = game.id("PL!-sd1-010-SD");
+    game.state.player1.hand.cards.push(cost_fodder);
+    // Fill deck with 20 known filler cards
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    let deck_before = game.state.player1.main_deck.cards.len();
 
-    advance_to_live_card_set_p1(&mut game);
-    game.set_live_card(live);
-    advance_to_live_start(&mut game);
+    // Directly trigger Honoka's LiveSuccess ability
+    trigger_honoka_live_success(&mut game, honoka);
 
+    // Process choices: cost (select 1 card from hand), then look_and_select (select 1 from looked_at)
     while game.has_pending_choice() {
-        if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
-            game.select_indices(&[]);
-        } else {
-            game.select_indices(&[0]);
-        }
+        game.select_indices(&[0]);
     }
 
-    // Ability resolves without panic
+    // live_score=1 + 2 = 3 cards looked at → 1 to hand, 2 to waitroom
+    // Plus the cost fodder (1) was discarded to pay the cost
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        1,
+        "8a: 1 card added to hand from looked_at (cost fodder was discarded)"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        3,
+        "8b: 2 remaining looked_at + 1 cost fodder = 3 in waitroom"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 3,
+        "8c: deck reduces by 3 looked-at cards"
+    );
     assert!(
         game.state.player1.stage.stage.contains(&honoka),
-        "8a: honoka stays on stage"
+        "8d: honoka stays on stage"
+    );
+}
+
+#[test]
+fn issue8_honoka_live_score_2() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let honoka = game.id("PL!-bp5-001-R\u{ff0b}");
+    let live2 = game.id("PL!-sd1-020-SD"); // score=2
+    let filler = game.id_ref("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[0] = honoka;
+    game.state.player1.success_live_card_zone.cards.push(live2);
+    let cost_fodder = game.id("PL!-sd1-010-SD");
+    game.state.player1.hand.cards.push(cost_fodder);
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    let deck_before = game.state.player1.main_deck.cards.len();
+
+    trigger_honoka_live_success(&mut game, honoka);
+
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    // score=2 + 2 = 4 cards looked at → 1 to hand, 3 to waitroom
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        1,
+        "8e: 1 card added to hand from looked_at"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        4,
+        "8f: 3 remaining looked_at + 1 cost fodder = 4 in waitroom"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 4,
+        "8g: deck reduces by 4 looked-at cards"
+    );
+    assert!(
+        game.state.player1.stage.stage.contains(&honoka),
+        "8h: honoka stays on stage"
+    );
+}
+
+#[test]
+fn issue8_honoka_live_score_1_plus_2() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let honoka = game.id("PL!-bp5-001-R\u{ff0b}");
+    let live1 = game.id("PL!-sd1-019-SD"); // score=1
+    let live2 = game.id("PL!-sd1-020-SD"); // score=2
+    let filler = game.id_ref("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[0] = honoka;
+    game.state.player1.success_live_card_zone.cards.push(live1);
+    game.state.player1.success_live_card_zone.cards.push(live2);
+    let cost_fodder = game.id("PL!-sd1-010-SD");
+    game.state.player1.hand.cards.push(cost_fodder);
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    let deck_before = game.state.player1.main_deck.cards.len();
+
+    trigger_honoka_live_success(&mut game, honoka);
+
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    // (1+2)+2 = 5 cards looked at → 1 to hand, 4 to waitroom
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        1,
+        "8i: 1 card added to hand from looked_at"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        5,
+        "8j: 4 remaining looked_at + 1 cost fodder = 5 in waitroom"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 5,
+        "8k: deck reduces by 5 looked-at cards"
+    );
+    assert!(
+        game.state.player1.stage.stage.contains(&honoka),
+        "8l: honoka stays on stage"
     );
 }

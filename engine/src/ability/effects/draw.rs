@@ -153,7 +153,9 @@ impl AbilityResolver {
                     self.moved_cards.len() as u32
                 }
             }
-            Some(reference) if reference.contains("合計スコア") => {
+            Some(reference)
+                if reference.contains("合計スコア") || reference == "total_live_score" =>
+            {
                 let player = gs.resolve_target_player("self");
                 player
                     .success_live_card_zone

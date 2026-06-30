@@ -175,10 +175,6 @@ export const ActionListView = {
                                 
                                 const areaActionCopy = { ...firstA };
                                 areaActionCopy.parameters = { ...firstA.parameters, stage_area: areaName };
-                                // Unique negative index for hover isolation
-                                const zoneIdx = -1000 - areaOrder.indexOf(areaName);
-                                areaActionCopy.index = zoneIdx;
-                                areaActionCopy._zoneArea = areaName;
                                 
                                 const btn = ActionButtons.createActionButton(areaActionCopy, true, '', state);
                                 const costText = isBaton ? `${label} ${cost} Baton` : `${label} ${cost}`;
@@ -186,16 +182,18 @@ export const ActionListView = {
                                 btn.dataset.zoneArea = areaName;
                                 btn.style.cssText = '';
                                 btn.className = btn.className + ' action-btn';
-                                // Custom hover: highlight stage zone
-                                btn.addEventListener('mouseenter', () => {
-                                    document.querySelectorAll('.member-slot').forEach(s => s.classList.remove('hover-highlight'));
+                                // Replace hover handlers: isolate to this button + highlight stage zone
+                                btn.onmouseenter = () => {
+                                    document.querySelectorAll('.action-btn.hover-highlight').forEach(s => s.classList.remove('hover-highlight'));
+                                    btn.classList.add('hover-highlight');
                                     const slot = document.getElementById(`my-stage-slot-${areaOrder.indexOf(areaName)}`);
                                     if (slot) slot.classList.add('hover-highlight');
-                                });
-                                btn.addEventListener('mouseleave', () => {
+                                };
+                                btn.onmouseleave = () => {
+                                    btn.classList.remove('hover-highlight');
                                     const slot = document.getElementById(`my-stage-slot-${areaOrder.indexOf(areaName)}`);
                                     if (slot) slot.classList.remove('hover-highlight');
-                                });
+                                };
                                 areasDiv.appendChild(btn);
                             } else {
                                 const spacer = document.createElement('div');

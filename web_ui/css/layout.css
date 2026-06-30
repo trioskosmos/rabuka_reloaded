@@ -264,8 +264,8 @@
 
 .live-group-row {
     width: 100%;
-    flex: 0 0 calc(var(--card-h) / var(--section-count, 1));
-    --card-loc-h: calc(var(--card-h) * 720 / 512 / var(--section-count, 1));
+    flex: 0 0 calc(var(--card-h) * 0.55 / var(--section-count, 1));
+    --card-loc-h: calc(var(--card-h) * 720 / 512 * 0.55 / var(--section-count, 1));
     background: rgba(0, 0, 0, 0.2);
     border-bottom: 1px solid var(--border);
     display: flex;
