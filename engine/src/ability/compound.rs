@@ -42,7 +42,7 @@ impl AbilityResolver {
         is_further: bool,
     ) -> Result<(), String> {
         if ABILITY_DEBUG.load(Ordering::Relaxed) {
-            eprintln!("[SEQ_ENTRY] execute_sequential_effect: action={} conditional={} is_further={} actions={}",
+            log::debug!("[SEQ_ENTRY] execute_sequential_effect: action={} conditional={} is_further={} actions={}",
                 effect.action, conditional, is_further, 
                 effect.compound.actions.as_ref().map(|a| a.len()).unwrap_or(0));
         }
@@ -115,9 +115,11 @@ impl AbilityResolver {
                 let repeats_remaining = repeat_max.saturating_sub(_repeat + 1);
                 'action_loop: for (i, action) in repeat_actions.iter().enumerate() {
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                        eprintln!(
+                        log::debug!(
                             "[SEQ_TRACE] _repeat={} i={} action={}",
-                            _repeat, i, action.action
+                            _repeat,
+                            i,
+                            action.action
                         );
                     }
                     log::debug!(
@@ -324,7 +326,7 @@ impl AbilityResolver {
                     match self.execute_effect(gs, &action_to_execute) {
                         Ok(_) => {
                             if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                                eprintln!(
+                                log::debug!(
                                     "[SEQ_TRACE] after execute: pending={:?}",
                                     self.pending_choice.is_some()
                                 );
@@ -447,7 +449,7 @@ impl AbilityResolver {
                                 // energy) requested cancellation of subsequent actions.
                                 self.cancel_remaining_commands = false;
                                 if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                                    eprintln!("[SEQ_TRACE] cancel_remaining_commands set — aborting sequential loop");
+                                    log::debug!("[SEQ_TRACE] cancel_remaining_commands set — aborting sequential loop");
                                 }
                                 return Ok(());
                             } else if action.optional.unwrap_or(false) {
@@ -795,7 +797,7 @@ impl AbilityResolver {
         }
 
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-            eprintln!(
+            log::debug!(
                 "[COND_OPT] opt={:?} cond={:?}",
                 optional_action.is_some(),
                 conditional_action.is_some()
@@ -893,7 +895,7 @@ impl AbilityResolver {
                         .and_then(|idx| opts.get(idx).cloned())
                 })
         });
-        eprintln!(
+        log::debug!(
             "[DBG_CHOICE] handle_choice_string_store: selected={} chosen_is_some={}",
             selected,
             chosen.is_some()
@@ -902,7 +904,7 @@ impl AbilityResolver {
             gs.ability_queue
                 .current_entry_mut()
                 .map(|e| e.conditional_choice = Some(s.clone()));
-            eprintln!("[DBG_CHOICE] stored conditional_choice");
+            log::debug!("[DBG_CHOICE] stored conditional_choice");
         }
         self.pending_choice = None;
         self.resume_pending_actions(gs)?;

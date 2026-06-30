@@ -4,7 +4,7 @@ impl GameState {
     /// Clears old constant-derived values and re-applies those whose conditions pass.
     pub fn recalculate_constants(&mut self) {
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-            eprintln!("[SZ_DEBUG] recalculate_constants ENTERED");
+            log::debug!("[SZ_DEBUG] recalculate_constants ENTERED");
         }
         let entries = self.collect_constant_stage_effects();
         self.mods.constant_score_sources.clear();
@@ -620,7 +620,7 @@ impl GameState {
         self.mods.constant_blade_bonuses = expected;
         self.recalculate_constant_cost_modifiers();
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-            eprintln!("[SZ_DEBUG] about to call evaluate_success_zone_constant_modifiers from recalculate_constants");
+            log::debug!("[SZ_DEBUG] about to call evaluate_success_zone_constant_modifiers from recalculate_constants");
         }
         self.evaluate_success_zone_constant_modifiers();
     }
@@ -1153,12 +1153,12 @@ impl GameState {
         use crate::ability::condition::ConditionContext;
 
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-            eprintln!("[SZ_DEBUG] evaluate_success_zone_constant_modifiers called");
-            eprintln!(
+            log::debug!("[SZ_DEBUG] evaluate_success_zone_constant_modifiers called");
+            log::debug!(
                 "[SZ_DEBUG] p1 success zone = {:?}",
                 self.player1.success_live_card_zone.cards.to_vec()
             );
-            eprintln!(
+            log::debug!(
                 "[SZ_DEBUG] p2 success zone = {:?}",
                 self.player2.success_live_card_zone.cards.to_vec()
             );
@@ -1216,14 +1216,14 @@ impl GameState {
             self.activating_card = Some(*cid);
             let ctx = ConditionContext::new(self);
             if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-                eprintln!("[SZ_DEBUG] cid={} effect={}", cid, effect.action);
+                log::debug!("[SZ_DEBUG] cid={} effect={}", cid, effect.action);
             }
             let cond_met = effect
                 .condition
                 .as_ref()
                 .is_none_or(|c| ctx.evaluate_condition(c));
             if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-                eprintln!("[SZ_DEBUG] cond_met={}", cond_met);
+                log::debug!("[SZ_DEBUG] cond_met={}", cond_met);
             }
             if !cond_met {
                 self.activating_card = prev_activating;
@@ -1313,14 +1313,14 @@ impl GameState {
                     _ => owner_player,
                 };
                 if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-                    eprintln!(
+                    log::debug!(
                         "[SZ_DEBUG] GainResource resource={} amount={} target={} position={:?}",
                         resource,
                         amount,
                         effect.target_name(),
                         effect.position
                     );
-                    eprintln!("[SZ_DEBUG] stage={:?}", player.stage.stage);
+                    log::debug!("[SZ_DEBUG] stage={:?}", player.stage.stage);
                 }
 
                 let candidates: Vec<i16> = player
@@ -1359,11 +1359,12 @@ impl GameState {
                     .collect();
 
                 if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-                    eprintln!(
+                    log::debug!(
                         "[SZ_DEBUG] GainResource resource={} amount={}",
-                        resource, amount
+                        resource,
+                        amount
                     );
-                    eprintln!(
+                    log::debug!(
                         "[SZ_DEBUG] candidates count={} ids={:?}",
                         candidates.len(),
                         candidates
@@ -1375,9 +1376,10 @@ impl GameState {
                             if crate::ability::debug::ABILITY_DEBUG
                                 .load(std::sync::atomic::Ordering::Relaxed)
                             {
-                                eprintln!(
+                                log::debug!(
                                     "[SZ_DEBUG] ADDING blade {} to target {}",
-                                    amount, target_id
+                                    amount,
+                                    target_id
                                 );
                             }
                             self.mods.add_blade_modifier(target_id, amount);

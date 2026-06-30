@@ -386,7 +386,7 @@ impl super::resolver::AbilityResolver {
         discard_remaining: Option<bool>,
     ) -> Result<(), String> {
         if ABILITY_DEBUG.load(Ordering::Relaxed) {
-            eprintln!(
+            log::debug!(
                 "[SEL_CARD] zone='{}' indices={:?} count={} allow_skip={} context={:?} is_reveal={}",
                 zone, indices, count, allow_skip, context, is_reveal
             );
@@ -504,7 +504,7 @@ impl super::resolver::AbilityResolver {
                         self.selected_cards.push(cid);
                     }
                 }
-                eprintln!(
+                log::debug!(
                     "[DBG_HSC] moved {} cards, moved_cards.len={}",
                     new_card_ids.len(),
                     self.moved_cards.len()
@@ -674,7 +674,7 @@ impl super::resolver::AbilityResolver {
                 self.store_pending_choice(gs);
                 return Ok(());
             }
-            eprintln!(
+            log::debug!(
                 "[DBG_HSC] finalizing with {} moved cards",
                 self.moved_cards.len()
             );
@@ -737,7 +737,7 @@ impl super::resolver::AbilityResolver {
         }
 
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-            eprintln!(
+            log::debug!(
                 "[OUTER_MATCH] zone={} effect_started={} pending_commands={}",
                 zone,
                 effect_started,
@@ -2087,10 +2087,10 @@ impl super::resolver::AbilityResolver {
                     "相手" => "opponent",
                     _ => return Err("Invalid choice for SelfOrOpponent".to_string()),
                 };
-                eprintln!("[SELFOR] chosen={}", chosen);
+                log::debug!("[SELFOR] chosen={}", chosen);
                 self.spawn_context.target = Some(chosen.to_string());
                 if let Some(ref current) = self.current_effect {
-                    eprintln!(
+                    log::debug!(
                         "[SELFOR] current.action={} steps={:?}",
                         current.action,
                         current.effect_steps.as_ref().map(|s| s.len())
@@ -2098,13 +2098,13 @@ impl super::resolver::AbilityResolver {
                     if let Some(ref steps) = current.effect_steps {
                         if let Some(inner) = steps.first() {
                             let mut modified = inner.clone();
-                            eprintln!(
+                            log::debug!(
                                 "[SELFOR] inner.action={} steps_before={}",
                                 modified.action,
                                 modified.effect_steps.as_ref().map(|s| s.len()).unwrap_or(0)
                             );
                             Self::set_chosen_target(&mut modified, chosen);
-                            eprintln!(
+                            log::debug!(
                                 "[SELFOR] after_set: target={:?} has_la={} has_sa={}",
                                 modified.target,
                                 modified.compound.look_action.is_some(),
@@ -2113,7 +2113,7 @@ impl super::resolver::AbilityResolver {
                             self.pending_choice = None;
                             gs.ability_queue.set_pending_actions(vec![modified]);
                             let res = self.resume_pending_actions(gs);
-                            eprintln!(
+                            log::debug!(
                                 "[SELFOR] after resume: pending={:?} res={:?}",
                                 self.pending_choice.is_some(),
                                 res
@@ -2121,7 +2121,7 @@ impl super::resolver::AbilityResolver {
                             match res {
                                 Ok(()) => return Ok(()),
                                 Err(e) => {
-                                    eprintln!("[SELFOR] inner effect failed: {}", e);
+                                    log::debug!("[SELFOR] inner effect failed: {}", e);
                                     self.clear_choice_state(gs);
                                     return Ok(());
                                 }
@@ -2129,7 +2129,7 @@ impl super::resolver::AbilityResolver {
                         }
                     }
                 }
-                eprintln!("[SELFOR] no inner effect found");
+                log::debug!("[SELFOR] no inner effect found");
                 self.clear_choice_state(gs);
                 return Ok(());
             }
@@ -2431,7 +2431,7 @@ impl super::resolver::AbilityResolver {
                 // Player chose to skip — card stays in waitroom, no-op.
                 if destination == "skip" {
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                        eprintln!("[DECK_DIAG] skip — card stays in waitroom");
+                        log::debug!("[DECK_DIAG] skip — card stays in waitroom");
                     }
                     // Mark optional as skipped so the RWC handler doesn't record use_limit.
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
@@ -2441,7 +2441,7 @@ impl super::resolver::AbilityResolver {
                     return self.resume_pending_actions(gs);
                 }
                 if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                    eprintln!("[DECK_DIAG] handle_position_destination ctx=MoveCardsPosition card_id={} dest={} src={}", card_id, destination, source_zone);
+                    log::debug!("[DECK_DIAG] handle_position_destination ctx=MoveCardsPosition card_id={} dest={} src={}", card_id, destination, source_zone);
                 }
                 // Remove card from source zone first, then place in destination.
                 // The card was left in place when the deck_top_or_bottom choice was created.
@@ -2451,15 +2451,16 @@ impl super::resolver::AbilityResolver {
                     || source_zone == "those_cards"
                 {
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                        eprintln!(
+                        log::debug!(
                             "[DECK_DIAG] waitroom before retain={:?} removing card_id={}",
-                            player.waitroom.cards, card_id
+                            player.waitroom.cards,
+                            card_id
                         );
                     }
                     let before = player.waitroom.cards.len();
                     player.waitroom.cards.retain(|c| *c != card_id);
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                        eprintln!(
+                        log::debug!(
                             "[DECK_DIAG] waitroom after retain={:?} ({} -> {})",
                             player.waitroom.cards,
                             before,
@@ -2468,9 +2469,10 @@ impl super::resolver::AbilityResolver {
                     }
                 } else if src_is_hand {
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                        eprintln!(
+                        log::debug!(
                             "[DECK_DIAG] hand before retain={:?} removing card_id={}",
-                            player.hand.cards, card_id
+                            player.hand.cards,
+                            card_id
                         );
                     }
                     player.hand.cards.retain(|c| *c != card_id);
@@ -2484,7 +2486,7 @@ impl super::resolver::AbilityResolver {
                     1,
                 );
                 if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                    eprintln!(
+                    log::debug!(
                         "[DECK_DIAG] deck len={} first={:?} last={:?}",
                         player.main_deck.cards.len(),
                         player.main_deck.cards.first(),
@@ -2496,7 +2498,7 @@ impl super::resolver::AbilityResolver {
                 if let Some(key) = use_limit_key {
                     *gs.turn_limited_abilities_used.entry(key).or_insert(0) += 1;
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
-                        eprintln!("[DECK_DIAG] recorded use_limit for optional effect");
+                        log::debug!("[DECK_DIAG] recorded use_limit for optional effect");
                     }
                 }
                 self.clear_choice_state(gs);

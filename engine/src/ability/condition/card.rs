@@ -2828,7 +2828,7 @@ impl<'a> ConditionContext<'a> {
                         if condition.position_compare.is_some() {
                             // position is for cross-comparison, not card positioning
                         } else {
-                            eprintln!(
+                            log::debug!(
                                 "[POS_CHECK] pos={:?} get_position={:?}",
                                 pos,
                                 pos.get_position()
@@ -2855,7 +2855,7 @@ impl<'a> ConditionContext<'a> {
                             }
                         } // end else (position without position_compare)
                     }
-                    eprintln!(
+                    log::debug!(
                         "[PCOND] position={:?} pc_some={} chars={:?} type={:?}",
                         condition.position,
                         condition.positions_characters.is_some(),
@@ -2863,7 +2863,7 @@ impl<'a> ConditionContext<'a> {
                         condition.condition_type
                     );
                     if let Some(ref pos_chars) = condition.positions_characters {
-                        eprintln!(
+                        log::debug!(
                             "[POSCHARS] checking {} entries: {:?}",
                             pos_chars.len(),
                             pos_chars

@@ -797,7 +797,7 @@ fn generate_rps_actions() -> Vec<Action> {
 }
 
 fn generate_choose_first_attacker_actions(game_state: &GameState) -> Vec<Action> {
-    println!(
+    log::debug!(
         "DEBUG: ChooseFirstAttacker phase, rps_winner: {:?}",
         game_state.rps_winner
     );

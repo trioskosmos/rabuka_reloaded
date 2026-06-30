@@ -240,9 +240,11 @@ impl super::TurnEngine {
 
         // Collect revealed card IDs from resolution zone before success check drains it
         let revealed_ids: Vec<i16> = resolution_zone.cards.iter().copied().collect();
-        eprintln!(
+        log::debug!(
             "[YELL_DEBUG] pid={} is_first={} revealed_ids={:?}",
-            player_id, is_first, revealed_ids
+            player_id,
+            is_first,
+            revealed_ids
         );
         for cid in &revealed_ids {
             game_state.revealed_cards.push(*cid);
@@ -580,14 +582,15 @@ impl super::TurnEngine {
     ) -> Result<(), String> {
         let cid = card_id.ok_or("No card selected for live card set")?;
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-            eprintln!(
+            log::debug!(
                 "[SET_LIVE] phase={:?} cid={}",
-                game_state.current_phase, cid
+                game_state.current_phase,
+                cid
             );
         }
         let player = game_state.active_player_mut();
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-            eprintln!(
+            log::debug!(
                 "[SET_LIVE] hand.len={} live_zone_before={:?}",
                 player.hand.cards.len(),
                 player.live_card_zone.cards
@@ -604,7 +607,7 @@ impl super::TurnEngine {
             }
             live_cards.push(card);
             if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-                eprintln!(
+                log::debug!(
                     "[SET_LIVE] live_zone_after={:?}",
                     player.live_card_zone.cards
                 );

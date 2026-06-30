@@ -346,7 +346,7 @@ impl AbilityResolver {
                         target_player_id,
                         ..
                     } => {
-                        eprintln!("[PENDING_CHOICE] SelectCard zone={} count={} allow_skip={} group={:?} card_type={:?} is_select_action={} heart_colors={:?} target_player_id={:?} description={}", zone, count, allow_skip, group, card_type, is_select_action, heart_colors, target_player_id, description);
+                        log::debug!("[PENDING_CHOICE] SelectCard zone={} count={} allow_skip={} group={:?} card_type={:?} is_select_action={} heart_colors={:?} target_player_id={:?} description={}", zone, count, allow_skip, group, card_type, is_select_action, heart_colors, target_player_id, description);
                     }
                     crate::ability::types::Choice::SelectHeartColor {
                         count,
@@ -354,7 +354,7 @@ impl AbilityResolver {
                         description,
                         ..
                     } => {
-                        eprintln!(
+                        log::debug!(
                         "[PENDING_CHOICE] SelectHeartColor count={} options={:?} description={}",
                         count, options, description
                     );
@@ -366,10 +366,10 @@ impl AbilityResolver {
                         allow_skip,
                         ..
                     } => {
-                        eprintln!("[PENDING_CHOICE] SelectTarget target={} options={:?} allow_skip={} description={}", target, options, allow_skip, description);
+                        log::debug!("[PENDING_CHOICE] SelectTarget target={} options={:?} allow_skip={} description={}", target, options, allow_skip, description);
                     }
                     crate::ability::types::Choice::SelectPosition { description, .. } => {
-                        eprintln!(
+                        log::debug!(
                             "[PENDING_CHOICE] SelectPosition description={}",
                             description
                         );
@@ -380,16 +380,18 @@ impl AbilityResolver {
                         description,
                         ..
                     } => {
-                        eprintln!(
+                        log::debug!(
                             "[PENDING_CHOICE] SelectHeartType count={} options={:?} description={}",
-                            count, options, description
+                            count,
+                            options,
+                            description
                         );
                     }
                     crate::ability::types::Choice::SelectAutoAbility { options, .. } => {
-                        eprintln!("[PENDING_CHOICE] SelectAutoAbility options={:?}", options);
+                        log::debug!("[PENDING_CHOICE] SelectAutoAbility options={:?}", options);
                     }
                     crate::ability::types::Choice::SelectLiveSuccess { description, .. } => {
-                        eprintln!(
+                        log::debug!(
                             "[PENDING_CHOICE] SelectLiveSuccess description={}",
                             description
                         );

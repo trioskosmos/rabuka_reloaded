@@ -176,9 +176,12 @@ impl AbilityResolver {
             _ => 0,
         };
 
-        println!(
+        log::debug!(
             "DEBUG: execute_reveal - source: {}, available: {}, count: {}, any_number: {}",
-            source, available, count, any_number
+            source,
+            available,
+            count,
+            any_number
         );
 
         if (Zone::from_str(source) == Some(Zone::Hand)
@@ -189,7 +192,7 @@ impl AbilityResolver {
             let is_max = current_effect.is_some_and(|e| e.max.unwrap_or(false));
             let is_optional = current_effect.is_some_and(|e| e.optional.unwrap_or(false));
 
-            println!("DEBUG: is_max: {}, is_optional: {}", is_max, is_optional);
+            log::debug!("DEBUG: is_max: {}, is_optional: {}", is_max, is_optional);
 
             // Create choice if max=true (up to X cards) or optional, or if count < available
             if is_max || is_optional || count == 0 || count < available as u32 {
@@ -200,9 +203,10 @@ impl AbilityResolver {
                 };
                 let allow_skip = any_number || is_optional || is_max;
 
-                println!(
+                log::debug!(
                     "DEBUG: Creating choice - choices_count: {}, allow_skip: {}",
-                    choices_count, allow_skip
+                    choices_count,
+                    allow_skip
                 );
 
                 self.pending_choice = Some(
@@ -238,10 +242,10 @@ impl AbilityResolver {
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
             } else {
-                println!("DEBUG: Not creating choice - conditions not met");
+                log::debug!("DEBUG: Not creating choice - conditions not met");
             }
         } else {
-            println!("DEBUG: Not creating choice - source not supported or no available cards");
+            log::debug!("DEBUG: Not creating choice - source not supported or no available cards");
         }
 
         let card_ids: Vec<i16> = {

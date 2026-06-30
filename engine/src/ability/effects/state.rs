@@ -135,9 +135,12 @@ impl AbilityResolver {
         let is_member_op = card_type_filter.as_deref() == Some("member_card") || self_cost;
 
         if is_member_op {
-            eprintln!(
+            log::debug!(
                 "[EXEC_CHANGE_STATE] member_op: target={} count={} max={} state_change={}",
-                target, count, max, state_change
+                target,
+                count,
+                max,
+                state_change
             );
 
             // Check cannot_activate_by_effect restriction before mutable borrow.
@@ -377,7 +380,7 @@ impl AbilityResolver {
             // actions (e.g. gain_resource with target_from_selection: true)
             // can target the affected member(s).
             for (_, card_id) in &actual_targets {
-                eprintln!(
+                log::debug!(
                     "[EXEC_CHANGE_STATE] pushing card_id={} to selected_cards (len={})",
                     card_id,
                     self.selected_cards.len()

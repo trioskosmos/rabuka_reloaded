@@ -247,12 +247,16 @@ impl AbilityResolver {
         } else {
             vacated_area
         };
-        eprintln!(
+        log::debug!(
             "[TRACE_PLACE] dest={} card={} pos_to_use={:?} vacated_area={:?} stage_before={:?}",
-            destination, card_id, pos_to_use, vacated_area, player.stage.stage
+            destination,
+            card_id,
+            pos_to_use,
+            vacated_area,
+            player.stage.stage
         );
         util::place_card_in_zone(player, card_id, destination, pos_to_use, is_max, count);
-        eprintln!("[TRACE_PLACE] stage_after={:?}", player.stage.stage);
+        log::debug!("[TRACE_PLACE] stage_after={:?}", player.stage.stage);
         Ok(false)
     }
 
@@ -529,9 +533,10 @@ impl AbilityResolver {
                     if crate::ability::debug::ABILITY_DEBUG
                         .load(std::sync::atomic::Ordering::Relaxed)
                     {
-                        eprintln!(
+                        log::debug!(
                             "[THOSE_CARDS] trigger_cards={:?} count={}",
-                            trigger_cards, count
+                            trigger_cards,
+                            count
                         );
                     }
                     let mut all_matching: Vec<i16> = Vec::new();
@@ -2001,9 +2006,11 @@ impl AbilityResolver {
                 Zone::Discard.to_str()
             });
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-            eprintln!(
+            log::debug!(
                 "[EXEC_SEL_DEST] zone={:?} destination={:?} dest={}",
-                zone_enum, destination, dest
+                zone_enum,
+                destination,
+                dest
             );
         }
         let mut moved = Vec::new();

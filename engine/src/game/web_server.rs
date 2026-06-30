@@ -546,18 +546,14 @@ fn settle_single_player_state(game_state: &mut GameState) -> Result<(), String> 
 
             crate::turn::TurnEngine::advance_phase(game_state);
 
-            if cfg!(debug_assertions) {
-                println!(
-                    "DEBUG: Auto-advanced from {:?} to {:?}",
-                    old_phase, game_state.current_phase
-                );
-            }
+            log::debug!(
+                "DEBUG: Auto-advanced from {:?} to {:?}",
+                old_phase, game_state.current_phase
+            );
         } else if is_live_card_set_phase(game_state) {
             // Live card set phases are manual - don't auto-advance
 
-            if cfg!(debug_assertions) {
-                println!("DEBUG: Live card set phase reached, stopping auto-advance");
-            }
+            log::debug!("DEBUG: Live card set phase reached, stopping auto-advance");
 
             break;
         } else {
@@ -1750,13 +1746,9 @@ fn notify_room_clients(data: &AppState, room_id: &str) {
     if let Some(sender) = broadcasts.get(room_id) {
         let count = sender.receiver_count();
         let _ = sender.send(());
-        if cfg!(debug_assertions) {
-            println!("[SSE] Notified room {} ({} clients)", room_id, count);
-        }
+        log::debug!("[SSE] Notified room {} ({} clients)", room_id, count);
     } else {
-        if cfg!(debug_assertions) {
-            println!("[SSE] No broadcast sender for room {}", room_id);
-        }
+        log::debug!("[SSE] No broadcast sender for room {}", room_id);
     }
 }
 
@@ -1792,7 +1784,7 @@ async fn sse_events(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
             .clone()
     };
 
-    println!("[SSE] Client connected to room {}", room_id);
+    log::debug!("[SSE] Client connected to room {}", room_id);
 
     let mut rx = sender.subscribe();
     let (tx, rx_stream) = mpsc::unbounded_channel::<Result<Bytes, actix_web::Error>>();
@@ -1827,7 +1819,7 @@ async fn sse_events(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
         if let Some(room) = rooms.get(&cleanup_room_id) {
             if room.sessions.is_empty() {
                 rooms.remove(&cleanup_room_id);
-                println!("[SSE] Room {} cleaned up (no sessions)", cleanup_room_id);
+                log::debug!("[SSE] Room {} cleaned up (no sessions)", cleanup_room_id);
             }
         }
         let mut broadcasts = cleanup_data.room_broadcasts.lock().unwrap();
@@ -2280,7 +2272,7 @@ pub async fn rooms_leave(
         if let Some(sender) = broadcasts.get(&room_id) {
             // Send a special "closed" event so other players know to redirect
             let _ = sender.send(());
-            println!("[SSE] Room {} closing: notified remaining clients", room_id);
+            log::debug!("[SSE] Room {} closing: notified remaining clients", room_id);
         }
     }
     // Remove broadcast channel

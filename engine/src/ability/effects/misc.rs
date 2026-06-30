@@ -485,9 +485,10 @@ impl AbilityResolver {
         let tracked_moved = recently_moved.as_ref().or(entry_snapshot.as_ref());
         if Zone::from_str(per_unit_type_str.unwrap_or("")) == Some(Zone::Discard) {
             let tm_len = tracked_moved.map(|v| v.len()).unwrap_or(0);
-            eprintln!(
+            log::debug!(
                 "[DBG_GR] tracked_moved.len={} last_discard_count={}",
-                tm_len, last_discard_count,
+                tm_len,
+                last_discard_count,
             );
             matching_count = util::resolve_discard_per_unit_count(
                 tracked_moved,
@@ -495,7 +496,7 @@ impl AbilityResolver {
                 &card_db,
                 filter,
             );
-            eprintln!("[DBG_GR] resolve result: matching_count={}", matching_count);
+            log::debug!("[DBG_GR] resolve result: matching_count={}", matching_count);
         } else if (Zone::from_str(per_unit_type_str.unwrap_or("")) == Some(Zone::Waitroom)
             || per_unit_type_str == Some("waitroom_card"))
             && (last_discard_count > 0 || recently_moved.is_some())
@@ -544,7 +545,7 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-            eprintln!("[GR_ENTER] resource={:?} count={:?} target_count={:?} source={:?} card_type={:?} target={:?} exclude_self={:?} target_from_sel={:?}",
+            log::debug!("[GR_ENTER] resource={:?} count={:?} target_count={:?} source={:?} card_type={:?} target={:?} exclude_self={:?} target_from_sel={:?}",
                 effect.resource, effect.count, effect.target_count, effect.source, effect.card_type, effect.target, effect.exclude_self, effect.target_from_selection);
         }
         if effect.resource.as_deref() == Some("heart")
@@ -1005,13 +1006,14 @@ impl AbilityResolver {
                 }
             }
             // Issue 6: Filter by timing_condition (e.g. "appeared_this_turn")
-            eprintln!(
+            log::debug!(
                 "[APP_IDS] appeared_ids={:?} all_candidates before={:?}",
-                appeared_ids, all_candidates
+                appeared_ids,
+                all_candidates
             );
             if effect.timing_condition.is_some() {
                 all_candidates.retain(|&cid| appeared_ids.contains(&cid));
-                eprintln!("[APP_IDS] all_candidates after={:?}", all_candidates);
+                log::debug!("[APP_IDS] all_candidates after={:?}", all_candidates);
             }
 
             // If target_count is set and more candidates than needed,
@@ -1354,9 +1356,12 @@ impl AbilityResolver {
                         .collect()
                 };
                 if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-                    eprintln!(
+                    log::debug!(
                         "[BLADE_APPLY] targets={:?} is_all={} final_count={} blades_to_add={}",
-                        targets, is_all, final_count, blades_to_add
+                        targets,
+                        is_all,
+                        final_count,
+                        blades_to_add
                     );
                 }
                 for &card_id in &targets {
@@ -1375,13 +1380,13 @@ impl AbilityResolver {
         // include cards whose group name (c.group, card position ②) matches the
         // group of the card that was discarded as cost (tracked in self.moved_cards).
         if effect.group_reference.as_deref() == Some("same_group_name") {
-            eprintln!("[SAME_GROUP] moved_cards={:?}", self.moved_cards);
+            log::debug!("[SAME_GROUP] moved_cards={:?}", self.moved_cards);
             let ref_group: Option<String> = self
                 .moved_cards
                 .first()
                 .and_then(|cid| {
                     let c = gs.card_database.get_card(*cid);
-                    eprintln!(
+                    log::debug!(
                         "[SAME_GROUP] cid={} card={:?}",
                         cid,
                         c.as_ref().map(|c| (&c.name, &c.group))
@@ -1389,19 +1394,21 @@ impl AbilityResolver {
                     c
                 })
                 .map(|c| c.group.clone());
-            eprintln!("[SAME_GROUP] ref_group={:?}", ref_group);
+            log::debug!("[SAME_GROUP] ref_group={:?}", ref_group);
             if let Some(ref group) = ref_group {
                 let before = heart_targets.len();
                 heart_targets.retain(|cid: &i16| {
                     let matches =
                         util::card_matches_group_str(&gs.card_database, *cid, Some(group.as_str()));
-                    eprintln!(
+                    log::debug!(
                         "[SAME_GROUP] cid={} matches={} group={}",
-                        cid, matches, group
+                        cid,
+                        matches,
+                        group
                     );
                     matches
                 });
-                eprintln!(
+                log::debug!(
                     "[SAME_GROUP] heart_targets: {} -> {}",
                     before,
                     heart_targets.len()
@@ -1479,17 +1486,20 @@ impl AbilityResolver {
                         .take(final_count as usize)
                         .collect()
                 };
-                eprintln!(
+                log::debug!(
                     "[HEART_APPLY] targets={:?} is_all={} final_count={}",
-                    targets, is_all, final_count
+                    targets,
+                    is_all,
+                    final_count
                 );
                 for &card_id in &targets {
-                    eprintln!(
+                    log::debug!(
                         "[HEART_APPLY] adding heart04 to card_id={}, activating={:?}",
-                        card_id, gs.activating_card
+                        card_id,
+                        gs.activating_card
                     );
                     for &(color, _) in &heart_distribution {
-                        eprintln!(
+                        log::debug!(
                             "[HEART_APPLY]   color={:?} current_mod={}",
                             color,
                             gs.mods.get_heart_modifier(card_id, color)

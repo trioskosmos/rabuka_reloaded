@@ -192,7 +192,7 @@ impl super::TurnEngine {
                     })
                     .unwrap_or(Zone::Stage);
 
-                eprintln!(
+                log::debug!(
                     "[ACTIVATE_CHECK] ability idx={} triggers={:?} loc={:?} card_pos={:?}",
                     idx,
                     ability.triggers,
@@ -734,20 +734,22 @@ impl super::TurnEngine {
                 }
                 _ => false,
             };
-            eprintln!(
+            log::debug!(
                 "[RWC_G1] tpid_opp={} spawn={:?} choice={:?}",
-                targets_opponent, resolver.spawn_context.target, &sub_choice
+                targets_opponent,
+                resolver.spawn_context.target,
+                &sub_choice
             );
             if let Some(entry) = game_state.ability_queue.current_entry_mut() {
                 if targets_opponent {
                     let current = entry.player_id.clone();
                     let opponent_id = if current == "p1" { "p2" } else { "p1" };
                     entry.choice_player_id = Some(opponent_id.to_string());
-                    eprintln!("[RWC_G1] SET choice_player_id={}", opponent_id);
+                    log::debug!("[RWC_G1] SET choice_player_id={}", opponent_id);
                 } else if matches!(&sub_choice, crate::ability::types::Choice::SelectCard { target_player_id: Some(tpid), .. } if tpid == "self")
                 {
                     entry.choice_player_id = Some(entry.player_id.clone());
-                    eprintln!(
+                    log::debug!(
                         "[RWC_G1] RESET choice_player_id to activator={}",
                         entry.player_id
                     );
@@ -812,7 +814,7 @@ impl super::TurnEngine {
                 && had_pending_sequential
                 && !game_state.ability_queue.has_pending_actions();
             let effect_ready = cost_was_paid && !had_pending_sequential && !effect_started;
-            eprintln!("[RWC_BRANCH] cost_was_paid={} effect_started={} had_pending={} optional_skipped={} pending_cleared={} effect_ready={}",
+            log::debug!("[RWC_BRANCH] cost_was_paid={} effect_started={} had_pending={} optional_skipped={} pending_cleared={} effect_ready={}",
                 cost_was_paid, effect_started, had_pending_sequential,
                 game_state.ability_queue.current_entry().is_some_and(|e| {
                     e.cost_paid && e.optional_cost_result == Some(false)
@@ -836,7 +838,7 @@ impl super::TurnEngine {
                 game_state.recently_state_changed.clear();
             } else if effect_ready {
                 log::debug!("RWC: calling process_current_ability");
-                eprintln!("[RWC_EFFECT_READY] storing resolver and calling PCA");
+                log::debug!("[RWC_EFFECT_READY] storing resolver and calling PCA");
                 // Store resolver back on entry so process_current_ability can reuse it
                 // (the resolver carries cost-phase state like revealed_cost_cards).
                 game_state.ability_queue.set_resolver(resolver);
@@ -901,7 +903,7 @@ impl super::TurnEngine {
                 // created by the current effect — it would be orphaned.
                 if game_state.has_pending_choice() {
                     log::debug!("[RWC] skipping complete_current — pending choice exists");
-                    eprintln!("[RWC] skipping complete_current — pending choice exists");
+                    log::debug!("[RWC] skipping complete_current — pending choice exists");
                     return Ok(());
                 }
                 // Post-resolution TAS scan for movement-based triggers.
