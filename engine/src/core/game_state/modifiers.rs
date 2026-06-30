@@ -62,7 +62,13 @@ impl GameState {
             };
 
             {
-                let ctx = crate::ability::condition::ConditionContext::new(self);
+                let self_player = if self.player1.stage.stage.contains(card_id) {
+                    Some(&self.player1)
+                } else {
+                    Some(&self.player2)
+                };
+                let ctx =
+                    crate::ability::condition::ConditionContext::new_with_self(self, self_player);
 
                 // Check effect-level position requirement
                 let pos_ok = if let Some(ref pos) = effect.position {
@@ -1214,7 +1220,12 @@ impl GameState {
         for (cid, player_idx, effect) in &entries {
             let prev_activating = self.activating_card;
             self.activating_card = Some(*cid);
-            let ctx = ConditionContext::new(self);
+            let self_player = match player_idx {
+                0 => Some(&self.player1),
+                1 => Some(&self.player2),
+                _ => None,
+            };
+            let ctx = ConditionContext::new_with_self(self, self_player);
             if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
                 log::debug!("[SZ_DEBUG] cid={} effect={}", cid, effect.action);
             }

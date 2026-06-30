@@ -1442,56 +1442,40 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         .is_some_and(|id| *id == game_state.player2.id)
         .then_some(game_state.live_card_selected_indices.as_slice());
 
-    let blade_flat: std::collections::HashMap<i16, i32> = game_state
-        .mods
-        .blade_modifiers
-        .iter()
-        .map(|(&k, v)| (k, v.total()))
-        .collect();
-    let blade_set_flat: std::collections::HashMap<i16, i32> = game_state
-        .mods
-        .blade_modifiers
-        .iter()
-        .map(|(&k, v)| (k, v.set))
-        .collect();
-    let score_flat: std::collections::HashMap<i16, i32> = game_state
-        .mods
-        .score_modifiers
-        .iter()
-        .map(|(&k, v)| (k, v.total()))
-        .collect();
-    let score_set_flat: std::collections::HashMap<i16, i32> = game_state
-        .mods
-        .score_modifiers
-        .iter()
-        .map(|(&k, v)| (k, v.set))
-        .collect();
-    let heart_flat: std::collections::HashMap<
+    let mut blade_flat: std::collections::HashMap<i16, i32> =
+        std::collections::HashMap::with_capacity(game_state.mods.blade_modifiers.len());
+    let mut blade_set_flat: std::collections::HashMap<i16, i32> =
+        std::collections::HashMap::with_capacity(game_state.mods.blade_modifiers.len());
+    for (&k, v) in &game_state.mods.blade_modifiers {
+        blade_flat.insert(k, v.total());
+        blade_set_flat.insert(k, v.set);
+    }
+
+    let mut score_flat: std::collections::HashMap<i16, i32> =
+        std::collections::HashMap::with_capacity(game_state.mods.score_modifiers.len());
+    let mut score_set_flat: std::collections::HashMap<i16, i32> =
+        std::collections::HashMap::with_capacity(game_state.mods.score_modifiers.len());
+    for (&k, v) in &game_state.mods.score_modifiers {
+        score_flat.insert(k, v.total());
+        score_set_flat.insert(k, v.set);
+    }
+
+    let mut heart_flat: std::collections::HashMap<
         i16,
         std::collections::HashMap<crate::card::HeartColor, i32>,
-    > = game_state
-        .mods
-        .heart_modifiers
-        .iter()
-        .map(|(&k, colors)| {
-            let flat: std::collections::HashMap<crate::card::HeartColor, i32> =
-                colors.iter().map(|(&c, e)| (c, e.total())).collect();
-            (k, flat)
-        })
-        .collect();
-    let heart_set_flat: std::collections::HashMap<
+    > = std::collections::HashMap::with_capacity(game_state.mods.heart_modifiers.len());
+    let mut heart_set_flat: std::collections::HashMap<
         i16,
         std::collections::HashMap<crate::card::HeartColor, i32>,
-    > = game_state
-        .mods
-        .heart_modifiers
-        .iter()
-        .map(|(&k, colors)| {
-            let flat: std::collections::HashMap<crate::card::HeartColor, i32> =
-                colors.iter().map(|(&c, e)| (c, e.set)).collect();
-            (k, flat)
-        })
-        .collect();
+    > = std::collections::HashMap::with_capacity(game_state.mods.heart_modifiers.len());
+    for (&k, colors) in &game_state.mods.heart_modifiers {
+        let total: std::collections::HashMap<crate::card::HeartColor, i32> =
+            colors.iter().map(|(&c, e)| (c, e.total())).collect();
+        let set: std::collections::HashMap<crate::card::HeartColor, i32> =
+            colors.iter().map(|(&c, e)| (c, e.set)).collect();
+        heart_flat.insert(k, total);
+        heart_set_flat.insert(k, set);
+    }
     let need_heart_flat: std::collections::HashMap<
         i16,
         std::collections::HashMap<crate::card::HeartColor, i32>,
@@ -1510,18 +1494,14 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     let blade_set_flat2 = blade_set_flat.clone();
     let score_flat2 = score_flat.clone();
     let score_set_flat2 = score_set_flat.clone();
-    let cost_flat: std::collections::HashMap<i16, i32> = game_state
-        .mods
-        .cost_modifiers
-        .iter()
-        .map(|(&k, v)| (k, v.total()))
-        .collect();
-    let cost_set_flat: std::collections::HashMap<i16, i32> = game_state
-        .mods
-        .cost_modifiers
-        .iter()
-        .map(|(&k, v)| (k, v.set))
-        .collect();
+    let mut cost_flat: std::collections::HashMap<i16, i32> =
+        std::collections::HashMap::with_capacity(game_state.mods.cost_modifiers.len());
+    let mut cost_set_flat: std::collections::HashMap<i16, i32> =
+        std::collections::HashMap::with_capacity(game_state.mods.cost_modifiers.len());
+    for (&k, v) in &game_state.mods.cost_modifiers {
+        cost_flat.insert(k, v.total());
+        cost_set_flat.insert(k, v.set);
+    }
     let cost_flat2 = cost_flat.clone();
     let cost_set_flat2 = cost_set_flat.clone();
     let heart_flat2 = heart_flat.clone();

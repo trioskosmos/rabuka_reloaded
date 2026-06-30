@@ -74,6 +74,23 @@ impl<'a> ConditionContext<'a> {
         }
     }
 
+    /// Create a ConditionContext with a pre-resolved self_player.
+    /// Avoids the zone-scan in resolve_self_player when the owner is already known
+    /// (e.g. during constant effect evaluation where the card's zone is fixed).
+    pub fn new_with_self(
+        game_state: &'a crate::game_state::GameState,
+        self_player: Option<&'a crate::player::Player>,
+    ) -> Self {
+        ConditionContext {
+            game_state,
+            activating_card_id: game_state.activating_card,
+            moved_cards: &[],
+            selected_card_ids: &[],
+            position_change_occurred: game_state.position_change_occurred_this_turn,
+            self_player,
+        }
+    }
+
     pub fn with_moved_cards(
         game_state: &'a crate::game_state::GameState,
         moved_cards: &'a [i16],
@@ -413,17 +430,19 @@ impl<'a> ConditionContext<'a> {
             let actual = self.describe_condition_actual(condition);
             push_cond_verdict(condition, &actual, final_result, vec![]);
         }
-        let thresh = if ct == Some(ConditionType::ComparisonCondition) {
-            condition.count.unwrap_or(0)
-        } else {
-            1
-        };
-        let dbg_actual = if result {
-            condition.count.unwrap_or(1)
-        } else {
-            0
-        };
-        dbg.condition(condition, dbg_actual, thresh, final_result);
+        if ABILITY_DEBUG.load(Ordering::Relaxed) {
+            let thresh = if ct == Some(ConditionType::ComparisonCondition) {
+                condition.count.unwrap_or(0)
+            } else {
+                1
+            };
+            let dbg_actual = if result {
+                condition.count.unwrap_or(1)
+            } else {
+                0
+            };
+            dbg.condition(condition, dbg_actual, thresh, final_result);
+        }
 
         if let Some(ref filter) = condition.ability_filter {
             // MovementCondition handles ability_filter internally (applies to

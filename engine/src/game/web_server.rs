@@ -910,7 +910,8 @@ pub async fn execute_action(
                     display.waiting_for_opponent = true;
                 }
             }
-            let actions = actions_with_index(&game_state);
+            ensure_actions(&data, &game_state, exec_room_id_str.as_deref());
+            let actions = read_actions(&data, exec_room_id_str.as_deref());
             let final_actions = if display.waiting_for_opponent {
                 None
             } else {

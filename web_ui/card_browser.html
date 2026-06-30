@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ラブカ ! | Card Browser</title>
+<link rel="stylesheet" href="css/deck_validation.css">
 <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ctAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAABklJREFUeNrs3b9PG2cAxvFLC1IYGlGGVAoLEh5BnUDNAtnISEa2whgW/BeEqhkbwUIGBhgYyIAUMiDVU4OHBuGhqfAIUhYzMBA2OiC173P1tcflPfsw94u77yeyLGLOr/H7+H3vfe/es+MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAArtXpxPVl2qLpm7Fd7W5K2srtyzvP+/mbsnCRddNWWvxvVkX8X84r4nGoUXax3HFkDz6Rs0d7PUT+HNtus6dy3gprkNUj+FN9iu61j0xdDyjbRf0BPqplSt4Nv2/uCnTAJoXsCyuZsmeOUNYTuI7839vgnictpd8AvCh3YGXuRlFAwQQBBAgACCAAIEEAQQIIDIn76sX8DE5IQzNTXlDA8Puz+fHJ84+/V9p3nU7Ljd0NCQMzMz44yNjzkDAwPO+fm5u02tVnMuLy9vVKa2q9frzvHxccft9Pvazl9mo9Fw6vv1rmXOPDWvdWzsxmUSwATNzc25YfAbrYy6t8Zhw9ne3g4NwvPF524I/IGcmp5yn+/VL6/ccNgsLi66z++nQOmm8NZ+rVm30+MLCwv2D4EJ1uu119YQ6jXqtXrBC5apv1F/K11wyrywdGqlVEFhFeoPX/BxBTusFQqG79rjJkyVSuVGz+l9IILh9D9nMHzBD6GtTAKYdABNV9bN5MSktSUKC5+/FbVVepQybb+jD0OUMtUi2rbtuhsyMUEA02arLFvYetnOC0Rwu24hkkfDj774v8popae/SS1blDKj/k0E8A4JVnyUIIT9XtRtcYcCGDZI8NOIOKjbaNMTHEW3Wq1I29rKPGoeRSoz+PxRR7hR3gsCGDNNX3R2Dj8cjszYuwWJIVNtyBNe/RSpsLcrUwF11ZmlBFulPeCAMZM0x22CvNXnK3yFISw6Rnv8Tfbb6yPab6uW5m2+Ue1ULu7ux3LDHtc/9+pTL2mMs8Fft3rho9/eLx828I//P7BXZnsHyB4la05uTBnZ2dOs9l0HnzzwHn43cNrAdra2nIft7m6unI+/vHRvfeXqYDs7e11LPO0deqcnJy423mDBgVPz7e+vh3ajfrL1Mi8v7//vzJ3dnYitco2BwcHP1nq5EdzN5JFkGyvJ4qeF6ZXl6p/swudnQwXpkd+PaUeBYN9QBSAjlglOQ1FABHK3d/9dijy1BcBRKx0nLrXQRIBxK27Xm9WggAi9a5XZ/HYJuUJIBI3vzDvDjy6nRRMAJHIfp8mzKMcfiSAiJXOXfTOX2ydtlIps4+3Hd6gY3b2/+uLdjp+TQAR64BDwQue/Ds+Np7KPiABLCkFTiELWzKg/9c+oOYBk5yKIYAFb910uz9w3x1Y6KiGlhx0WiQV7JZ1U3es8x0v/7r8994EM64uOtMAapWaFgGV+ZR3VejGxkaiI07v/VUYo4bPo9bv8/lnN3xJtIR9WYZPk51lp8VT2gfrdJJtrxQYf2hq5p/CqO5V733YB18fCk1CpzEVk1kAoyyRLFNXmRZ3v659JYfgWmd1q+9236V6hnZmAWSl2fWWKm3uCHfu+s9qhdOYfGYQkiNqdTqtN0mKf19Q4dN+aBZyFUDvgj1lEedo8qa8BfgqP4n9zzsZQB3+KfvVotKiqz3oA7C5sZl6t+vHseCSDno0Ea2uP+tF8QSwhDQNo92dPFwWLlddsHsRoKfFG2R4Rw/ywrueYR7kKoDexSmLONh4+fPLXIRQrV+Uq8jSBReI5jy9NRZ52P9L4ywXAgirsEsQE8CCy2q+L+84EpIw70r6eer2CGBY99DhKvUoJrpgEEAQQIAADtznHEEGIRnyFsGUhY5GaHSskwLydKiOLrgkvPUZ/gA">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -106,7 +107,11 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
 
 <div id="app">
   <aside id="sidebar">
-    <h1><span>&#128269;</span> Card Browser</h1>
+    <h1><span>&#128269;</span> <span id="sidebar-title">Card Browser</span></h1>
+    <div class="mode-toggle">
+      <button class="mode-btn active" data-mode="browser" id="mode-browser">&#128269; Browse</button>
+      <button class="mode-btn" data-mode="deck" id="mode-deck">&#127183; Deck</button>
+    </div>
     <div id="search-bar" style="display:flex;gap:4px;margin-bottom:6px;">
       <input type="search" data-fid="search" placeholder="Search by ID or name..."
              style="flex:1;padding:6px 8px;background:#1a1a2e;color:#e0e0e0;border:1px solid #0f3460;border-radius:4px;font-size:12px;outline:none;">
@@ -118,6 +123,31 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
   <div id="card-panel">
     <div id="panel-count"></div>
     <div id="empty-state">&#128270; Select filters to browse cards</div>
+  </div>
+  <div id="deck-panel" class="hidden">
+    <div class="deck-panel-inner">
+      <div class="deck-header">
+        <h2>&#127183; Deck Creator</h2>
+        <input type="text" id="deck-name" placeholder="Deck name..." value="My Deck">
+      </div>
+      <div class="deck-stats" id="deck-stats"></div>
+      <div id="checklist"><div class="checklist-title">Validation</div></div>
+      <div class="deck-card-section">
+        <div class="deck-list-title">Cards (<span id="deck-total">0</span>)</div>
+        <div id="deck-card-list"></div>
+      </div>
+      <div class="deck-actions">
+        <button id="export-deck">&#128203; Export</button>
+        <button id="clear-deck">&#128465; Clear</button>
+      </div>
+      <div id="import-area" class="hidden">
+        <textarea id="import-text" placeholder="Paste deck list (card_no x qty, or one per line)"></textarea>
+        <div class="deck-actions" style="margin-top:3px;">
+          <button id="import-btn" class="primary">Import</button>
+          <button id="import-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -405,6 +435,13 @@ function positionTooltip(e) {
 }
 
 let toastTimeout = null;
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => toastEl.classList.remove('show'), 2000);
+}
+
 function copyToClipboard(text) {
   navigator.clipboard.writeText(text).then(() => {
     toastEl.textContent = `Copied: ${text}`;
@@ -545,7 +582,363 @@ async function init() {
   }
 }
 
+// ══════════════════════════════════════════════
+// Deck Creator
+// ══════════════════════════════════════════════
+
+let deckMode = false;
+let deckState = { name: 'My Deck', cards: new Map() };
+
+function getBaseCardNo(cardNo) {
+  const i = cardNo.lastIndexOf('-');
+  return i > 0 ? cardNo.slice(0, i) : cardNo;
+}
+
+function deckCardLookup(cardNo) {
+  return allCardsArr.find(c => c.card_no === cardNo) || null;
+}
+
+function addToDeck(cardNo) {
+  const card = deckCardLookup(cardNo);
+  if (!card) return;
+  const entry = deckState.cards.get(cardNo) || { card, qty: 0 };
+  entry.qty = Math.min((entry.qty || 0) + 1, 99);
+  deckState.cards.set(cardNo, entry);
+  deckState.cards = new Map(deckState.cards);
+  updateDeckUI();
+}
+function removeFromDeck(cardNo) {
+  const entry = deckState.cards.get(cardNo);
+  if (!entry) return;
+  if (entry.qty <= 1) { deckState.cards.delete(cardNo); }
+  else { entry.qty--; }
+  deckState.cards = new Map(deckState.cards);
+  updateDeckUI();
+}
+function setDeckQty(cardNo, qty) {
+  qty = Math.max(0, Math.min(99, qty));
+  if (qty === 0) { deckState.cards.delete(cardNo); }
+  else {
+    const card = deckCardLookup(cardNo);
+    if (card) deckState.cards.set(cardNo, { card, qty });
+  }
+  deckState.cards = new Map(deckState.cards);
+  updateDeckUI();
+}
+function clearDeck() {
+  if (deckState.cards.size === 0) return;
+  if (!confirm('Clear the entire deck?')) return;
+  deckState.cards = new Map();
+  updateDeckUI();
+}
+function exportDeck() {
+  if (deckState.cards.size === 0) { toast('Deck is empty'); return; }
+  const name = document.getElementById('deck-name').value || 'deck';
+  const lines = [];
+  const entries = [...deckState.cards.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [cardNo, entry] of entries) {
+    lines.push(`${cardNo} x ${entry.qty}`);
+  }
+  const text = lines.join('\n');
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${name}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast(`Exported ${deckState.cards.size} card types`);
+}
+function importDeckText(text) {
+  const newCards = new Map();
+  let imported = 0;
+  for (let raw of text.split('\n')) {
+    raw = raw.trim();
+    if (!raw || raw.startsWith('//')) continue;
+    let cardNo, qty = 1;
+    const parts = raw.split(' x ');
+    if (parts.length === 2) {
+      const a = parts[0].trim(), b = parts[1].trim();
+      if (/^\d+$/.test(a)) { qty = parseInt(a); cardNo = b; }
+      else if (/^\d+$/.test(b)) { qty = parseInt(b); cardNo = a; }
+      else continue;
+    } else if (raw.includes('-')) {
+      cardNo = raw;
+    } else continue;
+    if (!cardNo) continue;
+    const card = deckCardLookup(cardNo);
+    if (!card) continue;
+    const existing = newCards.get(cardNo);
+    newCards.set(cardNo, { card, qty: (existing ? existing.qty : 0) + qty });
+    imported++;
+  }
+  if (imported === 0) { toast('No valid cards found in import'); return; }
+  deckState.cards = newCards;
+  document.getElementById('import-area').classList.add('hidden');
+  document.getElementById('import-text').value = '';
+  updateDeckUI();
+  toast(`Imported ${imported} card types`);
+}
+
+// ── Validation ──
+
+const DECK_CHECKS = [
+  {
+    id: 'member48', type: 'count',
+    label: 'Main deck has exactly 48 Member cards',
+    qa: 'Q3', rule: '§6.1.1.1',
+    eval: d => {
+      const v = d.memberCount;
+      return { pass: v === 48, current: `${v}/48`,
+        detail: v === 48 ? 'Correct number of Member cards.' :
+                v < 48 ? `Need ${48-v} more Member cards.` : `Too many! Max 48.` };
+    }
+  },
+  {
+    id: 'live12', type: 'count',
+    label: 'Main deck has exactly 12 Live cards',
+    qa: 'Q3', rule: '§6.1.1.1',
+    eval: d => {
+      const v = d.liveCount;
+      return { pass: v === 12, current: `${v}/12`,
+        detail: v === 12 ? 'Correct number of Live cards.' :
+                v < 12 ? `Need ${12-v} more Live cards.` : `Too many! Max 12.` };
+    }
+  },
+  {
+    id: 'total60', type: 'count',
+    label: 'Main deck total = 60 (48M + 12L)',
+    qa: 'Q3', rule: '§6.1.1.1',
+    eval: d => {
+      const v = d.mainTotal;
+      return { pass: v === 60, current: `${v}/60`,
+        detail: v === 60 ? 'Main deck is exactly 60 cards.' :
+                v < 60 ? `Need ${60-v} more cards total.` : `Too many! Max 60.` };
+    }
+  },
+  {
+    id: 'max4', type: 'violations',
+    label: 'Max 4 copies per card number',
+    qa: 'Q4,Q5', rule: '§6.1.1.2',
+    eval: d => {
+      const violations = [];
+      const baseMap = new Map();
+      for (const [cardNo, entry] of deckState.cards) {
+        const base = getBaseCardNo(cardNo);
+        baseMap.set(base, (baseMap.get(base) || 0) + entry.qty);
+      }
+      for (const [base, total] of baseMap) {
+        if (total > 4) violations.push({ base, total });
+      }
+      return { pass: violations.length === 0, violations,
+        detail: violations.length === 0 ? 'All cards within copy limit.' :
+                `${violations.length} card(s) exceed 4 copies across rarities.` };
+    }
+  },
+  {
+    id: 'sameCardRarity', type: 'info',
+    label: 'Same card_no across rarities counts toward same limit',
+    qa: 'Q5', rule: 'Shared limit',
+    eval: d => ({ pass: null, detail: 'e.g. PL!SP-bp1-005-R and PL!SP-bp1-005-P share the same 4-card limit.' })
+  },
+  {
+    id: 'diffCardDiff', type: 'info',
+    label: 'Different card_no = separate 4-card limit',
+    qa: 'Q6', rule: 'Separate limit',
+    eval: d => ({ pass: null, detail: 'Different card numbers are treated as separate cards for the 4-card limit.' })
+  },
+  {
+    id: 'energy12', type: 'count',
+    label: 'Energy deck: 12 Energy cards',
+    qa: 'Q7', rule: '§6.1.1.3',
+    eval: d => {
+      const v = d.energyCount;
+      return { pass: v === 12, current: `${v}/12`,
+        detail: v === 12 ? 'Correct number of Energy cards.' :
+                v < 12 ? `Need ${12-v} more Energy cards.` : `Too many! Max 12.` };
+    }
+  },
+  {
+    id: 'totalScore', type: 'info',
+    label: 'Total Live card score',
+    qa: 'Points', rule: 'Scoring',
+    eval: d => ({ pass: null, current: `${d.totalScore} pts`,
+      detail: `Sum of all Live card scores in deck. Higher is better for winning.` })
+  },
+];
+
+function validateDeck() {
+  let memberCount = 0, liveCount = 0, energyCount = 0, totalScore = 0;
+  for (const entry of deckState.cards.values()) {
+    const q = entry.qty;
+    switch (entry.card.type) {
+      case 'メンバー': memberCount += q; break;
+      case 'ライブ': liveCount += q; totalScore += (entry.card.score || 0) * q; break;
+      case 'エネルギー': energyCount += q; break;
+    }
+  }
+  const mainTotal = memberCount + liveCount;
+  const data = { memberCount, liveCount, energyCount, mainTotal, totalScore };
+  const results = DECK_CHECKS.map(c => ({ ...c, result: c.eval(data) }));
+  return { data, results };
+}
+function renderChecklist(results) {
+  const el = document.getElementById('checklist');
+  let html = '<div class="checklist-title">Validation</div>';
+  for (const c of results) {
+    const r = c.result;
+    const cls = r.pass === true ? 'pass' : r.pass === false ? 'fail' : 'info';
+    const icon = r.pass === true ? '\u2705' : r.pass === false ? '\u274C' : '\u2139\uFE0F';
+    const cur = r.current ? `<span class="rule-current">${r.current}</span>` : '';
+    const src = c.qa ? `<span class="rule-source">${c.qa}</span>` : '';
+    html += `<div class="checklist-item ${cls}">
+      <span class="status-icon">${icon}</span>
+      <div class="rule-body">
+        <div class="rule-label">${c.label} ${src}</div>
+        <div class="rule-detail">${r.detail} ${cur}</div>
+      </div>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+function renderDeckStats(data) {
+  const el = document.getElementById('deck-stats');
+  const memberCls = data.memberCount === 48 ? 'pass' : data.memberCount > 48 ? 'fail' : 'info';
+  const liveCls = data.liveCount === 12 ? 'pass' : data.liveCount > 12 ? 'fail' : 'info';
+  const energyCls = data.energyCount === 12 ? 'pass' : data.energyCount > 12 ? 'fail' : 'info';
+  const totalCls = data.mainTotal === 60 ? 'pass' : data.mainTotal > 60 ? 'fail' : 'info';
+  el.innerHTML = `
+    <span class="deck-stat ${memberCls}">M: ${data.memberCount}/48</span>
+    <span class="deck-stat ${liveCls}">L: ${data.liveCount}/12</span>
+    <span class="deck-stat ${totalCls}">Main: ${data.mainTotal}/60</span>
+    <span class="deck-stat ${energyCls}">E: ${data.energyCount}/12</span>
+    <span class="deck-stat info">Score: ${data.totalScore}</span>
+  `;
+}
+function renderDeckList() {
+  const el = document.getElementById('deck-card-list');
+  const totalEl = document.getElementById('deck-total');
+  const entries = [...deckState.cards.entries()].sort((a, b) => {
+    const order = { 'メンバー': 0, 'ライブ': 1, 'エネルギー': 2 };
+    const ta = order[a[1].card.type] || 9, tb = order[b[1].card.type] || 9;
+    return ta - tb || a[0].localeCompare(b[0]);
+  });
+  let total = 0;
+  let html = '';
+  const typeShort = { 'メンバー': 'M', 'ライブ': 'L', 'エネルギー': 'E' };
+  const baseQty = new Map();
+  for (const [, e] of entries) {
+    const base = getBaseCardNo(e.card.card_no);
+    baseQty.set(base, (baseQty.get(base) || 0) + e.qty);
+  }
+  for (const [cardNo, entry] of entries) {
+    total += entry.qty;
+    const base = getBaseCardNo(cardNo);
+    const over = baseQty.get(base) > 4 ? '\u26A0\uFE0F' : '';
+    html += `<div class="deck-card-row" data-card="${cardNo}">
+      <span class="dc-qty">${entry.qty}x</span>
+      <span class="dc-type">${typeShort[entry.card.type] || '?'}</span>
+      <span class="dc-name">${entry.card.name || cardNo}</span>
+      ${over ? `<span class="dc-violation">${over}</span>` : ''}
+      <span class="dc-remove">\u00D7</span>
+    </div>`;
+  }
+  el.innerHTML = html || '<div style="padding:10px;text-align:center;color:#505060;font-size:11px;">\u270D\uFE0F Click cards to build your deck</div>';
+  totalEl.textContent = total;
+  el.querySelectorAll('.deck-card-row').forEach(row => {
+    row.addEventListener('click', () => removeFromDeck(row.dataset.card));
+    row.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      setDeckQty(row.dataset.card, 0);
+    });
+  });
+}
+function updateDeckUI() {
+  const { data, results } = validateDeck();
+  renderChecklist(results);
+  renderDeckStats(data);
+  renderDeckList();
+  document.getElementById('deck-name').value = deckState.name;
+  // Update grid card indicators
+  document.querySelectorAll('.card-item').forEach(el => {
+    const no = el.dataset.cardNo;
+    const entry = deckState.cards.get(no);
+    const base = getBaseCardNo(no);
+    let totalForBase = 0;
+    for (const [cn, e] of deckState.cards) {
+      if (getBaseCardNo(cn) === base) totalForBase += e.qty;
+    }
+    el.classList.toggle('in-deck', !!entry);
+    el.classList.toggle('at-limit', totalForBase >= 4);
+  });
+}
+
+// ── Mode Toggle ──
+
+function setDeckMode(enabled) {
+  deckMode = enabled;
+  document.getElementById('mode-browser').classList.toggle('active', !enabled);
+  document.getElementById('mode-deck').classList.toggle('active', enabled);
+  document.getElementById('deck-panel').classList.toggle('hidden', !enabled);
+  document.getElementById('sidebar-title').textContent = enabled ? 'Deck Creator' : 'Card Browser';
+  document.getElementById('empty-state').innerHTML = enabled
+    ? '&#127183; Switch to Browse mode to search, or click cards here to add to deck'
+    : '&#128270; Switch to Deck mode to build a deck list';
+  // Re-bind card clicks
+  rebindCardClicks();
+}
+
+function rebindCardClicks() {
+  document.querySelectorAll('.card-item').forEach(el => {
+    const newEl = el.cloneNode(true);
+    el.parentNode.replaceChild(newEl, el);
+    newEl.addEventListener('click', () => {
+      if (deckMode) addToDeck(newEl.dataset.cardNo);
+      else copyToClipboard(newEl.dataset.cardNo);
+    });
+    newEl.addEventListener('mouseenter', showTooltip);
+    newEl.addEventListener('mouseleave', hideTooltip);
+    newEl.addEventListener('mousemove', moveTooltip);
+  });
+  updateDeckUI();
+}
+
+// ── Init Deck Creator UI ──
+
+function initDeckCreator() {
+  document.getElementById('mode-browser').addEventListener('click', () => setDeckMode(false));
+  document.getElementById('mode-deck').addEventListener('click', () => setDeckMode(true));
+  document.getElementById('export-deck').addEventListener('click', exportDeck);
+  document.getElementById('clear-deck').addEventListener('click', clearDeck);
+  document.getElementById('deck-name').addEventListener('input', function() {
+    deckState.name = this.value;
+  });
+
+  // Import: show/hide textarea
+  const importBtn = document.createElement('button');
+  importBtn.id = 'show-import';
+  importBtn.textContent = '\uD83D\uDCE5 Import';
+  importBtn.style.cssText = 'flex:1;padding:4px 6px;background:#1a1a2e;color:#8888a0;border:1px solid #0f3460;border-radius:3px;font-size:10px;cursor:pointer;';
+  document.querySelector('.deck-actions').appendChild(importBtn);
+  importBtn.addEventListener('click', () => {
+    document.getElementById('import-area').classList.toggle('hidden');
+  });
+  document.getElementById('import-btn').addEventListener('click', () => {
+    importDeckText(document.getElementById('import-text').value);
+  });
+  document.getElementById('import-cancel').addEventListener('click', () => {
+    document.getElementById('import-area').classList.add('hidden');
+  });
+
+  // Override card clicks after all cards render
+  const origRender = renderCards;
+  renderCards = function(cards) {
+    origRender(cards);
+    if (deckMode) rebindCardClicks();
+  };
+}
+
 init();
+initDeckCreator();
 </script>
 </body>
 </html>
