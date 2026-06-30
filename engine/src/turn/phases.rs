@@ -224,7 +224,7 @@ impl super::TurnEngine {
         let performer_id = player.id.clone();
         // Phase A: yell + blade heart (rules 8.3.10-8.3.12).
         // Returns intermediate data; resolution_zone still has the yell cards.
-        let yell_data = Self::player_perform_live(
+        let mut yell_data = Self::player_perform_live(
             player,
             &mut resolution_zone,
             &performer_id,
@@ -245,8 +245,18 @@ impl super::TurnEngine {
 
         // Collect revealed card IDs from resolution zone before success check drains it
         let revealed_ids: Vec<i16> = resolution_zone.cards.iter().copied().collect();
+        eprintln!(
+            "[YELL_DEBUG] pid={} is_first={} revealed_ids={:?}",
+            player_id, is_first, revealed_ids
+        );
         for cid in &revealed_ids {
             game_state.revealed_cards.push(*cid);
+        }
+        // Save initial yell cards BEFORE auto abilities fire, since
+        // re-yell abilities may discard them (clearing revealed_cards).
+        // Only save once — P2 performance would overwrite with empty.
+        if game_state.initial_yell_revealed_cards.is_empty() {
+            game_state.initial_yell_revealed_cards = game_state.revealed_cards.clone();
         }
         for cid in &revealed_ids {
             game_state.cheer_revealed_cards_first(is_first).push(*cid);
@@ -267,6 +277,52 @@ impl super::TurnEngine {
         game_state.trigger_auto_abilities_for_player(&performer_id);
         game_state.process_pending_auto_abilities(&performer_id);
         game_state.yell_occurred = false;
+
+        // Rule 8.3.13.1: If a re-yell occurred, replace yell data with newly-revealed cards.
+        if game_state.re_yell_occurred {
+            // Save re-yell revealed cards for display
+            game_state.re_yell_revealed_cards = game_state.revealed_cards.clone();
+            let card_db = &game_state.card_database;
+            let mut new_yell_cards: Vec<crate::core::types::YellCardResult> = Vec::new();
+            let mut new_total_hearts = [0u32; 8];
+            let mut new_cheer_count = 0u32;
+            for &cid in &game_state.revealed_cards {
+                if let Some(card) = card_db.get_card(cid) {
+                    let mut bh = [0u32; 8];
+                    let mut notes = 0u32;
+                    if let Some(ref bheart) = card.blade_heart {
+                        for (color, count) in &bheart.hearts {
+                            use crate::card::HeartColor;
+                            match color {
+                                HeartColor::Draw => {}
+                                HeartColor::Score => {
+                                    notes += count;
+                                    new_cheer_count += count;
+                                }
+                                _ => {
+                                    let idx = color.index();
+                                    if idx < 8 {
+                                        bh[idx] += count;
+                                        new_total_hearts[idx] += count;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    new_yell_cards.push(crate::core::types::YellCardResult {
+                        card_id: cid,
+                        blade_hearts: bh,
+                        note_icons: notes,
+                        draw_icons: 0,
+                        card_no: card.card_no.clone(),
+                    });
+                }
+            }
+            yell_data.yell_cards = new_yell_cards;
+            yell_data.total_hearts = new_total_hearts;
+            yell_data.note_icons = new_cheer_count;
+            game_state.re_yell_occurred = false;
+        }
 
         // Capture current heart modifiers (includes ability-granted hearts from
         // the 8.3.13 check timing) before re-borrowing player.

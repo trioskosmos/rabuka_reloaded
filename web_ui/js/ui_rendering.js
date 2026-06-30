@@ -282,12 +282,14 @@ export const Rendering = {
         const filteredCards = validPairs.map(p => p.card);
         const filteredActions = validPairs.map(p => p.action);
 
-        // Always hide the selection modal — pending choice cards are shown in sidebar's looked cards panel
-        // (accessible via mobile toggle buttons on narrow screens)
-        if (!modalState.isVisible || filteredCards.length > 0) {
+        // Hide selection modal when there's no pending choice (choice was resolved)
+        if (!State.data?.pending_choice) {
             panel.style.display = DISPLAY_VALUES.NONE;
             return;
         }
+
+        // ChoiceView already populates the modal — don't override
+        return;
 
         panel.style.display = DISPLAY_VALUES.FLEX;
 
@@ -298,9 +300,15 @@ export const Rendering = {
                 containerId: DOM_IDS.SELECTION_CONTENT,
                 actionId: action?.index,
             });
-            const cardEl = CardRenderer.createCardDOM(viewModel, c, () => {
-                if (window.doAction) window.doAction(action);
-            });
+            const onClick = () => {
+                if (State.uiMode === 'view') {
+                    const m = window.__modals?.CardDetailModal;
+                    if (m) m.open(c);
+                } else if (window.doAction) {
+                    window.doAction(action);
+                }
+            };
+            const cardEl = CardRenderer.createCardDOM(viewModel, c, onClick);
             CardRenderer.renderCardBonuses(cardEl, c, true);
             cardEl.className = `selection-card-item ${viewModel.classes}`;
             content.appendChild(cardEl);

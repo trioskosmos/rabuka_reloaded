@@ -11,6 +11,10 @@ import { LobbyModal } from './modals/LobbyModal.js';
 import { ReportModal } from './modals/ReportModal.js';
 import { DebugModal } from './modals/DebugModal.js';
 import { GameStateModal } from './modals/GameStateModal.js';
+import { CardDetailModal } from './modals/CardDetailModal.js';
+import { PlayActionModal } from './modals/PlayActionModal.js';
+import { StageAbilityModal } from './modals/StageAbilityModal.js';
+import { AbilityQueueModal } from './modals/AbilityQueueModal.js';
 
 export const Modals = {
     deckPresets: [],
@@ -70,5 +74,15 @@ export const Modals = {
     openDebugModal: () => DebugModal.openDebugModal(),
     closeDebugModal: () => DebugModal.closeDebugModal(),
     rewind: () => DebugModal.rewind(),
-    redo: () => DebugModal.redo()
+    redo: () => DebugModal.redo(),
+
+    // --- Mobile Modals ---
+    openCardDetail: (card) => CardDetailModal.open(card),
+    closeCardDetail: () => CardDetailModal.close(),
+    openPlayAction: (card, actions) => PlayActionModal.open(card, actions),
+    closePlayAction: () => PlayActionModal.close(),
+    openStageAbility: (card, actions) => StageAbilityModal.open(card, actions),
+    closeStageAbility: () => StageAbilityModal.close(),
+    openAbilityQueue: () => AbilityQueueModal.open(),
+    closeAbilityQueue: () => AbilityQueueModal.close(),
 };

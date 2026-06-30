@@ -59,6 +59,7 @@ pub mod gameplay_test;
 pub mod genki_zenkai_test;
 pub mod hanabiko_discard_test;
 pub mod hanamaru_test;
+pub mod kurosawa_dia_re_yell_test;
 pub mod tang_keke_test;
 
 pub mod hanamusubi_exclude_self_test;

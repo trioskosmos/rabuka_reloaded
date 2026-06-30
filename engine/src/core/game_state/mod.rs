@@ -64,6 +64,10 @@ pub struct GameState {
     pub revealed_cost_cards: Vec<i16>,
     pub player1_cheer_revealed_cards: Vec<i16>,
     pub player2_cheer_revealed_cards: Vec<i16>,
+    /// Cards revealed by the initial yell (saved before re-yell overwrites them).
+    pub initial_yell_revealed_cards: Vec<i16>,
+    /// Cards revealed by a re-yell (set after perform_yell draws new cards).
+    pub re_yell_revealed_cards: Vec<i16>,
     pub looked_at_cards: Vec<i16>,
     pub ability_applications: Vec<crate::types::AbilityApplication>,
     /// Synced from batch_movements by push_movement_event().
@@ -118,6 +122,9 @@ pub struct GameState {
     /// Set during the performance phase after a yell actually occurs
     /// (total_blade > 0 after modifiers). Checked by on_yell abilities.
     pub yell_occurred: bool,
+    /// Set by execute_re_yell when a card's ability triggers a re-yell.
+    /// The phase code checks this to re-compute yell data for live success.
+    pub re_yell_occurred: bool,
 
     // --- 2-byte aligned (i16, Option<i16>) ---
     pub activating_card: Option<i16>,
@@ -248,6 +255,8 @@ impl GameState {
             revealed_cost_cards: Vec::new(),
             player1_cheer_revealed_cards: Vec::new(),
             player2_cheer_revealed_cards: Vec::new(),
+            initial_yell_revealed_cards: Vec::new(),
+            re_yell_revealed_cards: Vec::new(),
             looked_at_cards: Vec::new(),
             ability_applications: Vec::new(),
             recently_moved_cards: None,
@@ -279,6 +288,7 @@ impl GameState {
             baton_touch_replaced_member_id: None,
             baton_touch_arriving_card_id: None,
             yell_occurred: false,
+            re_yell_occurred: false,
             // 2-byte aligned
             activating_card: None,
             activating_ability_index: None,

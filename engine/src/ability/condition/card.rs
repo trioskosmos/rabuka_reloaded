@@ -3306,6 +3306,7 @@ impl<'a> ConditionContext<'a> {
             Some(Zone::Energy) => player.energy_zone.cards.len() as u32,
             Some(Zone::LiveCardZone) => player.live_card_zone.len() as u32,
             Some(Zone::SuccessLiveZone) => player.success_live_card_zone.len() as u32,
+            Some(Zone::RevealedCards) => self.game_state.revealed_cards.len() as u32,
             _ => 0,
         }
     }

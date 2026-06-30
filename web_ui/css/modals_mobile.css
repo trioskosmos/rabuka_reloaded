@@ -1,0 +1,351 @@
+/* --- Mobile Modal Styles --- */
+
+/* Desktop: hide mobile-only floating elements */
+#mobile-choice-reopen {
+    display: none;
+}
+
+/* Selection modal - compact padding like sidebar panel (all screen sizes) */
+.selection-modal-content {
+    padding: 12px;
+}
+.selection-modal-content .modal-header {
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+}
+.selection-modal-content .modal-body {
+    padding: 4px;
+    max-height: 60vh;
+}
+.selection-modal-content .modal-title {
+    font-size: 1rem;
+}
+
+/* Full-screen modals on phone */
+@media (orientation: portrait), (max-aspect-ratio: 13/9) {
+    .modal-content.card-detail-content,
+    .modal-content.play-action-content,
+    .modal-content.stage-ability-content,
+    .modal-content.ability-queue-content {
+        width: 95vw;
+        max-width: 95vw;
+        height: 90dvh;
+        max-height: 90dvh;
+        display: flex;
+        flex-direction: column;
+        padding: 12px;
+    }
+
+    .modal-content.play-action-content {
+        height: auto;
+        max-height: 85dvh;
+    }
+
+    .modal-content.card-detail-content .modal-body,
+    .modal-content.stage-ability-content .modal-body,
+    .modal-content.ability-queue-content .modal-body {
+        flex: 1;
+        overflow-y: auto;
+        max-height: none;
+    }
+
+    .card-detail-layout {
+        flex-direction: column;
+    }
+
+    .card-detail-image {
+        width: 100%;
+        max-height: 35vh;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        background: rgba(0,0,0,0.15);
+        border-radius: 6px;
+        margin-bottom: 4px;
+    }
+
+    .card-detail-image img {
+        max-height: 35vh;
+        object-fit: contain;
+    }
+
+    .play-action-card-preview {
+        max-height: 25vh;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        background: rgba(0,0,0,0.15);
+        border-radius: 6px;
+        margin-bottom: 8px;
+    }
+
+    .play-action-card-preview img {
+        max-height: 25vh;
+        object-fit: contain;
+    }
+
+    .stage-ability-card-preview {
+        max-height: 20vh;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        background: rgba(0,0,0,0.15);
+        border-radius: 6px;
+        margin-bottom: 8px;
+    }
+
+    .stage-ability-card-preview img {
+        max-height: 20vh;
+        object-fit: contain;
+    }
+
+    /* Pending choice modal - compact like sidebar panel */
+    .selection-modal-content {
+        width: 95vw;
+        max-width: 95vw;
+        height: 85dvh;
+        max-height: 85dvh;
+        display: flex;
+        flex-direction: column;
+        padding: 8px;
+    }
+
+    .selection-modal-content .modal-header {
+        padding-bottom: 6px;
+        margin-bottom: 6px;
+    }
+
+    .selection-modal-content .modal-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 4px;
+        max-height: none;
+    }
+
+    .selection-modal-content .modal-title {
+        font-size: 1rem;
+    }
+
+    .selection-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
+        gap: 4px;
+        padding: 4px;
+    }
+
+    /* UI mode toggle badge */
+    #ui-mode-toggle {
+        font-size: 0.75rem;
+        padding: 3px 8px;
+        min-width: 50px;
+        text-align: center;
+    }
+
+    /* Choice reopen button */
+    #mobile-choice-reopen {
+        position: fixed;
+        bottom: 120px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        padding: 8px 20px;
+        border-radius: 20px;
+        background: var(--accent-purple, #9966ff);
+        color: white;
+        border: none;
+        font-weight: bold;
+        font-size: 0.85rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        cursor: pointer;
+        display: none;
+    }
+
+    #mobile-choice-reopen.show {
+        display: block;
+    }
+
+    /* Larger touch targets for action buttons in modals */
+    .action-group-buttons button {
+        min-height: 44px;
+    }
+
+    /* Ability queue mobile */
+    .ability-queue-entry {
+        font-size: 0.85rem;
+    }
+
+    /* Card detail stats badges */
+    .stat-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        margin: 2px;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 4px;
+        font-size: 0.75rem;
+    }
+}
+
+/* Desktop modal sizing - keep compact */
+.modal-content.card-detail-content {
+    max-width: 650px;
+    width: 90%;
+}
+
+.modal-content.play-action-content {
+    max-width: 420px;
+}
+
+.modal-content.stage-ability-content {
+    max-width: 420px;
+}
+
+.modal-content.ability-queue-content {
+    max-width: 500px;
+}
+
+/* Card detail layout: side-by-side on wider screens */
+.card-detail-layout {
+    display: flex;
+    gap: 12px;
+    height: 100%;
+}
+
+.card-detail-image {
+    flex: 0 0 auto;
+    width: clamp(140px, 35%, 280px);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    background: rgba(0,0,0,0.15);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.card-detail-image img {
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
+    display: block;
+}
+
+.card-detail-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
+}
+
+.card-detail-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+/* Nav buttons */
+.nav-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--text, #fff);
+    font-size: 1rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    line-height: 1;
+    transition: background 0.15s;
+}
+.nav-btn:hover { background: rgba(255,255,255,0.2); }
+.nav-btn:active { background: rgba(255,255,255,0.3); }
+
+.card-detail-header-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+}
+
+.card-detail-header-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.card-detail-header-left .modal-title {
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.card-detail-meta {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    margin-bottom: 6px;
+}
+
+.card-detail-ability {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: rgba(255,255,255,0.85);
+}
+
+#card-detail-footer {
+    padding-top: 6px;
+    margin-top: 4px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+/* Play action modal header nav */
+#play-action-modal .modal-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#play-action-modal .modal-header .modal-title {
+    flex: 1;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+#play-action-modal .modal-header .nav-btn {
+    font-size: 0.85rem;
+    padding: 3px 6px;
+}
+
+/* Extra narrow: smaller image */
+@media (max-width: 360px) {
+    .card-detail-image {
+        max-height: 25vh;
+    }
+    .card-detail-image img {
+        max-height: 25vh;
+    }
+}
+
+#play-action-buttons .action-group-buttons {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+#play-action-buttons .grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+/* Pending choice card items */
+.selection-card-item {
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.selection-card-item:active {
+    transform: scale(0.95);
+}
+
+/* View mode highlight */
+.selection-card-item.view-only {
+    cursor: help;
+}

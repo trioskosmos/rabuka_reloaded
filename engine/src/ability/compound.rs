@@ -719,6 +719,7 @@ impl AbilityResolver {
             if self.pending_choice.is_some() {
                 let mut finish = effect.clone();
                 finish.compound.primary_effect = None;
+                finish.condition = None;
                 gs.ability_queue.save_pending_actions(vec![finish]);
                 return Ok(());
             }

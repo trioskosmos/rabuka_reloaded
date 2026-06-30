@@ -2135,7 +2135,9 @@ def parse_action(text: str) -> Dict[str, Any]:
         ),
     )
     R(
-        lambda t: bool(re.search(r"を(すべて)?失[うい]", t)),
+        lambda t: bool(re.search(r"を(すべて)?失[うい]", t))
+        and "もう一度エール" not in t
+        and "もう1度エール" not in t,
         "gain_resource",
         lambda t, a: a.update(
             {
@@ -2150,9 +2152,33 @@ def parse_action(text: str) -> Dict[str, Any]:
     R(
         lambda t: "もう一度エール" in t or "もう1度エール" in t,
         "re_yell",
-        lambda t, a: a.update({"lose_blade_hearts": True})
-        if "できない" not in t
-        else None,
+        lambda t, a: None
+        if "できない" in t
+        else (
+            a.pop("lose_blade_hearts", None),
+            a.pop("location", None),
+            a.update(
+                {
+                    "action": "sequential",
+                    "actions": [
+                        {
+                            "text": "ブレードハートを失い",
+                            "action": "re_yell",
+                            "lose_blade_hearts": True,
+                            "target": "self",
+                        },
+                        {
+                            "text": "もう一度エールを行う",
+                            "action": "perform_yell",
+                            "count": 1,
+                            "target": "self",
+                        },
+                    ],
+                }
+            ),
+        )
+        if "ブレードハートを失い" in t
+        else a.update({"lose_blade_hearts": True}),
     )
     R(
         lambda t: ("見る" in t or "見て" in t or t.endswith("見")),
@@ -2174,11 +2200,33 @@ def parse_action(text: str) -> Dict[str, Any]:
         ),
     )
     R(
-        lambda t: "1枚ずつ公開" in t or "枚ずつ公開" in t,
-        "reveal",
-        lambda t, a: (
-            a.update({"per_unit": True, "per_unit_count": 1, "multiple_targets": True}),
-            None,
+        lambda t: "もう一度エール" in t or "もう1度エール" in t,
+        "re_yell",
+        lambda t, a: None
+        if "できない" in t
+        else (
+            a.update({"lose_blade_hearts": True}),
+            a.update(
+                {
+                    "action": "sequential",
+                    "actions": [
+                        {
+                            "text": t.split("、")[0] if "、" in t else t,
+                            "action": "re_yell",
+                            "lose_blade_hearts": True,
+                            "target": "self",
+                        },
+                        {
+                            "text": t.split("、")[-1] if "、" in t else t,
+                            "action": "perform_yell",
+                            "count": 1,
+                            "target": "self",
+                        },
+                    ],
+                }
+            )
+            if "ブレードハートを失い" in t
+            else (a.update({"lose_blade_hearts": True}),),
         ),
     )
     R("以下から1つを選ぶ", "choice", None)
@@ -2837,7 +2885,9 @@ def _enrich_card_count_condition(result, text):
     if "ALLブレード" in text or "{{icon_b_all.png" in text:
         result["card_property"] = "has_all_blade"
     # Revealed cards context
-    if "エールにより公開された" in text or "これにより公開された" in text:
+    if "エールにより" in text and "公開" in text:
+        result["location"] = "revealed_cards"
+    elif "これにより公開" in text:
         result["location"] = "revealed_cards"
     # Generic card_type/location/target (don't re-add if or_card_types is already set)
     ct = extract_card_type(text)
@@ -2986,6 +3036,9 @@ def _try_card_count(text):
     Also detects hand-count sub-conditions and promotes to compound.
     """
     for pat, op, unit in [
+        (r"(\d+)枚以下の場合", "<=", None),
+        (r"(\d+)枚以下の", "<=", None),
+        (r"(\d+)枚以下", "<=", None),
         (r"(\d+)つ以上ある", ">=", None),
         (r"(\d+)枚以上ある", ">=", None),
         (r"(\d+)種類以上ある", ">=", "types"),
@@ -7406,7 +7459,7 @@ def _try_kore_niyori_result(text):
     return {
         "text": text,
         "action": "conditional_on_result",
-        "primary_effect": parse_action(primary_text),
+        "primary_effect": parse_effect(primary_text),
         "result_condition": cond,
         "followup_action": parse_action(fp.strip()),
     }
@@ -7596,6 +7649,9 @@ def _try_lose_resource(text):
     """を失う — lose/gain-negative resource effects (e.g. ブレードを失う)."""
     if "を失う" not in text:
         return None
+    # Defer to _try_re_yell when the text also contains a re-yell instruction
+    if "もう一度エールを行う" in text or "もう1度エールを行う" in text:
+        return None
     result = {"text": text, "action": "gain_resource", "sign": "negative"}
     # Detect what's being lost
     if "ブレード" in text:
@@ -7769,10 +7825,41 @@ def _try_both_discard_until(text):
 
 
 def _try_re_yell(text):
-    """もう一度エールを行う + ブレードハートを失い — re-yell."""
+    """もう一度エールを行う + ブレードハートを失い — re-yell with perform_yell.
+    Handles preceding actions before the re-yell sentence (e.g. optional discard)
+    when the text has a 。 separator."""
     if "もう一度エールを行う" not in text or "ブレードハートを失い" not in text:
         return None
-    return {"text": text, "action": "re_yell", "lose_blade_hearts": True}
+    actions = []
+    # If there are preceding sentences before the re-yell instruction, parse them
+    if "。" in text:
+        parts = text.rsplit("。", 1)
+        preceding = parts[0].strip()
+        if preceding:
+            parsed = parse_effect(preceding)
+            if isinstance(parsed, dict):
+                if parsed.get("action") == "sequential":
+                    actions.extend(parsed.get("actions", []))
+                else:
+                    actions.append(parsed)
+        text = parts[1].strip().lstrip("、")
+    actions.append(
+        {
+            "text": "ブレードハートを失い",
+            "action": "re_yell",
+            "lose_blade_hearts": True,
+            "target": "self",
+        }
+    )
+    actions.append(
+        {
+            "text": "もう一度エールを行う",
+            "action": "perform_yell",
+            "count": 1,
+            "target": "self",
+        }
+    )
+    return {"text": text, "action": "sequential", "actions": actions}
 
 
 def _try_energy_under_member(text):
@@ -7949,6 +8036,7 @@ _EFFECT_HANDLERS = [
     _try_compound_select,  # Compound select + action
     _try_shi_sequential,  # Aし、B (te-form sequential)
     _try_te_sequential,  # Xを得て、Yを得る (sequential gains)
+    _try_re_yell,  # Re-yell — must be before implicit sequential to prevent splitting
     _try_implicit_sequential,  # Implicit sequential (two actions fused)
     # Tier 4: Single-action patterns (most general)
     _try_conditional,  # X場合、Y (generic conditional)
@@ -7963,7 +8051,6 @@ _EFFECT_HANDLERS = [
     _try_blade_actions,  # Blade-specific actions
     _try_both_discard_until,  # Both players discard until
     _try_lose_resource,  # Lose resource
-    _try_re_yell,  # Re-yell
     _try_restriction_effect,  # Restriction effects
 ]
 
@@ -8546,13 +8633,16 @@ def _walk(d, full_text, original_text, ctx_text=None):
     # Infer operator for comparison conditions when counts are present
     ct = d.get("condition_type") or d.get("type")
     if ct in ("comparison_condition", "card_count_condition", "location_condition"):
-        # Always override for "以上"/"以下" even if operator was pre-set
+        # Always override for "以上"/"以下" even if operator was pre-set.
+        # Check "以下" BEFORE "以上" so that compound texts like
+        # "1枚以上公開...2枚以下の場合" pick ≤2 (the real condition),
+        # not ≥1 (the trigger clause).
         _text = d.get("text", "")
         if d.get("count") is not None and not d.get("comparison_target"):
-            if "以上" in _text:
-                d["operator"] = ">="
-            elif "以下" in _text:
+            if "以下" in _text:
                 d["operator"] = "<="
+            elif "以上" in _text:
+                d["operator"] = ">="
             elif "operator" not in d:
                 d["operator"] = "="
         if "operator" not in d:
@@ -8899,10 +8989,10 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
     ):
         _text = node.get("text", "")
         if node.get("count") is not None and not node.get("comparison_target"):
-            if "以上" in _text:
-                node["operator"] = ">="
-            elif "以下" in _text:
+            if "以下" in _text:
                 node["operator"] = "<="
+            elif "以上" in _text:
+                node["operator"] = ">="
             elif "operator" not in node:
                 node["operator"] = "="
         if "operator" not in node:

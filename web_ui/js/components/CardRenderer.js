@@ -5,6 +5,24 @@ import { Tooltips } from '../ui_tooltips.js';
 import { DOMUtils } from '../utils/DOMUtils.js';
 import { DOM_IDS } from '../constants_dom.js';
 
+function openCardDetailModal(card, zoneHint) {
+    if (!window.__isMobile) return;
+    const m = window.__modals?.CardDetailModal;
+    if (m) m.open(card, zoneHint);
+}
+
+function openPlayActionModal(card, actions) {
+    if (!window.__isMobile) return;
+    const m = window.__modals?.PlayActionModal;
+    if (m) m.open(card, actions);
+}
+
+function openStageAbilityModal(card, actions) {
+    if (!window.__isMobile) return;
+    const m = window.__modals?.StageAbilityModal;
+    if (m) m.open(card, actions);
+}
+
 // Image loading with retry logic and error handling
 export const ImageLoader = {
     loadedImages: new Set(),
@@ -513,6 +531,42 @@ export const CardRenderer = {
 
             const onClick = clickable && (isValid || !hasGlobalSelection) ? (act) => {
                 if (!isValid) return;
+
+                const _uiMode = State.uiMode;
+
+                if (_uiMode === 'view') {
+                    openCardDetailModal(card, containerId);
+                    return;
+                }
+
+                if (_uiMode === 'play' && containerId === 'my-hand') {
+                    const legalActions = State.data?.legal_actions || [];
+                    const playActions = legalActions.filter(a =>
+                        a.action_type === 'play_member_to_stage' &&
+                        (a.parameters?.card_index === idx || a.parameters?.card_indices?.includes(idx))
+                    );
+                    if (playActions.length > 0) {
+                        openPlayActionModal(card, playActions);
+                        return;
+                    }
+                }
+
+                if (_uiMode === 'play' && (containerId === 'my-stage' || containerId === 'my-live')) {
+                    const legalActions = State.data?.legal_actions || [];
+                    const abilityActions = legalActions.filter(a => {
+                        if (a.action_type !== 'use_ability') return false;
+                        const params = a.parameters || {};
+                        if (params.stage_area && containerId === 'my-stage') return true;
+                        if (params.card_indices && containerId === 'my-live') return true;
+                        if (params.card_id !== undefined && params.card_id === card.id) return true;
+                        return false;
+                    });
+                    if (abilityActions.length > 0) {
+                        openStageAbilityModal(card, abilityActions);
+                        return;
+                    }
+                }
+
                 if (action.action_type === 'select_mulligan') {
                     const handIdx = action.parameters?.card_index ?? action.parameters?.card_indices?.[0];
                     if (handIdx !== undefined) {
@@ -715,6 +769,32 @@ export const CardRenderer = {
 
             if (clickable && (isValid || !hasGlobalSelection)) {
                 const clickHandler = () => {
+                    const _uiMode = State.uiMode;
+                    const slotCard = slot || null;
+
+                    if (_uiMode === 'view' && slotCard && slotCard.card_no) {
+                        const m = window.__modals?.CardDetailModal;
+                        if (m) m.open(slotCard, containerId);
+                        return;
+                    }
+
+                    if (_uiMode === 'play' && slotCard && slotCard.card_no) {
+                        const legalActions = State.data?.legal_actions || [];
+                        const abilityActions = legalActions.filter(a => {
+                            if (a.action_type !== 'use_ability') return false;
+                            const params = a.parameters || {};
+                            if (params.stage_area !== undefined) {
+                                const areaNames = ['left', 'center', 'right'];
+                                return params.stage_area === areaNames[i] || params.stage_area === areaNames[i] + '_side';
+                            }
+                            return params.card_id === slotCard.id || params.card_no === slotCard.card_no;
+                        });
+                        if (abilityActions.length > 0) {
+                            const m = window.__modals?.StageAbilityModal;
+                            if (m) { m.open(slotCard, abilityActions); return; }
+                        }
+                    }
+
                     if (isValid) {
                         if (window.selectedAction && window.selectedAction.card_index !== undefined) {
                             if (action.card_index === window.selectedAction.card_index && window.doAction) {
@@ -725,6 +805,8 @@ export const CardRenderer = {
                         } else if (window.doAction) {
                             window.doAction(action);
                         }
+                    } else if (_uiMode === 'view' && slotCard && slotCard.card_no) {
+                        // Already handled above
                     } else if (window.onStageSlotClick) {
                         window.onStageSlotClick(i);
                     }
@@ -825,9 +907,29 @@ export const CardRenderer = {
                     CardRenderer.renderCardBonuses(slot, card, true);
                 }
 
-                if (isValid) {
+                if (isValid || State.uiMode === 'view') {
                     slot.style.cursor = 'pointer';
-                    slot.onclick = () => { if (window.doAction) window.doAction(action); };
+                    slot.onclick = () => {
+                        const _uiMode = State.uiMode;
+                        if (_uiMode === 'view' && card && card.card_no && card.card_no > 0) {
+                            const m = window.__modals?.CardDetailModal;
+                            if (m) m.open(card, containerId);
+                            return;
+                        }
+                        if (_uiMode === 'play') {
+                            const legalActions = State.data?.legal_actions || [];
+                            const abilityActions = legalActions.filter(a => {
+                                if (a.action_type !== 'use_ability') return false;
+                                const params = a.parameters || {};
+                                return params.card_indices?.includes(i) || params.card_id === card?.id;
+                            });
+                            if (abilityActions.length > 0 && card && card.card_no) {
+                                const m = window.__modals?.StageAbilityModal;
+                                if (m) { m.open(card, abilityActions); return; }
+                            }
+                        }
+                        if (window.doAction && isValid) window.doAction(action);
+                    };
                     
                     slot.onmouseenter = () => {
                         if (window.highlightActionBtn) window.highlightActionBtn(action.index, true);

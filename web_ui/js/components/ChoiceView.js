@@ -2,10 +2,12 @@ import { State } from '../state.js';
 import { fixImg } from '../constants.js';
 import { Tooltips } from '../ui_tooltips.js';
 import { CardRenderer } from './CardRenderer.js';
+import { ModalManager } from '../utils/ModalManager.js';
+import { DOM_IDS } from '../constants_dom.js';
 import * as i18n from '../i18n/index.js';
 
 export const ChoiceView = {
-    render: (state, container) => {
+    render: (state, container, useModal = true) => {
         const choice = state.pending_choice;
 
         // G2: in PVP mode, if the choice is for the opponent, show a waiting indicator.
@@ -13,10 +15,12 @@ export const ChoiceView = {
         if (choice && state?.mode === 'pvp') {
             const viewerPlayerId = `p${State.perspectivePlayer + 1}`;
             if (choice.choice_player_id && choice.choice_player_id !== viewerPlayerId) {
-                const waitDiv = document.createElement('div');
-                waitDiv.className = 'pending-choice-indicator';
-                waitDiv.innerHTML = `<div style="font-weight:bold; color:#ffcc00; padding:20px; text-align:center;">Waiting for opponent's choice...</div>`;
-                container.appendChild(waitDiv);
+                if (!useModal) {
+                    const waitDiv = document.createElement('div');
+                    waitDiv.className = 'pending-choice-indicator';
+                    waitDiv.innerHTML = `<div style="font-weight:bold; color:#ffcc00; padding:20px; text-align:center;">Waiting for opponent's choice...</div>`;
+                    container.appendChild(waitDiv);
+                }
                 return;
             }
         }
@@ -417,6 +421,85 @@ export const ChoiceView = {
             }
         }
 
-        if (hasContent) container.appendChild(choiceDiv);
+        if (hasContent) {
+            if (useModal && window.__isMobile) {
+                // Check if user dismissed this specific pending choice
+                const choiceStateId = state.state_id || 0;
+                if (State._choiceModalDismissed && State._choiceStateId === choiceStateId) {
+                    // Don't auto-reopen — user dismissed it
+                    const reopen = document.getElementById(DOM_IDS.MOBILE_CHOICE_REOPEN);
+                    if (reopen) reopen.classList.add('show');
+                    return;
+                }
+                State._choiceModalDismissed = false;
+                State._choiceStateId = choiceStateId;
+
+                const selModal = document.getElementById(DOM_IDS.SELECTION_MODAL);
+                const selContent = document.getElementById(DOM_IDS.SELECTION_CONTENT);
+                const selTitle = document.getElementById('selection-title');
+                if (selModal && selContent) {
+                    selContent.innerHTML = '';
+                    // Move choiceDiv children into the selection modal content
+                    while (choiceDiv.children.length > 0) {
+                        selContent.appendChild(choiceDiv.children[0]);
+                    }
+                    // Also add choice header/prompt text if present in choiceDiv
+                    const headerClone = choiceDiv.cloneNode(true);
+                    headerClone.querySelectorAll('.choice-cards-row').forEach(r => r.remove());
+                    if (headerClone.children.length > 0 && selContent.firstChild) {
+                        selContent.prepend(headerClone);
+                    }
+                    if (selTitle) {
+                        const cardName = choice?.card_name || choice?.source_member || '';
+                        selTitle.textContent = cardName ? `${i18n.t('sel_title') || 'Select'}: ${cardName}` : (i18n.t('sel_title') || 'Select');
+                    }
+                    // Close selection modal after any choice is made
+                    selContent.querySelectorAll('.choice-item, .choice-cards-row > *').forEach(el => {
+                        if (el.onclick) {
+                            const orig = el.onclick;
+                            el.onclick = function(e) {
+                                ModalManager.hide(DOM_IDS.SELECTION_MODAL);
+                                State._choiceModalDismissed = false;
+                                return orig.call(this, e);
+                            };
+                        }
+                    });
+
+                    // In view mode, make selection items open detail modal instead
+                    if (State.uiMode === 'view') {
+                        selContent.querySelectorAll('.choice-item').forEach(el => {
+                            const origClick = el.onclick;
+                            el.onclick = (e) => {
+                                const cardEl = el.querySelector('.card-mini, .card-compact, .card');
+                                if (cardEl) {
+                                    const cardId = cardEl.dataset.cardId;
+                                    const name = cardEl.dataset.cardName;
+                                    if (cardId || name) {
+                                        const card = cardId ? State.resolveCardData(parseInt(cardId)) : (name ? State.resolveCardDataByName(name) : null);
+                                        if (card) {
+                                            const m = window.__modals?.CardDetailModal;
+                                            if (m) m.open(card);
+                                            return;
+                                        }
+                                    }
+                                }
+                                // Fallback: try to find card data from the item's action
+                                if (origClick) {
+                                    const fakeEvent = { stopPropagation: () => {} };
+                                    el.onclick = null;
+                                    origClick.call(el, fakeEvent);
+                                    el.onclick = origClick;
+                                }
+                            };
+                        });
+                    }
+                    ModalManager.show(DOM_IDS.SELECTION_MODAL);
+                    const reopen = document.getElementById(DOM_IDS.MOBILE_CHOICE_REOPEN);
+                    if (reopen) reopen.classList.remove('show');
+                }
+            } else {
+                container.appendChild(choiceDiv);
+            }
+        }
     }
 };

@@ -53,6 +53,10 @@ const stateInternal = {
  { return uiConfig().replay_mode || false; },
 
     // Purely rendering state (not in Rust)
+    uiMode: 'play', // 'view' | 'play' — controls mobile card interaction
+    _choiceModalDismissed: false,
+    _choiceStateId: null,
+    _sysActionsDismissed: false,
     _localPerspective: undefined,
     selectedHandIdx: -1,
     showingFullLog: false,
@@ -76,6 +80,18 @@ const stateInternal = {
 
     _frameCounter: 0,
     _actionLatency: -1,
+
+    setUiMode: (mode) => {
+        if (mode !== 'view' && mode !== 'play') return;
+        State.uiMode = mode;
+        try { localStorage.setItem('rabuka_ui_mode', mode); } catch (_) {}
+        State.emit('ui-mode-change', { mode });
+        if (typeof window.render === 'function') window.render();
+    },
+
+    toggleUiMode: () => {
+        State.setUiMode(State.uiMode === 'view' ? 'play' : 'view');
+    },
 
     updateUiConfig: async (changes) => {
         if (!State.data) State.data = {};
@@ -389,9 +405,21 @@ const stateInternal = {
         }
     },
 
+    initUiMode: () => {
+        try {
+            const saved = localStorage.getItem('rabuka_ui_mode');
+            if (saved === 'view' || saved === 'play') State.uiMode = saved;
+        } catch (_) {}
+    },
+
     resetForNewGame: () => {
         State.selectedHandIdx = -1;
         State.lastPerformanceTurn = -1;
+        State._sysActionsDismissed = false;
+        State._choiceModalDismissed = false;
+        State._choiceStateId = null;
+        const rpsEl = document.getElementById('rps-modal');
+        if (rpsEl) delete rpsEl.dataset.dismissed;
         State.showingFullLog = false;
         State.fullLogData = null;
         State.lastActionsHash = null;

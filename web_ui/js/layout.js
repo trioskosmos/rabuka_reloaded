@@ -4,8 +4,7 @@ import { State } from './state.js';
 
 function setSidebarButtonState(button, isActive) {
     if (!button) return;
-    button.textContent = isActive ? 'X' : '=';
-    button.style.background = isActive ? '#444' : 'var(--accent-pink)';
+    button.classList.toggle('active', isActive);
 }
 
 let _bothFlipped = false;

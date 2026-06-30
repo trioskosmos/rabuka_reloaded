@@ -3048,27 +3048,27 @@ impl AbilityResolver {
         target: &str,
     ) {
         log::debug!("re_yell: lose_blade_hearts={}", lose_blade_hearts);
-        let card_db = self.card_db();
-        let mut cards_to_clear_modifiers: Vec<i16> = Vec::new();
-        {
-            let player = gs.resolve_target_player_mut(target);
-            for i in 0..3 {
-                if player.stage.stage[i] != -1 {
-                    if let Some(card_id) =
-                        player.remove_member_from_stage_with_recycling(i, &card_db)
-                    {
-                        if lose_blade_hearts {
-                            cards_to_clear_modifiers.push(card_id);
-                        }
-                    }
-                }
-            }
-        }
         if lose_blade_hearts {
-            for card_id in cards_to_clear_modifiers {
-                gs.mods.clear_all_for_card(card_id);
+            // Collect card IDs to clear first (avoid borrow conflict with gs.mods)
+            let cids: Vec<i16> = {
+                let player = gs.resolve_target_player(target);
+                player
+                    .stage
+                    .stage
+                    .iter()
+                    .copied()
+                    .filter(|&id| id != -1)
+                    .collect()
+            };
+            for cid in cids {
+                gs.mods.clear_all_for_card(cid);
             }
         }
+        // Clear the old yell cards so perform_yell's new cards replace them.
+        // initial_yell_revealed_cards was already saved in the phase code before
+        // auto abilities fired, so it still contains the full initial yell list.
+        gs.clear_revealed_cards();
+        gs.re_yell_occurred = true;
         gs.prohibition_effects.push("re_yell".to_string());
     }
 
@@ -3203,5 +3203,6 @@ impl AbilityResolver {
                 gs.revealed_cards.push(cid);
             }
         }
+        gs.re_yell_revealed_cards = gs.revealed_cards.clone();
     }
 }

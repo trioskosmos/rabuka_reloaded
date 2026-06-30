@@ -2,6 +2,7 @@
 @import './cards.css';
 @import './components.css';
 @import './modals.css';
+@import './modals_mobile.css';
 @import './performance.css';
 @import './log_styles.css';
 @import './deck_validation.css';

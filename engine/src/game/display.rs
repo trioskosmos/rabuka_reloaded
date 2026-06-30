@@ -457,6 +457,10 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub revealed_cards: Vec<i16>,
     #[serde(default)]
+    pub initial_yell_revealed_cards: Vec<i16>,
+    #[serde(default)]
+    pub re_yell_revealed_cards: Vec<i16>,
+    #[serde(default)]
     pub heart_color_decision_phase: String,
     #[serde(default)]
     pub live_owned_hearts: std::collections::HashMap<String, Vec<[String; 2]>>,
@@ -1847,6 +1851,8 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         player1_cheer_revealed_cards: game_state.player1_cheer_revealed_cards.clone(),
         player2_cheer_revealed_cards: game_state.player2_cheer_revealed_cards.clone(),
         revealed_cards: game_state.revealed_cards.clone(),
+        initial_yell_revealed_cards: game_state.initial_yell_revealed_cards.clone(),
+        re_yell_revealed_cards: game_state.re_yell_revealed_cards.clone(),
         heart_color_decision_phase: game_state.heart_color_decision_phase.clone(),
         live_owned_hearts: live_owned,
         opponent_choice_declined: game_state.opponent_choice_declined,

@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-30T21:02:49.464540",
+  "generated_at": "2026-06-30T22:57:29.267950",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -8450,11 +8450,7 @@
         "action": "conditional_on_result",
         "primary_effect": {
           "text": "自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ。ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる",
-          "group_names": [
-            "DOLLCHESTRA"
-          ],
           "action": "sequential",
-          "original_value": true,
           "actions": [
             {
               "text": "自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ",
@@ -8468,15 +8464,17 @@
               "action": "select"
             },
             {
-              "text": "ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる",
+              "text": "このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる",
               "duration": "live_end",
               "card_type": "member_card",
               "action": "modify_cost",
-              "group_names": [
-                "DOLLCHESTRA"
-              ],
+              "self_target": true,
               "original_value": true
             }
+          ],
+          "original_value": true,
+          "group_names": [
+            "DOLLCHESTRA"
           ]
         },
         "result_condition": {
@@ -10570,23 +10568,24 @@
         "action": "conditional_on_result",
         "primary_effect": {
           "text": "エールにより公開された自分のカードの中にライブカードがないとき、それらのカードをすべて控え室に置いてもよい",
-          "source": "revealed_cards",
-          "dynamic_count": {
-            "type": "revealed_cards",
-            "reference": "previous_reveal"
-          },
-          "destination": "discard",
-          "card_type": "card",
-          "optional": true,
-          "action": "move_cards",
-          "all": true,
           "condition": {
             "type": "location_condition",
             "location": "revealed_cards",
             "target": "self",
             "text": "エールにより公開された自分のカードの中にライブカードがないとき",
-            "negation": true
+            "negation": true,
+            "card_type": "live_card"
           },
+          "destination": "discard",
+          "optional": true,
+          "action": "move_cards",
+          "source": "revealed_cards",
+          "card_type": "card",
+          "dynamic_count": {
+            "type": "revealed_cards",
+            "reference": "previous_reveal"
+          },
+          "all": true,
           "location": "revealed_cards"
         },
         "result_condition": {
@@ -10598,11 +10597,21 @@
         },
         "followup_action": {
           "text": "そのエールで得たブレードハートを失い、もう一度エールを行う",
-          "action": "gain_resource",
-          "sign": "negative",
-          "resource": "heart",
-          "all": null,
-          "count": 1,
+          "action": "sequential",
+          "actions": [
+            {
+              "text": "ブレードハートを失い",
+              "action": "re_yell",
+              "lose_blade_hearts": true,
+              "target": "self"
+            },
+            {
+              "text": "もう一度エールを行う",
+              "action": "perform_yell",
+              "count": 1,
+              "target": "self"
+            }
+          ],
           "location": "revealed_cards"
         },
         "all": true,
@@ -17175,12 +17184,29 @@
         "action": "conditional_on_result",
         "primary_effect": {
           "text": "自分と相手はそれぞれ、自身の控え室にあるすべてのメンバーカードをシャッフルし、自身のデッキの下に置く",
-          "source": "discard",
-          "destination": "deck_bottom",
-          "card_type": "member_card",
-          "target": "deck",
-          "multiple_targets": true,
-          "action": "move_cards",
+          "action": "sequential",
+          "actions": [
+            {
+              "text": "自分と相手はそれぞれ、自身の控え室にあるすべてのメンバーカードをシャッフルし",
+              "source": "discard",
+              "card_type": "member_card",
+              "target": "energy_deck",
+              "multiple_targets": true,
+              "action": "shuffle",
+              "all": true,
+              "shuffle": true
+            },
+            {
+              "text": "自身のデッキの下に置く",
+              "destination": "deck_bottom",
+              "action": "move_cards",
+              "source": "hand",
+              "card_type": "card",
+              "count": 1,
+              "all": true,
+              "shuffle": true
+            }
+          ],
           "shuffle": true,
           "all": true
         },
@@ -23125,19 +23151,19 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "エールにより自分のカードを1枚以上公開したとき、それらのカードの中にブレードハートを持つカードが2枚以下の場合、それらのカードをすべて控え室に置いてもよい。そのエールで得たブレードハートを失い、もう一度エールを行う",
-        "condition": {
-          "type": "card_count_condition",
-          "count": 1,
-          "operator": ">=",
-          "text": "エールにより自分のカードを1枚以上公開したとき、それらのカードの中にブレードハートを持つカードが2枚以下の場合",
-          "target": "self",
-          "card_property": "has_blade_heart"
-        },
+        "text": "そのエールで得たブレードハートを失い、もう一度エールを行う",
         "action": "sequential",
         "actions": [
           {
-            "text": "それらのカードをすべて控え室に置いてもよい",
+            "text": "エールにより自分のカードを1枚以上公開したとき、それらのカードの中にブレードハートを持つカードが2枚以下の場合、それらのカードをすべて控え室に置いてもよい",
+            "condition": {
+              "type": "card_count_condition",
+              "count": 2,
+              "operator": "<=",
+              "text": "エールにより自分のカードを1枚以上公開したとき、それらのカードの中にブレードハートを持つカードが2枚以下の場合",
+              "location": "revealed_cards",
+              "target": "self"
+            },
             "destination": "discard",
             "optional": true,
             "action": "move_cards",
@@ -23150,28 +23176,26 @@
             "all": true
           },
           {
-            "text": "そのエールで得たブレードハートを失い、もう一度エールを行う",
-            "action": "sequential",
-            "actions": [
-              {
-                "text": "そのエールで得たブレードハートを失い",
-                "action": "gain_resource",
-                "sign": "negative",
-                "resource": "heart",
-                "all": null,
-                "count": 1
-              },
-              {
-                "text": "もう一度エールを行う",
-                "action": "re_yell",
-                "lose_blade_hearts": true,
-                "all": true
-              }
-            ],
-            "all": true
+            "text": "ブレードハートを失い",
+            "action": "re_yell",
+            "lose_blade_hearts": true,
+            "target": "self"
+          },
+          {
+            "text": "もう一度エールを行う",
+            "action": "perform_yell",
+            "count": 1,
+            "target": "self"
           }
         ],
-        "all": true
+        "condition": {
+          "type": "card_count_condition",
+          "count": 1,
+          "operator": ">=",
+          "text": "エールにより自分のカードを1枚以上公開したとき",
+          "location": "revealed_cards",
+          "target": "self"
+        }
       }
     },
     {
@@ -29099,12 +29123,26 @@
       "effect": {
         "text": "自分の手札が6枚以下の場合、自分の控え室からメンバーカードを1枚手札に加える",
         "condition": {
-          "text": "自分の手札が6枚以下の場合",
-          "target": "self",
-          "location": "hand",
-          "count": 6,
-          "operator": "<=",
-          "type": "comparison_condition"
+          "type": "compound",
+          "operator": "and",
+          "conditions": [
+            {
+              "text": "自分の",
+              "target": "self",
+              "count": 1,
+              "operator": ">=",
+              "type": "comparison_condition"
+            },
+            {
+              "type": "comparison_condition",
+              "resource_type": "hand_count",
+              "location": "hand",
+              "count": 6,
+              "operator": "<=",
+              "text": "手札が6枚以下の場合"
+            }
+          ],
+          "text": "自分の手札が6枚以下の場合"
         },
         "source": "discard",
         "destination": "hand",

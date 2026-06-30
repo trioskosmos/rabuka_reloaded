@@ -488,61 +488,79 @@
     cursor: pointer;
 }
 
-/* Mobile toggle buttons: hidden on desktop */
-.mobile-toggle-btn {
+/* Mobile right-edge button group */
+.mobile-btn-group {
     display: none;
     position: fixed;
-    bottom: 20px;
-    z-index: calc(var(--z-modal) + 1);
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: var(--accent-pink);
-    color: #fff;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: calc(var(--z-modal) - 1);
+    flex-direction: column;
+    background: #1a2332;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-right: none;
+    border-radius: 6px 0 0 6px;
+    overflow: hidden;
+}
+
+.mobile-toggle-btn {
+    display: flex;
+    width: 40px;
+    height: 40px;
+    background: transparent;
+    color: #ccc;
     border: none;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
     cursor: pointer;
     align-items: center;
     justify-content: center;
-    flex-direction: column;
-    gap: 2px;
-    font-size: 0.65rem;
+    padding: 0;
+    font-size: 0.6rem;
     font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    position: relative;
 }
-.mobile-toggle-btn .icon { font-size: 1.3rem; line-height: 1; }
-.mobile-toggle-btn .label { line-height: 1; }
+.mobile-toggle-btn:first-child { border-radius: 6px 0 0 0; }
+.mobile-toggle-btn:last-child { border-radius: 0 0 0 6px; }
+.mobile-toggle-btn:hover { background: rgba(255,255,255,0.06); }
+.mobile-toggle-btn.active { background: rgba(255,255,255,0.1); }
+.mobile-toggle-btn.hidden { display: none; }
 
 .action-badge {
     position: absolute;
-    top: -4px;
-    right: -4px;
-    background: var(--accent-pink, #ff4081);
+    top: 3px;
+    right: 3px;
+    background: #ff4081;
     color: #fff;
-    font-size: 0.6rem;
+    font-size: 0.4rem;
     font-weight: 700;
-    min-width: 18px;
-    height: 18px;
+    min-width: 13px;
+    height: 13px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 4px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    padding: 0 2px;
     z-index: 1;
 }
 
-#mobile-toggle-log {
-    left: 20px;
+#mobile-pass-btn.mobile-toggle-btn {
+    background: #2ecc71;
+    color: #fff;
 }
-
-#mobile-toggle-actions {
-    right: 20px;
-}
+#mobile-pass-btn.mobile-toggle-btn:hover { background: #27ae60; }
 
 /* Mobile / Tablet Responsive Mode */
 @media (orientation: portrait), (max-aspect-ratio: 13/9) {
-    .mobile-toggle-btn {
+    .mobile-btn-group {
         display: flex;
+    }
+    #ui-mode-toggle {
+        display: none;
+    }
+    #ability-queue-btn {
+        display: none;
     }
     .mobile-action-bar {
         display: block;

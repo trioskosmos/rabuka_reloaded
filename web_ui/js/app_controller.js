@@ -5,6 +5,7 @@ import { Modals } from './ui_modals.js';
 import { Rendering } from './ui_rendering.js';
 import { Replay } from './replay_system.js';
 import { closeSidebar, toggleLogSidebar, toggleActionsSidebar, switchBoard } from './layout.js';
+import * as i18n from './i18n/index.js';
 import { loadTranslations } from './i18n/index.js';
 import { DOMUtils } from './utils/DOMUtils.js';
 import { ModalManager } from './utils/ModalManager.js';
@@ -12,6 +13,10 @@ import { DebugModal } from './modals/DebugModal.js';
 import { LogViewerModal } from './modals/LogViewerModal.js';
 import { LogDetailModal } from './modals/LogDetailModal.js';
 import { GameStateModal } from './modals/GameStateModal.js';
+import { CardDetailModal } from './modals/CardDetailModal.js';
+import { PlayActionModal } from './modals/PlayActionModal.js';
+import { StageAbilityModal } from './modals/StageAbilityModal.js';
+import { AbilityQueueModal } from './modals/AbilityQueueModal.js';
 import { LogRenderer } from './components/LogRenderer.js';
 import { DOM_IDS, COLORS, DISPLAY_VALUES } from './constants_dom.js';
 
@@ -77,6 +82,23 @@ function syncRoomDisplay() {
     DOMUtils.setVisible(DOM_IDS.ROOM_DISPLAY, Boolean(State.roomCode), DISPLAY_VALUES.FLEX);
 }
 
+// Make modal modules available to CardRenderer without circular imports
+window.__modals = { CardDetailModal, PlayActionModal, StageAbilityModal, AbilityQueueModal };
+
+function updateUiModeUI(mode) {
+    const headerBtn = document.getElementById(DOM_IDS.UI_MODE_TOGGLE);
+    const mobileLabel = document.getElementById('mobile-mode-label');
+    const isView = mode === 'view';
+    if (headerBtn) {
+        headerBtn.textContent = isView ? 'VIEW' : 'PLAY';
+        headerBtn.style.borderColor = isView ? 'var(--accent-blue)' : 'var(--accent-gold)';
+        headerBtn.style.color = isView ? 'var(--accent-blue)' : 'var(--accent-gold)';
+    }
+    if (mobileLabel) {
+        mobileLabel.textContent = i18n.t(isView ? 'mobile_mode_view' : 'mobile_mode_play');
+    }
+}
+
 const actionHandlers = {
     'toggle-log-sidebar': toggleLogSidebar,
     'toggle-actions-sidebar': toggleActionsSidebar,
@@ -108,7 +130,14 @@ const actionHandlers = {
     'show-revealed-cards': () => LogRenderer.showRevealedCardsModal(),
     'close-performance-modal': Modals.closePerformanceModal,
     'show-performance-tab': ({ value }) => Rendering.showPerfTab(value),
-    'close-selection-modal': () => ModalManager.hide(DOM_IDS.SELECTION_MODAL),
+    'close-selection-modal': () => {
+        ModalManager.hide(DOM_IDS.SELECTION_MODAL);
+        State._choiceModalDismissed = true;
+        if (State.data?.pending_choice) {
+            const reopen = document.getElementById(DOM_IDS.MOBILE_CHOICE_REOPEN);
+            if (reopen) reopen.classList.add('show');
+        }
+    },
     'close-report-modal': Modals.closeReportModal,
     'download-report': Modals.downloadReport,
     'submit-report': Modals.submitReport,
@@ -130,7 +159,52 @@ const actionHandlers = {
     'open-setup-modal': ({ value }) => Modals.openSetupModal(value),
     'create-room': () => Network.createRoom('pvp'),
     'join-room': () => Network.joinRoom(document.getElementById('room-code-input')?.value || ''),
-    'start-offline': () => { console.warn('Offline mode removed. Use Rust backend via Express proxy.'); },
+    'start-test-game': async () => {
+        // Create a sandbox room
+        if (!State.roomCode) {
+            const roomRes = await fetch('api/rooms/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: 'sandbox' })
+            });
+            const roomData = await roomRes.json();
+            if (roomData.success) {
+                State.roomCode = roomData.room_id;
+                if (roomData.session && Network?.saveSession) {
+                    Network.saveSession(roomData.room_id, roomData.session);
+                }
+            }
+        }
+        if (!State.roomCode) return;
+
+        // Load test decks for both players
+        try {
+            const deckRes = await fetch('api/get_test_deck');
+            const deckData = await deckRes.json();
+            if (!deckData.success) { alert("Failed to load test deck"); return; }
+            const cards = deckData.content;
+            const headers = Network?.getHeaders ? Network.getHeaders() : { 'Content-Type': 'application/json' };
+            await Promise.all([0, 1].map(pid =>
+                fetch('api/set_deck', {
+                    method: 'POST', headers,
+                    body: JSON.stringify({ player: pid, deck: cards, energy_deck: [] })
+                })
+            ));
+
+            const initRes = await fetch('api/init', {
+                method: 'POST', headers,
+                body: JSON.stringify({})
+            });
+            if (!initRes.ok) throw new Error('Init failed');
+            State.offlineMode = false;
+            State.gameHasStarted = true;
+            ModalManager.hide(DOM_IDS.MODAL_ROOM);
+            await Network.fetchState();
+        } catch (e) {
+            console.error(e);
+            alert("Test game error: " + e.message);
+        }
+    },
     'force-reset': () => window.App.forceReset(),
     'set-perspective': ({ value }) => window.Actions.setPerspective(value),
     'close-log-viewer': LogViewerModal.close,
@@ -170,6 +244,42 @@ const actionHandlers = {
     },
     'cheat-remove-success': ({ player }) => {
         window.Actions.execCode(`player_idx=${player}; remove_success`);
+    },
+    'toggle-ui-mode': () => {
+        State.toggleUiMode();
+        updateUiModeUI(State.uiMode);
+    },
+    'show-card-detail': ({ id }) => {
+        const card = id ? State.resolveCardData(parseInt(id)) : null;
+        if (card) CardDetailModal.open(card);
+    },
+    'show-ability-queue': () => AbilityQueueModal.open(),
+    'show-choice-modal': () => {
+        if (State.data?.pending_choice) {
+            State._choiceModalDismissed = false;
+            if (typeof window.render === 'function') window.render();
+            ModalManager.show(DOM_IDS.SELECTION_MODAL);
+            document.getElementById(DOM_IDS.MOBILE_CHOICE_REOPEN)?.classList.remove('show');
+        }
+    },
+    'card-nav-prev': () => CardDetailModal.navigatePrev(),
+    'card-nav-next': () => CardDetailModal.navigateNext(),
+    'card-nav-zone-prev': () => CardDetailModal.navigateZonePrev(),
+    'card-nav-zone-next': () => CardDetailModal.navigateZoneNext(),
+    'play-nav-prev': () => PlayActionModal.navigatePrev(),
+    'play-nav-next': () => PlayActionModal.navigateNext(),
+    'close-card-detail-modal': () => CardDetailModal.close(),
+    'close-play-action-modal': () => PlayActionModal.close(),
+    'close-stage-ability-modal': () => StageAbilityModal.close(),
+    'close-ability-queue-modal': () => AbilityQueueModal.close(),
+    'close-rps-modal': () => {
+        const el = document.getElementById('rps-modal');
+        if (el) el.dataset.dismissed = 'true';
+        ModalManager.hide('rps-modal');
+    },
+    'close-system-actions-modal': () => {
+        State._sysActionsDismissed = true;
+        ModalManager.hide('system-actions-modal');
     },
     'cheat-move': ({ player, zone }) => {
         const cardId = document.getElementById('cheat-card-id')?.value?.trim();
@@ -242,7 +352,61 @@ export const AppController = {
             loadTranslations(State.currentLang),
             State.loadStaticCardDatabase()
         ]);
-        
+
+        // Initialize UI mode from localStorage
+        State.initUiMode();
+        updateUiModeUI(State.uiMode);
+        State.on('ui-mode-change', (e) => updateUiModeUI(e.detail?.mode || State.uiMode));
+
+        // Track mobile viewport for modal gating
+        const updateMobile = () => {
+            window.__isMobile = window.matchMedia('(orientation: portrait), (max-aspect-ratio: 13/9)').matches;
+        };
+        updateMobile();
+        window.matchMedia('(orientation: portrait), (max-aspect-ratio: 13/9)').addEventListener('change', updateMobile);
+
+        // Backdrop close for mobile modals
+        [
+            { id: 'rps-modal', onClose: () => { document.getElementById('rps-modal').dataset.dismissed = 'true'; } },
+            { id: 'system-actions-modal', onClose: () => { State._sysActionsDismissed = true; } },
+            { id: DOM_IDS.MODAL_CARD_DETAIL },
+            { id: DOM_IDS.MODAL_PLAY_ACTION },
+            { id: DOM_IDS.MODAL_STAGE_ABILITY },
+            { id: DOM_IDS.MODAL_ABILITY_QUEUE },
+        ].forEach(({ id, onClose }) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('click', (e) => {
+                    if (e.target === el) {
+                        ModalManager.hide(id);
+                        if (onClose) onClose();
+                    }
+                });
+            }
+        });
+
+        // Selection modal backdrop close + reopen button tracking
+        const selModal = document.getElementById(DOM_IDS.SELECTION_MODAL);
+        if (selModal) {
+            selModal.addEventListener('click', (e) => {
+                if (e.target === selModal) {
+                    ModalManager.hide(DOM_IDS.SELECTION_MODAL);
+                    State._choiceModalDismissed = true;
+                    if (State.data?.pending_choice) {
+                        const reopen = document.getElementById(DOM_IDS.MOBILE_CHOICE_REOPEN);
+                        if (reopen) reopen.classList.add('show');
+                    }
+                }
+            });
+            const selObserver = new MutationObserver(() => {
+                if (selModal.style.display === DISPLAY_VALUES.NONE && State.data?.pending_choice) {
+                    const reopen = document.getElementById(DOM_IDS.MOBILE_CHOICE_REOPEN);
+                    if (reopen) reopen.classList.add('show');
+                }
+            });
+            selObserver.observe(selModal, { attributes: true, attributeFilter: ['style'] });
+        }
+
         const syncRoomState = () => syncRoomDisplay();
         State.on('roomUpdate', syncRoomState);
         State.on('room-change', syncRoomState);

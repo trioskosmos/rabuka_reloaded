@@ -1296,6 +1296,9 @@ impl super::resolver::AbilityResolver {
     ) -> Result<(), String> {
         let mapped = ctx.mfi(&ctx.indices);
         let moved = self.move_from_revealed(gs, &mapped, validate_card, dst_str);
+        // Track moved cards so preceding_moved conditions on the same
+        // ability (e.g. conditional_on_result) can see them.
+        self.moved_cards.extend(&moved);
         // Apply resource_on_select if present — grants resource (e.g. blade)
         // automatically when a card is selected from revealed_cards.
         if let Some(ref res) = self

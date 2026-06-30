@@ -62,6 +62,15 @@ export const DOM_IDS = {
   RESIZER_LEFT: 'resizer-left',
   RESIZER_RIGHT: 'resizer-right',
 
+  // Mobile UI Mode
+  MODAL_CARD_DETAIL: 'card-detail-modal',
+  MODAL_PLAY_ACTION: 'play-action-modal',
+  MODAL_STAGE_ABILITY: 'stage-ability-modal',
+  MODAL_ABILITY_QUEUE: 'ability-queue-modal',
+  UI_MODE_TOGGLE: 'ui-mode-toggle',
+  MOBILE_TOGGLE_MODE: 'mobile-toggle-mode',
+  MOBILE_CHOICE_REOPEN: 'mobile-choice-reopen',
+
   // Special
   LOOKED_CARDS_PANEL: 'looked-cards-panel',
   LOOKED_CARDS_CONTENT: 'looked-cards-content',

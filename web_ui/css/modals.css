@@ -179,9 +179,18 @@
 
 /* Lobby Styles */
 .lobby-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-xl);
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.lobby-actions .lobby-btn {
+    flex: 2;
+}
+
+.lobby-actions .lobby-btn:first-child {
+    flex: 1;
+    font-size: 0.8rem;
 }
 
 .lobby-btn:hover { background: var(--accent-blue); }

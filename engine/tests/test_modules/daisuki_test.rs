@@ -1,53 +1,109 @@
-/// Q156: ダイスキだったらダイジョウブ！(PL!S-bp3-020-L) — re-yell with 2 copies.
+/// ダイスキだったらダイジョウブ！(PL!S-bp3-020-L) ab#0
 ///
-/// Auto: When a card is revealed by yell and blade heart cards ≤ 2 among revealed,
-/// may discard all hand and re-yell. Q156: With 2 copies in live zone, both re-yell.
+/// 自動 [1/ターン]: エールにより自分のカードを1枚以上公開したとき、それらのカードの中に
+/// ブレードハートを持つカードが2枚以下の場合、それらのカードをすべて控え室に置いてもよい。
+/// そのエールで得たブレードハートを失い、もう一度エールを行う。
 use crate::helpers::*;
 
-#[test]
-fn daisuki_q156_two_copies_re_yell_triggers() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    let live1 = game.id("PL!S-bp3-020-L");
+fn fill_decks(game: &mut TestGame) {
     let filler = game.id("PL!-sd1-010-SD");
-
-    game.state.player1.hand.cards.push(live1);
-    game.state.player1.hand.cards.push(live1);
-    game.state.player1.hand.cards.push(filler);
-    game.state.player1.stage.stage = [filler, filler, -1];
-
-    let deck_before = game.state.player1.main_deck.cards.len();
     for _ in 0..60 {
         game.state.player1.main_deck.cards.push(filler);
-    }
-    for _ in 0..60 {
         game.state.player2.main_deck.cards.push(filler);
     }
-    game.give_energy(15);
+}
 
+fn advance_to_p1_performance(game: &mut TestGame, daisuki: i16) {
+    game.state.player1.hand.cards.push(daisuki);
     for _ in 0..5 {
         game.pass();
     }
-    game.set_live_card(live1);
-    game.set_live_card(live1);
-    game.pass(); // LiveCardSet draw (2 cards)
-    game.pass(); // Performance + LiveStart
-    game.pass(); // P1 performance (yell)
-    game.pass(); // P2 performance
-    game.pass(); // LiveVictory -> LiveSuccess
+    game.set_live_card(daisuki);
+    game.pass();
+    game.pass();
+    game.pass();
+}
 
-    while game.has_pending_choice() {
-        game.select_option(1);
-    }
-    while game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+/// Condition met (≤2 blade_heart) → ability triggers → discard → re-yell draws new cards.
+#[test]
+fn daisuki_re_yell_works() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let daisuki = game.id("PL!S-bp3-020-L");
 
-    // Re-yell would have drawn more cards from deck
+    // 2 members with blade=1 each → total_blade=2 → yell draws 2 cards
+    game.state.player1.stage.stage[0] = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage[1] = game.new_id("PL!-sd1-010-SD");
+    fill_decks(&mut game);
+    // Default fillers have blade_heart=yes, but condition is ≤2 → always met
+    // since only 2 cards are drawn and both have blade_heart (2 ≤ 2 = true)
+    game.give_energy(15);
+
+    let deck_before = game.state.player1.main_deck.cards.len();
+    advance_to_p1_performance(&mut game, daisuki);
+
+    // Ability triggers → optional discard prompt
+    assert!(game.has_pending_choice(), "Optional discard prompt");
+    game.select_indices(&[0]); // accept: discard all
+
+    // After re-yell, more deck cards should have been consumed
     let deck_after = game.state.player1.main_deck.cards.len();
     assert!(
-        deck_after < deck_before + 60,
-        "Q156: Re-yell consumed deck cards"
+        deck_after < deck_before,
+        "re-yell should consume additional deck cards"
+    );
+    assert!(
+        !game.state.re_yell_revealed_cards.is_empty(),
+        "re-yell drew cards"
+    );
+    // The initial yell cards were saved
+    assert!(
+        !game.state.initial_yell_revealed_cards.is_empty(),
+        "initial yell cards saved"
+    );
+}
+
+/// Condition NOT met (>2 blade_heart) → ability does not trigger.
+#[test]
+fn daisuki_too_many_blade_heart_no_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let daisuki = game.id("PL!S-bp3-020-L");
+
+    // 3 members with blade=1 each → total_blade=3 → draws 3 cards
+    game.state.player1.stage.stage[0] = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage[1] = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage[2] = game.new_id("PL!-sd1-010-SD");
+    fill_decks(&mut game);
+    // 3 blade_heart=yes cards > 2 → condition fails
+    game.give_energy(15);
+
+    advance_to_p1_performance(&mut game, daisuki);
+
+    // Ability should NOT trigger — no optional discard prompt
+    assert!(!game.has_pending_choice(), "no prompt when >2 blade_heart");
+}
+
+/// Skip optional discard → re-yell still happens (unconditional in this card).
+#[test]
+fn daisuki_skip_discard_still_re_yells() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let daisuki = game.id("PL!S-bp3-020-L");
+
+    game.state.player1.stage.stage[0] = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage[1] = game.new_id("PL!-sd1-010-SD");
+    fill_decks(&mut game);
+    game.give_energy(15);
+
+    advance_to_p1_performance(&mut game, daisuki);
+
+    assert!(game.has_pending_choice(), "Optional discard prompt");
+    game.select_indices(&[]); // skip discard
+
+    // re_yell fires regardless
+    assert!(
+        game.state.re_yell_occurred,
+        "re_yell should fire even when discard skipped"
     );
 }
