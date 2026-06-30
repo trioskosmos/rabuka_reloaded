@@ -2830,11 +2830,12 @@ impl AbilityResolver {
             (moved, positions)
         };
 
-        for &cid in &moved_card_ids {
-            gs.record_card_movement(cid);
-        }
         for (i, &cid) in moved_card_ids.iter().enumerate() {
             let (old_pos, new_pos) = original_positions[i];
+            // push_movement_event covers cards_moved_this_turn, turn_area_movements,
+            // last_area_move_card_id/by_player, batch_movements, and
+            // position_change_occurred_this_turn — all needed for TAS "moves" conditions.
+            gs.push_movement_event(cid, "stage", "stage", gs.activating_card, "", true);
             gs.position_change_events
                 .push(crate::types::PositionChangeEvent {
                     moved_card_id: cid,

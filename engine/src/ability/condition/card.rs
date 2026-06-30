@@ -1109,6 +1109,11 @@ impl<'a> ConditionContext<'a> {
         let is_both = target == "both";
         let player = self.resolve_condition_player(target);
 
+        // temporal deck condition (e.g. "このターン、自分のデッキがリフレッシュしていた場合")
+        if condition.temporal.as_deref() == Some("this_turn") && location == "deck" {
+            return player.deck_refreshed_this_turn;
+        }
+
         if !self.check_heart_type_all(condition, player, location) {
             return false;
         }

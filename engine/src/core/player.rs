@@ -47,6 +47,8 @@ pub struct Player {
 
     pub debut_count_this_turn: u32,
 
+    pub deck_refreshed_this_turn: bool,
+
     pub live_card_set_limit_reduction: u32,
 
     pub last_resolution_cards: Vec<i16>,
@@ -84,6 +86,8 @@ impl Player {
             stage_hearts: None,
 
             debut_count_this_turn: 0,
+
+            deck_refreshed_this_turn: false,
 
             live_card_set_limit_reduction: 0,
 
@@ -565,6 +569,7 @@ impl Player {
             for card in waitroom_cards {
                 self.main_deck.cards.push(card);
             }
+            self.deck_refreshed_this_turn = true;
         }
         // Rule 10.2.2.2: Handled by the caller before look_at operations
         // (see execute_look_at in look.rs which implements the Q85 multi-step)

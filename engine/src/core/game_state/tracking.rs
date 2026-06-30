@@ -6,6 +6,8 @@ impl GameState {
         self.player2_cheer_blade_heart_count = 0;
         self.player1.debut_count_this_turn = 0;
         self.player2.debut_count_this_turn = 0;
+        self.player1.deck_refreshed_this_turn = false;
+        self.player2.deck_refreshed_this_turn = false;
         self.player1.last_resolution_cards.clear();
         self.player2.last_resolution_cards.clear();
         self.clear_card_appearance_tracking();
