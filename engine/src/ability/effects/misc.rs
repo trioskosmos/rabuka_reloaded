@@ -708,6 +708,24 @@ impl AbilityResolver {
 
         let recently_moved = gs.recently_moved_cards.clone();
         let entry_snapshot = gs.entry_trigger_moved_cards();
+        let last_cost_moved = gs.mods.last_cost_moved_card_ids.clone();
+        let preceding_moved: Option<Vec<i16>> = entry_snapshot
+            .clone()
+            .or_else(|| {
+                let rm = recently_moved.clone()?;
+                if rm.is_empty() {
+                    None
+                } else {
+                    Some(rm)
+                }
+            })
+            .or_else(|| {
+                if last_cost_moved.is_empty() {
+                    None
+                } else {
+                    Some(last_cost_moved.clone())
+                }
+            });
 
         let exclude_self_id = if effect.exclude_self.unwrap_or(false) {
             gs.activating_card
@@ -735,6 +753,21 @@ impl AbilityResolver {
             };
             let mut prelim_filter = effect.filter_subset();
             prelim_filter.exclude_self = exclude_self_id;
+            let exclude_names: Vec<String> = effect
+                .exclude_by_name_source
+                .as_deref()
+                .filter(|&s| s == "preceding_moved")
+                .and_then(|_| preceding_moved.as_ref())
+                .map(|moved| {
+                    moved
+                        .iter()
+                        .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.clone()))
+                        .collect()
+                })
+                .unwrap_or_default();
+            if !exclude_names.is_empty() {
+                prelim_filter.exclude_names = Some(&exclude_names);
+            }
             let choice_exclude = if (effect.target_count.is_some() || effect.distinct.is_some())
                 && !all_selected.is_empty()
             {
@@ -865,6 +898,21 @@ impl AbilityResolver {
         let (blade_targets, mut heart_targets, heart_color_str, final_count) = {
             let mut filter = effect.filter_subset();
             filter.exclude_self = exclude_self_id;
+            let exclude_names: Vec<String> = effect
+                .exclude_by_name_source
+                .as_deref()
+                .filter(|&s| s == "preceding_moved")
+                .and_then(|_| preceding_moved.as_ref())
+                .map(|moved| {
+                    moved
+                        .iter()
+                        .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.clone()))
+                        .collect()
+                })
+                .unwrap_or_default();
+            if !exclude_names.is_empty() {
+                filter.exclude_names = Some(&exclude_names);
+            }
 
             let final_count = self.calculate_gain_multiplier(
                 gs,

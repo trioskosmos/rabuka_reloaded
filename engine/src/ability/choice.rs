@@ -487,6 +487,7 @@ impl super::resolver::AbilityResolver {
                     &card_db,
                 );
                 gs.mods.last_cost_discard_count += new_card_ids.len() as u32;
+                gs.mods.last_cost_moved_card_ids.extend(&new_card_ids);
                 for &cid in &new_card_ids {
                     self.moved_cards.push(cid);
                     if !self.selected_cards.contains(&cid) {
@@ -502,6 +503,7 @@ impl super::resolver::AbilityResolver {
             if new_card_ids.is_empty() {
                 if !self.moved_cards.is_empty() {
                     gs.mods.last_cost_discard_count = self.moved_cards.len() as u32;
+                    gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
                     gs.recently_moved_cards = Some(self.moved_cards.clone());
                     gs.recently_moved_from_zone = Some("hand".to_string());
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
@@ -669,6 +671,7 @@ impl super::resolver::AbilityResolver {
             self.pay_deferred_costs(gs)?;
             let final_count = self.moved_cards.len() as u32;
             gs.mods.last_cost_discard_count = final_count;
+            gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
             gs.recently_moved_cards = Some(self.moved_cards.clone());
             gs.recently_moved_from_zone = Some("hand".to_string());
             if let Some(entry) = gs.ability_queue.current_entry_mut() {

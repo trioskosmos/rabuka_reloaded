@@ -429,6 +429,7 @@ impl Choice {
                 need_heart_color: None,
                 characters: characters.as_ref(),
                 exclude_characters: None,
+                exclude_names: None,
                 heart_colors: &[],
                 require_all_heart_colors: false,
                 name_fragments: None,

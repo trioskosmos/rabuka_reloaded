@@ -687,6 +687,9 @@ pub struct CardFilter<'a> {
     pub original_blade_operator: Option<&'a str>,
     /// Card IDs to exclude from matching (e.g. previously selected by a prior sequential action)
     pub exclude_cards: Option<&'a [i16]>,
+    /// Card names to exclude from matching (resolved at runtime from
+    /// exclude_by_name_source on the AbilityEffect).
+    pub exclude_names: Option<&'a Vec<String>>,
     /// Ability filter: "no_ability" / "has_ability" / "no_ability_type"
     pub ability_filter: Option<&'a str>,
     /// Trigger types to check when ability_filter is "no_ability_type"
@@ -730,6 +733,10 @@ impl<'a> CardFilter<'a> {
     }
     pub fn exclude_cards_opt(mut self, ids: Option<&'a [i16]>) -> Self {
         self.exclude_cards = ids;
+        self
+    }
+    pub fn exclude_names_opt(mut self, names: Option<&'a Vec<String>>) -> Self {
+        self.exclude_names = names;
         self
     }
     pub fn original_blade_limit(mut self, obl: Option<u32>, obo: Option<&'a str>) -> Self {
@@ -815,6 +822,19 @@ impl<'a> CardFilter<'a> {
         if let Some(ex) = self.exclude_cards {
             if ex.contains(&id) {
                 return false;
+            }
+        }
+        if let Some(ex_names) = self.exclude_names {
+            if let Some(card) = db.get_card(id) {
+                let normalized_name: String =
+                    card.name.chars().filter(|c| !c.is_whitespace()).collect();
+                if ex_names.iter().any(|n| {
+                    n.chars()
+                        .filter(|c| !c.is_whitespace())
+                        .eq(normalized_name.chars())
+                }) {
+                    return false;
+                }
             }
         }
         if let Some(ct) = self.card_type {
@@ -1131,6 +1151,7 @@ impl<'a> CardFilter<'a> {
             original_blade_limit: effect.blade_limit,
             original_blade_operator: effect.blade_limit_operator.as_deref(),
             exclude_cards: None,
+            exclude_names: None,
             ability_filter: effect.ability_filter.as_deref(),
             ability_filter_triggers: effect.ability_filter_triggers.as_ref().map(|v| &**v),
             or_ability_filters: effect.or_ability_filters.as_ref().map(|v| &**v),
@@ -1166,6 +1187,7 @@ impl<'a> CardFilter<'a> {
                 characters: characters.as_ref(),
                 exclude_characters: None,
                 exclude_group_names: None,
+                exclude_names: None,
                 heart_colors: &[],
                 require_all_heart_colors: false,
                 name_fragments: None,

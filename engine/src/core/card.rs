@@ -849,6 +849,8 @@ pub struct AbilityEffect {
     pub exclude_self: Option<bool>,
     #[serde(default)]
     pub exclude_selected: Option<bool>,
+    #[serde(default)]
+    pub exclude_by_name_source: Option<String>,
     // Effect type for replacement/continuous effects
     #[serde(default)]
     pub effect_type: Option<String>,

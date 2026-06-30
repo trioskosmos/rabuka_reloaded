@@ -8100,6 +8100,7 @@ def _clean_action_list(actions, parent_effect=None, parent_text=""):
     if parent_effect:
         for f in (
             "exclude_self",
+            "exclude_by_name_source",
             "all",
             "target",
             "position",
@@ -8334,12 +8335,15 @@ def _walk(d, full_text, original_text, ctx_text=None):
             d["activation_position"] = "right_side"
 
     # Propagate exclude_self from text context to sub-actions.
+    # "このメンバー以外" = "other than this member" → always exclude the activating card.
     # per_unit gain_resource/heart effects should receive exclude_self
     # (e.g. "ほかのメンバー1人につき" needs self excluded from the count).
     # Non-per_unit self-buffs (plain "gain_resource" without "per_unit")
-    # are excluded since target="self" + exclude_self is contradictory.
+    # are excluded since target="self" + exclude_self is contradictory,
+    # UNLESS the text explicitly says "このメンバー以外".
     if (
         "exclude_self" not in d
+        and "exclude_by_name_source" not in d
         and d_ctx
         and ("このメンバー以外" in d_ctx or "ほかの" in d_ctx or "他の" in d_ctx)
     ):
@@ -8351,7 +8355,9 @@ def _walk(d, full_text, original_text, ctx_text=None):
             "change_state",
         ) or (d.get("action") in ("gain_resource",) and not is_per_unit)
         if (
-            d.get("action") == "position_change" or d.get("target") != "self"
+            "このメンバー以外" in d_ctx
+            or d.get("action") == "position_change"
+            or d.get("target") != "self"
         ) and not is_self_buff:
             d["exclude_self"] = True
 

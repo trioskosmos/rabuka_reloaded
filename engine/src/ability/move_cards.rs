@@ -2160,6 +2160,7 @@ impl AbilityResolver {
                         || Zone::from_str(dest) == Some(Zone::Waitroom))
                 {
                     gs.mods.last_cost_discard_count = moved.len() as u32;
+                    gs.mods.last_cost_moved_card_ids = moved.clone();
                 }
             }
             Some(Zone::Stage) => {

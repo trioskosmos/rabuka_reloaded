@@ -53,6 +53,8 @@ pub struct GameModifiers {
     pub heart_color_multiplier: HashMap<i16, HeartColor>,
     /// Number of cards moved from hand to discard by the most recent cost payment.
     pub last_cost_discard_count: u32,
+    /// Card IDs moved from hand to discard by the most recent cost payment.
+    pub last_cost_moved_card_ids: Vec<i16>,
     /// Number of energy cards paid by the most recent cost payment.
     pub last_cost_energy_count: u32,
     /// Per-card delayed "cannot activate" flags. Card_id → remaining turns of
@@ -99,6 +101,7 @@ impl GameModifiers {
             constant_score_sources: Vec::new(),
             heart_color_multiplier: HashMap::new(),
             last_cost_discard_count: 0,
+            last_cost_moved_card_ids: Vec::new(),
             last_cost_energy_count: 0,
             delayed_cannot_active: HashMap::new(),
             last_surplus_loss_count: 0,
