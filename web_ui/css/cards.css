@@ -128,7 +128,7 @@
 }
 
 .hand-row {
-    flex: 0 0 calc(var(--card-h) * 0.9 / var(--section-count, 1));
+    flex: 0 0 calc(var(--zone-total) * 0.40);
     display: flex;
     align-items: center;
     min-height: 0;
@@ -291,7 +291,7 @@
 
 /* --- Energy & Misc --- */
 .energy-row-hud {
-    flex: 0 0 calc(var(--card-h) * 0.18 / var(--section-count, 1));
+    flex: 0 0 calc(var(--zone-total) * 0.08);
     background: rgba(0, 0, 0, 0.2);
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);

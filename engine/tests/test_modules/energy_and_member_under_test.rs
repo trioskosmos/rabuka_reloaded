@@ -648,6 +648,156 @@ fn sayaka_live_start_zero_under_still_gets_hand_count() {
     assert_eq!(heart, 0, "0 heart05 when no members under");
 }
 
+/// Q243: Sayaka's LiveStart max=3 per activation. Second activation re-counts
+/// under-cards independently. If more cards were placed between activations,
+/// the second activation can count those (up to 3).
+///
+/// Uses direct `trigger_auto_ability` to simulate COMPASS activating Sayaka's
+/// LiveStart ability outside a live performance — the ability itself (cost+4,
+/// heart05 per under) works regardless of whether a live is in progress.
+fn trigger_sayaka_live_start(game: &mut TestGame, sayaka: i16) {
+    let card = game.db.get_card(sayaka).unwrap();
+    let live_start_ab = card
+        .abilities
+        .iter()
+        .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
+        .cloned()
+        .expect("Sayaka must have LiveStart ability");
+    let ability_id = format!("{}_{}", card.card_no, live_start_ab.full_text);
+    game.state.trigger_auto_ability(
+        ability_id,
+        rabuka_engine::core::types::AbilityTrigger::LiveStart,
+        game.state.player1.id.clone(),
+        Some(card.card_no.clone()),
+        Some(sayaka),
+        None,
+        None,
+    );
+    let pid = game.state.player1.id.clone();
+    game.state.process_pending_auto_abilities(&pid);
+}
+
+#[test]
+fn sayaka_q243_max_three_per_activation_recounts() {
+    use rabuka_engine::core::types::AbilityTrigger;
+
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sayaka = game.id("PL!HS-pb1-002-R");
+    game.state.player1.stage.stage = [-1, sayaka, -1];
+    let filler = game.id("PL!-sd1-010-SD");
+    game.give_energy(15);
+
+    // Place 2 under-cards before first activation
+    for _ in 0..2 {
+        let s = game.new_id("PL!HS-pb1-002-R");
+        game.state
+            .player1
+            .stage
+            .place_under_card(MemberArea::Center, s);
+    }
+    assert_eq!(
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .len(),
+        2,
+        "2 under-cards before first LiveStart"
+    );
+
+    // First activation: 2 under → max=3 → heart05+2
+    trigger_sayaka_live_start(&mut game, sayaka);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    let heart_1 = game
+        .state
+        .mods
+        .get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05);
+    assert_eq!(
+        heart_1, 2,
+        "Q243: First activation: 2 under → heart05=2 (within max=3)"
+    );
+
+    // Place 3 more under-cards (now 5 total)
+    for _ in 0..3 {
+        let s = game.new_id("PL!HS-pb1-002-R");
+        game.state
+            .player1
+            .stage
+            .place_under_card(MemberArea::Center, s);
+    }
+    assert_eq!(
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .len(),
+        5,
+        "5 under-cards before second LiveStart"
+    );
+
+    // Second activation: 5 under → max=3 → heart05+3 (new cards counted)
+    trigger_sayaka_live_start(&mut game, sayaka);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    let heart_total = game
+        .state
+        .mods
+        .get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05);
+    // 2 from first + 3 from second = 5 (each capped at 3 independently)
+    assert_eq!(
+        heart_total, 5,
+        "Q243: Two activations: total heart05 = 5 (2 first + 3 second)"
+    );
+
+    // Edge: third activation with no new under-cards → still counts 3
+    trigger_sayaka_live_start(&mut game, sayaka);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    let heart_final = game
+        .state
+        .mods
+        .get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05);
+    // 2 + 3 + 3 = 8 (each activation independently capped at 3)
+    assert_eq!(
+        heart_final, 8,
+        "Q243: Three activations: total heart05 = 8 (2+3+3)"
+    );
+}
+
+/// Edge: Sayaka with 0 under-cards → LiveStart gives 0 heart05.
+#[test]
+fn sayaka_q243_zero_under_no_heart() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sayaka = game.id("PL!HS-pb1-002-R");
+    game.state.player1.stage.stage = [-1, sayaka, -1];
+    let filler = game.id("PL!-sd1-010-SD");
+    game.state
+        .player1
+        .stage
+        .place_under_card(MemberArea::Center, filler);
+    game.give_energy(15);
+
+    // 1 under → LiveStart counts 1 (under max=3)
+    trigger_sayaka_live_start(&mut game, sayaka);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    let heart = game
+        .state
+        .mods
+        .get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05);
+    assert_eq!(heart, 1, "Q243: 1 under-cards → heart05=1");
+}
+
 #[test]
 fn sayaka_rule_4553_under_members_follow_position_change() {
     let db = load_real_database();
