@@ -217,6 +217,123 @@ fn chika_turn1_use_limit() {
     );
 }
 
+/// Multiple members on stage → selected member is waited and stays on stage
+/// (regression test: cost change_state choice had is_select_action=false,
+///  causing handle_stage_selection to move the card to discard instead)
+#[test]
+fn chika_wait_target_stays_on_stage() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let chika = game.id("PL!S-bp3-001-R\u{ff0b}");
+    let other = game.id("PL!S-bp2-001-R"); // another Aqours member
+
+    game.state.player1.stage.stage = [other, chika, -1];
+    game.give_energy(5);
+
+    // Activate → cost prompts for which member to wait (2 candidates)
+    game.activate_ability(chika);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]); // select other (stage[0])
+    }
+
+    // The selected member should be waited and STILL on stage
+    assert_eq!(
+        game.player().stage.stage[0],
+        other,
+        "Selected member should remain on stage"
+    );
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(other),
+        Some(&"wait".to_string()),
+        "Selected member should be in wait state"
+    );
+    // Chika stays at center, unchanged
+    assert_eq!(
+        game.player().stage.stage[1],
+        chika,
+        "Chika should remain at center"
+    );
+    // No cards should be in waitroom (no movement happened)
+    assert!(
+        game.state.player1.waitroom.cards.is_empty(),
+        "No cards should have been moved to waitroom"
+    );
+}
+
+/// Multiple members → selected member gets the +1 score modifier from the effect
+#[test]
+fn chika_waited_member_gets_score_boost() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let chika = game.id("PL!S-bp3-001-R\u{ff0b}");
+    let other = game.id("PL!S-bp2-001-R");
+
+    game.state.player1.stage.stage = [other, chika, -1];
+    game.give_energy(5);
+
+    game.activate_ability(chika);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]); // wait other
+    }
+
+    // Chika (activating card) gets +1 score via gain_ability
+    assert_eq!(
+        game.state.mods.get_score_modifier(chika),
+        1,
+        "Chika should have +1 score (gain_ability targets activating_card)"
+    );
+    // The waited member does NOT get the score modifier directly
+    assert_eq!(
+        game.state.mods.get_score_modifier(other),
+        0,
+        "Waited member should NOT get score (gain_ability gives to activating card)"
+    );
+}
+
+/// Two non-Chika members → can select either, the selected one gets waited
+#[test]
+fn chika_wait_can_select_any_member() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let chika = game.id("PL!S-bp3-001-R\u{ff0b}");
+    let a = game.id("PL!S-bp2-001-R");
+    let b = game.id("PL!S-bp2-002-R");
+
+    game.state.player1.stage.stage = [a, chika, b];
+    game.give_energy(5);
+
+    game.activate_ability(chika);
+    while game.has_pending_choice() {
+        game.select_indices(&[2]); // select b (stage[2], the 3rd option)
+    }
+
+    // Only b should be waited
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(b),
+        Some(&"wait".to_string()),
+        "Selected member (b) should be in wait state"
+    );
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(a),
+        None,
+        "Non-selected member (a) should NOT be in wait state"
+    );
+    // Chika (activating card) gets +1 score via gain_ability
+    assert_eq!(
+        game.state.mods.get_score_modifier(chika),
+        1,
+        "Chika should have +1 score (gain_ability targets activating_card)"
+    );
+    assert_eq!(
+        game.state.mods.get_score_modifier(a),
+        0,
+        "Non-selected member should NOT have score boost"
+    );
+}
+
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
     assert_eq!(game.state.current_phase.to_string(), "Main");
     game.pass();

@@ -1177,7 +1177,19 @@ impl GameState {
                 .and_then(|e| e.choice_card_no.as_ref())
                 == Some(&crate::ability::types::ChoiceRoute::Choice);
 
-            if !cost_already_paid {
+            // Don't set cost_paid for is_select_action choices — those are
+            // "select which target" prompts (e.g. change_state wait) where
+            // the actual state change is applied during choice resolution.
+            // Setting cost_paid here would prevent the cost handler from
+            // re-entering to apply the change.
+            let is_deferred = matches!(
+                c,
+                crate::ability::types::Choice::SelectCard {
+                    is_select_action: true,
+                    ..
+                }
+            );
+            if !cost_already_paid && !is_deferred {
                 if let Some(e) = self.ability_queue.current_entry_mut() {
                     e.cost_paid = true;
                 }

@@ -628,6 +628,7 @@ impl AbilityResolver {
                                 false,
                             )
                             .card_type(cost.card_type.clone())
+                            .is_select_action(true)
                             .target_player_id(Some(
                                 cost.target.clone().unwrap_or_else(|| "self".to_string()),
                             ))

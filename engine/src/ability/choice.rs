@@ -183,6 +183,16 @@ impl super::resolver::AbilityResolver {
         if !sub_choice {
             self.resume_pending_actions(gs)?;
         }
+        // If a deferred cost (is_select_action=true stage selection) just had
+        // its state change applied during handle_stage_selection, mark the cost
+        // as paid so the ability queue can transition to the effect phase.
+        if !sub_choice && self.pending_choice.is_none() {
+            if let Some(e) = gs.ability_queue.current_entry_mut() {
+                if !e.cost_paid && !e.effect_started {
+                    e.cost_paid = true;
+                }
+            }
+        }
         log::debug!(
             "[FINALIZE_CHOICE] pending={} selected={:?} context={:?}",
             has_pending_sequential,
@@ -1584,6 +1594,21 @@ impl super::resolver::AbilityResolver {
             for &cid in &cards {
                 if !self.selected_cards.contains(&cid) {
                     self.selected_cards.push(cid);
+                }
+            }
+            // During cost phase (effect_started=false) the only is_select_action
+            // stage selections come from change_state: "wait" costs. Apply the
+            // wait directly so the cost is truly paid — the cost handler won't
+            // re-enter because abilities.rs skips setting cost_paid for deferred
+            // choices.
+            if !cards.is_empty()
+                && gs
+                    .ability_queue
+                    .current_entry()
+                    .is_some_and(|e| !e.effect_started)
+            {
+                for &cid in &cards {
+                    gs.mods.add_orientation_modifier(cid, "wait");
                 }
             }
         } else {
