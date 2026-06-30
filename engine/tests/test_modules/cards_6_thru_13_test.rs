@@ -144,6 +144,205 @@ fn c8_both_shuffle_under_deck() {
     );
 }
 
+/// Q242: 百生吟子 debut — blade+2 gained even when no live card in discard.
+/// The followup has two independent effects: retrieve live card + gain blade+2.
+/// If retrieval fails (no live card in discard), blade+2 still applies.
+
+/// Helper: trigger 百生吟子's debut, returns true if condition triggered (blade applied)
+fn trigger_momoo_debut(game: &mut TestGame, card_id: i16) -> bool {
+    trigger(game, card_id, "登場");
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    let blade = game.state.mods.get_blade_modifier(card_id);
+    blade > 0
+}
+
+/// Happy path: 20+ member cards in discard + live card in discard → both effects apply.
+#[test]
+fn c8_q242_both_shuffle_and_retrieve_and_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let c = game.id("PL!HS-pb1-012-R");
+    let m = game.id("PL!-sd1-001-SD"); // member card
+    let live = game.id("PL!-sd1-019-SD"); // live card
+    let f = game.id("PL!-sd1-010-SD"); // filler
+    game.state.player1.stage.stage = [-1, c, -1];
+
+    // 10 member cards each in both players' discards = 20 total (hits threshold)
+    for _ in 0..10 {
+        game.state.player1.waitroom.cards.push(m);
+        game.state.player2.waitroom.cards.push(m);
+    }
+    // Live card in P1's discard for retrieval
+    game.state.player1.waitroom.cards.push(live);
+    let w1_before = game.state.player1.waitroom.cards.len();
+
+    deck(&mut game, f);
+    game.give_energy(5);
+    let blade_before = game.state.mods.get_blade_modifier(c);
+
+    trigger_momoo_debut(&mut game, c);
+
+    // Live card was retrieved from discard to hand
+    assert!(
+        game.state.player1.hand.cards.contains(&live),
+        "Q242: Live card should be retrieved to hand"
+    );
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&live),
+        "Q242: Live card should no longer be in discard"
+    );
+    // P1's waitroom shrank (member cards shuffled under + live card retrieved)
+    assert!(
+        game.state.player1.waitroom.cards.len() < w1_before,
+        "Q242: P1 waitroom should shrink"
+    );
+
+    // Blade+2 gained
+    let blade_after = game.state.mods.get_blade_modifier(c);
+    assert_eq!(
+        blade_after,
+        blade_before + 2,
+        "Q242: Should gain blade+2 from debut (happy path)"
+    );
+}
+
+/// Q242: No live card in discard → blade+2 still gained.
+#[test]
+fn c8_q242_no_live_card_still_gains_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let c = game.id("PL!HS-pb1-012-R");
+    let m = game.id("PL!-sd1-001-SD");
+    let f = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [-1, c, -1];
+
+    // 10 member cards each = 20 total (meets threshold)
+    for _ in 0..10 {
+        game.state.player1.waitroom.cards.push(m);
+        game.state.player2.waitroom.cards.push(m);
+    }
+    // NO live card in discard!
+    let hand_before = game.state.player1.hand.cards.len();
+
+    deck(&mut game, f);
+    game.give_energy(5);
+    let blade_before = game.state.mods.get_blade_modifier(c);
+
+    trigger_momoo_debut(&mut game, c);
+
+    // No live card retrieved (hand unchanged from the retrieve effect)
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "Q242: Hand should not grow when no live card in discard"
+    );
+
+    // Blade+2 STILL gained (Q242: yes, you can)
+    let blade_after = game.state.mods.get_blade_modifier(c);
+    assert_eq!(
+        blade_after,
+        blade_before + 2,
+        "Q242: Should gain blade+2 EVEN with no live card in discard"
+    );
+}
+
+/// Edge: Exactly 20 cards moved (threshold met).
+#[test]
+fn c8_q242_exactly_20_threshold_met() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let c = game.id("PL!HS-pb1-012-R");
+    let m = game.id("PL!-sd1-001-SD");
+    let live = game.id("PL!-sd1-019-SD");
+    let f = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [-1, c, -1];
+
+    // Exactly 10 each = 20 total
+    for _ in 0..10 {
+        game.state.player1.waitroom.cards.push(m);
+        game.state.player2.waitroom.cards.push(m);
+    }
+    game.state.player1.waitroom.cards.push(live);
+    deck(&mut game, f);
+    game.give_energy(5);
+
+    trigger_momoo_debut(&mut game, c);
+
+    let blade = game.state.mods.get_blade_modifier(c);
+    assert!(
+        blade >= 2,
+        "Q242: Exactly 20 cards moved → threshold met, blade+2 should apply"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&live),
+        "Q242: Live card retrieved at exactly 20 threshold"
+    );
+}
+
+/// Edge: Only 19 cards moved (threshold NOT met) → no blade, no retrieval.
+#[test]
+fn c8_q242_19_below_threshold() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let c = game.id("PL!HS-pb1-012-R");
+    let m = game.id("PL!-sd1-001-SD");
+    let live = game.id("PL!-sd1-019-SD");
+    let f = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [-1, c, -1];
+
+    // 9 P1 + 10 P2 = 19 total (below 20 threshold)
+    for _ in 0..9 {
+        game.state.player1.waitroom.cards.push(m);
+    }
+    for _ in 0..10 {
+        game.state.player2.waitroom.cards.push(m);
+    }
+    game.state.player1.waitroom.cards.push(live);
+    deck(&mut game, f);
+    game.give_energy(5);
+
+    trigger_momoo_debut(&mut game, c);
+
+    // Blade should NOT be gained
+    let blade = game.state.mods.get_blade_modifier(c);
+    assert_eq!(blade, 0, "Q242: 19 < 20 threshold → no blade+2");
+    // Live card should NOT be retrieved
+    assert!(
+        !game.state.player1.hand.cards.contains(&live),
+        "Q242: Live card not retrieved below threshold"
+    );
+}
+
+/// Edge: Only P1 contributes all 20 cards (P2 contributes 0).
+#[test]
+fn c8_q242_p1_only_20_threshold() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let c = game.id("PL!HS-pb1-012-R");
+    let m = game.id("PL!-sd1-001-SD");
+    let live = game.id("PL!-sd1-019-SD");
+    let f = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [-1, c, -1];
+
+    // 20 cards from P1 only, 0 from P2 = 20 total
+    for _ in 0..20 {
+        game.state.player1.waitroom.cards.push(m);
+    }
+    game.state.player1.waitroom.cards.push(live);
+    deck(&mut game, f);
+    game.give_energy(5);
+
+    trigger_momoo_debut(&mut game, c);
+
+    let blade = game.state.mods.get_blade_modifier(c);
+    assert!(
+        blade >= 2,
+        "Q242: P1-only 20 cards → threshold met (total=20), blade+2 applies"
+    );
+}
+
 // ========== Card 9: PL!-bp5-111-R A-RISE ==========
 #[test]
 fn c9_arise_constant_heart_with_other_arise() {

@@ -7490,7 +7490,7 @@ def _try_kore_niyori_result(text):
         "action": "conditional_on_result",
         "primary_effect": primary,
         "result_condition": cond,
-        "followup_action": parse_action(fp.strip()),
+        "followup_action": parse_effect(fp.strip()),
     }
 
 

@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-01T03:00:02.548081",
+  "generated_at": "2026-07-01T06:10:25.744874",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -17207,13 +17207,25 @@
         },
         "followup_action": {
           "text": "自分の控え室からライブカードを1枚手札に加え、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
-          "duration": "live_end",
-          "source": "discard",
-          "count": 1,
-          "card_type": "live_card",
-          "target": "self",
-          "action": "move_cards",
-          "destination": "hand"
+          "action": "sequential",
+          "actions": [
+            {
+              "text": "自分の控え室からライブカードを1枚手札に加え",
+              "source": "discard",
+              "count": 1,
+              "card_type": "live_card",
+              "target": "self",
+              "action": "move_cards",
+              "destination": "hand"
+            },
+            {
+              "text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+              "duration": "live_end",
+              "action": "gain_resource",
+              "resource": "blade",
+              "count": 2
+            }
+          ]
         },
         "shuffle": true,
         "all": true
