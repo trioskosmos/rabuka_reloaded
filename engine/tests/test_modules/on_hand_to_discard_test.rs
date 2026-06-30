@@ -106,9 +106,9 @@ fn rurino_empty_recently_moved_no_trigger() {
     );
 }
 
-/// Multiple cards in recently_moved → fires once per batch.
+/// Q241: Multiple cards discarded simultaneously → fires ONCE per batch, not per-card.
 #[test]
-fn rurino_multiple_cards_discarded_fires_once() {
+fn rurino_q241_multiple_cards_discarded_fires_once() {
     let db = load_real_database();
     let mut v = TestGame::new(db);
     let rurino = setup_rurino(&mut v);
