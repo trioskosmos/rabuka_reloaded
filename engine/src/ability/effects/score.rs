@@ -240,7 +240,6 @@ impl AbilityResolver {
         repeat_limit: Option<u32>,
         per_unit_heart_colors: &[String],
     ) -> Result<(), String> {
-        eprintln!("[WZ_ENTER] execute_modify_required_hearts called per_unit={} per_unit_heart_colors={:?}", per_unit, per_unit_heart_colors);
         if per_unit {
             let card_db = &gs.card_database;
             let player = gs.resolve_target_player(target);

@@ -181,10 +181,6 @@ impl AbilityResolver {
             }
         }
         if let Some(ref condition) = effect.condition {
-            eprintln!(
-                "[CAN_ACT] condition type={:?} text={:?}",
-                condition.condition_type, condition.text
-            );
             if crate::ability::enums::ActionType::from_str(&effect.action)
                 == Some(crate::ability::enums::ActionType::ConditionalAlternative)
             {

@@ -886,11 +886,20 @@ pub async fn execute_action(
                     .push(FrameSnapshot::capture(&game_state, frame, label));
             }
 
-            // Notify other SSE clients that state changed
+            // Release write lock before building display (read-only work)
+            drop(game_state);
+
+            // Notify other SSE clients that state changed (skip in sandbox mode — single client)
             if let Some(rid) = get_room_id_from_req(&http_req) {
-                notify_room_clients(&data, &rid);
+                let is_multiplayer = data.rooms.lock().ok()
+                    .and_then(|r| r.get(&rid).map(|room| room.mode.as_str() == "pvp"))
+                    .unwrap_or(false);
+                if is_multiplayer {
+                    notify_room_clients(&data, &rid);
+                }
             }
 
+            let game_state = lock_state!(gs_arc, read);
             let mut display = crate::display::game_state_to_display(&game_state);
             if let Some(ref rid) = exec_room_id_str {
                 if let Ok(rooms) = data.rooms.lock() {

@@ -533,7 +533,8 @@ impl GameState {
         self.mods.constant_global_need_heart = exp_global_need_heart;
 
         // Also recalculate cost modifiers from hand cards (hand-based cost reductions)
-        self.recalculate_constant_cost_modifiers();
+        // Pass pre-collected stage effects to avoid re-scanning the stage
+        self.recalculate_constant_cost_modifiers_with_entries(&entries);
 
         // Evaluate constant abilities from success live card zone (e.g. Love wing bell)
         self.evaluate_success_zone_constant_modifiers();
@@ -625,9 +626,17 @@ impl GameState {
     }
 
     pub fn recalculate_constant_cost_modifiers(&mut self) {
-        let mut cost_abilities: Vec<(i16, crate::card::AbilityEffect)> = self
-            .collect_constant_stage_effects()
-            .into_iter()
+        let entries = self.collect_constant_stage_effects();
+        self.recalculate_constant_cost_modifiers_with_entries(&entries);
+    }
+
+    fn recalculate_constant_cost_modifiers_with_entries(
+        &mut self,
+        stage_entries: &[(i16, crate::card::AbilityEffect)],
+    ) {
+        let mut cost_abilities: Vec<(i16, crate::card::AbilityEffect)> = stage_entries
+            .iter()
+            .cloned()
             .filter(|(_, effect)| {
                 crate::ability::enums::ActionType::from_str(&effect.action)
                     == Some(crate::ability::enums::ActionType::ModifyCost)

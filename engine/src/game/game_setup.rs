@@ -591,37 +591,22 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 }
             };
             // Apply filtered_indices: exclude already-selected or ineligible cards
-            let fi_for_mapping = filtered_indices.clone();
-            let card_ids: Vec<(usize, i16)> = match filtered_indices {
-                Some(fi) if !fi.is_empty() => {
-                    let valid_positions: Vec<usize> = fi.clone();
-                    card_ids
-                        .into_iter()
-                        .filter(|(idx, _)| valid_positions.contains(idx))
-                        .collect()
-                }
+            let card_ids: Vec<(usize, i16)> = match &filtered_indices {
+                Some(fi) if !fi.is_empty() => card_ids
+                    .into_iter()
+                    .filter(|(idx, _)| fi.contains(idx))
+                    .collect(),
                 Some(_) => Vec::new(),
                 None => card_ids,
             };
 
             if !card_ids.is_empty() {
                 for (zone_index, card_id) in &card_ids {
+                    let card = game_state.card_database.get_card(*card_id);
                     let card_matches = match card_type.as_deref() {
-                        Some("member_card") => game_state
-                            .card_database
-                            .get_card(*card_id)
-                            .map(|c| c.is_member())
-                            .unwrap_or(false),
-                        Some("live_card") => game_state
-                            .card_database
-                            .get_card(*card_id)
-                            .map(|c| c.is_live())
-                            .unwrap_or(false),
-                        Some("energy_card") => game_state
-                            .card_database
-                            .get_card(*card_id)
-                            .map(|c| c.is_energy())
-                            .unwrap_or(false),
+                        Some("member_card") => card.map(|c| c.is_member()).unwrap_or(false),
+                        Some("live_card") => card.map(|c| c.is_live()).unwrap_or(false),
+                        Some("energy_card") => card.map(|c| c.is_energy()).unwrap_or(false),
                         None => true,
                         _ => true,
                     };
@@ -656,18 +641,10 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             continue;
                         }
                     }
-                    let card_name = game_state
-                        .card_database
-                        .get_card(*card_id)
-                        .map(|c| c.name.as_str())
-                        .unwrap_or("Unknown");
-                    let real_card_no = game_state
-                        .card_database
-                        .get_card(*card_id)
-                        .map(|c| c.card_no.clone())
-                        .unwrap_or_default();
+                    let card_name = card.map(|c| c.name.as_str()).unwrap_or("Unknown");
+                    let real_card_no = card.map(|c| c.card_no.clone()).unwrap_or_default();
                     // Map zone position to index within filtered_indices
-                    let fi_index = match &fi_for_mapping {
+                    let fi_index = match &filtered_indices {
                         Some(fi) if !fi.is_empty() => fi
                             .iter()
                             .position(|&x| x == *zone_index)
