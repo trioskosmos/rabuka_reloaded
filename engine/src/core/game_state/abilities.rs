@@ -180,6 +180,7 @@ impl GameState {
         if movement == Some("moved")
             || movement == Some("moves")
             || movement == Some("position_change")
+            || movement == Some("baton_touch")
         {
             return true;
         }
@@ -278,10 +279,18 @@ impl GameState {
                                     // BUT: skip this guard for "preceding_moved"
                                     // watchers — those track OTHER cards moving to
                                     // discard, not the card itself being in discard.
+                                    let cond_location = condition
+                                        .location
+                                        .as_deref()
+                                        .or_else(|| {
+                                            condition
+                                                .trigger_event
+                                                .as_ref()
+                                                .and_then(|t| t.location.as_deref())
+                                        })
+                                        .unwrap_or("");
                                     if condition.source.as_deref() != Some("preceding_moved")
-                                        && Zone::from_str(
-                                            condition.location.as_deref().unwrap_or(""),
-                                        ) == Some(Zone::Discard)
+                                        && Zone::from_str(cond_location) == Some(Zone::Discard)
                                         && (condition.card_type.as_deref() == Some("member_card")
                                             || condition.target.as_deref() == Some("self"))
                                     {
