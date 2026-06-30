@@ -1237,7 +1237,14 @@ impl super::TurnEngine {
 
                 if let Some(ref bh) = card.blade_heart {
                     for (color, count) in &bh.hearts {
-                        let effective_color = override_color.unwrap_or(*color);
+                        // Draw/Score special icons are never converted by
+                        // set_blade_type — they pass through unchanged.
+                        let effective_color =
+                            if matches!(*color, HeartColor::Draw | HeartColor::Score) {
+                                *color
+                            } else {
+                                override_color.unwrap_or(*color)
+                            };
                         // Q45: ALL-blade (BAll) can be treated as any color heart.
                         // Mapped to HeartColor::All (icon_all, index 7) so the UI
                         // displays icon_all.png for BAll yell hearts.

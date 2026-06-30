@@ -824,8 +824,16 @@ impl super::TurnEngine {
                 }
                 replaced
             };
-            game_state.recently_moved_cards = Some(double_replaced_ids);
-            game_state.recently_moved_from_zone = Some("stage".to_string());
+            for &replaced_id in &double_replaced_ids {
+                game_state.push_movement_event(
+                    replaced_id,
+                    "stage",
+                    "waitroom",
+                    Some(card_id),
+                    &player_id,
+                    false,
+                );
+            }
             // Track the non-placement vacated area for empty_area deployment
             let other_vacated = if db_areas[0] != area {
                 Some(db_areas[0] as usize)
@@ -898,8 +906,14 @@ impl super::TurnEngine {
             // The replaced member moved stage→waitroom; record it so that
             // "手札から控え室に置かれるたび" auto-abilities do NOT fire.
             if let Some(replaced_id) = replaced_member_id {
-                game_state.recently_moved_cards = Some(vec![replaced_id]);
-                game_state.recently_moved_from_zone = Some("stage".to_string());
+                game_state.push_movement_event(
+                    replaced_id,
+                    "stage",
+                    "waitroom",
+                    Some(card_id),
+                    &player_id,
+                    false,
+                );
             }
         }
 

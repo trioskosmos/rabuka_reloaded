@@ -239,14 +239,24 @@ export const ChoiceView = {
                             'confirm_mulligan': i18n.t('confirm'),
                             'FinishLiveCardSet': i18n.t('finish_live_card_set'),
                             'finish_live_card_set': i18n.t('finish_live_card_set'),
-                            'SelectPosition': i18n.t('select_position'),
-                            'select_position': i18n.t('select_position'),
+
                             'SelectCard': i18n.t('select'),
                             'select_card': i18n.t('select'),
                             'SelectSkip': i18n.t('skip'),
                             'select_skip': i18n.t('skip'),
                         };
                         name = ACTION_LABELS[a.action_type] || a.action_type || '';
+                    }
+                    // Position choice labels: localize position names for JP
+                    if ((a.action_type === 'select_position' || a.action_type === 'SelectPosition') && name) {
+                        if (State.currentLang === 'jp') {
+                            name = name
+                                .replace('Left', i18n.t('area_left'))
+                                .replace('Center', i18n.t('area_center'))
+                                .replace('Right', i18n.t('area_right'))
+                                .replace('Select ', '')
+                                .replace('Move to ', '');
+                        }
                     }
                     // Special card_no-based text actions — use locale
                     if (cardNo === 'pay_optional_cost') {

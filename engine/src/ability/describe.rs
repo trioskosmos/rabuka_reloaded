@@ -22,6 +22,7 @@ fn zone_label(zone: Option<&str>) -> &str {
         Some("discard") => "the waiting room",
         Some("deck") => "deck",
         Some("deck_top") => "top of deck",
+        Some("deck_bottom") => "bottom of deck",
         Some("stage") => "stage",
         Some("energy") => "energy",
         Some("energy_deck") => "energy deck",
@@ -175,9 +176,9 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
             if let Some(ep) = effect.exclude_position.as_deref() {
                 format!("Move a{} member away from {}", gn, ep)
             } else if c == Some(1) || c.is_none() {
-                format!("Position change a{} member", gn)
+                format!("Change position of a{} member", gn)
             } else {
-                format!("Position change {}{} members", c.unwrap_or(1), gn)
+                format!("Change position of {}{} members", c.unwrap_or(1), gn)
             }
         }
 
@@ -611,6 +612,7 @@ fn zone_label_ja(zone: Option<&str>) -> &str {
         Some("discard") | Some("waitroom") => "控え室",
         Some("deck") => "デッキ",
         Some("deck_top") => "デッキの上",
+        Some("deck_bottom") => "デッキの下",
         Some("stage") => "ステージ",
         Some("energy") => "エネルギー",
         Some("energy_deck") => "エネルギーデッキ",

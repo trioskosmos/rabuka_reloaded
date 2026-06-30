@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-30T10:03:54.889060",
+  "generated_at": "2026-06-30T10:20:13.491605",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -4399,7 +4399,9 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         }
       }
     },
@@ -5201,7 +5203,9 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         },
         "count": 1,
         "card_type": "member_card",
@@ -5665,7 +5669,9 @@
             "Aqours"
           ],
           "target": "self",
-          "card_type": "live_card"
+          "card_type": "live_card",
+          "source": "live_card_zone",
+          "destination": "discard"
         },
         "source": "those_cards",
         "destination": "deck_top_or_bottom",
@@ -8753,7 +8759,9 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         },
         "count": 1,
         "card_type": "member_card",
@@ -10502,7 +10510,9 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         },
         "group_names": [
           "Aqours"
@@ -15229,7 +15239,9 @@
           "negation": true,
           "card_property": "has_blade_heart",
           "temporal": "this_turn",
-          "temporal_scope": "this_turn"
+          "temporal_scope": "this_turn",
+          "source": "live_card_zone",
+          "destination": "discard"
         },
         "action": "sequential",
         "actions": [
@@ -21825,7 +21837,9 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         },
         "look_action": {
           "text": "自分のデッキの上からカードを5枚見る。",
@@ -21871,7 +21885,9 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         },
         "look_action": {
           "text": "自分のデッキの上からカードを5枚見る。",
@@ -21949,7 +21965,9 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         },
         "action": "sequential",
         "actions": [
@@ -24599,7 +24617,9 @@
             "phase_target": "self"
           },
           "target": "self",
-          "self_target": true
+          "self_target": true,
+          "source": "discard",
+          "destination": "hand"
         }
       }
     },
@@ -30666,7 +30686,9 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         }
       }
     },
@@ -30720,7 +30742,9 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         },
         "heart_colors": [
           "heart05"
@@ -30751,7 +30775,9 @@
             "destination": "discard"
           },
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "source": "stage",
+          "destination": "discard"
         },
         "action": "sequential",
         "actions": [

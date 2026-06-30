@@ -87,14 +87,24 @@ export const ActionButtons = {
                 'confirm_live_card_set': i18n.t('confirm'),
                 'SkipLiveCardSet': i18n.t('skip'),
                 'skip_live_card_set': i18n.t('skip'),
-                'SelectPosition': i18n.t('select_position'),
-                'select_position': i18n.t('select_position'),
+
                 'SelectCard': i18n.t('select'),
                 'select_card': i18n.t('select'),
                 'SelectSkip': i18n.t('skip'),
                 'select_skip': i18n.t('skip'),
             };
             name = ACTION_LABELS[a.action_type] || name;
+        }
+        // Position choice labels: localize position names for JP
+        if ((a.action_type === 'select_position' || a.action_type === 'SelectPosition') && name) {
+            if (currentLang === 'jp') {
+                name = name
+                    .replace('Left', i18n.t('area_left'))
+                    .replace('Center', i18n.t('area_center'))
+                    .replace('Right', i18n.t('area_right'))
+                    .replace('Select ', '')
+                    .replace('Move to ', '');
+            }
         }
         // For JP mode with a card, engine description is English — use card name instead
         if (currentLang === 'jp' && displayCard && a.description && a.action_type !== 'use_ability') {
