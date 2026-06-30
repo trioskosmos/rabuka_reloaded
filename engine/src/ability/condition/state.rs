@@ -741,15 +741,19 @@ impl<'a> ConditionContext<'a> {
                 let snapshot_area_player =
                     self.game_state.entry_snapshot_last_area_move_by_player();
 
-                // Single batch-scoped source: position_change_events (from position
-                // change executors) + batch_area_moved_cards (from push_movement_event
-                // stage→stage calls, covers test helpers and some effect paths).
+                // Two sources: position_change_events (batch-scoped, from position
+                // change executors) + turn_area_movements (turn-scoped, from
+                // push_movement_event). Both track stage→stage movement.
                 let this_card_moved = self.activating_card_id.is_some_and(|cid| {
                     self.game_state
                         .position_change_events
                         .iter()
                         .any(|e| e.moved_card_id == cid)
-                        || self.game_state.batch_area_moved_cards.contains(&cid)
+                        || self
+                            .game_state
+                            .turn_area_movements
+                            .iter()
+                            .any(|m| m.moved_card_id == cid)
                 });
                 let area_ok = if !this_card_moved {
                     // "このメンバーがエリアを移動する" — THIS card must have moved.

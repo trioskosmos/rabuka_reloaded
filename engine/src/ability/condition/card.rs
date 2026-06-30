@@ -2686,10 +2686,11 @@ impl<'a> ConditionContext<'a> {
                             .characters
                             .as_ref()
                             .map_or(false, |c| !c.is_empty());
-                    if !baton_touch_trigger
-                        && !has_card_filters
-                        && !self.game_state.cards_appeared_this_turn.is_empty()
-                    {
+                    if !baton_touch_trigger && !has_card_filters {
+                        if self.game_state.cards_appeared_this_turn.is_empty() {
+                            push_rich("今ターン未登場", false);
+                            return false;
+                        }
                         let self_appeared = self.activating_card_id.is_some_and(|cid| {
                             self.game_state.has_card_appeared_this_turn(cid)
                                 && stage_ids.contains(&cid)

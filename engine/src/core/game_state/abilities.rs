@@ -434,14 +434,8 @@ impl GameState {
                             .is_some_and(|t| t == crate::triggers::AUTO)
                         {
                             if let Some(ref effect) = ability.effect {
-                                // For each_time abilities on live cards, skip the
-                                // condition pre-filter — they are handled by
-                                // dedicated trigger functions that fire per event.
-                                if effect.trigger_type.as_deref() == Some("each_time") {
-                                    continue;
-                                }
-                                // Same pre-filter for live cards — uses the same
-                                // event-based condition check.
+                                // Live card scan — uses the same event-based
+                                // condition check as stage cards.
                                 if let Some(ref condition) = effect.condition {
                                     if Self::condition_is_event_based(condition) {
                                         let saved_activating = self.activating_card;
@@ -1090,7 +1084,6 @@ impl GameState {
             }
             self.batch_movements.clear();
             self.position_change_events.clear();
-            self.batch_area_moved_cards.clear();
             self.this_batch_triggered_ability_ids.clear();
         }
     }

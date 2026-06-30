@@ -339,6 +339,455 @@ fn wakana_bp2_008_use_limit_blocks_second_activation() {
 }
 
 // ====================================================================
+// PL!SP-pb1-008-R (若菜四季) — ADDITIONAL EDGE CASE TESTS
+// ====================================================================
+
+fn setup_wakana_debut_game(deck_count: usize) -> (TestGame, i16, i16) {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let wakana = game.id("PL!SP-pb1-008-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..deck_count {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.add_to_hand(wakana);
+    game.give_energy(15);
+    (game, wakana, filler)
+}
+
+/// Area_select choice is NOT a yes/no binary — it must be SelectTarget with
+/// target="area_select", allow_skip=false, and valid area options.
+#[test]
+fn wakana_008_choice_is_select_target_not_yes_no() {
+    let (mut game, wakana, _) = setup_wakana_debut_game(3);
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.play_to_stage(wakana, MemberArea::Center);
+
+    let choice = game.get_pending_choice();
+    match choice {
+        rabuka_engine::ability::types::Choice::SelectTarget {
+            target,
+            allow_skip,
+            options,
+            ..
+        } => {
+            assert_eq!(target, "area_select", "Must be area_select, not yes/no");
+            assert!(!allow_skip, "Area selection must NOT be skippable");
+            if let Some(opts) = options {
+                assert!(!opts.contains(&"center".to_string()), "Center excluded");
+                assert!(opts.contains(&"left".to_string()), "Left is option");
+                assert!(opts.contains(&"right".to_string()), "Right is option");
+            }
+        }
+        _ => panic!("Choice must be SelectTarget(area_select), got {:?}", choice),
+    }
+}
+
+/// Play to Center, move to empty Left.
+#[test]
+fn wakana_008_debut_center_to_empty_left() {
+    let (mut game, wakana, _) = setup_wakana_debut_game(3);
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.play_to_stage(wakana, MemberArea::Center);
+    game.select_option(0); // Left (index 0 in ["left", "right"])
+
+    assert_eq!(game.state.player1.stage.stage[0], wakana, "Wakana at Left");
+    assert_eq!(game.state.player1.stage.stage[1], -1, "Center empty");
+    assert_eq!(game.state.player1.stage.stage[2], -1, "Right empty");
+    assert!(!game.has_pending_choice(), "No remaining choice");
+}
+
+/// Play to Center, swap with occupant at Left.
+#[test]
+fn wakana_008_debut_center_swap_with_left_occupant() {
+    let (mut game, wakana, filler) = setup_wakana_debut_game(3);
+    game.state.player1.stage.stage = [filler, -1, -1];
+    game.play_to_stage(wakana, MemberArea::Center);
+    game.select_option(0); // Left
+
+    assert_eq!(game.state.player1.stage.stage[0], wakana, "Wakana at Left");
+    assert_eq!(
+        game.state.player1.stage.stage[1], filler,
+        "Filler swapped to Center"
+    );
+    assert_eq!(game.state.player1.stage.stage[2], -1, "Right empty");
+}
+
+/// Play to Left, move to empty Center.
+#[test]
+fn wakana_008_debut_left_to_empty_center() {
+    let (mut game, wakana, _) = setup_wakana_debut_game(3);
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.play_to_stage(wakana, MemberArea::LeftSide);
+
+    // Options should exclude Left, include Center and Right
+    let choice = game.get_pending_choice();
+    if let rabuka_engine::ability::types::Choice::SelectTarget { options, .. } = choice {
+        if let Some(opts) = options {
+            assert!(!opts.contains(&"left".to_string()), "Left excluded");
+            assert!(opts.contains(&"center".to_string()), "Center is option");
+            assert!(opts.contains(&"right".to_string()), "Right is option");
+        }
+    }
+    game.select_option(0); // Center (index 0 in ["center", "right"])
+
+    assert_eq!(game.state.player1.stage.stage[0], -1, "Left empty");
+    assert_eq!(
+        game.state.player1.stage.stage[1], wakana,
+        "Wakana at Center"
+    );
+    assert_eq!(game.state.player1.stage.stage[2], -1, "Right empty");
+}
+
+/// Play to Left, swap with occupant at Center.
+#[test]
+fn wakana_008_debut_left_swap_with_center_occupant() {
+    let (mut game, wakana, filler) = setup_wakana_debut_game(3);
+    game.state.player1.stage.stage = [-1, filler, -1];
+    game.play_to_stage(wakana, MemberArea::LeftSide);
+    game.select_option(0); // Center (index 0 in ["center", "right"])
+
+    assert_eq!(
+        game.state.player1.stage.stage[0], filler,
+        "Filler swapped to Left"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[1], wakana,
+        "Wakana at Center"
+    );
+    assert_eq!(game.state.player1.stage.stage[2], -1, "Right empty");
+}
+
+/// Play to Right, move to empty Center.
+#[test]
+fn wakana_008_debut_right_to_empty_center() {
+    let (mut game, wakana, _) = setup_wakana_debut_game(3);
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.play_to_stage(wakana, MemberArea::RightSide);
+
+    let choice = game.get_pending_choice();
+    if let rabuka_engine::ability::types::Choice::SelectTarget { options, .. } = choice {
+        if let Some(opts) = options {
+            assert!(!opts.contains(&"right".to_string()), "Right excluded");
+            assert!(opts.contains(&"left".to_string()), "Left is option");
+            assert!(opts.contains(&"center".to_string()), "Center is option");
+        }
+    }
+    // Options: ["left", "center"] → option 0 = "left"
+    game.select_option(0); // Left
+
+    assert_eq!(game.state.player1.stage.stage[0], wakana, "Wakana at Left");
+    assert_eq!(game.state.player1.stage.stage[1], -1, "Center empty");
+    assert_eq!(game.state.player1.stage.stage[2], -1, "Right empty");
+}
+
+/// Play to Right, swap with occupant at Center.
+#[test]
+fn wakana_008_debut_right_swap_with_center_occupant() {
+    let (mut game, wakana, filler) = setup_wakana_debut_game(3);
+    game.state.player1.stage.stage = [-1, filler, -1];
+    game.play_to_stage(wakana, MemberArea::RightSide);
+    game.select_option(1); // Center (index 1 in ["left", "center"])
+
+    assert_eq!(game.state.player1.stage.stage[0], -1, "Left empty");
+    assert_eq!(
+        game.state.player1.stage.stage[1], wakana,
+        "Wakana at Center"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[2], filler,
+        "Filler swapped to Right"
+    );
+}
+
+/// Both other areas occupied → still must select one, swap occurs.
+#[test]
+fn wakana_008_debut_both_occupied_swap_either() {
+    let (mut game, wakana, filler) = setup_wakana_debut_game(3);
+    let occupant2 = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler, -1, occupant2];
+    game.play_to_stage(wakana, MemberArea::Center);
+
+    // Both Left and Right are options (Center excluded)
+    let choice = game.get_pending_choice();
+    if let rabuka_engine::ability::types::Choice::SelectTarget { options, .. } = choice {
+        if let Some(opts) = options {
+            assert!(opts.contains(&"left".to_string()), "Left is option");
+            assert!(opts.contains(&"right".to_string()), "Right is option");
+            assert_eq!(opts.len(), 2, "Exactly 2 options");
+        }
+    }
+    game.select_option(0); // Left → swap with filler
+
+    assert_eq!(game.state.player1.stage.stage[0], wakana, "Wakana at Left");
+    assert_eq!(
+        game.state.player1.stage.stage[1], filler,
+        "Filler at Center"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[2], occupant2,
+        "Occupant2 at Right"
+    );
+}
+
+/// Draw when deck has exactly 1 card → draw succeeds, area change still happens.
+#[test]
+fn wakana_008_debut_draw_last_card_then_move() {
+    let (mut game, wakana, filler) = setup_wakana_debut_game(1);
+    game.state.player1.main_deck.cards.push(filler);
+    let deck_before = game.state.player1.main_deck.cards.len();
+    let hand_before = game.state.player1.hand.cards.len();
+
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.play_to_stage(wakana, MemberArea::Center);
+
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 1,
+        "Last card drawn from deck"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before + 1,
+        "Card added to hand"
+    );
+
+    game.select_option(0); // Left
+    assert_eq!(
+        game.state.player1.stage.stage[0], wakana,
+        "Wakana at Left after draw+move"
+    );
+}
+
+/// Draw when deck is empty → draw is a no-op, area change still happens.
+#[test]
+fn wakana_008_debut_empty_deck_draw_noop_then_move() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let wakana = game.id("PL!SP-pb1-008-R");
+    game.add_to_hand(wakana);
+    game.give_energy(15);
+    // No cards in deck
+    game.state.player1.main_deck.cards.clear();
+    let hand_before = game.state.player1.hand.cards.len();
+
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.play_to_stage(wakana, MemberArea::Center);
+
+    // Draw from empty deck should not change hand size (draw is attempted but no cards)
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "No cards drawn from empty deck"
+    );
+    // Deck stays empty
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        0,
+        "Deck remains empty"
+    );
+
+    // Area change STILL happens even though draw did nothing
+    game.select_option(0); // Left
+    assert_eq!(
+        game.state.player1.stage.stage[0], wakana,
+        "Wakana at Left despite empty deck"
+    );
+}
+
+/// Position change events: 1 event when moving to empty area.
+#[test]
+fn wakana_008_debut_position_change_event_count_empty() {
+    let (mut game, wakana, _) = setup_wakana_debut_game(3);
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.play_to_stage(wakana, MemberArea::Center);
+    game.select_option(0); // Left (empty)
+
+    assert_eq!(
+        game.state.position_change_events.len(),
+        1,
+        "1 position change event when moving to empty area"
+    );
+    let event = &game.state.position_change_events[0];
+    assert_eq!(event.moved_card_id, wakana, "Wakana is the moved card");
+    assert_eq!(event.old_position, 1, "Moved from Center");
+    assert_eq!(event.new_position, 0, "Moved to Left");
+    assert!(
+        game.state.position_change_occurred_this_turn,
+        "position_change_occurred_this_turn should be true"
+    );
+}
+
+/// Position change events: 2 events when swapping (one for each card).
+#[test]
+fn wakana_008_debut_position_change_event_count_swap() {
+    let (mut game, wakana, filler) = setup_wakana_debut_game(3);
+    game.state.player1.stage.stage = [-1, -1, filler];
+    game.play_to_stage(wakana, MemberArea::Center);
+    game.select_option(1); // Right (occupied)
+
+    assert_eq!(
+        game.state.position_change_events.len(),
+        2,
+        "2 position change events for a swap (Wakana + occupant)"
+    );
+    // First event: Wakana moved from Center(1) to Right(2)
+    assert_eq!(
+        game.state.position_change_events[0].moved_card_id, wakana,
+        "First event is Wakana"
+    );
+    assert_eq!(game.state.position_change_events[0].old_position, 1);
+    assert_eq!(game.state.position_change_events[0].new_position, 2);
+    // Second event: occupant moved from Right(2) to Center(1)
+    assert_eq!(
+        game.state.position_change_events[1].moved_card_id, filler,
+        "Second event is occupant"
+    );
+    assert_eq!(game.state.position_change_events[1].old_position, 2);
+    assert_eq!(game.state.position_change_events[1].new_position, 1);
+    assert!(
+        game.state.position_change_occurred_this_turn,
+        "position_change_occurred_this_turn should be true"
+    );
+}
+
+// ====================================================================
+// PL!SP-bp2-008-R (若菜四季) — 起動 ADDITIONAL EDGE CASE TESTS
+// ====================================================================
+
+/// Activate from Left, select empty Right.
+#[test]
+fn wakana_bp2_008_activate_left_to_empty_right() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let wakana = game.id("PL!SP-bp2-008-R");
+    game.state.player1.stage.stage = [wakana, -1, -1];
+    game.give_energy(1);
+    game.activate_ability(wakana);
+
+    // Options: ["center", "right"] → option 1 = "right"
+    game.select_option(1);
+
+    assert_eq!(game.state.player1.stage.stage[0], -1, "Left empty");
+    assert_eq!(game.state.player1.stage.stage[1], -1, "Center empty");
+    assert_eq!(game.state.player1.stage.stage[2], wakana, "Wakana at Right");
+}
+
+/// Activate from Center, select empty Left.
+#[test]
+fn wakana_bp2_008_activate_center_to_empty_left() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let wakana = game.id("PL!SP-bp2-008-R");
+    game.state.player1.stage.stage = [-1, wakana, -1];
+    game.give_energy(1);
+    game.activate_ability(wakana);
+
+    // Options: ["left", "right"] → option 0 = "left"
+    game.select_option(0);
+
+    assert_eq!(game.state.player1.stage.stage[0], wakana, "Wakana at Left");
+    assert_eq!(game.state.player1.stage.stage[1], -1, "Center empty");
+    assert_eq!(game.state.player1.stage.stage[2], -1, "Right empty");
+}
+
+/// Activate from Right, swap with occupant at Center.
+#[test]
+fn wakana_bp2_008_activate_right_swap_with_center() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let wakana = game.id("PL!SP-bp2-008-R");
+    let occupant = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [-1, occupant, wakana];
+    game.give_energy(1);
+    game.activate_ability(wakana);
+
+    // Options: ["left", "center"] (Right is current, excluded)
+    game.select_option(1); // Center
+
+    assert_eq!(game.state.player1.stage.stage[0], -1, "Left empty");
+    assert_eq!(
+        game.state.player1.stage.stage[1], wakana,
+        "Wakana at Center"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[2], occupant,
+        "Occupant swapped to Right"
+    );
+}
+
+/// Activate choice is SelectTarget(area_select), not yes/no.
+#[test]
+fn wakana_bp2_008_choice_is_select_target() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let wakana = game.id("PL!SP-bp2-008-R");
+    game.state.player1.stage.stage = [wakana, -1, -1];
+    game.give_energy(1);
+    game.activate_ability(wakana);
+
+    let choice = game.get_pending_choice();
+    match choice {
+        rabuka_engine::ability::types::Choice::SelectTarget {
+            target, allow_skip, ..
+        } => {
+            assert_eq!(target, "area_select", "Must be area_select, not yes/no");
+            assert!(
+                !allow_skip,
+                "Area selection must NOT be skippable for activation ability"
+            );
+        }
+        _ => panic!("Choice must be SelectTarget(area_select), got {:?}", choice),
+    }
+}
+
+/// Insufficient energy → activation fails.
+#[test]
+fn wakana_bp2_008_insufficient_energy_fails() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let wakana = game.id("PL!SP-bp2-008-R");
+    game.state.player1.stage.stage = [wakana, -1, -1];
+    // No energy given
+    let result = game.try_activate_ability(wakana);
+    assert!(
+        result.is_err(),
+        "Activation should fail with 0 energy (cost is E = 1 active energy)"
+    );
+}
+
+/// Activate from Center, swap: position_change_events count = 2.
+#[test]
+fn wakana_bp2_008_position_change_event_count_swap() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let wakana = game.id("PL!SP-bp2-008-R");
+    let occupant = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [-1, wakana, occupant];
+    game.give_energy(1);
+    game.activate_ability(wakana);
+    game.select_option(1); // Right (occupied)
+
+    assert_eq!(
+        game.state.position_change_events.len(),
+        2,
+        "Swap generates 2 position change events"
+    );
+    assert_eq!(
+        game.state.position_change_events[0].moved_card_id, wakana,
+        "Wakana moved"
+    );
+    assert_eq!(
+        game.state.position_change_events[1].moved_card_id, occupant,
+        "Occupant swapped"
+    );
+    assert!(
+        game.state.position_change_occurred_this_turn,
+        "Flag set after activation position change"
+    );
+}
+
+// ====================================================================
 // PL!SP-bp5-013-N (唐 可可) — 登場: look 5, select SunnyPassion member OR
 //   Liella! member with blade heart, discard rest
 // ====================================================================

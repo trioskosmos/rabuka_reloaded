@@ -384,6 +384,8 @@ fn fuyumari_area_move_triggers_opponent_wait() {
 
     // Simulate area move: position changed and card moved this turn
     game.state.record_card_movement(fuyumari);
+    game.state
+        .push_movement_event(fuyumari, "stage", "stage", Some(fuyumari), "p1", true);
     game.state.position_change_occurred_this_turn = true;
 
     let pid = game.state.player1.id.clone();
