@@ -5,7 +5,7 @@ pattern lists, and normalization used across the parsing pipeline.
 """
 
 import re
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # Precompiled regex patterns for performance
 DIGIT_PATTERN = re.compile(r"(\d+)")
@@ -18,6 +18,7 @@ QUOTED_NAME_PATTERN = re.compile(r"「(.+?)」")
 COST_PATTERN = re.compile(r"コスト(\d+)")
 HEART_PATTERN = re.compile(r"{{heart_(\d+)\.png\|heart\d+}}")
 BLADE_PATTERN = re.compile(r"{{icon_blade\.png\|ブレード}}")
+ALL_ICON_PATTERN = re.compile(r"\{\{icon_all\.png\|ハート\}\}")
 
 
 def extract_int(pattern, text, default=None):
@@ -203,12 +204,17 @@ def _trim_reference_prefix(ref):
     return ref.strip()
 
 
-def extract_cost(text):
-    """Extract cost value from text (e.g., 'コスト3' -> 3)."""
-    match = COST_PATTERN.search(text)
-    if match:
-        return int(match.group(1))
+def extract_by_pattern(text: str, patterns: List[Tuple[str, str]]) -> Optional[str]:
+    """Match text against a priority-ordered (pattern, value) list. Returns first match."""
+    for pattern, value in patterns:
+        if pattern in text:
+            return value
     return None
+
+
+def extract_operator(text: str) -> Optional[str]:
+    """Extract comparison operator from text."""
+    return extract_by_pattern(text, OPERATOR_PATTERNS)
 
 
 def extract_heart_types(text):
@@ -221,24 +227,6 @@ def extract_blade_count(text):
     """Extract blade count from text (number of blade icons)."""
     matches = BLADE_PATTERN.findall(text)
     return len(matches) if matches else 0
-
-
-def create_fallback(raw_text):
-    """Create a fallback result with raw_text."""
-    return {"raw_text": raw_text}
-
-
-def is_fallback(result):
-    """Check if a result is a fallback (contains raw_text)."""
-    return isinstance(result, dict) and "raw_text" in result
-
-
-def merge_position_requirement(result, action):
-    """Merge position_requirement from action into result if present."""
-    if "position_requirement" in action:
-        result["position_requirement"] = action["position_requirement"]
-        del action["position_requirement"]
-    return result
 
 
 def check_exclude_self(text):
@@ -535,3 +523,366 @@ OPERATOR_PATTERNS: List[Tuple[str, str]] = [
     ("未満", "<"),
     ("超", ">"),
 ]
+
+# ============== POSITION KEYWORDS ==============
+POSITION_KEYWORDS: Dict[str, str] = {
+    "センターエリア": "center",
+    "左サイドエリア": "left_side",
+    "右サイドエリア": "right_side",
+    "センター": "center",
+    "左サイド": "left_side",
+    "右サイド": "right_side",
+    "正面": "front",
+}
+
+# ============== CARD TYPE PATTERNS (sorted longest-first) ==============
+_CARD_TYPE_LONGEST_FIRST: List[Tuple[str, str]] = sorted(
+    CARD_TYPE_PATTERNS, key=lambda x: -len(x[0])
+)
+
+# ============== PRE-COMPILED REGEXES ==============
+_ALL_KW_RE = re.compile(r"すべての|全ての|全部の|全て|全員|全体|カードをすべて")
+_DISTINCT_NAME_RE = re.compile(r"名前[がの]異なる|カード名が異なる")
+_DISTINCT_COST_RE = re.compile(r"コストがそれぞれ異なる")
+_ORIGINAL_VALUE_RE = re.compile(r"元々持つ|元々")
+_SHUFFLE_RE = re.compile(r"シャッフル")
+_SAME_GROUP_RE = re.compile(r"同じグループ名")
+_DIFF_GROUP_RE = re.compile(r"グループ名[がの]異なる|異なるグループ名")
+_SAME_UNIT_RE = re.compile(r"同じユニット名")
+_NON_STACKABLE_RE = re.compile(r"この効果は重複しない")
+_OPTIONAL_RE = re.compile(r"もよい|てもよい")
+_MULTIPLE_TARGETS_RE = re.compile(r"それぞれ|ずつ")
+_STATE_CHANGE_WAIT = re.compile(r"ウェイト(状態)?に(す|で)(る|き)")
+_STATE_CHANGE_ACTIVE = re.compile(r"アクティブにする")
+_ABILITY_FILTER_HAS = re.compile(r"能力を持つ")
+_ABILITY_FILTER_NO = re.compile(r"能力を持たない|能力も持たない")
+_CARD_PROPERTY_BLADE = re.compile(r"ブレードハートを持たない|ブレードハートがない")
+_CARD_PROPERTY_BLADE_POS = re.compile(r"ブレードハートを持つ")
+_CARD_PROPERTY_SCORE = re.compile(r"\{\{icon_score\.png\|スコア\}\}を持つ")
+_NEGATION_RE = re.compile(r"(がない|がなく|が\d*ない|いない|を持たない)")
+_SELF_TARGET_RE = re.compile(r"この(メンバー|カード)[がは]")
+
+
+def detect_require_all_hearts(text: str) -> bool:
+    """Detect if heart icons in text are joined by と (AND / all required)."""
+    heart_block = r"\{\{heart_\d+\.png\|heart\d+\}\}"
+    hearts = re.findall(heart_block, text)
+    if len(hearts) < 2:
+        return False
+    for i in range(len(hearts) - 1):
+        if not re.search(
+            re.escape(hearts[i]) + r"\s*と\s*" + re.escape(hearts[i + 1]), text
+        ):
+            return False
+    return True
+
+
+def extract_position(text: str) -> Optional[str]:
+    """Extract position (center/left_side/right_side) from text."""
+    return extract_by_pattern(text, list(POSITION_KEYWORDS.items()))
+
+
+def extract_cost_limit(text: str) -> Optional[int]:
+    """Extract cost limit value from text."""
+    for pat in [
+        r"元々のコスト[がは](\d+)(?:以上|以下|未満|超)",
+        r"(\d+)コスト(?:以上|以下|未満|超)",
+        r"コスト(\d+)(?:以上|以下|未満|超)",
+        r"コスト[がは](\d+)(?:以上|以下|未満|超)",
+        r"(\d+)\s*以下",
+        r"以下\s*(\d+)",
+        r"(\d+)\s*合計",
+        r"コスト(\d+)の",
+    ]:
+        m = re.search(pat, text)
+        if m:
+            return int(m.group(1))
+    return None
+
+
+def extract_source(text: str) -> Optional[str]:
+    """Extract source location (FROM zone)."""
+    return extract_by_pattern(text, SOURCE_PATTERNS)
+
+
+def extract_destination(text: str) -> Optional[str]:
+    """Extract destination location (TO zone)."""
+    pattern_result = extract_by_pattern(text, DESTINATION_PATTERNS)
+    if pattern_result:
+        return pattern_result
+    m = re.search(r"デッキの一番上から(\d+)枚目に置(?:いてもよい|く)", text)
+    if m:
+        return "deck"
+    if "エネルギーカードを1枚ウェイト状態で置いてもよい" in text:
+        return "energy_zone"
+    if (
+        "メンバーのいないエリアに登場させる" in text
+        or "メンバーのいないエリアにウェイト状態で登場させる" in text
+    ):
+        return "empty_area"
+    if "ウェイト状態で置く" in text or (
+        "エネルギーカードを" in text and ("置く" in text or "置いてもよい" in text)
+    ):
+        return "energy_zone"
+    if "登場させる" in text:
+        return "stage"
+    return None
+
+
+def extract_target(text: str) -> Optional[str]:
+    """Extract target (self/opponent/both/either)."""
+    t = text.replace("自分のカードの効果", "")
+    if (
+        ("自分の" in t and "相手の" in t)
+        or "自分と相手の" in text
+        or "自分と相手は" in text
+        or "自分と対戦相手は" in text
+        or "自分と対戦相手の" in text
+        or "自分と対戦相手" in text
+    ):
+        return "both"
+    if "自分か相手の" in text:
+        return "either"
+    if "相手の" in text:
+        return "opponent"
+    if "自分の" in text:
+        return "self"
+    return None
+
+
+def extract_card_type(text: str) -> Optional[str]:
+    """Extract card type from text."""
+    return extract_by_pattern(text, _CARD_TYPE_LONGEST_FIRST)
+
+
+class FieldExtractor:
+    """Single-pass extraction of all common fields from ability text.
+    Computes all fields once at init; access via attributes or .update_dict()."""
+
+    __slots__ = (
+        "text",
+        "ctx",
+        "count",
+        "card_type",
+        "target",
+        "source",
+        "destination",
+        "heart_colors",
+        "require_all_heart_colors",
+        "blade_count",
+        "group_names",
+        "characters",
+        "card_names",
+        "cost_limit",
+        "cost_limit_operator",
+        "position",
+        "optional",
+        "all_",
+        "distinct",
+        "original_value",
+        "exclude_self",
+        "shuffle",
+        "group_reference",
+        "same_unit_name",
+        "state_change",
+        "card_property",
+        "ability_filter",
+        "operator",
+        "negation",
+        "self_target",
+        "multiple_targets",
+        "non_stackable",
+    )
+
+    def __init__(self, text: str, context_text: str = ""):
+        self.text = text
+        self.ctx = context_text or text
+        self._extract_all()
+
+    def _extract_all(self):
+        t = self.text
+        c = self.ctx
+
+        self.count = extract_count(t)
+        self.card_type = extract_card_type(t)
+        self.target = extract_target(t)
+        self.source = extract_source(t)
+        self.destination = extract_destination(t)
+
+        hm = HEART_PATTERN.findall(t)
+        if hm:
+            self.heart_colors = sorted(set(f"heart{m.zfill(2)}" for m in hm))
+            self.require_all_heart_colors = detect_require_all_hearts(t) or None
+        else:
+            self.heart_colors = None
+            self.require_all_heart_colors = None
+
+        self.blade_count = extract_blade_count(t)
+
+        self.group_names = extract_all_groups(c) or None
+        self.characters = extract_all_quoted_names(c) or None
+        cn = re.search(r"カード名に「([^」]+)」を含む", t)
+        if not cn:
+            cn = re.search(r"カード名が「([^」]+)」のカード", t)
+        if not cn:
+            cn = re.search(r"カード名(?:に|が)[「『]([^」』]+)[」』]", t)
+        self.card_names = [cn.group(1)] if cn else None
+
+        self.cost_limit = extract_cost_limit(t)
+        if self.cost_limit is not None:
+            if "以下" in t:
+                self.cost_limit_operator = "<="
+            elif "以上" in t:
+                self.cost_limit_operator = ">="
+            elif "未満" in t:
+                self.cost_limit_operator = "<"
+            elif "より大きい" in t:
+                self.cost_limit_operator = ">"
+            else:
+                self.cost_limit_operator = "="
+        else:
+            self.cost_limit_operator = None
+
+        self.position = extract_position(t)
+
+        self.optional = _OPTIONAL_RE.search(t) is not None if t else None
+        self.all_ = _ALL_KW_RE.search(t) is not None if t else None
+        self.distinct = (
+            "card_name"
+            if _DISTINCT_NAME_RE.search(t)
+            else ("cost" if _DISTINCT_COST_RE.search(t) else None)
+        )
+        self.original_value = _ORIGINAL_VALUE_RE.search(t) is not None if t else None
+        self.exclude_self = check_exclude_self(t) if t else None
+        self.shuffle = _SHUFFLE_RE.search(t) is not None if t else None
+        self.group_reference = (
+            "same_group_name"
+            if _SAME_GROUP_RE.search(t)
+            else ("different_group_names" if _DIFF_GROUP_RE.search(t) else None)
+        )
+        self.same_unit_name = _SAME_UNIT_RE.search(t) is not None if t else None
+        self.non_stackable = _NON_STACKABLE_RE.search(t) is not None if t else None
+        self.multiple_targets = (
+            _MULTIPLE_TARGETS_RE.search(t) is not None if t else None
+        )
+
+        self.state_change = (
+            "wait"
+            if _STATE_CHANGE_WAIT.search(t)
+            else ("active" if _STATE_CHANGE_ACTIVE.search(t) else None)
+        )
+
+        if _CARD_PROPERTY_BLADE.search(t):
+            self.card_property = "has_blade_heart"
+        elif _CARD_PROPERTY_BLADE_POS.search(t):
+            self.card_property = "has_blade_heart"
+        elif _CARD_PROPERTY_SCORE.search(t):
+            self.card_property = "has_score_icon"
+        else:
+            self.card_property = None
+
+        if _ABILITY_FILTER_HAS.search(t) and not _ABILITY_FILTER_NO.search(t):
+            self.ability_filter = "has_ability"
+        elif _ABILITY_FILTER_NO.search(t):
+            self.ability_filter = "no_ability"
+        else:
+            self.ability_filter = None
+
+        self.operator = extract_operator(t)
+        self.negation = _NEGATION_RE.search(t) is not None if t else None
+        self.self_target = (
+            (bool(_SELF_TARGET_RE.search(t)) and "以外" not in t) if t else None
+        )
+
+    def update_dict(self, d: dict) -> dict:
+        """Insert all non-None fields into d (no overwrite of existing keys)."""
+        for key in (
+            "count",
+            "card_type",
+            "target",
+            "source",
+            "destination",
+            "heart_colors",
+            "require_all_heart_colors",
+            "group_names",
+            "characters",
+            "card_names",
+            "cost_limit",
+            "cost_limit_operator",
+            "position",
+            "state_change",
+            "card_property",
+            "ability_filter",
+            "operator",
+        ):
+            val = getattr(self, key, None)
+            if val is not None and key not in d:
+                d[key] = val
+        for key in (
+            "optional",
+            "original_value",
+            "exclude_self",
+            "shuffle",
+            "same_unit_name",
+            "non_stackable",
+            "multiple_targets",
+            "negation",
+            "self_target",
+        ):
+            val = getattr(self, key, None)
+            if val and val is not None and key not in d:
+                d[key] = val
+        if self.all_ and "all" not in d:
+            d["all"] = True
+        if self.distinct and "distinct" not in d:
+            d["distinct"] = self.distinct
+        if self.group_reference and "group_reference" not in d:
+            d["group_reference"] = self.group_reference
+        return d
+
+
+class PriorityRegistry:
+    """Priority-sorted handler registry. No fragile ordering — add handlers at any priority."""
+
+    def __init__(self, name: str = "registry"):
+        self._handlers: List[Tuple[int, str, callable]] = []
+        self._name = name
+        self._sorted = False
+
+    def register(self, priority: int, name: str, handler) -> None:
+        self._handlers.append((priority, name, handler))
+        self._sorted = False
+
+    def unregister(self, name: str) -> None:
+        self._handlers = [(p, n, h) for p, n, h in self._handlers if n != name]
+        self._sorted = False
+
+    def sorted_handlers(self):
+        if not self._sorted:
+            self._handlers.sort(key=lambda x: (x[0], x[1]))
+            self._sorted = True
+        return self._handlers
+
+    def dispatch(self, text: str, ctx: dict = None, *, default: Any = None) -> Any:
+        """Run handlers in priority order. First non-None return wins."""
+        if ctx is None:
+            ctx = {}
+        for _priority, _name, handler in self.sorted_handlers():
+            result = handler(text, ctx)
+            if result is not None:
+                return result
+        return default
+
+    def __repr__(self):
+        return f"PriorityRegistry({self._name}, {len(self._handlers)} handlers)"
+
+
+def action_rule(registry: PriorityRegistry, priority: int, name: str = ""):
+    """Decorator to register a handler in a PriorityRegistry."""
+
+    def decorator(func):
+        func_name = name or func.__name__
+        registry.register(priority, func_name, func)
+        return func
+
+    return decorator

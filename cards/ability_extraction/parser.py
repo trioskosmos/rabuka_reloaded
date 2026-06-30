@@ -2166,7 +2166,9 @@ def parse_action(text: str) -> Dict[str, Any]:
         lambda t, a: a.update({"restriction_type": "cannot_move"}),
     )
     R(
-        lambda t: "加える" in t or "加え" in t,
+        lambda t: ("加える" in t or "加え" in t)
+        and "選ぶ" not in t
+        and "選び" not in t,
         "move_cards",
         lambda t, a: a.update({"destination": "hand"}),
     )
@@ -2297,6 +2299,7 @@ def parse_action(text: str) -> Dict[str, Any]:
             None,
         ),
     )
+    R("以下から1つを選ぶ", "choice", None)
     R(
         lambda t: bool(re.search(r"数\d*つを選ぶ", t)),
         "select_number",
@@ -2359,7 +2362,6 @@ def parse_action(text: str) -> Dict[str, Any]:
         "modify_score",
         lambda t, a: a.update({"operation": "remove", "value": 1}),
     )
-    R("以下から1つを選ぶ", "choice", None)
     R("ブレードの色を", "set_blade_type", None)
     # "ハートをすべてheartXXにする" → set all hearts to specific color (not player choice)
     R(
