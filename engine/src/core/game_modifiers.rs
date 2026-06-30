@@ -287,6 +287,10 @@ impl GameModifiers {
         self.score_modifiers.entry(card_id).or_default().set = value;
     }
 
+    pub fn get_score_set_modifier(&self, card_id: i16) -> i32 {
+        self.score_modifiers.get(&card_id).map_or(0, |e| e.set)
+    }
+
     pub fn clear_score_set_modifier(&mut self, card_id: i16) {
         if let Some(entry) = self.score_modifiers.get_mut(&card_id) {
             entry.set = 0;

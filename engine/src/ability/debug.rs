@@ -8,7 +8,7 @@ use std::sync::Mutex;
 
 /// Toggle all ability debug output (eprintln! + rule_log buffer) at runtime.
 /// Default OFF in production, ON in tests via test helpers.
-pub static ABILITY_DEBUG: AtomicBool = AtomicBool::new(true);
+pub static ABILITY_DEBUG: AtomicBool = AtomicBool::new(false);
 
 /// Enable/disable ability debug.
 pub fn set_debug(enabled: bool) {

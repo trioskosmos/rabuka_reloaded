@@ -546,14 +546,18 @@ fn settle_single_player_state(game_state: &mut GameState) -> Result<(), String> 
 
             crate::turn::TurnEngine::advance_phase(game_state);
 
-            println!(
-                "DEBUG: Auto-advanced from {:?} to {:?}",
-                old_phase, game_state.current_phase
-            );
+            if cfg!(debug_assertions) {
+                println!(
+                    "DEBUG: Auto-advanced from {:?} to {:?}",
+                    old_phase, game_state.current_phase
+                );
+            }
         } else if is_live_card_set_phase(game_state) {
             // Live card set phases are manual - don't auto-advance
 
-            println!("DEBUG: Live card set phase reached, stopping auto-advance");
+            if cfg!(debug_assertions) {
+                println!("DEBUG: Live card set phase reached, stopping auto-advance");
+            }
 
             break;
         } else {
@@ -1737,9 +1741,13 @@ fn notify_room_clients(data: &AppState, room_id: &str) {
     if let Some(sender) = broadcasts.get(room_id) {
         let count = sender.receiver_count();
         let _ = sender.send(());
-        println!("[SSE] Notified room {} ({} clients)", room_id, count);
+        if cfg!(debug_assertions) {
+            println!("[SSE] Notified room {} ({} clients)", room_id, count);
+        }
     } else {
-        println!("[SSE] No broadcast sender for room {}", room_id);
+        if cfg!(debug_assertions) {
+            println!("[SSE] No broadcast sender for room {}", room_id);
+        }
     }
 }
 

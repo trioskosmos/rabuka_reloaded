@@ -3,7 +3,9 @@ impl GameState {
     /// Handles gain_resource(blade, heart), modify_score, modify_cost.
     /// Clears old constant-derived values and re-applies those whose conditions pass.
     pub fn recalculate_constants(&mut self) {
-        eprintln!("[SZ_DEBUG] recalculate_constants ENTERED");
+        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            eprintln!("[SZ_DEBUG] recalculate_constants ENTERED");
+        }
         let entries = self.collect_constant_stage_effects();
         self.mods.constant_score_sources.clear();
 
@@ -616,7 +618,9 @@ impl GameState {
         }
         self.mods.constant_blade_bonuses = expected;
         self.recalculate_constant_cost_modifiers();
-        eprintln!("[SZ_DEBUG] about to call evaluate_success_zone_constant_modifiers from recalculate_constants");
+        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            eprintln!("[SZ_DEBUG] about to call evaluate_success_zone_constant_modifiers from recalculate_constants");
+        }
         self.evaluate_success_zone_constant_modifiers();
     }
 
@@ -1139,15 +1143,17 @@ impl GameState {
     pub fn evaluate_success_zone_constant_modifiers(&mut self) {
         use crate::ability::condition::ConditionContext;
 
-        eprintln!("[SZ_DEBUG] evaluate_success_zone_constant_modifiers called");
-        eprintln!(
-            "[SZ_DEBUG] p1 success zone = {:?}",
-            self.player1.success_live_card_zone.cards.to_vec()
-        );
-        eprintln!(
-            "[SZ_DEBUG] p2 success zone = {:?}",
-            self.player2.success_live_card_zone.cards.to_vec()
-        );
+        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            eprintln!("[SZ_DEBUG] evaluate_success_zone_constant_modifiers called");
+            eprintln!(
+                "[SZ_DEBUG] p1 success zone = {:?}",
+                self.player1.success_live_card_zone.cards.to_vec()
+            );
+            eprintln!(
+                "[SZ_DEBUG] p2 success zone = {:?}",
+                self.player2.success_live_card_zone.cards.to_vec()
+            );
+        }
 
         // ── Clear previously-applied success zone bonuses ──
         let old_sz_blade = std::mem::take(&mut self.mods.success_zone_blade_bonuses);
@@ -1200,12 +1206,16 @@ impl GameState {
             let prev_activating = self.activating_card;
             self.activating_card = Some(*cid);
             let ctx = ConditionContext::new(self);
-            eprintln!("[SZ_DEBUG] cid={} effect={}", cid, effect.action);
+            if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                eprintln!("[SZ_DEBUG] cid={} effect={}", cid, effect.action);
+            }
             let cond_met = effect
                 .condition
                 .as_ref()
                 .is_none_or(|c| ctx.evaluate_condition(c));
-            eprintln!("[SZ_DEBUG] cond_met={}", cond_met);
+            if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                eprintln!("[SZ_DEBUG] cond_met={}", cond_met);
+            }
             if !cond_met {
                 self.activating_card = prev_activating;
                 continue;
@@ -1290,14 +1300,16 @@ impl GameState {
                     },
                     _ => owner_player,
                 };
-                eprintln!(
-                    "[SZ_DEBUG] GainResource resource={} amount={} target={} position={:?}",
-                    resource,
-                    amount,
-                    effect.target_name(),
-                    effect.position
-                );
-                eprintln!("[SZ_DEBUG] stage={:?}", player.stage.stage);
+                if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                    eprintln!(
+                        "[SZ_DEBUG] GainResource resource={} amount={} target={} position={:?}",
+                        resource,
+                        amount,
+                        effect.target_name(),
+                        effect.position
+                    );
+                    eprintln!("[SZ_DEBUG] stage={:?}", player.stage.stage);
+                }
 
                 let candidates: Vec<i16> = player
                     .stage
@@ -1334,19 +1346,28 @@ impl GameState {
                     .map(|(_, &id)| id)
                     .collect();
 
-                eprintln!(
-                    "[SZ_DEBUG] GainResource resource={} amount={}",
-                    resource, amount
-                );
-                eprintln!(
-                    "[SZ_DEBUG] candidates count={} ids={:?}",
-                    candidates.len(),
-                    candidates
-                );
+                if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                    eprintln!(
+                        "[SZ_DEBUG] GainResource resource={} amount={}",
+                        resource, amount
+                    );
+                    eprintln!(
+                        "[SZ_DEBUG] candidates count={} ids={:?}",
+                        candidates.len(),
+                        candidates
+                    );
+                }
                 match resource {
                     "blade" | "ブレード" => {
                         for &target_id in &candidates {
-                            eprintln!("[SZ_DEBUG] ADDING blade {} to target {}", amount, target_id);
+                            if crate::ability::debug::ABILITY_DEBUG
+                                .load(std::sync::atomic::Ordering::Relaxed)
+                            {
+                                eprintln!(
+                                    "[SZ_DEBUG] ADDING blade {} to target {}",
+                                    amount, target_id
+                                );
+                            }
                             self.mods.add_blade_modifier(target_id, amount);
                             *self
                                 .mods
@@ -1401,15 +1422,10 @@ impl GameState {
                 for &target_id in &targets {
                     match op {
                         "set" => {
-                            let base = self
-                                .card_database
-                                .get_card(target_id)
-                                .map(|c| c.get_score() as i32)
-                                .unwrap_or(0);
-                            self.mods.set_score_modifier(target_id, value - base);
+                            self.mods.set_score_modifier(target_id, value);
                             self.mods
                                 .success_zone_score_bonuses
-                                .insert(target_id, value - base);
+                                .insert(target_id, value);
                         }
                         _ => {
                             self.mods.add_score_modifier(target_id, value);

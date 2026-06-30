@@ -427,8 +427,14 @@ impl super::TurnEngine {
                         snap.lives[i].passed = true;
                     }
                     let base_score = card.get_score() as i32;
-                    let mod_score = game_state.mods.get_score_modifier(lc_id);
-                    snap.lives[i].score = (base_score + mod_score).max(0) as u32;
+                    let set_score = game_state.mods.get_score_set_modifier(lc_id);
+                    let additive = game_state.mods.get_score_modifier(lc_id) - set_score;
+                    let effective_base = if set_score != 0 {
+                        set_score
+                    } else {
+                        base_score
+                    };
+                    snap.lives[i].score = (effective_base + additive).max(0) as u32;
                 }
             }
 

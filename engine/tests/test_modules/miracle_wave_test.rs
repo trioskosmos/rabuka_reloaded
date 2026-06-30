@@ -51,10 +51,11 @@ fn miracle_wave_q182_excess_heart_score_4() {
     game.drain_auto_ability_choices();
 
     let mod_val = game.state.mods.get_score_modifier(wave);
-    // Card base score is 7, set_score adjusts modifier: 4 - 7 = -3 → final = 7 + (-3) = 4
+    // set_score stores absolute value 4 directly, additive=0 → get_score_modifier=4+0=4
+    // live calc uses set_score(4) as effective base → final = 4 + 0 = 4
     assert_eq!(
-        mod_val, -3,
-        "modifier should be -3 (base=7 + modifier=-3 = final=4), got {}",
+        mod_val, 4,
+        "score modifier should be 4 (set=4 additive=0), got {}",
         mod_val
     );
 
