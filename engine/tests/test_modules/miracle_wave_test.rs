@@ -51,9 +51,21 @@ fn miracle_wave_q182_excess_heart_score_4() {
     game.drain_auto_ability_choices();
 
     let mod_val = game.state.mods.get_score_modifier(wave);
+    // Card base score is 7, set_score adjusts modifier: 4 - 7 = -3 → final = 7 + (-3) = 4
     assert_eq!(
-        mod_val, 4,
-        "Excess heart ≥2 → score should be set to 4 (got {})",
+        mod_val, -3,
+        "modifier should be -3 (base=7 + modifier=-3 = final=4), got {}",
         mod_val
     );
+
+    // Verify the actual live score in the performance snapshot
+    let live_score = game
+        .state
+        .performance_snapshots
+        .iter()
+        .flat_map(|s| s.lives.iter())
+        .find(|l| l.card_id == wave)
+        .map(|l| l.score)
+        .unwrap_or(0);
+    assert_eq!(live_score, 4, "Live score should be 4, got {}", live_score);
 }

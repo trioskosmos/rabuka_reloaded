@@ -1401,10 +1401,15 @@ impl GameState {
                 for &target_id in &targets {
                     match op {
                         "set" => {
-                            self.mods.set_score_modifier(target_id, value);
+                            let base = self
+                                .card_database
+                                .get_card(target_id)
+                                .map(|c| c.get_score() as i32)
+                                .unwrap_or(0);
+                            self.mods.set_score_modifier(target_id, value - base);
                             self.mods
                                 .success_zone_score_bonuses
-                                .insert(target_id, value);
+                                .insert(target_id, value - base);
                         }
                         _ => {
                             self.mods.add_score_modifier(target_id, value);

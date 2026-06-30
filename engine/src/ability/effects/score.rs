@@ -142,7 +142,14 @@ impl AbilityResolver {
                     let delta = match operation.as_str() {
                         "add" => final_value as i32,
                         "remove" => -(final_value as i32),
-                        "set" => final_value as i32,
+                        "set" => {
+                            let base = gs
+                                .card_database
+                                .get_card(card_id)
+                                .map(|c| c.get_score() as i32)
+                                .unwrap_or(0);
+                            final_value as i32 - base
+                        }
                         _ => 0i32,
                     };
                     (card_id, delta)
