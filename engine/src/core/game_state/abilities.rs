@@ -247,12 +247,26 @@ impl GameState {
                 &self.player2
             };
             // Scan stage cards for AUTO abilities
-            for &card_id in &player.stage.stage {
+            for (stage_idx, &card_id) in player.stage.stage.iter().enumerate() {
+                let card_position = match stage_idx {
+                    0 => crate::zones::MemberArea::LeftSide,
+                    1 => crate::zones::MemberArea::Center,
+                    _ => crate::zones::MemberArea::RightSide,
+                };
                 if card_id == -1 {
                     continue;
                 }
                 if let Some(card) = self.card_database.get_card(card_id) {
                     for (ability_idx, ability) in card.abilities.iter().enumerate() {
+                        if !crate::zones::check_effect_position(
+                            ability
+                                .effect
+                                .as_ref()
+                                .and_then(|e| e.activation_position.as_deref()),
+                            card_position,
+                        ) {
+                            continue;
+                        }
                         if ability
                             .triggers
                             .as_ref()

@@ -944,15 +944,15 @@ def parse_effect(text: str) -> Dict[str, Any]:
                     cond_parsed = parse_condition(note)
                     if cond_parsed and cond_parsed.get("type") != "custom":
                         extra_activation_cond = cond_parsed
-            positions = []
-            if "センターエリア" in note:
-                positions.append("center")
-            if "左サイドエリア" in note or "左サイド" in note:
-                positions.append("left_side")
-            if "右サイドエリア" in note or "右サイド" in note:
-                positions.append("right_side")
-            if positions:
-                extra_activation_pos = ",".join(positions)
+                positions = []
+                if "センターエリア" in note:
+                    positions.append("center")
+                if "左サイドエリア" in note or "左サイド" in note:
+                    positions.append("left_side")
+                if "右サイドエリア" in note or "右サイド" in note:
+                    positions.append("right_side")
+                if positions:
+                    extra_activation_pos = ",".join(positions)
 
     # Also check the full_text/cost_text for position icon patterns
     # (e.g. {{center.png|センター}} in the cost/effect text)

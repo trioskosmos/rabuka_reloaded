@@ -400,3 +400,63 @@ fn issue8_honoka_live_score_1_plus_2() {
         "8l: honoka stays on stage"
     );
 }
+
+// ====================================================================
+// Issue 8 extension: PL!SP-bp5-015-N (平安名すみれ) — center debut gate
+// Text: {{toujyou.png|登場}}{{center.png|センター}}ライブ終了時まで、
+//        {{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+// Activation: only at Center. Target: center member (self when at center).
+// BUG (fixed): activation_position was not checked by debut trigger path,
+// so playing to left/right granted blades to whatever member was at center.
+// ====================================================================
+
+fn assert_blade(game: &TestGame, card_id: i16, expected: i32) -> i32 {
+    let actual = game.state.mods.get_blade_modifier(card_id);
+    assert_eq!(actual, expected, "blade modifier for card {}", card_id);
+    actual
+}
+
+#[test]
+fn sumire_center_debut_gains_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sumire = game.id("PL!SP-bp5-015-N");
+
+    game.add_to_hand(sumire);
+    game.give_energy(4);
+
+    game.play_to_stage(sumire, rabuka_engine::zones::MemberArea::Center);
+    game.drain_auto_ability_choices();
+
+    assert_blade(&game, sumire, 2);
+}
+
+#[test]
+fn sumire_left_debut_no_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sumire = game.id("PL!SP-bp5-015-N");
+
+    game.add_to_hand(sumire);
+    game.give_energy(4);
+
+    game.play_to_stage(sumire, rabuka_engine::zones::MemberArea::LeftSide);
+    game.drain_auto_ability_choices();
+
+    assert_blade(&game, sumire, 0);
+}
+
+#[test]
+fn sumire_right_debut_no_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sumire = game.id("PL!SP-bp5-015-N");
+
+    game.add_to_hand(sumire);
+    game.give_energy(4);
+
+    game.play_to_stage(sumire, rabuka_engine::zones::MemberArea::RightSide);
+    game.drain_auto_ability_choices();
+
+    assert_blade(&game, sumire, 0);
+}

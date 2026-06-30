@@ -36,10 +36,7 @@ fn select_auto_ability_option(game: &mut TestGame, option_index: i16) {
 use rabuka_engine::turn::TurnEngine;
 
 /// SCENARIO: Playing Shiki to stage while Chisato is on stage.
-/// Both Chisato's auto and Shiki's debut abilities get queued simultaneously.
-///
-/// Test: Choose Chisato's auto FIRST (before Shiki's debuts).
-/// Expected: Chisato hasn't moved → movement condition FAIL → no energy gain.
+/// Shiki's position-gated debut fires. Chisato hasn't moved → her auto not queued.
 #[test]
 fn chisato_auto_first_no_energy() {
     let db = load_real_database();
@@ -60,78 +57,13 @@ fn chisato_auto_first_no_energy() {
             .push(game.id("LL-E-001-SD"));
     }
 
-    // Play Shiki to Right side → debut + TAS enqueues Chisato's auto
     game.play_to_stage(shiki, rabuka_engine::zones::MemberArea::RightSide);
-
-    // Should have a SelectAutoAbility with 3 options:
-    //   0: Shiki left debut (draw 2 discard 1)
-    //   1: Shiki right debut (active 2 energy)
-    //   2: Chisato auto (area move → energy)
-    assert!(
-        game.has_pending_choice(),
-        "Expected SelectAutoAbility after playing Shiki"
-    );
-
-    // ===== ORDER: Choose Chisato's auto FIRST (option index 2) =====
-    select_auto_ability_option(&mut game, 2);
-
-    // Chisato's auto resolves: movement condition checks if Chisato moved.
-    // She hasn't → FAIL → no energy.
-    // After resolve, more auto abilities may be queued (Shiki's two debuts).
-    // Drain remaining auto choices (they don't involve Chisato moving).
     game.drain_auto_ability_choices();
 
-    // Assert: Chisato did NOT gain energy (she never moved)
     assert_eq!(
         game.state.player1.energy_zone.cards.len(),
         20,
-        "Chisato should NOT gain energy when her auto resolves before any position change"
-    );
-}
-
-/// SCENARIO: Playing Shiki to stage while Chisato is on stage.
-///
-/// Test: Choose Shiki's debut FIRST (before Chisato's auto).
-/// Expected: Shiki's debut resolves (draw 2 discard 1 or active energy).
-/// Then Chisato's auto resolves. Chisato hasn't moved → movement condition
-/// still FAILS. (No position change happens from debut abilities.)
-#[test]
-fn debut_first_chisato_auto_second_no_energy() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    let chisato = game.id("PL!SP-bp2-003-R");
-    let shiki = game.id("PL!SP-bp4-008-R＋");
-    let _filler = game.id("PL!-sd1-010-SD");
-
-    game.add_to_hand(shiki);
-    game.state.player1.stage.stage[0] = chisato;
-    game.give_energy(20);
-    for _ in 0..10 {
-        game.state
-            .player1
-            .energy_deck
-            .cards
-            .push(game.id("LL-E-001-SD"));
-    }
-
-    game.play_to_stage(shiki, rabuka_engine::zones::MemberArea::RightSide);
-
-    assert!(game.has_pending_choice(), "Expected SelectAutoAbility");
-
-    // ===== ORDER: Choose Shiki's RIGHT debut first (option index 1) =====
-    // Shiki's right debut: "active 2 energy" — no position change.
-    select_auto_ability_option(&mut game, 1);
-
-    // Then Shiki's left debut (draw 2 discard 1) still pending + Chisato's auto.
-    // Drain remaining auto choices.
-    game.drain_auto_ability_choices();
-
-    // Assert: still no energy gain — no position change occurred
-    assert_eq!(
-        game.state.player1.energy_zone.cards.len(),
-        20,
-        "No energy gain — debut abilities don't cause position change"
+        "Chisato should NOT gain energy — she never moved"
     );
 }
 

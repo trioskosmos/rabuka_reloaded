@@ -71,6 +71,16 @@ impl super::TurnEngine {
                                     trigger_match
                                 );
                                 if trigger_match {
+                                    // Position gate: skip if activation_position doesn't match this area
+                                    if !crate::zones::check_effect_position(
+                                        ability
+                                            .effect
+                                            .as_ref()
+                                            .and_then(|e| e.activation_position.as_deref()),
+                                        area,
+                                    ) {
+                                        continue;
+                                    }
                                     // Skip abilities that require baton touch if baton touch wasn't used
                                     if !baton_touch_used
                                         && ability
@@ -401,10 +411,24 @@ impl super::TurnEngine {
                     }
                 }
             }
-            for &card_id in &player.stage.stage {
+            for (stage_idx, &card_id) in player.stage.stage.iter().enumerate() {
+                let card_position = match stage_idx {
+                    0 => crate::zones::MemberArea::LeftSide,
+                    1 => crate::zones::MemberArea::Center,
+                    _ => crate::zones::MemberArea::RightSide,
+                };
                 if card_id != -1 && !game_state.negated_abilities.contains(&card_id) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
                         for (aidx, ability) in card.abilities.iter().enumerate() {
+                            if !crate::zones::check_effect_position(
+                                ability
+                                    .effect
+                                    .as_ref()
+                                    .and_then(|e| e.activation_position.as_deref()),
+                                card_position,
+                            ) {
+                                continue;
+                            }
                             if ability
                                 .triggers
                                 .as_ref()
@@ -531,7 +555,7 @@ impl super::TurnEngine {
             };
             let skip_negated =
                 |gs: &GameState, id: i16| -> bool { gs.negated_abilities.contains(&id) };
-            for (_area, index) in [
+            for (area, index) in [
                 (crate::zones::MemberArea::LeftSide, 0),
                 (crate::zones::MemberArea::Center, 1),
                 (crate::zones::MemberArea::RightSide, 2),
@@ -541,6 +565,15 @@ impl super::TurnEngine {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
                         let card_no = card.card_no.clone();
                         for (aidx, ability) in card.abilities.iter().enumerate() {
+                            if !crate::zones::check_effect_position(
+                                ability
+                                    .effect
+                                    .as_ref()
+                                    .and_then(|e| e.activation_position.as_deref()),
+                                area,
+                            ) {
+                                continue;
+                            }
                             if ability
                                 .triggers
                                 .as_ref()
@@ -573,6 +606,15 @@ impl super::TurnEngine {
                         // Also check gained card abilities
                         if let Some(gained_list) = game_state.gained_card_abilities.get(&card_id) {
                             for (gidx, gained_ability) in gained_list.iter().enumerate() {
+                                if !crate::zones::check_effect_position(
+                                    gained_ability
+                                        .effect
+                                        .as_ref()
+                                        .and_then(|e| e.activation_position.as_deref()),
+                                    area,
+                                ) {
+                                    continue;
+                                }
                                 if gained_ability
                                     .triggers
                                     .as_ref()
