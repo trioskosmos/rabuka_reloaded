@@ -1000,7 +1000,7 @@ impl super::TurnEngine {
         resolution_zone: &mut crate::zones::ResolutionZone,
         _player_id: &str,
         card_db: &CardDatabase,
-        blade_modifiers: &HashMap<i16, i32>,
+        blade_modifiers: &HashMap<i16, ModifierEntry>,
         heart_override: &HashMap<i16, (HeartColor, u32)>,
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
         blade_type_modifiers: &HashMap<i16, BladeColor>,
@@ -1066,7 +1066,7 @@ impl super::TurnEngine {
                 }
             }
 
-            let bl_mod = blade_modifiers.get(&cid).copied().unwrap_or(0);
+            let bl_mod = blade_modifiers.get(&cid).map(|e| e.total()).unwrap_or(0);
             let bonus_blades = if bl_mod > 0 { bl_mod as u32 } else { 0u32 };
 
             if let Some(mods) = heart_modifiers.get(&cid) {

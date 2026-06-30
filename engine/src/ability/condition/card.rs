@@ -908,18 +908,11 @@ impl<'a> ConditionContext<'a> {
                 _ => None,
             }
         } else if Zone::from_str(location) == Some(Zone::Stage) {
-            let bm_flat: std::collections::HashMap<i16, i32> = self
-                .game_state
-                .mods
-                .blade_modifiers
-                .iter()
-                .map(|(&k, e)| (k, e.total()))
-                .collect();
             Some(compare_counts(
                 condition.operator.as_deref(),
                 player.stage.total_blades(
                     &self.game_state.card_database,
-                    &bm_flat,
+                    &self.game_state.mods.blade_modifiers,
                     &self.game_state.mods.orientation_modifiers,
                 ),
                 condition.count.unwrap_or(0),
@@ -2387,16 +2380,9 @@ impl<'a> ConditionContext<'a> {
                 }
                 "member_card" => {
                     if condition.aggregate.as_deref() == Some("total") {
-                        let bm_flat: std::collections::HashMap<i16, i32> = self
-                            .game_state
-                            .mods
-                            .blade_modifiers
-                            .iter()
-                            .map(|(&k, e)| (k, e.total()))
-                            .collect();
                         let self_blade = player.stage.total_blades(
                             card_db,
-                            &bm_flat,
+                            &self.game_state.mods.blade_modifiers,
                             &self.game_state.mods.orientation_modifiers,
                         );
                         if is_both {
@@ -2404,7 +2390,7 @@ impl<'a> ConditionContext<'a> {
                             (self_blade
                                 + opp.stage.total_blades(
                                     card_db,
-                                    &bm_flat,
+                                    &self.game_state.mods.blade_modifiers,
                                     &self.game_state.mods.orientation_modifiers,
                                 )) as usize
                         } else {
@@ -2595,8 +2581,10 @@ impl<'a> ConditionContext<'a> {
         let mut total_blades = 0i32;
         for &cid in cards {
             let base = card_db.get_card(cid).map(|c| c.blade as i32).unwrap_or(0);
-            let modifier = self.game_state.mods.get_blade_modifier(cid);
-            total_blades += base + modifier;
+            let set_blade = self.game_state.mods.get_blade_set_modifier(cid);
+            let additive = self.game_state.mods.get_blade_modifier(cid) - set_blade;
+            let effective_base = if set_blade != 0 { set_blade } else { base };
+            total_blades += effective_base + additive;
         }
         let names: String = cards
             .iter()
@@ -3286,20 +3274,11 @@ impl<'a> ConditionContext<'a> {
 
     pub(crate) fn zone_len(&self, player: &crate::player::Player, location: &str) -> u32 {
         match Zone::from_str(location) {
-            Some(Zone::Stage) => {
-                let bm_flat: std::collections::HashMap<i16, i32> = self
-                    .game_state
-                    .mods
-                    .blade_modifiers
-                    .iter()
-                    .map(|(&k, e)| (k, e.total()))
-                    .collect();
-                player.stage.total_blades(
-                    &self.game_state.card_database,
-                    &bm_flat,
-                    &self.game_state.mods.orientation_modifiers,
-                )
-            }
+            Some(Zone::Stage) => player.stage.total_blades(
+                &self.game_state.card_database,
+                &self.game_state.mods.blade_modifiers,
+                &self.game_state.mods.orientation_modifiers,
+            ),
             Some(Zone::Hand) => player.hand.len() as u32,
             Some(Zone::Deck) => player.main_deck.len() as u32,
             Some(Zone::Discard) => player.waitroom.len() as u32,

@@ -945,18 +945,16 @@ impl AbilityResolver {
                 if let Some(stage_idx) = util::stage_position_index(p) {
                     let player = gs.resolve_target_player(target);
                     let expected = player.stage.stage[stage_idx];
-                    stage_cards.retain(|&cid| expected == -1 || cid == expected);
+                    if expected == -1 {
+                        stage_cards.clear();
+                    } else {
+                        stage_cards.retain(|&cid| cid == expected);
+                    }
                 }
             }
         }
-        let card_db = gs.card_database.clone();
         for &card_id in &stage_cards {
-            let original_blade = card_db
-                .get_card(card_id)
-                .map(|c| c.blade as i32)
-                .unwrap_or(0);
-            let set_value = (value as i32) - original_blade;
-            gs.mods.set_blade_modifier(card_id, set_value);
+            gs.mods.set_blade_modifier(card_id, value as i32);
             // Register for cleanup at live end / duration expiry
             if effect.duration.is_some() {
                 let mut data = serde_json::Map::new();

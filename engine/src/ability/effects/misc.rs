@@ -3171,12 +3171,7 @@ impl AbilityResolver {
     /// MIRAI TICKET's "for every 5 cost, perform 1 additional yell").
     pub(crate) fn execute_perform_yell(&mut self, gs: &mut GameState, count: u32, target: &str) {
         let card_db = gs.card_database.clone();
-        let bm: std::collections::HashMap<i16, i32> = gs
-            .mods
-            .blade_modifiers
-            .iter()
-            .map(|(&k, e)| (k, e.total()))
-            .collect();
+        let bm = gs.mods.blade_modifiers.clone();
         let om: std::collections::HashMap<i16, String> = gs
             .mods
             .orientation_modifiers

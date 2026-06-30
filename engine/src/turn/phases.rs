@@ -169,12 +169,7 @@ impl super::TurnEngine {
     fn execute_performance_phase(game_state: &mut GameState, is_first: bool) {
         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
         let card_db = game_state.card_database.clone();
-        let bm: std::collections::HashMap<i16, i32> = game_state
-            .mods
-            .blade_modifiers
-            .iter()
-            .map(|(&k, e)| (k, e.total()))
-            .collect();
+        let bm = game_state.mods.blade_modifiers.clone();
         let ho = game_state.mods.heart_override.clone();
         let hm: std::collections::HashMap<
             i16,

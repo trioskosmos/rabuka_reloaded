@@ -150,6 +150,10 @@ impl GameModifiers {
         self.blade_modifiers.get(&card_id).map_or(0, |e| e.total())
     }
 
+    pub fn get_blade_set_modifier(&self, card_id: i16) -> i32 {
+        self.blade_modifiers.get(&card_id).map_or(0, |e| e.set)
+    }
+
     pub fn set_blade_modifier(&mut self, card_id: i16, value: i32) {
         self.blade_modifiers.entry(card_id).or_default().set = value;
     }

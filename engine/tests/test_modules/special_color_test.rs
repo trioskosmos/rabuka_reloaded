@@ -30,7 +30,7 @@ fn fill_decks(game: &mut TestGame) {
     }
 }
 
-/// Happy path: Liella! member at center gets blade set to 3 (modifier = value - original).
+/// Happy path: Liella! member at center gets blade set to 3 (raw absolute value stored).
 #[test]
 fn special_color_q195_set_blade_liella_at_center() {
     let db = load_real_database();
@@ -51,8 +51,8 @@ fn special_color_q195_set_blade_liella_at_center() {
 
     assert_eq!(
         game.state.mods.get_blade_modifier(liella),
-        0,
-        "Liella! at center: modifier = 3 - 3 = 0"
+        3,
+        "Liella! at center: modifier = set=3 (raw absolute), effective blade = 3"
     );
     assert_eq!(
         game.state.mods.get_blade_modifier(non_liella),
@@ -160,8 +160,8 @@ fn multiple_liella_only_center_gets_modifier() {
 
     assert_eq!(
         game.state.mods.get_blade_modifier(liella_center),
-        0,
-        "Liella! at center: modifier = 0 (3-3), total blade = 3"
+        3,
+        "Liella! at center: modifier = 3 (raw set), effective blade = 3"
     );
     assert_eq!(
         game.state.mods.get_blade_modifier(liella_left),
@@ -225,8 +225,8 @@ fn all_three_liella_only_center_gets_modifier() {
 
     assert_eq!(
         game.state.mods.get_blade_modifier(liella_center),
-        0,
-        "Liella! at center: modifier = 0 (3-3)"
+        3,
+        "Liella! at center: modifier = 3 (raw set)"
     );
     assert_eq!(
         game.state.mods.get_blade_modifier(liella_left),
@@ -263,8 +263,8 @@ fn opponent_liella_not_affected_by_self_target() {
 
     assert_eq!(
         game.state.mods.get_blade_modifier(self_liella),
-        0,
-        "Self Liella! at center: modifier = 0 (3-3)"
+        3,
+        "Self Liella! at center: modifier = 3 (raw set)"
     );
     assert_eq!(
         game.state.mods.get_blade_modifier(opp_liella),
@@ -302,8 +302,8 @@ fn liella_blade_2_gets_correct_modifier() {
 
     assert_eq!(
         game.state.mods.get_blade_modifier(liella_blade2),
-        1,
-        "Liella! blade=2: modifier = 1 (3-2), total = 3"
+        3,
+        "Liella! blade=2: modifier = 3 (raw set), effective blade = 3"
     );
 }
 
@@ -328,8 +328,8 @@ fn liella_blade_1_gets_correct_modifier() {
 
     assert_eq!(
         game.state.mods.get_blade_modifier(liella_blade1),
-        2,
-        "Liella! blade=1: modifier = 2 (3-1), total = 3"
+        3,
+        "Liella! blade=1: modifier = 3 (raw set), effective blade = 3"
     );
 }
 
@@ -356,10 +356,10 @@ fn q195_existing_modifier_stacks_on_set_value() {
     game.set_live_card(special);
     advance_to_live_start(&mut game);
 
-    // Q195: after set_blade(3), modifier = set(0) + additive(1) = 1, total = 3 + 1 = 4
+    // Q195: after set_blade(3), modifier = set(3) + additive(1) = 4, effective blade = 3 + 1 = 4
     assert_eq!(
         game.state.mods.get_blade_modifier(liella),
-        1,
-        "Q195: existing +1 + set_blade(3) on blade=3 card → modifier should be 1 (set=0, additive=1)"
+        4,
+        "Q195: existing +1 + set_blade(3) → modifier should be 4 (set=3, additive=1)"
     );
 }
