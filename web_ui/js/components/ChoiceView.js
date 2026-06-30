@@ -426,9 +426,8 @@ export const ChoiceView = {
                 // Check if user dismissed this specific pending choice
                 const choiceStateId = state.state_id || 0;
                 if (State._choiceModalDismissed && State._choiceStateId === choiceStateId) {
-                    // Don't auto-reopen — user dismissed it
-                    const reopen = document.getElementById(DOM_IDS.MOBILE_CHOICE_REOPEN);
-                    if (reopen) reopen.classList.add('show');
+                    const cb = document.getElementById('mobile-choice-btn');
+                    if (cb) cb.style.display = 'flex';
                     return;
                 }
                 State._choiceModalDismissed = false;
@@ -494,8 +493,8 @@ export const ChoiceView = {
                         });
                     }
                     ModalManager.show(DOM_IDS.SELECTION_MODAL);
-                    const reopen = document.getElementById(DOM_IDS.MOBILE_CHOICE_REOPEN);
-                    if (reopen) reopen.classList.remove('show');
+                    const cb = document.getElementById('mobile-choice-btn');
+                    if (cb) cb.style.display = 'none';
                 }
             } else {
                 container.appendChild(choiceDiv);

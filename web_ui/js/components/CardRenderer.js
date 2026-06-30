@@ -543,7 +543,12 @@ export const CardRenderer = {
                         (a.parameters?.card_index === idx || a.parameters?.card_indices?.includes(idx))
                     );
                     if (playActions.length > 0) {
-                        openPlayActionModal(card, playActions);
+                        if (window._playSel && window._playSel.cardIdx === idx) {
+                            window._playSel = null;
+                        } else {
+                            window._playSel = { cardIdx: idx, card, actions: playActions };
+                        }
+                        if (window.render) window.render();
                         return;
                     }
                 }
@@ -640,6 +645,12 @@ export const CardRenderer = {
                 requestAnimationFrame(() => requestAnimationFrame(() => {
                     cardEl.classList.remove('card-enter');
                 }));
+            }
+            // Play selection highlight
+            const cardEl2 = existingChild || el.querySelector(`[id="${containerId}-card-${idx}"]`);
+            if (cardEl2) {
+                const isSel = window._playSel && window._playSel.cardIdx === idx;
+                cardEl2.classList.toggle('selected-for-play', isSel);
             }
         }
 
@@ -764,7 +775,51 @@ export const CardRenderer = {
                 slotDiv.removeAttribute('data-action-id');
             }
 
-            if (clickable && (isValid || !hasGlobalSelection)) {
+            // Play selection: show cost on empty zones when a hand card is selected for play
+            const areaNames = ['left', 'center', 'right'];
+            let playTargetCost = null;
+            if (State.uiMode === 'play' && window._playSel && !slot?.card_no) {
+                const matchAction = window._playSel.actions.find(a => {
+                    const p = a.parameters || {};
+                    return p.stage_area === areaNames[i] || p.available_areas?.some(av => av.area === areaNames[i] && av.available);
+                });
+                if (matchAction) {
+                    const params = matchAction.parameters || {};
+                    const areaInfo = params.available_areas?.find(a => a.area === areaNames[i]);
+                    playTargetCost = areaInfo ? areaInfo.cost : (params.base_cost ?? 0);
+                }
+            }
+            let costLabel = slotDiv.querySelector('.play-cost-label');
+            if (playTargetCost !== null) {
+                if (!costLabel) {
+                    costLabel = document.createElement('div');
+                    costLabel.className = 'play-cost-label';
+                    slotDiv.appendChild(costLabel);
+                }
+                costLabel.textContent = playTargetCost;
+                slotDiv.classList.add('play-target');
+            } else {
+                if (costLabel) costLabel.remove();
+                slotDiv.classList.remove('play-target');
+            }
+
+            // Always attach play-target click handler (independent of isValid/hasSelection)
+            if (window._playSel && State.uiMode === 'play' && !slot?.card_no) {
+                slotDiv.onclick = (e) => {
+                    e.stopPropagation();
+                    const areaNames2 = ['left', 'center', 'right'];
+                    const matchAction = window._playSel.actions.find(a => {
+                        const p = a.parameters || {};
+                        return p.stage_area === areaNames2[i] || p.available_areas?.some(av => av.area === areaNames2[i] && av.available);
+                    });
+                    if (matchAction && window.doAction) {
+                        window.doAction(matchAction);
+                        window._playSel = null;
+                        if (window.render) window.render();
+                    }
+                };
+                slotDiv.style.cursor = 'pointer';
+            } else if (clickable && (isValid || !hasGlobalSelection)) {
                 const clickHandler = () => {
                     const _uiMode = State.uiMode;
                     const slotCard = slot || null;

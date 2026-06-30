@@ -529,6 +529,8 @@
 }
 .mobile-toggle-btn:first-child { border-radius: 6px 0 0 0; }
 .mobile-toggle-btn:last-child { border-radius: 0 0 0 6px; }
+.mobile-toggle-btn#mobile-toggle-actions,
+.mobile-toggle-btn#mobile-choice-btn { margin-top: 4px; }
 .mobile-toggle-btn:hover { background: rgba(255,255,255,0.06); }
 .mobile-toggle-btn.active { background: rgba(255,255,255,0.1); }
 .mobile-toggle-btn.hidden { display: none; }
@@ -624,8 +626,7 @@
         left: 0;
         width: 100vw;
         height: 100dvh;
-        background: rgba(0, 0, 0, 0.75);
+        background: rgba(0, 0, 0, 0.55);
         z-index: calc(var(--z-modal) - 1);
-        cursor: pointer;
     }
 }

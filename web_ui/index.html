@@ -21,16 +21,18 @@
 
 
     <div class="mobile-btn-group" id="mobile-btn-group">
-        <button id="mobile-toggle-actions" data-action="toggle-actions-sidebar" class="mobile-toggle-btn" data-i18n="mobile_actions">ACTS</button>
         <button id="mobile-toggle-mode" data-action="toggle-ui-mode" class="mobile-toggle-btn">
             <span id="mobile-mode-label">PLAY</span>
         </button>
+        <button id="mobile-toggle-actions" data-action="toggle-actions-sidebar" class="mobile-toggle-btn" data-i18n="mobile_actions">ACTS</button>
         <button id="mobile-toggle-log" data-action="toggle-log-sidebar" class="mobile-toggle-btn" data-i18n="mobile_log_label">LOG</button>
+        <button id="mobile-choice-btn" class="mobile-toggle-btn" data-action="show-choice-modal" style="display:none;">
+            <span id="mobile-choice-label">CHC</span>
+        </button>
         <button id="mobile-pass-btn" class="mobile-toggle-btn" style="background:#2ecc71; color:#fff;">
             <span id="mobile-pass-label">PASS</span>
         </button>
     </div>
-    <button id="mobile-choice-reopen" data-action="show-choice-modal">Show Choice</button>
     
     <!-- Mobile Action Bar -->
     <div id="mobile-action-bar" class="mobile-action-bar"></div>

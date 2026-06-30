@@ -328,6 +328,18 @@ function applyFilters() {
     results.sort((a, b) => b._searchScore - a._searchScore);
   }
 
+  if (vals.hasPoints) {
+    results = results.filter(c => !!POINT_MAP[getBaseCardNo(c.card_no)]);
+  }
+  const sortBy = vals.sortBy || '';
+  if (sortBy === 'pts-high') {
+    results.sort((a, b) => (POINT_MAP[getBaseCardNo(b.card_no)] || 0) - (POINT_MAP[getBaseCardNo(a.card_no)] || 0));
+  } else if (sortBy === 'pts-low') {
+    results.sort((a, b) => (POINT_MAP[getBaseCardNo(a.card_no)] || 0) - (POINT_MAP[getBaseCardNo(b.card_no)] || 0));
+  } else if (sortBy === 'pts-only') {
+    results = results.filter(c => !!POINT_MAP[getBaseCardNo(c.card_no)]);
+  }
+
   let displayCards = results;
   if (!vals.showAllRarities) {
     const seen = new Set();
@@ -538,6 +550,14 @@ function populateFilters() {
   html += buildFilter('effectAction', 'Effect Action', null,
     `<select data-fid="effectAction">${sorted(effectActionSet).map(v => `<option value="${v}">${v}</option>`).join('')}</select>`);
   html += buildBtnGroup('useLimit', 'Use Limit', TEXT_ICONS.turn1, ['All', '1', '2']);
+  html += buildFilter('rabukaPoints', 'Rabuka Points', null,
+    '<div class="checkbox-group" style="margin-bottom:2px"><label><input type="checkbox" name="hasPoints"> Has points</label></div>' +
+    '<select data-fid="sortBy" style="width:100%;padding:3px 5px;background:#1a1a2e;color:#e0e0e0;border:1px solid #0f3460;border-radius:3px;font-size:10px;outline:none;">' +
+      '<option value="">Default order</option>' +
+      '<option value="pts-high">Points: high→low</option>' +
+      '<option value="pts-low">Points: low→high</option>' +
+      '<option value="pts-only">Points: only cards with points</option>' +
+    '</select>');
 
   filtersEl.innerHTML = html;
 
@@ -594,6 +614,23 @@ function getBaseCardNo(cardNo) {
   return i > 0 ? cardNo.slice(0, i) : cardNo;
 }
 
+// Rabuka Point System (ラブカポイントシステム)
+// Updated 2026-04-03: total points of point-assigned cards in deck must be ≤ 9
+const POINT_MAP = {
+  'PL!N-bp1-003': 4,
+  'PL!N-bp1-012': 3,
+  'LL-bp2-001': 3,
+  'PL!N-bp1-002': 2,
+  'PL!N-sd1-008': 2,
+  'PL!HS-bp2-014': 2,
+  'PL!SP-bp1-005': 1,
+  'PL!N-bp1-029': 1,
+  'PL!SP-sd1-019': 1,
+  'PL!SP-sd1-020': 1,
+  'PL!SP-pb1-014': 1,
+  'PL!SP-bp2-024': 1,
+};
+
 function deckCardLookup(cardNo) {
   return allCardsArr.find(c => c.card_no === cardNo) || null;
 }
@@ -646,7 +683,11 @@ function exportDeck() {
   a.download = `${name}.txt`;
   a.click();
   URL.revokeObjectURL(a.href);
-  toast(`Exported ${deckState.cards.size} card types`);
+  navigator.clipboard.writeText(text).then(() => {
+    toast(`Exported & copied ${deckState.cards.size} card types`);
+  }).catch(() => {
+    toast(`Exported ${deckState.cards.size} card types`);
+  });
 }
 function importDeckText(text) {
   const newCards = new Map();
@@ -760,14 +801,32 @@ const DECK_CHECKS = [
   {
     id: 'totalScore', type: 'info',
     label: 'Total Live card score',
-    qa: 'Points', rule: 'Scoring',
-    eval: d => ({ pass: null, current: `${d.totalScore} pts`,
-      detail: `Sum of all Live card scores in deck. Higher is better for winning.` })
+    qa: 'Points', rule: 'Live §8.4',
+    eval: d => ({
+      pass: null, current: `${d.totalScore} pts`,
+      detail: `Sum of all Live card scores in deck. Score is used during Live performance to determine the winner of each live round (higher wins).`
+    })
+  },
+  {
+    id: 'rabukaPoints', type: 'points',
+    label: 'Rabuka Point System: total ≤ 9',
+    qa: 'Official', rule: 'Point System',
+    eval: d => {
+      const v = d.pointTotal;
+      const violations = d.pointCards.filter(p => p.total > 0);
+      const detail = violations.length === 0
+        ? 'No point-assigned cards in deck. Passes automatically.'
+        : `${violations.length} card type(s) with points. Total: ${v}/9. ` +
+          violations.map(p => `${p.base} (${p.pt}pt × ${p.qty})`).join(', ');
+      return { pass: v <= 9, current: `${v}/9 points`, detail };
+    }
   },
 ];
 
 function validateDeck() {
   let memberCount = 0, liveCount = 0, energyCount = 0, totalScore = 0;
+  let pointTotal = 0;
+  const pointCardsMap = new Map(); // base -> { pt, qty }
   for (const entry of deckState.cards.values()) {
     const q = entry.qty;
     switch (entry.card.type) {
@@ -775,9 +834,17 @@ function validateDeck() {
       case 'ライブ': liveCount += q; totalScore += (entry.card.score || 0) * q; break;
       case 'エネルギー': energyCount += q; break;
     }
+    const base = getBaseCardNo(entry.card.card_no);
+    const pt = POINT_MAP[base];
+    if (pt) {
+      if (!pointCardsMap.has(base)) pointCardsMap.set(base, { base, pt, qty: 0 });
+      pointCardsMap.get(base).qty += q;
+      pointTotal += pt * q;
+    }
   }
+  const pointCards = [...pointCardsMap.values()];
   const mainTotal = memberCount + liveCount;
-  const data = { memberCount, liveCount, energyCount, mainTotal, totalScore };
+  const data = { memberCount, liveCount, energyCount, mainTotal, totalScore, pointTotal, pointCards };
   const results = DECK_CHECKS.map(c => ({ ...c, result: c.eval(data) }));
   return { data, results };
 }
@@ -806,11 +873,13 @@ function renderDeckStats(data) {
   const liveCls = data.liveCount === 12 ? 'pass' : data.liveCount > 12 ? 'fail' : 'info';
   const energyCls = data.energyCount === 12 ? 'pass' : data.energyCount > 12 ? 'fail' : 'info';
   const totalCls = data.mainTotal === 60 ? 'pass' : data.mainTotal > 60 ? 'fail' : 'info';
+  const ptCls = data.pointTotal <= 9 ? 'pass' : 'fail';
   el.innerHTML = `
     <span class="deck-stat ${memberCls}">M: ${data.memberCount}/48</span>
     <span class="deck-stat ${liveCls}">L: ${data.liveCount}/12</span>
     <span class="deck-stat ${totalCls}">Main: ${data.mainTotal}/60</span>
     <span class="deck-stat ${energyCls}">E: ${data.energyCount}/12</span>
+    <span class="deck-stat ${ptCls}">pts: ${data.pointTotal}/9</span>
     <span class="deck-stat info">Score: ${data.totalScore}</span>
   `;
 }
@@ -834,10 +903,15 @@ function renderDeckList() {
     total += entry.qty;
     const base = getBaseCardNo(cardNo);
     const over = baseQty.get(base) > 4 ? '\u26A0\uFE0F' : '';
+    const scoreInfo = entry.card.type === 'ライブ' && entry.card.score != null ? ` S:${entry.card.score}` : '';
+    const pt = POINT_MAP[getBaseCardNo(cardNo)];
+    const ptBadge = pt ? `<span class="dc-pt">${pt}pt</span>` : '';
     html += `<div class="deck-card-row" data-card="${cardNo}">
+      <img class="dc-img" src="img/cards_webp/${cardNo}.webp" alt="" loading="lazy"
+        onerror="this.style.display='none'">
       <span class="dc-qty">${entry.qty}x</span>
-      <span class="dc-type">${typeShort[entry.card.type] || '?'}</span>
-      <span class="dc-name">${entry.card.name || cardNo}</span>
+      ${ptBadge}
+      <span class="dc-name">${entry.card.name || cardNo}${scoreInfo}</span>
       ${over ? `<span class="dc-violation">${over}</span>` : ''}
       <span class="dc-remove">\u00D7</span>
     </div>`;

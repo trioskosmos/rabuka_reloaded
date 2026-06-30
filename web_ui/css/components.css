@@ -192,8 +192,10 @@
 .grid-3 {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 4px;
+    gap: 0;
+    margin: 0 -1px;
 }
+
 .action-group-header {
     display: flex;
     align-items: center;
@@ -205,12 +207,40 @@
     margin-bottom: 4px;
 }
 
+.action-group-buttons {
+    display: flex;
+    margin-top: 4px;
+}
+
+.action-group-buttons .action-btn {
+    flex: 1;
+    border-radius: 0 !important;
+    border-left: none !important;
+    text-align: center;
+    padding: 8px 4px !important;
+    font-size: 0.75rem !important;
+    line-height: 1.2 !important;
+    min-height: 36px;
+    border: 1px solid var(--border);
+    border-right: none;
+}
+
+.action-group-buttons .action-btn:first-child {
+    border-left: 1px solid var(--border) !important;
+    border-radius: 4px 0 0 4px !important;
+}
+
+.action-group-buttons .action-btn:last-child {
+    border-right: 1px solid var(--border) !important;
+    border-radius: 0 4px 4px 0 !important;
+}
+
 /* --- Action Button Interaction System --- */
 .action-btn:hover,
 .action-btn.hover-highlight,
 .action-btn.selected {
-    background: rgba(245, 158, 11, 0.1);
-    border-color: var(--accent-gold) !important;
+    background: rgba(74, 158, 255, 0.12);
+    border-color: var(--accent-blue) !important;
     z-index: 10;
     transform: none !important;
 }

@@ -24,6 +24,16 @@ export const ActionMenu = {
         const actionsDiv = DOMUtils.getElement(DOM_IDS.CONTAINER_ACTIONS);
         if (!actionsDiv) return;
 
+        // Clear stale play selection
+        if (window._playSel) {
+            const stillValid = state.legal_actions?.some(a =>
+                a.action_type === 'play_member_to_stage' &&
+                (a.parameters?.card_index === window._playSel.cardIdx ||
+                 a.parameters?.card_indices?.includes(window._playSel.cardIdx))
+            );
+            if (!stillValid) window._playSel = null;
+        }
+
         // Show/hide floating PASS button
         ActionMenu.updatePassButton(state);
 

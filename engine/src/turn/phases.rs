@@ -546,23 +546,28 @@ impl super::TurnEngine {
         // Use provided indices (from PVP/local selection) or fallback to server state
         let mulligan_indices =
             card_indices.unwrap_or_else(|| game_state.mulligan_selected_indices.clone());
-        let mulligan_count = mulligan_indices.len();
+        // Sort descending so removals don't shift other targets
+        let mut sorted_indices = mulligan_indices.clone();
+        sorted_indices.sort_unstable();
+        sorted_indices.dedup();
+        let mut removed_count = 0;
         let player = game_state.active_player_mut();
-        for &idx in mulligan_indices.iter().rev() {
+        for &idx in sorted_indices.iter().rev() {
             if idx < player.hand.cards.len() {
                 let card = player.hand.cards.remove(idx);
                 player.main_deck.cards.push(card);
+                removed_count += 1;
             }
         }
         player.main_deck.shuffle();
-        for _ in 0..mulligan_count {
+        for _ in 0..removed_count {
             if let Some(card) = player.main_deck.draw() {
                 player.hand.add_card(card);
             }
         }
         game_state.mulligan_selected_indices.clear();
         game_state.current_phase = next_phase;
-        log::debug!("Mulligan confirmed: {} cards mulliganed", mulligan_count);
+        log::debug!("Mulligan confirmed: {} cards mulliganed", removed_count);
         Ok(())
     }
 

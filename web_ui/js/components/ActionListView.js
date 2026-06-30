@@ -168,9 +168,8 @@ export const ActionListView = {
                     
                     if (anySingleAvailable) {
                         const areasDiv = document.createElement('div');
-                        areasDiv.className = 'action-group-buttons grid-3';
+                        areasDiv.className = 'action-group-buttons';
                         
-                        // Always render 3 slots (left, center, right)
                         areaOrder.forEach((expectedArea) => {
                             const areaInfo = availableAreas.find(a => a.area === expectedArea);
                             if (areaInfo && areaInfo.available) {
@@ -183,14 +182,14 @@ export const ActionListView = {
                                 areaActionCopy.parameters = { ...firstA.parameters, stage_area: areaName };
                                 
                                 const btn = ActionButtons.createActionButton(areaActionCopy, true, '', state);
-                                const costText = isBaton ? `${label} (${cost} - Baton)` : `${label} (${cost})`;
-                                btn.innerHTML = `<span>${costText}</span>`;
-                                btn.style.width = '100%';
+                                const costText = isBaton ? `${label} ${cost} Baton` : `${label} ${cost}`;
+                                btn.innerHTML = `<span style="display:flex;flex-direction:column;align-items:center;gap:1px;font-weight:600;"><span style="font-size:0.8rem;">${label}</span><span style="font-size:0.65rem;opacity:0.7;">${cost}</span></span>`;
+                                btn.style.cssText = '';
+                                btn.className = btn.className + ' action-btn';
                                 areasDiv.appendChild(btn);
                             } else {
                                 const spacer = document.createElement('div');
-                                spacer.style.visibility = 'hidden';
-                                spacer.style.minHeight = '36px';
+                                spacer.style.cssText = 'flex:1;min-height:36px;border:1px solid transparent;border-right:none;';
                                 areasDiv.appendChild(spacer);
                             }
                         });

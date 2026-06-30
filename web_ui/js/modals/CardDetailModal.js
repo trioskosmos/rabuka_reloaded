@@ -7,95 +7,50 @@ import { fixImg } from '../constants.js';
 import * as i18n from '../i18n/index.js';
 
 // Navigation state
-let navCards = [];       // flat list of cards in the current zone
-let navIndex = 0;        // index within navCards
-let navZoneNames = [];   // ordered zone names
-let navZoneCards = {};   // zoneName -> cards[]
-let navCurrentZone = ''; // which zone we're viewing
-let navPerspectivePlayer = 0;
+let navCards = [];
+let navIndex = 0;
+let navCurrentZone = '';
 
-function buildZoneMap() {
+function buildAllCards() {
     const state = State.data;
     if (!state) return {};
     const pp = State.perspectivePlayer;
-    navPerspectivePlayer = pp;
     const p = pp === 0 ? state.player1 : state.player2;
     const opp = pp === 0 ? state.player2 : state.player1;
     if (!p) return {};
 
-    const zones = {};
+    const cards = {};
 
-    const hand = p.hand?.cards || [];
-    zones['hand'] = hand.filter(c => c && c.card_no && c.card_no > 0);
+    const handArr = Array.isArray(p.hand?.cards) ? p.hand.cards : [];
+    cards['hand'] = handArr.filter(c => c && c.card_no > 0);
 
-    const stage = (p.stage || []).filter(s => s && s.card_no && s.card_no > 0);
-    zones['stage'] = stage;
+    const stageArr = Array.isArray(p.stage) ? p.stage : [];
+    cards['stage'] = stageArr.filter(s => s && s.card_no > 0);
 
-    const live = (p.live_zone?.cards || []).filter(c => c && c.card_no && c.card_no > 0);
-    zones['live'] = live;
+    const liveArr = Array.isArray(p.live_zone?.cards) ? p.live_zone.cards : [];
+    cards['live'] = liveArr.filter(c => c && c.card_no > 0);
 
-    const discard = (p.discard?.cards || []).filter(c => c && c.card_no && c.card_no > 0);
-    zones['discard'] = discard;
+    const discArr = Array.isArray(p.discard?.cards) ? p.discard.cards : [];
+    cards['discard'] = discArr.filter(c => c && c.card_no > 0);
 
-    // Under-cards (energy/members under stage)
     const under = [];
-    (p.stage || []).forEach(slot => {
-        (slot.under || []).forEach(c => {
-            if (c && c.card_no && c.card_no > 0) under.push(c);
-        });
+    stageArr.forEach(slot => {
+        const uArr = Array.isArray(slot.under) ? slot.under : [];
+        uArr.forEach(c => { if (c && c.card_no > 0) under.push(c); });
     });
-    if (under.length) zones['under'] = under;
+    if (under.length) cards['under'] = under;
 
-    // Opponent's hand (back side only) / stage — show briefly
-    const oppStage = (opp.stage || []).filter(s => s && s.card_no && s.card_no > 0);
-    if (oppStage.length) zones['opp_stage'] = oppStage;
+    const oppStageArr = Array.isArray(opp?.stage) ? opp.stage : [];
+    const oppStage = oppStageArr.filter(s => s && s.card_no > 0);
+    if (oppStage.length) cards['opp_stage'] = oppStage;
 
-    return zones;
+    return cards;
 }
 
-const ZONE_LABELS = {
-    hand: 'Hand',
-    stage: 'Stage',
-    live: 'Live',
-    discard: 'Discard',
-    under: 'Under',
-    opp_stage: 'Opp Stage',
-};
-
-function switchToZone(zoneName) {
-    const zones = buildZoneMap();
-    if (!zones[zoneName] || zones[zoneName].length === 0) return;
-    navCurrentZone = zoneName;
-    navCards = zones[zoneName];
-    navIndex = 0;
-    renderCurrentCard();
-}
-
-function navigateWithinZone(delta) {
-    if (!navCards.length) return;
-    const newIdx = navIndex + delta;
-    if (newIdx < 0 || newIdx >= navCards.length) return;
-    navIndex = newIdx;
-    renderCurrentCard();
-}
-
-function navigateZone(delta) {
-    const zones = buildZoneMap();
-    const names = Object.keys(zones);
-    if (!names.length) return;
-    const idx = names.indexOf(navCurrentZone);
-    if (idx === -1) { switchToZone(names[0]); return; }
-    const newIdx = (idx + delta + names.length) % names.length;
-    switchToZone(names[newIdx]);
-}
-
-function renderCurrentCard() {
-    const modal = document.getElementById(DOM_IDS.MODAL_CARD_DETAIL);
-    if (!modal) return;
-
+function render() {
     const titleEl = document.getElementById('card-detail-title');
     const imageEl = document.getElementById('card-detail-image');
-    const contentEl = document.getElementById('card-detail-text');
+    const textEl = document.getElementById('card-detail-text');
     const statsEl = document.getElementById('card-detail-stats');
     const footerEl = document.getElementById('card-detail-position');
 
@@ -103,36 +58,25 @@ function renderCurrentCard() {
     if (!card) return;
 
     const cardNo = card.card_no;
-    const resolved = card.card_no ? State.resolveCardData(card.card_no) : card;
+    const resolved = card.card_no > 0 ? State.resolveCardData(card.card_no) : null;
     const cardObj = resolved || card;
 
-    const isHidden = card.hidden || card.is_hidden ||
-        card.card_no === -2 || card.card_no === -1 ||
-        card.card_no === '-2' || card.card_no === '-1';
-
-    const translated = window.translateCard ? window.translateCard(cardObj) : { name: cardObj.name, groups: cardObj.groups, units: cardObj.units };
+    const isHidden = card.hidden || card.is_hidden || card.card_no <= 0;
+    const translated = window.translateCard ? window.translateCard(cardObj) : null;
 
     // Title
-    let titleText = translated.name || cardObj.name || 'Card';
-    if (cardNo && cardNo !== '-1' && cardNo !== -1) {
-        const productMatch = String(cardNo).match(/^(PL!-[A-Za-z0-9]+)/);
-        const productLabel = productMatch ? productMatch[1] : '';
-        if (productLabel) titleText = `${productLabel} — ${titleText}`;
-        titleText += ` <span style="opacity:0.5;font-size:0.75em;font-family:monospace;">${cardNo}</span>`;
+    if (titleEl) {
+        let t = translated?.name || cardObj.name || 'Card';
+        if (cardNo > 0) {
+            t += ` <span style="opacity:0.5;font-size:0.75em;font-family:monospace;">${cardNo}</span>`;
+        }
+        titleEl.innerHTML = t;
     }
-    if (titleEl) titleEl.innerHTML = titleText;
 
     // Image
     if (imageEl) {
         imageEl.innerHTML = '';
-        if (isHidden) {
-            const img = document.createElement('img');
-            img.src = fixImg('img/texticon/lltcg-back.png');
-            img.alt = 'Hidden';
-            img.style.maxWidth = '100%';
-            img.style.height = 'auto';
-            imageEl.appendChild(img);
-        } else if (cardNo && cardNo !== '-1' && cardNo !== -1) {
+        if (cardNo > 0) {
             const imgPath = resolveCardImagePath(cardNo);
             if (imgPath) {
                 const img = document.createElement('img');
@@ -143,99 +87,95 @@ function renderCurrentCard() {
         }
     }
 
-    // Content (stats + text side-by-side)
-    if (contentEl) {
-        contentEl.innerHTML = '';
-        if (isHidden) {
-            contentEl.innerHTML = '<p style="opacity:0.5;">Card is hidden</p>';
-        } else {
-            let html = '';
-            if (cardObj.groups || cardObj.units) {
-                const groups = (translated.groups || cardObj.groups || []).join(', ');
-                const units = (translated.units || cardObj.units || []).join(', ');
-                const parts = [];
-                if (groups) parts.push(`<span data-i18n="groups">Groups</span>: ${groups}`);
-                if (units) parts.push(`<span data-i18n="units">Units</span>: ${units}`);
-                if (parts.length) html += `<div class="card-detail-meta">${parts.join(' | ')}</div>`;
-            }
-
-            let rawText = cardObj.ability_text || cardObj.text || cardObj.original_text || '';
-            if (rawText) {
-                html += `<div class="card-detail-ability">${TextEnricher.enrichAbilityText(rawText)}</div>`;
-            }
-            contentEl.innerHTML = html;
-        }
-    }
-
     // Stats
     if (statsEl) {
         statsEl.innerHTML = '';
         if (!isHidden) {
-            const badges = [];
-            if (cardObj.energy_cost !== undefined) badges.push(`<span class="stat-badge">Cost: ${cardObj.energy_cost}</span>`);
-            if (cardObj.power !== undefined) badges.push(`<span class="stat-badge">Power: ${cardObj.power}</span>`);
-            if (cardObj.soul !== undefined) badges.push(`<span class="stat-badge">Soul: ${cardObj.soul}</span>`);
-            if (badges.length) statsEl.innerHTML = badges.join(' ');
+            const b = [];
+            if (cardObj.energy_cost !== undefined) b.push(`<span class="stat-badge">Cost: ${cardObj.energy_cost}</span>`);
+            if (cardObj.power !== undefined) b.push(`<span class="stat-badge">Power: ${cardObj.power}</span>`);
+            if (cardObj.soul !== undefined) b.push(`<span class="stat-badge">Soul: ${cardObj.soul}</span>`);
+            if (b.length) statsEl.innerHTML = b.join(' ');
         }
     }
 
-    // Footer position
+    // Text
+    if (textEl) {
+        textEl.innerHTML = '';
+        if (isHidden) {
+            textEl.innerHTML = '<p style="opacity:0.5;">Card is hidden</p>';
+        } else {
+            let html = '';
+            const groups = (translated?.groups || cardObj.groups || []).join(', ');
+            const units = (translated?.units || cardObj.units || []).join(', ');
+            const parts = [];
+            if (groups) parts.push(`Groups: ${groups}`);
+            if (units) parts.push(`Units: ${units}`);
+            if (parts.length) html += `<div style="font-size:0.75em;opacity:0.7;margin-bottom:4px;">${parts.join(' | ')}</div>`;
+
+            const rawText = cardObj.ability_text || cardObj.text || cardObj.original_text || '';
+            if (rawText) html += `<div class="card-detail-ability">${TextEnricher.enrichAbilityText(rawText)}</div>`;
+            textEl.innerHTML = html;
+        }
+    }
+
     if (footerEl) {
-        const zoneLabel = ZONE_LABELS[navCurrentZone] || navCurrentZone;
-        footerEl.textContent = `${zoneLabel}: ${navIndex + 1} / ${navCards.length}`;
+        footerEl.textContent = navCards.length > 1 ? `${navIndex + 1}/${navCards.length}` : '';
     }
 }
 
-// Map containerId → zone name
-const CONTAINER_TO_ZONE = {
-    'my-hand': 'hand', 'opp-hand': 'hand',
-    'my-stage': 'stage', 'opp-stage': 'opp_stage',
-    'my-live': 'live', 'opp-live': 'live',
-    'my-discard': 'discard', 'opp-discard': 'discard',
-};
-
 export const CardDetailModal = {
-    open(card, zoneHint) {
-        const modal = document.getElementById(DOM_IDS.MODAL_CARD_DETAIL);
-        if (!modal) return;
+    open(card) {
+        const cards = buildAllCards();
+        navCards = [card];
+        navIndex = 0;
+        navCurrentZone = '';
 
-        // Build zone map and find which zone this card belongs to
-        const zones = buildZoneMap();
-        const mappedHint = CONTAINER_TO_ZONE[zoneHint] || zoneHint;
-
-        if (mappedHint && zones[mappedHint]) {
-            navCurrentZone = mappedHint;
-            navCards = zones[mappedHint];
-            const foundIdx = navCards.findIndex(c => c.card_no === card.card_no || c.id === card.id);
-            navIndex = foundIdx >= 0 ? foundIdx : 0;
-        } else {
-            // Auto-detect zone
-            navCurrentZone = '';
-            for (const [name, cards] of Object.entries(zones)) {
-                const foundIdx = cards.findIndex(c => c.card_no === card.card_no || c.id === card.id);
-                if (foundIdx >= 0) {
-                    navCurrentZone = name;
-                    navCards = cards;
-                    navIndex = foundIdx;
-                    break;
-                }
-            }
-            if (!navCurrentZone) {
-                // Card not found in any zone (e.g., from a search result), just show it
-                navCards = [card];
-                navIndex = 0;
-                navCurrentZone = 'card';
+        // Try to find which zone this card belongs to and set up navigation
+        for (const [zone, list] of Object.entries(cards)) {
+            const idx = list.findIndex(c => c.card_no === card.card_no || c.id === card.id);
+            if (idx >= 0) {
+                navCards = list;
+                navIndex = idx;
+                navCurrentZone = zone;
+                break;
             }
         }
 
         ModalManager.show(DOM_IDS.MODAL_CARD_DETAIL);
-        renderCurrentCard();
+        render();
     },
 
-    navigatePrev() { navigateWithinZone(-1); },
-    navigateNext() { navigateWithinZone(1); },
-    navigateZonePrev() { navigateZone(-1); },
-    navigateZoneNext() { navigateZone(1); },
+    navigatePrev() {
+        if (navIndex > 0) { navIndex--; render(); }
+    },
+    navigateNext() {
+        if (navIndex < navCards.length - 1) { navIndex++; render(); }
+    },
+    navigateZonePrev() {
+        const cards = buildAllCards();
+        const names = Object.keys(cards);
+        if (!names.length) return;
+        const idx = names.indexOf(navCurrentZone);
+        if (idx < 0) { navCurrentZone = names[0]; navCards = cards[names[0]]; navIndex = 0; render(); return; }
+        const prev = (idx - 1 + names.length) % names.length;
+        navCurrentZone = names[prev];
+        navCards = cards[prev];
+        navIndex = 0;
+        render();
+    },
+    navigateZoneNext() {
+        const cards = buildAllCards();
+        const names = Object.keys(cards);
+        if (!names.length) return;
+        const idx = names.indexOf(navCurrentZone);
+        if (idx < 0) { navCurrentZone = names[0]; navCards = cards[names[0]]; navIndex = 0; render(); return; }
+        const next = (idx + 1) % names.length;
+        navCurrentZone = names[next];
+        navCards = cards[next];
+        navIndex = 0;
+        render();
+    },
 
     close() {
         ModalManager.hide(DOM_IDS.MODAL_CARD_DETAIL);

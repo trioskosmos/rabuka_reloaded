@@ -134,8 +134,8 @@ const actionHandlers = {
         ModalManager.hide(DOM_IDS.SELECTION_MODAL);
         State._choiceModalDismissed = true;
         if (State.data?.pending_choice) {
-            const reopen = document.getElementById(DOM_IDS.MOBILE_CHOICE_REOPEN);
-            if (reopen) reopen.classList.add('show');
+            const cb = document.getElementById('mobile-choice-btn');
+            if (cb) cb.style.display = 'flex';
         }
     },
     'close-report-modal': Modals.closeReportModal,
@@ -259,7 +259,8 @@ const actionHandlers = {
             State._choiceModalDismissed = false;
             if (typeof window.render === 'function') window.render();
             ModalManager.show(DOM_IDS.SELECTION_MODAL);
-            document.getElementById(DOM_IDS.MOBILE_CHOICE_REOPEN)?.classList.remove('show');
+            const cb = document.getElementById('mobile-choice-btn');
+            if (cb) cb.style.display = 'none';
         }
     },
     'card-nav-prev': () => CardDetailModal.navigatePrev(),
@@ -268,7 +269,13 @@ const actionHandlers = {
     'card-nav-zone-next': () => CardDetailModal.navigateZoneNext(),
     'play-nav-prev': () => PlayActionModal.navigatePrev(),
     'play-nav-next': () => PlayActionModal.navigateNext(),
+    'card-nav-prev': () => CardDetailModal.navigatePrev(),
+    'card-nav-next': () => CardDetailModal.navigateNext(),
+    'card-nav-zone-prev': () => CardDetailModal.navigateZonePrev(),
+    'card-nav-zone-next': () => CardDetailModal.navigateZoneNext(),
     'close-card-detail-modal': () => CardDetailModal.close(),
+    'play-nav-prev': () => PlayActionModal.navigatePrev(),
+    'play-nav-next': () => PlayActionModal.navigateNext(),
     'close-play-action-modal': () => PlayActionModal.close(),
     'close-stage-ability-modal': () => StageAbilityModal.close(),
     'close-ability-queue-modal': () => AbilityQueueModal.close(),
@@ -376,6 +383,14 @@ export const AppController = {
             }
         });
 
+        // Clear play selection on backdrop click
+        document.getElementById('game-board')?.addEventListener('click', (e) => {
+            if (window._playSel && !e.target.closest('.member-slot, .card')) {
+                window._playSel = null;
+                if (window.render) window.render();
+            }
+        });
+
         // Selection modal backdrop close + reopen button tracking
         const selModal = document.getElementById(DOM_IDS.SELECTION_MODAL);
         if (selModal) {
@@ -384,15 +399,15 @@ export const AppController = {
                     ModalManager.hide(DOM_IDS.SELECTION_MODAL);
                     State._choiceModalDismissed = true;
                     if (State.data?.pending_choice) {
-                        const reopen = document.getElementById(DOM_IDS.MOBILE_CHOICE_REOPEN);
-                        if (reopen) reopen.classList.add('show');
+                        const cb = document.getElementById('mobile-choice-btn');
+                        if (cb) cb.style.display = 'flex';
                     }
                 }
             });
             const selObserver = new MutationObserver(() => {
                 if (selModal.style.display === DISPLAY_VALUES.NONE && State.data?.pending_choice) {
-                    const reopen = document.getElementById(DOM_IDS.MOBILE_CHOICE_REOPEN);
-                    if (reopen) reopen.classList.add('show');
+                    const cb = document.getElementById('mobile-choice-btn');
+                    if (cb) cb.style.display = 'flex';
                 }
             });
             selObserver.observe(selModal, { attributes: true, attributeFilter: ['style'] });

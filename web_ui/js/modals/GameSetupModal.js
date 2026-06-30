@@ -263,8 +263,8 @@ export const GameSetupModal = {
         setupAutoConvert(1);
 
         // Paste is now default — ensure paste areas are visible
-        onDeckSelectChange(0, 'paste');
-        onDeckSelectChange(1, 'paste');
+        GameSetupModal.onDeckSelectChange(0, 'paste');
+        GameSetupModal.onDeckSelectChange(1, 'paste');
     },
 
     closeSetupModal: () => {
