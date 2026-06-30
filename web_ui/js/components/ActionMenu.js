@@ -52,13 +52,9 @@ export const ActionMenu = {
             return;
         }
 
-        // 2. Pending Choice — render into modal AND sidebar (so sidebar isn't empty)
+        // 2. Pending Choice — renders inline on desktop, modal on mobile
         if (state.pending_choice) {
             ChoiceView.render(state, actionsDiv, true);
-            // Also render a compact version into the sidebar
-            if (state.pending_choice) {
-                ChoiceView.render(state, actionsDiv, false);
-            }
             return;
         }
 

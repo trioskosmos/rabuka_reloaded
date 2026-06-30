@@ -21,9 +21,10 @@ use rabuka_engine::zones::MemberArea;
 //   相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする。
 // ====================================================================
 
-/// Serasu's own appearance must NOT consume use_limit or trigger the ability.
+/// Q245: Serasu's own appearance DOES trigger the ability (no "ほかの" in text).
+/// The opponent chooses which of their active members to wait.
 #[test]
-fn serasu_played_to_stage_does_not_self_trigger() {
+fn serasu_played_to_stage_triggers_self() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let serasu = game.id("PL!HS-bp6-007-R");
@@ -37,30 +38,45 @@ fn serasu_played_to_stage_does_not_self_trigger() {
 
     game.play_to_stage(serasu, MemberArea::Center);
 
-    // Core: no ability should fire
-    assert!(
-        !game.has_pending_choice(),
-        "Serasu's own appearance must NOT trigger its auto ability"
+    // Serasu's own appearance IS an EdelNote member appearing → ability fires.
+    // Opponent has exactly 1 active member → auto-selects, no prompt.
+
+    // Opponent member must now be waited
+    let orientation = game.state.mods.orientation_modifiers.get(&p2_member);
+    assert_eq!(
+        orientation,
+        Some(&"wait".to_string()),
+        "Opponent member must be waited when Serasu self-plays"
     );
+
+    // Queue should be idle (no pending choices)
     assert!(
         game.state.ability_queue.is_idle(),
-        "Ability queue should be idle after non-triggering play"
+        "Ability queue should be idle after auto-resolution"
     );
 
-    // Opponent member must remain active (not waited)
-    let orientation = game.state.mods.orientation_modifiers.get(&p2_member);
-    assert!(
-        orientation.is_none() || orientation == Some(&"active".to_string()),
-        "Opponent member must not be waited when Serasu self-plays"
-    );
-
-    // use_limit must NOT be consumed — the effect condition failed,
-    // so can_activate was false and use_limit was not recorded.
+    // use_limit IS consumed (the ability actually fired)
     let turn = game.state.turn_number;
     let key = format!("{}_{}_{}", serasu, 0, turn);
     assert!(
-        !game.state.turn_limited_abilities_used.contains_key(&key),
-        "use_limit must not be consumed by a condition-failed trigger"
+        game.state.turn_limited_abilities_used.contains_key(&key),
+        "use_limit must be consumed after successful trigger"
+    );
+
+    // Opponent member must now be waited
+    let orientation = game.state.mods.orientation_modifiers.get(&p2_member);
+    assert_eq!(
+        orientation,
+        Some(&"wait".to_string()),
+        "Opponent member must be waited when Serasu self-plays"
+    );
+
+    // use_limit IS consumed (the ability actually fired)
+    let turn = game.state.turn_number;
+    let key = format!("{}_{}_{}", serasu, 0, turn);
+    assert!(
+        game.state.turn_limited_abilities_used.contains_key(&key),
+        "use_limit must be consumed after successful trigger"
     );
 }
 

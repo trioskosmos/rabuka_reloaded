@@ -1,16 +1,12 @@
-import { isMulliganPhase } from './constants.js';
+import { isMulliganPhase, isLiveCardSetPhase } from './constants.js';
 
 function getSelectedIndices(state, uiState, perspectivePlayer) {
-    const isMulligan = isMulliganPhase(state.phase);
-    if (isMulligan) {
+    if (isMulliganPhase(state.phase)) {
         const player = perspectivePlayer === 0 ? state.player1 : state.player2;
         const serverSelection = player.mulligan_selection;
         const indices = new Set(uiState.localMulliganSelection);
-
-        // Engine may not send mulligan_selection in PlayerDisplay
         if (serverSelection !== undefined) {
             if (typeof serverSelection === 'number') {
-                // Rust backend: hand is { cards: [...] }
                 const handCards = player.hand.cards;
                 for (let i = 0; i < handCards.length; i++) {
                     if ((serverSelection >> i) & 1) indices.add(i);
@@ -19,8 +15,10 @@ function getSelectedIndices(state, uiState, perspectivePlayer) {
                 serverSelection.forEach(idx => indices.add(Number(idx)));
             }
         }
-
         return Array.from(indices);
+    }
+    if (isLiveCardSetPhase(state.phase)) {
+        return Array.from(uiState.localLiveCardSelection);
     }
     return uiState.selectedHandIdx !== -1 ? [uiState.selectedHandIdx] : [];
 }

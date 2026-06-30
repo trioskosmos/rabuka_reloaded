@@ -212,7 +212,7 @@ export const ActionButtons = {
                 if (State.localLiveCardSelection.has(ci)) {
                     const thumb = btn.querySelector('.action-card-thumb');
                     if (thumb) {
-                        thumb.classList.add('live-card-selected');
+                        thumb.classList.add('sel', 'sel-live');
                     }
                 }
             }
@@ -227,7 +227,7 @@ export const ActionButtons = {
                 if (State.localMulliganSelection.has(ci)) {
                     const thumb = btn.querySelector('.action-card-thumb');
                     if (thumb) {
-                        thumb.classList.add('mulligan-selected');
+                        thumb.classList.add('sel', 'sel-mulligan');
                     }
                 }
             }
@@ -243,10 +243,6 @@ export const ActionButtons = {
                     } else {
                         State.localMulliganSelection.add(handIdx);
                     }
-                    const cardEl = document.getElementById(`my-hand-card-${handIdx}`);
-                    if (cardEl) cardEl.classList.toggle('mulligan-selected');
-                    const thumb = btn.querySelector('.action-card-thumb');
-                    if (thumb) thumb.classList.toggle('mulligan-selected');
                 }
             } else if (a.action_type === 'select_live_card') {
                 const params = a.parameters || a.params || {};
@@ -261,10 +257,6 @@ export const ActionButtons = {
                         if (State.localLiveCardSelection.size + alreadyPlaced >= 3) return;
                         State.localLiveCardSelection.add(handIdx);
                     }
-                    const cardEl = document.getElementById(`my-hand-card-${handIdx}`);
-                    if (cardEl) cardEl.classList.toggle('live-card-selected');
-                    const thumb = btn.querySelector('.action-card-thumb');
-                    if (thumb) thumb.classList.toggle('live-card-selected');
                     window.render?.();
                 }
             } else if (window.doAction && a.index !== undefined) {

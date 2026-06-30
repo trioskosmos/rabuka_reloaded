@@ -2695,10 +2695,12 @@ impl<'a> ConditionContext<'a> {
                         }
                     }
                     // Generalized self-trigger guard: when cost_limit or card_type filters
-                    // are set, prevent the activating card from triggering on its own appearance
-                    // (the same logic as the group_names guard below).
+                    // are set AND exclude_self is true, prevent the activating card from
+                    // triggering on its own appearance (the same logic as the group_names
+                    // guard below).
                     if !baton_touch_trigger
                         && !self.game_state.cards_appeared_this_turn.is_empty()
+                        && condition.exclude_self.unwrap_or(false)
                         && (condition.cost_limit.is_some() || condition.card_type.is_some())
                     {
                         let has_other_appeared = stage_ids.iter().any(|&cid| {
@@ -2768,22 +2770,52 @@ impl<'a> ConditionContext<'a> {
                                 push_rich(&format!("グループ不一致: {:?}", groups), false);
                                 return false;
                             }
-                            // Prevent self-trigger on own appearance when NOT
-                            // arriving via baton touch (baton_touch appearances
-                            // legitimately trigger on the activating card itself).
+                            // Verify that an appeared card matches the group filter.
+                            // The group check above ensures SOME card on stage belongs
+                            // to the group, but the appearance trigger should only fire
+                            // when a card THAT actually appeared this turn matches the group.
+                            // If appearance tracking is cleared (resolution time), accept
+                            // — the ability was already queued by the trigger event.
+                            if !baton_touch_trigger {
+                                if self.game_state.cards_appeared_this_turn.is_empty() {
+                                    // Resolution: appearance happened (ability was queued)
+                                } else {
+                                    let has_appeared_matching = stage_ids.iter().any(|&cid| {
+                                        match_fn(cid)
+                                            && self.game_state.has_card_appeared_this_turn(cid)
+                                    });
+                                    if !has_appeared_matching {
+                                        push_rich("該当グループ未登場", false);
+                                        return false;
+                                    }
+                                }
+                            }
+                            // Verify that an appeared card matches the group filter.
+                            // The group check above ensures SOME card on stage belongs
+                            // to the group, but the appearance trigger should only fire
+                            // when a card THAT actually appeared this turn matches the group.
                             // Skip during constant evaluation (no cards "appeared").
                             if !baton_touch_trigger
                                 && !self.game_state.cards_appeared_this_turn.is_empty()
                             {
+                                let has_appeared_matching = stage_ids.iter().any(|&cid| {
+                                    match_fn(cid)
+                                        && self.game_state.has_card_appeared_this_turn(cid)
+                                });
+                                if !has_appeared_matching {
+                                    push_rich("該当グループ未登場", false);
+                                    return false;
+                                }
+                            }
+                            // Prevent self-trigger on own appearance when the condition
+                            // explicitly excludes self (e.g. "ほかのメンバー" / exclude_self).
+                            // baton_touch appearances legitimately trigger on the activating card.
+                            if !baton_touch_trigger
+                                && !self.game_state.cards_appeared_this_turn.is_empty()
+                                && condition.exclude_self.unwrap_or(false)
+                            {
                                 let has_other_matching = stage_ids.iter().any(|&cid| {
-                                    let matches_group = groups.iter().any(|g| {
-                                        crate::ability::util::card_matches_group_str(
-                                            card_db,
-                                            cid,
-                                            Some(g),
-                                        )
-                                    });
-                                    matches_group
+                                    match_fn(cid)
                                         && self
                                             .activating_card_id
                                             .map_or(true, |act_id| cid != act_id)

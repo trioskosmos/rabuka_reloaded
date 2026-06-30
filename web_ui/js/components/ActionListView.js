@@ -107,14 +107,11 @@ export const ActionListView = {
             addHeader(i18n.t('mulligan').toUpperCase(), 'var(--accent-pink)');
             allMulliganActions.forEach(a => listDiv.appendChild(ActionButtons.createActionButton(a, false, '', state)));
 
-            // Post-render: apply mulligan-selected class to thumbnails based on
-            // local selection state. This guarantees the grayscale appears even
-            // if createActionButton's check ran on stale localMulliganSelection.
             listDiv.querySelectorAll('.action-btn[data-card-index]').forEach(btn => {
                 const ci = parseInt(btn.dataset.cardIndex, 10);
                 if (!isNaN(ci) && State.localMulliganSelection.has(ci)) {
                     const thumb = btn.querySelector('.action-card-thumb');
-                    if (thumb) thumb.classList.add('mulligan-selected');
+                    if (thumb) { thumb.classList.add('sel', 'sel-mulligan'); }
                 }
             });
         }
@@ -124,13 +121,11 @@ export const ActionListView = {
             addHeader(i18n.t('live_card_set').toUpperCase(), 'var(--accent-cyan)');
             allLiveCardActions.forEach(a => listDiv.appendChild(ActionButtons.createActionButton(a, false, '', state)));
 
-            // Post-render: apply live-card-selected class to thumbnails based on
-            // local selection state.
             listDiv.querySelectorAll('.action-btn[data-card-index]').forEach(btn => {
                 const ci = parseInt(btn.dataset.cardIndex, 10);
                 if (!isNaN(ci) && State.localLiveCardSelection.has(ci)) {
                     const thumb = btn.querySelector('.action-card-thumb');
-                    if (thumb) thumb.classList.add('live-card-selected');
+                    if (thumb) { thumb.classList.add('sel', 'sel-live'); }
                 }
             });
         }
@@ -180,12 +175,27 @@ export const ActionListView = {
                                 
                                 const areaActionCopy = { ...firstA };
                                 areaActionCopy.parameters = { ...firstA.parameters, stage_area: areaName };
+                                // Unique negative index for hover isolation
+                                const zoneIdx = -1000 - areaOrder.indexOf(areaName);
+                                areaActionCopy.index = zoneIdx;
+                                areaActionCopy._zoneArea = areaName;
                                 
                                 const btn = ActionButtons.createActionButton(areaActionCopy, true, '', state);
                                 const costText = isBaton ? `${label} ${cost} Baton` : `${label} ${cost}`;
                                 btn.innerHTML = `<span style="display:flex;flex-direction:column;align-items:center;gap:1px;font-weight:600;"><span style="font-size:0.8rem;">${label}</span><span style="font-size:0.65rem;opacity:0.7;">${cost}</span></span>`;
+                                btn.dataset.zoneArea = areaName;
                                 btn.style.cssText = '';
                                 btn.className = btn.className + ' action-btn';
+                                // Custom hover: highlight stage zone
+                                btn.addEventListener('mouseenter', () => {
+                                    document.querySelectorAll('.member-slot').forEach(s => s.classList.remove('hover-highlight'));
+                                    const slot = document.getElementById(`my-stage-slot-${areaOrder.indexOf(areaName)}`);
+                                    if (slot) slot.classList.add('hover-highlight');
+                                });
+                                btn.addEventListener('mouseleave', () => {
+                                    const slot = document.getElementById(`my-stage-slot-${areaOrder.indexOf(areaName)}`);
+                                    if (slot) slot.classList.remove('hover-highlight');
+                                });
                                 areasDiv.appendChild(btn);
                             } else {
                                 const spacer = document.createElement('div');

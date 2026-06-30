@@ -1,5 +1,5 @@
 import { State } from '../state.js';
-import { fixImg as fixImgPath, isMulliganPhase } from '../constants.js';
+import { fixImg as fixImgPath, isMulliganPhase, isLiveCardSetPhase } from '../constants.js';
 import * as i18n from '../i18n/index.js';
 import { Tooltips } from '../ui_tooltips.js';
 import { DOMUtils } from '../utils/DOMUtils.js';
@@ -302,10 +302,13 @@ export const CardRenderer = {
         }
 
         if (isSelected) {
-            const isMulligan = isMulliganPhase(state.phase);
-            classNames.push(isMulligan ? 'mulligan-selected' : 'selected');
+            classNames.push('sel');
+            if (isMulliganPhase(state.phase)) classNames.push('sel-mulligan');
+            else if (isLiveCardSetPhase(state.phase)) classNames.push('sel-live');
+            else classNames.push('sel-action');
         }
         if (isValid && containerId !== 'my-hand') classNames.push('valid-target');
+        if (!isValid && containerId === 'my-hand') classNames.push('inert');
 
         // Sticky class for view model: if we match current global hover, keep it
         const isCurrentlyHovered = options.actionId !== undefined && options.actionId === State.hoveredActionId;
@@ -577,14 +580,8 @@ export const CardRenderer = {
                         } else {
                             State.localMulliganSelection.add(handIdx);
                         }
-                        const cardEl = document.getElementById(`${containerId}-card-${handIdx}`);
-                        if (cardEl) cardEl.classList.toggle('mulligan-selected');
-                        const mBtn = State.mulliganButtons.get(handIdx);
-                        if (mBtn) {
-                            const thumb = mBtn.querySelector('.action-card-thumb');
-                            if (thumb) thumb.classList.toggle('mulligan-selected');
-                        }
                     }
+                    window.render?.();
                     return;
                 }
                 if (action.action_type === 'select_live_card') {
@@ -598,13 +595,6 @@ export const CardRenderer = {
                             const alreadyPlaced = p?.live_zone?.cards?.length || 0;
                             if (State.localLiveCardSelection.size + alreadyPlaced >= 3) return;
                             State.localLiveCardSelection.add(handIdx);
-                        }
-                        const cardEl = document.getElementById(`${containerId}-card-${handIdx}`);
-                        if (cardEl) cardEl.classList.toggle('live-card-selected');
-                        const lBtn = State.liveCardButtons.get(handIdx);
-                        if (lBtn) {
-                            const thumb = lBtn.querySelector('.action-card-thumb');
-                            if (thumb) thumb.classList.toggle('live-card-selected');
                         }
                     }
                     window.render?.();

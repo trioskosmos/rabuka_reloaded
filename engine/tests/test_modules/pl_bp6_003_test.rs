@@ -239,6 +239,130 @@ fn kotori_live_start_only_muses_under_two_cost_selected() {
     }
 }
 
+/// Q247: Pre-existing under-card does NOT double the heart gain.
+/// Kotori's LiveStart: place 1 μ's member ≤2 cost under, gain 1 heart.
+/// If there's already a card under (from baton touch etc.), still only gain 1 heart.
+#[test]
+fn kotori_q247_preexisting_under_does_not_double_heart() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let kotori = game.id("PL!-bp6-003-R+");
+    let muse = game.id("PL!-sd1-005-SD"); // cost=2, μ's member
+    let under_card = game.id("PL!-sd1-005-SD"); // another copy to place under first
+    let filler_live = game.id("PL!-sd1-020-SD");
+
+    game.state.player1.stage.stage = [-1, kotori, -1];
+    // Pre-place a card under Kotori (simulating prior baton touch)
+    place_under(&mut game, MemberArea::Center, under_card);
+    assert_eq!(
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .len(),
+        1,
+        "1 card placed under before LiveStart"
+    );
+
+    game.state.player1.hand.cards.push(muse);
+    game.state.player1.hand.cards.push(filler_live);
+    seed_deck(&mut game);
+    game.give_energy(3);
+
+    process_live_start_ability(&mut game, kotori);
+
+    // Step 1: Select card to place under
+    assert!(
+        game.has_pending_choice(),
+        "Q247: LiveStart should prompt to select μ's member"
+    );
+    game.select_indices(&[0]);
+
+    // Step 2: Pick heart color
+    assert!(
+        game.has_pending_choice(),
+        "Q247: LiveStart should prompt for heart color"
+    );
+    game.select_option(0); // heart01
+
+    assert!(
+        !game.has_pending_choice(),
+        "Q247: no more choices after heart selected"
+    );
+
+    // Verify: 2 cards under center (1 pre-existing + 1 from LiveStart)
+    assert_eq!(
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .len(),
+        2,
+        "Q247: 2 cards under (1 pre-existing + 1 from LiveStart)"
+    );
+
+    // Q247: Heart gained is still 1, NOT 2 (the pre-existing under-card doesn't double it)
+    let heart = game
+        .state
+        .mods
+        .get_heart_modifier(kotori, HeartColor::Heart01);
+    assert_eq!(
+        heart, 1,
+        "Q247: Heart gain is 1, not doubled by pre-existing under-card. Got {}",
+        heart
+    );
+}
+
+/// Edge: Pre-existing under + skip LiveStart → no new under, no heart.
+#[test]
+fn kotori_q247_preexisting_under_skip_live_start_no_heart() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let kotori = game.id("PL!-bp6-003-R+");
+    let muse = game.id("PL!-sd1-005-SD"); // μ's member — valid skip target
+    let under_card = game.id("PL!-sd1-005-SD"); // pre-existing under
+    let filler_live = game.id("PL!-sd1-020-SD");
+
+    game.state.player1.stage.stage = [-1, kotori, -1];
+    place_under(&mut game, MemberArea::Center, under_card);
+    game.state.player1.hand.cards.push(muse);
+    game.state.player1.hand.cards.push(filler_live);
+    seed_deck(&mut game);
+    game.give_energy(3);
+
+    process_live_start_ability(&mut game, kotori);
+
+    // Should prompt to select card (optional, can skip)
+    assert!(
+        game.has_pending_choice(),
+        "Q247: LiveStart should prompt (optional)"
+    );
+    // Send empty selection to skip
+    game.select_indices(&[]);
+
+    // No heart color choice (skipped because no card was placed)
+    assert!(
+        !game.has_pending_choice(),
+        "Q247: no heart color when skipped"
+    );
+    assert_eq!(
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .len(),
+        1,
+        "Q247: still only 1 under (pre-existing, LiveStart was skipped)"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(kotori, HeartColor::Heart01),
+        0,
+        "Q247: no heart gained when LiveStart skipped"
+    );
+}
+
 #[test]
 fn kotori_live_start_second_activation_asks_one_card_not_two() {
     let db = load_real_database();

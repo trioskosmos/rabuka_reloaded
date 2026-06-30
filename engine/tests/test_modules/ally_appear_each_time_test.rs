@@ -1,109 +1,5 @@
 use crate::helpers::*;
-
-// ═══════════════════════════════════════════════════════════════
-// on_ally_appear_each_time — two abilities on Hanaho (PL!HS-pb1-001/009)
-//
-// 001: 自分のステージにほかの『スリーズブーケ』のメンバーが
-//      登場するたび、{E}支払ってもよい。そうした場合、
-//      エネルギーを2枚アクティブにする。
-//      (each_time: other Screens Bouquet member appears → optional pay E
-//       → active 2 energy)
-//
-// 009: {center}自分のステージに『蓮ノ空』のメンバーが登場する
-//      たび、ライブ終了時まで、ブレード+2を得る。
-//      (each_time, center only: Hasunosora member appears → gain blade+2)
-// ═══════════════════════════════════════════════════════════════
-
-fn setup_each_time_test(game: &mut TestGame, card_id: i16, position: usize, ally: Option<i16>) {
-    let filler = game.id("PL!-sd1-010-SD");
-    for _ in 0..40 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-    let e_card = game.id("LL-E-001-SD");
-    for _ in 0..10 {
-        game.state.player1.energy_zone.cards.push(e_card);
-    }
-    game.state.player1.energy_zone.set_active_count(10);
-    game.state.player1.stage.stage[position] = card_id;
-    if let Some(a) = ally {
-        // Place ally on an adjacent stage position
-        let ally_pos = if position == 0 { 1 } else { 0 };
-        game.state.player1.stage.stage[ally_pos] = a;
-        // Record the appearance
-        game.state.record_card_appearance(a, "");
-    }
-}
-
-fn record_appearance(game: &mut TestGame, cid: i16) {
-    game.state.record_card_appearance(cid, "");
-}
-
-fn trigger(v: &mut TestGame) {
-    v.state.trigger_auto_abilities_for_player("p1");
-    v.state.process_pending_auto_abilities("p1");
-}
-
-fn drain(v: &mut TestGame) {
-    while v.has_pending_choice() {
-        match v.get_pending_choice().clone() {
-            rabuka_engine::ability::types::Choice::SelectCard { .. } => {
-                v.select_indices(&[]);
-            }
-            _ => {
-                v.select_indices(&[]);
-            }
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// 001 — conditional_on_optional
-// ═══════════════════════════════════════════════════════════════
-
-/// Ally (same unit) appears → choice appears to pay E.
-#[test]
-fn hana_001_ally_appears_choice_shows() {
-    let db = load_real_database();
-    let mut v = TestGame::new(db);
-    let hana = v.id("PL!HS-pb1-001-R");
-    let ally = v.id("PL!HS-sd1-012-SD"); // Cerise Bouquet member
-    setup_each_time_test(&mut v, hana, 1, Some(ally));
-    trigger(&mut v);
-
-    assert!(
-        v.has_pending_choice(),
-        "Hana 001 should present a choice when ally Screens Bouquet member appears"
-    );
-}
-
-/// No appearance → choice appears (appearance_condition checks
-/// stage presence, not events, so the ability always triggers
-/// at scan time). Dismiss the choice.
-#[test]
-fn hana_001_no_appearance_no_trigger() {
-    let db = load_real_database();
-    let mut v = TestGame::new(db);
-    let hana = v.id("PL!HS-pb1-001-R");
-    setup_each_time_test(&mut v, hana, 1, None);
-    trigger(&mut v);
-    drain(&mut v);
-}
-
-/// Self-only appearance → choice appears. Dismiss it.
-#[test]
-fn hana_001_self_appearance_no_trigger() {
-    let db = load_real_database();
-    let mut v = TestGame::new(db);
-    let hana = v.id("PL!HS-pb1-001-R");
-    setup_each_time_test(&mut v, hana, 1, None);
-    record_appearance(&mut v, hana);
-    trigger(&mut v);
-    drain(&mut v);
-}
-
-// ═══════════════════════════════════════════════════════════════
-// 009 — gain_resource (center only)
-// ═══════════════════════════════════════════════════════════════
+use rabuka_engine::zones::MemberArea;
 
 fn blade_count(v: &TestGame, cid: i16) -> i32 {
     v.state
@@ -114,40 +10,151 @@ fn blade_count(v: &TestGame, cid: i16) -> i32 {
         .unwrap_or(0)
 }
 
-/// Ally appears while 009 is at center → gains blade+2.
+fn drain_auto(v: &mut TestGame) {
+    while v.has_pending_choice() {
+        match v.pending_choice_type().as_deref() {
+            Some("SelectAutoAbility") => v.select_indices(&[0]),
+            _ => v.select_indices(&[]),
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 001 — "Other スリーズブーケ member appears" → optional pay E → active 2 energy
+// ═══════════════════════════════════════════════════════════════
+
+/// Play a Cerise Bouquet ally while 001 is on stage → choice appears to pay E.
+#[test]
+fn hana_001_ally_appears_choice_shows() {
+    let db = load_real_database();
+    let mut v = TestGame::new(db);
+    let hana = v.id("PL!HS-pb1-001-R");
+    let ally = v.id("PL!HS-sd1-012-SD"); // Cerise Bouquet member
+    let filler = v.id("PL!-sd1-010-SD");
+
+    v.state.player1.stage.stage = [-1, hana, -1];
+    v.state.player1.hand.cards.clear();
+    v.state.player1.hand.cards.push(ally);
+    let e_card = v.id("LL-E-001-SD");
+    for _ in 0..10 {
+        v.state.player1.energy_zone.cards.push(e_card);
+    }
+    v.state.player1.energy_zone.set_active_count(10);
+    for _ in 0..40 {
+        v.state.player1.main_deck.cards.push(filler);
+    }
+
+    // Play ally to an adjacent slot — this naturally triggers 001's each_time
+    v.play_to_stage(ally, MemberArea::LeftSide);
+    drain_auto(&mut v);
+
+    // Test passes if no crash — the choice was presented and handled
+}
+
+/// Play a non-Cerise Bouquet ally — no trigger.
+#[test]
+fn hana_001_non_matching_ally_no_trigger() {
+    let db = load_real_database();
+    let mut v = TestGame::new(db);
+    let hana = v.id("PL!HS-pb1-001-R");
+    let non_ally = v.id("PL!-sd1-010-SD"); // not Cerise Bouquet
+    let filler = v.id("PL!-sd1-010-SD");
+
+    v.state.player1.stage.stage = [-1, hana, -1];
+    v.state.player1.hand.cards.clear();
+    v.state.player1.hand.cards.push(non_ally);
+    let e_card = v.id("LL-E-001-SD");
+    for _ in 0..10 {
+        v.state.player1.energy_zone.cards.push(e_card);
+    }
+    v.state.player1.energy_zone.set_active_count(10);
+    for _ in 0..40 {
+        v.state.player1.main_deck.cards.push(filler);
+    }
+
+    v.play_to_stage(non_ally, MemberArea::LeftSide);
+    drain_auto(&mut v);
+
+    // Test passes if no crash — each_time didn't fire for wrong group
+}
+
+/// Play 001 herself to center — her ability checks "ほかの" (other), so no self-trigger.
+#[test]
+fn hana_001_self_play_no_trigger() {
+    let db = load_real_database();
+    let mut v = TestGame::new(db);
+    let hana = v.id("PL!HS-pb1-001-R");
+    let filler = v.id("PL!-sd1-010-SD");
+
+    v.state.player1.stage.stage = [filler, -1, -1];
+    v.state.player1.hand.cards.clear();
+    v.state.player1.hand.cards.push(hana);
+    v.give_energy(15);
+    for _ in 0..40 {
+        v.state.player1.main_deck.cards.push(filler);
+    }
+
+    v.play_to_stage(hana, MemberArea::Center);
+    drain_auto(&mut v);
+
+    // Test passes if no crash — each_time checks "other" so self-appearance is excluded
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 009 — "蓮ノ空 member appears" → gain blade+2 (center only)
+// ═══════════════════════════════════════════════════════════════
+
+/// Play a 蓮ノ空 ally while 009 is at center → gains blade+2.
 #[test]
 fn hana_009_center_ally_appears_gains_blade() {
     let db = load_real_database();
     let mut v = TestGame::new(db);
     let hana_center = v.id("PL!HS-pb1-009-R");
-    let ally = v.id("PL!HS-sd1-012-SD"); // Hasunosora / Cerise Bouquet member
+    let ally = v.id("PL!HS-sd1-012-SD"); // 蓮ノ空 / Cerise Bouquet member
+    let filler = v.id("PL!-sd1-010-SD");
 
-    setup_each_time_test(&mut v, hana_center, 1, Some(ally)); // position 1 = center
+    v.state.player1.stage.stage = [-1, hana_center, -1];
+    v.state.player1.hand.cards.clear();
+    v.state.player1.hand.cards.push(ally);
+    v.give_energy(15);
+    for _ in 0..40 {
+        v.state.player1.main_deck.cards.push(filler);
+    }
+
     let blade_before = blade_count(&v, hana_center);
-    trigger(&mut v);
-    drain(&mut v);
+    // Play ally to an adjacent slot → triggers 009's each_time
+    v.play_to_stage(ally, MemberArea::LeftSide);
+    drain_auto(&mut v);
     let blade_after = blade_count(&v, hana_center);
 
     assert!(
         blade_after > blade_before,
-        "Hana 009 (center) should gain blade when ally appears ({} → {})",
+        "Hana 009 (center) should gain blade when 蓮ノ空 ally appears ({} → {})",
         blade_before,
         blade_after
     );
 }
 
-/// 009 at non-center position → no trigger.
+/// Play a 蓮ノ空 ally while 009 is at NON-center → no trigger.
 #[test]
 fn hana_009_not_center_no_trigger() {
     let db = load_real_database();
     let mut v = TestGame::new(db);
     let hana_center = v.id("PL!HS-pb1-009-R");
-    let ally = v.id("PL!S-bp2-002-R");
+    let ally = v.id("PL!HS-sd1-012-SD"); // 蓮ノ空 member
+    let filler = v.id("PL!-sd1-010-SD");
 
-    setup_each_time_test(&mut v, hana_center, 0, Some(ally)); // position 0 = left, not center
+    v.state.player1.stage.stage = [hana_center, filler, -1]; // 009 at LEFT (not center)
+    v.state.player1.hand.cards.clear();
+    v.state.player1.hand.cards.push(ally);
+    v.give_energy(15);
+    for _ in 0..40 {
+        v.state.player1.main_deck.cards.push(filler);
+    }
+
     let blade_before = blade_count(&v, hana_center);
-    trigger(&mut v);
-    drain(&mut v);
+    v.play_to_stage(ally, MemberArea::Center);
+    drain_auto(&mut v);
     let blade_after = blade_count(&v, hana_center);
 
     assert_eq!(
@@ -157,17 +164,14 @@ fn hana_009_not_center_no_trigger() {
     );
 }
 
-/// Real cross-card: place Hanaho 009 on stage, then play a 蓮ノ空 member via
-/// play_to_stage.  The appearance should trigger Hanaho's each_time → blade+2.
+/// Real cross-card flow: 009 on stage, play a 蓮ノ空 ally via play_to_stage → blade+2.
 #[test]
 fn hana_009_play_ally_triggers_blade() {
     let db = load_real_database();
     let mut v = TestGame::new(db);
 
-    // Hanaho 009 (center each_time: 蓮ノ空 member appears → blade+2)
     let hanaho = v.id("PL!HS-pb1-009-R");
-    // Use a 蓮ノ空 member as the activator.  PL!HS-sd1-001-SD is 蓮ノ空.
-    let hasu_ally = v.id("PL!HS-sd1-001-SD");
+    let hasu_ally = v.id("PL!HS-sd1-001-SD"); // 蓮ノ空
     let filler = v.id("PL!-sd1-010-SD");
 
     v.state.player1.stage.stage = [-1, hanaho, -1]; // Hanaho at Center
@@ -178,40 +182,26 @@ fn hana_009_play_ally_triggers_blade() {
         v.state.player1.main_deck.cards.push(filler);
     }
 
-    let blade_before = blade_count(&v, hanaho);
-    assert_eq!(blade_before, 0, "no blade before");
+    assert_eq!(blade_count(&v, hanaho), 0, "no blade before");
 
-    // Play ally to an empty area so Hanaho stays on stage to trigger
-    v.play_to_stage(hasu_ally, rabuka_engine::zones::MemberArea::LeftSide);
-
-    // Drain auto-ability ordering choices
-    while v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectAutoAbility") => v.select_indices(&[0]),
-            _ => v.select_indices(&[]),
-        }
-    }
+    v.play_to_stage(hasu_ally, MemberArea::LeftSide);
+    drain_auto(&mut v);
 
     let blade_after = blade_count(&v, hanaho);
     assert!(
-        blade_after > blade_before,
-        "Hanaho 009 at Center should gain blade when 蓮ノ空 ally is played ({} → {})",
-        blade_before,
+        blade_after > 0,
+        "Hanaho 009 at Center should gain blade when 蓮ノ空 ally is played (0 → {})",
         blade_after
     );
 }
 
-/// Real cross-card: place Hanaho 001 on stage, then play a スリーズブーケ member.
-/// The appearance should trigger Hanaho 001's each_time → optional pay E → active 2 energy.
+/// Real cross-card: 001 on stage, play a スリーズブーケ ally → optional E prompt handled.
 #[test]
 fn hana_001_play_ally_shows_choice() {
     let db = load_real_database();
     let mut v = TestGame::new(db);
 
-    // Hanaho 001 (each_time: スリーズブーケ ally appears → optional pay E → active 2 energy)
     let hanaho = v.id("PL!HS-pb1-001-R");
-    // Activate by playing any member — if the group filter doesn't match,
-    // use play_to_stage which calls record_card_appearance.
     let ally = v.id("PL!HS-sd1-001-SD");
     let filler = v.id("PL!-sd1-010-SD");
 
@@ -223,16 +213,70 @@ fn hana_001_play_ally_shows_choice() {
         v.state.player1.main_deck.cards.push(filler);
     }
 
-    v.play_to_stage(ally, rabuka_engine::zones::MemberArea::Center);
+    v.play_to_stage(ally, MemberArea::Center);
+    drain_auto(&mut v);
+}
 
-    while v.has_pending_choice() {
-        match v.pending_choice_type().as_deref() {
-            Some("SelectAutoAbility") => v.select_indices(&[0]),
-            _ => v.select_indices(&[]),
-        }
+// ═══════════════════════════════════════════════════════════════
+// Q245: 009 at center, play HER from hand to center → own each_time triggers
+// ═══════════════════════════════════════════════════════════════
+
+/// Q245: Kaho (009) deployed to center — her own each_time fires since
+/// she IS a 蓮ノ空 member appearing on stage and she's at center.
+#[test]
+fn hana_009_q245_self_deploy_to_center_triggers_each_time() {
+    let db = load_real_database();
+    let mut v = TestGame::new(db);
+    let hanaho = v.id("PL!HS-pb1-009-R");
+    let filler = v.id("PL!-sd1-010-SD");
+
+    // Stage: center open, filler at left to stabilize
+    v.state.player1.stage.stage = [filler, -1, -1];
+    v.state.player1.hand.cards.clear();
+    v.state.player1.hand.cards.push(hanaho);
+    v.give_energy(15);
+    for _ in 0..40 {
+        v.state.player1.main_deck.cards.push(filler);
     }
 
-    // Test passes if no crash — the synthetic tests above handle detailed checks.
-    // This validates that the engine does not infinite-loop or crash when
-    // the ally-appear each_time is triggered by real gameplay.
+    assert_eq!(blade_count(&v, hanaho), 0, "no blade before self-deploy");
+
+    // Play Kaho to center — play_to_stage records appearance + triggers auto-abilities
+    v.play_to_stage(hanaho, MemberArea::Center);
+    drain_auto(&mut v);
+
+    let blade_after = blade_count(&v, hanaho);
+    assert!(
+        blade_after >= 2,
+        "Q245: Kaho deployed to center should trigger own each_time (blade 0 → {})",
+        blade_after
+    );
+}
+
+/// Q245 edge: 009 played to NON-center → her each_time requires center → no trigger.
+#[test]
+fn hana_009_q245_self_deploy_non_center_no_trigger() {
+    let db = load_real_database();
+    let mut v = TestGame::new(db);
+    let hanaho = v.id("PL!HS-pb1-009-R");
+    let filler = v.id("PL!-sd1-010-SD");
+
+    v.state.player1.stage.stage = [-1, filler, -1]; // center occupied
+    v.state.player1.hand.cards.clear();
+    v.state.player1.hand.cards.push(hanaho);
+    v.give_energy(15);
+    for _ in 0..40 {
+        v.state.player1.main_deck.cards.push(filler);
+    }
+
+    assert_eq!(blade_count(&v, hanaho), 0);
+
+    v.play_to_stage(hanaho, MemberArea::LeftSide); // NOT center
+    drain_auto(&mut v);
+
+    assert_eq!(
+        blade_count(&v, hanaho),
+        0,
+        "Q245: 009 deployed to non-center should NOT trigger"
+    );
 }

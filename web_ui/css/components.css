@@ -196,11 +196,19 @@
     margin: 0 -1px;
 }
 
+.action-group-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px;
+    margin-bottom: 6px;
+}
+
 .action-group-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 4px 0;
+    padding: 2px 0 4px 2px;
     font-size: 0.85rem;
     font-weight: 600;
     border-bottom: 1px solid var(--border);
@@ -214,25 +222,29 @@
 
 .action-group-buttons .action-btn {
     flex: 1;
-    border-radius: 0 !important;
-    border-left: none !important;
+    border-radius: 0;
+    border-left: none;
     text-align: center;
-    padding: 8px 4px !important;
-    font-size: 0.75rem !important;
-    line-height: 1.2 !important;
+    padding: 8px 4px;
+    font-size: 0.75rem;
+    line-height: 1.2;
     min-height: 36px;
     border: 1px solid var(--border);
     border-right: none;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.1s;
 }
 
 .action-group-buttons .action-btn:first-child {
-    border-left: 1px solid var(--border) !important;
-    border-radius: 4px 0 0 4px !important;
+    border-left: 1px solid var(--border);
+    border-radius: 4px 0 0 4px;
 }
 
 .action-group-buttons .action-btn:last-child {
-    border-right: 1px solid var(--border) !important;
-    border-radius: 0 4px 4px 0 !important;
+    border-right: 1px solid var(--border);
+    border-radius: 0 4px 4px 0;
 }
 
 /* --- Action Button Interaction System --- */
@@ -613,20 +625,17 @@
     flex-shrink: 0;
     object-fit: cover;
 }
-.action-card-thumb.mulligan-selected {
-    z-index: 100 !important;
-    border: 2px solid var(--accent-pink) !important;
-    box-shadow: var(--glow-pink) !important;
-    filter: grayscale(1) !important;
+.action-card-thumb.sel {
+    z-index: 100;
+    border: 2px solid var(--sel-c);
+    box-shadow: 0 0 8px var(--sel-c);
+    filter: grayscale(1);
+    opacity: 0.7;
+    transform: translateY(-2px) scale(1.02);
 }
-.action-card-thumb.live-card-selected {
-    z-index: 100 !important;
-    border: 2px solid var(--accent-blue) !important;
-    box-shadow: 0 0 8px var(--accent-blue) !important;
-    filter: grayscale(1) !important;
-    opacity: 0.7 !important;
-    transform: translateY(-2px) scale(1.02) !important;
-}
+.action-card-thumb.sel-mulligan { --sel-c: var(--accent-pink); }
+.action-card-thumb.sel-live { --sel-c: var(--accent-blue); }
+.action-card-thumb.sel-action { --sel-c: var(--accent-gold); }
 
 .action-btn.mini {
     padding: 1px 4px;

@@ -184,13 +184,9 @@ impl GameState {
         {
             return true;
         }
-        // Appearance
-        if matches!(
-            condition.condition_type,
-            Some(crate::ability::enums::ConditionType::AppearanceCondition)
-        ) {
-            return true;
-        }
+        // Appearance — NOT pre-filtered. Evaluated at resolution time via
+        // can_activate_effect so that both self-triggers (Q245) and
+        // group-matching are handled correctly with full resolution context.
         // card_count (all variants — zone counts are stable state checks)
         // Exception: conditions on revealed_cards are NOT event-based because
         // revealed_cards is populated during yell, not at the trigger event.

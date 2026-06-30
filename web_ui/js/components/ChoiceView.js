@@ -15,7 +15,8 @@ export const ChoiceView = {
         if (choice && state?.mode === 'pvp') {
             const viewerPlayerId = `p${State.perspectivePlayer + 1}`;
             if (choice.choice_player_id && choice.choice_player_id !== viewerPlayerId) {
-                if (!useModal) {
+                const _isMobile = typeof window.__isMobile === 'function' ? window.__isMobile() : false;
+                if (!_isMobile) {
                     const waitDiv = document.createElement('div');
                     waitDiv.className = 'pending-choice-indicator';
                     waitDiv.innerHTML = `<div style="font-weight:bold; color:#ffcc00; padding:20px; text-align:center;">Waiting for opponent's choice...</div>`;

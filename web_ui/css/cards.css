@@ -242,39 +242,38 @@
     cursor: pointer !important; 
 }
 
-/* Gold border only: hover highlight (no glow, no movement, no z-index) */
+/* Hand card with no actions — subtle greyscale */
+.card.inert {
+    filter: grayscale(0.35);
+    opacity: 0.75;
+}
+
 .hover-highlight {
-    border: 2px solid var(--accent-gold) !important;
+    border: 2px solid var(--accent-gold);
 }
 
-/* Gold border only: valid target / selected */
-.card.valid-target,
+/* Legacy action selection (window.selectedAction) */
 .card.selected {
-    border: 2px solid var(--accent-gold) !important;
+    border: 2px solid var(--accent-gold);
 }
 
-.card.mulligan-selected {
-    z-index: 100 !important;
-    border: 2px solid var(--accent-pink) !important;
-    box-shadow: var(--glow-pink) !important;
-    filter: grayscale(1) !important;
-    opacity: 0.7 !important;
-    transform: translateY(-2px) scale(1.02) !important;
+/* Selection states — single rule, color via CSS var */
+.card.sel {
+    z-index: 100;
+    border: 2px solid var(--sel-c);
+    box-shadow: 0 0 8px var(--sel-c);
+    filter: grayscale(1);
+    opacity: 0.7;
+    transform: translateY(-2px) scale(1.02);
 }
-.card.mulligan-selected img {
-    filter: grayscale(1) !important;
-}
+.card.sel img { filter: grayscale(1); }
+.card.sel-action { --sel-c: var(--accent-gold); }
+.card.sel-mulligan { --sel-c: var(--accent-pink); }
+.card.sel-live { --sel-c: var(--accent-blue); }
 
-.card.live-card-selected {
-    z-index: 100 !important;
-    border: 2px solid var(--accent-blue) !important;
-    box-shadow: 0 0 8px var(--accent-blue) !important;
-    filter: grayscale(1) !important;
-    opacity: 0.7 !important;
-    transform: translateY(-2px) scale(1.02) !important;
-}
-.card.live-card-selected img {
-    filter: grayscale(1) !important;
+/* Valid target (not selected, just highlight) */
+.card.valid-target {
+    border: 2px solid var(--accent-gold);
 }
 
 /* Gold: Source / Initiator */
@@ -503,8 +502,7 @@
 }
 
 .card.selected-for-play {
-    outline: 1px solid var(--accent-gold);
-    outline-offset: 1px;
+    border: 1px solid var(--accent-gold);
 }
 
 .member-slot.play-target {
