@@ -70,6 +70,7 @@ pub mod hanayo_bp4_constant_test;
 pub mod hanayo_bp6_test;
 pub mod hanayo_test;
 pub mod hasunosora_bp6_test;
+pub mod hasunosora_pb1_test;
 pub mod hazuki_test;
 pub mod heart_override_test;
 pub mod himeno_front_test;
