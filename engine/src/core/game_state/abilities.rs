@@ -1741,7 +1741,29 @@ impl GameState {
     }
 
     pub fn resolve_target_player(&self, target: &str) -> &Player {
-        let master = self.ability_master_id();
+        let master = self.ability_master_id().or_else(|| {
+            self.activating_card.and_then(|cid| {
+                if self.player1.stage.stage.contains(&cid)
+                    || self.player1.live_card_zone.cards.contains(&cid)
+                    || self.player1.success_live_card_zone.cards.contains(&cid)
+                    || self.player1.hand.cards.contains(&cid)
+                    || self.player1.energy_zone.cards.contains(&cid)
+                    || self.player1.waitroom.cards.contains(&cid)
+                {
+                    Some(self.player1.id.clone())
+                } else if self.player2.stage.stage.contains(&cid)
+                    || self.player2.live_card_zone.cards.contains(&cid)
+                    || self.player2.success_live_card_zone.cards.contains(&cid)
+                    || self.player2.hand.cards.contains(&cid)
+                    || self.player2.energy_zone.cards.contains(&cid)
+                    || self.player2.waitroom.cards.contains(&cid)
+                {
+                    Some(self.player2.id.clone())
+                } else {
+                    None
+                }
+            })
+        });
         match (target, master.as_deref()) {
             ("self", Some("player2") | Some("p2")) => &self.player2,
             ("self", _) => &self.player1,
