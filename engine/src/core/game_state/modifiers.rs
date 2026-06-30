@@ -1283,6 +1283,9 @@ impl GameState {
                     effect.exclude_self.unwrap_or(false),
                     effect.self_target.unwrap_or(false),
                     effect.exclude_heart_colors.as_deref().unwrap_or(&[]),
+                    effect.max.unwrap_or(false),
+                    effect.repeat_limit,
+                    &effect.per_unit_heart_colors,
                 );
                 self.ability_queue.pop_constant_context();
                 self.activating_card = prev;

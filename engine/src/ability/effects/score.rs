@@ -236,73 +236,116 @@ impl AbilityResolver {
         exclude_self: bool,
         self_target: bool,
         exclude_heart_colors: &[String],
+        max: bool,
+        repeat_limit: Option<u32>,
+        per_unit_heart_colors: &[String],
     ) -> Result<(), String> {
+        eprintln!("[WZ_ENTER] execute_modify_required_hearts called per_unit={} per_unit_heart_colors={:?}", per_unit, per_unit_heart_colors);
         if per_unit {
             let card_db = &gs.card_database;
             let player = gs.resolve_target_player(target);
 
-            let cards: Vec<i16> = match location {
-                Some("success_live_zone") | Some("success_live_card_zone") => {
-                    player.success_live_card_zone.cards.to_vec()
+            if !per_unit_heart_colors.is_empty() {
+                // Count total heart icon count of specified colors across matching members.
+                // Used for patterns like "そのメンバーが持つheart03 2つにつき" (count heart03 on card).
+                let mut total_hearts = 0u32;
+                let stage_ids: Vec<i16> = player
+                    .stage
+                    .stage
+                    .iter()
+                    .filter(|&&id| id != -1)
+                    .copied()
+                    .collect();
+                for &card_id in &stage_ids {
+                    if exclude_self {
+                        if gs.activating_card == Some(card_id) {
+                            continue;
+                        }
+                    }
+                    if let Some(g) = group_name {
+                        if !util::card_matches_group_str(card_db, card_id, Some(g)) {
+                            continue;
+                        }
+                    }
+                    if let Some(card) = card_db.get_card(card_id) {
+                        if let Some(ref base) = card.base_heart {
+                            for hc_str in per_unit_heart_colors {
+                                let hc: crate::card::HeartColor =
+                                    hc_str.parse().unwrap_or(crate::card::HeartColor::Heart00);
+                                total_hearts += base.hearts.get(&hc).copied().unwrap_or(0);
+                            }
+                        }
+                    }
                 }
-                Some("live_card_zone") | Some("live_zone") => player.live_card_zone.cards.to_vec(),
-                _ => {
-                    // Default: count stage members
-                    player
+                let per_unit_base = if max { 1 } else { value };
+                let mut units = total_hearts / per_unit_count.max(1);
+                if let Some(cap) = repeat_limit {
+                    units = units.min(cap);
+                }
+                value = per_unit_base * units;
+            } else {
+                // Default per-unit: count cards in the specified location.
+                let cards: Vec<i16> = match location {
+                    Some("success_live_zone") | Some("success_live_card_zone") => {
+                        player.success_live_card_zone.cards.to_vec()
+                    }
+                    Some("live_card_zone") | Some("live_zone") => {
+                        player.live_card_zone.cards.to_vec()
+                    }
+                    _ => player
                         .stage
                         .stage
                         .iter()
                         .filter(|&&id| id != -1)
                         .copied()
-                        .collect()
-                }
-            };
-            let activating_id = gs.activating_card;
-            let mut count = 0u32;
-            for &card_id in &cards {
-                if exclude_self {
-                    if activating_id == Some(card_id) {
-                        continue;
-                    }
-                }
-                if let Some(g) = group_name {
-                    if !util::card_matches_group_str(card_db, card_id, Some(g)) {
-                        continue;
-                    }
-                }
-                if let Some(tc) = timing_condition {
-                    if tc == "appeared_or_moved_this_turn" {
-                        let moved = gs.has_card_moved_this_turn(card_id);
-                        let appeared = gs.has_card_appeared_this_turn(card_id);
-                        if !moved && !appeared {
+                        .collect(),
+                };
+                let activating_id = gs.activating_card;
+                let mut count = 0u32;
+                for &card_id in &cards {
+                    if exclude_self {
+                        if activating_id == Some(card_id) {
                             continue;
                         }
                     }
-                }
-                // Exclude members whose ALL base_heart colors are in the exclusion list.
-                // e.g. exclude_heart_colors=["heart01","heart06"] means a member with
-                // only {heart01, heart06} is excluded, but {heart01, heart03, heart06} counts
-                // because heart03 is NOT in the exclusion list.
-                if !exclude_heart_colors.is_empty() {
-                    let card = card_db.get_card(card_id);
-                    if let Some(card) = card {
-                        let all_excluded = card.base_heart.as_ref().map_or(false, |base| {
-                            base.hearts.keys().all(|hc| {
-                                exclude_heart_colors
-                                    .iter()
-                                    .any(|exc| &hc.to_string() == exc)
-                            })
-                        });
-                        if all_excluded {
+                    if let Some(g) = group_name {
+                        if !util::card_matches_group_str(card_db, card_id, Some(g)) {
                             continue;
                         }
                     }
+                    if let Some(tc) = timing_condition {
+                        if tc == "appeared_or_moved_this_turn" {
+                            let moved = gs.has_card_moved_this_turn(card_id);
+                            let appeared = gs.has_card_appeared_this_turn(card_id);
+                            if !moved && !appeared {
+                                continue;
+                            }
+                        }
+                    }
+                    if !exclude_heart_colors.is_empty() {
+                        let card = card_db.get_card(card_id);
+                        if let Some(card) = card {
+                            let all_excluded = card.base_heart.as_ref().map_or(false, |base| {
+                                base.hearts.keys().all(|hc| {
+                                    exclude_heart_colors
+                                        .iter()
+                                        .any(|exc| &hc.to_string() == exc)
+                                })
+                            });
+                            if all_excluded {
+                                continue;
+                            }
+                        }
+                    }
+                    count += 1;
                 }
-                count += 1;
+                let per_unit_base = if max { 1 } else { value };
+                let mut units = count / per_unit_count.max(1);
+                if let Some(cap) = repeat_limit {
+                    units = units.min(cap);
+                }
+                value = per_unit_base * units;
             }
-            // Mirror execute_modify_cost: divide the matched count by per_unit_count
-            // (every N cards) then multiply by the per-unit heart amount (value).
-            value = value * (count / per_unit_count.max(1));
         }
         let card_ids: Vec<i16> = {
             // Include success_live_card_zone only when the activating card

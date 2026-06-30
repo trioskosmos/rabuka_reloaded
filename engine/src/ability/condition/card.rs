@@ -4100,6 +4100,13 @@ impl<'a> ConditionContext<'a> {
         }
 
         let location = condition.location.as_deref().unwrap_or("");
+        // Default to stage when location is empty but position is set
+        // (e.g. "センターエリアにμ'sのメンバーがいる場合" → position=center, location is inferred as stage).
+        let location = if location.is_empty() && condition.position.is_some() {
+            "stage"
+        } else {
+            location
+        };
         match Zone::from_str(location) {
             Some(Zone::Stage) => self.count_group_cards_in_cards(
                 &player.stage.stage,

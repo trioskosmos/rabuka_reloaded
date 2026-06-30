@@ -793,6 +793,10 @@ pub struct AbilityEffect {
     pub options: Option<Vec<AbilityEffect>>,
     pub per_unit_count: Option<u32>,
     pub per_unit_type: Option<String>,
+    /// Heart colors to count for per-unit calculations (e.g. count heart03 on a card).
+    /// Used when per_unit_type is "つ" and the effect counts heart icons, not cards.
+    #[serde(default)]
+    pub per_unit_heart_colors: Vec<String>,
     /// Zone to count cards in for per_unit calculations. When absent, falls back
     /// to the effect's `location` field (or "hand" as default).
     pub per_unit_location: Option<String>,

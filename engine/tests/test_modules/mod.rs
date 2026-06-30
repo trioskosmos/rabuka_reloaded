@@ -315,3 +315,6 @@ pub mod self_control_position_change_test;
 // 桜内梨子 (PL!S-bp5-002) — LiveStart center: left_cost == right_cost → wait opponent low-blade
 // Verifies require_position_cards: both positions must have cards (empty = no trigger)
 pub mod riko_bp5_center_cost_equal_test;
+
+// Wonder zone (PL!-bp5-020-L) — modify_required_hearts per-unit with per_unit_heart_colors + max_repeats
+pub mod wonder_zone_max_repeats_test;

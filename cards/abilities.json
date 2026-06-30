@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-30T23:56:20.915182",
+  "generated_at": "2026-07-01T01:06:16.119114",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -20700,6 +20700,14 @@
         "self_target": true,
         "per_unit": true,
         "per_unit_type": "heart_colors",
+        "per_unit_heart_colors": [
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06"
+        ],
         "group_names": [
           "虹ヶ咲"
         ],
@@ -25203,7 +25211,8 @@
         "optional": true,
         "type": "pay_energy",
         "energy": 1,
-        "zone": "energy_zone"
+        "zone": "energy_zone",
+        "max": true
       },
       "effect": {
         "text": "支払った{{icon_energy.png|E}}につき、{{icon_blade.png|ブレード}}を得る",
@@ -25707,15 +25716,20 @@
       "effect": {
         "text": "自分のセンターエリアに『μ's』のメンバーがいる場合、そのメンバーが持つ{{heart_03.png|heart03}}2つにつき、このカードの必要ハートを{{heart_00.png|heart0}}減らす。この能力では{{heart_00.png|heart0}}は3つまでしか減らない",
         "count": 3,
+        "max": true,
         "action": "modify_required_hearts",
         "heart_colors": [
           "heart00"
         ],
         "operation": "decrease",
+        "max_repeats": 3,
         "self_target": true,
         "per_unit": true,
         "per_unit_count": 2,
         "per_unit_type": "つ",
+        "per_unit_heart_colors": [
+          "heart03"
+        ],
         "card_type": "member_card",
         "condition": {
           "text": "自分のセンターエリアに『μ's』のメンバーがいる場合",
@@ -28443,11 +28457,13 @@
       "effect": {
         "text": "自分がエールしたとき、ライブ終了時まで、エールにより公開された自分のカードの中のライブカード1枚につき、{{heart_02.png|heart02}}を得る。この能力では{{heart_02.png|heart02}}は3つまでしか得られない",
         "count": 3,
+        "max": true,
         "action": "gain_resource",
         "resource": "heart",
         "heart_colors": [
           "heart02"
         ],
+        "max_repeats": 3,
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",

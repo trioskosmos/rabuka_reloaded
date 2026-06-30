@@ -338,6 +338,9 @@ impl AbilityResolver {
                 effect.exclude_self.unwrap_or(false),
                 effect.self_target.unwrap_or(false),
                 effect.exclude_heart_colors.as_deref().unwrap_or(&[]),
+                effect.max.unwrap_or(false),
+                effect.repeat_limit,
+                &effect.per_unit_heart_colors,
             ),
             ActionType::SetCost => {
                 self.execute_set_cost(gs, effect, effect.value.unwrap_or(0));

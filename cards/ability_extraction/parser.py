@@ -305,7 +305,7 @@ def strip_parenthetical(text: str) -> str:
 
 def extract_max(text: str) -> bool:
     """Check if count has 'max' modifier (まで)."""
-    return "人まで" in text or "枚まで" in text
+    return "人まで" in text or "枚まで" in text or "つまで" in text or "個まで" in text
 
 
 def categorize_quoted_text(quoted_text: List[str]) -> Dict[str, List[str]]:
@@ -746,6 +746,8 @@ def parse_cost(text: str) -> Dict[str, Any]:
             cost["optional"] = True
         if "好きな数" in text or "任意の数" in text:
             cost["any_number"] = True
+        if extract_max(text):
+            cost["max"] = True
         return cost
 
     # Sequential cost (～し、～ or ～て、～)
@@ -4667,7 +4669,13 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
                     g for g in action["group_names"] if g not in exc_gns
                 ]
     # per_unit_type: detect heart colors vs member counts
-    if a in ("modify_score", "gain_resource", "modify_cost", "perform_yell"):
+    if a in (
+        "modify_score",
+        "gain_resource",
+        "modify_cost",
+        "perform_yell",
+        "modify_required_hearts",
+    ):
         if action.get("per_unit"):
             if "色につき" in text or "色に付き" in text:
                 action["per_unit_type"] = "heart_colors"
@@ -4680,7 +4688,7 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
             if "これにより" in text and ("置いた" in text or "置かれた" in text):
                 action["per_unit_source"] = "previous_moved_cards"
         # Issue 15: max_repeats from "N枚までしか" / "N回までしか" patterns
-        max_m = re.search(r"(\d+)(枚|回)までしか", text)
+        max_m = re.search(r"(\d+)(?:枚|回|つ)までしか", text)
         if not max_m:
             max_m = re.search(r"(\d+)までしか", text)
         if max_m:
@@ -5247,6 +5255,23 @@ def _try_per_unit(text):
     gm = re.search(r"『([^』]+)』", remaining_per_text)
     if gm:
         result["group_names"] = [gm.group(1)]
+    # Extract heart colors from per_text for per-unit counting (e.g. heart03 from "そのメンバーが持つ{{heart_03.png|heart03}}2つ")
+    # Exclude heart colors in exclusion patterns (e.g. "heart01とheart06以外の色" — those are excluded colors, not counted)
+    per_heart_matches = re.findall(r"\{\{heart_(\d+)\.png\|heart(\d+)\}\}", per_text)
+    if per_heart_matches:
+        colors = sorted(set(f"heart{m.zfill(2)}" for _, m in per_heart_matches))
+        # Remove colors that appear in "以外" exclusion context
+        igai_before = per_text.split("以外")[0] if "以外" in per_text else ""
+        excluded_colors = set()
+        if igai_before:
+            exc_matches = re.findall(
+                r"\{\{heart_(\d+)\.png\|heart(\d+)\}\}", igai_before
+            )
+            excluded_colors = set(f"heart{m.zfill(2)}" for _, m in exc_matches)
+        counted_colors = [c for c in colors if c not in excluded_colors]
+        if counted_colors:
+            result["per_unit_heart_colors"] = counted_colors
+
     if "名前の異なる" in per_text or "カード名の異なる" in per_text:
         result["distinct"] = "card_name"
 
@@ -5373,6 +5398,7 @@ def _try_per_unit(text):
                 "per_unit",
                 "per_unit_count",
                 "per_unit_type",
+                "per_unit_heart_colors",
                 "card_type",
                 "group_names",
                 "exclude_group_names",
@@ -5448,8 +5474,8 @@ def _try_per_unit(text):
     # Issue 15: Extract per_unit_source from "これにより控え室に置いた" patterns
     if "これにより" in text and ("置いた" in text or "置かれた" in text):
         action["per_unit_source"] = "previous_moved_cards"
-    # Issue 15: Extract max_repeats from "N枚/回までしか" patterns
-    max_m = re.search(r"(\d+)(枚|回)までしか", text)
+    # Issue 15: Extract max_repeats from "N枚/回/つまでしか" patterns
+    max_m = re.search(r"(\d+)(?:枚|回|つ)までしか", text)
     if not max_m:
         max_m = re.search(r"(\d+)までしか", text)
     if max_m:
@@ -5465,6 +5491,7 @@ def _propagate(src, dst):
         "per_unit",
         "per_unit_count",
         "per_unit_type",
+        "per_unit_heart_colors",
         "card_type",
         "group_names",
         "exclude_group_names",
@@ -5493,6 +5520,7 @@ def _propagate_if_missing(src, dst):
         "per_unit",
         "per_unit_count",
         "per_unit_type",
+        "per_unit_heart_colors",
         "card_type",
         "group_names",
         "exclude_group_names",
