@@ -36,6 +36,7 @@ from parser import (
     parse_effect,
     _normalize_effect_tree,
     _collapse_to_effect_steps,
+    _enrich_effect_type,
 )
 
 TRIGGER_PATTERN = re.compile(r"\{\{([^|]+)\|([^}]+)\}\}")
@@ -309,34 +310,6 @@ def _normalize_heart_notation(text: str) -> str:
         return m.group(0)
 
     return _JP_HEART_RE.sub(_repl, text)
-
-
-def _enrich_effect_type(effect, triggerless=""):
-    """Extract heart colors from ability text. effect_type is NOT set here
-    (the trigger field already implies whether it's continuous or triggered)."""
-    if effect is None:
-        return
-    heart_colors = []
-    seen = set()
-    for m in re.findall(r"{{heart_(\d+)\.png\|heart\d+}}", triggerless):
-        h = f"heart{m.zfill(2)}"
-        if h not in seen:
-            seen.add(h)
-            heart_colors.append(h)
-    if heart_colors and "heart_colors" not in effect:
-        effect["heart_colors"] = heart_colors
-    # Propagate heart_colors into location_condition for collective heart checks.
-    # Skip check_self conditions -- they check a specific card's location, not
-    # collective heart presence; heart_colors there is effect metadata leakage.
-    if "heart_colors" in effect and "condition" in effect:
-        cond = effect["condition"]
-        if (
-            isinstance(cond, dict)
-            and cond.get("type") == "location_condition"
-            and "heart_colors" not in cond
-            and not cond.get("check_self")
-        ):
-            cond["heart_colors"] = effect["heart_colors"]
 
 
 def extract_all_abilities(cards_file: Path) -> dict:

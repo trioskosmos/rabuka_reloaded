@@ -23,6 +23,14 @@ from parser_utils import (
     extract_group_name,
     normalize_fullwidth_digits,
     strip_suffix_period,
+    extract_by_pattern,
+    extract_source,
+    extract_destination,
+    extract_target,
+    extract_card_type,
+    extract_operator,
+    extract_cost_limit,
+    detect_require_all_hearts,
     SOURCE_PATTERNS,
     DESTINATION_PATTERNS,
     STATE_CHANGE_PATTERNS,
@@ -154,53 +162,6 @@ REGEX_DECK_POSITION = r"(\d+)枚目"
 # ====================================================================
 
 
-def extract_by_pattern(text: str, patterns: List[Tuple[str, str]]) -> Optional[str]:
-    """Generic function to extract value by matching patterns."""
-    for pattern, code in patterns:
-        if pattern in text:
-            return code
-    return None
-
-
-def extract_source(text: str) -> Optional[str]:
-    """Extract source location (FROM).
-    Uses SOURCE_PATTERNS which are ordered by specificity (longest/most-specific first).
-    """
-    return extract_by_pattern(text, SOURCE_PATTERNS)
-
-
-def extract_destination(text: str) -> Optional[str]:
-    """Extract destination location (TO).
-    Uses DESTINATION_PATTERNS which are ordered by specificity (longest/most-specific first).
-    Note: Some compound patterns (e.g. エネルギーカードを1枚ウェイト状態で置いてもよい)
-    are handled here because they need regex or multi-condition matching.
-    """
-    # Check specific patterns FIRST — they are more specific than the fallbacks below.
-    # e.g. "いたエリアに登場させる" should match "same_area", not "stage".
-    pattern_result = extract_by_pattern(text, DESTINATION_PATTERNS)
-    if pattern_result:
-        return pattern_result
-
-    # Special cases needing regex or compound matching (only if patterns didn't match)
-    m = re.search(r"デッキの一番上から(\d+)枚目に置(?:いてもよい|く)", text)
-    if m:
-        return "deck"
-    if "エネルギーカードを1枚ウェイト状態で置いてもよい" in text:
-        return "energy_zone"
-    if (
-        "メンバーのいないエリアに登場させる" in text
-        or "メンバーのいないエリアにウェイト状態で登場させる" in text
-    ):
-        return "empty_area"
-    if "ウェイト状態で置く" in text or (
-        "エネルギーカードを" in text and ("置く" in text or "置いてもよい" in text)
-    ):
-        return "energy_zone"
-    if "登場させる" in text:
-        return "stage"
-    return None
-
-
 def extract_location(text: str) -> Optional[str]:
     """Extract location (general)."""
     return extract_by_pattern(text, LOCATION_PATTERNS)
@@ -212,8 +173,6 @@ def extract_locations(text: str) -> Optional[List[str]]:
     for pattern, loc_name in LOCATION_PATTERNS:
         if pattern in text:
             locs.append(loc_name)
-    # Deduplicate: if success_live_card_zone is present, remove live_card_zone
-    # since "成功ライブカード置き場" contains "ライブカード置き場" as substring
     if "success_live_card_zone" in locs and "live_card_zone" in locs:
         locs = [l for l in locs if l != "live_card_zone"]
     if len(locs) >= 2:
@@ -224,59 +183,6 @@ def extract_locations(text: str) -> Optional[List[str]]:
 def extract_state_change(text: str) -> Optional[str]:
     """Extract state change (wait/active)."""
     return extract_by_pattern(text, STATE_CHANGE_PATTERNS)
-
-
-def extract_card_type(text: str) -> Optional[str]:
-    """Extract card type."""
-    return extract_by_pattern(text, CARD_TYPE_PATTERNS)
-
-
-def extract_target(text: str) -> Optional[str]:
-    """Extract target (self/opponent/both/either).
-    'both' means the action applies to or involves both players.
-    Used for both action target and condition scope."""
-    # "自分のカードの効果" (my card's effect) refers to the effect source,
-    # not the target location — exclude this pattern from "both" detection.
-    text_for_target = text.replace("自分のカードの効果", "")
-    if (
-        ("自分の" in text_for_target and "相手の" in text_for_target)
-        or "自分と相手の" in text
-        or "自分と相手は" in text
-        or "自分と対戦相手は" in text
-        or "自分と対戦相手の" in text
-        or "自分と対戦相手" in text
-    ):
-        return "both"
-    if "自分か相手の" in text:
-        return "either"
-    if "相手の" in text:
-        return "opponent"
-    if "自分の" in text:
-        return "self"
-    return None
-
-
-def extract_operator(text: str) -> Optional[str]:
-    """Extract comparison operator."""
-    return extract_by_pattern(text, OPERATOR_PATTERNS)
-
-
-def extract_cost_limit(text: str) -> Optional[Union[int, List[int]]]:
-    """Extract cost limit."""
-    for pat in [
-        r"元々のコスト[がは](\d+)(?:以上|以下|未満|超)",
-        r"(\d+)コスト(?:以上|以下|未満|超)",
-        r"コスト(\d+)(?:以上|以下|未満|超)",
-        r"コスト[がは](\d+)(?:以上|以下|未満|超)",
-        r"(\d+)\s*以下",
-        r"以下\s*(\d+)",
-        r"(\d+)\s*合計",
-        r"コスト(\d+)の",
-    ]:  # e.g. "コスト10の" → limit to cost=10
-        m = re.search(pat, text)
-        if m:
-            return int(m.group(1))
-    return None
 
 
 def extract_cost_range(text: str) -> Optional[Dict[str, int]]:
@@ -376,30 +282,6 @@ def extract_group_names(text: str) -> List[str]:
 def extract_heart_types(text: str) -> List[str]:
     """Extract heart type identifiers (e.g. heart02, heart01) from icon markup."""
     return re.findall(r"heart_(\d+)\.png\|heart(\d+)", text)  # type: ignore[return-value]
-
-
-def detect_require_all_hearts(text: str) -> bool:
-    """Detect if heart icons in text are joined by と (AND / all required).
-
-    Card text patterns:
-      {{heart_02.png|heart02}}と{{heart_04.png|heart04}}と{{heart_05.png|heart05}}をすべて持つ
-        → AND semantics (card must have ALL listed hearts)
-
-      {{heart_02.png|heart02}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}を持つ
-        → OR semantics (any match, this is the default)
-
-    Returns True if consecutive heart icon blocks are joined by と.
-    """
-    heart_block = r"\{\{heart_\d+\.png\|heart\d+\}\}"
-    hearts = re.findall(heart_block, text)
-    if len(hearts) < 2:
-        return False
-    for i in range(len(hearts) - 1):
-        if not re.search(
-            re.escape(hearts[i]) + r"\s*と\s*" + re.escape(hearts[i + 1]), text
-        ):
-            return False
-    return True
 
 
 def extract_quoted_text(text: str) -> List[str]:
@@ -10237,6 +10119,32 @@ def _validate_effect(eff, context=""):
         elif isinstance(sub, list):
             for item in sub:
                 _validate_effect(item, context)
+
+
+def _enrich_effect_type(effect, triggerless=""):
+    """Extract heart colors from ability text after parsing.
+    This is called by the extraction pipeline (extract_card_abilities.py)
+    to patch a parser gap: heart_colors not propagated to conditions."""
+    if effect is None:
+        return
+    heart_colors = []
+    seen = set()
+    for m in re.findall(r"{{heart_(\d+)\.png\|heart\d+}}", triggerless):
+        h = f"heart{m.zfill(2)}"
+        if h not in seen:
+            seen.add(h)
+            heart_colors.append(h)
+    if heart_colors and "heart_colors" not in effect:
+        effect["heart_colors"] = heart_colors
+    if "heart_colors" in effect and "condition" in effect:
+        cond = effect["condition"]
+        if (
+            isinstance(cond, dict)
+            and cond.get("type") == "location_condition"
+            and "heart_colors" not in cond
+            and not cond.get("check_self")
+        ):
+            cond["heart_colors"] = effect["heart_colors"]
 
 
 def _validate_semantic(abilities):

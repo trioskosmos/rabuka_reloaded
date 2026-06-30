@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-30T11:15:56.615100",
+  "generated_at": "2026-06-30T11:40:05.762092",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1626,7 +1626,7 @@
           "reference": "previous_reveal"
         },
         "count": 1,
-        "card_type": "member_card",
+        "card_type": "live_card",
         "target": "self",
         "group_names": [
           "Aqours"
@@ -4568,7 +4568,7 @@
           "calculation": "add",
           "calculation_value": 1
         },
-        "card_type": "member_card",
+        "card_type": "energy_card",
         "target": "self",
         "action": "place_energy_under_member",
         "energy_count": 1,
@@ -6516,7 +6516,7 @@
           "text": "自分のステージにほかのメンバーがおり、かつこれにより公開した手札の中にライブカードがない場合",
           "target": "self",
           "location": "hand",
-          "card_type": "member_card"
+          "card_type": "live_card"
         },
         "look_action": {
           "text": "自分のデッキの上からカードを5枚見る。",
@@ -14870,7 +14870,7 @@
           "count": 2,
           "operator": ">=",
           "text": "このメンバーの下にエネルギーカードが2枚以上置かれているかぎり",
-          "card_type": "member_card",
+          "card_type": "energy_card",
           "location": "energy_zone"
         },
         "duration": "as_long_as",
@@ -16363,7 +16363,7 @@
           "text": "自分のステージに『蓮ノ空』のメンバーが3人以上いて、かつ自分の控え室にカード名に「DreamBelievers」を含むライブカードがある場合",
           "target": "self",
           "location": "discard",
-          "card_type": "member_card",
+          "card_type": "live_card",
           "group_names": [
             "蓮ノ空"
           ],
@@ -23806,7 +23806,7 @@
           "text": "自分の成功ライブカード置き場のカードが0枚で、かつ自分のステージにいるメンバーが『lilywhite』のみの場合",
           "target": "self",
           "location": "success_live_card_zone",
-          "card_type": "member_card",
+          "card_type": "live_card",
           "group_names": [
             "lilywhite"
           ]
@@ -24189,7 +24189,7 @@
           "text": "このカードが自分の成功ライブカード置き場にあり、かつ自分のステージに『μ's』のメンバーがいるかぎり",
           "target": "self",
           "location": "success_live_card_zone",
-          "card_type": "member_card",
+          "card_type": "live_card",
           "group_names": [
             "μ's"
           ]
@@ -26211,7 +26211,7 @@
           "target": "self",
           "location": "stage",
           "resource_type": "energy",
-          "card_type": "member_card",
+          "card_type": "energy_card",
           "type": "comparison_condition"
         },
         "action": "gain_resource",
@@ -26408,7 +26408,7 @@
           "text": "自分か相手の成功ライブカード置き場にカードが2枚以上あり、かつ自分のステージに名前の異なるメンバーが3人以上いる場合",
           "target": "both",
           "location": "success_live_card_zone",
-          "card_type": "member_card",
+          "card_type": "live_card",
           "distinct": "card_name"
         },
         "action": "modify_score",

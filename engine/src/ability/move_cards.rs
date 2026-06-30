@@ -472,7 +472,7 @@ impl AbilityResolver {
             if matching.is_empty() {
                 return Ok(vec![]);
             }
-            if (take_count < matching.len() || can_skip) && can_skip {
+            if take_count < matching.len() || can_skip {
                 self.prompt_card_selection(
                     "revealed_cards",
                     take_count,
@@ -502,6 +502,15 @@ impl AbilityResolver {
                     gs.player1.main_deck.cards.remove(pos);
                 } else if let Some(pos) = gs.player2.main_deck.cards.iter().position(|&c| c == id) {
                     gs.player2.main_deck.cards.remove(pos);
+                }
+            }
+            // Remove from waitroom too — yell cards went to waitroom after
+            // check_live_success drained the resolution zone (Rule 8.4.7).
+            for &id in &taken {
+                if let Some(pos) = gs.player1.waitroom.cards.iter().position(|&c| c == id) {
+                    gs.player1.waitroom.cards.remove(pos);
+                } else if let Some(pos) = gs.player2.waitroom.cards.iter().position(|&c| c == id) {
+                    gs.player2.waitroom.cards.remove(pos);
                 }
             }
             return Ok(taken);
@@ -1721,6 +1730,19 @@ impl AbilityResolver {
             }
             result
         };
+        // Remove from physical zone (waitroom for yell cards,
+        // hand for cost reveals, deck for deck-peek reveals).
+        for &cid in &cards {
+            if let Some(pos) = gs.player1.waitroom.cards.iter().position(|&c| c == cid) {
+                gs.player1.waitroom.cards.remove(pos);
+            } else if let Some(pos) = gs.player2.waitroom.cards.iter().position(|&c| c == cid) {
+                gs.player2.waitroom.cards.remove(pos);
+            } else if let Some(pos) = gs.player1.main_deck.cards.iter().position(|&c| c == cid) {
+                gs.player1.main_deck.cards.remove(pos);
+            } else if let Some(pos) = gs.player2.main_deck.cards.iter().position(|&c| c == cid) {
+                gs.player2.main_deck.cards.remove(pos);
+            }
+        }
         // Don't set self.selected_cards here — cards moved from
         // revealed_cards are effect-internal (not user-targeted
         // selections), and would bleed into downstream gain_resource

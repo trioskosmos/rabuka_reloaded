@@ -242,11 +242,21 @@ fn poppin_multiple_niji_revealed_picks_one() {
     game.pass();
     game.pass();
     game.pass();
+    // Choice: select first matching niji card from revealed
+    game.select_indices(&[0]);
 
     assert_eq!(
         game.state.player1.hand.cards.len() - hand_before,
         1,
         "Exactly 1 card should be added to hand"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&niji_a),
+        "niji_a should be in hand"
+    );
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&niji_a),
+        "niji_a should be removed from waitroom (no duplication)"
     );
 }
 

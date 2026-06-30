@@ -1284,7 +1284,8 @@ impl super::resolver::AbilityResolver {
         validate_card: &mut impl FnMut(i16) -> bool,
         dst_str: &str,
     ) -> Result<(), String> {
-        let moved = self.move_from_revealed(gs, &ctx.indices, validate_card, dst_str);
+        let mapped = ctx.mfi(&ctx.indices);
+        let moved = self.move_from_revealed(gs, &mapped, validate_card, dst_str);
         // Apply resource_on_select if present — grants resource (e.g. blade)
         // automatically when a card is selected from revealed_cards.
         if let Some(ref res) = self
