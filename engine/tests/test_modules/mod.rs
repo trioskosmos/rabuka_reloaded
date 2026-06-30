@@ -92,6 +92,7 @@ pub mod kanon_test;
 pub mod kasumi_test;
 pub mod keke_bp5_test;
 pub mod kinako_bp5_test;
+pub mod kinako_each_time_blade_test;
 pub mod kinako_hs_test;
 pub mod kinako_sakurakoji_test;
 pub mod kinako_test;

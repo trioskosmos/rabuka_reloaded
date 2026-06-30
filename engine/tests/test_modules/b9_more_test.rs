@@ -102,13 +102,95 @@ fn kaguya_live_success_cheer_recover() {
     );
 }
 
-/// PL!S-bp2-022-L (未熟DREAMER) Q36: LiveSuccess timing.
+/// PL!S-bp2-022-L (未熟DREAMER) — deck refresh condition
 #[test]
-fn mijuku_dreamer_live_success_timing() {
+fn mijuku_dreamer_no_refresh_no_bonus() {
     let db = load_real_database();
-    let card = db.get_card_id("PL!S-bp2-022-L").expect("Card exists");
-    let c = db.get_card(card).expect("Mijuku card should exist");
-    assert!(!c.abilities.is_empty());
+    let mut game = TestGame::new(db.clone());
+    let mijuku = game.id("PL!S-bp2-022-L");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.main_deck.cards = vec![filler; 10].into();
+    game.state.player1.success_live_card_zone.cards.push(mijuku);
+
+    let card = game.db.get_card(mijuku).unwrap();
+    let ab = card
+        .abilities
+        .iter()
+        .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
+        .cloned()
+        .unwrap();
+    let pid = game.state.player1.id.clone();
+    game.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ab.full_text),
+        rabuka_engine::core::types::AbilityTrigger::LiveSuccess,
+        pid.clone(),
+        Some(card.card_no.clone()),
+        Some(mijuku),
+        None,
+        None,
+    );
+    game.state.activating_card = Some(mijuku);
+    game.state.process_pending_auto_abilities(&pid);
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(mijuku),
+        0,
+        "no refresh this turn → no score bonus"
+    );
+}
+
+/// Natural refresh via PL!-sd1-008-SD mill-10 from a 3-card deck.
+#[test]
+fn mijuku_dreamer_refresh_via_mill_gets_bonus() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let mijuku = game.id("PL!S-bp2-022-L");
+    let hanayo = game.id("PL!-sd1-008-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[0] = hanayo;
+    game.give_energy(2);
+    game.state.player1.main_deck.cards = vec![filler; 3].into();
+    game.state.player1.waitroom.cards = vec![filler; 10].into();
+    game.state.player1.success_live_card_zone.cards.push(mijuku);
+    game.state.player1.deck_refreshed_this_turn = false;
+
+    game.activate_ability(hanayo);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert!(
+        game.state.player1.deck_refreshed_this_turn,
+        "deck refresh must occur during mill-10 overdraw"
+    );
+
+    let card = game.db.get_card(mijuku).unwrap();
+    let ab = card
+        .abilities
+        .iter()
+        .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
+        .cloned()
+        .unwrap();
+    let pid = game.state.player1.id.clone();
+    game.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ab.full_text),
+        rabuka_engine::core::types::AbilityTrigger::LiveSuccess,
+        pid.clone(),
+        Some(card.card_no.clone()),
+        Some(mijuku),
+        None,
+        None,
+    );
+    game.state.activating_card = Some(mijuku);
+    game.state.process_pending_auto_abilities(&pid);
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(mijuku),
+        2,
+        "deck refreshed this turn → +2 score"
+    );
 }
 
 use rabuka_engine::card::HeartColor;

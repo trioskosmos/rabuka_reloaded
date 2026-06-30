@@ -946,6 +946,7 @@ impl GameState {
         if is_area_move {
             self.turn_area_movements.push(event);
             self.position_change_occurred_this_turn = true;
+            self.batch_area_moved_cards.insert(moved_card_id);
         }
         // Track in cards_moved_this_turn for fast O(1) lookups
         self.cards_moved_this_turn.insert(moved_card_id);

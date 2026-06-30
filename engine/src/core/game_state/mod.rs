@@ -79,6 +79,10 @@ pub struct GameState {
     /// Cleared at the end of each ability batch process (after post-loop TAS scan
     /// in process_player_abilities), NOT in clear_effect_tracking.
     pub position_change_events: Vec<crate::types::PositionChangeEvent>,
+    /// Batch-scoped set of cards that moved stage→stage in the current batch.
+    /// Populated by push_movement_event and position change executors.
+    /// Cleared at the same points as position_change_events.
+    pub batch_area_moved_cards: std::collections::HashSet<i16>,
     /// Detailed event log for per-batch tracking: cards moved in the current
     /// cost/effect batch, what caused the move (cause_card_id), etc.
     /// recently_moved_cards/from_zone are synced from this vec.
@@ -262,6 +266,7 @@ impl GameState {
             recently_moved_cards: None,
             recently_moved_from_zone: None,
             position_change_events: Vec::new(),
+            batch_area_moved_cards: std::collections::HashSet::new(),
             batch_movements: Vec::new(),
             turn_area_movements: Vec::new(),
             turn_movements: Vec::new(),

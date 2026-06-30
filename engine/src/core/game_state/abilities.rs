@@ -1081,14 +1081,17 @@ impl GameState {
             self.recently_moved_cards = None;
             self.recently_state_changed.clear();
             self.recently_moved_from_zone = None;
-            self.batch_movements.clear();
-            self.position_change_events.clear();
-            self.this_batch_triggered_ability_ids.clear();
             // Re-enter the loop to process any abilities just enqueued
             // by the watcher scan (e.g. Hazuki Ren each_time after discard).
+            // Keep this_batch_triggered_ability_ids alive through the recursive
+            // call so the same ability isn't enqueued twice from stale events.
             if !self.has_pending_choice() {
                 self.process_player_abilities(player_id);
             }
+            self.batch_movements.clear();
+            self.position_change_events.clear();
+            self.batch_area_moved_cards.clear();
+            self.this_batch_triggered_ability_ids.clear();
         }
     }
 
