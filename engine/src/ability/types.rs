@@ -432,6 +432,7 @@ impl Choice {
                 exclude_names: None,
                 heart_colors: &[],
                 require_all_heart_colors: false,
+                heart_color_count: None,
                 name_fragments: None,
                 distinct: None,
                 exclude_self: None,

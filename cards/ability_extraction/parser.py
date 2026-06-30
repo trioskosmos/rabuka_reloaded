@@ -2839,9 +2839,9 @@ def _enrich_card_count_condition(result, text):
     # Revealed cards context
     if "エールにより公開された" in text or "これにより公開された" in text:
         result["location"] = "revealed_cards"
-    # Generic card_type/location/target
+    # Generic card_type/location/target (don't re-add if or_card_types is already set)
     ct = extract_card_type(text)
-    if ct:
+    if ct and "or_card_types" not in result:
         zone_keywords = ["置き場", "ゾーン"]
         if not any(kw in text for kw in zone_keywords):
             result["card_type"] = ct
@@ -4699,7 +4699,7 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
                 action["cost_reference"] = "previous_moved_card"
                 action["cost_offset"] = int(m.group(1))
                 action.setdefault("cost_limit_operator", "=")
-        if "card_type" not in action:
+        if "card_type" not in action and "or_card_types" not in action:
             ct = _infer_card_type(text, action)
             if ct:
                 action["card_type"] = ct
@@ -5969,6 +5969,21 @@ def _add_or_card_types_if_needed(d, text):
             d.pop("card_type", None)
 
 
+def _add_heart_color_threshold(d, text):
+    """Extract heart color count threshold from patterns like 'heart05を2個以上' or 'heart05を2以上'.
+    Stores as heart_color_count on the dict."""
+    if "heart_color_count" in d or "heart_colors" not in d:
+        return
+    m = re.search(
+        r"\{\{heart_(\d+)\.png\|heart\d+\}\}を(\d+)(?:個)?以上",
+        text,
+    )
+    if m:
+        count = int(m.group(2))
+        if count > 0:
+            d["heart_color_count"] = count
+
+
 def _enrich_from_text(d, text):
     """Add common fields (count, max, card_type, heart_colors, optional, group_names, cost_limit) from text."""
     c = extract_count(text)
@@ -5977,13 +5992,14 @@ def _enrich_from_text(d, text):
     if extract_max(text):
         d["max"] = True
     ct = extract_card_type(text)
-    if ct:
+    if ct and "or_card_types" not in d:
         d["card_type"] = ct
     hc = list(
         dict.fromkeys(f"heart{m.zfill(2)}" for m in re.findall(r"heart_(\d+)", text))
     )
     if hc:
         d["heart_colors"] = hc
+        _add_heart_color_threshold(d, text)
         if detect_require_all_hearts(text):
             d["require_all_heart_colors"] = True
     if extract_optional(text):
@@ -6166,6 +6182,7 @@ def _build_look_select_actions_inner(select_text):
                 )
                 if hc:
                     result["heart_colors"] = hc
+                _add_heart_color_threshold(result, select_text)
                 ct = extract_card_type(select_text)
                 if ct:
                     result["card_type"] = ct

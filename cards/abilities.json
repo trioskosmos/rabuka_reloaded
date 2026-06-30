@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-30T12:09:39.257017",
+  "generated_at": "2026-06-30T20:20:44.951277",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -22451,11 +22451,11 @@
           "heart_colors": [
             "heart04"
           ],
+          "heart_color_count": 2,
           "or_card_types": [
             "live_card",
             "member_card"
           ],
-          "card_type": "member_card",
           "optional": true,
           "cost_limit_operator": ">="
         },
@@ -22503,11 +22503,11 @@
           "heart_colors": [
             "heart02"
           ],
+          "heart_color_count": 2,
           "or_card_types": [
             "live_card",
             "member_card"
           ],
-          "card_type": "member_card",
           "optional": true,
           "cost_limit_operator": ">="
         },
@@ -22555,11 +22555,11 @@
           "heart_colors": [
             "heart05"
           ],
+          "heart_color_count": 2,
           "or_card_types": [
             "live_card",
             "member_card"
           ],
-          "card_type": "member_card",
           "optional": true,
           "cost_limit_operator": ">="
         },

@@ -675,6 +675,8 @@ pub struct CardFilter<'a> {
     /// When true, card must match ALL heart_colors (AND).
     /// When false, card matches ANY heart_colors (OR, default).
     pub require_all_heart_colors: bool,
+    /// Minimum count per heart color (e.g. 2 for "heart05を2個以上").
+    pub heart_color_count: Option<u32>,
     pub need_heart_total: Option<u32>,
     pub need_heart_operator: Option<&'a str>,
     pub need_heart_color: Option<&'a str>,
@@ -892,6 +894,43 @@ impl<'a> CardFilter<'a> {
                 card_matches_heart_colors(db, id, self.heart_colors)
             };
             if !matches {
+                return false;
+            }
+        }
+        // Heart color count threshold check (e.g. "heart05を2個以上").
+        if let Some(min_count) = self.heart_color_count {
+            let passes = if self.require_all_heart_colors {
+                self.heart_colors.iter().all(|color| {
+                    let hc = crate::zones::parse_heart_color(color);
+                    let base_amount = db
+                        .get_card(id)
+                        .and_then(|c| c.base_heart.as_ref())
+                        .map(|bh| *bh.hearts.get(&hc).unwrap_or(&0))
+                        .unwrap_or(0);
+                    let need_amount = db
+                        .get_card(id)
+                        .and_then(|c| c.need_heart.as_ref())
+                        .map(|nh| *nh.hearts.get(&hc).unwrap_or(&0))
+                        .unwrap_or(0);
+                    base_amount.max(need_amount) >= min_count
+                })
+            } else {
+                self.heart_colors.iter().any(|color| {
+                    let hc = crate::zones::parse_heart_color(color);
+                    let base_amount = db
+                        .get_card(id)
+                        .and_then(|c| c.base_heart.as_ref())
+                        .map(|bh| *bh.hearts.get(&hc).unwrap_or(&0))
+                        .unwrap_or(0);
+                    let need_amount = db
+                        .get_card(id)
+                        .and_then(|c| c.need_heart.as_ref())
+                        .map(|nh| *nh.hearts.get(&hc).unwrap_or(&0))
+                        .unwrap_or(0);
+                    base_amount.max(need_amount) >= min_count
+                })
+            };
+            if !passes {
                 return false;
             }
         }
@@ -1134,6 +1173,7 @@ impl<'a> CardFilter<'a> {
             exclude_group_names: effect.exclude_group_names.as_ref(),
             heart_colors: &effect.heart_colors,
             require_all_heart_colors: effect.require_all_heart_colors.unwrap_or(false),
+            heart_color_count: effect.heart_color_count,
             need_heart_total: effect.need_heart_total,
             need_heart_operator: effect.need_heart_operator.as_deref(),
             need_heart_color: effect.need_heart_color.as_deref(),
@@ -1190,6 +1230,7 @@ impl<'a> CardFilter<'a> {
                 exclude_names: None,
                 heart_colors: &[],
                 require_all_heart_colors: false,
+                heart_color_count: None,
                 name_fragments: None,
                 distinct: None,
                 exclude_self: None,

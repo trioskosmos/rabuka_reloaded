@@ -775,6 +775,10 @@ pub struct AbilityEffect {
     /// When false/absent, card must have ANY listed heart_colors (OR semantics, default).
     #[serde(default)]
     pub require_all_heart_colors: Option<bool>,
+    /// Minimum count per heart color (e.g. 2 for "heart05を2個以上").
+    /// When set, the card must have at least this many hearts of the specified color(s).
+    #[serde(default)]
+    pub heart_color_count: Option<u32>,
     /// Card names to filter by (e.g. `["EMOTION"]`).  When set, per-unit
     /// counting and effect targeting only consider cards whose name
     /// contains one of these strings (case-insensitive substring match).
