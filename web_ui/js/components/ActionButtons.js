@@ -107,7 +107,7 @@ export const ActionButtons = {
             }
         }
         // For JP mode with a card, engine description is English — use card name instead
-        if (currentLang === 'jp' && displayCard && a.description && a.action_type !== 'use_ability') {
+        if (currentLang === 'jp' && displayCard && a.description && a.action_type !== 'use_ability' && a.action_type !== 'select_position') {
             name = displayCard.name || displayCard.card_no || name;
         }
         // Special text-only actions — override generic labels with locale text

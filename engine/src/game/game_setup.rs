@@ -292,9 +292,9 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     .map(|(i, pos)| {
                         let idx = crate::ability::util::stage_position_index(pos);
                         let (stage_area, card_id) = match idx {
-                            Some(0) => ("left".to_string(), 0),
-                            Some(1) => ("center".to_string(), 1),
-                            Some(2) => ("right".to_string(), 2),
+                            Some(0) => ("left".to_string(), i as i16),
+                            Some(1) => ("center".to_string(), i as i16),
+                            Some(2) => ("right".to_string(), i as i16),
                             _ => (pos.clone(), i as i16),
                         };
                         let capitalize = |s: &str| -> String {

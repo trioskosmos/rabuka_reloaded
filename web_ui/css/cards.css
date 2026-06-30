@@ -299,18 +299,14 @@
     overflow: hidden;
 }
 
-.energy-area-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    justify-content: flex-start;
-    height: 100%;
-}
-
 .energy-area-container.horizontal {
+    display: flex;
     flex-direction: row;
-    overflow-x: auto;
+    align-items: center;
     height: 100%;
+    overflow: hidden;
+    gap: 3px;
+    padding: 0 4px;
 }
 
 .card-area.stage {
@@ -318,17 +314,20 @@
     flex-direction: row;
     justify-content: space-evenly;
     align-items: center;
-    overflow-x: auto;
-    overflow-y: hidden;
     flex: 1;
+    overflow: hidden;
 }
 
 .card-area.energy {
-    gap: 4px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: 100%;
+    gap: 2px;
 }
 
 .energy-pip {
-    height: calc(var(--card-h-mini) * 0.5 / var(--section-count, 1));
+    height: 100%;
     width: auto;
     aspect-ratio: 512 / 720;
     border-radius: var(--radius-sm);
@@ -336,7 +335,6 @@
     background: var(--bg-tertiary);
     overflow: hidden;
     flex-shrink: 0;
-    position: relative;
 }
 
 .energy-pip img {
