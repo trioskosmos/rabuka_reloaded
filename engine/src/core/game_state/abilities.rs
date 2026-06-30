@@ -192,10 +192,13 @@ impl GameState {
             return true;
         }
         // card_count (all variants — zone counts are stable state checks)
+        // Exception: conditions on revealed_cards are NOT event-based because
+        // revealed_cards is populated during yell, not at the trigger event.
         if matches!(
             condition.condition_type,
             Some(crate::ability::enums::ConditionType::CardCountCondition)
-        ) {
+        ) && condition.location.as_deref() != Some("revealed_cards")
+        {
             return true;
         }
         // State change (active↔wait) — pre-filter so the condition only

@@ -42,9 +42,13 @@ export const ActionMenu = {
             return;
         }
 
-        // 2. Pending Choice — always render via ChoiceView (handles options, selection_cards, legal_actions)
+        // 2. Pending Choice — render into modal AND sidebar (so sidebar isn't empty)
         if (state.pending_choice) {
             ChoiceView.render(state, actionsDiv, true);
+            // Also render a compact version into the sidebar
+            if (state.pending_choice) {
+                ChoiceView.render(state, actionsDiv, false);
+            }
             return;
         }
 
@@ -115,13 +119,19 @@ export const ActionMenu = {
             }
         }
         const passLabel = document.getElementById('mobile-pass-label');
+        passBtn.style.display = 'flex';
         if (foundAction) {
-            passBtn.style.display = 'flex';
+            passBtn.disabled = false;
+            passBtn.style.opacity = '1';
+            passBtn.style.cursor = 'pointer';
             passBtn.onclick = () => { if (window.doAction) window.doAction(foundAction); };
             if (passLabel) passLabel.textContent = foundLabel;
         } else {
-            passBtn.style.display = 'none';
+            passBtn.disabled = true;
+            passBtn.style.opacity = '0.4';
+            passBtn.style.cursor = 'default';
             passBtn.onclick = null;
+            if (passLabel) passLabel.textContent = 'PASS';
         }
     },
 

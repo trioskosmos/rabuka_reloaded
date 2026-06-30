@@ -26,6 +26,7 @@
     flex-shrink: 0;
     overflow: hidden;
     box-sizing: border-box;
+    touch-action: manipulation;
 }
 
 /* --- Base Image & Aspect Handling --- */

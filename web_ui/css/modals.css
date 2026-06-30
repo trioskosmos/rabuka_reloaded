@@ -5,7 +5,7 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: transparent;
+    background: rgba(0, 0, 0, 0.82);
     display: none;
     align-items: center;
     justify-content: center;
@@ -86,9 +86,11 @@
     top: 0;
     left: 0;
     width: 100vw;
+    width: 100dvw;
     height: 100vh;
-    background: transparent;
-    display: flex;
+    height: 100dvh;
+    background: rgba(0, 0, 0, 0.82);
+    display: none;
     align-items: center;
     justify-content: center;
     z-index: var(--z-modal);

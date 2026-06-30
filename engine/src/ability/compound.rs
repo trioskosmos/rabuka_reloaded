@@ -201,7 +201,9 @@ impl AbilityResolver {
                                 }
                                 p
                             };
-                            condition_failed = Some(!passed);
+                            if !action.optional.unwrap_or(false) {
+                                condition_failed = Some(!passed);
+                            }
                             if !passed {
                                 continue 'action_loop;
                             }

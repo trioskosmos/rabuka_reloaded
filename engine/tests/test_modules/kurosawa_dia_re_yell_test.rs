@@ -26,9 +26,9 @@ fn advance_to_p1_performance(game: &mut TestGame, dia: i16) {
     game.pass();
 }
 
-/// Re-yell works: optional discard accepted → followup runs.
+/// Q107: re-yell works — optional discard accepted → followup runs.
 #[test]
-fn dia_re_yell_works() {
+fn q107_dia_re_yell_works() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let dia = game.id("PL!S-bp2-004-R");
@@ -54,9 +54,9 @@ fn dia_re_yell_works() {
     assert!(!game.state.re_yell_revealed_cards.is_empty());
 }
 
-/// Skip optional discard → followup does NOT run.
+/// Q107: skip optional discard → followup does NOT run.
 #[test]
-fn dia_skip_discard_no_followup() {
+fn q107_dia_skip_discard_no_followup() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let dia = game.id("PL!S-bp2-004-R");

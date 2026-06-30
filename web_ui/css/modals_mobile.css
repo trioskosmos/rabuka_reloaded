@@ -168,6 +168,15 @@
         min-height: 44px;
     }
 
+    /* Touch-friendly: prevent 300ms tap delay on mobile */
+    .modal-content,
+    .choice-item,
+    .action-btn,
+    .mobile-toggle-btn,
+    .card-area[style*="cursor: pointer"] {
+        touch-action: manipulation;
+    }
+
     /* Ability queue mobile */
     .ability-queue-entry {
         font-size: 0.85rem;

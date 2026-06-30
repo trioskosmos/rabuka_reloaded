@@ -569,6 +569,7 @@
     justify-content: flex-start;
     box-sizing: border-box;
     margin-bottom: 0px;
+    touch-action: manipulation;
 }
 
 .action-btn .action-title .icon-wrapper {

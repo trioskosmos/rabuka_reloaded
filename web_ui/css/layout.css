@@ -488,6 +488,11 @@
     cursor: pointer;
 }
 
+/* Mobile action bar — hidden by default (unused element) */
+.mobile-action-bar {
+    display: none;
+}
+
 /* Mobile right-edge button group */
 .mobile-btn-group {
     display: none;
@@ -520,6 +525,7 @@
     line-height: 1;
     text-align: center;
     position: relative;
+    touch-action: manipulation;
 }
 .mobile-toggle-btn:first-child { border-radius: 6px 0 0 0; }
 .mobile-toggle-btn:last-child { border-radius: 0 0 0 6px; }
@@ -545,28 +551,11 @@
     line-height: 1;
 }
 
-/* Floating PASS/SKIP/CONFIRM button — always positioned, hidden/shown by JS */
-#mobile-pass-btn {
-    position: fixed;
-    right: 20px;
-    bottom: 130px;
-    z-index: calc(var(--z-modal) - 1);
-    min-width: 48px;
-    padding: 6px 14px;
+#mobile-pass-btn.mobile-toggle-btn {
     background: #2ecc71;
     color: #fff;
-    border: none;
-    border-radius: 6px;
-    font-size: 0.65rem;
-    font-weight: 800;
-    text-align: center;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
-#mobile-pass-btn:hover { background: #27ae60; }
+#mobile-pass-btn.mobile-toggle-btn:hover { background: #27ae60; }
 
 /* Mobile / Tablet Responsive Mode */
 @media (orientation: portrait), (max-aspect-ratio: 13/9) {
@@ -604,7 +593,7 @@
         max-width: 320px;
         height: 100dvh;
         top: 0;
-        z-index: var(--z-modal);
+        z-index: calc(var(--z-modal) - 2);
         box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
     }
 

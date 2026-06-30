@@ -24,9 +24,9 @@ fn advance_to_p1_performance(game: &mut TestGame, daisuki: i16) {
     game.pass();
 }
 
-/// Condition met (≤2 blade_heart) → ability triggers → discard → re-yell draws new cards.
+/// Q156: condition met (≤2 blade_heart) → ability triggers → discard → re-yell draws new cards.
 #[test]
-fn daisuki_re_yell_works() {
+fn q156_daisuki_re_yell_works() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let daisuki = game.id("PL!S-bp3-020-L");
@@ -63,9 +63,9 @@ fn daisuki_re_yell_works() {
     );
 }
 
-/// Condition NOT met (>2 blade_heart) → ability does not trigger.
+/// Q156: condition NOT met (>2 blade_heart) → ability does not trigger.
 #[test]
-fn daisuki_too_many_blade_heart_no_trigger() {
+fn q156_daisuki_too_many_blade_heart_no_trigger() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let daisuki = game.id("PL!S-bp3-020-L");
@@ -84,9 +84,9 @@ fn daisuki_too_many_blade_heart_no_trigger() {
     assert!(!game.has_pending_choice(), "no prompt when >2 blade_heart");
 }
 
-/// Skip optional discard → re-yell still happens (unconditional in this card).
+/// Q156: skip optional discard → re-yell still happens (unconditional in this card).
 #[test]
-fn daisuki_skip_discard_still_re_yells() {
+fn q156_daisuki_skip_discard_still_re_yells() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let daisuki = game.id("PL!S-bp3-020-L");

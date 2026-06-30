@@ -35,6 +35,7 @@ pub mod chisato_test;
 pub mod choice_bullet_test;
 pub mod condition_negative_test;
 pub mod constant_edge_case_test;
+pub mod daisuki_and_dia_test;
 pub mod daisuki_test;
 pub mod dazzling_test;
 pub mod draw_phase_fix;

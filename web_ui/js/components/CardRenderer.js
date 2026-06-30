@@ -526,15 +526,15 @@ export const CardRenderer = {
                 continue;
             }
 
-            const onClick = clickable && (isValid || !hasGlobalSelection) ? (act) => {
-                if (!isValid) return;
-
+            const onClick = clickable && (State.uiMode === 'view' || isValid || !hasGlobalSelection) ? (act) => {
                 const _uiMode = State.uiMode;
 
                 if (_uiMode === 'view') {
                     openCardDetailModal(card, containerId);
                     return;
                 }
+
+                if (!isValid) return;
 
                 if (_uiMode === 'play' && containerId === 'my-hand') {
                     const legalActions = State.data?.legal_actions || [];
