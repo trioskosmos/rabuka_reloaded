@@ -401,6 +401,20 @@ impl AbilityResolver {
                                 "ability_from_source:{}:{}",
                                 src_id, ability.triggerless_text
                             ));
+                        let gained = crate::card::Ability {
+                            full_text: ability.full_text.clone(),
+                            triggerless_text: ability.triggerless_text.clone(),
+                            triggers: ability.triggers.clone(),
+                            use_limit: ability.use_limit,
+                            is_null: ability.is_null,
+                            cost: ability.cost.clone(),
+                            effect: ability.effect.clone(),
+                            keywords: ability.keywords.clone(),
+                        };
+                        gs.gained_card_abilities
+                            .entry(activating_card)
+                            .or_default()
+                            .push(gained);
                     }
                 }
             }

@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-30T11:40:05.762092",
+  "generated_at": "2026-06-30T12:09:39.257017",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -18785,7 +18785,11 @@
             "destination": "under_member",
             "card_type": "member_card",
             "action": "move_cards",
-            "count": 1
+            "count": 1,
+            "source": "those_cards",
+            "group_names": [
+              "Liella!"
+            ]
           }
         ],
         "group_names": [

@@ -163,8 +163,14 @@ impl super::TurnEngine {
             "P2"
         };
 
+        struct AbilityActivation {
+            idx: usize,
+            ability: crate::card::Ability,
+            loc: Zone,
+        }
+
         // Find the first ability that can be activated from the current location
-        let mut ability_to_activate = None;
+        let mut ability_to_activate: Option<AbilityActivation> = None;
         for (idx, ability) in card.abilities.iter().enumerate() {
             if ability
                 .triggers
@@ -235,13 +241,42 @@ impl super::TurnEngine {
                             continue;
                         }
                     }
-                    ability_to_activate = Some((idx, ability, loc));
+                    ability_to_activate = Some(AbilityActivation {
+                        idx,
+                        ability: ability.clone(),
+                        loc,
+                    });
                     break;
                 }
             }
         }
 
-        let (_ability_idx, ability, loc) = ability_to_activate
+        if ability_to_activate.is_none() {
+            if let Some(gained) = game_state
+                .gained_card_abilities
+                .get(&card_id)
+                .and_then(|list| {
+                    list.iter()
+                        .enumerate()
+                        .find(|(_, a)| {
+                            a.triggers
+                                .as_ref()
+                                .is_some_and(|t| t == crate::triggers::ACTIVATION)
+                        })
+                        .map(|(i, a)| (i, a.clone()))
+                })
+            {
+                if player.stage.stage.iter().any(|&id| id == card_id) {
+                    ability_to_activate = Some(AbilityActivation {
+                        idx: 10000 + gained.0,
+                        ability: gained.1,
+                        loc: Zone::Stage,
+                    });
+                }
+            }
+        }
+
+        let AbilityActivation { ability, loc, idx } = ability_to_activate
             .ok_or("No activatable ability found for this card at its current location")?;
 
         if loc == Zone::Hand {
@@ -250,7 +285,18 @@ impl super::TurnEngine {
             player.waitroom.add_card(card_id);
         }
 
-        let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+        // Gained abilities use the "card_no_gained_{idx}" format so
+        // trigger_auto_ability's gained-ability code path (line ~683)
+        // can find and enqueue them.
+        let ability_id = if idx >= 10000 {
+            debug_assert!(
+                game_state.gained_card_abilities.contains_key(&card_id),
+                "gained ability idx >= 10000 but no gained_card_abilities entry"
+            );
+            format!("{}_gained_{}", card.card_no, idx - 10000)
+        } else {
+            format!("{}_{}", card.card_no, ability.full_text)
+        };
         game_state.trigger_auto_ability(
             ability_id,
             crate::game_state::AbilityTrigger::Activation,

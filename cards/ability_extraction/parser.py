@@ -9229,9 +9229,10 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             parent_card_type = eff.get("card_type")
             prev_was_select = False
             prev_was_look_at = False
+            prev_was_baton_touch = False
             for sub in eff.get("actions", []):
                 if not isinstance(sub, dict):
-                    prev_was_select = prev_was_look_at = False
+                    prev_was_select = prev_was_look_at = prev_was_baton_touch = False
                     continue
                 # Propagate card_type from parent and infer missing sub-action.
                 if not sub.get("card_type") and parent_card_type:
@@ -9241,13 +9242,16 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                         sub["action"] = "move_cards"
                     elif sub.get("actions"):
                         sub["action"] = "sequential"
-                # Chain select→move and look_at→move source inference.
+                # Chain select→move, look_at→move, and play_baton_touch→move source inference.
                 if sub.get("action") in ("select_cards", "look_and_select", "select"):
                     prev_was_select = True
-                    prev_was_look_at = False
+                    prev_was_look_at = prev_was_baton_touch = False
                 elif sub.get("action") == "look_at":
                     prev_was_look_at = True
-                    prev_was_select = False
+                    prev_was_select = prev_was_baton_touch = False
+                elif sub.get("action") == "play_baton_touch":
+                    prev_was_baton_touch = True
+                    prev_was_select = prev_was_look_at = False
                 elif sub.get("action") == "move_cards" and prev_was_look_at:
                     if sub.get("source") != "looked_at":
                         sub["source"] = "looked_at"
@@ -9265,8 +9269,14 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     ):
                         sub.pop("count", None)
                     prev_was_select = False
+                elif sub.get("action") == "move_cards" and prev_was_baton_touch:
+                    if sub.get("source") != "those_cards":
+                        sub["source"] = "those_cards"
+                    if not sub.get("group_names") and eff.get("group_names"):
+                        sub["group_names"] = eff["group_names"]
+                    prev_was_baton_touch = False
                 else:
-                    prev_was_select = prev_was_look_at = False
+                    prev_was_select = prev_was_look_at = prev_was_baton_touch = False
 
         # --- 2. Targeted fixes logic ---
         t = ability.get("triggerless_text", "")
