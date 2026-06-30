@@ -6,19 +6,16 @@ import { DOMUtils } from '../utils/DOMUtils.js';
 import { DOM_IDS } from '../constants_dom.js';
 
 function openCardDetailModal(card, zoneHint) {
-    if (!window.__isMobile) return;
     const m = window.__modals?.CardDetailModal;
     if (m) m.open(card, zoneHint);
 }
 
 function openPlayActionModal(card, actions) {
-    if (!window.__isMobile) return;
     const m = window.__modals?.PlayActionModal;
     if (m) m.open(card, actions);
 }
 
 function openStageAbilityModal(card, actions) {
-    if (!window.__isMobile) return;
     const m = window.__modals?.StageAbilityModal;
     if (m) m.open(card, actions);
 }

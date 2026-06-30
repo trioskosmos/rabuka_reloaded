@@ -273,8 +273,6 @@ const actionHandlers = {
     'close-stage-ability-modal': () => StageAbilityModal.close(),
     'close-ability-queue-modal': () => AbilityQueueModal.close(),
     'close-rps-modal': () => {
-        const el = document.getElementById('rps-modal');
-        if (el) el.dataset.dismissed = 'true';
         ModalManager.hide('rps-modal');
     },
     'close-system-actions-modal': () => {
@@ -358,16 +356,9 @@ export const AppController = {
         updateUiModeUI(State.uiMode);
         State.on('ui-mode-change', (e) => updateUiModeUI(e.detail?.mode || State.uiMode));
 
-        // Track mobile viewport for modal gating
-        const updateMobile = () => {
-            window.__isMobile = window.matchMedia('(orientation: portrait), (max-aspect-ratio: 13/9)').matches;
-        };
-        updateMobile();
-        window.matchMedia('(orientation: portrait), (max-aspect-ratio: 13/9)').addEventListener('change', updateMobile);
-
         // Backdrop close for mobile modals
         [
-            { id: 'rps-modal', onClose: () => { document.getElementById('rps-modal').dataset.dismissed = 'true'; } },
+            { id: 'rps-modal' },
             { id: 'system-actions-modal', onClose: () => { State._sysActionsDismissed = true; } },
             { id: DOM_IDS.MODAL_CARD_DETAIL },
             { id: DOM_IDS.MODAL_PLAY_ACTION },

@@ -7456,10 +7456,11 @@ def _try_kore_niyori_result(text):
     # Skip empty/trivial primary text (e.g. cost text already consumed, or just bracket fragments)
     if not primary_text or re.match(r"^[\s）」\)』」、。]*$", primary_text):
         return None
+    primary = parse_action(primary_text)
     return {
         "text": text,
         "action": "conditional_on_result",
-        "primary_effect": parse_effect(primary_text),
+        "primary_effect": primary,
         "result_condition": cond,
         "followup_action": parse_action(fp.strip()),
     }
@@ -9122,6 +9123,19 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
             for f in ("location",):
                 if f not in ch and f in ctx:
                     ch[f] = ctx[f]
+        # For conditional_on_result: propagate card_type from the outer
+        # condition into the primary_effect's condition when missing.
+        if (
+            action == "conditional_on_result"
+            and ck == "primary_effect"
+            and isinstance(ch, dict)
+            and eff_root
+        ):
+            outer_cond = eff_root.get("condition", {})
+            if isinstance(outer_cond, dict) and outer_cond.get("card_type"):
+                nested_cond = ch.get("condition", {})
+                if isinstance(nested_cond, dict) and not nested_cond.get("card_type"):
+                    nested_cond["card_type"] = outer_cond["card_type"]
 
     for ak in ("actions", "options"):
         arr = node.get(ak, [])

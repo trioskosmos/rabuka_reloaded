@@ -529,27 +529,44 @@
 
 .action-badge {
     position: absolute;
-    top: 3px;
-    right: 3px;
-    background: #ff4081;
+    top: 2px;
+    right: 2px;
+    background: rgba(255,255,255,0.15);
     color: #fff;
     font-size: 0.4rem;
-    font-weight: 700;
-    min-width: 13px;
-    height: 13px;
-    border-radius: 50%;
+    font-weight: 800;
+    min-width: 14px;
+    height: 14px;
+    border-radius: 3px;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 2px;
-    z-index: 1;
+    padding: 0 3px;
+    line-height: 1;
 }
 
-#mobile-pass-btn.mobile-toggle-btn {
+/* Floating PASS/SKIP/CONFIRM button — always positioned, hidden/shown by JS */
+#mobile-pass-btn {
+    position: fixed;
+    right: 20px;
+    bottom: 130px;
+    z-index: calc(var(--z-modal) - 1);
+    min-width: 48px;
+    padding: 6px 14px;
     background: #2ecc71;
     color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
-#mobile-pass-btn.mobile-toggle-btn:hover { background: #27ae60; }
+#mobile-pass-btn:hover { background: #27ae60; }
 
 /* Mobile / Tablet Responsive Mode */
 @media (orientation: portrait), (max-aspect-ratio: 13/9) {

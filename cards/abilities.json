@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-30T22:57:29.267950",
+  "generated_at": "2026-06-30T23:13:06.145791",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -8450,7 +8450,11 @@
         "action": "conditional_on_result",
         "primary_effect": {
           "text": "自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ。ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる",
+          "group_names": [
+            "DOLLCHESTRA"
+          ],
           "action": "sequential",
+          "original_value": true,
           "actions": [
             {
               "text": "自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ",
@@ -8464,17 +8468,15 @@
               "action": "select"
             },
             {
-              "text": "このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる",
+              "text": "ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる",
               "duration": "live_end",
               "card_type": "member_card",
               "action": "modify_cost",
-              "self_target": true,
+              "group_names": [
+                "DOLLCHESTRA"
+              ],
               "original_value": true
             }
-          ],
-          "original_value": true,
-          "group_names": [
-            "DOLLCHESTRA"
           ]
         },
         "result_condition": {
@@ -10568,6 +10570,16 @@
         "action": "conditional_on_result",
         "primary_effect": {
           "text": "エールにより公開された自分のカードの中にライブカードがないとき、それらのカードをすべて控え室に置いてもよい",
+          "source": "revealed_cards",
+          "dynamic_count": {
+            "type": "revealed_cards",
+            "reference": "previous_reveal"
+          },
+          "destination": "discard",
+          "card_type": "card",
+          "optional": true,
+          "action": "move_cards",
+          "all": true,
           "condition": {
             "type": "location_condition",
             "location": "revealed_cards",
@@ -10576,16 +10588,6 @@
             "negation": true,
             "card_type": "live_card"
           },
-          "destination": "discard",
-          "optional": true,
-          "action": "move_cards",
-          "source": "revealed_cards",
-          "card_type": "card",
-          "dynamic_count": {
-            "type": "revealed_cards",
-            "reference": "previous_reveal"
-          },
-          "all": true,
           "location": "revealed_cards"
         },
         "result_condition": {
@@ -17184,29 +17186,12 @@
         "action": "conditional_on_result",
         "primary_effect": {
           "text": "自分と相手はそれぞれ、自身の控え室にあるすべてのメンバーカードをシャッフルし、自身のデッキの下に置く",
-          "action": "sequential",
-          "actions": [
-            {
-              "text": "自分と相手はそれぞれ、自身の控え室にあるすべてのメンバーカードをシャッフルし",
-              "source": "discard",
-              "card_type": "member_card",
-              "target": "energy_deck",
-              "multiple_targets": true,
-              "action": "shuffle",
-              "all": true,
-              "shuffle": true
-            },
-            {
-              "text": "自身のデッキの下に置く",
-              "destination": "deck_bottom",
-              "action": "move_cards",
-              "source": "hand",
-              "card_type": "card",
-              "count": 1,
-              "all": true,
-              "shuffle": true
-            }
-          ],
+          "source": "discard",
+          "destination": "deck_bottom",
+          "card_type": "member_card",
+          "target": "deck",
+          "multiple_targets": true,
+          "action": "move_cards",
           "shuffle": true,
           "all": true
         },

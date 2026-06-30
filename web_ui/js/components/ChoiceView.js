@@ -422,7 +422,7 @@ export const ChoiceView = {
         }
 
         if (hasContent) {
-            if (useModal && window.__isMobile) {
+            if (useModal) {
                 // Check if user dismissed this specific pending choice
                 const choiceStateId = state.state_id || 0;
                 if (State._choiceModalDismissed && State._choiceStateId === choiceStateId) {

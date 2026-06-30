@@ -56,8 +56,8 @@ export const ActionMenu = {
             actionsDiv.appendChild(aiDiv);
         }
 
-        // 4. System actions modal (choose first/second and similar) — mobile only
-        if (window.__isMobile && !State._sysActionsDismissed && state.legal_actions) {
+        // 4. System actions modal (choose first/second and similar)
+        if (!State._sysActionsDismissed && state.legal_actions) {
             const systemOnly = state.legal_actions.filter(a =>
                 a.action_type === 'choose_first_attacker' ||
                 a.action_type === 'choose_second_attacker'
@@ -94,7 +94,9 @@ export const ActionMenu = {
         const passBtn = document.getElementById('mobile-pass-btn');
         if (!passBtn) return;
         const lowTypes = ['pass', 'pass_remaining', 'decision', 'select_skip',
+            'select_card', 'choose_option',
             'confirm_mulligan', 'skip_mulligan',
+            'select_position',
             'finish_live_card_set', 'confirm_live_card_set', 'skip_live_card_set'];
         let foundAction = null;
         let foundLabel = '';
@@ -104,7 +106,7 @@ export const ActionMenu = {
                 if (lowTypes.includes(t)) {
                     foundAction = a;
                     if (t === 'pass' || t === 'pass_remaining') foundLabel = i18n.t('pass_no') || 'PASS';
-                    else if (t === 'decision' || t === 'select_skip') foundLabel = i18n.t('done') || 'DONE';
+                    else if (t === 'decision' || t === 'select_skip' || t === 'select_card' || t === 'choose_option' || t === 'select_position') foundLabel = i18n.t('done') || 'DONE';
                     else if (t === 'confirm_mulligan' || t === 'confirm_live_card_set') foundLabel = i18n.t('confirm') || 'CONFIRM';
                     else if (t === 'skip_mulligan' || t === 'skip_live_card_set') foundLabel = i18n.t('skip') || 'SKIP';
                     else if (t === 'finish_live_card_set') foundLabel = i18n.t('finish_live_card_set') || 'DONE';
@@ -114,11 +116,11 @@ export const ActionMenu = {
         }
         const passLabel = document.getElementById('mobile-pass-label');
         if (foundAction) {
-            passBtn.classList.remove('hidden');
+            passBtn.style.display = 'flex';
             passBtn.onclick = () => { if (window.doAction) window.doAction(foundAction); };
             if (passLabel) passLabel.textContent = foundLabel;
         } else {
-            passBtn.classList.add('hidden');
+            passBtn.style.display = 'none';
             passBtn.onclick = null;
         }
     },

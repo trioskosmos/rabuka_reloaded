@@ -418,8 +418,6 @@ const stateInternal = {
         State._sysActionsDismissed = false;
         State._choiceModalDismissed = false;
         State._choiceStateId = null;
-        const rpsEl = document.getElementById('rps-modal');
-        if (rpsEl) delete rpsEl.dataset.dismissed;
         State.showingFullLog = false;
         State.fullLogData = null;
         State.lastActionsHash = null;

@@ -6,12 +6,7 @@ export const RpsView = {
     render: (state, perspectivePlayer, container) => {
         const modalEl = document.getElementById('rps-modal');
         const body = document.getElementById('rps-modal-body');
-        if (body && modalEl && window.__isMobile) {
-            if (modalEl.dataset.dismissed === 'true') {
-                RpsView._renderInline(state, container);
-                return;
-            }
-            delete modalEl.dataset.dismissed;
+        if (body && modalEl) {
             body.innerHTML = '';
             const signs = [
                 { actionType: 'RockChoice', snakeType: 'rock_choice', name: i18n.t('rps_rock') },
