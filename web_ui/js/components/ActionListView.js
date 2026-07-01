@@ -106,28 +106,12 @@ export const ActionListView = {
         if (allMulliganActions.length > 0) {
             addHeader(i18n.t('mulligan').toUpperCase(), 'var(--accent-pink)');
             allMulliganActions.forEach(a => listDiv.appendChild(ActionButtons.createActionButton(a, false, '', state)));
-
-            listDiv.querySelectorAll('.action-btn[data-card-index]').forEach(btn => {
-                const ci = parseInt(btn.dataset.cardIndex, 10);
-                if (!isNaN(ci) && State.localMulliganSelection.has(ci)) {
-                    const thumb = btn.querySelector('.action-card-thumb');
-                    if (thumb) { thumb.classList.add('sel', 'sel-mulligan'); }
-                }
-            });
         }
 
         const allLiveCardActions = Object.values(liveCardActions).flat();
         if (allLiveCardActions.length > 0) {
             addHeader(i18n.t('live_card_set').toUpperCase(), 'var(--accent-cyan)');
             allLiveCardActions.forEach(a => listDiv.appendChild(ActionButtons.createActionButton(a, false, '', state)));
-
-            listDiv.querySelectorAll('.action-btn[data-card-index]').forEach(btn => {
-                const ci = parseInt(btn.dataset.cardIndex, 10);
-                if (!isNaN(ci) && State.localLiveCardSelection.has(ci)) {
-                    const thumb = btn.querySelector('.action-card-thumb');
-                    if (thumb) { thumb.classList.add('sel', 'sel-live'); }
-                }
-            });
         }
 
         if (Object.keys(playActionsByHand).length > 0) {

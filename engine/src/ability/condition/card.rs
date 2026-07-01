@@ -2386,6 +2386,28 @@ impl<'a> ConditionContext<'a> {
                     count_filtered(util::zone_cards(player, location), card_type)
                 }
             }
+            Some(Zone::UnderMember) => {
+                // Cards under a specific member (このメンバーの下). Find the
+                // activating card's stage position and count its under_cards.
+                if let Some(cid) = self.activating_card_id {
+                    let pos = player.stage.stage.iter().position(|&id| id == cid);
+                    if let Some(idx) = pos {
+                        count_filtered(&player.stage.under_cards[idx], card_type)
+                    } else {
+                        0
+                    }
+                } else {
+                    // Fallback: count under_cards across all positions
+                    let all_under: Vec<i16> = player
+                        .stage
+                        .under_cards
+                        .iter()
+                        .flat_map(|sv| sv.iter())
+                        .copied()
+                        .collect();
+                    count_filtered(&all_under, card_type)
+                }
+            }
             Some(Zone::Discard) | Some(Zone::Waitroom) => {
                 if condition.text.contains("手札から") {
                     // Event-based: only count recently-moved cards from hand

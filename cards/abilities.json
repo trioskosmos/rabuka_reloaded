@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-01T20:08:57.594227",
+  "generated_at": "2026-07-01T20:32:47.202277",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -14881,7 +14881,7 @@
           "operator": ">=",
           "text": "このメンバーの下にエネルギーカードが2枚以上置かれているかぎり",
           "card_type": "energy_card",
-          "location": "energy_zone"
+          "location": "under_member"
         },
         "duration": "as_long_as",
         "conditional": true,

@@ -575,13 +575,30 @@ export const CardRenderer = {
                 if (action.action_type === 'select_mulligan') {
                     const handIdx = action.parameters?.card_index ?? action.parameters?.card_indices?.[0];
                     if (handIdx !== undefined) {
-                        if (State.localMulliganSelection.has(handIdx)) {
-                            State.localMulliganSelection.delete(handIdx);
-                        } else {
+                        const isNowSelected = !State.localMulliganSelection.has(handIdx);
+                        if (isNowSelected) {
                             State.localMulliganSelection.add(handIdx);
+                        } else {
+                            State.localMulliganSelection.delete(handIdx);
+                        }
+                        // Toggle this card without full re-render (preserves images)
+                        const cardEl = document.getElementById(`${containerId}-card-${idx}`);
+                        if (cardEl) {
+                            cardEl.classList.toggle('sel', isNowSelected);
+                            cardEl.classList.toggle('sel-mulligan', isNowSelected);
+                        }
+                        // Sync action button
+                        const actionBtn = State.mulliganButtons.get(handIdx);
+                        if (actionBtn) {
+                            actionBtn.classList.toggle('sel', isNowSelected);
+                            actionBtn.classList.toggle('sel-mulligan', isNowSelected);
+                            const thumb = actionBtn.querySelector('.action-card-thumb');
+                            if (thumb) {
+                                thumb.classList.toggle('sel', isNowSelected);
+                                thumb.classList.toggle('sel-mulligan', isNowSelected);
+                            }
                         }
                     }
-                    window.render?.();
                     return;
                 }
                 if (action.action_type === 'select_live_card') {

@@ -2926,6 +2926,10 @@ def _enrich_card_count_condition(result, text):
     # Live card zone
     if "ライブ中の" in text and not result.get("location"):
         result["location"] = "live_card_zone"
+    # Under member takes priority when both "下" and "エネルギー" appear
+    if "メンバーの下" in text or "このメンバーの下" in text:
+        if not result.get("location") and not result.get("resource_type"):
+            result["location"] = "under_member"
     # Energy zone
     if (
         "エネルギー" in text

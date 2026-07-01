@@ -218,13 +218,14 @@ export const ActionButtons = {
             }
         }
 
-        // For mulligan actions: mark card thumbnail selected so it goes grayscale like hand cards
+        // For mulligan actions: mark button + thumbnail selected so they go greyscale like hand cards
         if (a.action_type === 'select_mulligan') {
             const ci = (a.parameters || a.params || {}).card_index;
             if (ci !== undefined) {
                 btn.dataset.cardIndex = ci;
                 State.mulliganButtons.set(ci, btn);
                 if (State.localMulliganSelection.has(ci)) {
+                    btn.classList.add('sel', 'sel-mulligan');
                     const thumb = btn.querySelector('.action-card-thumb');
                     if (thumb) {
                         thumb.classList.add('sel', 'sel-mulligan');
@@ -238,12 +239,32 @@ export const ActionButtons = {
                 const params = a.parameters || a.params || {};
                 const handIdx = params.card_index ?? params.card_indices?.[0];
                 if (handIdx !== undefined) {
-                    if (State.localMulliganSelection.has(handIdx)) {
-                        State.localMulliganSelection.delete(handIdx);
-                    } else {
+                    const isNowSelected = !State.localMulliganSelection.has(handIdx);
+                    if (isNowSelected) {
                         State.localMulliganSelection.add(handIdx);
+                    } else {
+                        State.localMulliganSelection.delete(handIdx);
                     }
-                    window.render?.();
+                    // Toggle this button without full re-render (preserves images)
+                    btn.classList.toggle('sel', isNowSelected);
+                    btn.classList.toggle('sel-mulligan', isNowSelected);
+                    const thumb = btn.querySelector('.action-card-thumb');
+                    if (thumb) {
+                        thumb.classList.toggle('sel', isNowSelected);
+                        thumb.classList.toggle('sel-mulligan', isNowSelected);
+                    }
+                    // Update label prefix
+                    const titleEl = btn.querySelector('.action-title');
+                    if (titleEl && displayCard) {
+                        const cardName = State.currentLang === 'en' ? i18n.translateCard(displayCard).name : StringUtils.cleanCardName(displayCard.name);
+                        titleEl.innerHTML = Tooltips.enrichAbilityText(`${isNowSelected ? '✓ ' : ''}${cardName}`);
+                    }
+                    // Sync hand card
+                    const handCardEl = document.getElementById(`my-hand-card-${handIdx}`);
+                    if (handCardEl) {
+                        handCardEl.classList.toggle('sel', isNowSelected);
+                        handCardEl.classList.toggle('sel-mulligan', isNowSelected);
+                    }
                 }
             } else if (a.action_type === 'select_live_card') {
                 const params = a.parameters || a.params || {};
