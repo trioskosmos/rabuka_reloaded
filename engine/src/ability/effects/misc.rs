@@ -571,29 +571,39 @@ impl AbilityResolver {
                 })
                 .collect();
             let _ = player;
-            eprintln!("[GR_SELECTED_CARD] entering branch. selected_cards={:?} target_ids={:?} gs.activating={:?}",
-                self.selected_cards, target_ids, gs.activating_card);
+            if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                eprintln!("[GR_SELECTED_CARD] entering branch. selected_cards={:?} target_ids={:?} gs.activating={:?}",
+                    self.selected_cards, target_ids, gs.activating_card);
+            }
             if let Some(&selected_id) = self.selected_cards.first() {
                 if let Some(selected_card) = card_db.get_card(selected_id) {
-                    eprintln!(
-                        "[GR_SELECTED_BH] selected_id={} has_base_heart={} hearts_count={}",
-                        selected_id,
-                        selected_card.base_heart.is_some(),
-                        selected_card
-                            .base_heart
-                            .as_ref()
-                            .map(|bh| bh.hearts.len())
-                            .unwrap_or(0)
-                    );
+                    if crate::ability::debug::ABILITY_DEBUG
+                        .load(std::sync::atomic::Ordering::Relaxed)
+                    {
+                        eprintln!(
+                            "[GR_SELECTED_BH] selected_id={} has_base_heart={} hearts_count={}",
+                            selected_id,
+                            selected_card.base_heart.is_some(),
+                            selected_card
+                                .base_heart
+                                .as_ref()
+                                .map(|bh| bh.hearts.len())
+                                .unwrap_or(0)
+                        );
+                    }
                     if let Some(ref base_heart) = selected_card.base_heart {
                         for (&color, _) in &base_heart.hearts {
                             for &target_id in &target_ids {
-                                eprintln!(
-                                    "[GR_APPLY] target={} color={:?} before={}",
-                                    target_id,
-                                    color,
-                                    gs.mods.get_heart_modifier(target_id, color)
-                                );
+                                if crate::ability::debug::ABILITY_DEBUG
+                                    .load(std::sync::atomic::Ordering::Relaxed)
+                                {
+                                    eprintln!(
+                                        "[GR_APPLY] target={} color={:?} before={}",
+                                        target_id,
+                                        color,
+                                        gs.mods.get_heart_modifier(target_id, color)
+                                    );
+                                }
                                 gs.mods.add_heart_modifier_with_trace(
                                     target_id,
                                     color,
@@ -602,12 +612,16 @@ impl AbilityResolver {
                                     target_id,
                                     &effect.text,
                                 );
-                                eprintln!(
-                                    "[GR_APPLY] target={} color={:?} after={}",
-                                    target_id,
-                                    color,
-                                    gs.mods.get_heart_modifier(target_id, color)
-                                );
+                                if crate::ability::debug::ABILITY_DEBUG
+                                    .load(std::sync::atomic::Ordering::Relaxed)
+                                {
+                                    eprintln!(
+                                        "[GR_APPLY] target={} color={:?} after={}",
+                                        target_id,
+                                        color,
+                                        gs.mods.get_heart_modifier(target_id, color)
+                                    );
+                                }
                                 if effect.duration.as_deref() == Some("live_end") {
                                     let effect_data = serde_json::json!({
                                         "card_id": target_id,

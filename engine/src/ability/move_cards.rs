@@ -1818,17 +1818,7 @@ impl AbilityResolver {
     /// This is the single canonical function for debut processing — every
     /// code path that places a card on stage must call this.
     fn fire_debut_side_effects(&self, gs: &mut GameState, card_id: i16, target: &str) {
-        let player_id = match target {
-            "self" => gs.active_player().id.clone(),
-            _ => {
-                let active = gs.active_player().id.clone();
-                if gs.player1.id == active {
-                    gs.player2.id.clone()
-                } else {
-                    gs.player1.id.clone()
-                }
-            }
-        };
+        let player_id = gs.resolve_target_player(target).id.clone();
 
         let source = self.spawn_context.source.as_deref().unwrap_or("");
         gs.record_card_appearance(card_id, source);

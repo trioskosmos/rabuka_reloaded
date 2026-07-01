@@ -782,7 +782,7 @@ impl super::resolver::AbilityResolver {
                     .destination
                     .clone()
                     .or(edst)
-                    .unwrap_or_else(|| Zone::Discard.to_str().to_string());
+                    .unwrap_or_else(|| Zone::Discard.to_string());
                 self.handle_revealed_cards_selection(gs, &ctx, &mut validate_card, &dst_str)?;
             }
             Some(Zone::Energy) => {
@@ -1408,7 +1408,7 @@ impl super::resolver::AbilityResolver {
     ) -> Result<(), String> {
         let cost = gs.entry_cost().cloned().unwrap();
         let card_db = gs.card_database.clone();
-        let player = gs.active_player();
+        let player = gs.resolve_target_player("self");
         let card_ids: Vec<i16> = ctx
             .indices
             .iter()
@@ -1446,7 +1446,7 @@ impl super::resolver::AbilityResolver {
                 .map(|c| c.name.clone())
                 .collect();
             let turn = gs.turn_number;
-            let player_num = if std::ptr::eq(gs.active_player(), &gs.player1) {
+            let player_num = if std::ptr::eq(gs.resolve_target_player("self"), &gs.player1) {
                 1
             } else {
                 2
@@ -1461,7 +1461,8 @@ impl super::resolver::AbilityResolver {
             }
         }
         let cost_source = gs.current_ability_source_card_id();
-        let cost_owner: Option<u8> = if std::ptr::eq(gs.active_player(), &gs.player1) {
+        let cost_owner: Option<u8> = if std::ptr::eq(gs.resolve_target_player("self"), &gs.player1)
+        {
             Some(0)
         } else {
             Some(1)
@@ -1649,7 +1650,8 @@ impl super::resolver::AbilityResolver {
                 .or(edst)
                 .unwrap_or_else(|| Zone::Discard.to_string());
             let card_db = gs.card_database.clone();
-            let player = gs.active_player_mut();
+            let player =
+                gs.resolve_target_player_mut(ctx.target_player_id.as_deref().unwrap_or("self"));
             let card_ids = util::resolve_indices_to_ids(player, Zone::Stage.to_str(), &ctx.indices);
             let valid_ids: Vec<i16> = card_ids
                 .into_iter()

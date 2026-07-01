@@ -123,7 +123,7 @@ impl Zone {
 
 impl std::fmt::Display for Zone {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.label())
+        write!(f, "{}", self.to_str())
     }
 }
 
@@ -433,7 +433,7 @@ impl ActionType {
 
 impl std::fmt::Display for ActionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.label())
+        write!(f, "{}", self.to_str())
     }
 }
 

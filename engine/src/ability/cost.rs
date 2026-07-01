@@ -119,7 +119,7 @@ impl AbilityResolver {
             }
             "energy_condition" => {
                 let count = cost.count.unwrap_or(1) as usize;
-                let player = gs.active_player();
+                let player = gs.resolve_target_player("self");
                 if player.energy_zone.cards.len() < count {
                     return Err(format!(
                         "Not enough energy cards: need {}, have {}",
