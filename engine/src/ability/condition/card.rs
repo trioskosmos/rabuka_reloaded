@@ -1228,7 +1228,10 @@ impl<'a> ConditionContext<'a> {
                 }
             });
         let op = condition.operator.as_deref();
-        let cost_op = condition.cost_limit_operator.as_deref();
+        let cost_op = condition
+            .cost_limit_operator
+            .as_deref()
+            .or(condition.operator.as_deref());
 
         let cards: Vec<i16> = if Zone::from_str(location) == Some(Zone::RevealedCards) {
             // When yell_trigger is true, the ability triggers on yell alone

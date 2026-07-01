@@ -1120,206 +1120,57 @@ export const LogRenderer = {
     showRevealedCardsModal: () => {
         const s = State.data;
         if (!s) return;
-
-        console.log('[RevealedModal] State keys:', Object.keys(s).filter(k => k.includes('cheer') || k.includes('reveal') || k.includes('yell') || k.includes('looked')));
-        console.log('[RevealedModal] player1_cheer:', s.player1_cheer_revealed_cards);
-        console.log('[RevealedModal] player2_cheer:', s.player2_cheer_revealed_cards);
-        console.log('[RevealedModal] initial_yell:', s.initial_yell_revealed_cards);
-        console.log('[RevealedModal] re_yell:', s.re_yell_revealed_cards);
-        console.log('[RevealedModal] revealed_cards:', s.revealed_cards);
-        console.log('[RevealedModal] revealed_card_info:', s.revealed_card_info);
-        console.log('[RevealedModal] revealed_cost_cards:', s.revealed_cost_cards);
-        console.log('[RevealedModal] looked_cards:', s.looked_cards);
         const title = document.getElementById(DOM_IDS.REVEALED_TITLE);
         const content = document.getElementById(DOM_IDS.REVEALED_CONTENT);
         if (!title || !content) return;
 
-        // Resolve card data to { card_no, name }, handling multiple input types.
-        const resolveCard = (entry) => {
-            if (!entry) return null;
-            if (typeof entry === 'number') return State.resolveCardData(entry);
-            if (entry.card_id !== undefined) return State.resolveCardData(entry.card_id);
-            if (entry.id !== undefined) return State.resolveCardData(entry.id);
-            return entry;
-        };
-        const extractCid = (entry) => {
-            if (typeof entry === 'number') return entry;
-            return entry.card_id ?? entry.id;
-        };
+        // Collect ALL card IDs from ALL sources
+        const allIds = new Set();
 
-        // Render a single card with optional source label.
-        const cardToHtml = (entry) => {
-            const card = resolveCard(entry);
-            if (!card) {
-                const id = extractCid(entry);
-                return `<div class="revealed-card chip">ID:${id ?? '?'}</div>`;
-            }
-            const imgPath = resolveCardImagePath(card.card_no);
-            const img = imgPath ? `<img src="${fixImg(imgPath)}" class="revealed-card-img" alt="${card.name}">` : '';
-            const srcName = entry && entry.source_card_name;
-            const srcHtml = srcName ? `<span class="revealed-card-source">via ${srcName}</span>` : '';
-            return `<div class="revealed-card">${img}<span class="revealed-card-name">${card.name}</span>${srcHtml}</div>`;
-        };
+        // 1. Cheer / yell (including persistent fields)
+        for (const src of ['player1_cheer_revealed_cards', 'player2_cheer_revealed_cards',
+                           'initial_yell_revealed_cards', 're_yell_revealed_cards',
+                           'revealed_cost_cards']) {
+            (s[src] || []).forEach(id => allIds.add(id));
+        }
 
-        const sectionGrid = (label, items) => {
-            if (!items || items.length === 0) return '';
-            return `<div class="revealed-section"><h4>${label} (${items.length})</h4><div class="revealed-grid">${items.map(cardToHtml).join('')}</div></div>`;
-        };
+        // 2. Effect reveals (objects with card_id, or raw IDs)
+        if (s.revealed_card_info?.length) {
+            s.revealed_card_info.forEach(e => { if (e.card_id !== undefined) allIds.add(e.card_id); });
+        } else {
+            (s.revealed_cards || []).forEach(id => allIds.add(id));
+        }
+        if (s.revealed_cost_card_info?.length) {
+            s.revealed_cost_card_info.forEach(e => { if (e.card_id !== undefined) allIds.add(e.card_id); });
+        }
 
-        // Old zone-scanning owner detection used as fallback when
-        // engine-side owner tracking is unavailable.
-        const ownerOf = (cid) => {
-            const scan = (pl) => {
-                const c = [];
-                if (pl.stage) {
-                    (pl.stage.stage || []).forEach(x => { if (x !== -1) c.push(x); });
-                    Object.values(pl.stage).filter(v => Array.isArray(v)).forEach(arr => arr.forEach(x => { if (typeof x === 'number' && x !== -1) c.push(x); }));
-                }
-                if (pl.hand?.cards) c.push(...pl.hand.cards);
-                if (pl.live_zone?.cards) c.push(...pl.live_zone.cards);
-                if (pl.success_live_card_zone?.cards) c.push(...pl.success_live_card_zone.cards);
-                if (pl.waitroom?.cards) c.push(...pl.waitroom.cards);
-                if (pl.energy_zone?.cards) c.push(...pl.energy_zone.cards);
-                if (pl.energy_deck?.cards) c.push(...pl.energy_deck.cards);
-                if (pl.main_deck?.cards) c.push(...pl.main_deck.cards);
-                if (pl.exclusion_zone?.cards) c.push(...pl.exclusion_zone.cards);
-                return c;
-            };
-            const p1s = new Set(scan(s.player1));
-            const p2s = new Set(scan(s.player2));
-            if (p1s.has(cid)) return 0;
-            if (p2s.has(cid)) return 1;
-            return -1;
-        };
-
-        const perspective = State.perspectivePlayer; // 0=P1 1=P2
-        const p1Label = perspective === 0 ? 'You' : 'Opponent';
-        const p2Label = perspective === 1 ? 'You' : 'Opponent';
-
-        // Cheer cards — already per-player, source is implicit.
-        const p1Cheer = (s.player1_cheer_revealed_cards || []).slice().reverse();
-        const p2Cheer = (s.player2_cheer_revealed_cards || []).slice().reverse();
-        const cheerIds = new Set([
-            ...(s.player1_cheer_revealed_cards || []),
-            ...(s.player2_cheer_revealed_cards || []),
-        ]);
-
-        // Always supplement cheer with persistent yell fields that survive clears
-        // (re-yell wipes player1/2_cheer_revealed_cards but not these).
-        const yellIds = new Set([
-            ...(s.initial_yell_revealed_cards || []),
-            ...(s.re_yell_revealed_cards || []),
-        ]);
-        [...yellIds].forEach(cid => {
-            if (cheerIds.has(cid)) return;
-            const owner = ownerOf(cid);
-            if (owner === 0) { p1Cheer.unshift(cid); cheerIds.add(cid); }
-            else if (owner === 1) { p2Cheer.unshift(cid); cheerIds.add(cid); }
+        // 3. Looked cards
+        (s.looked_cards?.cards || []).forEach(c => {
+            const id = typeof c === 'number' ? c : (c.card_id ?? c.id);
+            if (id !== undefined) allIds.add(id);
         });
 
-        // Cost cards — prefer engine-side info (source + owner + private), fall back to IDs.
-        const costEntries = (s.revealed_cost_card_info && s.revealed_cost_card_info.length
-            ? s.revealed_cost_card_info
-            : (s.revealed_cost_cards || [])
-        ).slice().reverse();
-        const costIds = new Set(s.revealed_cost_cards || []);
+        const ids = [...allIds].filter(id => id > 0);
 
-        // Effect cards — same preference.
-        const effectEntries = (s.revealed_card_info && s.revealed_card_info.length
-            ? s.revealed_card_info
-            : (s.revealed_cards || [])
-        ).slice().reverse();
-
-        // Looked cards — CardDisplay[] from the server.
-        const lookedCards = (s.looked_cards?.cards || []).slice().reverse();
-
-        // Helper: determine if a reveal entry is visible from the current perspective.
-        // Private reveals (is_private=true) are only visible to the owner.
-        const isVisible = (entry) => {
-            if (!entry || typeof entry === 'number') return true;
-            if (!entry.is_private) return true;
-            return entry.owner === perspective;
+        const cardToHtml = (id) => {
+            const card = State.resolveCardData(id);
+            if (!card) return `<div class="revealed-card chip">ID:${id}</div>`;
+            const imgPath = resolveCardImagePath(card.card_no);
+            const img = imgPath ? `<img src="${fixImg(imgPath)}" class="revealed-card-img" alt="${card.name}">` : '';
+            return `<div class="revealed-card">${img}<span class="revealed-card-name">${card.name}</span></div>`;
         };
 
-        // Helper: resolve owner from engine info (0/1) or fall back to zone scan.
-        const resolveOwner = (entry) => {
-            if (entry && typeof entry !== 'number' && entry.owner !== -1) return entry.owner;
-            const cid = extractCid(entry);
-            return cid !== undefined ? ownerOf(cid) : -1;
-        };
-
-        // Split cost cards by owner.
-        const p1Cost = [], p2Cost = [], unknownCost = [];
-        for (const entry of costEntries) {
-            if (!isVisible(entry)) continue;
-            const owner = resolveOwner(entry);
-            if (owner === 0) p1Cost.push(entry);
-            else if (owner === 1) p2Cost.push(entry);
-            else unknownCost.push(entry);
-        }
-
-        // Split effect cards by owner, skipping cheer+cost duplicates.
-        const p1Effect = [], p2Effect = [], unknownEffect = [];
-        for (const entry of effectEntries) {
-            const cid = extractCid(entry);
-            if (cid !== undefined && (cheerIds.has(cid) || costIds.has(cid))) continue;
-            if (!isVisible(entry)) continue;
-            const owner = resolveOwner(entry);
-            if (owner === 0) p1Effect.push(entry);
-            else if (owner === 1) p2Effect.push(entry);
-            else unknownEffect.push(entry);
-        }
-
-        // Split looked cards by owner.
-        const p1Looked = [], p2Looked = [], unknownLooked = [];
-        for (const c of lookedCards) {
-            const cid = extractCid(c);
-            if (cid === undefined) { unknownLooked.push(c); continue; }
-            const owner = ownerOf(cid);
-            if (owner === 0) p1Looked.push(c);
-            else if (owner === 1) p2Looked.push(c);
-            else unknownLooked.push(c);
-        }
-
-        const hasP1 = p1Cheer.length || p1Cost.length || p1Effect.length || p1Looked.length;
-        const hasP2 = p2Cheer.length || p2Cost.length || p2Effect.length || p2Looked.length;
-        const hasUnknown = unknownCost.length || unknownEffect.length || unknownLooked.length;
-
-        if (!hasP1 && !hasP2 && !hasUnknown) {
-            content.innerHTML = '<div style="opacity:0.5;padding:40px;text-align:center;">No cards have been revealed this game.</div>';
+        if (!ids.length) {
+            // DEBUG: dump raw state keys so we can see what exists
+            const relevantKeys = Object.keys(s).filter(k => /cheer|reveal|yell|looked/i.test(k));
+            const dump = relevantKeys.map(k => `<p><b>${k}:</b> ${JSON.stringify(s[k])}</p>`).join('');
+            content.innerHTML = `<div style="padding:20px;"><h3 style="color:#f66;">No card IDs found</h3>${dump}</div>`;
             ModalManager.show(DOM_IDS.MODAL_REVEALED);
             return;
         }
 
-        title.textContent = 'Revealed / Looked Cards';
-
-        content.innerHTML = `
-        <div class="revealed-two-column">
-            <div class="revealed-column">
-                <h3 class="revealed-player-header">${p1Label}</h3>
-                ${sectionGrid('Cheer', p1Cheer)}
-                ${sectionGrid('Cost', p1Cost)}
-                ${sectionGrid('Effect', p1Effect)}
-                ${sectionGrid('Looked', p1Looked)}
-                ${!hasP1 ? '<div class="revealed-section" style="opacity:0.4">No revealed cards</div>' : ''}
-            </div>
-            <div class="revealed-column">
-                <h3 class="revealed-player-header">${p2Label}</h3>
-                ${sectionGrid('Cheer', p2Cheer)}
-                ${sectionGrid('Cost', p2Cost)}
-                ${sectionGrid('Effect', p2Effect)}
-                ${sectionGrid('Looked', p2Looked)}
-                ${!hasP2 ? '<div class="revealed-section" style="opacity:0.4">No revealed cards</div>' : ''}
-            </div>
-        </div>
-        ${unknownCost.length || unknownEffect.length || unknownLooked.length ? `
-        <div class="revealed-shared">
-            <h3 class="revealed-player-header">Unknown</h3>
-            ${sectionGrid('Cost', unknownCost)}
-            ${sectionGrid('Effect', unknownEffect)}
-            ${sectionGrid('Looked', unknownLooked)}
-        </div>` : ''}`;
-
+        title.textContent = `Revealed Cards (${ids.length})`;
+        content.innerHTML = `<div class="revealed-grid">${ids.map(cardToHtml).join('')}</div>`;
         ModalManager.show(DOM_IDS.MODAL_REVEALED);
     },
 

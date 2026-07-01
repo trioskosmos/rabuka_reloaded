@@ -1,5 +1,5 @@
-// Node.js test for the yell-fallback logic in showRevealedCardsModal
-// Tests ONLY the data processing logic (not DOM rendering).
+// Node.js test for the COMPLETELY REWRITTEN showRevealedCardsModal logic
+// Tests the flat "collect all IDs from all sources" approach.
 
 const tests = [];
 
@@ -18,217 +18,164 @@ function runTest(name, fn) {
     }
 }
 
-// Simulate the cheer-merge logic exactly as in LogRenderer.js
-function simulateCheerMerge(state, perspectivePlayer) {
+// Simulate the NEW flat-collection logic from showRevealedCardsModal
+function simulateFlatCollect(state) {
     const s = state;
-    const p1Cheer = (s.player1_cheer_revealed_cards || []).slice().reverse();
-    const p2Cheer = (s.player2_cheer_revealed_cards || []).slice().reverse();
-    const cheerIds = new Set([
-        ...(s.player1_cheer_revealed_cards || []),
-        ...(s.player2_cheer_revealed_cards || []),
-    ]);
+    const allIds = new Set();
 
-    // ownerOf fallback: scan all zones
-    const ownerOf = (cid) => {
-        const scan = (pl) => {
-            const c = [];
-            if (pl.stage) {
-                (pl.stage.stage || []).forEach(x => { if (x !== -1) c.push(x); });
-            }
-            if (pl.hand?.cards) c.push(...pl.hand.cards);
-            if (pl.live_zone?.cards) c.push(...pl.live_zone.cards);
-            if (pl.success_live_card_zone?.cards) c.push(...pl.success_live_card_zone.cards);
-            if (pl.waitroom?.cards) c.push(...pl.waitroom.cards);
-            if (pl.energy_zone?.cards) c.push(...pl.energy_zone.cards);
-            if (pl.energy_deck?.cards) c.push(...pl.energy_deck.cards);
-            if (pl.main_deck?.cards) c.push(...pl.main_deck.cards);
-            if (pl.exclusion_zone?.cards) c.push(...pl.exclusion_zone.cards);
-            return c;
-        };
-        const p1s = new Set(scan(s.player1));
-        const p2s = new Set(scan(s.player2));
-        if (p1s.has(cid)) return 0;
-        if (p2s.has(cid)) return 1;
-        return -1;
-    };
+    // 1. Cheer / yell (including persistent fields)
+    for (const src of ['player1_cheer_revealed_cards', 'player2_cheer_revealed_cards',
+                       'initial_yell_revealed_cards', 're_yell_revealed_cards',
+                       'revealed_cost_cards']) {
+        (s[src] || []).forEach(id => allIds.add(id));
+    }
 
-    // THE FIX: Always supplement cheer with persistent yell fields
-    const yellIds = new Set([
-        ...(s.initial_yell_revealed_cards || []),
-        ...(s.re_yell_revealed_cards || []),
-    ]);
-    [...yellIds].forEach(cid => {
-        if (cheerIds.has(cid)) return;
-        const owner = ownerOf(cid);
-        if (owner === 0) { p1Cheer.unshift(cid); cheerIds.add(cid); }
-        else if (owner === 1) { p2Cheer.unshift(cid); cheerIds.add(cid); }
+    // 2. Effect reveals
+    if (s.revealed_card_info?.length) {
+        s.revealed_card_info.forEach(e => { if (e.card_id !== undefined) allIds.add(e.card_id); });
+    } else {
+        (s.revealed_cards || []).forEach(id => allIds.add(id));
+    }
+    if (s.revealed_cost_card_info?.length) {
+        s.revealed_cost_card_info.forEach(e => { if (e.card_id !== undefined) allIds.add(e.card_id); });
+    }
+
+    // 3. Looked cards
+    (s.looked_cards?.cards || []).forEach(c => {
+        const id = typeof c === 'number' ? c : (c.card_id ?? c.id);
+        if (id !== undefined) allIds.add(id);
     });
 
-    return { p1Cheer, p2Cheer, cheerIds };
+    return [...allIds].filter(id => id > 0);
 }
 
-// === TEST 1: Re-yell scenario — cheer arrays empty, yell fields populated ===
+// === TEST 1: Normal yell ===
+runTest('normal yell: cheer arrays populated', () => {
+    const state = {
+        player1_cheer_revealed_cards: [101, 102],
+        player2_cheer_revealed_cards: [201, 202],
+        initial_yell_revealed_cards: [],
+        re_yell_revealed_cards: [],
+        revealed_cost_cards: [],
+        revealed_cards: [101, 102, 201, 202],
+        revealed_card_info: null,
+        revealed_cost_card_info: null,
+        looked_cards: null,
+    };
+    const ids = simulateFlatCollect(state);
+    assert(ids.length === 4, 'Expected 4 IDs, got ' + ids.length);
+    assert(ids.includes(101), 'Missing 101');
+    assert(ids.includes(102), 'Missing 102');
+    assert(ids.includes(201), 'Missing 201');
+    assert(ids.includes(202), 'Missing 202');
+});
+
+// === TEST 2: Re-yell scenario (cheer empty, yell fields populated) ===
 runTest('re-yell: cheer empty, yell fields populated', () => {
     const state = {
-        player1: {
-            hand: { cards: [1,2] },
-            stage: { stage: [-1, -1, -1] },
-            waitroom: { cards: [101, 102] },
-            live_zone: { cards: [] },
-            success_live_card_zone: { cards: [] },
-            energy_zone: { cards: [] },
-            energy_deck: { cards: [] },
-            main_deck: { cards: [] },
-            exclusion_zone: { cards: [] },
-        },
-        player2: {
-            hand: { cards: [3,4] },
-            stage: { stage: [-1, -1, -1] },
-            waitroom: { cards: [] },
-            live_zone: { cards: [] },
-            success_live_card_zone: { cards: [] },
-            energy_zone: { cards: [] },
-            energy_deck: { cards: [] },
-            main_deck: { cards: [] },
-            exclusion_zone: { cards: [] },
-        },
-        player1_cheer_revealed_cards: [],   // cleared by re-yell
-        player2_cheer_revealed_cards: [],   // cleared by re-yell
-        initial_yell_revealed_cards: [101],  // P1's original yell
-        re_yell_revealed_cards: [102],       // P1's re-yell
-    };
-
-    const result = simulateCheerMerge(state, 0);
-
-    // p1Cheer should have both yell cards (in newest-first order: 102, 101)
-    assert(result.p1Cheer.length === 2, 'Expected 2 cards in p1Cheer, got ' + result.p1Cheer.length);
-    assert(result.p1Cheer[0] === 102, 'First card should be 102 (newest), got ' + result.p1Cheer[0]);
-    assert(result.p1Cheer[1] === 101, 'Second card should be 101, got ' + result.p1Cheer[1]);
-    assert(result.p2Cheer.length === 0, 'Expected 0 cards in p2Cheer, got ' + result.p2Cheer.length);
-    assert(result.cheerIds.has(101), 'cheerIds should have 101');
-    assert(result.cheerIds.has(102), 'cheerIds should have 102');
-});
-
-// === TEST 2: Normal yell — cheer arrays populated, no re-yell ===
-runTest('normal yell: cheer arrays populated, yell fields match', () => {
-    const state = {
-        player1: {
-            hand: { cards: [1,2] },
-            stage: { stage: [-1, -1, -1] },
-            waitroom: { cards: [101, 102] },
-            live_zone: { cards: [] },
-            success_live_card_zone: { cards: [] },
-            energy_zone: { cards: [] },
-            energy_deck: { cards: [] },
-            main_deck: { cards: [] },
-            exclusion_zone: { cards: [] },
-        },
-        player2: {
-            hand: { cards: [3,4] },
-            stage: { stage: [-1, -1, -1] },
-            waitroom: { cards: [] },
-            live_zone: { cards: [] },
-            success_live_card_zone: { cards: [] },
-            energy_zone: { cards: [] },
-            energy_deck: { cards: [] },
-            main_deck: { cards: [] },
-            exclusion_zone: { cards: [] },
-        },
-        player1_cheer_revealed_cards: [101, 102], // already populated
-        player2_cheer_revealed_cards: [],
-        initial_yell_revealed_cards: [101, 102],   // same as cheer
-        re_yell_revealed_cards: [],
-    };
-
-    const result = simulateCheerMerge(state, 0);
-
-    // Should have same cards, no duplicates
-    assert(result.p1Cheer.length === 2, 'Expected 2 cards in p1Cheer, got ' + result.p1Cheer.length);
-    assert(result.p1Cheer[0] === 102, 'First should be 102 (newest from reverse), got ' + result.p1Cheer[0]);
-    assert(result.p1Cheer[1] === 101, 'Second should be 101, got ' + result.p1Cheer[1]);
-});
-
-// === TEST 3: Re-yell on first performance, normal second performance ===
-runTest('mixed: re-yell first perf, normal second perf', () => {
-    const state = {
-        player1: {
-            hand: { cards: [1,2] },
-            stage: { stage: [-1, -1, -1] },
-            waitroom: { cards: [101, 102] },
-            live_zone: { cards: [] },
-            success_live_card_zone: { cards: [] },
-            energy_zone: { cards: [] },
-            energy_deck: { cards: [] },
-            main_deck: { cards: [] },
-            exclusion_zone: { cards: [] },
-        },
-        player2: {
-            hand: { cards: [3,4] },
-            stage: { stage: [-1, -1, -1] },
-            waitroom: { cards: [201, 202] },
-            live_zone: { cards: [] },
-            success_live_card_zone: { cards: [] },
-            energy_zone: { cards: [] },
-            energy_deck: { cards: [] },
-            main_deck: { cards: [] },
-            exclusion_zone: { cards: [] },
-        },
-        player1_cheer_revealed_cards: [],      // cleared by re-yell
-        player2_cheer_revealed_cards: [201, 202], // P2's yell from second perf
-        initial_yell_revealed_cards: [101, 102],  // P1's yell (persistent)
-        re_yell_revealed_cards: [],
-    };
-
-    const result = simulateCheerMerge(state, 0);
-
-    // P1's cards from initial_yell_revealed_cards should be in p1Cheer
-    assert(result.p1Cheer.length === 2, 'Expected 2 cards in p1Cheer, got ' + result.p1Cheer.length);
-    assert(result.p1Cheer.includes(101), 'p1Cheer should have 101');
-    assert(result.p1Cheer.includes(102), 'p1Cheer should have 102');
-    // P2's cards from cheer_revealed should be in p2Cheer
-    assert(result.p2Cheer.length === 2, 'Expected 2 cards in p2Cheer, got ' + result.p2Cheer.length);
-    assert(result.p2Cheer.includes(201), 'p2Cheer should have 201');
-    assert(result.p2Cheer.includes(202), 'p2Cheer should have 202');
-});
-
-// === TEST 4: Unknown owner — card stays in effect (not added to cheer) ===
-runTest('unknown owner: card not added to cheer', () => {
-    const state = {
-        player1: {
-            hand: { cards: [1,2] },
-            stage: { stage: [-1, -1, -1] },
-            waitroom: { cards: [] },   // card 999 not here
-            live_zone: { cards: [] },
-            success_live_card_zone: { cards: [] },
-            energy_zone: { cards: [] },
-            energy_deck: { cards: [] },
-            main_deck: { cards: [] },
-            exclusion_zone: { cards: [] },
-        },
-        player2: {
-            hand: { cards: [3,4] },
-            stage: { stage: [-1, -1, -1] },
-            waitroom: { cards: [] },
-            live_zone: { cards: [] },
-            success_live_card_zone: { cards: [] },
-            energy_zone: { cards: [] },
-            energy_deck: { cards: [] },
-            main_deck: { cards: [] },
-            exclusion_zone: { cards: [] },
-        },
         player1_cheer_revealed_cards: [],
         player2_cheer_revealed_cards: [],
-        initial_yell_revealed_cards: [999], // not in any zone
-        re_yell_revealed_cards: [],
+        initial_yell_revealed_cards: [101, 102],
+        re_yell_revealed_cards: [103, 104],
+        revealed_cost_cards: [],
+        revealed_cards: [101, 102, 103, 104],
+        revealed_card_info: null,
+        revealed_cost_card_info: null,
+        looked_cards: null,
     };
+    const ids = simulateFlatCollect(state);
+    assert(ids.length === 4, 'Expected 4 IDs, got ' + ids.length);
+    assert(ids.includes(101), 'Missing 101');
+    assert(ids.includes(103), 'Missing 103');
+});
 
-    const result = simulateCheerMerge(state, 0);
+// === TEST 3: revealed_card_info objects ===
+runTest('revealed_card_info objects with card_id', () => {
+    const state = {
+        player1_cheer_revealed_cards: [],
+        player2_cheer_revealed_cards: [],
+        initial_yell_revealed_cards: [],
+        re_yell_revealed_cards: [],
+        revealed_cost_cards: [],
+        revealed_cards: [101],
+        revealed_card_info: [{ card_id: 101, owner: 0 }, { card_id: 102, owner: 1 }],
+        revealed_cost_card_info: null,
+        looked_cards: null,
+    };
+    const ids = simulateFlatCollect(state);
+    assert(ids.length === 2, 'Expected 2 IDs from revealed_card_info, got ' + ids.length);
+    assert(ids.includes(101), 'Missing 101');
+    assert(ids.includes(102), 'Missing 102');
+});
 
-    // Owner is unknown (-1), should NOT add to cheer
-    assert(result.p1Cheer.length === 0, 'p1Cheer should be empty, got ' + result.p1Cheer.length);
-    assert(result.p2Cheer.length === 0, 'p2Cheer should be empty, got ' + result.p2Cheer.length);
-    // Should NOT be in cheerIds (so it appears in Effect section)
-    assert(!result.cheerIds.has(999), 'cheerIds should NOT have 999 (unknown owner stays in Effect)');
+// === TEST 4: Looked cards ===
+runTest('looked cards with card_id', () => {
+    const state = {
+        player1_cheer_revealed_cards: [],
+        player2_cheer_revealed_cards: [],
+        initial_yell_revealed_cards: [],
+        re_yell_revealed_cards: [],
+        revealed_cost_cards: [],
+        revealed_cards: [],
+        revealed_card_info: null,
+        revealed_cost_card_info: null,
+        looked_cards: { cards: [{ card_id: 101, id: 101 }, { card_id: 102, id: 102 }] },
+    };
+    const ids = simulateFlatCollect(state);
+    assert(ids.length === 2, 'Expected 2 looked card IDs, got ' + ids.length);
+});
+
+// === TEST 5: Deduplication ===
+runTest('deduplication across sources', () => {
+    const state = {
+        player1_cheer_revealed_cards: [101],
+        player2_cheer_revealed_cards: [],
+        initial_yell_revealed_cards: [101],  // same card
+        re_yell_revealed_cards: [],
+        revealed_cost_cards: [101],          // same card
+        revealed_cards: [101],
+        revealed_card_info: null,
+        revealed_cost_card_info: null,
+        looked_cards: null,
+    };
+    const ids = simulateFlatCollect(state);
+    assert(ids.length === 1, 'Expected 1 ID (deduped), got ' + ids.length);
+    assert(ids[0] === 101, 'Expected 101');
+});
+
+// === TEST 6: Negative IDs filtered out ===
+runTest('negative IDs filtered out', () => {
+    const state = {
+        player1_cheer_revealed_cards: [-1, -2, 101],
+        player2_cheer_revealed_cards: [],
+        initial_yell_revealed_cards: [],
+        re_yell_revealed_cards: [],
+        revealed_cost_cards: [],
+        revealed_cards: [],
+        revealed_card_info: null,
+        revealed_cost_card_info: null,
+        looked_cards: null,
+    };
+    const ids = simulateFlatCollect(state);
+    assert(ids.length === 1, 'Expected 1 positive ID, got ' + ids.length);
+    assert(ids[0] === 101, 'Expected 101');
+});
+
+// === TEST 7: Empty state ===
+runTest('empty state returns empty array', () => {
+    const state = {
+        player1_cheer_revealed_cards: [],
+        player2_cheer_revealed_cards: [],
+        initial_yell_revealed_cards: [],
+        re_yell_revealed_cards: [],
+        revealed_cost_cards: [],
+        revealed_cards: [],
+        revealed_card_info: null,
+        revealed_cost_card_info: null,
+        looked_cards: null,
+    };
+    const ids = simulateFlatCollect(state);
+    assert(ids.length === 0, 'Expected empty array, got ' + ids.length);
 });
 
 // === SUMMARY ===
