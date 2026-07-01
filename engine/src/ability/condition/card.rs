@@ -3745,18 +3745,9 @@ impl<'a> ConditionContext<'a> {
                 } else {
                     None
                 };
-                let filter = util::CardFilter {
-                    card_type: condition.card_type.as_deref(),
-                    group: condition
-                        .group_names
-                        .as_ref()
-                        .and_then(|v| v.first())
-                        .map(|s| s.as_str()),
-                    groups: condition.group_names.as_ref().map(|v| v),
-                    exclude_self: exclude_id,
-                    characters: condition.characters.as_ref().map(|v| v),
-                    ..util::CardFilter::default()
-                };
+                let mut filter = condition.filter_subset();
+                filter.exclude_self = exclude_id;
+                filter.groups = condition.group_names.as_ref().map(|v| v);
                 let max_cost = cards
                     .iter()
                     .filter(|&&id| filter.matches(card_db, id, false))
