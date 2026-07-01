@@ -1214,24 +1214,16 @@ impl<'a> ConditionContext<'a> {
             }
         }
 
-        let group = condition
-            .group_names
-            .as_ref()
-            .and_then(|g| g.first().map(|s| s.as_str()))
-            .or_else(|| {
-                if condition.group_reference.as_deref() == Some("same_group_name") {
-                    self.activating_card_id
-                        .and_then(|cid| self.game_state.card_database.get_card(cid))
-                        .map(|c| c.group.as_str())
-                } else {
-                    None
-                }
-            });
+        let group_override = condition.group_reference.as_deref().and_then(|gr| {
+            if gr == "same_group_name" {
+                self.activating_card_id
+                    .and_then(|cid| self.game_state.card_database.get_card(cid))
+                    .map(|c| c.group.as_str())
+            } else {
+                None
+            }
+        });
         let op = condition.operator.as_deref();
-        let cost_op = condition
-            .cost_limit_operator
-            .as_deref()
-            .or(condition.operator.as_deref());
 
         let cards: Vec<i16> = if Zone::from_str(location) == Some(Zone::RevealedCards) {
             // When yell_trigger is true, the ability triggers on yell alone
@@ -1251,34 +1243,21 @@ impl<'a> ConditionContext<'a> {
             util::zone_cards(player, location).to_vec()
         };
 
-        let count = if condition.exclude_self.unwrap_or(false) {
-            let ex_id = self.activating_card_id;
-            cards
-                .iter()
-                .filter(|&&id| {
-                    id != -1
-                        && Some(id) != ex_id
-                        && util::card_matches_type(card_db, id, condition.card_type.as_deref())
-                        && util::card_matches_group_str(card_db, id, group)
-                        && util::card_matches_cost_limit_op(
-                            card_db,
-                            id,
-                            condition.cost_limit,
-                            cost_op,
-                        )
-                        && util::card_matches_characters(card_db, id, condition.characters.as_ref())
-                        && self.check_original_blade_filter(condition, id)
-                        && self.check_original_heart_filter(condition, id)
-                        && self.check_heart_type_all_per_card(condition, card_db, id)
-                })
-                .count() as u32
-        } else {
-            let mut filter = util::CardFilter::default();
-            filter.card_type = condition.card_type.as_deref();
-            filter.group = group;
-            filter.cost_limit = condition.cost_limit;
-            filter.cost_operator = cost_op;
-            filter.characters = condition.characters.as_ref();
+        let effective_group = group_override.or_else(|| {
+            condition
+                .group_names
+                .as_ref()
+                .and_then(|g| g.first().map(|s| s.as_str()))
+        });
+
+        let count = {
+            let mut filter = condition.filter_subset();
+            if let Some(grp) = group_override {
+                filter.group = Some(grp);
+            }
+            if condition.exclude_self.unwrap_or(false) {
+                filter.exclude_self = self.activating_card_id;
+            }
             cards
                 .iter()
                 .filter(|&&id| {
@@ -1308,7 +1287,7 @@ impl<'a> ConditionContext<'a> {
                                     id,
                                     condition.card_type.as_deref(),
                                 )
-                                && util::card_matches_group_str(card_db, id, group)
+                                && util::card_matches_group_str(card_db, id, effective_group)
                                 && util::card_matches_characters(
                                     card_db,
                                     id,

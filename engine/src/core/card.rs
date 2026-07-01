@@ -1592,7 +1592,10 @@ impl Condition {
                 .and_then(|v| v.first())
                 .map(|s| s.as_str()),
             cost_limit: self.cost_limit,
-            cost_operator: self.operator.as_deref(),
+            cost_operator: self
+                .cost_limit_operator
+                .as_deref()
+                .or(self.operator.as_deref()),
             characters: self.characters.as_ref(),
             exclude_characters: self.exclude_characters.as_ref(),
             exclude_self: None,
