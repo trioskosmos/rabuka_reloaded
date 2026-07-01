@@ -780,9 +780,12 @@ impl AbilityResolver {
                 let explicit_count = cost.count.unwrap_or(1) as usize;
 
                 if has_explicit_count && card_ids.len() <= explicit_count {
+                    let cost_source = gs.current_ability_source_card_id();
+                    let cost_owner =
+                        util::target_player_index(target, gs.ability_master_id().as_deref());
                     for &card_id in &card_ids {
-                        gs.revealed_cards.push(card_id);
-                        gs.revealed_cost_cards.push(card_id);
+                        gs.push_revealed_card(card_id, cost_source, false, cost_owner);
+                        gs.push_revealed_cost_card(card_id, cost_source, false, cost_owner);
                     }
                     Ok(())
                 } else {

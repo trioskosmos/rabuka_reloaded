@@ -282,6 +282,26 @@ fn cost_threshold_met(card: &crate::card::Card, effect: &crate::card::AbilityEff
     true
 }
 
+/// Returns 0 for player1, 1 for player2 based on target and ability master.
+pub fn target_player_index(target: &str, master: Option<&str>) -> Option<u8> {
+    match (target, master) {
+        ("self", Some("player2") | Some("p2")) => Some(1),
+        ("self", _) => Some(0),
+        ("opponent", Some("player2") | Some("p2")) => Some(0),
+        ("opponent", _) => Some(1),
+        (t, _) => {
+            // Try to parse player label
+            if t.eq_ignore_ascii_case("player1") || t == "p1" {
+                Some(0)
+            } else if t.eq_ignore_ascii_case("player2") || t == "p2" {
+                Some(1)
+            } else {
+                None
+            }
+        }
+    }
+}
+
 pub fn target_player_label(target: &str, master: Option<&str>) -> &'static str {
     match (target, master) {
         ("self", Some("player2") | Some("p2")) => "P2",

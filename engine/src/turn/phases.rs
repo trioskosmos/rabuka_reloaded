@@ -153,6 +153,10 @@ impl super::TurnEngine {
                     }
                     game_state.clear_revealed_cards();
                     game_state.revealed_cost_cards.clear();
+                    game_state.revealed_cost_card_sources.clear();
+                    game_state.revealed_cost_card_source_names.clear();
+                    game_state.revealed_cost_card_is_private.clear();
+                    game_state.revealed_cost_card_owners.clear();
                     game_state.turn_limited_abilities_used.clear();
                     game_state.turn_number += 1;
                     game_state.current_turn_phase =
@@ -246,8 +250,13 @@ impl super::TurnEngine {
             is_first,
             revealed_ids
         );
+        let yell_owner: Option<u8> = if performer_id == game_state.player1.id {
+            Some(0)
+        } else {
+            Some(1)
+        };
         for cid in &revealed_ids {
-            game_state.revealed_cards.push(*cid);
+            game_state.push_revealed_card(*cid, None, false, yell_owner);
         }
         // Save initial yell cards BEFORE auto abilities fire, since
         // re-yell abilities may discard them (clearing revealed_cards).

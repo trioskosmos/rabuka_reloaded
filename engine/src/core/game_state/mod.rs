@@ -61,7 +61,15 @@ pub struct GameState {
     pub replacement_effects: Vec<ReplacementEffect>,
     pub constant_ability_statuses: Vec<crate::types::ConstantAbilityStatus>,
     pub revealed_cards: Vec<i16>,
+    pub revealed_card_sources: Vec<Option<i16>>,
+    pub revealed_card_source_names: Vec<Option<String>>,
+    pub revealed_card_is_private: Vec<bool>,
+    pub revealed_card_owners: Vec<Option<u8>>,
     pub revealed_cost_cards: Vec<i16>,
+    pub revealed_cost_card_sources: Vec<Option<i16>>,
+    pub revealed_cost_card_source_names: Vec<Option<String>>,
+    pub revealed_cost_card_is_private: Vec<bool>,
+    pub revealed_cost_card_owners: Vec<Option<u8>>,
     pub player1_cheer_revealed_cards: Vec<i16>,
     pub player2_cheer_revealed_cards: Vec<i16>,
     /// Cards revealed by the initial yell (saved before re-yell overwrites them).
@@ -253,7 +261,15 @@ impl GameState {
             replacement_effects: Vec::new(),
             constant_ability_statuses: Vec::new(),
             revealed_cards: Vec::new(),
+            revealed_card_sources: Vec::new(),
+            revealed_card_source_names: Vec::new(),
+            revealed_card_is_private: Vec::new(),
+            revealed_card_owners: Vec::new(),
             revealed_cost_cards: Vec::new(),
+            revealed_cost_card_sources: Vec::new(),
+            revealed_cost_card_source_names: Vec::new(),
+            revealed_cost_card_is_private: Vec::new(),
+            revealed_cost_card_owners: Vec::new(),
             player1_cheer_revealed_cards: Vec::new(),
             player2_cheer_revealed_cards: Vec::new(),
             initial_yell_revealed_cards: Vec::new(),
@@ -539,6 +555,47 @@ impl GameState {
         } else {
             &mut self.player2_cheer_revealed_cards
         }
+    }
+
+    /// Push a card to revealed_cards with source/owner/private tracking.
+    pub fn push_revealed_card(
+        &mut self,
+        card_id: i16,
+        source_card_id: Option<i16>,
+        is_private: bool,
+        owner: Option<u8>,
+    ) {
+        let source_name = source_card_id
+            .and_then(|sid| self.card_database.get_card(sid))
+            .map(|c| c.name.clone());
+        self.revealed_cards.push(card_id);
+        self.revealed_card_sources.push(source_card_id);
+        self.revealed_card_source_names.push(source_name);
+        self.revealed_card_is_private.push(is_private);
+        self.revealed_card_owners.push(owner);
+    }
+
+    /// Push a card to revealed_cost_cards with source/owner/private tracking.
+    pub fn push_revealed_cost_card(
+        &mut self,
+        card_id: i16,
+        source_card_id: Option<i16>,
+        is_private: bool,
+        owner: Option<u8>,
+    ) {
+        let source_name = source_card_id
+            .and_then(|sid| self.card_database.get_card(sid))
+            .map(|c| c.name.clone());
+        self.revealed_cost_cards.push(card_id);
+        self.revealed_cost_card_sources.push(source_card_id);
+        self.revealed_cost_card_source_names.push(source_name);
+        self.revealed_cost_card_is_private.push(is_private);
+        self.revealed_cost_card_owners.push(owner);
+    }
+
+    /// Get the source card ID from the current ability queue entry, if any.
+    pub fn current_ability_source_card_id(&self) -> Option<i16> {
+        self.ability_queue.current_entry().and_then(|e| e.card_id)
     }
 
     /// Push a log entry to both rule_log and structured_log.

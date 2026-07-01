@@ -3238,8 +3238,9 @@ impl AbilityResolver {
                 }
                 drawn
             };
+            let reyell_source = gs.current_ability_source_card_id();
             for cid in total_blade {
-                gs.revealed_cards.push(cid);
+                gs.push_revealed_card(cid, reyell_source, false, None);
             }
         }
         gs.re_yell_revealed_cards = gs.revealed_cards.clone();

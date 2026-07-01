@@ -287,8 +287,10 @@ impl AbilityResolver {
             }
         };
 
+        let reveal_src = gs.current_ability_source_card_id();
+        let owner = util::target_player_index(target, gs.ability_master_id().as_deref());
         for card_id in &card_ids {
-            gs.revealed_cards.push(*card_id);
+            gs.push_revealed_card(*card_id, reveal_src, false, owner);
         }
 
         if !card_ids.is_empty() {
@@ -885,9 +887,11 @@ impl AbilityResolver {
             by_group.entry(group_name).or_default().push(card_id);
         }
 
+        let pg_source = gs.current_ability_source_card_id();
+        let pg_owner = util::target_player_index(target, gs.ability_master_id().as_deref());
         for members in by_group.values() {
             for &card_id in members {
-                gs.revealed_cards.push(card_id);
+                gs.push_revealed_card(card_id, pg_source, false, pg_owner);
             }
         }
 
@@ -919,6 +923,8 @@ impl AbilityResolver {
         let card_db = gs.card_database.clone();
         let mut all_revealed = Vec::new();
         let mut matched_idx = None;
+        let ru_source = gs.current_ability_source_card_id();
+        let ru_owner = util::target_player_index(target, gs.ability_master_id().as_deref());
 
         loop {
             let card_id = {
@@ -928,7 +934,7 @@ impl AbilityResolver {
             match card_id {
                 Some(cid) => {
                     all_revealed.push(cid);
-                    gs.revealed_cards.push(cid);
+                    gs.push_revealed_card(cid, ru_source, false, ru_owner);
                     if termination_check(&card_db, cid) {
                         matched_idx = Some(all_revealed.len() - 1);
                         break;
@@ -948,7 +954,7 @@ impl AbilityResolver {
                     player.main_deck.shuffle();
                     if let Some(cid) = player.main_deck.draw() {
                         all_revealed.push(cid);
-                        gs.revealed_cards.push(cid);
+                        gs.push_revealed_card(cid, ru_source, false, ru_owner);
                         if termination_check(&card_db, cid) {
                             matched_idx = Some(all_revealed.len() - 1);
                             break;

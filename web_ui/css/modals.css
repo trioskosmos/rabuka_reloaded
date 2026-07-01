@@ -457,6 +457,16 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+.revealed-card-source {
+    font-size: 0.55rem;
+    color: var(--accent-gold);
+    text-align: center;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    opacity: 0.8;
+}
 
 /* Two-column revealed modal layout */
 .revealed-two-column {

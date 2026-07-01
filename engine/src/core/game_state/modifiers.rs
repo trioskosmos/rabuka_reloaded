@@ -1074,7 +1074,8 @@ impl GameState {
     }
 
     pub fn add_revealed_card(&mut self, card_id: i16) {
-        self.revealed_cards.push(card_id);
+        let src = self.current_ability_source_card_id();
+        self.push_revealed_card(card_id, src, false, None);
     }
 
     pub fn remove_revealed_card(&mut self, card_id: i16) {
@@ -1087,6 +1088,10 @@ impl GameState {
 
     pub fn clear_revealed_cards(&mut self) {
         self.revealed_cards.clear();
+        self.revealed_card_sources.clear();
+        self.revealed_card_source_names.clear();
+        self.revealed_card_is_private.clear();
+        self.revealed_card_owners.clear();
         self.player1_cheer_revealed_cards.clear();
         self.player2_cheer_revealed_cards.clear();
     }

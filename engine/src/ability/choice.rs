@@ -205,10 +205,11 @@ impl super::resolver::AbilityResolver {
 
     fn reveal_selected_looked_at(&mut self, gs: &mut GameState, indices: &[usize]) {
         let mut revealed_ids = Vec::new();
+        let source = gs.current_ability_source_card_id();
         for &idx in indices.iter() {
             if idx < gs.looked_at_cards.len() {
                 let cid = gs.looked_at_cards[idx];
-                gs.revealed_cards.push(cid);
+                gs.push_revealed_card(cid, source, false, None);
                 revealed_ids.push(cid);
             }
         }
@@ -1238,8 +1239,10 @@ impl super::resolver::AbilityResolver {
             util::resolve_indices_to_ids(player, Zone::Hand.to_str(), ids_to_reveal)
         };
 
+        let source = gs.current_ability_source_card_id();
+        let owner = util::target_player_index(&target, gs.ability_master_id().as_deref());
         for &cid in &revealed_card_ids {
-            gs.revealed_cards.push(cid);
+            gs.push_revealed_card(cid, source, false, owner);
         }
         if !revealed_card_ids.is_empty() {
             let names: Vec<String> = revealed_card_ids
@@ -1257,8 +1260,10 @@ impl super::resolver::AbilityResolver {
             ));
         }
         if !effect_started {
+            let cost_source = gs.current_ability_source_card_id();
+            let cost_owner = util::target_player_index(&target, gs.ability_master_id().as_deref());
             for &cid in &revealed_card_ids {
-                gs.revealed_cost_cards.push(cid);
+                gs.push_revealed_cost_card(cid, cost_source, false, cost_owner);
             }
         }
 
@@ -1446,9 +1451,15 @@ impl super::resolver::AbilityResolver {
                 ));
             }
         }
+        let cost_source = gs.current_ability_source_card_id();
+        let cost_owner: Option<u8> = if std::ptr::eq(gs.active_player(), &gs.player1) {
+            Some(0)
+        } else {
+            Some(1)
+        };
         for card_id in card_ids {
-            gs.revealed_cards.push(card_id);
-            gs.revealed_cost_cards.push(card_id);
+            gs.push_revealed_card(card_id, cost_source, false, cost_owner);
+            gs.push_revealed_cost_card(card_id, cost_source, false, cost_owner);
         }
         self.finalize_choice(gs, context)
     }

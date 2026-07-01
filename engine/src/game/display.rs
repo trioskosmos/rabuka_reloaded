@@ -251,6 +251,19 @@ pub struct StageDisplay {
     pub right_under: Vec<CardDisplay>,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct RevealedCardDisplay {
+    pub card_id: i16,
+    #[serde(default)]
+    pub source_card_id: Option<i16>,
+    #[serde(default)]
+    pub source_card_name: Option<String>,
+    #[serde(default)]
+    pub owner: i8,
+    #[serde(default)]
+    pub is_private: bool,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct GameStateDisplay {
     pub turn: u32,
@@ -460,6 +473,10 @@ pub struct GameStateDisplay {
     pub initial_yell_revealed_cards: Vec<i16>,
     #[serde(default)]
     pub re_yell_revealed_cards: Vec<i16>,
+    #[serde(default)]
+    pub revealed_card_info: Vec<RevealedCardDisplay>,
+    #[serde(default)]
+    pub revealed_cost_card_info: Vec<RevealedCardDisplay>,
     #[serde(default)]
     pub heart_color_decision_phase: String,
     #[serde(default)]
@@ -1351,7 +1368,8 @@ pub fn player_to_display(
 
 pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     // Collect publicly visible revealed cards + pending_choice selection cards
-    let mut looked_ids: Vec<i16> = game_state.revealed_cards.clone();
+    let mut looked_ids: Vec<i16> = game_state.looked_at_cards.clone();
+    looked_ids.extend(&game_state.revealed_cards);
     if let Some(ref pc) = game_state.get_pending_choice_json() {
         if let Some(cards) = pc.get("selection_cards").and_then(|v| v.as_array()) {
             for val in cards {
@@ -1827,6 +1845,38 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         player1_cheer_revealed_cards: game_state.player1_cheer_revealed_cards.clone(),
         player2_cheer_revealed_cards: game_state.player2_cheer_revealed_cards.clone(),
         revealed_cards: game_state.revealed_cards.clone(),
+        revealed_card_info: game_state
+            .revealed_cards
+            .iter()
+            .enumerate()
+            .map(|(i, &cid)| {
+                let src_id = game_state.revealed_card_sources.get(i).copied().flatten();
+                let src_name = game_state
+                    .revealed_card_source_names
+                    .get(i)
+                    .cloned()
+                    .flatten();
+                let owner = game_state
+                    .revealed_card_owners
+                    .get(i)
+                    .copied()
+                    .flatten()
+                    .map(|o| o as i8)
+                    .unwrap_or(-1i8);
+                let is_private = game_state
+                    .revealed_card_is_private
+                    .get(i)
+                    .copied()
+                    .unwrap_or(false);
+                RevealedCardDisplay {
+                    card_id: cid,
+                    source_card_id: src_id,
+                    source_card_name: src_name,
+                    owner,
+                    is_private,
+                }
+            })
+            .collect(),
         initial_yell_revealed_cards: game_state.initial_yell_revealed_cards.clone(),
         re_yell_revealed_cards: game_state.re_yell_revealed_cards.clone(),
         heart_color_decision_phase: game_state.heart_color_decision_phase.clone(),
@@ -1838,6 +1888,42 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .clone(),
         resolution_zone_cards: game_state.resolution_zone.cards.iter().copied().collect(),
         revealed_cost_cards: game_state.revealed_cost_cards.clone(),
+        revealed_cost_card_info: game_state
+            .revealed_cost_cards
+            .iter()
+            .enumerate()
+            .map(|(i, &cid)| {
+                let src_id = game_state
+                    .revealed_cost_card_sources
+                    .get(i)
+                    .copied()
+                    .flatten();
+                let src_name = game_state
+                    .revealed_cost_card_source_names
+                    .get(i)
+                    .cloned()
+                    .flatten();
+                let owner = game_state
+                    .revealed_cost_card_owners
+                    .get(i)
+                    .copied()
+                    .flatten()
+                    .map(|o| o as i8)
+                    .unwrap_or(-1i8);
+                let is_private = game_state
+                    .revealed_cost_card_is_private
+                    .get(i)
+                    .copied()
+                    .unwrap_or(false);
+                RevealedCardDisplay {
+                    card_id: cid,
+                    source_card_id: src_id,
+                    source_card_name: src_name,
+                    owner,
+                    is_private,
+                }
+            })
+            .collect(),
         ability_applications: ability_apps,
         effect_creation_counter: game_state.effect_creation_counter,
         last_state_change_wait_to_active_count: game_state.last_state_change_wait_to_active_count,

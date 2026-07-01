@@ -22,11 +22,8 @@ pub const BATON_TOUCH: &str = "baton touch";
 pub const DEBUT_EN: &str = "Debut";
 pub const LIVE_SUCCESS_EN: &str = "live_success";
 
-// Each_time watcher trigger substrings — these are matched against
-// condition.text in each_time abilities on live cards.
-// The text must CONTAIN the substring for the watcher to fire.
-//
 // Jidou auto trigger types parsed from abilities.json (17 sub-types):
+// The TAS scan catches all of them via standard condition evaluation.
 //
 //  1. on_yell         — "自分がエールしたとき" / "エールにより公開された"
 //  2. on_area_move    — "このメンバーがエリアを移動したとき/するたび"
@@ -60,12 +57,8 @@ pub fn trigger_to_texticon(trigger: &str) -> String {
     }
 }
 
-// Substrings for each_time watchers on live cards (used in trigger_each_time_abilities):
-// 登場  → matches debut/ally appearance watchers
-// ライブ開始時 → matches live start watchers
-// ライブ成功時 → matches live success watchers
-// エリアを移動 → matches area move watchers
-// ウェイト状態 → matches state change to wait watchers
+// All jidou/each_time abilities are handled by the unified TAS scan
+// (trigger_auto_abilities_for_player_with_event). No separate scan needed.
 // 控え室に置かれ → matches discard watchers
 // エネルギー置き場 → matches energy placement watchers
 // エール → matches yell watchers

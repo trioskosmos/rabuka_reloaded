@@ -1124,12 +1124,31 @@ export const LogRenderer = {
         const content = document.getElementById(DOM_IDS.REVEALED_CONTENT);
         if (!title || !content) return;
 
-        const cardToHtml = (idOrCard) => {
-            const card = typeof idOrCard === 'number' ? State.resolveCardData(idOrCard) : idOrCard;
-            if (!card) return `<div class="revealed-card chip">ID:${typeof idOrCard === 'number' ? idOrCard : '?'}</div>`;
+        // Resolve card data to { card_no, name }, handling multiple input types.
+        const resolveCard = (entry) => {
+            if (!entry) return null;
+            if (typeof entry === 'number') return State.resolveCardData(entry);
+            if (entry.card_id !== undefined) return State.resolveCardData(entry.card_id);
+            if (entry.id !== undefined) return State.resolveCardData(entry.id);
+            return entry;
+        };
+        const extractCid = (entry) => {
+            if (typeof entry === 'number') return entry;
+            return entry.card_id ?? entry.id;
+        };
+
+        // Render a single card with optional source label.
+        const cardToHtml = (entry) => {
+            const card = resolveCard(entry);
+            if (!card) {
+                const id = extractCid(entry);
+                return `<div class="revealed-card chip">ID:${id ?? '?'}</div>`;
+            }
             const imgPath = resolveCardImagePath(card.card_no);
             const img = imgPath ? `<img src="${fixImg(imgPath)}" class="revealed-card-img" alt="${card.name}">` : '';
-            return `<div class="revealed-card">${img}<span class="revealed-card-name">${card.name}</span></div>`;
+            const srcName = entry && entry.source_card_name;
+            const srcHtml = srcName ? `<span class="revealed-card-source">via ${srcName}</span>` : '';
+            return `<div class="revealed-card">${img}<span class="revealed-card-name">${card.name}</span>${srcHtml}</div>`;
         };
 
         const sectionGrid = (label, items) => {
@@ -1137,85 +1156,107 @@ export const LogRenderer = {
             return `<div class="revealed-section"><h4>${label} (${items.length})</h4><div class="revealed-grid">${items.map(cardToHtml).join('')}</div></div>`;
         };
 
-        // Determine card ownership by scanning all zones (cards no longer in
-        // any zone after revealing are shown in "Unknown").
+        // Old zone-scanning owner detection used as fallback when
+        // engine-side owner tracking is unavailable.
         const ownerOf = (cid) => {
-            const p = (pl) => {
-                const cards = [];
+            const scan = (pl) => {
+                const c = [];
                 if (pl.stage) {
-                    (pl.stage.stage || []).forEach(c => { if (c !== -1) cards.push(c); });
-                    Object.values(pl.stage).filter(v => Array.isArray(v)).forEach(arr => arr.forEach(c => { if (typeof c === 'number' && c !== -1) cards.push(c); }));
+                    (pl.stage.stage || []).forEach(x => { if (x !== -1) c.push(x); });
+                    Object.values(pl.stage).filter(v => Array.isArray(v)).forEach(arr => arr.forEach(x => { if (typeof x === 'number' && x !== -1) c.push(x); }));
                 }
-                if (pl.hand?.cards) cards.push(...pl.hand.cards);
-                if (pl.live_zone?.cards) cards.push(...pl.live_zone.cards);
-                if (pl.success_live_card_zone?.cards) cards.push(...pl.success_live_card_zone.cards);
-                if (pl.waitroom?.cards) cards.push(...pl.waitroom.cards);
-                if (pl.energy_zone?.cards) cards.push(...pl.energy_zone.cards);
-                if (pl.energy_deck?.cards) cards.push(...pl.energy_deck.cards);
-                if (pl.main_deck?.cards) cards.push(...pl.main_deck.cards);
-                if (pl.exclusion_zone?.cards) cards.push(...pl.exclusion_zone.cards);
-                return cards;
+                if (pl.hand?.cards) c.push(...pl.hand.cards);
+                if (pl.live_zone?.cards) c.push(...pl.live_zone.cards);
+                if (pl.success_live_card_zone?.cards) c.push(...pl.success_live_card_zone.cards);
+                if (pl.waitroom?.cards) c.push(...pl.waitroom.cards);
+                if (pl.energy_zone?.cards) c.push(...pl.energy_zone.cards);
+                if (pl.energy_deck?.cards) c.push(...pl.energy_deck.cards);
+                if (pl.main_deck?.cards) c.push(...pl.main_deck.cards);
+                if (pl.exclusion_zone?.cards) c.push(...pl.exclusion_zone.cards);
+                return c;
             };
-            const p1cards = new Set(p(s.player1));
-            const p2cards = new Set(p(s.player2));
-            if (p1cards.has(cid)) return 0;
-            if (p2cards.has(cid)) return 1;
+            const p1s = new Set(scan(s.player1));
+            const p2s = new Set(scan(s.player2));
+            if (p1s.has(cid)) return 0;
+            if (p2s.has(cid)) return 1;
             return -1;
         };
 
-        // Source data — newest-first order throughout (array is in push order,
-        // last element is most recent).
+        const perspective = State.perspectivePlayer; // 0=P1 1=P2
+        const p1Label = perspective === 0 ? 'You' : 'Opponent';
+        const p2Label = perspective === 1 ? 'You' : 'Opponent';
+
+        // Cheer cards — already per-player, source is implicit.
         const p1Cheer = (s.player1_cheer_revealed_cards || []).slice().reverse();
         const p2Cheer = (s.player2_cheer_revealed_cards || []).slice().reverse();
-        const costRevealed = (s.revealed_cost_cards || []).slice().reverse();
-        const allRevealed = (s.revealed_cards || []).slice().reverse();
-        const lookedCards = (s.looked_cards?.cards || []).slice().reverse();
-
-        // Build dedup sets: cheer and cost are per-player/known categories.
         const cheerIds = new Set([
             ...(s.player1_cheer_revealed_cards || []),
             ...(s.player2_cheer_revealed_cards || []),
         ]);
+
+        // Cost cards — prefer engine-side info (source + owner + private), fall back to IDs.
+        const costEntries = (s.revealed_cost_card_info && s.revealed_cost_card_info.length
+            ? s.revealed_cost_card_info
+            : (s.revealed_cost_cards || [])
+        ).slice().reverse();
         const costIds = new Set(s.revealed_cost_cards || []);
 
-        // Split cost-revealed cards by owner.
-        const p1Cost = [];
-        const p2Cost = [];
-        const unknownCost = [];
-        for (const cid of costRevealed) {
-            const owner = ownerOf(cid);
-            if (owner === 0) p1Cost.push(cid);
-            else if (owner === 1) p2Cost.push(cid);
-            else unknownCost.push(cid);
+        // Effect cards — same preference.
+        const effectEntries = (s.revealed_card_info && s.revealed_card_info.length
+            ? s.revealed_card_info
+            : (s.revealed_cards || [])
+        ).slice().reverse();
+
+        // Looked cards — CardDisplay[] from the server.
+        const lookedCards = (s.looked_cards?.cards || []).slice().reverse();
+
+        // Helper: determine if a reveal entry is visible from the current perspective.
+        // Private reveals (is_private=true) are only visible to the owner.
+        const isVisible = (entry) => {
+            if (!entry || typeof entry === 'number') return true;
+            if (!entry.is_private) return true;
+            return entry.owner === perspective;
+        };
+
+        // Helper: resolve owner from engine info (0/1) or fall back to zone scan.
+        const resolveOwner = (entry) => {
+            if (entry && typeof entry !== 'number' && entry.owner !== -1) return entry.owner;
+            const cid = extractCid(entry);
+            return cid !== undefined ? ownerOf(cid) : -1;
+        };
+
+        // Split cost cards by owner.
+        const p1Cost = [], p2Cost = [], unknownCost = [];
+        for (const entry of costEntries) {
+            if (!isVisible(entry)) continue;
+            const owner = resolveOwner(entry);
+            if (owner === 0) p1Cost.push(entry);
+            else if (owner === 1) p2Cost.push(entry);
+            else unknownCost.push(entry);
         }
 
-        // Split effect-revealed cards by owner, skipping cheer+cost duplicates.
-        const p1Effect = [];
-        const p2Effect = [];
-        const unknownEffect = [];
-        for (const cid of allRevealed) {
-            if (cheerIds.has(cid) || costIds.has(cid)) continue;
-            const owner = ownerOf(cid);
-            if (owner === 0) p1Effect.push(cid);
-            else if (owner === 1) p2Effect.push(cid);
-            else unknownEffect.push(cid);
+        // Split effect cards by owner, skipping cheer+cost duplicates.
+        const p1Effect = [], p2Effect = [], unknownEffect = [];
+        for (const entry of effectEntries) {
+            const cid = extractCid(entry);
+            if (cid !== undefined && (cheerIds.has(cid) || costIds.has(cid))) continue;
+            if (!isVisible(entry)) continue;
+            const owner = resolveOwner(entry);
+            if (owner === 0) p1Effect.push(entry);
+            else if (owner === 1) p2Effect.push(entry);
+            else unknownEffect.push(entry);
         }
 
         // Split looked cards by owner.
-        const p1Looked = [];
-        const p2Looked = [];
-        const unknownLooked = [];
+        const p1Looked = [], p2Looked = [], unknownLooked = [];
         for (const c of lookedCards) {
-            const cid = typeof c === 'number' ? c : (c.id ?? c.card_id);
+            const cid = extractCid(c);
             if (cid === undefined) { unknownLooked.push(c); continue; }
             const owner = ownerOf(cid);
             if (owner === 0) p1Looked.push(c);
             else if (owner === 1) p2Looked.push(c);
             else unknownLooked.push(c);
         }
-
-        const p1Label = State.perspectivePlayer === 0 ? 'You' : 'Opponent';
-        const p2Label = State.perspectivePlayer === 1 ? 'You' : 'Opponent';
 
         const hasP1 = p1Cheer.length || p1Cost.length || p1Effect.length || p1Looked.length;
         const hasP2 = p2Cheer.length || p2Cost.length || p2Effect.length || p2Looked.length;

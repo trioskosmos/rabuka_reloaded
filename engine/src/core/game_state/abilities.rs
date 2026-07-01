@@ -154,7 +154,7 @@ impl GameState {
     ///     triggering event has actually occurred ("このメンバーがエリアを移動したとき"
     ///     should not queue if the card hasn't moved).
     ///   Live cards: non-each_time auto abilities only.
-    ///     each_time live card abilities handled by trigger_each_time_abilities().
+    ///     all auto abilities (including each_time) handled by one TAS scan.
     ///
     /// Called from:
     ///   - process_current_ability() post-resolve scan (line ~753)
@@ -1362,36 +1362,8 @@ impl GameState {
                 // also needs the guard to prevent re-enqueueing the same
                 // each_time watcher on stale movement data.
 
-                // §9.5.3: After each ability resolves, check for each_time
-                // watchers triggered by the just-completed effect.
-                // Each_time abilities on live cards (たび) are not caught by the
-                // TAS scan above (§9.7.2: they enter standby), so fire their
-                // trigger substrings here.  The conditions are evaluated inside
-                // trigger_each_time_abilities — only matching abilities queue.
-                if self.current_phase == crate::types::Phase::Main {
-                    if self.recently_moved_cards.is_some() {
-                        crate::turn::TurnEngine::trigger_each_time_abilities(
-                            self,
-                            &current_pid,
-                            "控え室に置かれ",
-                            None,
-                        );
-                        crate::turn::TurnEngine::trigger_each_time_abilities(
-                            self,
-                            &current_pid,
-                            "エリアを移動",
-                            None,
-                        );
-                    }
-                    if self.last_energy_placed_by_effect() {
-                        crate::turn::TurnEngine::trigger_each_time_abilities(
-                            self,
-                            &current_pid,
-                            "エネルギー置き場",
-                            None,
-                        );
-                    }
-                }
+                // TAS scan above already caught all AUTO abilities including
+                // trigger_type: "each_time". No separate each_time scan needed.
             }
             // Clear activating_card AFTER the TAS scan (the guard at line 331-335
             // uses it to prevent re-enqueueing the just-completed ability).
