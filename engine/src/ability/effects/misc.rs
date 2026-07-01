@@ -548,6 +548,89 @@ impl AbilityResolver {
             log::debug!("[GR_ENTER] resource={:?} count={:?} target_count={:?} source={:?} card_type={:?} target={:?} exclude_self={:?} target_from_sel={:?}",
                 effect.resource, effect.count, effect.target_count, effect.source, effect.card_type, effect.target, effect.exclude_self, effect.target_from_selection);
         }
+        // heart_colors_from_selected_card: gain 1 heart of each color
+        // that the previously-selected card in the sequential has (base_heart).
+        if effect.resource.as_deref() == Some("heart")
+            && effect.heart_colors_from_selected_card.unwrap_or(false)
+        {
+            let target_str = effect.target_name().to_string();
+            let player = gs.resolve_target_player_mut(&target_str);
+            let card_db = self.card_db();
+            let target_ids: Vec<i16> = player
+                .stage
+                .stage
+                .iter()
+                .cloned()
+                .filter(|&tid| {
+                    tid != -1
+                        && crate::ability::util::card_matches_characters(
+                            &card_db,
+                            tid,
+                            effect.characters.as_ref(),
+                        )
+                })
+                .collect();
+            let _ = player;
+            eprintln!("[GR_SELECTED_CARD] entering branch. selected_cards={:?} target_ids={:?} gs.activating={:?}",
+                self.selected_cards, target_ids, gs.activating_card);
+            if let Some(&selected_id) = self.selected_cards.first() {
+                if let Some(selected_card) = card_db.get_card(selected_id) {
+                    eprintln!(
+                        "[GR_SELECTED_BH] selected_id={} has_base_heart={} hearts_count={}",
+                        selected_id,
+                        selected_card.base_heart.is_some(),
+                        selected_card
+                            .base_heart
+                            .as_ref()
+                            .map(|bh| bh.hearts.len())
+                            .unwrap_or(0)
+                    );
+                    if let Some(ref base_heart) = selected_card.base_heart {
+                        for (&color, _) in &base_heart.hearts {
+                            for &target_id in &target_ids {
+                                eprintln!(
+                                    "[GR_APPLY] target={} color={:?} before={}",
+                                    target_id,
+                                    color,
+                                    gs.mods.get_heart_modifier(target_id, color)
+                                );
+                                gs.mods.add_heart_modifier_with_trace(
+                                    target_id,
+                                    color,
+                                    1,
+                                    &mut gs.ability_applications,
+                                    target_id,
+                                    &effect.text,
+                                );
+                                eprintln!(
+                                    "[GR_APPLY] target={} color={:?} after={}",
+                                    target_id,
+                                    color,
+                                    gs.mods.get_heart_modifier(target_id, color)
+                                );
+                                if effect.duration.as_deref() == Some("live_end") {
+                                    let effect_data = serde_json::json!({
+                                        "card_id": target_id,
+                                        "amount": 1,
+                                        "color": format!("{:?}", color),
+                                    });
+                                    crate::ability::util::push_temporary_effect(
+                                        gs,
+                                        "gain_heart",
+                                        Some("live_end"),
+                                        "self",
+                                        &format!("Gain +1 {:?} from selected card", color),
+                                        Some(effect_data),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return Ok(());
+        }
+
         if effect.resource.as_deref() == Some("heart")
             && effect.heart_type.as_deref() == Some("all")
         {

@@ -959,6 +959,11 @@ pub struct AbilityEffect {
     pub timing_condition: Option<String>,
     #[serde(default)]
     pub self_target: Option<bool>,
+    /// When true, gain_resource with resource="heart" copies the heart colors
+    /// from the card selected by the preceding action in the sequential chain
+    /// (e.g. "選んだカードが持つ色のハートを1つずつ得る").
+    #[serde(default)]
+    pub heart_colors_from_selected_card: Option<bool>,
     /// When true, the resource (blade/heart) goes to the card(s) selected by
     /// the preceding action in the same sequential chain, not to all matching
     /// members on stage.  Used for patterns like "activated member + this card

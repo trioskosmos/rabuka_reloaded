@@ -26577,7 +26577,8 @@
               "quoted_type": "character"
             },
             "action": "select",
-            "all": true
+            "all": true,
+            "source": "revealed_cards"
           },
           {
             "text": "自分のステージにいる「中須かすみ」1人は、これにより選んだカードが持つ色のハートを1つずつ得る",
@@ -26595,7 +26596,8 @@
             "multiple_targets": true,
             "action": "gain_resource",
             "resource": "heart",
-            "all": true
+            "all": true,
+            "heart_colors_from_selected_card": true
           },
           {
             "text": "公開したカードをすべて控え室に置く",

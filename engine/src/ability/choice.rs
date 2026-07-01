@@ -782,7 +782,7 @@ impl super::resolver::AbilityResolver {
                     .destination
                     .clone()
                     .or(edst)
-                    .unwrap_or_else(|| Zone::Discard.to_string());
+                    .unwrap_or_else(|| Zone::Discard.to_str().to_string());
                 self.handle_revealed_cards_selection(gs, &ctx, &mut validate_card, &dst_str)?;
             }
             Some(Zone::Energy) => {
@@ -1308,6 +1308,15 @@ impl super::resolver::AbilityResolver {
     ) -> Result<(), String> {
         let mapped = ctx.mfi(&ctx.indices);
         let moved = self.move_from_revealed(gs, &mapped, validate_card, dst_str);
+        // If this is a select action, store selected cards for downstream
+        // sequential actions (e.g. gain_resource with heart_colors_from_selected_card).
+        if ctx.is_select_action {
+            for &cid in &moved {
+                if !self.selected_cards.contains(&cid) {
+                    self.selected_cards.push(cid);
+                }
+            }
+        }
         // Track moved cards so preceding_moved conditions on the same
         // ability (e.g. conditional_on_result) can see them.
         self.moved_cards.extend(&moved);

@@ -5038,6 +5038,8 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
             action["source"] = "stage"
         elif "ライブ中の" in text or "ライブカード置き場" in text:
             action["source"] = "live_card_zone"
+        elif "それらの中から" in text:
+            action["source"] = "revealed_cards"
     # Fix target for select actions: when both "自分の" and "相手の" appear in text
     # (e.g., count reference mentions opponent but selection is from your waiting room),
     # extract_target may incorrectly return "both". Override to the correct player
