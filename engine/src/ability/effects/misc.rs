@@ -5,7 +5,6 @@ use super::super::util;
 use crate::card::AbilityEffect;
 use crate::card::PositionInfo;
 use crate::game_state::GameState;
-use smallvec::SmallVec;
 
 impl AbilityResolver {
     pub(crate) fn execute_reveal_effect(
@@ -1589,11 +1588,6 @@ impl AbilityResolver {
         // which 2 occupied positions to replace. This path is used when the
         // constant ability is triggered directly (e.g. via web UI buttons).
         if count > 1 {
-            let area_enums = [
-                crate::zones::MemberArea::LeftSide,
-                crate::zones::MemberArea::Center,
-                crate::zones::MemberArea::RightSide,
-            ];
             let player = gs.resolve_target_player(target);
             let stage_ids = [
                 player.stage.stage[0],
@@ -2381,7 +2375,7 @@ impl AbilityResolver {
                 continue; // handled in phase 2 (stay-in-place)
             }
             // Place member, record evicted card
-            let evicted = if new_stage[dest_idx] != -1 {
+            let _evicted = if new_stage[dest_idx] != -1 {
                 new_stage[dest_idx]
             } else {
                 occupant[dest_idx]

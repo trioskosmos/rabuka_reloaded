@@ -566,7 +566,7 @@ fn sumire_keke_skip_no_trigger() {
                 }
                 game.drain_auto_ability_choices();
             }
-            other => {
+            _other => {
                 // Not a position destination choice, drain it
                 game.select_indices(&[]);
                 game.drain_auto_ability_choices();

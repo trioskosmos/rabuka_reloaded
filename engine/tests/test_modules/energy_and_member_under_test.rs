@@ -679,13 +679,11 @@ fn trigger_sayaka_live_start(game: &mut TestGame, sayaka: i16) {
 
 #[test]
 fn sayaka_q243_max_three_per_activation_recounts() {
-    use rabuka_engine::core::types::AbilityTrigger;
-
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let sayaka = game.id("PL!HS-pb1-002-R");
     game.state.player1.stage.stage = [-1, sayaka, -1];
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
     game.give_energy(15);
 
     // Place 2 under-cards before first activation

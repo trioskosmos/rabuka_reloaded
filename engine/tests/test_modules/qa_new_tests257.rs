@@ -280,7 +280,7 @@ fn maki_debut_crossroads_replacement_with_dreamin() {
     let mut cost_handled = false;
     let mut replacement_handled = false;
     while game.has_pending_choice() {
-        let before = game.state.ability_queue.len();
+        let _before = game.state.ability_queue.len();
         if !cost_handled {
             // First choice: reveal cost
             game.select_indices(&[0]);

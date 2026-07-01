@@ -1627,6 +1627,7 @@ impl super::TurnEngine {
                     });
                     pool[0] -= take;
                     filled_h00 += take;
+                    let _ = filled_h00;
                 }
             }
 
@@ -1676,6 +1677,7 @@ impl super::TurnEngine {
                         });
                         pool[7] -= take;
                         filled[0] += take;
+                        let _ = filled;
                     }
                 }
             }

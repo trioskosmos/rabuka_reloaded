@@ -180,7 +180,7 @@ fn hazuki_non_liella_under_no_abilities_gained() {
     let mut game = TestGame::new(db);
     let hazuki = game.id("PL!SP-pb2-005-R");
     let non_liella = game.id("PL!-sd1-005-SD");
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.stage.stage[1] = hazuki;
     game.state.player1.stage.under_cards[1].push(non_liella);

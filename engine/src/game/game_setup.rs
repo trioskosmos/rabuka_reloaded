@@ -905,7 +905,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         active_player.stage.stage[2],
                     ];
 
-                    for (area_idx, (area, area_name)) in areas.iter().enumerate() {
+                    for (area_idx, (_area, area_name)) in areas.iter().enumerate() {
                         let mut area_info = AreaInfo {
                             area: area_name.to_string(),
                             available: false,
@@ -985,11 +985,6 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     });
 
                     let (double_baton_pairs, any_double_baton_available) = if has_double_baton {
-                        let area_enums = [
-                            crate::zones::MemberArea::LeftSide,
-                            crate::zones::MemberArea::Center,
-                            crate::zones::MemberArea::RightSide,
-                        ];
                         // Pre-compute which occupied areas have cannot_baton_touch protection
                         let cannot_baton_touch_protected: Vec<bool> = (0..3)
                             .map(|idx| {

@@ -63,7 +63,7 @@ fn ayumu_pb1_q199_no_baton_touch_after_effect_placement() {
     );
 
     // The area where it was placed should be locked (no baton touch)
-    let target_area = game
+    let _target_area = game
         .state
         .player1
         .stage

@@ -106,7 +106,7 @@ fn chisato_non_liella_move_no_bonus() {
     game.drain_auto_ability_choices();
 
     // Navigate formation change choices: move Chisato to a different position
-    for choice_idx in 0..3 {
+    for _choice_idx in 0..3 {
         if !game.has_pending_choice() {
             break;
         }

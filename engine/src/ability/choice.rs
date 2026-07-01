@@ -2598,11 +2598,6 @@ impl super::resolver::AbilityResolver {
             self.clear_choice_state(gs);
             return Err(format!("Invalid double baton selection: {}", selected));
         }
-        let area_enums = [
-            crate::zones::MemberArea::LeftSide,
-            crate::zones::MemberArea::Center,
-            crate::zones::MemberArea::RightSide,
-        ];
         let area_from_name = |name: &str| -> usize {
             match name {
                 "left" => 0,
