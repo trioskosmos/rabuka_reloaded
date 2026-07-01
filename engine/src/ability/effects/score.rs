@@ -115,13 +115,20 @@ impl AbilityResolver {
                     &filter,
                     true,
                 ),
-                _ => player
-                    .live_card_zone
-                    .cards
-                    .iter()
-                    .chain(player.success_live_card_zone.cards.iter())
-                    .copied()
-                    .collect(),
+                _ => {
+                    let mut ids: Vec<i16> = player
+                        .live_card_zone
+                        .cards
+                        .iter()
+                        .chain(player.success_live_card_zone.cards.iter())
+                        .copied()
+                        .collect();
+                    // Also include stage cards — modify_score from a live success
+                    // trigger targets a member on stage (effect fields don't
+                    // propagate condition fields like card_type/self_target).
+                    ids.extend(player.stage.stage.iter().filter(|&&id| id != -1));
+                    ids
+                }
             };
             let target_card_ids: Vec<(i16, i32)> = candidate_ids
                 .iter()

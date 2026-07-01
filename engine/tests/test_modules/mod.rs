@@ -29,6 +29,7 @@ pub mod cheer_pipeline_test;
 pub mod chika_test;
 pub mod chisato_bp5_test;
 pub mod chisato_jidou_move_analysis_test;
+pub mod chisato_live_success_test;
 pub mod chisato_move_test;
 pub mod chisato_natsumi_test;
 pub mod chisato_test;

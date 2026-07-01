@@ -1816,6 +1816,37 @@ impl<'a> ConditionContext<'a> {
                 return true;
             }
         }
+        if condition.temporal.as_deref() == Some("this_turn")
+            && condition.self_target.unwrap_or(false)
+            && condition
+                .group_names
+                .as_ref()
+                .is_some_and(|g| !g.is_empty())
+            && condition.card_type.as_deref() == Some("member_card")
+        {
+            if let Some(activating_card_id) = self.activating_card_id {
+                let target = condition.target.as_deref().unwrap_or("self");
+                let player = self.resolve_condition_player(target);
+                let card_db = &self.game_state.card_database;
+                let groups = condition.group_names.as_ref().unwrap();
+                return self.game_state.turn_area_movements.iter().any(|m| {
+                    m.moved_card_id == activating_card_id
+                        && m.effect_only
+                        && m.cause_player_id == player.id
+                        && m.cause_card_id.is_some_and(|cause_cid| {
+                            groups.iter().any(|g| {
+                                crate::ability::util::card_matches_group_str(
+                                    card_db,
+                                    cause_cid,
+                                    Some(g),
+                                )
+                            })
+                        })
+                });
+            }
+            return false;
+        }
+
         let mut count = self.get_group_card_count(condition);
         if condition.exclude_self.unwrap_or(false) {
             if let Some(aid) = self.activating_card_id {
