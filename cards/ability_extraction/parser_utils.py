@@ -600,6 +600,33 @@ def extract_cost_limit(text: str) -> Optional[int]:
     return None
 
 
+def extract_cost_limit_with_operator(text: str) -> Optional[Tuple[int, str]]:
+    """Extract cost limit value AND operator together.
+    Returns (value, operator) e.g. (13, '>=') or None if no match."""
+    m = re.search(r"コスト(\d+)(以上|以下|より大きい|より小さい|未満)", text)
+    if m:
+        value = int(m.group(1))
+        op_map = {
+            "以上": ">=",
+            "以下": "<=",
+            "より大きい": ">",
+            "より小さい": "<",
+            "未満": "<",
+        }
+        return (value, op_map.get(m.group(2), ">="))
+    return None
+
+
+def detect_card_property(text: str) -> Optional[Tuple[str, bool]]:
+    """Detect card property patterns from text.
+    Returns (property_name, is_negated) or None.
+    Only matches NEGATED patterns (持たない/がない) — positive patterns are
+    handled by the text itself and don't need a card_property filter."""
+    if "ブレードハートを持たない" in text or "ブレードハートがない" in text:
+        return ("has_blade_heart", True)
+    return None
+
+
 def extract_source(text: str) -> Optional[str]:
     """Extract source location (FROM zone)."""
     return extract_by_pattern(text, SOURCE_PATTERNS)

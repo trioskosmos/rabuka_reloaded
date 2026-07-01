@@ -30,6 +30,8 @@ from parser_utils import (
     extract_card_type,
     extract_operator,
     extract_cost_limit,
+    extract_cost_limit_with_operator,
+    detect_card_property,
     detect_require_all_hearts,
     SOURCE_PATTERNS,
     DESTINATION_PATTERNS,
@@ -1209,23 +1211,16 @@ def parse_condition(text: str) -> Dict[str, Any]:
             # Only extract when the key is truly absent (not just None) to avoid
             # interfering with handlers that intentionally omit these fields.
             if "cost_limit" not in result and "cost_limit_operator" not in result:
-                cm = re.search(
-                    r"コスト(\d+)(以上|以下|より大きい|より小さい|未満)", text
-                )
-                if cm:
-                    result["cost_limit"] = int(cm.group(1))
-                    op_map = {
-                        "以上": ">=",
-                        "以下": "<=",
-                        "より大きい": ">",
-                        "より小さい": "<",
-                        "未満": "<",
-                    }
-                    result["cost_limit_operator"] = op_map.get(cm.group(2), ">=")
-            if "card_property" not in result and (
-                "ブレードハートを持たない" in text or "ブレードハートがない" in text
-            ):
-                result["card_property"] = "has_blade_heart"
+                cl_op = extract_cost_limit_with_operator(text)
+                if cl_op:
+                    result["cost_limit"] = cl_op[0]
+                    result["cost_limit_operator"] = cl_op[1]
+            if "card_property" not in result:
+                cp = detect_card_property(text)
+                if cp:
+                    result["card_property"] = cp[0]
+                    if cp[1]:
+                        result["negation"] = True
             # Add scope/aggregate fields for "自分と相手" conditions
             if "scope" not in result and "自分と相手" in text:
                 result["scope"] = "both"
@@ -2949,17 +2944,10 @@ def _enrich_card_count_condition(result, text):
     if gns and "を含む" not in text:
         result["group_names"] = gns
     # Cost limit
-    cm = re.search(r"コスト(\d+)(以上|以下|より大きい|より小さい|未満)", text)
-    if cm:
-        result["cost_limit"] = int(cm.group(1))
-        op_map = {
-            "以上": ">=",
-            "以下": "<=",
-            "より大きい": ">",
-            "より小さい": "<",
-            "未満": "<",
-        }
-        result["cost_limit_operator"] = op_map.get(cm.group(2), ">=")
+    cl_op = extract_cost_limit_with_operator(text)
+    if cl_op:
+        result["cost_limit"] = cl_op[0]
+        result["cost_limit_operator"] = cl_op[1]
     # Heart colors
     if "{{heart_" in text:
         hm = re.findall(r"{{heart_(\d+)\.png\|heart\d+}}", text)
@@ -3213,26 +3201,21 @@ def _try_baton_touch(text):
     count_m = re.search(rf"(\d+)人{sep}バトンタッチ", text)
     if count_m:
         te_data["min_count"] = int(count_m.group(1))
-    # Extract cost limit (e.g., "コスト10以上" → cost_limit=10, operator=">=")
-    cm = re.search(r"コスト(\d+)(以上|以下|より大きい|より小さい|未満)", text)
-    if cm:
-        result["cost_limit"] = int(cm.group(1))
-        op_map = {
-            "以上": ">=",
-            "以下": "<=",
-            "より大きい": ">",
-            "より小さい": "<",
-            "未満": "<",
-        }
-        result["cost_limit_operator"] = op_map.get(cm.group(2), ">=")
+    # Extract cost limit (e.g., "コスト10以上" → cost_limit=10, cost_limit_operator=">=")
+    cl_op = extract_cost_limit_with_operator(text)
+    if cl_op:
+        result["cost_limit"] = cl_op[0]
+        result["cost_limit_operator"] = cl_op[1]
     # Extract group_names (for から-form, this is handled below)
     gns = extract_group_names(text)
     if gns:
         result["group_names"] = gns
-    # Extract card_property: "ブレードハートを持たない" → has_blade_heart + negation
-    if "ブレードハートを持たない" in text or "ブレードハートがない" in text:
-        result["card_property"] = "has_blade_heart"
-        result["negation"] = True
+    # Extract card_property
+    cp = detect_card_property(text)
+    if cp:
+        result["card_property"] = cp[0]
+        if cp[1]:
+            result["negation"] = True
     # Extract cost comparison (e.g. "コストが低い" → comparison_type=cost, operator=<)
     if "コスト" in text and ("低い" in text or "高い" in text):
         te_data["cost_comparison"] = {
@@ -4241,22 +4224,18 @@ def _extract_generic_fields(condition, text):
     if "置かれた" in text and "locations" not in condition:
         condition["movement"] = "moved"
 
-    # Cost limit (e.g., "コスト10以上" → cost_limit=10, operator=">=")
-    cm = re.search(r"コスト(\d+)(以上|以下|より大きい|より小さい|未満)", text)
-    if cm:
-        condition["cost_limit"] = int(cm.group(1))
-        op_map = {
-            "以上": ">=",
-            "以下": "<=",
-            "より大きい": ">",
-            "より小さい": "<",
-            "未満": "<",
-        }
-        condition["cost_limit_operator"] = op_map.get(cm.group(2), ">=")
+    # Cost limit (e.g., "コスト10以上" → cost_limit=10, cost_limit_operator=">=")
+    cl_op = extract_cost_limit_with_operator(text)
+    if cl_op:
+        condition["cost_limit"] = cl_op[0]
+        condition["cost_limit_operator"] = cl_op[1]
 
-    # Card property: "ブレードハートを持たない" → has_blade_heart + negation
-    if "ブレードハートを持たない" in text or "ブレードハートがない" in text:
-        condition["card_property"] = "has_blade_heart"
+    # Card property
+    cp = detect_card_property(text)
+    if cp:
+        condition["card_property"] = cp[0]
+        if cp[1]:
+            condition["negation"] = True
 
     # Temporal scope
     for kw, tmp in [("このターン", "this_turn"), ("このライブ", "this_live")]:
@@ -8260,99 +8239,6 @@ def _clean_action_list(actions, parent_effect=None, parent_text=""):
                 if "cost_limit_operator" not in sub:
                     sub["cost_limit_operator"] = clo
     return cleaned
-
-
-def _collapse_position_changes(node):
-    if isinstance(node, dict):
-        # Recurse into children FIRST so they're collapsed before parent processes them
-        for v in node.values():
-            _collapse_position_changes(v)
-        if node.get("action") == "sequential":
-            acts = node.get("actions", [])
-            collapsed = []
-            skip_next = False
-            for i, act in enumerate(acts):
-                if skip_next:
-                    skip_next = False
-                    continue
-                if isinstance(act, dict) and act.get("action") == "position_change":
-                    if (
-                        i + 1 < len(acts)
-                        and isinstance(acts[i + 1], dict)
-                        and acts[i + 1].get("action") == "gain_resource"
-                    ):
-                        gr = dict(acts[i + 1])
-                        gr["timing_condition"] = "moved_this_turn"
-                        for f in ("card_type", "all", "target"):
-                            if f == "target" and not gr.get("target"):
-                                gr["target"] = "self"
-                            elif act.get(f) and not gr.get(f):
-                                gr[f] = act[f]
-                        collapsed.append(gr)
-                        skip_next = True
-                        continue
-                if isinstance(act, dict) and act.get("action") == "sequential":
-                    sub_acts = act.get("actions", [])
-                    if len(sub_acts) == 1:
-                        item = dict(sub_acts[0])
-                        for f in ("duration", "all", "card_type", "target"):
-                            if act.get(f) and not item.get(f):
-                                item[f] = act[f]
-                        collapsed.append(item)
-                        continue
-                collapsed.append(act)
-            node["actions"] = collapsed
-    elif isinstance(node, list):
-        for item in node:
-            _collapse_position_changes(item)
-    return node
-
-
-def _collect_gain(d, nodes):
-    if isinstance(d, dict):
-        if d.get("action") == "gain_ability" and d.get("ability_gain"):
-            nodes.append(d)
-        for v in d.values():
-            if isinstance(v, dict):
-                _collect_gain(v, nodes)
-            elif isinstance(v, list):
-                for item in v:
-                    _collect_gain(item, nodes)
-
-
-def _enrich_characters(d):
-    if isinstance(d, dict):
-        # Skip compound action containers — their children handle their own enrichment
-        if d.get("action") in (
-            "sequential",
-            "conditional_on_optional",
-            "conditional_on_result",
-            "conditional_alternative",
-            "look_and_select",
-        ):
-            pass
-        elif "text" in d:
-            text = d["text"]
-            if not d.get("characters"):
-                cm = re.search(
-                    r"((?:「[^」]+」[か、]? ?)+)の(?:メンバーカード|ライブカード)",
-                    text,
-                )
-                if cm:
-                    names = re.findall(r"「([^」]+)」", cm.group(1))
-                    if names:
-                        d["characters"] = names
-            if not d.get("card_names"):
-                cn = re.search(r"カード名(?:に|が)「([^」]+)」", text)
-                if cn:
-                    d["card_names"] = [cn.group(1)]
-        for v in d.values():
-            if isinstance(v, (dict, list)):
-                _enrich_characters(v)
-    elif isinstance(d, list):
-        for item in d:
-            if isinstance(item, (dict, list)):
-                _enrich_characters(item)
 
 
 def _walk(d, full_text, original_text, ctx_text=None):
