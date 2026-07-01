@@ -161,6 +161,7 @@ impl super::TurnEngine {
                 game_state.live_surplus_ready_this_turn = true;
 
                 Self::trigger_live_success_abilities(game_state, &player1_id);
+                Self::trigger_auto_abilities_for_player(game_state, &player1_id);
                 game_state.process_pending_auto_abilities(&player1_id);
                 if game_state.has_pending_choice() {
                     return;
@@ -191,6 +192,7 @@ impl super::TurnEngine {
             // and the function returns early, P2 is not re-triggered on re-entry.
             game_state.live_success_p2_fired = true;
             Self::trigger_live_success_abilities(game_state, &player2_id);
+            Self::trigger_auto_abilities_for_player(game_state, &player2_id);
             game_state.process_pending_auto_abilities(&player2_id);
             if game_state.has_pending_choice() {
                 return;

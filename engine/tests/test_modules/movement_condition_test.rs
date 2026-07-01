@@ -220,63 +220,41 @@ fn chisato_movement_triggers_with_both_flags() {
     let mut game = TestGame::new(db);
 
     let chisato = game.id("PL!SP-bp2-003-R");
-    let filler = game.id("PL!-sd1-010-SD");
-
-    game.state.player1.stage.stage = [chisato, -1, filler];
+    let keke = game.id("PL!SP-bp4-013-N"); // Liella! position change on debut
     setup_energy(&mut game);
+
+    game.state.player1.stage.stage = [chisato, -1, -1];
+    game.state.player1.hand.cards.push(keke);
+    game.give_energy(5);
 
     let energy_before = game.state.player1.energy_zone.cards.len();
 
-    let old_left_id = game.state.player1.stage.stage[0];
-    let old_right_id = game.state.player1.stage.stage[2];
-
-    game.state
-        .player1
-        .stage
-        .position_change(MemberArea::LeftSide, MemberArea::RightSide)
-        .expect("position_change should succeed");
-
-    // Push position change events for both swapped cards
-    if old_left_id != -1 {
-        game.state
-            .position_change_events
-            .push(rabuka_engine::types::PositionChangeEvent {
-                moved_card_id: old_left_id,
-                old_position: 0,
-                new_position: 2,
-                cause_card_id: None,
-                cause_player_id: "p1".to_string(),
-                effect_only: false,
-            });
+    // Play Keke → debut → optional position change → swap with Chisato
+    game.play_to_stage(keke, MemberArea::RightSide);
+    game.drain_auto_ability_choices();
+    if game.has_pending_choice() {
+        match game.get_pending_choice().clone() {
+            rabuka_engine::ability::types::Choice::SelectTarget { target, .. }
+                if target == "position|destination" =>
+            {
+                let acts = game.generated_actions();
+                let left_idx = acts
+                    .iter()
+                    .position(|a| {
+                        a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("left")
+                    })
+                    .unwrap();
+                game.select_generated(left_idx);
+                game.drain_auto_ability_choices();
+            }
+            _ => {
+                game.select_indices(&[]);
+                game.drain_auto_ability_choices();
+            }
+        }
     }
-    if old_right_id != -1 {
-        game.state
-            .position_change_events
-            .push(rabuka_engine::types::PositionChangeEvent {
-                moved_card_id: old_right_id,
-                old_position: 2,
-                new_position: 0,
-                cause_card_id: None,
-                cause_player_id: "p1".to_string(),
-                effect_only: false,
-            });
-    }
-    game.state.record_card_movement(chisato);
-    game.state.record_card_movement(filler);
-    if old_left_id != -1 {
-        game.state
-            .push_movement_event(old_left_id, "stage", "stage", None, "p1", false);
-    }
-    if old_right_id != -1 {
-        game.state
-            .push_movement_event(old_right_id, "stage", "stage", None, "p1", false);
-    }
-    game.state.position_change_occurred_this_turn = true;
 
-    let player_id = game.state.player1.id.clone();
-    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
-
+    // 千砂都 moved via Keke's position change → TAS fired automatically
     assert_eq!(
         game.state.player1.energy_zone.cards.len(),
         energy_before + 1,

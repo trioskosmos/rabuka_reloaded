@@ -1183,6 +1183,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
         _try_temporal_count,
         # Tier 5: Target/location/zone patterns
         _try_either_target,
+        _try_live_success_or_move,
         _try_appear_or_move,
         _try_movement,
         _try_appearance,
@@ -3496,6 +3497,39 @@ def _try_zone_placement(text):
     result.pop("location", None)
     result.pop("locations", None)
     return result
+
+
+def _try_live_success_or_move(text):
+    if "ライブが成功するか、" not in text or "エリアを移動" not in text:
+        return None
+    tense = "past" if "移動した" in text else "nonpast"
+    return {
+        "type": "or_condition",
+        "conditions": [
+            {
+                "type": "movement_condition",
+                "movement": "live_success",
+                "text": text,
+                "trigger_event": {"type": "live_success", "tense": "past"},
+                "self_target": True,
+            },
+            {
+                "type": "movement_condition",
+                "movement": "position_change",
+                "text": text,
+                "trigger_event": {"type": "area_move", "tense": tense},
+                "self_target": True,
+            },
+        ],
+        "text": text,
+        "trigger_event": {
+            "type": "or",
+            "events": [
+                {"type": "live_success", "tense": "past"},
+                {"type": "area_move", "tense": tense},
+            ],
+        },
+    }
 
 
 def _try_appear_or_move(text):

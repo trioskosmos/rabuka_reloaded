@@ -43,13 +43,8 @@ fn q255_dancing_stars_live_success_after_position_change() {
         game.select_indices(&[]);
     }
 
-    // Now trigger each_time for LIVE_START (simulating post-LiveStart phase)
-    TurnEngine::trigger_each_time_abilities(
-        &mut game.state,
-        &player_id,
-        rabuka_engine::triggers::LIVE_START,
-        None,
-    );
+    // Now trigger LIVE_START abilities (simulating post-LiveStart phase)
+    TurnEngine::trigger_live_start_abilities(&mut game.state, &player_id);
     game.state.process_pending_auto_abilities(&player_id);
     // Drain the position change choice if there is one
     if game.has_pending_choice() {
@@ -99,13 +94,8 @@ fn q255_dancing_stars_live_success_after_position_change() {
         game.select_indices(&[]);
     }
 
-    // Now trigger each_time for LIVE_SUCCESS (Dancing stars' ab#1)
-    TurnEngine::trigger_each_time_abilities(
-        &mut game.state,
-        &player_id,
-        rabuka_engine::triggers::LIVE_SUCCESS,
-        None,
-    );
+    // Now trigger LIVE_SUCCESS abilities (Dancing stars' ab#1)
+    TurnEngine::trigger_live_success_abilities(&mut game.state, &player_id);
     game.state.process_pending_auto_abilities(&player_id);
     if game.has_pending_choice() {
         game.select_indices(&[]);

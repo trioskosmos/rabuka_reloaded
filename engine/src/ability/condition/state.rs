@@ -490,10 +490,19 @@ impl<'a> ConditionContext<'a> {
                 true
             }
             "position_change" => {
-                if !self.position_event_matches_filters(
+                let pce_match = self.position_event_matches_filters(
                     &self.game_state.position_change_events,
                     condition,
-                ) {
+                );
+                let tm_match = if !pce_match && self.activating_card_id.is_some() {
+                    self.game_state
+                        .turn_area_movements
+                        .iter()
+                        .any(|m| self.activating_card_id == Some(m.moved_card_id) && m.effect_only)
+                } else {
+                    false
+                };
+                if !pce_match && !tm_match {
                     return false;
                 }
                 if let Some(cost_limit) = condition.cost_limit {
@@ -518,6 +527,7 @@ impl<'a> ConditionContext<'a> {
                 true
             }
             "notmoved" => true,
+            "live_success" => self.game_state.live_success_triggered_this_turn,
             "baton_touch" => {
                 let triggered = condition.baton_touch_trigger.unwrap_or(false);
                 if !triggered {

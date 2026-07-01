@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-01T06:48:30.935307",
+  "generated_at": "2026-07-01T20:08:57.594227",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -18889,16 +18889,43 @@
       "effect": {
         "text": "自分のライブが成功するか、このメンバーがエリアを移動したとき、自分の控え室にある『Liella!』のメンバーカードを1枚、このメンバーの下に置く",
         "condition": {
-          "type": "movement_condition",
+          "type": "or_condition",
+          "conditions": [
+            {
+              "type": "movement_condition",
+              "movement": "live_success",
+              "text": "自分のライブが成功するか、このメンバーがエリアを移動したとき",
+              "trigger_event": {
+                "type": "live_success",
+                "tense": "past"
+              },
+              "self_target": true
+            },
+            {
+              "type": "movement_condition",
+              "movement": "position_change",
+              "text": "自分のライブが成功するか、このメンバーがエリアを移動したとき",
+              "trigger_event": {
+                "type": "area_move",
+                "tense": "past"
+              },
+              "self_target": true
+            }
+          ],
           "text": "自分のライブが成功するか、このメンバーがエリアを移動したとき",
           "trigger_event": {
-            "type": "area_move",
-            "tense": "past"
-          },
-          "movement": "position_change",
-          "target": "self",
-          "card_type": "member_card",
-          "self_target": true
+            "type": "or",
+            "events": [
+              {
+                "type": "live_success",
+                "tense": "past"
+              },
+              {
+                "type": "area_move",
+                "tense": "past"
+              }
+            ]
+          }
         },
         "source": "discard",
         "destination": "under_member",

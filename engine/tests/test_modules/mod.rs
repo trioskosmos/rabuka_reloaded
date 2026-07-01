@@ -95,6 +95,7 @@ pub mod keke_bp5_test;
 pub mod kinako_bp5_test;
 pub mod kinako_each_time_blade_test;
 pub mod kinako_hs_test;
+pub mod kinako_live_success_or_move_test;
 pub mod kinako_sakurakoji_test;
 pub mod kinako_test;
 pub mod konata_bp4_test;

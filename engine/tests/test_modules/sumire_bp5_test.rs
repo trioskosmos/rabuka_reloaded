@@ -22,19 +22,25 @@ fn test_sumire_area_move_triggers_draw_and_heart() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let sumire = game.id("PL!SP-bp5-004-R+");
+    let kinako_mover = game.id("PL!SP-bp5-006-R");
     fill_deck(&mut game);
     game.give_energy(15);
-    game.add_to_stage(MemberArea::Center, sumire);
-    // Simulate area move by own card effect — this SHOULD trigger Sumire's auto ability.
-    game.state.cards_moved_this_turn.insert(sumire);
-    game.state
-        .push_movement_event(sumire, "stage", "stage", Some(sumire), "p1", true);
-    game.state.batch_movements.clear();
+    // Place Sumire on stage, plus a mover card that can swap with her
+    game.add_to_stage(rabuka_engine::zones::MemberArea::LeftSide, sumire);
+    game.add_to_stage(rabuka_engine::zones::MemberArea::Center, kinako_mover);
 
-    let player_id = game.state.player1.id.clone();
-    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
+    // Activate 起動 きな子 → swap with Sumire → Sumire moves
+    game.activate_ability(kinako_mover);
+    game.drain_auto_ability_choices();
+    let acts = game.generated_actions();
+    let left_idx = acts
+        .iter()
+        .position(|a| a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("left"))
+        .unwrap();
+    game.select_generated(left_idx);
+    game.drain_auto_ability_choices();
 
+    // Sumire moved via game action → TAS fired inside choice handler → ability resolved
     let hand_size = game.state.player1.hand.cards.len();
     assert_eq!(hand_size, 1, "One card drawn after area move");
     assert_eq!(
@@ -49,22 +55,21 @@ fn test_sumire_energy_effect_triggers() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let sumire = game.id("PL!SP-bp5-004-R+");
+    let hazuki = game.id("PL!SP-pb1-005-R"); // 葉月恋: debut places energy from energy deck
     fill_deck(&mut game);
+    fill_energy_deck(&mut game);
     game.give_energy(15);
-    // Place Sumire on stage WITHOUT triggering auto-abilities (add_to_stage bypasses triggers).
-    // This leaves the 1/turn available for the energy trigger test.
+    // Place Sumire on stage, then play Hazuki to trigger energy placement
     game.add_to_stage(MemberArea::Center, sumire);
-    // Simulate energy placed by card effect
-    game.state
-        .push_movement_event(-1, "energy_deck", "energy", None, "p1", true);
+    game.state.player1.hand.cards.push(hazuki);
 
-    let before_hand = game.state.player1.hand.cards.len();
-    let player_id = game.state.player1.id.clone();
-    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
+    game.play_to_stage(hazuki, MemberArea::RightSide);
+    game.drain_auto_ability_choices();
+
+    // Hazuki's debut places energy → Sumire's ability fires automatically
     assert_eq!(
         game.state.player1.hand.cards.len(),
-        before_hand + 1,
+        1,
         "energy placement by effect should trigger draw"
     );
     assert_eq!(

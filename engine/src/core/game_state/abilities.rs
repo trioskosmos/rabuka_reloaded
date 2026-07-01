@@ -181,6 +181,7 @@ impl GameState {
             || movement == Some("moves")
             || movement == Some("position_change")
             || movement == Some("baton_touch")
+            || movement == Some("live_success")
         {
             return true;
         }
