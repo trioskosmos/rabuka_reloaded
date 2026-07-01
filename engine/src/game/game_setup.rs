@@ -129,6 +129,8 @@ pub struct ActionParameters {
     pub final_cost: Option<u32>,
     pub available_areas: Option<Vec<AreaInfo>>,
     pub double_baton_pairs: Option<Vec<DoubleBatonPair>>, // Available double baton pair+placement options
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disabled: Option<bool>, // Card is visible but not selectable (greyscale)
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -190,6 +192,7 @@ fn make_params() -> ActionParameters {
         final_cost: None,
         available_areas: None,
         double_baton_pairs: None,
+        disabled: None,
     }
 }
 
@@ -439,32 +442,46 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     "Don't apply",
                 );
             }
+            if target == "self_or_opponent" {
+                let opts = options.as_ref().map(|v| v.as_slice()).unwrap_or(&[]);
+                if !opts.is_empty() {
+                    return opts
+                        .iter()
+                        .enumerate()
+                        .map(|(i, opt)| {
+                            make_action_params(
+                                ActionType::ChoiceOption,
+                                opt,
+                                ActionParameters {
+                                    card_id: Some(i as i16),
+                                    card_no: Some(i.to_string()),
+                                    ..make_params()
+                                },
+                            )
+                        })
+                        .collect();
+                }
+            }
             if target == "choice_string" || target == "conditional_optional" {
                 if let Some(ref opts) = options {
-                    if opts.len() > 2 {
-                        // Multi-option choice_string: enumerate options
-                        return opts
-                            .iter()
-                            .enumerate()
-                            .map(|(i, opt)| {
-                                make_action_params(
-                                    ActionType::ChoiceOption,
-                                    opt,
-                                    ActionParameters {
-                                        card_id: Some(i as i16),
-                                        card_no: Some(i.to_string()),
-                                        ..make_params()
-                                    },
-                                )
-                            })
-                            .collect();
-                    }
+                    // Enumerate all options directly — no fallback to Yes/No+description
+                    return opts
+                        .iter()
+                        .enumerate()
+                        .map(|(i, opt)| {
+                            make_action_params(
+                                ActionType::ChoiceOption,
+                                opt,
+                                ActionParameters {
+                                    card_id: Some(i as i16),
+                                    card_no: Some(i.to_string()),
+                                    ..make_params()
+                                },
+                            )
+                        })
+                        .collect();
                 }
-                return make_choice_pair(
-                    ActionType::ChoiceOption,
-                    &format!("Yes E{}", description),
-                    &format!("No E{}", description),
-                );
+                return make_choice_pair(ActionType::ChoiceOption, "Yes", "No");
             }
             if target == "choice_condition" {
                 let opts = options.as_ref().map(|v| v.as_slice()).unwrap_or(&[]);
@@ -486,23 +503,19 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         .collect();
                 }
             }
-            make_choice_pair(
-                ActionType::ChoiceDecision,
-                &format!("Yes  E{}", description),
-                &format!("No  E{}", description),
-            )
+            // Generic fallback for unrecognized targets
+            make_choice_pair(ActionType::ChoiceDecision, "Yes", "No")
         }
         Choice::SelectCard {
             zone,
             card_type,
-            count: _,
             description,
             allow_skip,
-            cost_limit,
-            cost_limit_operator,
-            group,
-            characters,
             ref filtered_indices,
+            cost_limit,
+            ref cost_limit_operator,
+            ref group,
+            ref characters,
             ref target_player_id,
             ..
         } => {
@@ -590,81 +603,84 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     _ => Vec::new(),
                 }
             };
-            // Apply filtered_indices: exclude already-selected or ineligible cards
-            let card_ids: Vec<(usize, i16)> = match &filtered_indices {
-                Some(fi) if !fi.is_empty() => card_ids
-                    .into_iter()
-                    .filter(|(idx, _)| fi.contains(idx))
-                    .collect(),
-                Some(_) => Vec::new(),
-                None => card_ids,
+            // filtered_indices (if set) narrows selectable set; otherwise all cards are candidates
+            let fi_set: Option<std::collections::HashSet<usize>> = match filtered_indices {
+                Some(fi) if !fi.is_empty() => Some(fi.iter().copied().collect()),
+                _ => None,
             };
 
-            if !card_ids.is_empty() {
-                for (zone_index, card_id) in &card_ids {
-                    let card = game_state.card_database.get_card(*card_id);
-                    let card_matches = match card_type.as_deref() {
-                        Some("member_card") => card.map(|c| c.is_member()).unwrap_or(false),
-                        Some("live_card") => card.map(|c| c.is_live()).unwrap_or(false),
-                        Some("energy_card") => card.map(|c| c.is_energy()).unwrap_or(false),
-                        None => true,
-                        _ => true,
-                    };
-                    if !card_matches {
-                        continue;
-                    }
-                    // Apply per-card cost_limit filter (NOT sum cost_total)
-                    if let Some(lim) = cost_limit {
-                        if !crate::ability::util::card_matches_cost_limit_op(
-                            &game_state.card_database,
-                            *card_id,
-                            Some(*lim),
-                            cost_limit_operator.as_deref(),
-                        ) {
-                            continue;
-                        }
-                    }
-                    if !crate::ability::util::card_matches_characters(
+            for (zone_index, card_id) in &card_ids {
+                let card = game_state.card_database.get_card(*card_id);
+                let card_name = card.map(|c| c.name.as_str()).unwrap_or("Unknown");
+                let real_card_no = card.map(|c| c.card_no.clone()).unwrap_or_default();
+
+                // Hard filter: card_type mismatch → hide entirely
+                let matches_type = match card_type.as_deref() {
+                    Some("member_card") => card.map(|c| c.is_member()).unwrap_or(false),
+                    Some("live_card") => card.map(|c| c.is_live()).unwrap_or(false),
+                    Some("energy_card") => card.map(|c| c.is_energy()).unwrap_or(false),
+                    None => true,
+                    _ => true,
+                };
+                if !matches_type {
+                    continue;
+                }
+
+                // Soft filters: any failure → shown greyed out
+                let in_fi = fi_set.as_ref().map_or(true, |s| s.contains(zone_index));
+                let matches_chars = characters.as_ref().map_or(true, |chars| {
+                    crate::ability::util::card_matches_characters(
                         &game_state.card_database,
                         *card_id,
-                        characters.as_ref(),
-                    ) {
-                        continue;
-                    }
-                    // Apply group filter
-                    if let Some(ref grp) = group {
-                        if !crate::ability::util::card_matches_group_str(
-                            &game_state.card_database,
-                            *card_id,
-                            Some(grp.as_str()),
-                        ) {
-                            continue;
-                        }
-                    }
-                    let card_name = card.map(|c| c.name.as_str()).unwrap_or("Unknown");
-                    let real_card_no = card.map(|c| c.card_no.clone()).unwrap_or_default();
-                    // Map zone position to index within filtered_indices
-                    let fi_index = match &filtered_indices {
-                        Some(fi) if !fi.is_empty() => fi
-                            .iter()
-                            .position(|&x| x == *zone_index)
-                            .unwrap_or(*zone_index),
-                        _ => *zone_index,
-                    };
-                    actions.push(make_action_params(
-                        ActionType::ChoiceSelect,
-                        &format!("{} ({})", card_name, zone_index),
-                        ActionParameters {
-                            card_id: Some(*card_id),
-                            card_index: Some(*zone_index),
-                            card_indices: Some(vec![fi_index]),
-                            card_name: Some(card_name.to_string()),
-                            card_no: Some(real_card_no.clone()),
-                            ..make_params()
+                        Some(chars),
+                    )
+                });
+                let matches_group = group.as_ref().map_or(true, |grp| {
+                    crate::ability::util::card_matches_group_str(
+                        &game_state.card_database,
+                        *card_id,
+                        Some(grp.as_str()),
+                    )
+                });
+                let matches_cost = cost_limit.map_or(true, |lim| {
+                    crate::ability::util::card_matches_cost_limit_op(
+                        &game_state.card_database,
+                        *card_id,
+                        Some(lim),
+                        cost_limit_operator.as_deref(),
+                    )
+                });
+                let is_selectable = in_fi && matches_chars && matches_group && matches_cost;
+
+                // Map to filtered-index position for card_indices
+                let fi_index = match filtered_indices {
+                    Some(fi) if !fi.is_empty() => fi
+                        .iter()
+                        .position(|&x| x == *zone_index)
+                        .unwrap_or(*zone_index),
+                    _ => *zone_index,
+                };
+
+                actions.push(make_action_params(
+                    ActionType::ChoiceSelect,
+                    card_name,
+                    ActionParameters {
+                        card_id: Some(*card_id),
+                        card_index: Some(*zone_index),
+                        card_indices: if is_selectable {
+                            Some(vec![fi_index])
+                        } else {
+                            None
                         },
-                    ));
-                }
-            } else {
+                        card_name: Some(card_name.to_string()),
+                        card_no: Some(real_card_no.clone()),
+                        disabled: if is_selectable { None } else { Some(true) },
+                        ..make_params()
+                    },
+                ));
+            }
+
+            if actions.is_empty() {
                 actions.push(make_action_params(
                     ActionType::ChoiceSelect,
                     &format!("Select card(s): {}", description),

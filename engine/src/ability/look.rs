@@ -18,7 +18,7 @@ impl AbilityResolver {
         }
 
         if let Some(ref select_action) = effect.compound.select_action {
-            let placement_order = select_action.placement_order.as_deref();
+            let _placement_order = select_action.placement_order.as_deref();
             let any_number = select_action.any_number.unwrap_or(false);
             let count = select_action.count.unwrap_or(1);
             let optional = select_action.optional.unwrap_or(false);
@@ -97,17 +97,19 @@ impl AbilityResolver {
             };
 
             let description = if any_number {
-                format!("Select any number of cards from the {} looked-at cards (or skip) (placement_order: {})",
-                    total_count, placement_order.unwrap_or("default"))
+                format!(
+                    "Select any number of cards from the {} looked-at cards (or skip)",
+                    total_count
+                )
             } else if is_max || optional {
-                format!("Select up to {} card(s) from the {} looked-at cards (or skip) (placement_order: {})",
-                    max_select, total_count, placement_order.unwrap_or("default"))
+                format!(
+                    "Select up to {} card(s) from the {} looked-at cards (or skip)",
+                    max_select, total_count
+                )
             } else {
                 format!(
-                    "Select {} card(s) from the {} looked-at cards (placement_order: {})",
-                    max_select,
-                    total_count,
-                    placement_order.unwrap_or("default")
+                    "Select {} card(s) from the {} looked-at cards",
+                    max_select, total_count,
                 )
             };
 
@@ -213,7 +215,10 @@ impl AbilityResolver {
                     Choice::select_cards(
                         source.to_string(),
                         choices_count,
-                        format!("Select card(s) to reveal from {}", source),
+                        format!(
+                            "Select card(s) to reveal from {}",
+                            crate::ability::describe::zone_label(Some(&source))
+                        ),
                         allow_skip,
                     )
                     .card_type(card_type.map(|s| s.to_string()))
@@ -504,7 +509,11 @@ impl AbilityResolver {
             Choice::select_cards(
                 source.to_string(),
                 count as usize,
-                format!("Select {} card(s) from {}", count, source),
+                format!(
+                    "Select {} card(s) from {}",
+                    count,
+                    crate::ability::describe::zone_label(Some(&source))
+                ),
                 optional,
             )
             .card_type(effect.card_type.clone())
@@ -532,7 +541,7 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         self.current_effect = Some(effect.clone());
 
-        let placement_order = effect.placement_order.as_deref();
+        let _placement_order = effect.placement_order.as_deref();
         let any_number = effect.any_number.unwrap_or(false);
         let count = effect.count.unwrap_or(1) as usize;
         let optional = effect.optional.unwrap_or(false);
@@ -708,20 +717,18 @@ impl AbilityResolver {
 
         let description = if any_number {
             format!(
-                "Select any number of cards from the {} looked-at cards (or skip) (placement_order: {})",
-                total_count, placement_order.unwrap_or("default")
+                "Select any number of cards from the {} looked-at cards (or skip)",
+                total_count
             )
         } else if is_max || optional {
             format!(
-                "Select up to {} card(s) from the {} looked-at cards (or skip) (placement_order: {})",
-                max_select, total_count, placement_order.unwrap_or("default")
+                "Select up to {} card(s) from the {} looked-at cards (or skip)",
+                max_select, total_count
             )
         } else {
             format!(
-                "Select {} card(s) from the {} looked-at cards (placement_order: {})",
-                max_select,
-                total_count,
-                placement_order.unwrap_or("default")
+                "Select {} card(s) from the {} looked-at cards",
+                max_select, total_count,
             )
         };
 

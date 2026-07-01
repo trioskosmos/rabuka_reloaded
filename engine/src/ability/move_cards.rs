@@ -107,13 +107,11 @@ impl AbilityResolver {
         filter: &util::CardFilter,
         filtered_indices: Option<Vec<usize>>,
     ) {
+        let zone_display = crate::ability::describe::zone_label(Some(zone));
         let description = if effect.any_number.unwrap_or(false) {
-            format!(
-                "Select any number of card(s) from {}",
-                zone.replace("_", " ")
-            )
+            format!("Select any number of card(s) from {}", zone_display)
         } else {
-            format!("Select {} card(s) from {}", count, zone.replace("_", " "))
+            format!("Select {} card(s) from {}", count, zone_display)
         };
         self.pending_choice = Some(
             Choice::select_cards(zone, count, description, can_skip)
@@ -942,17 +940,33 @@ impl AbilityResolver {
                 if matching.is_empty() {
                     Ok(vec![])
                 } else if effect.optional.unwrap_or(false) && count > 0 {
-                    // Optional discard: prompt player to choose which (if any)
-                    // looked-at cards to take, instead of auto-taking.
+                    // Optional discard: card selection with user-friendly description
+                    let max_take = count.min(matching.len());
+                    let description = format!("Discard up to {} looked-at card(s)?", max_take);
+                    let description_en = Some(description.clone());
+                    let description_ja = Some(if max_take == 1 {
+                        "見たカードを控え室に置きますか？".to_string()
+                    } else {
+                        format!("見たカードを最大{}枚まで控え室に置きますか？", max_take)
+                    });
                     let filter = util::CardFilter::from_effect(effect);
-                    self.prompt_card_selection(
-                        Zone::LookedAt.to_str(),
-                        count.min(matching.len()),
-                        true,
-                        effect,
-                        &filter,
-                        None,
+                    self.pending_choice = Some(
+                        Choice::select_cards(Zone::LookedAt.to_str(), max_take, description, true)
+                            .description_en(description_en)
+                            .description_ja(description_ja)
+                            .card_type(filter.card_type.map(|s| s.to_string()))
+                            .cost_limit(filter.cost_limit, effect.cost_limit_operator.clone())
+                            .cost_total(filter.cost_total, effect.cost_total_operator.clone())
+                            .group(filter.group.map(|s| s.to_string()))
+                            .characters(filter.characters.cloned())
+                            .target_player_id(Some(
+                                effect.target.clone().unwrap_or_else(|| "self".to_string()),
+                            ))
+                            .destination(effect.destination.clone())
+                            .discard_remaining(effect.discard_remaining)
+                            .build(),
                     );
+                    self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                     Ok(vec![])
                 } else {
                     // For LookedAt, cards are ordered: [0] = matched target,
@@ -1129,13 +1143,17 @@ impl AbilityResolver {
                 match chosen {
                     Some(s) => Some(s),
                     None => {
+                        let type_labels: Vec<String> = or_types
+                            .iter()
+                            .map(|t| crate::ability::describe::card_type_label(Some(t)).to_string())
+                            .collect();
                         self.pending_choice = Some(Choice::SelectTarget {
                             target: "choice_string".to_string(),
-                            description: format!("Pick card type: {:?}", or_types),
+                            description: format!("Pick card type: {}", type_labels.join(" / ")),
                             description_en: None,
                             description_ja: None,
                             allow_skip: false,
-                            options: None,
+                            options: Some(type_labels),
                         });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         if let Some(e) = gs.ability_queue.current_entry_mut() {

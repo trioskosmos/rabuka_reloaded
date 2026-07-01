@@ -16,7 +16,7 @@ fn maybe_plural(count: Option<u32>, word: &str) -> String {
     }
 }
 
-fn zone_label(zone: Option<&str>) -> &str {
+pub fn zone_label(zone: Option<&str>) -> &str {
     match zone {
         Some("hand") => "hand",
         Some("discard") => "the waiting room",
@@ -39,7 +39,7 @@ fn zone_label(zone: Option<&str>) -> &str {
     }
 }
 
-fn card_type_label(ct: Option<&str>) -> &str {
+pub fn card_type_label(ct: Option<&str>) -> &str {
     match ct {
         Some("member_card") => "member",
         Some("live_card") => "live card",
@@ -414,9 +414,9 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         "sequential_cost" => {
             if let Some(ref costs) = effect.compound.actions {
                 let parts: Vec<String> = costs.iter().map(|c| describe_cost_en(c)).collect();
-                let combined = parts.join(" + ");
+                let combined = parts.join("\n");
                 if costs.last().and_then(|c| c.optional).unwrap_or(false) {
-                    format!("{} (or skip)", combined)
+                    format!("{}\n(or skip)", combined)
                 } else {
                     combined
                 }
@@ -583,9 +583,9 @@ pub fn describe_sequential_cost_en(costs: &[AbilityEffect], choice_index: usize)
     let parts: Vec<String> = (0..=choice_index)
         .map(|i| describe_cost_en(&costs[i]))
         .collect();
-    let combined = parts.join(" + ");
+    let combined = parts.join("\n");
     if costs[choice_index].optional.unwrap_or(false) {
-        format!("{} (or skip)", combined)
+        format!("{}\n(or skip)", combined)
     } else {
         combined
     }
@@ -596,7 +596,7 @@ pub fn describe_sequential_cost_ja(costs: &[AbilityEffect], choice_index: usize)
     let parts: Vec<String> = (0..=choice_index)
         .map(|i| describe_cost_ja(&costs[i]))
         .collect();
-    let combined = parts.join(" + ");
+    let combined = parts.join("\n");
     if costs[choice_index].optional.unwrap_or(false) {
         format!("{}（またはスキップ）", combined)
     } else {
@@ -606,7 +606,7 @@ pub fn describe_sequential_cost_ja(costs: &[AbilityEffect], choice_index: usize)
 
 // ── Japanese description ──────────────────────────────────────────────
 
-fn zone_label_ja(zone: Option<&str>) -> &str {
+pub fn zone_label_ja(zone: Option<&str>) -> &str {
     match zone {
         Some("hand") => "手札",
         Some("discard") | Some("waitroom") => "控え室",
@@ -985,9 +985,9 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
         "sequential_cost" => {
             if let Some(ref costs) = effect.compound.actions {
                 let parts: Vec<String> = costs.iter().map(|c| describe_cost_ja(c)).collect();
-                let combined = parts.join(" + ");
+                let combined = parts.join("\n");
                 if costs.last().and_then(|c| c.optional).unwrap_or(false) {
-                    format!("{}（またはスキップ）", combined)
+                    format!("{}\n（またはスキップ）", combined)
                 } else {
                     combined
                 }

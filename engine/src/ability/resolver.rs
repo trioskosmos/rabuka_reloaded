@@ -135,7 +135,11 @@ impl AbilityResolver {
                 Choice::select_cards(
                     zone_name.to_string(),
                     0,
-                    format!("Select {} card(s) to {} for cost", count, zone_name),
+                    format!(
+                        "Select {} card(s) to {} for cost",
+                        count,
+                        crate::ability::describe::zone_label(Some(zone_name))
+                    ),
                     true,
                 )
                 .build(),

@@ -196,6 +196,7 @@ fn output_actions() {
                             })
                             .collect()
                     }),
+                    disabled: p.disabled,
                     available_areas: p.available_areas.map(|areas| {
                         areas
                             .into_iter()

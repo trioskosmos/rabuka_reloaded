@@ -1194,6 +1194,23 @@ export const LogRenderer = {
             ...(s.player2_cheer_revealed_cards || []),
         ]);
 
+        // Fallback: if cheer arrays are empty (e.g. cleared by re-yell), use
+        // the persistent yell fields that survive clears.
+        if (!s.player1_cheer_revealed_cards?.length && !s.player2_cheer_revealed_cards?.length) {
+            const initialYell = s.initial_yell_revealed_cards || [];
+            const reYell = s.re_yell_revealed_cards || [];
+            const allYell = [...new Set([...initialYell, ...reYell])];
+            const p1Yell = [], p2Yell = [];
+            allYell.forEach(cid => {
+                const owner = ownerOf(cid);
+                if (owner === 0) p1Yell.push(cid);
+                else if (owner === 1) p2Yell.push(cid);
+            });
+            // Insert at front so yell (most recent) appears before any surviving cheer cards
+            p1Yell.reverse().forEach(c => { p1Cheer.unshift(c); cheerIds.add(c); });
+            p2Yell.reverse().forEach(c => { p2Cheer.unshift(c); cheerIds.add(c); });
+        }
+
         // Cost cards — prefer engine-side info (source + owner + private), fall back to IDs.
         const costEntries = (s.revealed_cost_card_info && s.revealed_cost_card_info.length
             ? s.revealed_cost_card_info

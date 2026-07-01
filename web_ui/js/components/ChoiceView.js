@@ -268,6 +268,31 @@ export const ChoiceView = {
                         name = i18n.t('pay_optional_cost');
                     } else if (cardNo === 'skip_optional_cost') {
                         name = i18n.t('skip');
+                    } else if (cardNo === 'primary') {
+                        name = i18n.t('primary_option');
+                    } else if (cardNo === 'alternative') {
+                        name = i18n.t('alternative_option');
+                    } else if (cardNo === 'yes') {
+                        name = i18n.t('yes_label');
+                    } else if (cardNo === 'no') {
+                        name = i18n.t('no_label');
+                    } else if (name.startsWith('Draw ')) {
+                        const drawMatch = name.match(/^Draw (\d+)/);
+                        if (drawMatch) {
+                            const n = parseInt(drawMatch[1]);
+                            name = n === 0 ? i18n.t('draw_skip') : i18n.t('draw_count', { count: n });
+                        }
+                    } else if (name.startsWith('Move card ')) {
+                        const orderMatch = name.match(/^Move card (\d+) to top/);
+                        if (orderMatch) {
+                            name = i18n.t('move_to_top', { n: orderMatch[1] });
+                        }
+                    } else if (name === "Skip (don't change position)") {
+                        name = i18n.t('skip');
+                    } else if (name === 'Apply replacement') {
+                        name = i18n.t('apply_replacement');
+                    } else if (name === "Don't apply") {
+                        name = i18n.t('dont_apply');
                     }
                     optItems.push({ card: cardData, name, action: a, isText: isTextAction });
                 });
@@ -410,9 +435,17 @@ export const ChoiceView = {
                     }
                 }
 
-                choiceEl.onclick = () => {
-                    if (window.doAction) window.doAction(item.action);
-                };
+                const isDisabled = item.action?.parameters?.disabled === true;
+                if (isDisabled) {
+                    choiceEl.style.opacity = '0.35';
+                    choiceEl.style.filter = 'grayscale(1)';
+                    choiceEl.style.cursor = 'not-allowed';
+                    choiceEl.style.pointerEvents = 'none';
+                } else {
+                    choiceEl.onclick = () => {
+                        if (window.doAction) window.doAction(item.action);
+                    };
+                }
                 optContainer.appendChild(choiceEl);
             });
 
