@@ -2,6 +2,7 @@ use super::condition::ConditionContext;
 use super::enums::Zone;
 use super::types::{
     Choice, ChoiceBuilder, ChoiceResult, ChoiceRoute, ExecutionContext, LookAndSelectStep,
+    TriggerEvent,
 };
 use super::util;
 use crate::ability::debug::ABILITY_DEBUG;
@@ -325,16 +326,22 @@ impl super::resolver::AbilityResolver {
                 Some(Choice::SelectTarget { target, .. }),
                 ChoiceResult::TargetSelected { target: selected },
             ) if target == "area_select" => {
-                // area_select: look up the actual option string from the choice's options list
-                // instead of using the numeric index directly.
+                // area_select: selected is either a numeric index (for backward compat
+                // with direct select_option calls) or the actual area name (when the
+                // choice was rendered as position|destination buttons).
                 if let Some(Choice::SelectTarget {
                     options: Some(ref opts),
                     ..
                 }) = choice
                 {
-                    let idx: usize = selected.parse().unwrap_or(0);
-                    let opt = opts.get(idx).map(|s| s.as_str()).unwrap_or("left");
-                    self.selected_area = Some(opt.to_string());
+                    if let Ok(idx) = selected.parse::<usize>() {
+                        let opt = opts.get(idx).map(|s| s.as_str()).unwrap_or("left");
+                        self.selected_area = Some(opt.to_string());
+                    } else if opts.contains(&selected) {
+                        self.selected_area = Some(selected.clone());
+                    } else {
+                        self.selected_area = Some(opts[0].clone());
+                    }
                     self.clear_choice_state(gs);
                     return self.resume_pending_actions(gs);
                 }
@@ -2221,10 +2228,28 @@ impl super::resolver::AbilityResolver {
                 if let Some(tgt) = raw.strip_prefix("position_change:") {
                     if tgt == "opponent:front" {
                         modified.source_position = Some(selected.to_string());
-                        if let Err(e) =
-                            self.execute_position_change_with_destination(gs, &modified, "front")
-                        {
+                        let pc_ok =
+                            self.execute_position_change_with_destination(gs, &modified, "front");
+                        if let Err(ref e) = pc_ok {
                             log::debug!("Failed to execute position change: {}", e);
+                        }
+                        if pc_ok.is_ok() {
+                            let pid = gs
+                                .ability_queue
+                                .current_entry()
+                                .map(|e| e.player_id.clone())
+                                .unwrap_or_default();
+                            gs.trigger_auto_abilities_for_player_with_event(
+                                &pid,
+                                &TriggerEvent {
+                                    moved_cards: gs
+                                        .recently_moved_cards
+                                        .clone()
+                                        .unwrap_or_default(),
+                                    position_change_occurred: gs.position_change_occurred_this_turn,
+                                    ..Default::default()
+                                },
+                            );
                         }
                         self.clear_choice_state_and_resume(gs)?;
                         return Ok(());
@@ -2311,6 +2336,22 @@ impl super::resolver::AbilityResolver {
                             self.compute_valid_position_destinations(gs, &effect, "self");
                         if valid_destinations.is_empty() {
                             self.finalize_formation_change(gs)?;
+                            let pid = gs
+                                .ability_queue
+                                .current_entry()
+                                .map(|e| e.player_id.clone())
+                                .unwrap_or_default();
+                            gs.trigger_auto_abilities_for_player_with_event(
+                                &pid,
+                                &TriggerEvent {
+                                    moved_cards: gs
+                                        .recently_moved_cards
+                                        .clone()
+                                        .unwrap_or_default(),
+                                    position_change_occurred: gs.position_change_occurred_this_turn,
+                                    ..Default::default()
+                                },
+                            );
                             self.clear_choice_state_and_resume(gs)?;
                             return Ok(());
                         }
@@ -2336,6 +2377,19 @@ impl super::resolver::AbilityResolver {
                     } else {
                         // All members assigned — execute batch swap.
                         self.finalize_formation_change(gs)?;
+                        let pid = gs
+                            .ability_queue
+                            .current_entry()
+                            .map(|e| e.player_id.clone())
+                            .unwrap_or_default();
+                        gs.trigger_auto_abilities_for_player_with_event(
+                            &pid,
+                            &TriggerEvent {
+                                moved_cards: gs.recently_moved_cards.clone().unwrap_or_default(),
+                                position_change_occurred: gs.position_change_occurred_this_turn,
+                                ..Default::default()
+                            },
+                        );
                         self.clear_choice_state_and_resume(gs)?;
                         return Ok(());
                     }
@@ -2345,6 +2399,21 @@ impl super::resolver::AbilityResolver {
             modified.destination = Some(dest.to_string());
             if let Err(e) = self.execute_position_change_with_destination(gs, &modified, dest) {
                 log::debug!("Failed to execute position change: {}", e);
+            } else {
+                // Scan immediately for auto-abilities triggered by this swap.
+                let pid = gs
+                    .ability_queue
+                    .current_entry()
+                    .map(|e| e.player_id.clone())
+                    .unwrap_or_default();
+                gs.trigger_auto_abilities_for_player_with_event(
+                    &pid,
+                    &TriggerEvent {
+                        moved_cards: gs.recently_moved_cards.clone().unwrap_or_default(),
+                        position_change_occurred: gs.position_change_occurred_this_turn,
+                        ..Default::default()
+                    },
+                );
             }
             self.selected_area = None;
         }

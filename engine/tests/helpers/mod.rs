@@ -512,7 +512,7 @@ impl TestGame {
         let all = rabuka_engine::game_setup::generate_possible_actions(&self.state);
         match pending {
             rabuka_engine::ability::types::Choice::SelectTarget { target, .. }
-                if target == "position|destination" =>
+                if target == "position|destination" || target == "area_select" =>
             {
                 all.into_iter()
                     .filter(|a| {
@@ -531,7 +531,7 @@ impl TestGame {
         let all = rabuka_engine::game_setup::generate_possible_actions(&self.state);
         let matching: Vec<&rabuka_engine::game_setup::Action> = match &pending {
             rabuka_engine::ability::types::Choice::SelectTarget { target, .. }
-                if target == "position|destination" =>
+                if target == "position|destination" || target == "area_select" =>
             {
                 all.iter()
                     .filter(|a| {

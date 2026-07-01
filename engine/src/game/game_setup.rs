@@ -273,7 +273,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     ),
                 ];
             }
-            if target == "position|destination" {
+            if target == "position|destination" || target == "area_select" {
                 let is_source = description == "Choose which member to move";
                 // Extract source position from description e.g. "(currently at Center)"
                 let from_pos = if is_source {
