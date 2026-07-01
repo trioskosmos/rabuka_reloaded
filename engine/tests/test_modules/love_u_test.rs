@@ -68,9 +68,11 @@ fn love_u_q192_live_success_all_blade_score_up() {
         !game.state.player1.success_live_card_zone.cards.is_empty(),
         "Live card should have reached success_live_card_zone after LiveSuccess"
     );
-    let score_mod = game.state.mods.get_score_modifier(love_u);
     assert_eq!(
-        score_mod, 1,
-        "Score should be +1 when a b_all card is among yell-revealed cards"
+        game.state.mods.get_score_modifier(love_u),
+        0,
+        "LiveSuccess score bonus cleared after live"
     );
+    let l = &game.state.performance_snapshots[0].lives[0];
+    assert_eq!(l.score - l.base_score, 1, "bonus in final score");
 }

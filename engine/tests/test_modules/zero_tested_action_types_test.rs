@@ -396,8 +396,13 @@ fn vitamin_summer_live_success_hand_condition() {
         game.select_indices(&[]);
     }
 
-    let score = game.state.mods.get_score_modifier(live);
-    assert_eq!(score, 1, "vitamin: hand 5 > opp 3 → +1 score");
+    assert_eq!(
+        game.state.mods.get_score_modifier(live),
+        0,
+        "LiveSuccess score bonus cleared after live"
+    );
+    let l = &game.state.performance_snapshots[0].lives[0];
+    assert_eq!(l.score - l.base_score, 1, "bonus in final score");
 }
 
 /// Step! ZERO to ONE (PL!S-bp6-019-L): Live start — if all stage members are Aqours,

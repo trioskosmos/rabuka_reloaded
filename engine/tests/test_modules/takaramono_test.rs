@@ -50,9 +50,13 @@ fn takaramono_no_excess_heart_score_plus_1() {
     game.set_live_card(takaramono);
     advance_to_live_success(&mut game);
 
-    // Score should be +1 (no excess heart condition met)
-    let score_mod = game.state.mods.get_score_modifier(takaramono);
-    assert_eq!(score_mod, 1, "No excess heart → score +1");
+    assert_eq!(
+        game.state.mods.get_score_modifier(takaramono),
+        0,
+        "LiveSuccess score bonus cleared after live"
+    );
+    let l = &game.state.performance_snapshots[0].lives[0];
+    assert_eq!(l.score - l.base_score, 1, "bonus in final score");
 }
 
 /// When self has excess heart (flag not set), condition fails.

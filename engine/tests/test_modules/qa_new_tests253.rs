@@ -56,7 +56,13 @@ fn q253_galaxy_gets_plus_one() {
         game.select_indices(&[]);
     }
 
-    assert_eq!(game.state.mods.get_score_modifier(galaxy), 1);
+    assert_eq!(
+        game.state.mods.get_score_modifier(galaxy),
+        0,
+        "LiveSuccess score bonus cleared after live"
+    );
+    let l = &game.state.performance_snapshots[0].lives[0];
+    assert_eq!(l.score - l.base_score, 1, "bonus in final score");
 }
 
 /// Kanan takes the only live card from yell → GALAXY gets nothing (Q253 ruling).

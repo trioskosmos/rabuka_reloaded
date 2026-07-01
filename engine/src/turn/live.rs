@@ -478,6 +478,31 @@ impl super::TurnEngine {
             snap.success = snap.lives.iter().all(|l| l.passed) && snap.total_score > 0;
         }
 
+        // Revert score modifiers added by LiveSuccess-triggered abilities.
+        // The snapshot already captured the correct final score (including bonuses)
+        // at lines 431-439. Delayed gained effects below will re-apply their
+        // bonuses on the cleared state.
+        {
+            let post: HashMap<i16, i32> = game_state
+                .mods
+                .score_modifiers
+                .iter()
+                .map(|(&k, e)| (k, e.total()))
+                .collect();
+            for (&cid, post_total) in &post {
+                let pre = pre_score_flat.get(&cid).copied().unwrap_or(0);
+                let delta = post_total - pre;
+                if delta != 0 {
+                    game_state.mods.add_score_modifier(cid, -delta);
+                }
+            }
+            for (&cid, &pre_total) in &pre_score_flat {
+                if !post.contains_key(&cid) {
+                    game_state.mods.set_score_modifier(cid, pre_total);
+                }
+            }
+        }
+
         // Process delayed gained effects (e.g. constant gain_ability with
         // conditional_alternative gained_effect that checks revealed_cards).
         // These couldn't be evaluated at constant-evaluation time because the
@@ -642,6 +667,7 @@ impl super::TurnEngine {
             player2_won
         );
         Self::move_live_to_success_and_handle_wins(game_state, player1_won, player2_won);
+
         // Rule 8.4.13: If only one player moved a card to success this live, they become first attacker
         let p1_now = game_state.player1.success_live_card_zone.cards.len();
         let p2_now = game_state.player2.success_live_card_zone.cards.len();

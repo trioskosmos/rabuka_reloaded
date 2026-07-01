@@ -183,13 +183,17 @@ fn butterfly_wing_live_success_scores_with_live_start_members() {
         game.select_indices(&[]);
     }
 
-    // BW's live_success should fire because members WITH live_start ability are on stage
-    let score_mod = game.state.mods.get_score_modifier(butterfly);
     assert_eq!(
-        score_mod, 1,
-        "Butterfly Wing should get +1 score (live_start members on stage): got {}",
-        score_mod
+        game.state.mods.get_score_modifier(butterfly),
+        0,
+        "LiveSuccess score bonus cleared after live"
     );
+    let l = game.state.performance_snapshots[0]
+        .lives
+        .iter()
+        .find(|l| l.card_id == butterfly)
+        .unwrap();
+    assert_eq!(l.score - l.base_score, 1, "bonus in final score");
 }
 
 /// Butterfly Wing's live_success does NOT score when no live_start member is on stage.

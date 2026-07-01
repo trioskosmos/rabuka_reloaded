@@ -75,11 +75,13 @@ fn vitamin_q128_hand_greater_triggers_score() {
         p2_hand
     );
 
-    let score_mod = game.state.mods.get_score_modifier(vitamin);
     assert_eq!(
-        score_mod, 1,
-        "Q128: Score +1 when P1 hand > P2 hand at LiveSuccess"
+        game.state.mods.get_score_modifier(vitamin),
+        0,
+        "LiveSuccess score bonus cleared after live"
     );
+    let l = &game.state.performance_snapshots[0].lives[0];
+    assert_eq!(l.score - l.base_score, 1, "bonus in final score");
 }
 
 /// Q119: Score increase is locked in at LiveSuccess resolution time.
@@ -117,23 +119,21 @@ fn vitamin_q119_score_locked_after_resolution() {
     game.pass();
     game.pass();
 
-    // Score should be +1 after LiveSuccess resolution
+    // Score locked — verify in snapshot, cleared from mods
     assert_eq!(
         game.state.mods.get_score_modifier(vitamin),
-        1,
-        "Q119: Score should be +1 after LiveSuccess ability resolves"
+        0,
+        "LiveSuccess bonus cleared after live"
     );
+    let l = &game.state.performance_snapshots[0].lives[0];
+    assert_eq!(l.score - l.base_score, 1, "bonus in final score");
 
-    // Now change hand counts dramatically — the score modifier should NOT change
-    // because the condition was already evaluated and won't re-evaluate
+    // Hand changes don't re-evaluate (still 0)
     game.state.player1.hand.cards.clear();
-
-    // The score modifier is locked in from the LiveSuccess evaluation
-    // Even if P1 hand < P2 hand now, the already-applied score stays
     assert_eq!(
         game.state.mods.get_score_modifier(vitamin),
-        1,
-        "Q119: Score stays +1 even after hand counts change post-resolution"
+        0,
+        "Q119: Score stays 0 after hand counts change"
     );
 }
 

@@ -109,9 +109,15 @@ fn strawberry_q132_first_attacker_evaluated() {
     let target = game.state.player1.success_live_card_zone.cards[0];
     assert_eq!(
         game.state.mods.get_score_modifier(target),
-        2,
-        "Q132: Both conditions met → score +2"
+        0,
+        "LiveSuccess score bonus cleared after live"
     );
+    let l = game.state.performance_snapshots[0]
+        .lives
+        .iter()
+        .find(|l| l.card_id == target)
+        .unwrap();
+    assert_eq!(l.score - l.base_score, 2, "bonus in final score");
 }
 
 /// Q142: Excess heart blocks the temporal condition.

@@ -63,10 +63,11 @@ fn smile_q224_live_success_score_plus_1() {
         .copied()
         .unwrap_or(smile);
 
-    let score_mod = game.state.mods.get_score_modifier(mod_id);
     assert_eq!(
-        score_mod, 1,
-        "LiveSuccess condition met → +1 score (got {})",
-        score_mod
+        game.state.mods.get_score_modifier(mod_id),
+        0,
+        "LiveSuccess score bonus cleared after live"
     );
+    let l = &game.state.performance_snapshots[0].lives[0];
+    assert_eq!(l.score - l.base_score, 1, "bonus in final score");
 }

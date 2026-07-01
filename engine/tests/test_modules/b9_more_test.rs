@@ -111,7 +111,7 @@ fn mijuku_dreamer_no_refresh_no_bonus() {
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.main_deck.cards = vec![filler; 10].into();
-    game.state.player1.success_live_card_zone.cards.push(mijuku);
+    game.state.player1.live_card_zone.cards.push(mijuku);
 
     let card = game.db.get_card(mijuku).unwrap();
     let ab = card
@@ -153,7 +153,7 @@ fn mijuku_dreamer_refresh_via_mill_gets_bonus() {
     game.give_energy(2);
     game.state.player1.main_deck.cards = vec![filler; 3].into();
     game.state.player1.waitroom.cards = vec![filler; 10].into();
-    game.state.player1.success_live_card_zone.cards.push(mijuku);
+    game.state.player1.live_card_zone.cards.push(mijuku);
     game.state.player1.deck_refreshed_this_turn = false;
 
     game.activate_ability(hanayo);

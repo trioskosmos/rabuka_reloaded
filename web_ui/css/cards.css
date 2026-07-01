@@ -652,28 +652,35 @@
     vertical-align: middle;
 }
 
-/* --- Under Cards (Stacked Behind Member) --- */
+/* --- Under Cards (Overlaid at bottom of member slot) --- */
 .under-cards {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
     display: flex;
-    flex-wrap: wrap;
-    gap: 1px;
-    justify-content: center;
-    width: 100%;
-    flex: 0 0 auto;
-    max-height: 60%;
-    overflow-y: auto;
+    flex-direction: row;
+    gap: 2px;
+    padding: 14px 3px 3px;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.75) 45%, rgba(0, 0, 0, 0.75) 100%);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    scrollbar-width: thin;
 }
 
 .under-card {
-    width: calc(var(--card-w-mini) * 0.35);
-    height: calc(var(--card-h-mini) * 0.35);
-    border: 1px solid var(--border);
+    flex: 0 0 auto;
+    width: calc(var(--card-w-mini) * 0.32);
+    height: calc(var(--card-h-mini) * 0.32);
+    border: 1.5px solid var(--border);
     border-radius: 2px;
     overflow: hidden;
     background: var(--bg-tertiary);
-    position: relative;
     opacity: 0.85;
     cursor: help;
+    transition: opacity 0.15s, transform 0.15s;
 }
 
 .under-card img {
@@ -684,17 +691,15 @@
 
 .under-card:hover {
     opacity: 1;
-    transform: scale(1.15);
+    transform: scale(1.2);
     z-index: 50;
     box-shadow: var(--shadow-md);
 }
 
-/* Energy under cards get a subtle tint */
 .under-card.energy-type {
     border-color: var(--accent-blue);
 }
 
-/* Member under cards get a subtle tint */
 .under-card.member-type {
     border-color: var(--accent-pink);
 }

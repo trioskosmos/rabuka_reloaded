@@ -50,23 +50,15 @@ fn miracle_wave_q182_excess_heart_score_4() {
     game.pass(); // → Active (processes LiveVictoryDetermination)
     game.drain_auto_ability_choices();
 
-    let mod_val = game.state.mods.get_score_modifier(wave);
-    // set_score stores absolute value 4 directly, additive=0 → get_score_modifier=4+0=4
-    // live calc uses set_score(4) as effective base → final = 4 + 0 = 4
     assert_eq!(
-        mod_val, 4,
-        "score modifier should be 4 (set=4 additive=0), got {}",
-        mod_val
+        game.state.mods.get_score_modifier(wave),
+        0,
+        "LiveSuccess set_score cleared after live"
     );
-
-    // Verify the actual live score in the performance snapshot
-    let live_score = game
-        .state
-        .performance_snapshots
+    let l = game.state.performance_snapshots[0]
+        .lives
         .iter()
-        .flat_map(|s| s.lives.iter())
         .find(|l| l.card_id == wave)
-        .map(|l| l.score)
-        .unwrap_or(0);
-    assert_eq!(live_score, 4, "Live score should be 4, got {}", live_score);
+        .unwrap();
+    assert_eq!(l.score, 4, "Live score should be 4");
 }

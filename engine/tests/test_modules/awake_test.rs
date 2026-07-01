@@ -52,12 +52,13 @@ fn awake_q36_10_plus_hasetsu_cheers_score_plus_1() {
     game.pass();
     game.pass();
 
-    let score_mod = game.state.mods.get_score_modifier(awake);
     assert_eq!(
-        score_mod, 1,
-        "10+ 蓮ノ空 members in cheered cards → score +1 (got {})",
-        score_mod
+        game.state.mods.get_score_modifier(awake),
+        0,
+        "LiveSuccess score bonus cleared after live"
     );
+    let l = &game.state.performance_snapshots[0].lives[0];
+    assert_eq!(l.score - l.base_score, 1, "bonus in final score");
 }
 
 /// Only 1 member with blade=2 → <10 cheered → condition fails.

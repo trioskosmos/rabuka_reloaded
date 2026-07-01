@@ -83,10 +83,17 @@ fn strawberry_trapper_q132_conditions_met_score_plus_2() {
         game.select_indices(&[]);
     }
 
-    let score_mod = game.state.mods.get_score_modifier(strawberry);
-    // GAP: Riko auto-trigger infinite loop prevents LiveSuccess from resolving properly.
-    // Score modifier may or may not be applied depending on how the loop is resolved.
-    assert_eq!(score_mod, 2, "Q132: Score +2 expected, got {}", score_mod);
+    assert_eq!(
+        game.state.mods.get_score_modifier(strawberry),
+        0,
+        "LiveSuccess score bonus cleared after live"
+    );
+    let l = game.state.performance_snapshots[0]
+        .lives
+        .iter()
+        .find(|l| l.card_id == strawberry)
+        .unwrap();
+    assert_eq!(l.score - l.base_score, 2, "bonus in final score");
 }
 
 /// Negative: Aqours members have heart05 < 4 (only 2 total) → condition fails.
