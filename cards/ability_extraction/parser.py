@@ -3363,7 +3363,7 @@ def _try_either_target(text):
                 result["cost_limit"] = cl
             op = extract_operator(text)
             if op:
-                result["operator"] = op
+                result["cost_limit_operator"] = op
             return result
     return None
 
@@ -9464,6 +9464,18 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     if not sub.get("group_names") and eff.get("group_names"):
                         sub["group_names"] = eff["group_names"]
                     prev_was_baton_touch = False
+                elif (
+                    sub.get("action") == "gain_resource"
+                    and sub.get("resource") == "heart"
+                    and prev_was_select
+                ):
+                    sub_text = sub.get("text", "")
+                    if (
+                        "選んだカードが持つ色" in sub_text
+                        or "これにより選んだカード" in sub_text
+                    ):
+                        sub["heart_colors_from_selected_card"] = True
+                    prev_was_select = False
                 else:
                     prev_was_select = prev_was_look_at = prev_was_baton_touch = False
 

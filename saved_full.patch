@@ -1,0 +1,197 @@
+warning: in the working copy of 'engine/src/ability/condition/card.rs', LF will be replaced by CRLF the next time Git touches it
+diff --git a/cards/abilities.json b/cards/abilities.json
+index f881ed4..14a6d35 100644
+--- a/cards/abilities.json
++++ b/cards/abilities.json
+@@ -1,6 +1,6 @@
+ {
+   "schema": "extracted_abilities.v1",
+-  "generated_at": "2026-07-01T20:32:47.202277",
++  "generated_at": "2026-07-02T01:30:34.943781",
+   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
+   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
+   "statistics": {
+@@ -4768,8 +4768,7 @@
+               "state_change": "active",
+               "card_type": "member_card",
+               "action": "change_state",
+-              "count": 1,
+-              "activation_position": "left_side"
++              "count": 1
+             },
+             {
+               "text": "2枚ある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+@@ -4787,11 +4786,11 @@
+               "action": "gain_resource",
+               "resource": "blade",
+               "count": 2,
+-              "duration": "live_end",
+-              "activation_position": "left_side"
++              "duration": "live_end"
+             }
+           ],
+-          "activation_position": "left_side"
++          "activation_position": "left_side",
++          "self_target": true
+         }
+       }
+     },
+@@ -6393,7 +6392,7 @@
+           "target": "either",
+           "text": "自分か相手のステージにコスト13以上のメンバーがいる場合",
+           "cost_limit": 13,
+-          "operator": ">="
++          "cost_limit_operator": ">="
+         },
+         "action": "gain_resource",
+         "resource": "blade",
+@@ -10622,7 +10621,8 @@
+           "target": "self",
+           "text": "エールにより公開された自分のカードの中にライブカードがないとき",
+           "negation": true,
+-          "card_type": "live_card"
++          "card_type": "live_card",
++          "yell_trigger": true
+         }
+       }
+     },
+@@ -26577,8 +26577,8 @@
+               "quoted_type": "character"
+             },
+             "action": "select",
+-            "all": true,
+-            "source": "revealed_cards"
++            "source": "revealed_cards",
++            "all": true
+           },
+           {
+             "text": "自分のステージにいる「中須かすみ」1人は、これにより選んだカードが持つ色のハートを1つずつ得る",
+@@ -26596,8 +26596,7 @@
+             "multiple_targets": true,
+             "action": "gain_resource",
+             "resource": "heart",
+-            "all": true,
+-            "heart_colors_from_selected_card": true
++            "all": true
+           },
+           {
+             "text": "公開したカードをすべて控え室に置く",
+diff --git a/cards/ability_extraction/parser.py b/cards/ability_extraction/parser.py
+index 9642288..42f66d7 100644
+--- a/cards/ability_extraction/parser.py
++++ b/cards/ability_extraction/parser.py
+@@ -3363,7 +3363,7 @@ def _try_either_target(text):
+                 result["cost_limit"] = cl
+             op = extract_operator(text)
+             if op:
+-                result["operator"] = op
++                result["cost_limit_operator"] = op
+             return result
+     return None
+ 
+diff --git a/engine/src/ability/condition/card.rs b/engine/src/ability/condition/card.rs
+index 1f3f2a6..b1c6896 100644
+--- a/engine/src/ability/condition/card.rs
++++ b/engine/src/ability/condition/card.rs
+@@ -1214,24 +1214,16 @@ impl<'a> ConditionContext<'a> {
+             }
+         }
+ 
+-        let group = condition
+-            .group_names
+-            .as_ref()
+-            .and_then(|g| g.first().map(|s| s.as_str()))
+-            .or_else(|| {
+-                if condition.group_reference.as_deref() == Some("same_group_name") {
+-                    self.activating_card_id
+-                        .and_then(|cid| self.game_state.card_database.get_card(cid))
+-                        .map(|c| c.group.as_str())
+-                } else {
+-                    None
+-                }
+-            });
++        let group_override = condition.group_reference.as_deref().and_then(|gr| {
++            if gr == "same_group_name" {
++                self.activating_card_id
++                    .and_then(|cid| self.game_state.card_database.get_card(cid))
++                    .map(|c| c.group.as_str())
++            } else {
++                None
++            }
++        });
+         let op = condition.operator.as_deref();
+-        let cost_op = condition
+-            .cost_limit_operator
+-            .as_deref()
+-            .or(condition.operator.as_deref());
+ 
+         let cards: Vec<i16> = if Zone::from_str(location) == Some(Zone::RevealedCards) {
+             // When yell_trigger is true, the ability triggers on yell alone
+@@ -1251,34 +1243,14 @@ impl<'a> ConditionContext<'a> {
+             util::zone_cards(player, location).to_vec()
+         };
+ 
+-        let count = if condition.exclude_self.unwrap_or(false) {
+-            let ex_id = self.activating_card_id;
+-            cards
+-                .iter()
+-                .filter(|&&id| {
+-                    id != -1
+-                        && Some(id) != ex_id
+-                        && util::card_matches_type(card_db, id, condition.card_type.as_deref())
+-                        && util::card_matches_group_str(card_db, id, group)
+-                        && util::card_matches_cost_limit_op(
+-                            card_db,
+-                            id,
+-                            condition.cost_limit,
+-                            cost_op,
+-                        )
+-                        && util::card_matches_characters(card_db, id, condition.characters.as_ref())
+-                        && self.check_original_blade_filter(condition, id)
+-                        && self.check_original_heart_filter(condition, id)
+-                        && self.check_heart_type_all_per_card(condition, card_db, id)
+-                })
+-                .count() as u32
+-        } else {
+-            let mut filter = util::CardFilter::default();
+-            filter.card_type = condition.card_type.as_deref();
+-            filter.group = group;
+-            filter.cost_limit = condition.cost_limit;
+-            filter.cost_operator = cost_op;
+-            filter.characters = condition.characters.as_ref();
++        let count = {
++            let mut filter = condition.filter_subset();
++            if let Some(grp) = group_override {
++                filter.group = Some(grp);
++            }
++            if condition.exclude_self.unwrap_or(false) {
++                filter.exclude_self = self.activating_card_id;
++            }
+             cards
+                 .iter()
+                 .filter(|&&id| {
+@@ -1308,7 +1280,7 @@ impl<'a> ConditionContext<'a> {
+                                     id,
+                                     condition.card_type.as_deref(),
+                                 )
+-                                && util::card_matches_group_str(card_db, id, group)
++                                && util::card_matches_group_str(card_db, id, group_override)
+                                 && util::card_matches_characters(
+                                     card_db,
+                                     id,
+diff --git a/engine/src/core/card.rs b/engine/src/core/card.rs
+index af87ca7..d724182 100644
+--- a/engine/src/core/card.rs
++++ b/engine/src/core/card.rs
+@@ -1592,7 +1592,10 @@ impl Condition {
+                 .and_then(|v| v.first())
+                 .map(|s| s.as_str()),
+             cost_limit: self.cost_limit,
+-            cost_operator: self.operator.as_deref(),
++            cost_operator: self
++                .cost_limit_operator
++                .as_deref()
++                .or(self.operator.as_deref()),
+             characters: self.characters.as_ref(),
+             exclude_characters: self.exclude_characters.as_ref(),
+             exclude_self: None,

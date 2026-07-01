@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-01T20:32:47.202277",
+  "generated_at": "2026-07-02T01:50:03.206596",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -6393,7 +6393,7 @@
           "target": "either",
           "text": "自分か相手のステージにコスト13以上のメンバーがいる場合",
           "cost_limit": 13,
-          "operator": ">="
+          "cost_limit_operator": ">="
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -26577,8 +26577,8 @@
               "quoted_type": "character"
             },
             "action": "select",
-            "all": true,
-            "source": "revealed_cards"
+            "source": "revealed_cards",
+            "all": true
           },
           {
             "text": "自分のステージにいる「中須かすみ」1人は、これにより選んだカードが持つ色のハートを1つずつ得る",
