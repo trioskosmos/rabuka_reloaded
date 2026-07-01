@@ -91,6 +91,7 @@ export const HeaderStats = {
 
         const phaseKey = getPhaseKey(state.phase);
         const isSetPhase = state.phase === 'LiveCardSetFirstAttacker' || state.phase === 'LiveCardSetSecondAttacker';
+        const perspective = State.perspectivePlayer;
 
         if (HeaderStats.cache.turn) HeaderStats.cache.turn.textContent = state.turn || 1;
         if (HeaderStats.cache.phase) HeaderStats.cache.phase.textContent = i18n.t(phaseKey);

@@ -1124,17 +1124,17 @@ export const LogRenderer = {
         const content = document.getElementById(DOM_IDS.REVEALED_CONTENT);
         if (!title || !content) return;
 
-        // Collect ALL card IDs from ALL sources
+        // Collect ALL card IDs from ALL revealed sources
         const allIds = new Set();
 
-        // 1. Cheer / yell (including persistent fields)
+        // Cheer / yell (including persistent fields)
         for (const src of ['player1_cheer_revealed_cards', 'player2_cheer_revealed_cards',
                            'initial_yell_revealed_cards', 're_yell_revealed_cards',
                            'revealed_cost_cards']) {
             (s[src] || []).forEach(id => allIds.add(id));
         }
 
-        // 2. Effect reveals (objects with card_id, or raw IDs)
+        // Effect reveals (objects with card_id, or raw IDs)
         if (s.revealed_card_info?.length) {
             s.revealed_card_info.forEach(e => { if (e.card_id !== undefined) allIds.add(e.card_id); });
         } else {
@@ -1143,12 +1143,6 @@ export const LogRenderer = {
         if (s.revealed_cost_card_info?.length) {
             s.revealed_cost_card_info.forEach(e => { if (e.card_id !== undefined) allIds.add(e.card_id); });
         }
-
-        // 3. Looked cards
-        (s.looked_cards?.cards || []).forEach(c => {
-            const id = typeof c === 'number' ? c : (c.card_id ?? c.id);
-            if (id !== undefined) allIds.add(id);
-        });
 
         const ids = [...allIds].filter(id => id > 0);
 
@@ -1162,7 +1156,7 @@ export const LogRenderer = {
 
         if (!ids.length) {
             // DEBUG: dump raw state keys so we can see what exists
-            const relevantKeys = Object.keys(s).filter(k => /cheer|reveal|yell|looked/i.test(k));
+            const relevantKeys = Object.keys(s).filter(k => /cheer|reveal|yell/i.test(k));
             const dump = relevantKeys.map(k => `<p><b>${k}:</b> ${JSON.stringify(s[k])}</p>`).join('');
             content.innerHTML = `<div style="padding:20px;"><h3 style="color:#f66;">No card IDs found</h3>${dump}</div>`;
             ModalManager.show(DOM_IDS.MODAL_REVEALED);
