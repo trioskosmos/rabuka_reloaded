@@ -125,7 +125,7 @@
         object-fit: contain;
     }
 
-    /* Pending choice modal - compact like sidebar panel */
+    /* Pending choice modal - full width each component */
     .selection-modal-content {
         width: 95vw;
         max-width: 95vw;
@@ -159,10 +159,22 @@
         align-items: stretch;
     }
 
+    #selection-content .choice-cards-row > * {
+        width: 100%;
+        min-width: 0;
+    }
+
     #selection-content .selection-grid {
-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
+        grid-template-columns: 1fr !important;
         gap: 4px;
         padding: 4px;
+    }
+
+    #selection-content .action-btn,
+    #selection-content .choice-item,
+    #selection-content .selection-card-item {
+        width: 100%;
+        min-width: 0;
     }
 
     /* UI mode toggle badge */

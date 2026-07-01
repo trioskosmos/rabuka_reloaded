@@ -89,14 +89,6 @@ export const HeaderStats = {
         const p0 = state.player1 || {};
         const p1 = state.player2 || {};
 
-        const perspective = State.perspectivePlayer;
-        const selfLabel = perspective === 0 ? 'P1' : 'P2';
-        const oppLabel = perspective === 0 ? 'P2' : 'P1';
-        const p1LabelEls = document.querySelectorAll('[data-i18n="player1"]');
-        const p2LabelEls = document.querySelectorAll('[data-i18n="player2"]');
-        p1LabelEls.forEach(el => el.textContent = selfLabel);
-        p2LabelEls.forEach(el => el.textContent = oppLabel);
-
         const phaseKey = getPhaseKey(state.phase);
         const isSetPhase = state.phase === 'LiveCardSetFirstAttacker' || state.phase === 'LiveCardSetSecondAttacker';
 

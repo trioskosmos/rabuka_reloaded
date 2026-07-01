@@ -363,7 +363,25 @@
     "gs_global": "Global",
     "gs_player": "Player",
     "gs_zones": "Zones",
-    "gs_tracking": "Tracking"
+    "gs_tracking": "Tracking",
+    "card_browser": "Card Browser",
+    "browse": "Browse",
+    "deck": "Deck",
+    "search_placeholder": "Search by ID or name...",
+    "clear": "Clear",
+    "select_filters": "Select filters to browse",
+    "empty_state": "Select filters to browse cards",
+    "validation": "Validation",
+    "cards_label": "Cards",
+    "export": "Export",
+    "clear_deck": "Clear",
+    "import_btn": "Import",
+    "cancel": "Cancel",
+    "deck_name_placeholder": "Deck name...",
+    "import_placeholder": "Paste deck list, Deck Log HTML, or card_no x qty",
+    "decklog_guide": "How to get a deck from Deck Log",
+    "browse_mode_hint": "Switch to Deck mode to build a deck list",
+    "deck_mode_hint": "Switch to Browse mode to search cards, or click cards here to add to deck"
   },
   "heuristics": []
 }

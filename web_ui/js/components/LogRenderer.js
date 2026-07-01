@@ -1120,6 +1120,16 @@ export const LogRenderer = {
     showRevealedCardsModal: () => {
         const s = State.data;
         if (!s) return;
+
+        console.log('[RevealedModal] State keys:', Object.keys(s).filter(k => k.includes('cheer') || k.includes('reveal') || k.includes('yell') || k.includes('looked')));
+        console.log('[RevealedModal] player1_cheer:', s.player1_cheer_revealed_cards);
+        console.log('[RevealedModal] player2_cheer:', s.player2_cheer_revealed_cards);
+        console.log('[RevealedModal] initial_yell:', s.initial_yell_revealed_cards);
+        console.log('[RevealedModal] re_yell:', s.re_yell_revealed_cards);
+        console.log('[RevealedModal] revealed_cards:', s.revealed_cards);
+        console.log('[RevealedModal] revealed_card_info:', s.revealed_card_info);
+        console.log('[RevealedModal] revealed_cost_cards:', s.revealed_cost_cards);
+        console.log('[RevealedModal] looked_cards:', s.looked_cards);
         const title = document.getElementById(DOM_IDS.REVEALED_TITLE);
         const content = document.getElementById(DOM_IDS.REVEALED_CONTENT);
         if (!title || !content) return;
@@ -1194,22 +1204,18 @@ export const LogRenderer = {
             ...(s.player2_cheer_revealed_cards || []),
         ]);
 
-        // Fallback: if cheer arrays are empty (e.g. cleared by re-yell), use
-        // the persistent yell fields that survive clears.
-        if (!s.player1_cheer_revealed_cards?.length && !s.player2_cheer_revealed_cards?.length) {
-            const initialYell = s.initial_yell_revealed_cards || [];
-            const reYell = s.re_yell_revealed_cards || [];
-            const allYell = [...new Set([...initialYell, ...reYell])];
-            const p1Yell = [], p2Yell = [];
-            allYell.forEach(cid => {
-                const owner = ownerOf(cid);
-                if (owner === 0) p1Yell.push(cid);
-                else if (owner === 1) p2Yell.push(cid);
-            });
-            // Insert at front so yell (most recent) appears before any surviving cheer cards
-            p1Yell.reverse().forEach(c => { p1Cheer.unshift(c); cheerIds.add(c); });
-            p2Yell.reverse().forEach(c => { p2Cheer.unshift(c); cheerIds.add(c); });
-        }
+        // Always supplement cheer with persistent yell fields that survive clears
+        // (re-yell wipes player1/2_cheer_revealed_cards but not these).
+        const yellIds = new Set([
+            ...(s.initial_yell_revealed_cards || []),
+            ...(s.re_yell_revealed_cards || []),
+        ]);
+        [...yellIds].forEach(cid => {
+            if (cheerIds.has(cid)) return;
+            const owner = ownerOf(cid);
+            if (owner === 0) { p1Cheer.unshift(cid); cheerIds.add(cid); }
+            else if (owner === 1) { p2Cheer.unshift(cid); cheerIds.add(cid); }
+        });
 
         // Cost cards — prefer engine-side info (source + owner + private), fall back to IDs.
         const costEntries = (s.revealed_cost_card_info && s.revealed_cost_card_info.length

@@ -107,44 +107,49 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
 
 <div id="app">
   <aside id="sidebar">
-    <h1><span>&#128269;</span> <span id="sidebar-title">Card Browser</span></h1>
+    <h1><span>&#128269;</span> <span id="sidebar-title" data-i18n="card_browser">Card Browser</span></h1>
     <div class="mode-toggle">
-      <button class="mode-btn active" data-mode="browser" id="mode-browser">&#128269; Browse</button>
-      <button class="mode-btn" data-mode="deck" id="mode-deck">&#127183; Deck</button>
+      <button class="mode-btn active" data-mode="browser" id="mode-browser" data-i18n="browse">&#128269; Browse</button>
+      <button class="mode-btn" data-mode="deck" id="mode-deck" data-i18n="deck">&#127183; Deck</button>
+      <button id="help-btn" style="margin-left:auto;padding:4px 8px;background:transparent;color:#8888a0;border:1px solid #0f3460;border-radius:3px;font-size:10px;cursor:pointer;" title="Help / Tutorial" onclick="window.open('tutorial.html','_blank')">&#10067;</button>
+      <button id="lang-btn-cb" style="padding:4px 8px;background:transparent;color:#8888a0;border:1px solid #0f3460;border-radius:3px;font-size:10px;cursor:pointer;">English</button>
     </div>
     <div id="search-bar" style="display:flex;gap:4px;margin-bottom:6px;">
-      <input type="search" data-fid="search" placeholder="Search by ID or name..."
+      <input type="search" data-fid="search" placeholder="" data-i18n-placeholder="search_placeholder"
              style="flex:1;padding:6px 8px;background:#1a1a2e;color:#e0e0e0;border:1px solid #0f3460;border-radius:4px;font-size:12px;outline:none;">
-      <button id="clear-all" style="padding:6px 10px;background:#e94560;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;white-space:nowrap;">Clear</button>
+      <button id="clear-all" style="padding:6px 10px;background:#e94560;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;white-space:nowrap;" data-i18n="clear">Clear</button>
     </div>
     <div id="filters"></div>
-    <div id="result-count">Select filters to browse</div>
+    <div id="result-count" data-i18n="select_filters">Select filters to browse</div>
   </aside>
   <div id="card-panel">
     <div id="panel-count"></div>
-    <div id="empty-state">&#128270; Select filters to browse cards</div>
+    <div id="empty-state" data-i18n="empty_state">&#128270; Select filters to browse cards</div>
   </div>
   <div id="deck-panel" class="hidden">
     <div class="deck-panel-inner">
       <div class="deck-header">
-        <h2>&#127183; Deck Creator</h2>
-        <input type="text" id="deck-name" placeholder="Deck name..." value="My Deck">
+        <h2 data-i18n="deck_creator">&#127183; Deck Creator</h2>
+        <input type="text" id="deck-name" placeholder="" data-i18n-placeholder="deck_name_placeholder" value="My Deck">
       </div>
       <div class="deck-stats" id="deck-stats"></div>
-      <div id="checklist"><div class="checklist-title">Validation</div></div>
+      <div id="checklist"><div class="checklist-title" data-i18n="validation">Validation</div></div>
       <div class="deck-card-section">
-        <div class="deck-list-title">Cards (<span id="deck-total">0</span>)</div>
+        <div class="deck-list-title" data-i18n="cards_label">Cards (<span id="deck-total">0</span>)</div>
         <div id="deck-card-list"></div>
       </div>
       <div class="deck-actions">
-        <button id="export-deck">&#128203; Export</button>
-        <button id="clear-deck">&#128465; Clear</button>
+        <button id="export-deck" data-i18n="export">&#128203; Export</button>
+        <button id="clear-deck" data-i18n="clear_deck">&#128465; Clear</button>
       </div>
       <div id="import-area" class="hidden">
-        <textarea id="import-text" placeholder="Paste deck list (card_no x qty, or one per line)"></textarea>
+        <textarea id="import-text" placeholder="" data-i18n-placeholder="import_placeholder"></textarea>
         <div class="deck-actions" style="margin-top:3px;">
-          <button id="import-btn" class="primary">Import</button>
-          <button id="import-cancel">Cancel</button>
+          <button id="import-btn" class="primary" data-i18n="import_btn">Import</button>
+          <button id="import-cancel" data-i18n="cancel">Cancel</button>
+        </div>
+        <div style="margin-top:4px;font-size:9px;color:#808090;text-align:center;">
+          <a href="tutorial.html" target="_blank" style="color:#e94560;" data-i18n="decklog_guide">How to get a deck from Deck Log</a>
         </div>
       </div>
     </div>
@@ -155,6 +160,27 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
 <div id="toast"></div>
 
 <script>
+// ── i18n ──
+let cbLang = localStorage.getItem('card_browser_lang') || 'en';
+async function loadCbLang(lang) {
+  cbLang = lang;
+  localStorage.setItem('card_browser_lang', lang);
+  const mod = await import('./js/i18n/translator.js');
+  await mod.loadTranslations(lang);
+  const ui = mod.getCurrentTranslations()?.ui || {};
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (ui[key]) el.textContent = ui[key];
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (ui[key]) el.placeholder = ui[key];
+  });
+  const btn = document.getElementById('lang-btn-cb');
+  if (btn) btn.textContent = lang === 'jp' ? 'English' : '日本語';
+}
+document.getElementById('lang-btn-cb')?.addEventListener('click', () => loadCbLang(cbLang === 'jp' ? 'en' : 'jp'));
+
 const TEXT_ICONS = {
   heart: 'img/texticon/heart_01.png',
   blade: 'img/texticon/icon_blade.png',
@@ -689,29 +715,54 @@ function exportDeck() {
     toast(`Exported ${deckState.cards.size} card types`);
   });
 }
+function normalizeCode(code) {
+  if (!code) return '';
+  return code.replace(/＋/g, '+').replace(/－/g, '-').replace(/ー/g, '-').trim().toUpperCase();
+}
+function extractCardId(title) {
+  const parts = title.split(/\s*:\s*/);
+  return normalizeCode(parts[0]);
+}
 function importDeckText(text) {
   const newCards = new Map();
   let imported = 0;
-  for (let raw of text.split('\n')) {
-    raw = raw.trim();
-    if (!raw || raw.startsWith('//')) continue;
-    let cardNo, qty = 1;
-    const parts = raw.split(' x ');
-    if (parts.length === 2) {
-      const a = parts[0].trim(), b = parts[1].trim();
-      if (/^\d+$/.test(a)) { qty = parseInt(a); cardNo = b; }
-      else if (/^\d+$/.test(b)) { qty = parseInt(b); cardNo = a; }
-      else continue;
-    } else if (raw.includes('-')) {
-      cardNo = raw;
-    } else continue;
-    if (!cardNo) continue;
-    const card = deckCardLookup(cardNo);
-    if (!card) continue;
-    const existing = newCards.get(cardNo);
-    newCards.set(cardNo, { card, qty: (existing ? existing.qty : 0) + qty });
-    imported++;
+
+  // Try Deck Log HTML format first (<span title="ID : Name">...<span class="num">QTY</span>)
+  const decklogRe = /<span\s+title="([^"]+)"[^>]*>\s*<\/span>\s*<span[^>]*class="num"[^>]*>(\d+)<\/span>/g;
+  let m, htmlMatch = false;
+  while ((m = decklogRe.exec(text)) !== null) {
+    const cardId = extractCardId(m[1]);
+    const qty = parseInt(m[2], 10);
+    if (cardId && qty > 0 && deckCardLookup(cardId)) {
+      newCards.set(cardId, { card: deckCardLookup(cardId), qty: (newCards.get(cardId)?.qty || 0) + qty });
+      imported++; htmlMatch = true;
+    }
   }
+
+  // Fallback: plain text per-line
+  if (!htmlMatch) {
+    for (let raw of text.split('\n')) {
+      raw = raw.trim();
+      if (!raw || raw.startsWith('//')) continue;
+      let cardNo, qty = 1;
+      const parts = raw.split(' x ');
+      if (parts.length === 2) {
+        const a = parts[0].trim(), b = parts[1].trim();
+        if (/^\d+$/.test(a)) { qty = parseInt(a); cardNo = b; }
+        else if (/^\d+$/.test(b)) { qty = parseInt(b); cardNo = a; }
+        else continue;
+      } else if (raw.includes('-')) {
+        cardNo = raw;
+      } else continue;
+      if (!cardNo) continue;
+      const card = deckCardLookup(cardNo);
+      if (!card) continue;
+      const existing = newCards.get(cardNo);
+      newCards.set(cardNo, { card, qty: (existing ? existing.qty : 0) + qty });
+      imported++;
+    }
+  }
+
   if (imported === 0) { toast('No valid cards found in import'); return; }
   deckState.cards = newCards;
   document.getElementById('import-area').classList.add('hidden');
@@ -953,10 +1004,11 @@ function setDeckMode(enabled) {
   document.getElementById('mode-browser').classList.toggle('active', !enabled);
   document.getElementById('mode-deck').classList.toggle('active', enabled);
   document.getElementById('deck-panel').classList.toggle('hidden', !enabled);
-  document.getElementById('sidebar-title').textContent = enabled ? 'Deck Creator' : 'Card Browser';
+  const ui = window._cbUi || {};
+  document.getElementById('sidebar-title').textContent = enabled ? (ui.deck_creator || 'Deck Creator') : (ui.card_browser || 'Card Browser');
   document.getElementById('empty-state').innerHTML = enabled
-    ? '&#127183; Switch to Browse mode to search, or click cards here to add to deck'
-    : '&#128270; Switch to Deck mode to build a deck list';
+    ? '&#127183; ' + (ui.deck_mode_hint || 'Switch to Browse mode to search cards, or click cards here to add to deck')
+    : '&#128270; ' + (ui.browse_mode_hint || 'Switch to Deck mode to build a deck list');
   // Re-bind card clicks
   rebindCardClicks();
 }
@@ -1011,8 +1063,14 @@ function initDeckCreator() {
   };
 }
 
-init();
-initDeckCreator();
+// Load i18n then init
+(async () => {
+  await loadCbLang(cbLang);
+  const mod = await import('./js/i18n/translator.js');
+  window._cbUi = mod.getCurrentTranslations()?.ui || {};
+  init();
+  initDeckCreator();
+})();
 </script>
 </body>
 </html>

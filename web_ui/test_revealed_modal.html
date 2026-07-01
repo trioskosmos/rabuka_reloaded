@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Revealed Modal Test</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <h1>Revealed Modal Test</h1>
+    <div id="log"></div>
+    <div id="revealed-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content">
+            <span class="modal-title" id="revealed-modal-title">Revealed Cards</span>
+            <button class="close-btn" data-action="close-revealed-modal">✕</button>
+            <div id="revealed-modal-content"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        const log = document.getElementById('log');
+        function addLog(msg, ok = true) {
+            const div = document.createElement('div');
+            div.textContent = (ok ? '✓' : '✗') + ' ' + msg;
+            div.style.color = ok ? '#0f0' : '#f00';
+            log.appendChild(div);
+        }
+
+        // Minimal mock of State that LogRenderer.showRevealedCardsModal needs
+        const mockState = {
+            player1: {
+                hand: { cards: [101, 102, 103, 104] },
+                stage: { stage: [-1, -1, -1] },
+                live_zone: { cards: [] },
+                success_live_card_zone: { cards: [] },
+                waitroom: { cards: [] },
+                energy_zone: { cards: [] },
+                energy_deck: { cards: [] },
+                main_deck: { cards: [] },
+                exclusion_zone: { cards: [] },
+            },
+            player2: {
+                hand: { cards: [201, 202, 203, 204] },
+                stage: { stage: [-1, -1, -1] },
+                live_zone: { cards: [] },
+                success_live_card_zone: { cards: [] },
+                waitroom: { cards: [] },
+                energy_zone: { cards: [] },
+                energy_deck: { cards: [] },
+                main_deck: { cards: [] },
+                exclusion_zone: { cards: [] },
+            },
+            // Simulate re-yell wipe: cheer arrays empty, but persistent yell fields populated
+            player1_cheer_revealed_cards: [],
+            player2_cheer_revealed_cards: [],
+            initial_yell_revealed_cards: [101, 102],   // P1's original yell
+            re_yell_revealed_cards: [103, 104],          // Re-yell cards (also P1's)
+            revealed_cards: [101, 102, 103, 104],
+            revealed_cost_cards: [],
+            looked_cards: { cards: [] },
+        };
+
+        // Move yell cards into zones so ownerOf() can find them
+        mockState.player1.waitroom.cards = [101, 102, 103, 104];
+
+        window.State = {
+            data: mockState,
+            perspectivePlayer: 0,
+            resolveCardData: (id) => {
+                const db = {
+                    101: { card_no: '001', name: 'Test Card A', id: 101 },
+                    102: { card_no: '002', name: 'Test Card B', id: 102 },
+                    103: { card_no: '003', name: 'Test Card C', id: 103 },
+                    104: { card_no: '004', name: 'Test Card D', id: 104 },
+                };
+                return db[id] || null;
+            },
+        };
+
+        try {
+            const { LogRenderer } = await import('./js/components/LogRenderer.js');
+
+            addLog('Imported LogRenderer');
+
+            // Call showRevealedCardsModal
+            LogRenderer.showRevealedCardsModal();
+
+            const content = document.getElementById('revealed-modal-content');
+            const title = document.getElementById('revealed-modal-title');
+            const html = content.innerHTML;
+
+            addLog('Modal rendered, checking content...');
+
+            // Should NOT show "No cards" message
+            if (html.includes('No cards have been revealed')) {
+                addLog('FAIL: Modal shows "No cards" despite yell fields populated', false);
+            } else {
+                addLog('Modal does NOT show "No cards" message');
+            }
+
+            // Should show Cheer section with cards
+            if (html.includes('Cheer')) {
+                addLog('Cheer section present');
+            } else {
+                addLog('FAIL: Cheer section missing', false);
+            }
+
+            // Should show the yell cards in the Cheer section
+            let foundCards = 0;
+            const cardNames = ['Test Card A', 'Test Card B', 'Test Card C', 'Test Card D'];
+            cardNames.forEach(name => {
+                if (html.includes(name)) {
+                    foundCards++;
+                    addLog(`Found card: ${name}`);
+                } else {
+                    addLog(`FAIL: Missing card: ${name}`, false);
+                }
+            });
+
+            if (foundCards === 4) {
+                addLog('ALL 4 yell cards present in modal');
+            }
+
+            // Verify modal was shown (not display:none)
+            const modal = document.getElementById('revealed-modal');
+            if (modal.style.display !== 'none') {
+                addLog('Modal is visible');
+            } else {
+                addLog('FAIL: Modal is hidden', false);
+            }
+
+            addLog('=== TEST COMPLETE ===');
+        } catch (e) {
+            addLog('CRITICAL ERROR: ' + e.message, false);
+            addLog(e.stack, false);
+        }
+    </script>
+</body>
+</html>

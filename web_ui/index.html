@@ -46,20 +46,13 @@
                 <div class="header-stat-row"><span class="stat-label">Phase</span> <strong id="phase">MAIN</strong></div>
             </div>
 
-            <!-- Column 2: Hand Counts -->
-            <div class="header-col col-hand">
-                <div class="header-stat-row"><span class="stat-label" data-i18n="player1">P1</span> <strong id="player1-hand-count">0</strong></div>
-                <div class="header-stat-row"><span class="stat-label" data-i18n="player2">P2</span> <strong id="player2-hand-count">0</strong></div>
-            </div>
-
-            <!-- Column 3: Energy -->
-            <div class="header-col col-energy">
-                <div class="header-stat-row"><span class="stat-label" data-i18n="player1">P1</span> <img src="img/texticon/icon_energy.png" class="heart-mini-icon"> <strong id="player1-energy">0 / 0</strong></div>
-                <div class="header-stat-row"><span class="stat-label" data-i18n="player2">P2</span> <img src="img/texticon/icon_energy.png" class="heart-mini-icon"> <strong id="player2-energy">0 / 0</strong></div>
-            </div>
-
-            <!-- Column 4: P1 Stats -->
+            <!-- Column 2: P1 Stats (hand + energy + hearts) -->
             <div class="header-col col-p1">
+                <div class="header-stat-row">
+                    <span class="stat-label" data-i18n="player1">P1</span>
+                    <span style="opacity:0.6">Hand</span> <strong id="player1-hand-count">0</strong>
+                    <img src="img/texticon/icon_energy.png" class="heart-mini-icon"> <strong id="player1-energy">0 / 0</strong>
+                </div>
                 <div class="header-stat-row hearts-blades-row">
                     <span class="summary-pips" title="Hearts"><div id="player1-hearts-summary"></div></span>
                     <span class="summary-pips" title="Blades"><div id="player1-blades-summary"></div></span>
@@ -70,8 +63,13 @@
                 </div>
             </div>
 
-            <!-- Column 5: P2 Stats -->
+            <!-- Column 3: P2 Stats (hand + energy + hearts) -->
             <div class="header-col col-p2">
+                <div class="header-stat-row">
+                    <span class="stat-label" data-i18n="player2">P2</span>
+                    <span style="opacity:0.6">Hand</span> <strong id="player2-hand-count">0</strong>
+                    <img src="img/texticon/icon_energy.png" class="heart-mini-icon"> <strong id="player2-energy">0 / 0</strong>
+                </div>
                 <div class="header-stat-row hearts-blades-row">
                     <span class="summary-pips" title="Hearts"><div id="player2-hearts-summary"></div></span>
                     <span class="summary-pips" title="Blades"><div id="player2-blades-summary"></div></span>
@@ -643,7 +641,7 @@
                 </div>
                 <div id="room-waiting-hint" style="margin-top: 12px; padding: 6px 10px; border-radius: 6px; color: var(--text-muted, #aaa); font-size: 0.85rem; text-align: center;"></div>
                 <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-color, #333); text-align: center;">
-                    <a href="/card_browser.html" target="_blank" style="color: #e94560; font-size: 0.8rem; text-decoration: none;">&#128269; Card Browser</a>
+                    <a href="/card_browser.html" target="_blank" class="btn btn-accent-pink" style="font-size: 0.85rem; padding: 8px 20px;">&#128269; Card Browser / Deck Builder</a>
                 </div>
             </div>
         </div>
