@@ -63,12 +63,10 @@ fn test_named_baton_touch_mia() {
     let mia2 = game.new_id("PL!N-pb1-022-P+"); // A second copy of Mia
 
     // Clear center and put Kasumi there.
-    // Also unlock Center so baton touch is allowed (simulating fresh occupancy).
+    // Also remove Center card from deployed_this_turn (simulating it wasn't deployed this turn).
+    let center_card = game.state.player1.stage.stage[1];
     game.state.player1.stage.stage[1] = -1;
-    game.state
-        .player1
-        .areas_locked_this_turn
-        .remove(&MemberArea::Center);
+    game.state.player1.deployed_this_turn.remove(&center_card);
     game.add_to_stage(MemberArea::Center, kasumi);
     game.state.player1.hand.cards.push(mia2);
 

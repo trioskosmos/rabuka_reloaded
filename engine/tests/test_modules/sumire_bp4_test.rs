@@ -109,20 +109,21 @@ fn sumire_q193_q194_baton_touch_draw_and_deploy() {
         "Q193: Drew 2 cards = hand len 3"
     );
 
-    // Both vacated areas (Left & Center) should be locked after double baton
+    // Both occupied areas (Left & Center) should have their cards tracked as deployed this turn
+    let on_stage_after = game.state.player1.stage.stage;
     assert!(
         game.state
             .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::LeftSide),
-        "LeftSide should be locked after double baton"
+            .deployed_this_turn
+            .contains(&on_stage_after[0]),
+        "LeftSide card should be in deployed_this_turn"
     );
     assert!(
         game.state
             .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::Center),
-        "Center should be locked after double baton"
+            .deployed_this_turn
+            .contains(&on_stage_after[1]),
+        "Center card should be in deployed_this_turn"
     );
 }
 
@@ -202,11 +203,9 @@ fn sumire_q194_locked_member_excluded_from_double_baton() {
 
     advance_to_turn2(&mut game);
 
-    // Lock LeftSide AFTER advance (which clears areas_locked_this_turn)
-    game.state
-        .player1
-        .areas_locked_this_turn
-        .insert(MemberArea::LeftSide);
+    // Lock LeftSide AFTER advance (which clears deployed_this_turn)
+    // Simulate liella1 being deployed this turn by adding its card ID to the tracking set.
+    game.state.player1.deployed_this_turn.insert(liella1);
 
     TurnEngine::execute_main_phase_action(
         &mut game.state,
@@ -228,7 +227,7 @@ fn sumire_q194_locked_member_excluded_from_double_baton() {
     assert_eq!(
         game.state.baton_touch_count.get("p1").copied().unwrap_or(0),
         1,
-        "Q194: Only 1 baton touch — LeftSide was locked (debuted this turn)"
+        "Q194: Only 1 baton touch — LeftSide had a member deployed this turn"
     );
     // Only 1 Liella member in waitroom (the replaced center one)
     let in_waitroom = &game.state.player1.waitroom.cards;
@@ -355,20 +354,15 @@ fn sumire_double_baton_to_left_does_not_activate_debut() {
         "No draw: ab#1 requires Center position, Sumire is at Left"
     );
 
-    // Both vacated areas (Left & Center) should be locked
+    // Left (where Sumire was placed) should be locked — Sumire was deployed this turn.
+    // Center was vacated by double baton but is now empty — no card to lock.
     assert!(
-        game.state
-            .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::LeftSide),
-        "LeftSide should be locked after double baton"
+        game.state.player1.deployed_this_turn.contains(&sumire),
+        "Sumire should be tracked as deployed this turn"
     );
-    assert!(
-        game.state
-            .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::Center),
-        "Center should be locked after double baton"
+    assert_eq!(
+        game.state.player1.stage.stage[1], -1,
+        "Center is empty after double baton"
     );
 }
 
@@ -595,20 +589,15 @@ fn sumire_double_baton_integration_via_string_path() {
         "Hand: filler + 2 draws from ab#1"
     );
 
-    // Both vacated areas should be locked
+    // Both occupied areas should have their cards tracked as deployed this turn
+    let on_stage = game.state.player1.stage.stage;
     assert!(
-        game.state
-            .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::LeftSide),
-        "LeftSide should be locked after double baton"
+        game.state.player1.deployed_this_turn.contains(&on_stage[0]),
+        "LeftSide card should be in deployed_this_turn"
     );
     assert!(
-        game.state
-            .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::Center),
-        "Center should be locked after double baton"
+        game.state.player1.deployed_this_turn.contains(&on_stage[1]),
+        "Center card (Sumire) should be in deployed_this_turn"
     );
 }
 
@@ -696,20 +685,15 @@ fn sumire_explicit_double_baton_via_card_indices() {
         energy_after
     );
 
-    // Both vacated areas (Left & Center) should be locked
+    // Both occupied areas should have their cards tracked as deployed this turn
+    let on_stage = game.state.player1.stage.stage;
     assert!(
-        game.state
-            .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::LeftSide),
-        "LeftSide should be locked after double baton"
+        game.state.player1.deployed_this_turn.contains(&on_stage[0]),
+        "Left card (deployed liella2) should be in deployed_this_turn"
     );
     assert!(
-        game.state
-            .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::Center),
-        "Center should be locked after double baton"
+        game.state.player1.deployed_this_turn.contains(&on_stage[1]),
+        "Center card (Sumire) should be in deployed_this_turn"
     );
 }
 
@@ -779,19 +763,14 @@ fn sumire_explicit_double_baton_to_left_no_debut() {
     assert_eq!(game.state.player1.stage.stage[1], -1, "Center empty");
     assert_eq!(game.state.player1.stage.stage[2], -1, "Right empty");
 
-    // Both vacated areas should be locked
+    // Only Sumire was deployed this turn (Center is empty, no card to lock)
     assert!(
-        game.state
-            .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::LeftSide),
-        "LeftSide should be locked after double baton"
+        game.state.player1.deployed_this_turn.contains(&sumire),
+        "Sumire should be in deployed_this_turn"
     );
-    assert!(
-        game.state
-            .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::Center),
-        "Center should be locked after double baton"
+    assert_eq!(
+        game.state.player1.deployed_this_turn.len(),
+        1,
+        "Only Sumire deployed this turn"
     );
 }

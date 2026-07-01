@@ -1603,7 +1603,8 @@ impl AbilityResolver {
             let occupied: Vec<(usize, &str)> = [0, 1, 2]
                 .iter()
                 .filter(|&&idx| stage_ids[idx] != -1)
-                .filter(|&&idx| !player.areas_locked_this_turn.contains(&area_enums[idx]))
+                // Rule 9.6.2.1.2.1: Check card identity, not area identity.
+                .filter(|&&idx| !player.deployed_this_turn.contains(&stage_ids[idx]))
                 .map(|&idx| {
                     let area_names = ["left", "center", "right"];
                     (idx, area_names[idx])

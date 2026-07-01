@@ -38,10 +38,14 @@ pub struct Player {
 
     pub exclusion_zone: ExclusionZone,
 
-    // Rule 9.6.2.1.2.1: Track areas where cards moved from non-stage to stage this turn
-
-    // These areas cannot be targeted for baton touch
-    pub areas_locked_this_turn: std::collections::HashSet<crate::zones::MemberArea>,
+    // Rule 9.6.2.1.2.1: Track card IDs that moved from non-stage to stage this turn.
+    // When checking if an area can be specified for playing a new member, resolve the
+    // card currently in that area — if its ID is in this set, the area is locked.
+    // This is member-based (not area-based) because:
+    //   - R4 (11.10) may position-change the card to a different area
+    //   - R3 (4.1.4 exclusion) confirms member-area movement preserves card identity
+    //   - R1 checks "メンバーカードのあるエリア" = current location of the card
+    pub deployed_this_turn: std::collections::HashSet<i16>,
 
     pub stage_hearts: Option<crate::card::BaseHeart>,
 
@@ -81,7 +85,7 @@ impl Player {
 
             exclusion_zone: ExclusionZone::new(),
 
-            areas_locked_this_turn: std::collections::HashSet::new(),
+            deployed_this_turn: std::collections::HashSet::new(),
 
             stage_hearts: None,
 
@@ -126,6 +130,19 @@ impl Player {
         Some(self.hand.cards.remove(index))
     }
 
+    /// Rule 9.6.2.1.2.1: Check if the area currently contains a member deployed this turn.
+    /// The restriction follows the member (R4), not the area — if the member position-changes,
+    /// the destination area becomes locked, not the vacated one.
+    pub fn is_area_locked(&self, area: crate::zones::MemberArea) -> bool {
+        let idx = match area {
+            crate::zones::MemberArea::LeftSide => 0,
+            crate::zones::MemberArea::Center => 1,
+            crate::zones::MemberArea::RightSide => 2,
+        };
+        let card_id = self.stage.stage[idx];
+        card_id != -1 && self.deployed_this_turn.contains(&card_id)
+    }
+
     /// Rule 10.5.3-10.5.4: Remove a member from stage and recycle its under-cards.
     /// Member cards under → waitroom. Energy cards under → energy deck.
     /// Returns the removed member card ID.
@@ -146,7 +163,8 @@ impl Player {
             _ => crate::zones::MemberArea::RightSide,
         };
         let (member_under, energy_under) = self.stage.recycle_under_cards(area, card_db);
-        self.areas_locked_this_turn.remove(&area);
+        // Rule 9.6.2.1.2.1: Card is no longer on stage, clean up tracking.
+        self.deployed_this_turn.remove(&card_id);
         for cid in member_under {
             self.waitroom.add_card(cid);
         }
@@ -251,9 +269,10 @@ impl Player {
 
             let baton_touch_used = if should_use_baton_touch {
                 if let Some(existing_member) = self.stage.get_area(stage_area) {
-                    // Rule 9.6.2.1.2.1: Cannot baton touch to an area that had a card moved from non-stage to stage this turn
+                    // Rule 9.6.2.1.2.1: Cannot specify an area where a member deployed this turn currently exists.
+                    // The check follows the member (R3/R4), not the area.
 
-                    if self.areas_locked_this_turn.contains(&stage_area) {
+                    if self.is_area_locked(stage_area) {
                         self.hand.cards.insert(hand_index, card_id);
                         return Err("Cannot baton touch: area is locked this turn".to_string());
                     } else {
@@ -352,7 +371,8 @@ impl Player {
             };
 
             self.stage.stage[index] = card_id;
-            self.areas_locked_this_turn.insert(stage_area);
+            // Rule 9.6.2.1.2.1: Card moved from hand (non-stage) to stage, track it.
+            self.deployed_this_turn.insert(card_id);
 
             // Rule 9.6.2.3.2.1: If baton touch performed, trigger 'baton touch' event
 

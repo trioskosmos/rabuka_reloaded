@@ -80,9 +80,9 @@ fn ayumu_pb1_q199_no_baton_touch_after_effect_placement() {
     assert!(
         game.state
             .player1
-            .areas_locked_this_turn
-            .contains(&target_area),
-        "Placed card's area should be locked against baton touch"
+            .deployed_this_turn
+            .contains(&target_ayumu),
+        "Placed card should be tracked as deployed this turn"
     );
 }
 

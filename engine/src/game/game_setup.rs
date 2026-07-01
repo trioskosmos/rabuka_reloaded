@@ -916,7 +916,12 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 
                         if stage_card_ids[area_idx] != -1 {
                             let existing_member_id = stage_card_ids[area_idx];
-                            if !active_player.areas_locked_this_turn.contains(area) {
+                            // Rule 9.6.2.1.2.1: Check if the card at this area was deployed this turn.
+                            // The check follows the member (R3/R4), not the area.
+                            if !active_player
+                                .deployed_this_turn
+                                .contains(&existing_member_id)
+                            {
                                 // Check if existing member has cannot_baton_touch restriction
                                 let has_baton_touch_protection = game_state
                                     .card_database
@@ -1023,10 +1028,11 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         let occupied: Vec<(usize, &str, i16)> = [0, 1, 2]
                             .iter()
                             .filter(|&&idx| stage_card_ids[idx] != -1)
+                            // Rule 9.6.2.1.2.1: Check card identity, not area identity.
                             .filter(|&&idx| {
                                 !active_player
-                                    .areas_locked_this_turn
-                                    .contains(&area_enums[idx])
+                                    .deployed_this_turn
+                                    .contains(&stage_card_ids[idx])
                             })
                             .filter(|&&idx| !cannot_baton_touch_protected[idx])
                             .map(|&idx| {

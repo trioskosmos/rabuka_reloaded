@@ -15,8 +15,8 @@ impl GameState {
         self.reset_change_flags();
         self.cheer_check_completed = false;
         self.reset_loop_detection();
-        self.player1.areas_locked_this_turn.clear();
-        self.player2.areas_locked_this_turn.clear();
+        self.player1.deployed_this_turn.clear();
+        self.player2.deployed_this_turn.clear();
         self.baton_touch_count.clear();
         self.baton_touch_arriving_card_ids.clear();
         self.baton_touch_zero_cost = false;

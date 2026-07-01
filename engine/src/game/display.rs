@@ -221,7 +221,7 @@ pub struct PlayerDisplay {
     #[serde(default)]
     pub prevent_baton: i32,
     #[serde(default)]
-    pub areas_locked_this_turn: Vec<String>,
+    pub deployed_this_turn: Vec<i16>,
     #[serde(default)]
     pub debut_count_this_turn: u32,
     #[serde(default)]
@@ -1338,11 +1338,7 @@ pub fn player_to_display(
         } else {
             0
         },
-        areas_locked_this_turn: player
-            .areas_locked_this_turn
-            .iter()
-            .map(|a| format!("{:?}", a))
-            .collect(),
+        deployed_this_turn: player.deployed_this_turn.iter().copied().collect(),
         debut_count_this_turn: player.debut_count_this_turn,
         id: player.id.clone(),
         name: player.name.clone(),

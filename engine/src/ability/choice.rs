@@ -2623,14 +2623,17 @@ impl super::resolver::AbilityResolver {
         // Replace both members (move to waitroom)
         let p1 = &mut gs.player1;
         if idx1 < 3 && p1.stage.stage[idx1] != -1 {
-            p1.waitroom.add_card(p1.stage.stage[idx1]);
+            let old_id = p1.stage.stage[idx1];
+            p1.waitroom.add_card(old_id);
             p1.stage.stage[idx1] = -1;
-            p1.areas_locked_this_turn.insert(area_enums[idx1]);
+            // Rule 9.6.2.1.2.1: Card left stage, clean up tracking (member-based, not area-based).
+            p1.deployed_this_turn.remove(&old_id);
         }
         if idx2 < 3 && p1.stage.stage[idx2] != -1 {
-            p1.waitroom.add_card(p1.stage.stage[idx2]);
+            let old_id = p1.stage.stage[idx2];
+            p1.waitroom.add_card(old_id);
             p1.stage.stage[idx2] = -1;
-            p1.areas_locked_this_turn.insert(area_enums[idx2]);
+            p1.deployed_this_turn.remove(&old_id);
         }
         let p1_id = gs.player1.id.clone();
         // For double baton via choice, the arriving card has already been placed on stage

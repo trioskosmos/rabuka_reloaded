@@ -206,7 +206,7 @@ fn test_q24_baton_touch_procedure() {
     // Advance to turn 2 for baton touch
     game_state.turn_number = 2;
     // Clear locked areas to simulate end of turn logic
-    game_state.player1.areas_locked_this_turn.clear();
+    game_state.player1.deployed_this_turn.clear();
 
     let initial_waitroom_count = game_state.player1.waitroom.cards.len();
     let initial_hand_count = game_state.player1.hand.cards.len();
@@ -347,7 +347,7 @@ fn test_q25_baton_touch_same_or_lower_cost() {
     game_state.turn_number = 2; // Turn 2 so baton touch is allowed (member was placed turn 1)
 
     // Clear locked areas to allow baton touch
-    game_state.player1.areas_locked_this_turn.clear();
+    game_state.player1.deployed_this_turn.clear();
 
     let initial_energy_active = game_state.player1.energy_zone.active_count();
     let initial_waitroom_count = game_state.player1.waitroom.cards.len();
@@ -483,7 +483,7 @@ fn test_q26_baton_touch_lower_cost_no_energy_gain() {
     game_state.turn_number = 2; // Turn 2 so baton touch is allowed
 
     // Clear locked areas to allow baton touch
-    game_state.player1.areas_locked_this_turn.clear();
+    game_state.player1.deployed_this_turn.clear();
 
     let initial_energy_active = game_state.player1.energy_zone.active_count();
     let initial_waitroom_count = game_state.player1.waitroom.cards.len();
@@ -628,7 +628,7 @@ fn test_q27_baton_touch_only_one_member() {
     game_state.turn_number = 2;
 
     // Clear locked areas to allow baton touch
-    game_state.player1.areas_locked_this_turn.clear();
+    game_state.player1.deployed_this_turn.clear();
 
     println!("Stage members: cost 4 at left, cost 5 at right");
     println!("Hand member: cost 10");
@@ -759,7 +759,7 @@ fn test_q28_play_without_baton_touch_full_cost() {
     game_state.turn_number = 2;
 
     // Clear locked areas to allow play
-    game_state.player1.areas_locked_this_turn.clear();
+    game_state.player1.deployed_this_turn.clear();
 
     let initial_energy_active = game_state.player1.energy_zone.active_count();
     let initial_waitroom_count = game_state.player1.waitroom.cards.len();
@@ -911,7 +911,7 @@ fn test_q29_cannot_baton_touch_same_turn() {
     game_state.turn_number = 1;
 
     // Clear locked areas
-    game_state.player1.areas_locked_this_turn.clear();
+    game_state.player1.deployed_this_turn.clear();
 
     // Play first member to stage (turn 1)
     let actions = game_setup::generate_possible_actions(&game_state);
@@ -1024,7 +1024,7 @@ fn test_q30_can_play_same_card_multiple_times() {
     game_state.turn_number = 1;
 
     // Clear locked areas
-    game_state.player1.areas_locked_this_turn.clear();
+    game_state.player1.deployed_this_turn.clear();
 
     let initial_energy = game_state.player1.energy_zone.active_count();
 
@@ -1168,7 +1168,7 @@ fn test_q31_can_play_same_live_card_multiple_times() {
     game_state.turn_number = 1;
 
     // Clear locked areas
-    game_state.player1.areas_locked_this_turn.clear();
+    game_state.player1.deployed_this_turn.clear();
 
     let initial_live_count = game_state.player1.live_card_zone.cards.len();
 

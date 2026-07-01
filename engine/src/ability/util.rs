@@ -1671,7 +1671,8 @@ pub fn place_card_in_zone(
             }
             if let Some(pos) = stage_first_empty(&player.stage.stage) {
                 player.stage.stage[pos] = card_id;
-                player.areas_locked_this_turn.insert(pos_to_area(pos));
+                // Rule 9.6.2.1.2.1: Card deployed to stage, track it.
+                player.deployed_this_turn.insert(card_id);
             } else {
                 // Stage full — return card to discard instead of hand
                 player.waitroom.add_card(card_id);
@@ -1715,16 +1716,16 @@ pub fn place_card_in_zone(
             if let Some(pos) = vacated_stage_area {
                 if pos < 3 && player.stage.stage[pos] == -1 {
                     player.stage.stage[pos] = card_id;
-                    player.areas_locked_this_turn.insert(pos_to_area(pos));
+                    player.deployed_this_turn.insert(card_id);
                 } else if let Some(ep) = stage_first_empty(&player.stage.stage) {
                     player.stage.stage[ep] = card_id;
-                    player.areas_locked_this_turn.insert(pos_to_area(ep));
+                    player.deployed_this_turn.insert(card_id);
                 } else {
                     player.hand.add_card(card_id);
                 }
             } else if let Some(ep) = stage_first_empty(&player.stage.stage) {
                 player.stage.stage[ep] = card_id;
-                player.areas_locked_this_turn.insert(pos_to_area(ep));
+                player.deployed_this_turn.insert(card_id);
             } else {
                 player.hand.add_card(card_id);
             }

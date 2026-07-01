@@ -24,6 +24,8 @@ fn remove_card_from_any_zone(
         player.waitroom.cards.remove(pos);
     } else if let Some(pos) = player.stage.stage.iter().position(|&id| id == card_id) {
         player.stage.stage[pos] = -1;
+        // Rule 9.6.2.1.2.1: Card left stage, clean up tracking.
+        player.deployed_this_turn.remove(&card_id);
         *last_vacated_stage_area = Some(pos);
     } else if let Some(pos) = player
         .energy_zone
@@ -156,15 +158,12 @@ impl AbilityResolver {
 
             // Determine which slots are available for placement
             let available_slots: Vec<usize> = if allow_occupied_stage {
-                // Q76: Include ALL positions (including occupied), excluding locked areas
+                // Q76: Include ALL positions (including occupied), excluding areas where the
+                // member at that slot was deployed this turn (Rule 9.6.2.1.2.1).
                 (0..3)
                     .filter(|&i| {
-                        let area = match i {
-                            0 => zones::MemberArea::LeftSide,
-                            1 => zones::MemberArea::Center,
-                            _ => zones::MemberArea::RightSide,
-                        };
-                        !player.areas_locked_this_turn.contains(&area)
+                        let card_id = player.stage.stage[i];
+                        card_id == -1 || !player.deployed_this_turn.contains(&card_id)
                     })
                     .collect()
             } else {
@@ -180,7 +179,8 @@ impl AbilityResolver {
                     if va < 3 && player.stage.stage[va] == -1 {
                         player.stage.stage[va] = card_id;
                         if source_zone != Zone::Stage.to_str() {
-                            player.areas_locked_this_turn.insert(util::pos_to_area(va));
+                            // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
+                            player.deployed_this_turn.insert(card_id);
                         }
                         return Ok(false);
                     }
@@ -223,9 +223,8 @@ impl AbilityResolver {
                 }
                 player.stage.stage[slot] = card_id;
                 if source_zone != Zone::Stage.to_str() {
-                    player
-                        .areas_locked_this_turn
-                        .insert(util::pos_to_area(slot));
+                    // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
+                    player.deployed_this_turn.insert(card_id);
                 }
                 return Ok(false);
             }
@@ -1479,12 +1478,8 @@ impl AbilityResolver {
                                 }
                                 player.stage.stage[idx] = card_id;
                                 if should_lock {
-                                    let area = match idx {
-                                        0 => zones::MemberArea::LeftSide,
-                                        1 => zones::MemberArea::Center,
-                                        _ => zones::MemberArea::RightSide,
-                                    };
-                                    player.areas_locked_this_turn.insert(area);
+                                    // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
+                                    player.deployed_this_turn.insert(card_id);
                                 }
                             }
                             match pos_idx {
@@ -1517,13 +1512,9 @@ impl AbilityResolver {
                 let mut placed = match pos_idx {
                     Some(idx) if idx < 3 && player.stage.stage[idx] == -1 => {
                         player.stage.stage[idx] = card_id;
-                        let area = match idx {
-                            0 => zones::MemberArea::LeftSide,
-                            1 => zones::MemberArea::Center,
-                            _ => zones::MemberArea::RightSide,
-                        };
                         if should_lock {
-                            player.areas_locked_this_turn.insert(area);
+                            // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
+                            player.deployed_this_turn.insert(card_id);
                         }
                         true
                     }
@@ -1535,13 +1526,9 @@ impl AbilityResolver {
                         if idx < 3 && player.stage.stage[idx] != -1 {
                             player.waitroom.add_card(player.stage.stage[idx]);
                             player.stage.stage[idx] = card_id;
-                            let area = match idx {
-                                0 => zones::MemberArea::LeftSide,
-                                1 => zones::MemberArea::Center,
-                                _ => zones::MemberArea::RightSide,
-                            };
                             if should_lock {
-                                player.areas_locked_this_turn.insert(area);
+                                // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
+                                player.deployed_this_turn.insert(card_id);
                             }
                             placed = true;
                         }

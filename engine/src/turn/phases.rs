@@ -905,10 +905,9 @@ impl super::TurnEngine {
             player.hand.cards.remove(idx);
             // Place card in chosen placement area
             player.stage.stage[area as usize] = card_id;
-            // Re-lock both vacated areas (remove_member_from_stage_with_recycling removed them)
-            for &a in &db_areas {
-                player.areas_locked_this_turn.insert(a);
-            }
+            // Rule 9.6.2.1.2.1: Card came from hand (non-stage), track it.
+            // remove_member_from_stage_with_recycling already cleaned up the old card IDs.
+            player.deployed_this_turn.insert(card_id);
             // Record 2 baton touches
             for _ in 0..2 {
                 game_state.record_baton_touch(&player_id, Some(card_id));
@@ -932,19 +931,6 @@ impl super::TurnEngine {
             Self::trigger_auto_abilities_for_player(game_state, &db_opponent_id);
             game_state.process_pending_auto_abilities(&player_id);
             game_state.recalculate_constants();
-
-            for area in [
-                crate::zones::MemberArea::LeftSide,
-                crate::zones::MemberArea::Center,
-                crate::zones::MemberArea::RightSide,
-            ] {
-                if game_state.active_player().stage.get_area(area).is_none() {
-                    game_state
-                        .active_player_mut()
-                        .areas_locked_this_turn
-                        .insert(area);
-                }
-            }
 
             log::debug!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
             return Ok(());

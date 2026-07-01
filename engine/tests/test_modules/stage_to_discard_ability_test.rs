@@ -50,7 +50,7 @@ fn stage_to_discard_ability_triggers_only_on_baton_touch() {
     );
 
     // ---- Step 3: Directly clear area lock to allow baton touch ----
-    game.state.player1.areas_locked_this_turn.clear();
+    game.state.player1.deployed_this_turn.clear();
 
     // ---- Step 4: Baton touch - play arriver to LeftSide (Honoka's area) ----
     game.state.player1.hand.cards.push(arriver);

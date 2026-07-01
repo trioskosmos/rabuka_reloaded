@@ -149,31 +149,17 @@ fn kasumi_q75_no_baton_touch_same_turn() {
     assert!(game.has_pending_choice(), "Position prompt expected");
     TurnEngine::resume_with_choice(&mut game.state, Some(0), None).expect("select left");
 
-    // Q75: Area should be locked (can't baton touch same turn)
+    // Q75: Kasumi should be tracked as deployed this turn (can't baton touch same turn)
     assert!(
-        game.state
-            .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::LeftSide),
-        "Q75: LeftSide should be locked after ability appearance"
+        game.state.player1.deployed_this_turn.contains(&kasumi),
+        "Q75: Kasumi should be tracked as deployed this turn"
     );
 
-    // Confirm other areas are NOT locked
-    assert!(
-        !game
-            .state
-            .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::Center),
-        "Center should not be locked"
-    );
-    assert!(
-        !game
-            .state
-            .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::RightSide),
-        "RightSide should not be locked"
+    // Only Kasumi was deployed this turn — no other cards
+    assert_eq!(
+        game.state.player1.deployed_this_turn.len(),
+        1,
+        "Only Kasumi deployed this turn"
     );
 
     // Kasumi is on LeftSide
@@ -238,13 +224,10 @@ fn kasumi_q76_appear_on_occupied_area() {
         "Q76: filler was moved to waitroom"
     );
 
-    // Area should be locked (can't baton touch same turn)
+    // Kasumi should be tracked as deployed this turn
     assert!(
-        game.state
-            .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::Center),
-        "Q76: Center locked after ability appearance"
+        game.state.player1.deployed_this_turn.contains(&kasumi),
+        "Q76: Kasumi tracked as deployed this turn"
     );
 }
 
@@ -254,20 +237,15 @@ fn kasumi_q76_cannot_target_locked_area() {
     let mut game = TestGame::new(db);
     let kasumi = game.id("PL!N-bp1-002-R\u{ff0b}");
     let discard_fodder = game.id("PL!-sd1-010-SD");
+    let filler1 = game.new_id("PL!-sd1-010-SD");
+    let filler2 = game.new_id("PL!-sd1-010-SD");
+    let filler3 = game.new_id("PL!-sd1-010-SD");
 
-    // All 3 areas are locked (simulating cards that appeared this turn)
-    game.state
-        .player1
-        .areas_locked_this_turn
-        .insert(MemberArea::LeftSide);
-    game.state
-        .player1
-        .areas_locked_this_turn
-        .insert(MemberArea::Center);
-    game.state
-        .player1
-        .areas_locked_this_turn
-        .insert(MemberArea::RightSide);
+    // All 3 areas have members deployed this turn
+    game.state.player1.stage.stage = [filler1, filler2, filler3];
+    game.state.player1.deployed_this_turn.insert(filler1);
+    game.state.player1.deployed_this_turn.insert(filler2);
+    game.state.player1.deployed_this_turn.insert(filler3);
 
     // Setup: Kasumi in discard with enough resources
     game.state.player1.waitroom.cards.push(kasumi);
@@ -346,31 +324,20 @@ fn kasumi_q76_appear_when_stage_full_all_occupied() {
         "filler1 was moved to waitroom"
     );
 
-    // LeftSide should be locked
+    // LeftSide card (kasumi) should be tracked as deployed this turn
     assert!(
-        game.state
-            .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::LeftSide),
-        "LeftSide locked after ability appearance"
+        game.state.player1.deployed_this_turn.contains(&kasumi),
+        "Kasumi at LeftSide deployed this turn"
     );
 
-    // Other areas NOT locked
+    // Other areas' cards are from setup, NOT deployed this turn
     assert!(
-        !game
-            .state
-            .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::Center),
-        "Center should not be locked"
+        !game.state.player1.deployed_this_turn.contains(&filler2),
+        "Center filler2 NOT deployed this turn"
     );
     assert!(
-        !game
-            .state
-            .player1
-            .areas_locked_this_turn
-            .contains(&MemberArea::RightSide),
-        "RightSide should not be locked"
+        !game.state.player1.deployed_this_turn.contains(&filler3),
+        "Right filler3 NOT deployed this turn"
     );
 
     // filler2 and filler3 remain in place

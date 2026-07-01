@@ -337,7 +337,7 @@ export const GameStateModal = {
                 ['Cost Reduction', p.cost_reduction ?? 0],
                 ['Prevent Baton', bool(!!(p.prevent_baton_touch || p.prevent_baton))],
                 ['Debut Count', p.debut_count_this_turn ?? 0],
-                ['Areas Locked', (p.areas_locked_this_turn || []).join(', ') || 'none'],
+                ['Deployed This Turn', (p.deployed_this_turn || []).join(', ') || 'none'],
                 ['Energy Active', `${p.energy_active_count ?? 0}/${(p.energy?.cards || []).length}`],
                 ['Blade Buffs', (p.blade_buffs || []).join(', ') || 'none'],
                 ['Heart Buffs', (p.heart_buffs || []).map(h => `[${h.join(',')}]`).join(' ') || 'none'],
