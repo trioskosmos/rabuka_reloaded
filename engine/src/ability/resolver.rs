@@ -18,6 +18,10 @@ pub struct AbilityResolver {
     pub card_database: Arc<CardDatabase>,
     pub duration_effects: Vec<(String, String)>,
     pub current_ability: Option<crate::card::Ability>,
+    /// The index of `current_ability` within the card's abilities list.
+    /// Stored directly (not read from queue) because the queue's current entry
+    /// may change during effect execution (e.g. process_pending_auto_abilities).
+    pub current_ability_index: Option<usize>,
     pub activating_card_id: Option<i16>,
     pub execution_context: ExecutionContext,
     pub current_effect: Option<AbilityEffect>,
@@ -62,6 +66,7 @@ impl AbilityResolver {
             card_database: card_database.clone(),
             duration_effects: Vec::new(),
             current_ability: None,
+            current_ability_index: None,
             activating_card_id,
             execution_context: ExecutionContext::None,
             current_effect: None,
@@ -671,10 +676,9 @@ impl AbilityResolver {
         // Update the matching trigger_evaluation entry with the resolution result.
         // Match on (source_card_id, turn, ability_index, trigger_str) to distinguish
         // multiple abilities on the same card with the same trigger type.
-        let ability_index = gs
-            .ability_queue
-            .current_entry()
-            .map(|e| e.ability_index);
+        // Use the resolver's stored index (not the queue's current entry) because
+        // the queue entry may have changed during effect execution.
+        let ability_index = self.current_ability_index;
         if let Some(cid) = card_id {
             for entry in gs.structured_log.iter_mut().rev() {
                 if entry.category != "trigger_evaluation" {
@@ -786,6 +790,7 @@ impl AbilityResolver {
             }
         }
         self.current_ability = Some(ability.clone());
+        self.current_ability_index = Some(ability_index);
         gs.activating_card = activating_card;
 
         let cost_already_paid = gs
@@ -1068,6 +1073,7 @@ impl AbilityResolver {
 
         gs.activating_card = None;
         self.current_ability = None;
+        self.current_ability_index = None;
 
         if self.debug_trace {
             self.pipeline.trace.after = Some(ZoneSnapshot::from_game_state(gs));

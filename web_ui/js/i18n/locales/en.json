@@ -401,15 +401,36 @@
     "faq_click_card": "Click a card to use or move it.",
 
     "turn_start": "=== Turn {turn} Start ===",
-    "phase_active_first": "=== First Attacker: Active Phase ===",
-    "phase_active_second": "=== Second Attacker: Active Phase ===",
+    "phase_active_first": "=== First Normal Phase: Active Phase ===",
+    "phase_active_second": "=== Second Normal Phase: Active Phase ===",
     "phase_energy": "=== Energy Phase ===",
     "phase_draw": "=== Draw Phase ===",
     "phase_main": "=== Main Phase ===",
-    "phase_live_set": "=== Live Card Set ===",
-    "phase_performance_first": "=== First Attacker Performance ===",
-    "phase_performance_second": "=== Second Attacker Performance ===",
-    "phase_victory": "=== Victory Determination ==="
+    "phase_live_set": "=== Live Card Set Phase ===",
+    "phase_performance_first": "=== First Attacker Performance Phase ===",
+    "phase_performance_second": "=== Second Attacker Performance Phase ===",
+    "phase_victory": "=== Live Victory Determination Phase ===",
+
+    "RockPaperScissors": "Rock Paper Scissors",
+    "ChooseFirstAttacker": "Choose First Attacker",
+    "MulliganFirstAttacker": "Mulligan",
+    "MulliganSecondAttacker": "Mulligan",
+    "Active": "Active Phase",
+    "Energy": "Energy Phase",
+    "Draw": "Draw Phase",
+    "Main": "Main Phase",
+    "LiveCardSetFirstAttacker": "Live Card Set Phase",
+    "LiveCardSetSecondAttacker": "Live Card Set Phase",
+    "FirstAttackerPerformance": "First Attacker Performance Phase",
+    "SecondAttackerPerformance": "Second Attacker Performance Phase",
+    "LiveVictoryDetermination": "Live Victory Determination Phase",
+
+    "rps": "Rock Paper Scissors",
+    "choose_first_attacker": "Choose First Attacker",
+    "mulligan": "Mulligan",
+    "live_card_set": "Set Live Cards",
+    "live_victory_determination": "Victory Determination",
+    "wait": "Waiting..."
   },
   "heuristics": []
 }

@@ -918,9 +918,9 @@ impl super::TurnEngine {
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
                 let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
-                if (game_state.recently_moved_cards.is_some()
+                if game_state.recently_moved_cards.is_some()
                     || game_state.last_energy_placed_by_effect()
-                    || !game_state.recently_appeared_cards.is_empty())
+                    || !game_state.recently_appeared_cards.is_empty()
                 {
                     let event = crate::ability::types::TriggerEvent {
                         moved_cards: game_state.recently_moved_cards.clone().unwrap_or_default(),
@@ -946,9 +946,9 @@ impl super::TurnEngine {
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
                 let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
-                if (game_state.recently_moved_cards.is_some()
+                if game_state.recently_moved_cards.is_some()
                     || game_state.last_energy_placed_by_effect()
-                    || !game_state.recently_appeared_cards.is_empty())
+                    || !game_state.recently_appeared_cards.is_empty()
                 {
                     let event = crate::ability::types::TriggerEvent {
                         moved_cards: game_state.recently_moved_cards.clone().unwrap_or_default(),

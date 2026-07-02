@@ -134,18 +134,29 @@ export const LogRenderer = {
 
     getPhaseKey: (phase) => {
         const perspectivePlayer = State.perspectivePlayer;
+        // Handle string phase names from backend directly
+        if (typeof phase === 'string') {
+            if (phase === 'FirstAttackerPerformance') return perspectivePlayer === 0 ? 'perf_p1' : 'perf_p2';
+            if (phase === 'SecondAttackerPerformance') return perspectivePlayer === 1 ? 'perf_p1' : 'perf_p2';
+            return phase; // use the string directly as i18n key
+        }
+        // Fallback: numeric Phase constants
         switch (phase) {
-            case Phase.ROCK_PAPER_SCISSORS: return 'rps';
-            case Phase.MULLIGAN: return 'mulligan';
-            case Phase.ACTIVE: return 'active';
-            case Phase.ENERGY: return 'energy';
-            case Phase.DRAW: return 'draw';
-            case Phase.MAIN: return 'main';
+            case Phase.ROCK_PAPER_SCISSORS: return 'RockPaperScissors';
+            case Phase.MULLIGAN: 
+            case Phase.MULLIGAN_P1: 
+            case Phase.MULLIGAN_P2: return 'MulliganFirstAttacker';
+            case Phase.ACTIVE: return 'Active';
+            case Phase.ENERGY: return 'Energy';
+            case Phase.DRAW: return 'Draw';
+            case Phase.MAIN: return 'Main';
+            case Phase.LIVE_SET:
             case Phase.LIVE_CARD_SET_FIRST_ATTACKER:
-            case Phase.LIVE_CARD_SET_SECOND_ATTACKER: return 'live_set';
+            case Phase.LIVE_CARD_SET_SECOND_ATTACKER: return 'LiveCardSetFirstAttacker';
             case Phase.FIRST_ATTACKER_PERFORMANCE: return perspectivePlayer === 0 ? 'perf_p1' : 'perf_p2';
             case Phase.SECOND_ATTACKER_PERFORMANCE: return perspectivePlayer === 1 ? 'perf_p1' : 'perf_p2';
-            case Phase.LIVE_VICTORY_DETERMINATION: return 'live_result';
+            case Phase.LIVE_RESULT:
+            case Phase.LIVE_VICTORY_DETERMINATION: return 'LiveVictoryDetermination';
             default: return String(phase);
         }
     },

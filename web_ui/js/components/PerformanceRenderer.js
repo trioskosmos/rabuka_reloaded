@@ -1459,16 +1459,23 @@ export const PerformanceRenderer = {
 
     _getPhaseKey: (phase) => {
         const perspectivePlayer = State.perspectivePlayer;
-        if (phase === Phase.ROCK_PAPER_SCISSORS) return 'rps';
-        if (isMulliganPhase(phase)) return 'mulligan';
-        if (phase === Phase.ACTIVE) return 'active';
-        if (phase === Phase.ENERGY) return 'energy';
-        if (phase === Phase.DRAW) return 'draw';
-        if (phase === Phase.MAIN) return 'main';
-        if (isLiveCardSetPhase(phase)) return 'live_set';
+        // Handle string phase names from backend directly
+        if (typeof phase === 'string') {
+            if (phase === 'FirstAttackerPerformance') return perspectivePlayer === 0 ? 'perf_p1' : 'perf_p2';
+            if (phase === 'SecondAttackerPerformance') return perspectivePlayer === 1 ? 'perf_p1' : 'perf_p2';
+            return phase; // use the string directly as i18n key
+        }
+        // Fallback: numeric Phase constants
+        if (phase === Phase.ROCK_PAPER_SCISSORS) return 'RockPaperScissors';
+        if (isMulliganPhase(phase)) return 'MulliganFirstAttacker';
+        if (phase === Phase.ACTIVE) return 'Active';
+        if (phase === Phase.ENERGY) return 'Energy';
+        if (phase === Phase.DRAW) return 'Draw';
+        if (phase === Phase.MAIN) return 'Main';
+        if (isLiveCardSetPhase(phase)) return 'LiveCardSetFirstAttacker';
         if (phase === Phase.FIRST_ATTACKER_PERFORMANCE) return perspectivePlayer === 0 ? 'perf_p1' : 'perf_p2';
         if (phase === Phase.SECOND_ATTACKER_PERFORMANCE) return perspectivePlayer === 1 ? 'perf_p1' : 'perf_p2';
-        if (phase === Phase.LIVE_VICTORY_DETERMINATION) return 'live_result';
+        if (phase === Phase.LIVE_VICTORY_DETERMINATION) return 'LiveVictoryDetermination';
         return 'wait';
     },
 

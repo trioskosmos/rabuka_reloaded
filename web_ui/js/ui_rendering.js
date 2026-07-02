@@ -209,28 +209,36 @@ export const Rendering = {
         const perspectivePlayer = State.perspectivePlayer;
         if (!phase) return 'wait';
         
-        // Normalize phase to match Rust Debug format (case-insensitive)
-        const phaseLower = String(phase).toLowerCase();
-        
-        // Log unknown phases for debugging
-        const knownPhases = Object.values(Phase).map(p => String(p).toLowerCase());
-        if (!knownPhases.includes(phaseLower)) {
-            console.log('Unknown phase:', phase, 'Lower:', phaseLower, 'Known:', knownPhases);
+        // Handle string phase names from backend directly
+        if (typeof phase === 'string') {
+            if (phase === 'RockPaperScissors') return 'RockPaperScissors';
+            if (phase === 'ChooseFirstAttacker') return 'ChooseFirstAttacker';
+            if (phase === 'MulliganFirstAttacker' || phase === 'MulliganSecondAttacker') return 'MulliganFirstAttacker';
+            if (phase === 'Active') return 'Active';
+            if (phase === 'Energy') return 'Energy';
+            if (phase === 'Draw') return 'Draw';
+            if (phase === 'Main') return 'Main';
+            if (phase === 'LiveCardSetFirstAttacker' || phase === 'LiveCardSetSecondAttacker') return 'LiveCardSetFirstAttacker';
+            if (phase === 'FirstAttackerPerformance') return (perspectivePlayer === 0) ? 'perf_p1' : 'perf_p2';
+            if (phase === 'SecondAttackerPerformance') return (perspectivePlayer === 1) ? 'perf_p1' : 'perf_p2';
+            if (phase === 'LiveVictoryDetermination') return 'LiveVictoryDetermination';
+            return phase;
         }
         
-        if (phaseLower === 'rockpaperscissors') return 'rps';
-        if (phaseLower === 'choosefirstattacker') return 'choose_first_attacker';
-        if (isMulliganPhase(phase)) return 'mulligan';
-        if (phaseLower === 'active') return 'active';
-        if (phaseLower === 'energy') return 'energy';
-        if (phaseLower === 'draw') return 'draw';
-        if (phaseLower === 'main') return 'main';
-        if (isLiveCardSetPhase(phase)) return 'live_card_set';
-        if (phaseLower === 'firstattackerperformance') return (perspectivePlayer === 0) ? 'perf_p1' : 'perf_p2';
-        if (phaseLower === 'secondattackerperformance') return (perspectivePlayer === 1) ? 'perf_p1' : 'perf_p2';
-        if (phaseLower === 'livevictorydetermination') return 'live_victory_determination';
+        // Fallback: numeric Phase constants
+        if (phase === Phase.ROCK_PAPER_SCISSORS) return 'RockPaperScissors';
+        if (phase === Phase.CHOOSE_FIRST_ATTACKER) return 'ChooseFirstAttacker';
+        if (isMulliganPhase(phase)) return 'MulliganFirstAttacker';
+        if (phase === Phase.ACTIVE) return 'Active';
+        if (phase === Phase.ENERGY) return 'Energy';
+        if (phase === Phase.DRAW) return 'Draw';
+        if (phase === Phase.MAIN) return 'Main';
+        if (isLiveCardSetPhase(phase)) return 'LiveCardSetFirstAttacker';
+        if (phase === Phase.FIRST_ATTACKER_PERFORMANCE) return (perspectivePlayer === 0) ? 'perf_p1' : 'perf_p2';
+        if (phase === Phase.SECOND_ATTACKER_PERFORMANCE) return (perspectivePlayer === 1) ? 'perf_p1' : 'perf_p2';
+        if (phase === Phase.LIVE_VICTORY_DETERMINATION) return 'LiveVictoryDetermination';
         
-        return phaseLower.replace(/_/g, '_');
+        return String(phase);
     },
 
 

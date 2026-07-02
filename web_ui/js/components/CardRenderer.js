@@ -873,12 +873,13 @@ export const CardRenderer = {
                 slotDiv.onclick = clickHandler;
                 area.style.cursor = 'pointer';
 
-                if (isValid) {
+                if (isValid && action?.index != null) {
+                    const idx = action.index;
                     area.onmouseenter = () => {
-                        if (window.highlightActionBtn) window.highlightActionBtn(action.index, true);
+                        if (window.highlightActionBtn) window.highlightActionBtn(idx, true);
                     };
                     area.onmouseleave = () => {
-                        if (window.highlightActionBtn) window.highlightActionBtn(action.index, false);
+                        if (window.highlightActionBtn) window.highlightActionBtn(idx, false);
                     };
                 } else {
                     area.onmouseenter = null;
@@ -910,7 +911,7 @@ export const CardRenderer = {
         for (let i = 0; i < 3; i++) {
             const card = (shouldHideCards && liveCards[i]) ? { card_no: -1, hidden: true } : liveCards[i];
             const action = validActionMap[i];
-            const isValid = action !== undefined;
+            const isValid = action != null;
             const validClass = isValid ? ' valid-target' : '';
             const existingSlot = existingSlots[i];
 
@@ -958,7 +959,7 @@ export const CardRenderer = {
                     slot.appendChild(inner);
                 }
                 
-                Tooltips.attachCardData(slot, card, isValid ? action.index : undefined);
+                Tooltips.attachCardData(slot, card, isValid && action?.index != null ? action.index : undefined);
                 if (!isValid) slot.removeAttribute('data-action-id');
 
                 if (!isCardHidden) {
@@ -989,11 +990,12 @@ export const CardRenderer = {
                         if (window.doAction && isValid) window.doAction(action);
                     };
                     
+                    const idx = action?.index;
                     slot.onmouseenter = () => {
-                        if (window.highlightActionBtn) window.highlightActionBtn(action.index, true);
+                        if (window.highlightActionBtn && idx != null) window.highlightActionBtn(idx, true);
                     };
                     slot.onmouseleave = () => {
-                        if (window.highlightActionBtn) window.highlightActionBtn(action.index, false);
+                        if (window.highlightActionBtn && idx != null) window.highlightActionBtn(idx, false);
                     };
                 } else {
                     slot.onclick = null;

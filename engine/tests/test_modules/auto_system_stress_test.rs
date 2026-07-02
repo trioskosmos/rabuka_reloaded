@@ -27,7 +27,7 @@ fn dbg(g: &TestGame) {
     eprintln!("  P2 stage: [{},{},{}] e={}", s2[0], s2[1], s2[2], energy_p2(g));
 }
 
-fn drain(game: &mut TestGame, label: &str) {
+fn drain(game: &mut TestGame, _label: &str) {
     let mut safety = 0;
     while game.has_pending_choice() && safety < 20 {
         safety += 1;

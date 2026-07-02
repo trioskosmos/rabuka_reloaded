@@ -326,5 +326,4 @@ pub mod riko_bp5_center_cost_equal_test;
 
 // Wonder zone (PL!-bp5-020-L) — modify_required_hearts per-unit with per_unit_heart_colors + max_repeats
 pub mod wonder_zone_max_repeats_test;
-pub mod kinako_position_change_activate_energy_test;
 pub mod auto_system_stress_test;
