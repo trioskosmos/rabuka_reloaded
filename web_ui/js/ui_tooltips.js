@@ -53,6 +53,7 @@ export const Tooltips = {
         const cid = card.id !== undefined ? card.id : card.card_id;
         if (cid !== undefined && cid !== -1) el.setAttribute('data-card-id', cid);
         if (card.name) el.setAttribute('data-card-name', card.name);
+        if (card.card_no) el.setAttribute('data-card-no', card.card_no);
 
         let rawText = (State.cardSet === 'vanilla') ? "" : TextEnricher.getEffectiveRawText(card);
 
@@ -134,6 +135,10 @@ export const Tooltips = {
 
         if (!cardObj && dataSource.dataset.cardName) {
             cardObj = State.resolveCardDataByName(dataSource.dataset.cardName);
+        }
+
+        if (!cardObj && dataSource.dataset.cardNo) {
+            cardObj = State.resolveCardData(dataSource.dataset.cardNo);
         }
 
         if (cardObj && cardObj.id !== undefined && cardObj.id >= 0) {

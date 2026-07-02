@@ -156,13 +156,21 @@ export const ChoiceView = {
                     });
                 });
             } else if (choice.options && choice.options.length > 0 && choice.options[0].card_index !== undefined) {
-                // SelectLiveSuccess: options have card_name + card_index, not ability_text
+                // SelectLiveSuccess: options have card_name + card_index
+                // Try to show card images by resolving card data from selection_cards or card_no
+                const selByNo = {};
+                (choice.selection_cards || []).forEach(sc => { if (sc.card_no) selByNo[sc.card_no] = sc; });
                 choice.options.forEach((opt, idx) => {
+                    const resolved = opt.card_no ? (selByNo[opt.card_no] || State.resolveCardData(opt.card_no) || State.resolveCardDataByName(opt.card_name)) : null;
+                    const action = state.legal_actions?.find(a =>
+                        (a.action_type === 'select_card' || a.action_type === 'select_live_card') &&
+                        (a.parameters?.card_id === idx || a.parameters?.card_indices?.includes(idx) || a.parameters?.card_no === opt.card_no)
+                    );
                     optItems.push({
-                        card: null,
+                        card: resolved,
                         name: opt.card_name || `Card ${idx + 1}`,
-                        action: { action_type: 'select_card', parameters: { card_indices: [idx] } },
-                        isText: true,
+                        action: action || { action_type: 'select_card', parameters: { card_indices: [idx] } },
+                        isText: !resolved,
                     });
                 });
             } else if (choice.options && choice.options.length > 0) {

@@ -20,29 +20,31 @@ function buildAllCards() {
     const opp = pp === 0 ? state.player2 : state.player1;
     if (!p) return {};
 
+    const isValid = (c) => c && c.card_no && c.card_no !== -1 && c.card_no !== -2 && c.card_no !== '-1' && c.card_no !== '-2';
+
     const cards = {};
 
     const handArr = Array.isArray(p.hand?.cards) ? p.hand.cards : [];
-    cards['hand'] = handArr.filter(c => c && c.card_no > 0);
+    cards['hand'] = handArr.filter(isValid);
 
     const stageArr = Array.isArray(p.stage) ? p.stage : [];
-    cards['stage'] = stageArr.filter(s => s && s.card_no > 0);
+    cards['stage'] = stageArr.filter(isValid);
 
     const liveArr = Array.isArray(p.live_zone?.cards) ? p.live_zone.cards : [];
-    cards['live'] = liveArr.filter(c => c && c.card_no > 0);
+    cards['live'] = liveArr.filter(isValid);
 
     const discArr = Array.isArray(p.discard?.cards) ? p.discard.cards : [];
-    cards['discard'] = discArr.filter(c => c && c.card_no > 0);
+    cards['discard'] = discArr.filter(isValid);
 
     const under = [];
     stageArr.forEach(slot => {
         const uArr = Array.isArray(slot.under) ? slot.under : [];
-        uArr.forEach(c => { if (c && c.card_no > 0) under.push(c); });
+        uArr.forEach(c => { if (isValid(c)) under.push(c); });
     });
     if (under.length) cards['under'] = under;
 
     const oppStageArr = Array.isArray(opp?.stage) ? opp.stage : [];
-    const oppStage = oppStageArr.filter(s => s && s.card_no > 0);
+    const oppStage = oppStageArr.filter(isValid);
     if (oppStage.length) cards['opp_stage'] = oppStage;
 
     return cards;
@@ -229,7 +231,7 @@ function render() {
     }
 
     if (footerEl) {
-        footerEl.textContent = navCards.length > 1 ? `${navIndex + 1}/${navCards.length}` : '';
+        footerEl.textContent = navCards.length > 1 ? `${navIndex + 1} / ${navCards.length}` : '';
     }
 }
 
@@ -256,10 +258,16 @@ export const CardDetailModal = {
     },
 
     navigatePrev() {
-        if (navIndex > 0) { navIndex--; render(); }
+        if (navCards.length > 1) {
+            navIndex = (navIndex - 1 + navCards.length) % navCards.length;
+            render();
+        }
     },
     navigateNext() {
-        if (navIndex < navCards.length - 1) { navIndex++; render(); }
+        if (navCards.length > 1) {
+            navIndex = (navIndex + 1) % navCards.length;
+            render();
+        }
     },
     navigateZonePrev() {
         const cards = buildAllCards();

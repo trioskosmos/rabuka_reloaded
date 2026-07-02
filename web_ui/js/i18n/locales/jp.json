@@ -426,7 +426,17 @@
     "Select card(s): ": "カードを選択: ",
     "Skip": "スキップ",
     "Pay optional cost": "任意コストを支払う",
-    "Skip optional cost": "任意コストを支払わない"
+    "Skip optional cost": "任意コストを支払わない",
+    "Choose cost option": "コストを選択",
+    "Place top card of deck to waiting room": "デッキの上を控え室に置く",
+    "Choose which member's state to change": "状態を変えるメンバーを選んでください",
+    "Place cards from hand to waiting room": "手札から控え室にカードを置く",
+    "Choose a card from discard to return to hand": "控え室から手札に戻すカードを選んでください",
+    "Select heart colors to gain": "得るハートの色を選んでください",
+    "Place energy under member": "メンバーの下にエネルギーを置く",
+    "Choose a member to deploy": "登場させるメンバーを選んでください",
+    "Choose which card to place on top of deck": "デッキの上に置くカードを選んでください",
+    "Select cards to move": "移動させるカードを選んでください"
   },
   "heuristics": []
 }

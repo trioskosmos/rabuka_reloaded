@@ -62,7 +62,7 @@ export const BoardRenderer = {
         const da = State.deckAnalysis;
         const updateSummary = (id, m, l, p) => {
             const el = document.getElementById(id);
-            if (el) el.textContent = `M:${m} L:${l} P:${p}`;
+            if (el) el.textContent = `M:${m} L:${l} P:${p <= 9 ? '<=9' : '>9'}`;
         };
         if (da) {
             const myIdx = State.perspectivePlayer;
