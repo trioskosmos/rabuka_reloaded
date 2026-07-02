@@ -108,17 +108,13 @@ function renderHandCard(index) {
                     btn.style.padding = '12px 8px';
                     btn.style.fontSize = '0.95rem';
                     btn.dataset.zoneArea = areaInfo.area;
-                    // Replace hover handlers: isolate to this button + highlight stage zone
+                    // Replace hover handlers: isolate to this button only (stage-slot hover removed — was buggy)
                     btn.onmouseenter = () => {
                         document.querySelectorAll('.action-btn.hover-highlight').forEach(s => s.classList.remove('hover-highlight'));
                         btn.classList.add('hover-highlight');
-                        const slot = document.getElementById(`my-stage-slot-${areaOrder.indexOf(areaInfo.area)}`);
-                        if (slot) slot.classList.add('hover-highlight');
                     };
                     btn.onmouseleave = () => {
                         btn.classList.remove('hover-highlight');
-                        const slot = document.getElementById(`my-stage-slot-${areaOrder.indexOf(areaInfo.area)}`);
-                        if (slot) slot.classList.remove('hover-highlight');
                     };
                     btn.onclick = (e) => { e.stopPropagation(); closeAndDoAction(areaActionCopy); };
                     areasDiv.appendChild(btn);

@@ -96,6 +96,14 @@
     width: auto;
     height: auto;
     flex-shrink: 1;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.choice-item.text-option .icon-wrapper {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    line-height: 1;
 }
 
 /* --- Card Choice (Choice view items) --- */

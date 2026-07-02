@@ -35,7 +35,7 @@ function buildConfirmedActions(selectedIndices, validTargets) {
 
 export const ViewState = {
     buildRenderModel(state, uiState, validTargets) {
-        const activePlayerNum = state.active_player === 'player2' || state.active_player === '1' || state.active_player === 1 ? 1 : 0;
+        const activePlayerNum = state.active_player === 'player2' || state.active_player === 'p2' || state.active_player === '1' || state.active_player === 1 ? 1 : 0;
         const gameMode = state.mode || State.data?.mode;
         const perspectivePlayer = gameMode !== 'pvp' && gameMode !== 'pve' && state.active_player !== undefined
             ? activePlayerNum

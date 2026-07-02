@@ -101,7 +101,7 @@ export const Tooltips = {
             // Rust backend: use action.index instead of action.id
             actionObj = state.legal_actions.find(a => a.index === parseInt(actionId));
             if (actionObj) {
-                Highlighter.highlightTargetsForAction(actionObj);
+                // highlight targets removed — data-action-id was shared across area buttons causing wrong highlights
                 // Rust backend format: player1, player2
                 const p = perspectivePlayer === 0 ? state.player1 : state.player2;
                 if (p) {

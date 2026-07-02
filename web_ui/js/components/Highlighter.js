@@ -37,9 +37,9 @@ export const Highlighter = {
         Highlighter.clearHighlights();
 
         const perspectivePlayer = State.perspectivePlayer;
-        // Normalize actingPlayer: server sends "player1"/"player2" (string), but perspectivePlayer is 0/1 (number)
+        // Normalize actingPlayer: server sends "p1"/"p2"/"player1"/"player2" (string), but perspectivePlayer is 0/1 (number)
         const rawActive = state.current_player ?? state.active_player;
-        const actingPlayer = rawActive === 'player2' || rawActive === '1' || rawActive === 1 ? 1 : 0;
+        const actingPlayer = rawActive === 'player2' || rawActive === 'p2' || rawActive === '1' || rawActive === 1 ? 1 : 0;
         const selfPrefix = (actingPlayer === perspectivePlayer ? 'my' : 'opp');
         const oppPrefix = (actingPlayer === perspectivePlayer ? 'opp' : 'my');
 
@@ -241,7 +241,7 @@ export const Highlighter = {
         let found = false;
         const perspectivePlayer = State.perspectivePlayer;
         const rawActive = state.current_player ?? state.active_player;
-        const activePlayer = rawActive === 'player2' || rawActive === '1' || rawActive === 1 ? 1 : 0;
+        const activePlayer = rawActive === 'player2' || rawActive === 'p2' || rawActive === '1' || rawActive === 1 ? 1 : 0;
         const selfPrefix = (activePlayer === perspectivePlayer ? 'my' : 'opp');
 
         // Support both params and parameters field names

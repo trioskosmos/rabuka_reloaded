@@ -179,6 +179,8 @@
     "mobile_mode_play": "操作",
     "mobile_mode_view": "表示",
     "mobile_log_label": "ログ",
+    "mobile_perf": "ライブ",
+    "mobile_revealed": "公開",
     "app_title": "ラブカ Solo",
     "card_ability": "カード能力",
     "active_effects_applied": "適用中の効果",
@@ -392,6 +394,11 @@
     "faq_tip": "ヒント: 「PL!-bp3-012-RM x 3」や「3 x PL!-bp3-012-RM」のようなプレーンテキストも貼り付け可能です。",
 
     "faq_mobile": "モバイル操作",
+    "faq_ui_mode": "UIモード: View vs Play",
+    "faq_ui_mode_desc": "右上のボタンでViewモードとPlayモードを切り替えられます：",
+    "faq_view_desc": "ボードの確認、カードの詳細表示、能力テキストの閲覧。カードをクリックすると詳細が見られます。アクションは実行されません。",
+    "faq_play_desc": "ゲーム操作：手札からカードをプレイ、能力発動、ライブカードセット、ターゲット選択。有効なターゲットは緑色で強調表示されます。",
+
     "faq_mobile_menu": "画面右下の <b>Menu</b> ボタンでサイドバーを開閉できます。",
     "faq_mobile_scroll": "手札やステージなどのゾーンは横スクロール可能です。",
 

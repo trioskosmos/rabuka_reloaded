@@ -179,6 +179,8 @@
     "mobile_mode_play": "PLAY",
     "mobile_mode_view": "VIEW",
     "mobile_log_label": "LOG",
+    "mobile_perf": "LIVE",
+    "mobile_revealed": "REV",
     "app_title": "Rabuka Solo",
     "card_ability": "Card Ability",
     "active_effects_applied": "Active Effects",
@@ -392,6 +394,11 @@
     "faq_tip": "Tip: You can also paste plain text like \"PL!-bp3-012-RM x 3\" or \"3 x PL!-bp3-012-RM\".",
 
     "faq_mobile": "Mobile",
+    "faq_ui_mode": "UI Mode: View vs Play",
+    "faq_ui_mode_desc": "The top-right button toggles between View and Play mode:",
+    "faq_view_desc": "Browse the board, inspect cards, read abilities. Click any card to see its detail. No actions are taken.",
+    "faq_play_desc": "Interact with the game: play cards from hand, activate abilities, set live cards, select targets. Valid targets are highlighted in green.",
+
     "faq_mobile_menu": "Use the <b>Menu</b> button (bottom-right) to toggle the sidebar.",
     "faq_mobile_scroll": "Zones like hand and stage are horizontally scrollable.",
 

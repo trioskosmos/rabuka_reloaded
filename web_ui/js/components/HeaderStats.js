@@ -82,22 +82,50 @@ export const HeaderStats = {
         return hearts;
     },
 
+    // Compute total score from locally selected live cards (during set phase).
+    // Returns { base: N, bonus: N, total: N } where bonus comes from score_modifiers
+    // that are already active (e.g. from stage members or global effects).
+    computeLocalLiveScore: (player) => {
+        let base = 0;
+        State.localLiveCardSelection.forEach(idx => {
+            const handCard = player?.hand?.cards?.[idx];
+            if (!handCard) return;
+            const cardData = State.resolveCardData(handCard.card_no || handCard.card_id);
+            if (!cardData) return;
+            base += cardData.score || 0;
+        });
+        // current_score = stage base + all modifiers. The bonuses come from
+        // already-active effects (stage member abilities, global modifiers).
+        // We don't try to separate them out here — just add the new live card
+        // base scores on top since those cards aren't in the score yet.
+        const current = player.current_score || 0;
+        return { base, bonus: 0, total: current + base };
+    },
+
     render: (state, _p0, _p1, getPhaseKey) => {
         if (!HeaderStats.cache.turn) HeaderStats.init();
 
-        // Use player1/player2 directly — P1 always top, P2 always bottom
+        // Column layout: col-meta | col-p1 = perspective player | col-p2 = opponent
         const p0 = state.player1 || {};
         const p1 = state.player2 || {};
+        const perspective = State.perspectivePlayer;
+        const pPerspective = perspective === 0 ? p0 : p1;
+        const pOpponent   = perspective === 0 ? p1 : p0;
+
+        // Update column labels: col-p1 = perspective player, col-p2 = opponent
+        const col1Label = document.querySelector('.col-p1 .stat-label[data-i18n]');
+        const col2Label = document.querySelector('.col-p2 .stat-label[data-i18n]');
+        if (col1Label) col1Label.textContent = perspective === 0 ? i18n.t('player1') : i18n.t('player2');
+        if (col2Label) col2Label.textContent = perspective === 0 ? i18n.t('player2') : i18n.t('player1');
 
         const phaseKey = getPhaseKey(state.phase);
         const isSetPhase = state.phase === 'LiveCardSetFirstAttacker' || state.phase === 'LiveCardSetSecondAttacker';
-        const perspective = State.perspectivePlayer;
 
         if (HeaderStats.cache.turn) HeaderStats.cache.turn.textContent = state.turn || 1;
         if (HeaderStats.cache.phase) HeaderStats.cache.phase.textContent = i18n.t(phaseKey);
         if (HeaderStats.cache.activePlayer) {
             const ap = state.active_player;
-            const apLabel = ap === 'player1' || ap === '0' ? 'P1' : ap === 'player2' || ap === '1' ? 'P2' : ap || 'P1';
+            const apLabel = ap === 'player1' || ap === 'p1' || ap === '0' ? 'P1' : ap === 'player2' || ap === 'p2' || ap === '1' ? 'P2' : ap || 'P1';
             HeaderStats.cache.activePlayer.textContent = apLabel;
         }
         if (HeaderStats.cache.frameCounter) {
@@ -113,38 +141,36 @@ export const HeaderStats = {
             }
         }
 
-        // Score display — show current_score from backend
+        // Score display — col-p1 = perspective, col-p2 = opponent
+        const formatScore = (p, isPerspective) => {
+            const total = p.current_score ?? 0;
+            return `${total}`;
+        };
         if (HeaderStats.cache.player1Score) {
-            const sc = p0.current_score ?? 0;
-            HeaderStats.cache.player1Score.textContent = `${sc}`;
-            HeaderStats.cache.player1Score.title = `Current score: ${sc} (base + ability modifiers)`;
+            HeaderStats.cache.player1Score.textContent = formatScore(pPerspective, true);
         }
         if (HeaderStats.cache.player2Score) {
-            const sc = p1.current_score ?? 0;
-            HeaderStats.cache.player2Score.textContent = `${sc}`;
-            HeaderStats.cache.player2Score.title = `Current score: ${sc} (base + ability modifiers)`;
+            HeaderStats.cache.player2Score.textContent = formatScore(pOpponent, false);
         }
 
-        // P1 Energy
+        // Energy — col-p1 = perspective, col-p2 = opponent
         if (HeaderStats.cache.player1Energy) {
-            const active = (p0.energy?.cards || []).filter(e => e && e.orientation === 'Active').length;
-            const total = (p0.energy?.cards || []).length;
+            const active = (pPerspective.energy?.cards || []).filter(e => e && e.orientation === 'Active').length;
+            const total = (pPerspective.energy?.cards || []).length;
             HeaderStats.cache.player1Energy.textContent = `${active}/${total}`;
         }
-
-        // P2 Energy
         if (HeaderStats.cache.player2Energy) {
-            const active = (p1.energy?.cards || []).filter(e => e && e.orientation === 'Active').length;
-            const total = (p1.energy?.cards || []).length;
+            const active = (pOpponent.energy?.cards || []).filter(e => e && e.orientation === 'Active').length;
+            const total = (pOpponent.energy?.cards || []).length;
             HeaderStats.cache.player2Energy.textContent = `${active}/${total}`;
         }
 
-        // Hand Counts
+        // Hand Counts — col-p1 = perspective, col-p2 = opponent
         if (HeaderStats.cache.player1HandCount) {
-            HeaderStats.cache.player1HandCount.textContent = (p0.hand?.cards || []).length;
+            HeaderStats.cache.player1HandCount.textContent = (pPerspective.hand?.cards || []).length;
         }
         if (HeaderStats.cache.player2HandCount) {
-            HeaderStats.cache.player2HandCount.textContent = (p1.hand?.cards || []).length;
+            HeaderStats.cache.player2HandCount.textContent = (pOpponent.hand?.cards || []).length;
         }
 
         // Helper: compute stage hearts from player data
@@ -208,48 +234,44 @@ export const HeaderStats = {
             return null;
         };
 
-        // --- P1: stage hearts + blades (row 1), score + need hearts (row 2) ---
+        // --- Col-P1 (perspective player): stage hearts + blades + need hearts ---
         if (HeaderStats.cache.player1Hearts) {
-            HeaderStats.cache.player1Hearts.innerHTML = PerformanceRenderer.renderHeartsCompact(getStageHearts(p0));
+            HeaderStats.cache.player1Hearts.innerHTML = PerformanceRenderer.renderHeartsCompact(getStageHearts(pPerspective));
         }
         if (HeaderStats.cache.player1Blades) {
-            const b = getBladesCount(p0);
-            HeaderStats.cache.player1Blades.innerHTML = `<span class="stat-item" title="P1 Blades">
+            const b = getBladesCount(pPerspective);
+            HeaderStats.cache.player1Blades.innerHTML = `<span class="stat-item" title="Perspective Blades">
                 <img src="img/texticon/icon_blade.png" class="heart-mini-icon">
                 <span class="stat-value">${b}</span>
             </span>`;
         }
         if (HeaderStats.cache.player1NeedHearts) {
-            const nh = getNeedHearts(p0, perspective === 0);
+            const nh = getNeedHearts(pPerspective, true);
             HeaderStats.cache.player1NeedHearts.innerHTML = nh ? '<span class="stat-separator"></span>' + PerformanceRenderer.renderHeartsCompact(nh) : '';
         }
 
-        // --- P2: stage hearts + blades (row 1), score + need hearts (row 2) ---
+        // --- Col-P2 (opponent): stage hearts + blades + need hearts ---
         if (HeaderStats.cache.player2Hearts) {
-            HeaderStats.cache.player2Hearts.innerHTML = PerformanceRenderer.renderHeartsCompact(getStageHearts(p1));
+            HeaderStats.cache.player2Hearts.innerHTML = PerformanceRenderer.renderHeartsCompact(getStageHearts(pOpponent));
         }
         if (HeaderStats.cache.player2Blades) {
-            const b = getBladesCount(p1);
-            HeaderStats.cache.player2Blades.innerHTML = `<span class="stat-item" title="P2 Blades">
+            const b = getBladesCount(pOpponent);
+            HeaderStats.cache.player2Blades.innerHTML = `<span class="stat-item" title="Opponent Blades">
                 <img src="img/texticon/icon_blade.png" class="heart-mini-icon">
                 <span class="stat-value">${b}</span>
             </span>`;
         }
         if (HeaderStats.cache.player2NeedHearts) {
-            const nh = getNeedHearts(p1, perspective === 1);
+            const nh = getNeedHearts(pOpponent, false);
             HeaderStats.cache.player2NeedHearts.innerHTML = nh ? '<span class="stat-separator"></span>' + PerformanceRenderer.renderHeartsCompact(nh) : '';
         }
 
-        // Deck / Energy / Discard counts
-        if (state.player1) {
-            if (HeaderStats.cache.p1.deck) HeaderStats.cache.p1.deck.textContent = state.player1.main_deck_count;
-            if (HeaderStats.cache.p1.energy) HeaderStats.cache.p1.energy.textContent = state.player1.energy_deck_count;
-            if (HeaderStats.cache.p1.discard) HeaderStats.cache.p1.discard.textContent = (state.player1.waitroom?.cards?.length || state.player1.discard?.cards?.length || 0);
-        }
-        if (state.player2) {
-            if (HeaderStats.cache.p2.deck) HeaderStats.cache.p2.deck.textContent = state.player2.main_deck_count;
-            if (HeaderStats.cache.p2.energy) HeaderStats.cache.p2.energy.textContent = state.player2.energy_deck_count;
-            if (HeaderStats.cache.p2.discard) HeaderStats.cache.p2.discard.textContent = (state.player2.waitroom?.cards?.length || state.player2.discard?.cards?.length || 0);
-        }
+        // Deck / Energy / Discard counts — col-p1 = perspective, col-p2 = opponent
+        if (HeaderStats.cache.p1.deck) HeaderStats.cache.p1.deck.textContent = pPerspective.main_deck_count ?? 0;
+        if (HeaderStats.cache.p1.energy) HeaderStats.cache.p1.energy.textContent = pPerspective.energy_deck_count ?? 0;
+        if (HeaderStats.cache.p1.discard) HeaderStats.cache.p1.discard.textContent = (pPerspective.waitroom?.cards?.length || pPerspective.discard?.cards?.length || 0);
+        if (HeaderStats.cache.p2.deck) HeaderStats.cache.p2.deck.textContent = pOpponent.main_deck_count ?? 0;
+        if (HeaderStats.cache.p2.energy) HeaderStats.cache.p2.energy.textContent = pOpponent.energy_deck_count ?? 0;
+        if (HeaderStats.cache.p2.discard) HeaderStats.cache.p2.discard.textContent = (pOpponent.waitroom?.cards?.length || pOpponent.discard?.cards?.length || 0);
     }
 };

@@ -1004,14 +1004,12 @@ impl super::TurnEngine {
         game_state.baton_touch_replaced_member_cost = replaced_member_cost;
         game_state.baton_touch_replaced_member_id = replaced_member_id;
 
-        game_state.active_player_mut().debut_count_this_turn += 1;
-        game_state.record_card_appearance(card_id, "hand");
-
+        // Per Q24, baton touch step 2 (old card → waitroom) happens before step 4
+        // (new card → stage). Enqueue movement-based triggers BEFORE appearance
+        // triggers so they resolve first when process_pending runs below.
         if baton_touch_used {
             game_state.record_baton_touch(&player_id, Some(card_id));
             game_state.baton_touch_arriving_card_id = Some(card_id);
-            // The replaced member moved stage→waitroom; record it so that
-            // "手札から控え室に置かれるたび" auto-abilities do NOT fire.
             if let Some(replaced_id) = replaced_member_id {
                 game_state.push_movement_event(
                     replaced_id,
@@ -1022,7 +1020,20 @@ impl super::TurnEngine {
                     false,
                 );
             }
+            // Enqueue movement-triggered auto abilities (baton_touch, discard, etc.)
+            // but do NOT process yet — let them queue before appearance triggers.
+            Self::trigger_auto_abilities_for_player(game_state, &player_id);
+            let bt_opponent_id = if player_id == game_state.player1.id {
+                game_state.player2.id.clone()
+            } else {
+                game_state.player1.id.clone()
+            };
+            Self::trigger_auto_abilities_for_player(game_state, &bt_opponent_id);
         }
+
+        // Phase 2: record appearance and debut triggers
+        game_state.active_player_mut().debut_count_this_turn += 1;
+        game_state.record_card_appearance(card_id, "hand");
 
         // Track area move for movement_condition "moves"
         log::debug!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
@@ -1041,6 +1052,8 @@ impl super::TurnEngine {
             game_state.player1.id.clone()
         };
         Self::trigger_auto_abilities_for_player(game_state, &sb_opponent_id);
+        // Process ALL queued abilities now: movement-triggered (baton_touch, etc.)
+        // are ahead of appearance-triggered in the queue, so they resolve first.
         game_state.process_pending_auto_abilities(&player_id);
         game_state.recalculate_constants();
 

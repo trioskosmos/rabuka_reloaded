@@ -145,6 +145,11 @@ export const Rendering = {
         // Update UI Headers, Stats, etc. (Logic moved from main.js)
         Rendering.renderHeaderStats(state, p0, p1);
         Rendering.renderBoard(state, p0, p1, validTargets);
+        // Adjust stage scroll centering: center when content fits, align to start edge when it overflows
+        const myStage = document.getElementById('my-stage');
+        if (myStage) myStage.style.justifyContent = myStage.scrollWidth > myStage.clientWidth ? 'flex-start' : 'center';
+        const oppStage = document.getElementById('opp-stage');
+        if (oppStage) oppStage.style.justifyContent = oppStage.scrollWidth > oppStage.clientWidth ? 'flex-start' : 'center';
 
         Rendering.renderMulliganReturn(viewState);
 
@@ -169,7 +174,7 @@ export const Rendering = {
         // Update board toggle labels based on perspective
         const selfLabel = viewState.perspectivePlayer === 0 ? 'P1' : 'P2';
         const oppLabel = viewState.perspectivePlayer === 0 ? 'P2' : 'P1';
-        const activePlayerNum = state.active_player === 'player2' || state.active_player === '1' || state.active_player === 1 ? 1 : 0;
+        const activePlayerNum = state.active_player === 'player2' || state.active_player === 'p2' || state.active_player === '1' || state.active_player === 1 ? 1 : 0;
         const isSelfActive = state.active_player !== undefined && viewState.perspectivePlayer === activePlayerNum;
         const selfRole = isSelfActive ? 'Attacker' : 'Defender';
         const oppRole = isSelfActive ? 'Defender' : 'Attacker';
@@ -183,8 +188,8 @@ export const Rendering = {
         if (oppBtn) oppBtn.textContent = `${ui.opponent || 'Opponent'}${oppSuffix}`;
         if (bothBtn) bothBtn.textContent = `Both (${selfLabel} + ${oppLabel})`;
 
-        // In non-PvP (sandbox), default to both-mode view on first render only
-        if (!_viewInitialized && state.mode !== 'pvp' && bothBtn && !bothBtn.classList.contains('active')) {
+        // Default to both-mode view on first render
+        if (!_viewInitialized && bothBtn && !bothBtn.classList.contains('active')) {
             switchBoard('both');
         }
 

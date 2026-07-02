@@ -94,7 +94,7 @@ export const ChoiceView = {
         // Render prompt/instruction between ability text and options
         const prompt = State.currentLang === 'en'
             ? (choice.prompt_en || choice.title || '')
-            : (choice.prompt_ja || window.translateChoiceDescription?.(choice.title) || choice.title || '');
+            : (choice.prompt_ja || choice.prompt_en || choice.title || '');
         if (prompt) {
             const displayPrompt = State.currentLang === 'en' && window.translateAbility
                 ? window.translateAbility(prompt, 'en')

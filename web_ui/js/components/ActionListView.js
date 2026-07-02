@@ -166,17 +166,13 @@ export const ActionListView = {
                                 btn.dataset.zoneArea = areaName;
                                 btn.style.cssText = '';
                                 btn.className = btn.className + ' action-btn';
-                                // Replace hover handlers: isolate to this button + highlight stage zone
+                                // Replace hover handlers: isolate to this button only (stage-slot hover removed — was buggy due to shared data-action-id)
                                 btn.onmouseenter = () => {
                                     document.querySelectorAll('.action-btn.hover-highlight').forEach(s => s.classList.remove('hover-highlight'));
                                     btn.classList.add('hover-highlight');
-                                    const slot = document.getElementById(`my-stage-slot-${areaOrder.indexOf(areaName)}`);
-                                    if (slot) slot.classList.add('hover-highlight');
                                 };
                                 btn.onmouseleave = () => {
                                     btn.classList.remove('hover-highlight');
-                                    const slot = document.getElementById(`my-stage-slot-${areaOrder.indexOf(areaName)}`);
-                                    if (slot) slot.classList.remove('hover-highlight');
                                 };
                                 areasDiv.appendChild(btn);
                             } else {

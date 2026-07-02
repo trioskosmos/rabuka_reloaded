@@ -1564,16 +1564,18 @@ impl GameState {
                     obj.insert("prompt_en".into(), serde_json::Value::String(prompt_en));
                 }
                 if !obj.contains_key("prompt_ja") {
-                    let prompt_ja = if entry.choice_effect_text.is_some() {
-                        if let Some(ref effect) = entry.ability.effect {
-                            crate::ability::describe::describe_effect_ja(effect)
-                        } else {
-                            existing_title.clone()
+                    // Only inject prompt_ja when we can generate actual Japanese text.
+                    // If the choice has a card-backed effect_text, describe_effect_ja provides
+                    // real Japanese. Otherwise leave prompt_ja absent so the frontend
+                    // falls back to prompt_en/title instead of getting fake Japanese.
+                    if let Some(ref choice_text) = entry.choice_effect_text {
+                        if !choice_text.is_empty() {
+                            if let Some(ref effect) = entry.ability.effect {
+                                let prompt_ja = crate::ability::describe::describe_effect_ja(effect);
+                                obj.insert("prompt_ja".into(), serde_json::Value::String(prompt_ja));
+                            }
                         }
-                    } else {
-                        existing_title.clone()
-                    };
-                    obj.insert("prompt_ja".into(), serde_json::Value::String(prompt_ja));
+                    }
                 }
                 obj.insert(
                     "trigger_type".into(),

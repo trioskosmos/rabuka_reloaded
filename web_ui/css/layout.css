@@ -131,6 +131,10 @@
     gap: 3px;
     line-height: 1.2;
 }
+.header-stat-row .heart-mini-icon {
+    width: auto;
+    height: 1em;
+}
 
 .header-stat-row strong {
     color: var(--text);
@@ -259,7 +263,8 @@
     min-height: 0;
     padding: 1px;
     gap: 1px;
-    overflow: hidden;
+    overflow: clip;
+    overflow-y: auto;
 }
 
 .live-group-row {
@@ -334,7 +339,6 @@
 /* Mirror opponent stage: their left is on the viewer's right */
 #opp-stage {
     flex-direction: row-reverse;
-    justify-content: center !important;
 }
 
 /* Flip perspective: put player on top */
@@ -511,6 +515,25 @@
     border-radius: 6px 0 0 6px;
     overflow: hidden;
 }
+
+/* Mobile left-edge button group — mirror of right-side group (after .mobile-btn-group so overrides win) */
+.mobile-btn-group-left {
+    position: fixed;
+    left: 0;
+    right: auto;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: calc(var(--z-modal) - 1);
+    flex-direction: column;
+    background: var(--bg-secondary);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-left: none;
+    border-right: 1px solid rgba(255,255,255,0.1);
+    border-radius: 0 6px 6px 0;
+    overflow: hidden;
+}
+.mobile-btn-group-left .mobile-toggle-btn:first-child { border-radius: 0 6px 0 0; }
+.mobile-btn-group-left .mobile-toggle-btn:last-child { border-radius: 0 0 6px 0; }
 
 .mobile-toggle-btn {
     display: flex;

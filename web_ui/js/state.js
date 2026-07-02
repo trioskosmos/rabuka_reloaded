@@ -607,6 +607,7 @@ export const State = typeof window !== 'undefined' ? window.StateMaster : stateI
 
 export function updateStateData(newData) {
     State.update(newData);
+    State._sysActionsDismissed = false;
 }
 
 if (typeof window !== 'undefined') {

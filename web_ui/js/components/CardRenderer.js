@@ -909,7 +909,12 @@ export const CardRenderer = {
         const existingSlots = Array.from(el.children);
 
         for (let i = 0; i < 3; i++) {
-            const card = (shouldHideCards && liveCards[i]) ? { card_no: -1, hidden: true } : liveCards[i];
+            let card = liveCards[i];
+            const hideForOpponent = shouldHideCards && card;
+            const isMemberInLiveZone = card && card.card_no && !CardRenderer.isCardLive(card);
+            if (hideForOpponent || isMemberInLiveZone) {
+                card = { card_no: -1, hidden: true };
+            }
             const action = validActionMap[i];
             const isValid = action != null;
             const validClass = isValid ? ' valid-target' : '';
@@ -1068,20 +1073,12 @@ export const CardRenderer = {
 
         // Include pending choice selection cards here (modal is hidden, so show them in sidebar panel)
         const pendingSelectionCards = state.pending_choice?.selection_cards || [];
-        let cards = overrideCards || (pendingSelectionCards.length > 0 ? pendingSelectionCards : (state.looked_cards || []));
+        let cards = overrideCards || (pendingSelectionCards.length > 0 ? pendingSelectionCards : (state.looked_cards?.cards || state.looked_cards || []));
 
-        // When a choice is active, filter to only cards with a matching legal action
-        // (backend may send all zone cards; legal_actions define which are valid picks)
-        if (state.pending_choice && state.legal_actions && state.legal_actions.length > 0 && cards.length > 0) {
-            cards = cards.filter(c => {
-                if (!c) return false;
-                const cardId = c.id !== undefined ? c.id : c.card_id;
-                return state.legal_actions.some(a => {
-                    const params = a.parameters || {};
-                    return params.card_id === cardId || params.card_id === c.card_id;
-                });
-            });
-        }
+        // Show ALL looked-at/revealed cards. Non-selectable cards are rendered
+        // grayed out below (via isClickable=false), not hidden.
+        // The legal_actions determine which cards are valid picks;
+        // cards without a matching action are shown as non-interactive.
 
         if (cards.length === 0) {
             DOMUtils.setVisible(DOM_IDS.LOOKED_CARDS_PANEL, false);

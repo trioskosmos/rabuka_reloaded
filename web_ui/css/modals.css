@@ -152,6 +152,10 @@
     width: calc(var(--card-w) * 1);
     height: calc(var(--card-h) * 1);
 }
+#discard-modal-cards .card-mini.orientation-landscape {
+    width: calc(var(--card-h) * 1);
+    height: calc(var(--card-w) * 1);
+}
 
 .discard-grid {
     display: grid;

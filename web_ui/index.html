@@ -20,6 +20,17 @@
     <div id="floating-tooltip" class="floating-tooltip" style="display: none;"></div>
 
 
+    <!-- Mobile: left side (utility modals) -->
+    <div class="mobile-btn-group mobile-btn-group-left" id="mobile-btn-group-left">
+        <button id="mobile-perf-btn" data-action="show-last-performance" class="mobile-toggle-btn" title="Performance" style="color:var(--accent-purple);">
+            <span data-i18n="mobile_perf">LIVE</span>
+        </button>
+        <button id="mobile-revealed-btn" data-action="show-revealed-cards" class="mobile-toggle-btn" title="Revealed Cards" style="color:var(--accent-cyan);">
+            <span data-i18n="mobile_revealed">OPEN</span>
+        </button>
+    </div>
+
+    <!-- Mobile: right side (game actions) -->
     <div class="mobile-btn-group" id="mobile-btn-group">
         <button id="mobile-toggle-mode" data-action="toggle-ui-mode" class="mobile-toggle-btn" style="color:var(--accent-red);">
             <span id="mobile-mode-label">PLAY</span>
@@ -27,7 +38,7 @@
         <button id="mobile-toggle-actions" data-action="toggle-actions-sidebar" class="mobile-toggle-btn" data-i18n="mobile_actions">ACTS</button>
         <button id="mobile-toggle-log" data-action="toggle-log-sidebar" class="mobile-toggle-btn" data-i18n="mobile_log_label">LOG</button>
         <button id="mobile-choice-btn" class="mobile-toggle-btn" data-action="show-choice-modal" style="display:none;">
-            <span id="mobile-choice-label">CHC</span>
+            <span style="font-size:0.55rem;">CHOICE</span>
         </button>
         <button id="mobile-pass-btn" class="mobile-toggle-btn" style="background:#2ecc71; color:#fff;">
             <span id="mobile-pass-label">PASS</span>
@@ -455,40 +466,7 @@
         </div>
     </div>
 
-    <!-- Help / FAQ Modal -->
-    <div id="help-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="modal-title" data-i18n="faq_title">Help & FAQ</span>
-                <button class="close-btn" data-action="close-help-modal">×</button>
-            </div>
-            <div class="modal-body help-body">
-                <h3 data-i18n="faq_decklog_import">Import from Deck Log</h3>
-                <ol style="padding-left: 18px; margin-bottom: 12px;">
-                    <li data-i18n="faq_step1">Go to decklog.bushiroad.com, find a deck, and open its detail page.</li>
-                    <li data-i18n="faq_step2">Right-click → "View Page Source" (Ctrl+U), then Ctrl+A, Ctrl+C to copy the full HTML.</li>
-                    <li data-i18n="faq_step3">In the game setup modal, select "Paste Deck List" and paste the HTML into the text area.</li>
-                </ol>
-                <div style="text-align: center; margin: 8px 0;">
-                    <img src="img/tutorial/decklog-import.webp" alt="Deck Log HTML source copy example" style="max-width: 100%; border-radius: 6px; border: 1px solid var(--border-color, #333);">
-                </div>
-                <p style="font-size: 0.8rem; color: var(--text-muted, #aaa); text-align: center; margin-bottom: 12px;" data-i18n="faq_tip">Tip: You can also paste plain text like "PL!-bp3-012-RM x 3" or "3 x PL!-bp3-012-RM".</p>
-
-                <h3>📱 <span data-i18n="faq_mobile">Mobile</span></h3>
-                <ul>
-                    <li data-i18n="faq_mobile_menu">Use the Menu button (bottom-right) to toggle the sidebar.</li>
-                    <li data-i18n="faq_mobile_scroll">Zones like hand and stage are horizontally scrollable.</li>
-                </ul>
-
-                <h3>🎮 <span data-i18n="faq_controls">Controls</span></h3>
-                <ul>
-                    <li data-i18n="faq_controls_update"><b>Update:</b> Re-fetches the game state.</li>
-                    <li data-i18n="faq_controls_reset"><b>Reset:</b> Restarts the game from the beginning.</li>
-                    <li data-i18n="faq_click_card">Click a card to use or move it.</li>
-                </ul>
-            </div>
-        </div>
-    </div>
+    <!-- Help / FAQ Modal (moved to end of body for proper z-ordering) -->
 
     <!-- Deck Setup Modal -->
     <div id="deck-modal" class="modal-overlay" style="display: none;">
@@ -832,6 +810,48 @@
             </div>
             <div class="modal-body" id="system-actions-body" style="display: flex; flex-direction: column; gap: 6px; padding: 8px 0;">
                 <!-- Populated by ActionMenu -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Help / FAQ Modal -->
+    <div id="help-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title" data-i18n="faq_title">Help & FAQ</span>
+                <button class="close-btn" data-action="close-help-modal">×</button>
+            </div>
+            <div class="modal-body help-body">
+                <h3 data-i18n="faq_ui_mode">UI Mode: View vs Play</h3>
+                <p style="margin-bottom: 8px; line-height: 1.5;" data-i18n="faq_ui_mode_desc">The top-right button toggles between View and Play mode:</p>
+                <ul style="margin-bottom: 12px;">
+                    <li><b data-i18n="mobile_mode_view">View</b> — <span data-i18n="faq_view_desc">Browse the board, inspect cards, read abilities. Click any card to see its detail. No actions are taken.</span></li>
+                    <li><b data-i18n="mobile_mode_play">Play</b> — <span data-i18n="faq_play_desc">Interact with the game: play cards from hand, activate abilities, set live cards, select targets. Valid targets are highlighted in green.</span></li>
+                </ul>
+
+                <h3 data-i18n="faq_decklog_import">Import from Deck Log</h3>
+                <ol style="padding-left: 18px; margin-bottom: 12px;">
+                    <li data-i18n="faq_step1">Go to decklog.bushiroad.com, find a deck, and open its detail page.</li>
+                    <li data-i18n="faq_step2">Open DevTools (usually F12) and do as the picture shows.</li>
+                    <li data-i18n="faq_step3">In the game setup modal, select "Paste Deck List" and paste the HTML into the text area.</li>
+                </ol>
+                <div style="text-align: center; margin: 8px 0;">
+                    <img src="img/tutorial/decklog-import.webp" alt="Deck Log HTML source copy example" style="max-width: 100%; border-radius: 6px; border: 1px solid var(--border-color, #333);">
+                </div>
+                <p style="font-size: 0.8rem; color: var(--text-muted, #aaa); text-align: center; margin-bottom: 12px;" data-i18n="faq_tip">Tip: You can also paste plain text like "PL!-bp3-012-RM x 3" or "3 x PL!-bp3-012-RM".</p>
+
+                <h3>📱 <span data-i18n="faq_mobile">Mobile</span></h3>
+                <ul>
+                    <li data-i18n="faq_mobile_menu">Use the Menu button (bottom-right) to toggle the sidebar.</li>
+                    <li data-i18n="faq_mobile_scroll">Zones like hand and stage are horizontally scrollable.</li>
+                </ul>
+
+                <h3>🎮 <span data-i18n="faq_controls">Controls</span></h3>
+                <ul>
+                    <li data-i18n="faq_controls_update"><b>Update:</b> Re-fetches the game state.</li>
+                    <li data-i18n="faq_controls_reset"><b>Reset:</b> Restarts the game from the beginning.</li>
+                    <li data-i18n="faq_click_card">Click a card to use or move it.</li>
+                </ul>
             </div>
         </div>
     </div>

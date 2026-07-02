@@ -80,7 +80,7 @@ export const AiDriver = {
                 }
             }
 
-            const isAiTurn = state.active_player === 'player2' || state.active_player === '1' || state.active_player === 1;
+            const isAiTurn = state.active_player === 'player2' || state.active_player === 'p2' || state.active_player === '1' || state.active_player === 1;
             if (isAiTurn) {
                 const valid = actions.filter(a => !a.parameters?.disabled);
                 if (valid.length) { this._do(valid[Math.random() * valid.length | 0]); }

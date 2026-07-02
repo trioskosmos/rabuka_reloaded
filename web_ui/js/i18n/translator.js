@@ -527,69 +527,11 @@ function parseParams(paramsStr) {
     return params;
 }
 
-const DYNAMIC_PROMPT_PATTERNS_JA = [
-    { re: /^Select any number of card\(s\) from hand \(0-(\d+)\) \(or skip\)$/, t: m => `手札からカードを0${m[1]}枚まで選んでください（スキップ可）` },
-    { re: /^Select (\d+) card\(s\) from hand(?: \(or skip\))?$/, t: m => `手札からカードを${m[1]}枚選んでください${m[0].includes('skip') ? '（スキップ可）' : ''}` },
-    { re: /^Select (\d+) more card\(s\) from hand for cost$/, t: m => `コストとして手札からカードを${m[1]}枚選んでください` },
-    { re: /^Select any number of card\(s\) from (.+)$/, t: m => `${zoneNameJa(m[1])}からカードを好きな枚数選んでください` },
-    { re: /^Select (\d+) card\(s\) from (.+)$/, t: m => `${zoneNameJa(m[2])}からカードを${m[1]}枚選んでください` },
-    { re: /^Select 1 card \(need (\d+) with the same unit name\)$/, t: m => `ユニット名が同じものを${m[1]}枚選んでください` },
-    { re: /^Select (\d+) stage member\(s\) to wait$/, t: m => `ウェイトにするステージメンバーを${m[1]}人選んでください` },
-    { re: /^Pay (\d+) energy \(or skip\)\?$/, t: m => `エネルギーを${m[1]}枚支払いますか？（スキップ可）` },
-    { re: /^Pay (\d+) energy\?$/, t: m => `エネルギーを${m[1]}枚支払いますか？` },
-    { re: /^Select up to (\d+) more card\(s\) from the (\d+) remaining looked-at cards$/, t: m => `確認済みカードの残り${m[2]}枚から${m[1]}枚まで選んでください` },
-    { re: /^Select card\(s\) from revealed cards$/, t: () => `公開されたカードを選択` },
-    { re: /^Choose cost option: (.+)$/, t: m => `コストを選択: ${m[1]}` },
-    { re: /^Select 1 (.+) card to place on deck$/, t: m => `${m[1]}カードを1枚デッキに置く` },
-    { re: /^Select (\d+) (.+) card\(s\)$/, t: m => `${m[2]}カードを${m[1]}枚選んでください` },
-    { re: /^Choose order for cards on deck \((\d+) cards\)$/, t: m => `デッキのカードの順番を選んでください（${m[1]}枚）` },
-    { re: /^Choose how many cards to draw \(0-(\d+)\)$/, t: m => `引くカードの枚数を選んでください（0${m[1]}枚）` },
-    { re: /^Select (\d+) card\(s\) to receive (\d+) (.+)$/, t: m => `${m[3]}を${m[2]}個得るカードを${m[1]}枚選んでください` },
-    { re: /^Select up to (\d+) member\(s\) to change state$/, t: m => `状態を変えるメンバーを${m[1]}人まで選んでください` },
-    { re: /^Select (\d+) member\(s\) to change state$/, t: m => `状態を変えるメンバーを${m[1]}人選んでください` },
-    { re: /^Select (\d+) member\(s\) for heart type conversion$/, t: m => `ハートタイプ変換の対象メンバーを${m[1]}人選んでください` },
-    { re: /^Pay (\d+) energy$/, t: m => `エネルギーを${m[1]}枚支払う` },
-    { re: /^Repeat up to (\d+) times$/, t: m => `最大${m[1]}回繰り返す` },
-    { re: /^Pay cost or skip: (.+)$/, t: m => `コストを支払うかスキップ: ${m[1]}` },
-    { re: /^Place (\d+) from (.+) to (.+)$/, t: m => `${zoneNameJa(m[2])}から${zoneNameJa(m[3])}に${m[1]}枚置く` },
-    { re: /^Select (\d+) from (.+?)(?: \((.+?)\))?$/, t: m => `${zoneNameJa(m[2])}から${m[1]}枚選んでください${m[3] ? `（${m[3]}）` : ''}` },
-    { re: /^Select (.+) from (.+)$/, t: m => `${zoneNameJa(m[2])}から${m[1]}を選んでください` },
-];
-
-function zoneNameJa(z) {
-    if (!z) return '';
-    const map = {
-        'hand': '手札', 'deck': 'デッキ', 'waiting room': '控え室', 'waitingRoom': '控え室',
-        'energy deck': 'エネルギーデッキ', 'energyDeck': 'エネルギーデッキ',
-        'stage': 'ステージ', 'success zone': '成功ゾーン', 'successZone': '成功ゾーン',
-        'live zone': 'ライブゾーン', 'liveZone': 'ライブゾーン',
-        'under': 'カードの下', 'under cards': 'カードの下',
-        'looked-at cards': '確認済みカード', 'revealed cards': '公開カード',
-        'discard pile': '控え室', 'trush': '控え室',
-    };
-    const lower = z.toLowerCase();
-    for (const [k, v] of Object.entries(map)) {
-        if (lower.includes(k)) return v;
-    }
-    return z;
-}
-
 export function translateChoiceDescription(desc) {
     if (!desc) return '';
     if (currentLanguage === 'en') return desc;
     const langData = translations[currentLanguage] || {};
-
-    const exact = langData.choice_descriptions?.[desc];
-    if (exact) return exact;
-
-    if (currentLanguage === 'jp') {
-        for (const pat of DYNAMIC_PROMPT_PATTERNS_JA) {
-            const m = desc.match(pat.re);
-            if (m) return pat.t(m);
-        }
-    }
-
-    return desc;
+    return langData.choice_descriptions?.[desc] || desc;
 }
 
 export function getCurrentTranslations() {
