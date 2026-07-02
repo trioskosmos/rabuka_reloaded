@@ -3,6 +3,38 @@ use crate::game_state::{GameState, Phase};
 use crate::types::LogEntry;
 
 impl super::TurnEngine {
+    /// Log a phase transition to both rule_log and structured_log.
+    /// Uses [[key]] translatable markers for bilingual frontend rendering.
+    fn log_phase(game_state: &mut GameState, marker_key: &str) {
+        let text = format!("[[{}]]", marker_key);
+        game_state.rule_log.push(text.clone());
+        game_state.structured_log.push(LogEntry {
+            text,
+            turn: game_state.turn_number,
+            player_label: "SYSTEM".into(),
+            source_card_id: None,
+            source_card_name: None,
+            category: "phase_transition".to_string(),
+            metadata: None,
+        });
+    }
+
+    /// Log the start of a new turn.
+    /// Uses [[turn_start:turn=N]] translatable marker.
+    fn log_turn_start(game_state: &mut GameState) {
+        let text = format!("[[turn_start:turn={}]]", game_state.turn_number);
+        game_state.rule_log.push(text.clone());
+        game_state.structured_log.push(LogEntry {
+            text,
+            turn: game_state.turn_number,
+            player_label: "SYSTEM".into(),
+            source_card_id: None,
+            source_card_name: None,
+            category: "turn_transition".to_string(),
+            metadata: Some(serde_json::json!({"turn": game_state.turn_number})),
+        });
+    }
+
     pub fn advance_phase(game_state: &mut GameState) {
         debug_assert!(
             game_state.phase_invariant(),
@@ -75,12 +107,14 @@ impl super::TurnEngine {
                     game_state.mods.tick_delayed_cannot_active();
                     game_state.active_player_mut().activate_all_energy();
                     Self::check_timing(game_state);
+                    Self::log_phase(game_state, "phase_energy");
                     game_state.current_phase = Phase::Energy;
                 }
                 Phase::Energy => {
                     game_state.recalculate_constants();
                     let _drawn_card = game_state.active_player_mut().draw_energy();
                     Self::check_timing(game_state);
+                    Self::log_phase(game_state, "phase_draw");
                     game_state.current_phase = Phase::Draw;
                 }
                 Phase::Draw => {
@@ -88,6 +122,7 @@ impl super::TurnEngine {
                     let _drawn = game_state.active_player_mut().draw_card();
                     game_state.recalculate_constants();
                     Self::check_timing(game_state);
+                    Self::log_phase(game_state, "phase_main");
                     game_state.current_phase = Phase::Main;
                 }
                 Phase::Main => {
@@ -96,10 +131,12 @@ impl super::TurnEngine {
                     if game_state.current_turn_phase
                         == crate::game_state::TurnPhase::FirstAttackerNormal
                     {
+                        Self::log_phase(game_state, "phase_active_second");
                         game_state.current_turn_phase =
                             crate::game_state::TurnPhase::SecondAttackerNormal;
                         game_state.current_phase = Phase::Active;
                     } else {
+                        Self::log_phase(game_state, "phase_live_set");
                         game_state.current_turn_phase = crate::game_state::TurnPhase::Live;
                         game_state.current_phase = Phase::LiveCardSetFirstAttacker;
                     }
@@ -119,6 +156,7 @@ impl super::TurnEngine {
                     game_state.player2.live_card_set_limit_reduction = 0;
                     game_state.recalculate_constants();
                     Self::check_timing(game_state);
+                    Self::log_phase(game_state, "phase_performance_first");
                     game_state.current_phase = Phase::FirstAttackerPerformance;
                     let first_attacker_id = game_state.first_attacker().id.clone();
                     let second_attacker_id = game_state.second_attacker().id.clone();
@@ -159,6 +197,8 @@ impl super::TurnEngine {
                     game_state.revealed_cost_card_owners.clear();
                     game_state.turn_limited_abilities_used.clear();
                     game_state.turn_number += 1;
+                    Self::log_turn_start(game_state);
+                    Self::log_phase(game_state, "phase_active_first");
                     game_state.current_turn_phase =
                         crate::game_state::TurnPhase::FirstAttackerNormal;
                     game_state.current_phase = Phase::Active;
@@ -507,10 +547,12 @@ impl super::TurnEngine {
             Self::trigger_auto_abilities_for_player(game_state, &opponent_id);
             game_state.process_pending_auto_abilities(&opponent_id);
         }
-        game_state.current_phase = if is_first {
-            Phase::SecondAttackerPerformance
+        if is_first {
+            Self::log_phase(game_state, "phase_performance_second");
+            game_state.current_phase = Phase::SecondAttackerPerformance;
         } else {
-            Phase::LiveVictoryDetermination
+            Self::log_phase(game_state, "phase_victory");
+            game_state.current_phase = Phase::LiveVictoryDetermination;
         };
     }
 
@@ -547,6 +589,7 @@ impl super::TurnEngine {
         game_state: &mut GameState,
         card_indices: Option<Vec<usize>>,
     ) -> Result<(), String> {
+        let is_first_turn_active = game_state.current_phase == Phase::MulliganSecondAttacker;
         let next_phase = match game_state.current_phase {
             Phase::MulliganFirstAttacker => Phase::MulliganSecondAttacker,
             Phase::MulliganSecondAttacker => Phase::Active,
@@ -575,18 +618,28 @@ impl super::TurnEngine {
             }
         }
         game_state.mulligan_selected_indices.clear();
+        if is_first_turn_active && next_phase == Phase::Active {
+            Self::log_turn_start(game_state);
+            Self::log_phase(game_state, "phase_active_first");
+        }
         game_state.current_phase = next_phase;
         log::debug!("Mulligan confirmed: {} cards mulliganed", removed_count);
         Ok(())
     }
 
     pub(crate) fn handle_mulligan_skip(game_state: &mut GameState) -> Result<(), String> {
+        let is_first_turn_active = game_state.current_phase == Phase::MulliganSecondAttacker;
         game_state.mulligan_selected_indices.clear();
-        game_state.current_phase = match game_state.current_phase {
+        let next_phase = match game_state.current_phase {
             Phase::MulliganFirstAttacker => Phase::MulliganSecondAttacker,
             Phase::MulliganSecondAttacker => Phase::Active,
             _ => return Ok(()),
         };
+        if is_first_turn_active && next_phase == Phase::Active {
+            Self::log_turn_start(game_state);
+            Self::log_phase(game_state, "phase_active_first");
+        }
+        game_state.current_phase = next_phase;
         Ok(())
     }
 

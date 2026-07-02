@@ -398,7 +398,18 @@
     "faq_controls": "Controls",
     "faq_controls_update": "<b>Update:</b> Re-fetches the game state.",
     "faq_controls_reset": "<b>Reset:</b> Restarts the game from the beginning.",
-    "faq_click_card": "Click a card to use or move it."
+    "faq_click_card": "Click a card to use or move it.",
+
+    "turn_start": "=== Turn {turn} Start ===",
+    "phase_active_first": "=== First Attacker: Active Phase ===",
+    "phase_active_second": "=== Second Attacker: Active Phase ===",
+    "phase_energy": "=== Energy Phase ===",
+    "phase_draw": "=== Draw Phase ===",
+    "phase_main": "=== Main Phase ===",
+    "phase_live_set": "=== Live Card Set ===",
+    "phase_performance_first": "=== First Attacker Performance ===",
+    "phase_performance_second": "=== Second Attacker Performance ===",
+    "phase_victory": "=== Victory Determination ==="
   },
   "heuristics": []
 }

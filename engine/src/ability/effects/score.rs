@@ -222,6 +222,17 @@ impl AbilityResolver {
             ),
             effect_data,
         );
+        {
+            let pp = gs.player_prefix();
+            let act_name = gs.activating_card
+                .and_then(|id| gs.card_database.get_card(id))
+                .map(|c| c.name.clone())
+                .unwrap_or_default();
+            gs.rule_log.push(format!(
+                "{} {}: スコア{} {} ({}枚適用)",
+                pp, act_name, operation, final_value, count_applied
+            ));
+        }
         Ok(())
     }
 
@@ -500,6 +511,12 @@ impl AbilityResolver {
                     .add_need_heart_modifier(*card_id, color, modifier_value);
             }
         }
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log.push(format!("{} {}: 要求ハート標準{} {}", pp, act_name, operation, value));
         Ok(())
     }
 

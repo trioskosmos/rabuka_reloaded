@@ -755,6 +755,12 @@ impl AbilityResolver {
                 max_per_group: effect.per_group_count,
             },
         };
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log.push(format!("{} {}: カード選択 {}枚", pp, act_name, count));
         Ok(())
     }
     pub fn execute_look_at(
@@ -817,6 +823,12 @@ impl AbilityResolver {
         };
 
         gs.looked_at_cards = cards;
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log.push(format!("{} {}: 確認 {}枚", pp, act_name, count));
         Ok(())
     }
 

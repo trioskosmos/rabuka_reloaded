@@ -424,6 +424,10 @@ impl super::TurnEngine {
             crate::ability::types::Choice::SelectTarget {
                 target, options, ..
             } => {
+                log::debug!(
+                    "[BCR] SelectTarget target={} card_id={:?} card_indices={:?} options={:?}",
+                    target, card_id, card_indices, options
+                );
                 let selected = match target.as_str() {
                     "pay_optional_cost:skip_optional_cost" => {
                         if card_id == Some(1) {
@@ -917,7 +921,6 @@ impl super::TurnEngine {
                 if (game_state.recently_moved_cards.is_some()
                     || game_state.last_energy_placed_by_effect()
                     || !game_state.recently_appeared_cards.is_empty())
-                    && game_state.current_phase == crate::types::Phase::Main
                 {
                     let event = crate::ability::types::TriggerEvent {
                         moved_cards: game_state.recently_moved_cards.clone().unwrap_or_default(),
@@ -946,7 +949,6 @@ impl super::TurnEngine {
                 if (game_state.recently_moved_cards.is_some()
                     || game_state.last_energy_placed_by_effect()
                     || !game_state.recently_appeared_cards.is_empty())
-                    && game_state.current_phase == crate::types::Phase::Main
                 {
                     let event = crate::ability::types::TriggerEvent {
                         moved_cards: game_state.recently_moved_cards.clone().unwrap_or_default(),

@@ -1978,6 +1978,10 @@ impl super::resolver::AbilityResolver {
     ) -> Result<(), String> {
         let choice_card_no = gs.entry_choice_card_no();
         let conditional_choice = gs.entry_conditional_choice();
+        log::debug!(
+            "[HST] target={} selected={} choice_card_no={:?} activating={:?}",
+            target, selected, choice_card_no, gs.activating_card
+        );
 
         // choice_card_no-based routing
         match choice_card_no.as_ref() {
@@ -2054,6 +2058,7 @@ impl super::resolver::AbilityResolver {
                 return self.handle_choice_string_selection(gs, selected, conditional_choice);
             }
             Some(ChoiceRoute::Raw(s)) if s.starts_with("position_change") => {
+                log::debug!("[HPCC_MATCH] routing to handle_position_change_choice: s={} selected={}", s, selected);
                 return self.handle_position_change_choice(gs, choice_card_no, selected);
             }
             _ => {}
@@ -2232,6 +2237,12 @@ impl super::resolver::AbilityResolver {
         choice_card_no: Option<ChoiceRoute>,
         selected: &str,
     ) -> Result<(), String> {
+        log::debug!(
+            "[HPCC] entry: choice_card_no={:?} selected={} entry_effect={:?} activating={:?}",
+            choice_card_no, selected,
+            gs.entry_effect().map(|e| e.action.clone()),
+            gs.activating_card
+        );
         if selected == "skip" {
             self.formation_plan.clear();
             self.clear_choice_state_and_resume(gs)?;

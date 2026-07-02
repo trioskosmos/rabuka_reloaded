@@ -240,8 +240,24 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            ActionType::DiscardCard => self.execute_move_cards(gs, effect),
+            ActionType::DiscardCard => {
+                let pp = self.player_prefix(gs);
+                let cn = gs
+                    .activating_card
+                    .and_then(|id| gs.card_database.get_card(id))
+                    .map(|c| c.name.clone())
+                    .unwrap_or_default();
+                gs.rule_log.push(format!("{} {}: カード破棄", pp, cn));
+                self.execute_move_cards(gs, effect)
+            }
             ActionType::MoveCards => {
+                let pp = self.player_prefix(gs);
+                let cn = gs
+                    .activating_card
+                    .and_then(|id| gs.card_database.get_card(id))
+                    .map(|c| c.name.clone())
+                    .unwrap_or_default();
+                gs.rule_log.push(format!("{} {}: カード移動", pp, cn));
                 if effect.multiple_targets.unwrap_or(false)
                     && effect.target.as_deref() == Some("deck")
                 {
@@ -470,7 +486,16 @@ impl AbilityResolver {
                 self.execute_play_baton_touch(gs, effect.count_or(1), effect.target_name())
             }
             ActionType::Reveal | ActionType::RevealEffect => self.execute_reveal_effect(gs, effect),
-            ActionType::Select => self.execute_select_effect(gs, effect),
+            ActionType::Select => {
+                let pp = self.player_prefix(gs);
+                let cn = gs
+                    .activating_card
+                    .and_then(|id| gs.card_database.get_card(id))
+                    .map(|c| c.name.clone())
+                    .unwrap_or_default();
+                gs.rule_log.push(format!("{} {}: カード選択", pp, cn));
+                self.execute_select_effect(gs, effect)
+            }
             ActionType::SelectNumber => self.execute_select_number(gs, effect),
             ActionType::Look | ActionType::LookAt => {
                 let base_count = if let Some(ref dc) = effect.dynamic_count {

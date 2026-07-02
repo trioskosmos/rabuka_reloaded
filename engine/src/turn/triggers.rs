@@ -59,7 +59,7 @@ impl super::TurnEngine {
                             card_no_clone
                         );
                         if card.card_no == card_no_clone {
-                            for ability in &card.abilities {
+                            for (ability_index, ability) in card.abilities.iter().enumerate() {
                                 let trigger_match = ability.triggers.as_ref().is_some_and(|t| {
                                     t.contains(crate::triggers::DEBUT)
                                         || t.contains(crate::triggers::DEBUT_EN)
@@ -105,7 +105,9 @@ impl super::TurnEngine {
                                         metadata: Some(serde_json::json!({
                                             "trigger": "debut",
                                             "zone": "stage",
-                                            "result": "pending"
+                                            "result": "pending",
+                                            "ability_index": ability_index,
+                                            "ability_text": ability.full_text,
                                         })),
                                     });
                                     let ability_id =
@@ -288,7 +290,9 @@ impl super::TurnEngine {
                                     metadata: Some(serde_json::json!({
                                         "trigger": "live_start",
                                         "zone": "live_card_zone",
-                                        "result": "pending"
+                                        "result": "pending",
+                                        "ability_index": aidx,
+                                        "ability_text": ability.full_text,
                                     })),
                                 });
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
@@ -340,7 +344,9 @@ impl super::TurnEngine {
                                         metadata: Some(serde_json::json!({
                                             "trigger": "live_start",
                                             "zone": "stage",
-                                            "result": "pending"
+                                            "result": "pending",
+                                            "ability_index": aidx,
+                                            "ability_text": ability.full_text,
                                         })),
                                     });
                                     let ability_id =
@@ -487,7 +493,9 @@ impl super::TurnEngine {
                                     metadata: Some(serde_json::json!({
                                         "trigger": "live_success",
                                         "zone": "stage",
-                                        "result": "pending"
+                                        "result": "pending",
+                                        "ability_index": aidx,
+                                        "ability_text": ability.full_text,
                                     })),
                                 });
                                 let ability_id = format!("{}_{}", card_no, ability.full_text);
@@ -527,7 +535,9 @@ impl super::TurnEngine {
                                         metadata: Some(serde_json::json!({
                                             "trigger": "live_success",
                                             "zone": "stage_gained",
-                                            "result": "pending"
+                                            "result": "pending",
+                                            "ability_index": 10000 + gidx,
+                                            "ability_text": gained_ability.full_text,
                                         })),
                                     });
                                     let ability_id = format!("{}_gained_{}", card_no, gidx);
@@ -568,7 +578,9 @@ impl super::TurnEngine {
                             metadata: Some(serde_json::json!({
                                 "trigger": "live_success",
                                 "zone": "live_card_zone",
-                                "result": "pending"
+                                "result": "pending",
+                                "ability_index": aidx,
+                                "ability_text": ability.full_text,
                             })),
                         });
                         let ability_id = format!("{}_{}", card_no, ability.full_text);
@@ -598,7 +610,9 @@ impl super::TurnEngine {
                                     metadata: Some(serde_json::json!({
                                         "trigger": "live_success",
                                         "zone": "live_card_zone_gained",
-                                        "result": "pending"
+                                        "result": "pending",
+                                        "ability_index": 10000 + gidx,
+                                        "ability_text": gained_ability.full_text,
                                     })),
                                 });
                                 let ability_id = format!("{}_gained_{}", card_no, gidx);

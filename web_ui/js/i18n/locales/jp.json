@@ -436,7 +436,18 @@
     "Place energy under member": "メンバーの下にエネルギーを置く",
     "Choose a member to deploy": "登場させるメンバーを選んでください",
     "Choose which card to place on top of deck": "デッキの上に置くカードを選んでください",
-    "Select cards to move": "移動させるカードを選んでください"
+    "Select cards to move": "移動させるカードを選んでください",
+
+    "turn_start": "=== ターン {turn} 開始 ===",
+    "phase_active_first": "=== 先行:アクティブフェイズ ===",
+    "phase_active_second": "=== 後攻:アクティブフェイズ ===",
+    "phase_energy": "=== エネルギーフェイズ ===",
+    "phase_draw": "=== ドローフェイズ ===",
+    "phase_main": "=== メインフェイズ ===",
+    "phase_live_set": "=== ライブカードセット ===",
+    "phase_performance_first": "=== 先行パフォーマンス ===",
+    "phase_performance_second": "=== 後攻パフォーマンス ===",
+    "phase_victory": "=== ライブ結果判定 ==="
   },
   "heuristics": []
 }

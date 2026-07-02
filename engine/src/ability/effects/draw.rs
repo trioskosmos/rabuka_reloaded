@@ -324,6 +324,11 @@ impl AbilityResolver {
         per_unit_count: u32,
         per_unit_type: Option<&str>,
     ) -> Result<(), String> {
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
         let card_db = self.card_db();
         let is_any_number = effect.any_number.unwrap_or(false);
         let is_distinct = effect.distinct.as_deref();
@@ -481,6 +486,11 @@ impl AbilityResolver {
             }
         }
         self.step_state.last_draw_count = final_count;
+        let dst = if destination.is_empty() { "手札" } else { destination };
+        gs.rule_log.push(format!(
+            "{} {}: {}枚ドロー({}→{})",
+            pp, act_name, final_count, source, dst
+        ));
         Ok(())
     }
 
@@ -579,6 +589,12 @@ impl AbilityResolver {
             allow_skip: effect.optional.unwrap_or(false),
             options: Some(options),
         });
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log.push(format!("{} {}: 数字選択", pp, act_name));
         Ok(())
     }
 

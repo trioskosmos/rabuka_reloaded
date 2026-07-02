@@ -962,6 +962,7 @@ impl GameState {
         self.cards_moved_this_turn.clear();
         self.turn_movements.clear();
         self.cards_appeared_this_turn.clear();
+        self.turn_area_movements.clear();
     }
 
     pub fn set_heart_color_decision_phase(&mut self, phase: &str) {

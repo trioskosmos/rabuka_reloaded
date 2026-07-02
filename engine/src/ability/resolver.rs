@@ -653,11 +653,13 @@ impl AbilityResolver {
         if let Some(e) = error {
             meta["error"] = serde_json::json!(e);
         }
+        let log_text = format!(
+            "{pp} {card_name} [{zone}]: 能力発動 [{trigger_str}] — {}",
+            result
+        );
+        gs.rule_log.push(log_text.clone());
         gs.structured_log.push(LogEntry {
-            text: format!(
-                "{pp} {card_name} [{zone}]: 能力発動 [{trigger_str}] — {}",
-                result
-            ),
+            text: log_text,
             turn: gs.turn_number,
             player_label: pp.clone(),
             source_card_id: card_id,
@@ -666,7 +668,13 @@ impl AbilityResolver {
             metadata: Some(meta),
         });
 
-        // Update the matching trigger_evaluation entry with the resolution result
+        // Update the matching trigger_evaluation entry with the resolution result.
+        // Match on (source_card_id, turn, ability_index, trigger_str) to distinguish
+        // multiple abilities on the same card with the same trigger type.
+        let ability_index = gs
+            .ability_queue
+            .current_entry()
+            .map(|e| e.ability_index);
         if let Some(cid) = card_id {
             for entry in gs.structured_log.iter_mut().rev() {
                 if entry.category != "trigger_evaluation" {
@@ -686,6 +694,20 @@ impl AbilityResolver {
                     == Some(trigger_str);
                 if !trigger_match {
                     continue;
+                }
+                // Match ability_index when present in both queue entry and metadata
+                let eval_idx = entry
+                    .metadata
+                    .as_ref()
+                    .and_then(|m| m.get("ability_index"))
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                if let Some(ai) = ability_index {
+                    if let Some(ei) = eval_idx {
+                        if ai != ei {
+                            continue;
+                        }
+                    }
                 }
                 // Found the matching entry — update its metadata
                 if let Some(ref mut meta) = entry.metadata {

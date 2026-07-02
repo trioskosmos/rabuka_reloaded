@@ -999,6 +999,7 @@ impl GameState {
 
             self.process_current_ability();
             let had_recent_moves = self.recently_moved_cards.is_some();
+            let had_recent_appearances = !self.recently_appeared_cards.is_empty();
             self.recently_moved_cards = None;
             self.recently_appeared_cards.clear();
             self.recently_state_changed.clear();
@@ -1010,7 +1011,10 @@ impl GameState {
             // batch movements (look_and_select, etc.) that finalize card
             // movement outside individual ability resolution.
             if had_recent_moves {
-                self.recently_moved_cards = Some(Vec::new()); // non-None marker for scan below
+                self.recently_moved_cards = Some(Vec::new());
+            }
+            if had_recent_appearances {
+                self.recently_appeared_cards.push(-1);
             }
             if self.has_pending_choice() {
                 break;
@@ -1070,9 +1074,7 @@ impl GameState {
         //   and the ability selects 1 card from the batch.
         let moved_marker = self.recently_moved_cards.is_some();
         let appeared_marker = !self.recently_appeared_cards.is_empty();
-        if (moved_marker || self.last_energy_placed_by_effect() || appeared_marker)
-            && self.current_phase == crate::types::Phase::Main
-        {
+        if moved_marker || self.last_energy_placed_by_effect() || appeared_marker {
             let batch_ids: Vec<i16> = self
                 .batch_movements
                 .iter()
@@ -1348,9 +1350,7 @@ impl GameState {
             // Scan stage watchers (e.g. each_time triggers) BEFORE clearing
             // recently_moved_cards so their preceding_moved conditions pass.
             // Trigger types: each_time:discard, each_time:area_move, each_time:energy_placed
-            if (self.recently_moved_cards.is_some() || self.last_energy_placed_by_effect() || !self.recently_appeared_cards.is_empty())
-                && self.current_phase == crate::types::Phase::Main
-            {
+            if self.recently_moved_cards.is_some() || self.last_energy_placed_by_effect() || !self.recently_appeared_cards.is_empty() {
                 if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
                     log::debug!(
                         "[PCA_TRIGGER] scanning stage watchers pid={} moved={:?}",

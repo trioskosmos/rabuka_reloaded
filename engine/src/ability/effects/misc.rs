@@ -113,6 +113,13 @@ impl AbilityResolver {
         }
 
         log::debug!("Unhandled custom action: {}", action_str);
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log
+            .push(format!("{} {}: カスタム効果", pp, act_name));
         Ok(())
     }
 
@@ -1666,6 +1673,18 @@ impl AbilityResolver {
                 effect_data,
             );
         }
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log.push(format!(
+            "{} {}: 資源獲得 {} {}",
+            pp,
+            act_name,
+            effect.count.unwrap_or(1),
+            effect.resource.as_deref().unwrap_or("?")
+        ));
         Ok(())
     }
 
@@ -1726,6 +1745,9 @@ impl AbilityResolver {
         }
         gs.prohibition_effects
             .push(format!("baton_touch_allowed:{}", count));
+        let pp = self.player_prefix(gs);
+        gs.rule_log
+            .push(format!("{}: バトンタッチ {}回", pp, count));
         Ok(())
     }
 
@@ -1887,6 +1909,13 @@ impl AbilityResolver {
             player.stage.place_under_card(area, card);
         }
         gs.recalculate_constants();
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log
+            .push(format!("{} {}: エネルギー配置(メンバー下) count={}", pp, act_name, count));
     }
 
     pub fn execute_position_change(
@@ -1897,6 +1926,12 @@ impl AbilityResolver {
         target: &str,
         target_member: &str,
     ) -> Result<(), String> {
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log.push(format!("{} {}: 位置変更", pp, act_name));
         // Check source_position from effect (new parser field), fall back to position param
         let source_pos = effect
             .source_position
@@ -2572,6 +2607,20 @@ impl AbilityResolver {
         destination: &str,
     ) -> Result<(), String> {
         let raw_target = effect.target.as_deref().unwrap_or("self");
+        let target = if raw_target == "both" {
+            "self"
+        } else {
+            raw_target
+        };
+        let target_member = effect.target_member.as_deref().unwrap_or("this_member");
+        let source_position = effect
+            .source_position
+            .as_deref()
+            .or_else(|| effect.position.as_ref().and_then(|p| p.get_position()));
+        log::debug!(
+            "[EPCWD] entry: target={} target_member={} source_pos={:?} dest={} activating={:?}",
+            target, target_member, source_position, destination, self.activating_card_id
+        );
         // "both" at resolution time means "self" (the ability controller resolves choices)
         let target = if raw_target == "both" {
             "self"
@@ -2589,6 +2638,7 @@ impl AbilityResolver {
         // previous position_change (the source area of the first move). Since
         // position_change already swaps members, this second move is redundant.
         if destination == "same_area" {
+            log::debug!("[EPCWD] same_area → early return");
             return Ok(());
         }
 
@@ -2640,6 +2690,7 @@ impl AbilityResolver {
                 return Ok(()); // no member at source, skip
             }
             if source_idx == target_index {
+                log::debug!("[EPCWD] source == target → NOOP");
                 return Ok(()); // same position, no move needed
             }
             let from_area2 = match source_idx {
@@ -2714,6 +2765,7 @@ impl AbilityResolver {
         // Handle specific card_no (for "multiple_targets" each-member pattern)
         if let Some(ref card_no) = effect.target_member {
             if card_no != "this_member" {
+                log::debug!("[EPCWD] card_no branch: card_no={}", card_no);
                 let card_db = self.card_db();
                 let player = gs.resolve_target_player_mut(target);
                 let current_index = player.stage.stage.iter().position(|&cid| {
@@ -2803,8 +2855,10 @@ impl AbilityResolver {
         }
 
         if target_member == "this_member" {
+            log::debug!("[EPCWD] this_member branch: target={} dest_idx={}", target, target_index);
             if let Some(activating_card_id) = self.activating_card_id {
                 let player = gs.resolve_target_player_mut(target);
+                log::debug!("[EPCWD] stage: {:?}", player.stage.stage);
 
                 let current_index = player
                     .stage
@@ -2980,6 +3034,13 @@ impl AbilityResolver {
                 ..Default::default()
             },
         );
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log
+            .push(format!("{} {}: 回転", pp, act_name));
         Ok(())
     }
 
@@ -3122,6 +3183,13 @@ impl AbilityResolver {
             let player = gs.resolve_target_player_mut(target);
             player.energy_zone.pay_energy(count as usize)?;
         }
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log
+            .push(format!("{} {}: {}エネルギー支払", pp, act_name, count));
         Ok(())
     }
 
@@ -3151,6 +3219,15 @@ impl AbilityResolver {
             .build(),
         );
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log.push(format!(
+            "{} {}: {}枚になるまで破棄",
+            pp, act_name, target_count
+        ));
         Ok(())
     }
 
@@ -3168,8 +3245,8 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         gs.rule_log.push(format!(
-            "{} {}: 制限追加 type={:?} dest={:?} delayed={}",
-            pp, act_name, restriction_type, restricted_destination, delayed
+            "{} {}: 制限追加",
+            pp, act_name
         ));
         let restriction_str = format!(
             "restriction:{}:{}",
@@ -3237,6 +3314,13 @@ impl AbilityResolver {
         gs.clear_revealed_cards();
         gs.re_yell_occurred = true;
         gs.prohibition_effects.push("re_yell".to_string());
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log
+            .push(format!("{} {}: 再エール", pp, act_name));
     }
 
     pub(crate) fn execute_activation_restriction(&mut self, gs: &mut GameState, target: &str) {
@@ -3251,7 +3335,7 @@ impl AbilityResolver {
             .push(format!("activation_restriction:{}", target));
     }
 
-    pub(crate) fn execute_choose_required_hearts(&mut self, _gs: &mut GameState) {
+    pub(crate) fn execute_choose_required_hearts(&mut self, gs: &mut GameState) {
         self.pending_choice = Some(Choice::SelectTarget {
             target: "choose_required_hearts".to_string(),
             description: "Choose required hearts".to_string(),
@@ -3260,11 +3344,14 @@ impl AbilityResolver {
             allow_skip: false,
             options: None,
         });
+        let pp = self.player_prefix(gs);
+        gs.rule_log
+            .push(format!("{}: 要求ハート選択", pp));
     }
 
     pub(crate) fn execute_choose_target_player(
         &mut self,
-        _gs: &mut GameState,
+        gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         self.current_effect = Some(effect.clone());
@@ -3280,6 +3367,9 @@ impl AbilityResolver {
             allow_skip: false,
             options: Some(options),
         });
+        let pp = self.player_prefix(gs);
+        gs.rule_log
+            .push(format!("{}: ターゲットプレイヤー選択", pp));
         Ok(())
     }
 
@@ -3298,6 +3388,13 @@ impl AbilityResolver {
                 log::debug!("Unknown shuffle zone: {}", source);
             }
         }
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log
+            .push(format!("{} {}: シャッフル", pp, act_name));
     }
 
     pub(crate) fn player_prefix(&self, gs: &GameState) -> String {
@@ -3367,5 +3464,12 @@ impl AbilityResolver {
             }
         }
         gs.re_yell_revealed_cards = gs.revealed_cards.clone();
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log
+            .push(format!("{} {}: エール実行 {}回", pp, act_name, count));
     }
 }

@@ -452,6 +452,12 @@ impl AbilityResolver {
                 }
             }
 
+            let pp = self.player_prefix(gs);
+            let act_name = gs
+                .activating_card
+                .map(|c| self.card_name(c))
+                .unwrap_or_default();
+            gs.rule_log.push(format!("{} {}: 状態変更→{}", pp, act_name, state_change));
             return Ok(());
         }
 
@@ -701,6 +707,12 @@ impl AbilityResolver {
                 None,
             );
         }
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log.push(format!("{} {}: コスト設定", pp, act_name));
         for card_id in card_ids {
             gs.mods.set_cost_modifier(card_id, value as i32);
         }
@@ -858,8 +870,8 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         gs.rule_log.push(format!(
-            "{} {}: 起動コスト{} {} (target={})",
-            pp, act_name, operation, value, target
+            "{} {}: 起動コスト{} {}",
+            pp, act_name, operation, value
         ));
         let prohibition_text = format!("activation_cost_{}_{}", operation, value);
         match target {
@@ -885,8 +897,8 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         gs.rule_log.push(format!(
-            "{} {}: カード同一性変更 identities={:?}",
-            pp, act_name, identities
+            "{} {}: カード同一性変更",
+            pp, act_name
         ));
         if !identities.is_empty() {
             gs.prohibition_effects
@@ -979,7 +991,7 @@ impl AbilityResolver {
 
     pub(crate) fn execute_specify_heart_color(
         &mut self,
-        _gs: &mut GameState,
+        gs: &mut GameState,
         choice: bool,
         _target: &str,
     ) {
@@ -1002,6 +1014,12 @@ impl AbilityResolver {
                 description_ja: None,
             });
         }
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log.push(format!("{} {}: ハート色指定", pp, act_name));
     }
 
     pub(crate) fn execute_set_card_identity_all_regions(
@@ -1020,6 +1038,12 @@ impl AbilityResolver {
                 }
             }
         }
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log.push(format!("{} {}: 全領域カード同一性変更", pp, act_name));
     }
 
     pub(crate) fn execute_set_cost_to_use(
@@ -1031,6 +1055,12 @@ impl AbilityResolver {
         if let Some(card_id) = card_id {
             gs.mods.set_cost_modifier(card_id, value as i32);
         }
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log.push(format!("{} {}: 使用コスト設定", pp, act_name));
         Ok(())
     }
 
@@ -1047,6 +1077,12 @@ impl AbilityResolver {
                 card_id, timing, treat_as
             ));
         }
+        let pp = self.player_prefix(gs);
+        let act_name = gs
+            .activating_card
+            .map(|c| self.card_name(c))
+            .unwrap_or_default();
+        gs.rule_log.push(format!("{} {}: 全ブレードタイミング", pp, act_name));
     }
 
     pub(crate) fn execute_modify_cost(
