@@ -31,19 +31,55 @@
                     return;
                 }
                 setupButton.click();
-                await new Promise(resolve => setTimeout(resolve, 1000));
                 
-                // Select decks
-                addLog('2. Selecting decks...');
-                const p0Select = document.getElementById('p0-deck-select');
-                const p1Select = document.getElementById('p1-deck-select');
-                if (p0Select && p1Select) {
-                    p0Select.value = 'Aqours Cup';
-                    p1Select.value = 'Aqours Cup';
+                // Wait for decks to populate
+                addLog('2. Waiting for decks to load...');
+                let decksLoaded = false;
+                for (let i = 0; i < 20; i++) {
                     await new Promise(resolve => setTimeout(resolve, 500));
+                    const p0Select = document.getElementById('p0-deck-select');
+                    if (p0Select && p0Select.options.length > 2) {
+                        // Pick deck with most cards (parse "(N cards)" from text)
+                        let bestOpt = null, bestCount = 0;
+                        for (let j = 0; j < p0Select.options.length; j++) {
+                            const opt = p0Select.options[j];
+                            if (opt.value === 'paste' || opt.value === 'random' || opt.value === 'manual') continue;
+                            const m = opt.textContent.match(/\((\d+)\s*cards?\)/i);
+                            const cnt = m ? parseInt(m[1], 10) : 0;
+                            if (cnt > bestCount) { bestCount = cnt; bestOpt = opt; }
+                        }
+                        if (bestOpt) {
+                            p0Select.value = bestOpt.value;
+                            if (window.onDeckSelectChange) window.onDeckSelectChange(0, bestOpt.value);
+                            addLog(`   P1 deck: ${bestOpt.textContent}`);
+                        }
+                        const p1Select = document.getElementById('p1-deck-select');
+                        if (p1Select) {
+                            bestOpt = null; bestCount = 0;
+                            for (let j = 0; j < p1Select.options.length; j++) {
+                                const opt = p1Select.options[j];
+                                if (opt.value === 'paste' || opt.value === 'random' || opt.value === 'manual') continue;
+                                const m = opt.textContent.match(/\((\d+)\s*cards?\)/i);
+                                const cnt = m ? parseInt(m[1], 10) : 0;
+                                if (cnt > bestCount) { bestCount = cnt; bestOpt = opt; }
+                            }
+                            if (bestOpt) {
+                                p1Select.value = bestOpt.value;
+                                if (window.onDeckSelectChange) window.onDeckSelectChange(1, bestOpt.value);
+                                addLog(`   P2 deck: ${bestOpt.textContent}`);
+                            }
+                        }
+                        decksLoaded = true;
+                        break;
+                    }
                 }
                 
-                // Start game
+                if (!decksLoaded) {
+                    addLog('❌ Decks did not load');
+                    return;
+                }
+                
+                // Start game with selected decks (sandbox auto-resolves RPS and turn choice)
                 addLog('3. Starting game...');
                 const submitButton = document.querySelector('[data-action="submit-game-setup"]');
                 if (!submitButton) {
@@ -51,108 +87,41 @@
                     return;
                 }
                 submitButton.click();
-                await new Promise(resolve => setTimeout(resolve, 3000));
                 
-                // Check initial phase
-                addLog('4. Checking initial phase...');
-                const initialPhase = window.State?.data?.phase;
-                addLog('Initial phase: ' + initialPhase);
-                
-                if (initialPhase !== 'RockPaperScissors') {
-                    addLog('❌ Wrong initial phase, expected RockPaperScissors');
-                    return;
-                }
-                
-                // Get RPS actions
-                addLog('5. Getting RPS actions...');
-                const rpsActions = window.State?.data?.legal_actions?.filter(a => 
-                    a.action_type === 'rock_choice' || 
-                    a.action_type === 'paper_choice' || 
-                    a.action_type === 'scissors_choice'
-                ) || [];
-                addLog('RPS actions: ' + rpsActions.length);
-                
-                if (rpsActions.length !== 3) {
-                    addLog('❌ Wrong number of RPS actions');
-                    return;
-                }
-                
-                // Click Rock
-                addLog('6. Clicking Rock...');
-                const rockAction = rpsActions.find(a => a.action_type === 'rock_choice');
-                const rockButton = document.querySelector(`[data-action-id="${rockAction?.index}"]`);
-                if (rockButton) {
-                    rockButton.click();
+                // Wait for sandbox auto-resolve to complete RPS + turn choice
+                addLog('3. Waiting for sandbox auto-resolve (RPS + turn choice)...');
+                let mulliganPhase = false;
+                for (let i = 0; i < 30; i++) {
                     await new Promise(resolve => setTimeout(resolve, 1000));
+                    const phase = window.State?.data?.phase;
+                    addLog(`   Poll ${i + 1}: phase = ${phase}`);
+                    if (phase && (phase.startsWith('Mulligan') || phase === 'Main')) {
+                        mulliganPhase = true;
+                        break;
+                    }
                 }
                 
-                // Click Paper
-                addLog('7. Clicking Paper...');
-                const paperAction = window.State?.data?.legal_actions?.find(a => a.action_type === 'paper_choice');
-                const paperButton = document.querySelector(`[data-action-id="${paperAction?.index}"]`);
-                if (paperButton) {
-                    paperButton.click();
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                }
-                
-                // Check phase after RPS
-                addLog('8. Checking phase after RPS...');
-                const phaseAfterRPS = window.State?.data?.phase;
-                addLog('Phase after RPS: ' + phaseAfterRPS);
-                
-                if (phaseAfterRPS !== 'ChooseFirstAttacker') {
-                    addLog('❌ Wrong phase after RPS, expected ChooseFirstAttacker');
+                if (!mulliganPhase) {
+                    addLog('❌ Did not reach mulligan or main phase');
                     return;
                 }
                 
-                // Get turn choice actions
-                addLog('9. Getting turn choice actions...');
-                const turnActions = window.State?.data?.legal_actions?.filter(a => 
-                    a.action_type === 'choose_first_attacker' || 
-                    a.action_type === 'choose_second_attacker'
-                ) || [];
-                addLog('Turn choice actions: ' + turnActions.length);
+                const phase = window.State?.data?.phase;
+                addLog('4. Reached phase: ' + phase);
                 
-                if (turnActions.length !== 2) {
-                    addLog('❌ Wrong number of turn choice actions');
-                    return;
-                }
-                
-                // Click "Go first"
-                addLog('10. Clicking Go first...');
-                const goFirstAction = turnActions.find(a => a.action_type === 'choose_first_attacker');
-                const goFirstButton = document.querySelector(`[data-action-id="${goFirstAction?.index}"]`);
-                if (goFirstButton) {
-                    goFirstButton.click();
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                }
-                
-                // Check phase after turn choice
-                addLog('11. Checking phase after turn choice...');
-                const phaseAfterTurn = window.State?.data?.phase;
-                addLog('Phase after turn choice: ' + phaseAfterTurn);
-                
-                if (phaseAfterTurn !== 'MulliganP1Turn' && phaseAfterTurn !== 'MulliganP2Turn') {
-                    addLog('❌ Wrong phase after turn choice, expected Mulligan phase');
-                    addLog('Got: ' + phaseAfterTurn);
-                    return;
-                }
-                
-                // Get mulligan actions
-                addLog('12. Getting mulligan actions...');
-                const mulliganActions = window.State?.data?.legal_actions?.filter(a => 
-                    a.action_type === 'confirm_mulligan' || 
-                    a.action_type === 'skip_mulligan'
-                ) || [];
-                addLog('Mulligan actions: ' + mulliganActions.length);
-                
-                if (mulliganActions.length < 1) {
-                    addLog('❌ No mulligan actions available');
-                    return;
+                // Check that main deck has enough cards
+                const state = window.State?.data;
+                const p1 = state?.player1;
+                if (p1?.deck?.cards) {
+                    addLog(`P1 main deck: ${p1.deck.cards.length} cards`);
+                    if (p1.deck.cards.length < 20) {
+                        addLog('❌ Main deck too small (< 20 cards)');
+                        return;
+                    }
                 }
                 
                 addLog('=== TEST PASSED ===');
-                addLog('Turn choice phase correctly advances to mulligan');
+                addLog('Game started successfully with sufficient cards');
                 
             } catch (error) {
                 addLog('=== TEST FAILED ===');

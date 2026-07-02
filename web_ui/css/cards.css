@@ -312,11 +312,13 @@
 .card-area.stage {
     display: flex;
     flex-direction: row;
-    justify-content: space-evenly;
+    gap: 4px;
     align-items: center;
+    justify-content: center;
     flex: 1;
     overflow-x: auto;
     overflow-y: hidden;
+    padding: 0 2px;
 }
 
 .card-area.energy {
@@ -728,7 +730,6 @@
     flex: 1;
     min-height: 0;
     flex-wrap: nowrap;
-    overflow: hidden;
 }
 
 .play-area-left {

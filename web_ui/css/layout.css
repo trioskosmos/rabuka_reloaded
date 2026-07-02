@@ -334,6 +334,7 @@
 /* Mirror opponent stage: their left is on the viewer's right */
 .game-board.both-mode #opp-stage {
     flex-direction: row-reverse;
+    justify-content: flex-start;
 }
 
 /* Flip perspective: put player on top */
@@ -583,8 +584,7 @@
         overflow-x: scroll;
     }
 
-    /* Ensure field containers can scroll horizontally too */
-    .field-row,
+    /* Ensure live zone containers can scroll horizontally too */
     .live-group-row {
         overflow-x: auto;
     }
@@ -620,15 +620,16 @@
         display: inline-flex;
     }
 
-    /* Overlay backdrop when sidebar is open */
-    body.sidebar-open::after {
-        content: '';
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100dvh;
-        background: rgba(0, 0, 0, 0.55);
-        z-index: calc(var(--z-modal) - 1);
-    }
+/* Overlay backdrop when sidebar is open */
+body.sidebar-open::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100dvh;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: calc(var(--z-sidebar) - 1);
+    pointer-events: auto;
+}
 }

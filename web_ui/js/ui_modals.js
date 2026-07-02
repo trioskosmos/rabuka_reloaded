@@ -27,7 +27,7 @@ export const Modals = {
     populateDeckSelect: (el, decks) => DeckSetupModal.populateDeckSelect(el, decks),
     submitDeck: () => DeckSetupModal.submitDeck(),
     loadTestDeck: () => DeckSetupModal.loadTestDeck(),
-    loadRandomDeck: () => DeckSetupModal.loadRandomDeck(),
+
 
     openSetupModal: (mode) => GameSetupModal.openSetupModal(mode),
     closeSetupModal: () => GameSetupModal.closeSetupModal(),

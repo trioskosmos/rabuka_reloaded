@@ -41,9 +41,14 @@ function updateMobileSidebarToggleState(side, isOpen) {
 }
 
 let mobileSidebarOverlayHandler = null;
+const OVERLAY_EVENTS = ['mousedown', 'touchstart'];
 
 function isAnySidebarOpen() {
     return document.querySelectorAll('.sidebar.active').length > 0;
+}
+
+function isClickInsideSidebar(target) {
+    return target && target.closest('.sidebar');
 }
 
 function refreshOverlay() {
@@ -51,23 +56,28 @@ function refreshOverlay() {
     document.body.classList.toggle(CSS_CLASSES.SIDEBAR_OPEN, open);
 }
 
+function handleOverlayEvent(e) {
+    if (isClickInsideSidebar(e.target)) return;
+    closeSidebar();
+}
+
 function setupOverlayListener() {
     if (mobileSidebarOverlayHandler) return;
-    mobileSidebarOverlayHandler = (e) => {
-        if (e.target === document.body || e.target.closest('.main-content')) {
-            closeSidebar();
-        }
-    };
+    mobileSidebarOverlayHandler = handleOverlayEvent;
     setTimeout(() => {
         if (mobileSidebarOverlayHandler) {
-            document.addEventListener('mousedown', mobileSidebarOverlayHandler);
+            OVERLAY_EVENTS.forEach(evt => {
+                document.addEventListener(evt, mobileSidebarOverlayHandler, { passive: true });
+            });
         }
     }, 10);
 }
 
 function teardownOverlayListener() {
     if (mobileSidebarOverlayHandler) {
-        document.removeEventListener('mousedown', mobileSidebarOverlayHandler);
+        OVERLAY_EVENTS.forEach(evt => {
+            document.removeEventListener(evt, mobileSidebarOverlayHandler);
+        });
         mobileSidebarOverlayHandler = null;
     }
 }

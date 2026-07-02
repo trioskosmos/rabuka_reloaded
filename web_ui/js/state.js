@@ -471,6 +471,7 @@ const stateInternal = {
             if (!p) continue;
             const getZoneCards = (zone) => {
                 if (!zone) return [];
+                if (!Array.isArray(zone.cards)) return [];
                 return zone.cards;
             };
             const allZones = [

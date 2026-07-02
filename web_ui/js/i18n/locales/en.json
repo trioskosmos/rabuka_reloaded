@@ -164,6 +164,7 @@
     "rps_rock": "Rock",
     "rps_paper": "Paper",
     "rps_scissors": "Scissors",
+    "waiting_for_opponent": "Waiting for opponent...",
     "rps_p_chose": "Player {p_idx} chose {move}",
     "rps_draw": "Draw #{count}! Restarting RPS.",
     "rps_result": "RPS Result: P0={p0}, P1={p1}",
@@ -381,7 +382,23 @@
     "import_placeholder": "Paste deck list, Deck Log HTML, or card_no x qty",
     "decklog_guide": "How to get a deck from Deck Log",
     "browse_mode_hint": "Switch to Deck mode to build a deck list",
-    "deck_mode_hint": "Switch to Browse mode to search cards, or click cards here to add to deck"
+    "deck_mode_hint": "Switch to Browse mode to search cards, or click cards here to add to deck",
+
+    "faq_title": "Help &amp; FAQ",
+    "faq_decklog_import": "Import from Deck Log",
+    "faq_step1": "Go to <a href=\"https://decklog.bushiroad.com/\" target=\"_blank\">decklog.bushiroad.com</a>, find a deck, and open its detail page.",
+    "faq_step2": "Right-click → \"View Page Source\" (Ctrl+U), then Ctrl+A, Ctrl+C to copy the full HTML.",
+    "faq_step3": "In the game setup modal, select \"Paste Deck List\" and paste the HTML into the text area.",
+    "faq_tip": "Tip: You can also paste plain text like \"PL!-bp3-012-RM x 3\" or \"3 x PL!-bp3-012-RM\".",
+
+    "faq_mobile": "Mobile",
+    "faq_mobile_menu": "Use the <b>Menu</b> button (bottom-right) to toggle the sidebar.",
+    "faq_mobile_scroll": "Zones like hand and stage are horizontally scrollable.",
+
+    "faq_controls": "Controls",
+    "faq_controls_update": "<b>Update:</b> Re-fetches the game state.",
+    "faq_controls_reset": "<b>Reset:</b> Restarts the game from the beginning.",
+    "faq_click_card": "Click a card to use or move it."
   },
   "heuristics": []
 }

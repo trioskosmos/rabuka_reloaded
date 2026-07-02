@@ -18,6 +18,7 @@ import { switchBoard } from './layout.js';
 import { ModalManager } from './utils/ModalManager.js';
 import { DOMUtils } from './utils/DOMUtils.js';
 import { DOM_IDS } from './constants_dom.js';
+import { AiDriver } from './components/AiDriver.js';
 
 /**
  * Wire all legacy global APIs to window.
@@ -130,7 +131,7 @@ export function initializeGlobals(controller = {}) {
     window.closeDeckModal = Modals.closeDeckModal;
     window.submitDeck = Modals.submitDeck;
     window.loadTestDeck = Modals.loadTestDeck;
-    window.loadRandomDeck = Modals.loadRandomDeck;
+
     window.openSetupModal = Modals.openSetupModal;
     window.closeSetupModal = Modals.closeSetupModal;
     window.submitGameSetup = Modals.submitGameSetup;
@@ -182,6 +183,7 @@ export function initializeGlobals(controller = {}) {
     window.Rendering = Rendering;
     window.Tooltips = Tooltips;
     window.DragDrop = DragDrop;
+    window.AiDriver = AiDriver;
 
     console.log("[Compat] All legacy globals wired successfully. No overwrites.");
 }

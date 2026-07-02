@@ -78,6 +78,118 @@ fn kinako_activate_discards_matching_card() {
     );
 }
 
+/// Q240: Discard Sumire (center-gated debut) via Kinako's activation.
+/// Sumire's debut fires from waitroom → center check fails → no blade+2.
+#[test]
+fn kinako_q240_sumire_discard_no_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let kinako = game.id("PL!SP-bp2-006-P");
+    let sumire = game.id("PL!SP-bp5-015-N"); // Liella!, cost=4, debut center → blade+2
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.give_energy(10);
+    game.state.player1.hand.cards.push(kinako);
+    game.state.player1.hand.cards.push(sumire); // cost=4, eligible for cost_limit=4
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.play_to_stage(kinako, MemberArea::Center);
+
+    let blade_before = game.state.mods.get_blade_modifier(kinako);
+
+    TurnEngine::execute_main_phase_action(
+        &mut game.state,
+        &ActionType::UseAbility,
+        Some(kinako),
+        None,
+        None,
+        None,
+    )
+    .expect("activate_ability failed");
+
+    // Select Sumire as cost card
+    if game.has_pending_choice() {
+        let t = game.pending_choice_type().unwrap_or_default();
+        eprintln!("[POST ACTIVATE] choice={:?}", t);
+        game.select_indices(&[0]);
+    }
+
+    // Drain any remaining choices (debut ability activation followup, etc.)
+    while game.has_pending_choice() {
+        let t = game.pending_choice_type().unwrap_or_default();
+        eprintln!("[DRAIN] choice={:?}", t);
+        game.select_indices(&[]);
+    }
+
+    // Sumire should be in discard (cost paid)
+    assert!(
+        game.state.player1.waitroom.cards.contains(&sumire),
+        "Q240: Sumire should be discarded as cost"
+    );
+
+    // Q240: Sumire's debut fires from waitroom → center check FAILS → no blade
+    let blade_after = game.state.mods.get_blade_modifier(kinako);
+    assert_eq!(
+        blade_after, blade_before,
+        "Q240: Sumire's center-gated debut from waitroom should NOT grant blade+2 (got {})",
+        blade_after
+    );
+
+    // Also check no blade modifier was added to Sumire (she's in waitroom)
+    let sumire_blade = game.state.mods.get_blade_modifier(sumire);
+    assert_eq!(
+        sumire_blade, 0,
+        "Q240: Sumire should not get blade+2 from waitroom debut"
+    );
+}
+
+/// Control: Discard a Liella! card with non-center-gated debut → activates from waitroom.
+#[test]
+fn kinako_q240_non_center_debut_activates() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let kinako = game.id("PL!SP-bp2-006-P");
+    // PL!SP-sd1-008-SD 若菜四季: cost=4, Liella! series, debut: pay 1E → look top 3
+    let debut_card = game.id("PL!SP-sd1-008-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.give_energy(10);
+    game.state.player1.hand.cards.push(kinako);
+    game.state.player1.hand.cards.push(debut_card); // cost=4, Liella! series
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.play_to_stage(kinako, MemberArea::Center);
+
+    TurnEngine::execute_main_phase_action(
+        &mut game.state,
+        &ActionType::UseAbility,
+        Some(kinako),
+        None,
+        None,
+        None,
+    )
+    .expect("activate_ability failed");
+
+    // Select debut_card as cost
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+    // Drain followup: if the debut ability triggers additional choices
+    while game.has_pending_choice() {
+        eprintln!("[CTRL DRAIN] choice={:?}", game.pending_choice_type());
+        game.select_indices(&[]);
+    }
+
+    assert!(
+        game.state.player1.waitroom.cards.contains(&debut_card),
+        "Q240 control: Debut card should be discarded as cost"
+    );
+}
+
 /// Verify the ability activation fails when no eligible card is in hand
 /// (the high-cost card is left untouched).
 #[test]

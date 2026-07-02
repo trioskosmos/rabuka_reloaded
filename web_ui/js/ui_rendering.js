@@ -8,6 +8,7 @@ import { BoardRenderer } from './components/BoardRenderer.js';
 import { ActionMenu } from './components/ActionMenu.js';
 
 import { Phase, isMulliganPhase, isLiveCardSetPhase } from './constants.js';
+import { AiDriver } from './components/AiDriver.js';
 import * as i18n from './i18n/index.js';
 import { Tooltips } from './ui_tooltips.js';
 import { InteractionAdapter } from './interaction_adapter.js';
@@ -98,7 +99,10 @@ export const Rendering = {
     renderInternal: () => {
         const state = State.data;
         // Rust backend format: state.player1, state.player2
-        if (!state || (!state.player1 && !state.player2)) return;
+        if (!state || (!state.player1 && !state.player2)) {
+            AiDriver.stop();
+            return;
+        }
 
         const assetsToLoad = [];
         [state.player1, state.player2].forEach(p => {
@@ -129,7 +133,7 @@ export const Rendering = {
         const validTargets = Rendering.get_valid_targets(state);
         const viewState = ViewState.buildRenderModel(state, State, validTargets);
 
-        if (State.data?.mode !== 'pvp' && State.perspectivePlayer !== viewState.perspectivePlayer) {
+        if (State.data?.mode !== 'pvp' && State.data?.mode !== 'pve' && State.perspectivePlayer !== viewState.perspectivePlayer) {
             State.updateUiConfig({ perspective_player: viewState.perspectivePlayer });
         }
 
@@ -193,9 +197,12 @@ export const Rendering = {
 
         Tooltips.highlightPendingSource();
 
-        // Update language button label
-        const langBtn = document.getElementById('lang-btn');
-        if (langBtn) langBtn.textContent = State.currentLang === 'jp' ? 'English' : 'Japanese';
+        // Update language button labels
+        document.querySelectorAll('[data-action="toggle-lang"]').forEach(btn => {
+            btn.textContent = State.currentLang === 'jp' ? 'English' : 'Japanese';
+        });
+
+        AiDriver.think();
     },
 
     getPhaseKey: (phase) => {

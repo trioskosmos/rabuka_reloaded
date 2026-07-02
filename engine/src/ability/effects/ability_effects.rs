@@ -97,7 +97,13 @@ impl AbilityResolver {
                     };
                     if let Some(ability) = selected {
                         if let Some(ref effect) = ability.effect {
+                            // Q240: Set activating_card to the TARGET card (the one whose
+                            // ability is being activated) so position checks like
+                            // activation_position evaluate the correct card, not the activator.
+                            let saved_activating = gs.activating_card;
+                            gs.activating_card = Some(cid);
                             let _ = self.execute_effect(gs, effect);
+                            gs.activating_card = saved_activating;
                         }
                         let pp = self.player_prefix(gs);
                         gs.rule_log.push(format!(

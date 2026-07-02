@@ -164,6 +164,7 @@
     "rps_rock": "グー",
     "rps_paper": "パー",
     "rps_scissors": "チョキ",
+    "waiting_for_opponent": "対戦相手を待っています...",
     "rps_p_chose": "プレイヤー{p_idx}が{move}を出しました",
     "rps_draw": "あいこ！{count}回目です",
     "rps_result": "ジャンケン結果: P0={p0}, P1={p1}",
@@ -381,7 +382,23 @@
     "import_placeholder": "デッキリスト、デッキログHTML、またはcard_no x 枚数を貼り付け",
     "decklog_guide": "デッキログからデッキを取得する方法",
     "browse_mode_hint": "デッキモードに切り替えてデッキを作成",
-    "deck_mode_hint": "検索モードに切り替えてカードを検索するか、カードをクリックしてデッキに追加"
+    "deck_mode_hint": "検索モードに切り替えてカードを検索するか、カードをクリックしてデッキに追加",
+
+    "faq_title": "ヘルプ &amp; FAQ",
+    "faq_decklog_import": "デッキログからインポート",
+    "faq_step1": "<a href=\"https://decklog.bushiroad.com/\" target=\"_blank\">decklog.bushiroad.com</a> でデッキを探し、詳細ページを開きます。",
+    "faq_step2": "右クリック → 「ページのソースを表示」(Ctrl+U)、Ctrl+A、Ctrl+C でHTMLをコピーします。",
+    "faq_step3": "ゲームセットアップで「デッキリストを貼り付け」を選び、HTMLをテキストエリアに貼り付けます。",
+    "faq_tip": "ヒント: 「PL!-bp3-012-RM x 3」や「3 x PL!-bp3-012-RM」のようなプレーンテキストも貼り付け可能です。",
+
+    "faq_mobile": "モバイル操作",
+    "faq_mobile_menu": "画面右下の <b>Menu</b> ボタンでサイドバーを開閉できます。",
+    "faq_mobile_scroll": "手札やステージなどのゾーンは横スクロール可能です。",
+
+    "faq_controls": "ゲーム操作",
+    "faq_controls_update": "<b>更新:</b> ゲームの状態を再取得します。",
+    "faq_controls_reset": "<b>リセット:</b> ゲームを初期状態からやり直します。",
+    "faq_click_card": "カードをクリックして使用・移動します。"
   },
   "choice_descriptions": {
     "Choose a heart color": "ハートの色を選んでください",

@@ -25,8 +25,11 @@ python deployment_scripts/consolidate_images.py
 ### 2. Uploading to Hugging Face
 We use the Hugging Face CLI. To prevent files from being placed in the root folder of the Space, **you must specify both the local path and the destination path** in the `hf upload` command.
 
+#### How to avoid redundant uploads
+The `hf upload` command automatically calculates file hashes. If a file with the same content already exists on the Space, **it is skipped and not re-uploaded**. However, the "Checking" phase for thousands of files can trigger environment timeouts.
+
 **Automated Way (Recommended):**
-Run the PowerShell helper script. It handles the explicit paths and batching.
+Run the PowerShell helper script. It uses a batching strategy for images to avoid timeouts while still benefiting from hash-skipping.
 ```powershell
 .\deployment_scripts\deploy_hf.ps1
 ```

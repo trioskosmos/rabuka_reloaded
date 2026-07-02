@@ -1124,38 +1124,52 @@ export const LogRenderer = {
         const content = document.getElementById(DOM_IDS.REVEALED_CONTENT);
         if (!title || !content) return;
 
-        // Collect ALL card IDs from ALL revealed sources
-        const allIds = new Set();
+        // Collect card IDs per player with source labels
+        const p1Cards = [];  // {id, source}
+        const p2Cards = [];
+        const sharedCards = [];
 
-        // Cheer / yell (including persistent fields)
-        for (const src of ['player1_cheer_revealed_cards', 'player2_cheer_revealed_cards',
-                           'initial_yell_revealed_cards', 're_yell_revealed_cards',
-                           'revealed_cost_cards']) {
-            (s[src] || []).forEach(id => allIds.add(id));
-        }
-
-        // Effect reveals (objects with card_id, or raw IDs)
-        if (s.revealed_card_info?.length) {
-            s.revealed_card_info.forEach(e => { if (e.card_id !== undefined) allIds.add(e.card_id); });
-        } else {
-            (s.revealed_cards || []).forEach(id => allIds.add(id));
-        }
-        if (s.revealed_cost_card_info?.length) {
-            s.revealed_cost_card_info.forEach(e => { if (e.card_id !== undefined) allIds.add(e.card_id); });
-        }
-
-        const ids = [...allIds].filter(id => id > 0);
-
-        const cardToHtml = (id) => {
-            const card = State.resolveCardData(id);
-            if (!card) return `<div class="revealed-card chip">ID:${id}</div>`;
-            const imgPath = resolveCardImagePath(card.card_no);
-            const img = imgPath ? `<img src="${fixImg(imgPath)}" class="revealed-card-img" alt="${card.name}">` : '';
-            return `<div class="revealed-card">${img}<span class="revealed-card-name">${card.name}</span></div>`;
+        const addCard = (id, source, bucket) => {
+            if (id === null || id === undefined || id <= 0) return;
+            if (bucket.some(e => e.id === id)) return;
+            bucket.push({ id, source });
         };
 
-        if (!ids.length) {
-            // DEBUG: dump raw state keys so we can see what exists
+        // P1 sources
+        (s.player1_cheer_revealed_cards || []).forEach(id => addCard(id, 'Cheer', p1Cards));
+        (s.initial_yell_revealed_cards || []).forEach(id => addCard(id, 'Initial Yell', p1Cards));
+
+        // P2 sources
+        (s.player2_cheer_revealed_cards || []).forEach(id => addCard(id, 'Cheer', p2Cards));
+        (s.re_yell_revealed_cards || []).forEach(id => addCard(id, 'Re-Yell', p2Cards));
+
+        // Shared sources
+        (s.revealed_cost_cards || []).forEach(id => addCard(id, 'Cost', sharedCards));
+
+        if (s.revealed_card_info?.length) {
+            s.revealed_card_info.forEach(e => {
+                if (e.card_id !== undefined) addCard(e.card_id, e.source || 'Effect', sharedCards);
+            });
+        } else {
+            (s.revealed_cards || []).forEach(id => addCard(id, 'Effect', sharedCards));
+        }
+        if (s.revealed_cost_card_info?.length) {
+            s.revealed_cost_card_info.forEach(e => {
+                if (e.card_id !== undefined) addCard(e.card_id, e.source || 'Cost', sharedCards);
+            });
+        }
+
+        const totalCount = p1Cards.length + p2Cards.length + sharedCards.length;
+
+        const cardToHtml = (entry) => {
+            const card = State.resolveCardData(entry.id);
+            if (!card) return `<div class="revealed-card chip">ID:${entry.id}<span class="revealed-card-source">${entry.source}</span></div>`;
+            const imgPath = resolveCardImagePath(card.card_no);
+            const img = imgPath ? `<img src="${fixImg(imgPath)}" class="revealed-card-img" alt="${card.name}">` : '';
+            return `<div class="revealed-card">${img}<span class="revealed-card-name">${card.name}</span><span class="revealed-card-source">${entry.source}</span></div>`;
+        };
+
+        if (!totalCount) {
             const relevantKeys = Object.keys(s).filter(k => /cheer|reveal|yell/i.test(k));
             const dump = relevantKeys.map(k => `<p><b>${k}:</b> ${JSON.stringify(s[k])}</p>`).join('');
             content.innerHTML = `<div style="padding:20px;"><h3 style="color:#f66;">No card IDs found</h3>${dump}</div>`;
@@ -1163,8 +1177,36 @@ export const LogRenderer = {
             return;
         }
 
-        title.textContent = `Revealed Cards (${ids.length})`;
-        content.innerHTML = `<div class="revealed-grid">${ids.map(cardToHtml).join('')}</div>`;
+        title.textContent = `Revealed Cards (${totalCount})`;
+
+        let html = '<div class="revealed-two-column">';
+
+        // P1 column
+        html += '<div class="revealed-column">';
+        html += '<div class="revealed-player-header">Player 1</div>';
+        html += '<div class="revealed-grid">';
+        p1Cards.forEach(entry => { html += cardToHtml(entry); });
+        html += '</div></div>';
+
+        // P2 column
+        html += '<div class="revealed-column">';
+        html += '<div class="revealed-player-header">Player 2</div>';
+        html += '<div class="revealed-grid">';
+        p2Cards.forEach(entry => { html += cardToHtml(entry); });
+        html += '</div></div>';
+
+        html += '</div>'; // .revealed-two-column
+
+        // Shared section
+        if (sharedCards.length) {
+            html += '<div class="revealed-shared">';
+            html += '<div class="revealed-player-header">Shared</div>';
+            html += '<div class="revealed-grid">';
+            sharedCards.forEach(entry => { html += cardToHtml(entry); });
+            html += '</div></div>';
+        }
+
+        content.innerHTML = html;
         ModalManager.show(DOM_IDS.MODAL_REVEALED);
     },
 

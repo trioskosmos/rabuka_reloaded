@@ -231,6 +231,10 @@ function setupAutoConvert(pid) {
 
 export const GameSetupModal = {
     openSetupModal: (mode) => {
+        if (mode === 'pve') {
+            GameSetupModal._openPveSetup();
+            return;
+        }
         ModalManager.show(DOM_IDS.MODAL_SETUP);
         ModalManager.hide(DOM_IDS.MODAL_ROOM);
 
@@ -254,8 +258,6 @@ export const GameSetupModal = {
             p1Col.style.display = DISPLAY_VALUES.BLOCK;
             p1Col.style.opacity = '1';
             p1Col.style.pointerEvents = 'auto';
-            const p1Title = p1Col.querySelector('h4');
-            if (p1Title) p1Title.textContent = 'Player 2 (AI)';
         }
 
         // Setup auto-convert for both paste areas
@@ -275,6 +277,7 @@ export const GameSetupModal = {
     closeSetupModal: () => {
         ModalManager.hide(DOM_IDS.MODAL_SETUP);
         Modals.pvpJoinPid = null;
+        State._gameMode = null;
         // Only return to lobby if a game hasn't started yet
         if (!State.gameHasStarted) {
             ModalManager.show(DOM_IDS.MODAL_ROOM);
@@ -290,8 +293,6 @@ export const GameSetupModal = {
         if (mode === 'manual' || mode === 'paste') {
             const input = document.getElementById(`p${pid}-deck-paste`);
             return { type: 'manual', content: input ? input.value : '' };
-        } else if (mode === 'random') {
-            return { type: 'random' };
         } else {
             const presets = Modals.deckPresets || [];
             const preset = presets.find(d => d.id === mode);
@@ -310,13 +311,6 @@ export const GameSetupModal = {
                 return null;
             }
             return { main: config.preset.main, energy: config.preset.energy };
-        } else if (config.type === 'random') {
-            const res = await fetch('api/get_random_deck');
-            const data = await res.json();
-            return {
-                main: data.content || [],
-                energy: data.energy || []
-            };
         } else if (config.type === 'manual') {
             const content = config.content || '';
             if (!content.trim()) {
@@ -358,11 +352,13 @@ export const GameSetupModal = {
             return;
         }
 
+        const gameMode = State._gameMode || 'sandbox';
+
         if (!State.roomCode) {
             const roomRes = await fetch('api/rooms/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode: 'sandbox' })
+                body: JSON.stringify({ mode: gameMode })
             });
             const roomData = await roomRes.json();
             if (roomData.success) {
@@ -525,6 +521,46 @@ export const GameSetupModal = {
             console.error(e);
             alert("Error submitting deck.");
         }
+    },
+
+    _openPveSetup: () => {
+        State._gameMode = 'pve';
+        ModalManager.show(DOM_IDS.MODAL_SETUP);
+        ModalManager.hide(DOM_IDS.MODAL_ROOM);
+
+        Modals.fetchAndPopulateDecks().then(() => {
+            Modals.populateDeckSelect('p0-deck-select', Modals.deckPresets);
+            Modals.populateDeckSelect('p1-deck-select', Modals.deckPresets);
+        });
+
+        const p0Col = document.getElementById('setup-p0-col');
+        const p1Col = document.getElementById('setup-p1-col');
+        const title = document.getElementById('setup-title');
+        const roomCodeEl = document.getElementById('setup-room-code');
+        if (title) title.textContent = 'VS AI Setup';
+        if (roomCodeEl) {
+            roomCodeEl.style.display = DISPLAY_VALUES.NONE;
+            roomCodeEl.textContent = '';
+        }
+
+        if (p0Col) p0Col.style.display = DISPLAY_VALUES.BLOCK;
+        if (p1Col) {
+            p1Col.style.display = DISPLAY_VALUES.BLOCK;
+            p1Col.style.opacity = '1';
+            p1Col.style.pointerEvents = 'auto';
+            const p1Title = p1Col.querySelector('h4');
+            if (p1Title) p1Title.textContent = 'Player 2 (AI)';
+        }
+
+        setupAutoConvert(0);
+        setupAutoConvert(1);
+
+        GameSetupModal.onDeckSelectChange(0, 'paste');
+        GameSetupModal.onDeckSelectChange(1, 'paste');
+        const p0pa = document.getElementById('p0-paste-area');
+        const p1pa = document.getElementById('p1-paste-area');
+        if (p0pa) p0pa.style.display = 'block';
+        if (p1pa) p1pa.style.display = 'block';
     },
 
     onDeckSelectChange: (pid, value) => {

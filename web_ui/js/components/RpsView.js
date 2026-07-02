@@ -1,119 +1,236 @@
 import { ActionButtons } from './ActionButtons.js';
 import { ModalManager } from '../utils/ModalManager.js';
+import { State } from '../state.js';
 import * as i18n from '../i18n/index.js';
 
-// Track local RPS choice for display while waiting
-let _localRpsName = '';
+const SIGNS = [
+    { actionType: 'RockChoice', snakeType: 'rock_choice', name: 'rps_rock', emoji: '✊' },
+    { actionType: 'PaperChoice', snakeType: 'paper_choice', name: 'rps_paper', emoji: '✋' },
+    { actionType: 'ScissorsChoice', snakeType: 'scissors_choice', name: 'rps_scissors', emoji: '✌️' },
+];
+
+function signByValue(v) {
+    if (v === 0) return SIGNS[0];
+    if (v === 1) return SIGNS[2];
+    if (v === 2) return SIGNS[1];
+    return null;
+}
+
+function getRpsDrawHistory(state) {
+    if (!state.structured_log) return [];
+    return state.structured_log
+        .filter(e => e.category === 'rps')
+        .map(e => {
+            const m = e.metadata || {};
+            return {
+                p1: m.p1_choice || '—',
+                p2: m.p2_choice || '—',
+                winner: m.winner || '',
+                p1_value: m.p1_value,
+                p2_value: m.p2_value,
+            };
+        });
+}
+
+function renderFull(body, state, perspectivePlayer) {
+    body.innerHTML = '';
+
+    const mode = state.mode;
+    const isSandbox = mode && mode !== 'pvp' && mode !== 'pve';
+    const isPve = mode === 'pve';
+
+    let myIdx;
+    let showBothLabels;
+    if (isPve) {
+        myIdx = 0;
+        showBothLabels = false;
+    } else if (isSandbox && state.pending_rps_player_id != null) {
+        myIdx = state.pending_rps_player_id;
+        showBothLabels = false;
+    } else if (isSandbox && state.player1_rps_choice != null && state.player2_rps_choice != null) {
+        myIdx = 0;
+        showBothLabels = true;
+    } else {
+        myIdx = perspectivePlayer;
+        showBothLabels = isSandbox ? false : true;
+    }
+
+    const myLabel = `P${myIdx + 1}`;
+    const oppIdx = myIdx === 0 ? 1 : 0;
+    const oppLabel = `P${oppIdx + 1}`;
+
+    const hasLegalRps = state.legal_actions?.some(a =>
+        SIGNS.some(s => a.action_type === s.actionType || a.action_type === s.snakeType)
+    );
+
+    const myChoice = myIdx === 0 ? state.player1_rps_choice : state.player2_rps_choice;
+    const oppChoice = myIdx === 0 ? state.player2_rps_choice : state.player1_rps_choice;
+    const history = getRpsDrawHistory(state);
+    const drawCount = history.length;
+
+    // Header: player identity
+    const header = document.createElement('div');
+    header.className = 'rps-heading';
+    if (showBothLabels) {
+        header.innerHTML = `<div class="rps-title">RPS</div>
+            <div class="rps-player-badge"><strong>${myLabel}</strong> · <strong>${oppLabel}</strong></div>`;
+    } else {
+        header.innerHTML = `<div class="rps-title">Choose for <strong>${myLabel}</strong></div>`;
+    }
+    body.appendChild(header);
+
+    // Draw history (if any draws occurred)
+    if (drawCount > 0) {
+        const histDiv = document.createElement('div');
+        histDiv.className = 'rps-history';
+        histDiv.innerHTML = `<div class="rps-history-title">Draws: ${drawCount}</div>` +
+            history.map((h, i) => {
+                return `<div class="rps-history-row">
+                    <span class="rps-history-num">#${i + 1}</span>
+                    <span>${h.p1} vs ${h.p2}</span>
+                    <span class="rps-history-draw">Draw</span>
+                </div>`;
+            }).join('');
+        body.appendChild(histDiv);
+    }
+
+    // Both have chosen — show result
+    if (myChoice != null && oppChoice != null) {
+        const mySign = signByValue(myChoice);
+        const oppSign = signByValue(oppChoice);
+        const winner = state.rps_winner;
+        const iWon = winner === myIdx;
+        const isDraw = winner === -1 || winner === undefined || winner === null;
+
+        let resultText;
+        if (isDraw) {
+            resultText = 'Draw! Choose again.';
+        } else if (iWon) {
+            resultText = `${myLabel} Wins!`;
+        } else {
+            resultText = `${oppLabel} Wins.`;
+        }
+
+        let statusHtml = `<div class="rps-waiting">
+            <div class="rps-waiting-choice">
+                <span class="rps-emoji rps-emoji-lg">${mySign ? mySign.emoji : '?'}</span>
+                <span class="rps-waiting-label">${mySign ? i18n.t(mySign.name) : '?'} (${myLabel})</span>
+            </div>
+            <div class="rps-vs">vs</div>
+            <div class="rps-waiting-choice">
+                <span class="rps-emoji rps-emoji-lg">${oppSign ? oppSign.emoji : '?'}</span>
+                <span class="rps-waiting-label">${oppSign ? i18n.t(oppSign.name) : '?'} (${oppLabel})</span>
+            </div>
+            <div class="rps-waiting-text" style="font-size:1rem;font-weight:bold;margin-top:8px;">${resultText}</div>
+        </div>`;
+        body.innerHTML += statusHtml;
+        return;
+    }
+
+    // My choice is sent, waiting for opponent
+    if (myChoice != null) {
+        const mySign = signByValue(myChoice);
+        let waitingText = isSandbox ? `Waiting for ${oppLabel}...` : i18n.t('waiting_for_opponent');
+        let statusHtml = `<div class="rps-waiting">
+            <div class="rps-waiting-choice">
+                <span class="rps-emoji rps-emoji-lg">${mySign ? mySign.emoji : '?'}</span>
+                <span class="rps-waiting-label">${mySign ? i18n.t(mySign.name) : '?'} (${myLabel})</span>
+            </div>
+            <div class="rps-vs">vs</div>
+            <div class="rps-waiting-choice">
+                <span class="rps-emoji rps-emoji-lg">❔</span>
+                <span class="rps-waiting-label">???</span>
+            </div>
+            <div class="rps-waiting-text">${waitingText}</div>
+            <div class="rps-spinner"></div>
+        </div>`;
+        body.innerHTML += statusHtml;
+        return;
+    }
+
+    // Opponent chose, waiting for me
+    if (oppChoice != null && myChoice == null && !hasLegalRps) {
+        const oppSign = signByValue(oppChoice);
+        body.innerHTML += `<div class="rps-waiting">
+            <div class="rps-waiting-text">${oppLabel} chose — waiting for you...</div>
+            <div class="rps-waiting-choice">
+                <span class="rps-emoji rps-emoji-lg">${oppSign ? oppSign.emoji : '?'}</span>
+                <span class="rps-waiting-label">${oppSign ? i18n.t(oppSign.name) : '?'}</span>
+            </div>
+            <div class="rps-spinner"></div>
+        </div>`;
+        return;
+    }
+
+    // No choices made yet — show buttons
+    const grid = document.createElement('div');
+    grid.className = 'rps-grid';
+
+    SIGNS.forEach((sign, idx) => {
+        const found = state.legal_actions?.find(a =>
+            a.action_type === sign.actionType || a.action_type === sign.snakeType
+        );
+        if (!found) return;
+        if (found.index === undefined && state.legal_actions) {
+            found.index = state.legal_actions.indexOf(found);
+        }
+
+        const btn = document.createElement('button');
+        btn.className = 'rps-choice-btn';
+        btn.innerHTML = `
+            <span class="rps-emoji">${sign.emoji}</span>
+            <span class="rps-label">${i18n.t(sign.name)}</span>
+        `;
+        btn.onclick = () => {
+            if (found.index !== undefined) {
+                window.doAction?.(found);
+                renderFull(body, {
+                    ...state,
+                    legal_actions: [],
+                    [myIdx === 0 ? 'player1_rps_choice' : 'player2_rps_choice']: idx === 0 ? 0 : idx === 1 ? 2 : 1,
+                }, perspectivePlayer);
+            }
+        };
+        grid.appendChild(btn);
+    });
+    body.appendChild(grid);
+}
 
 export const RpsView = {
-    resetLocalChoice: () => { _localRpsName = ''; },
     render: (state, perspectivePlayer, container) => {
-        const isMobile = typeof window.__isMobile === 'function' ? window.__isMobile() : false;
         const modalEl = document.getElementById('rps-modal');
         const body = document.getElementById('rps-modal-body');
-        if (body && modalEl && isMobile) {
-            body.innerHTML = '';
-
-            // If a choice was already made locally, show waiting state
-            // (unless RPS buttons are available again = new RPS session, reset)
-            const hasRpsBtns = state.legal_actions?.some(a =>
-                ['RockChoice','rock_choice','PaperChoice','paper_choice','ScissorsChoice','scissors_choice'].includes(a.action_type)
-            );
-            if (_localRpsName && !hasRpsBtns) {
-                const waitDiv = document.createElement('div');
-                waitDiv.style.cssText = 'text-align:center;padding:24px;';
-                waitDiv.innerHTML = `
-                    <div style="font-size:1.1rem;font-weight:700;color:var(--accent-gold);margin-bottom:10px;">
-                        You chose ${_localRpsName}
-                    </div>
-                    <div style="font-size:0.85rem;opacity:0.6;">Waiting for opponent...</div>
-                `;
-                body.appendChild(waitDiv);
-                ModalManager.show('rps-modal');
-                return;
-            }
-            // Reset if this is a new RPS phase
-            _localRpsName = '';
-
-            const signs = [
-                { actionType: 'RockChoice', snakeType: 'rock_choice', name: i18n.t('rps_rock') },
-                { actionType: 'PaperChoice', snakeType: 'paper_choice', name: i18n.t('rps_paper') },
-                { actionType: 'ScissorsChoice', snakeType: 'scissors_choice', name: i18n.t('rps_scissors') }
-            ];
-
-            signs.forEach((sign, idx) => {
-                const found = state.legal_actions && state.legal_actions.find(a => 
-                    a.action_type === sign.actionType || a.action_type === sign.snakeType
-                );
-                const a = found || { action_type: sign.snakeType, description: sign.name, index: idx };
-                if (found && found.index === undefined && state.legal_actions) {
-                    found.index = state.legal_actions.indexOf(found);
-                }
-                const btn = ActionButtons.createActionButton(a, false, 'rps-btn', state);
-                btn.style.width = '100%';
-                btn.style.padding = '14px 20px';
-                btn.style.fontSize = '1.1rem';
-
-                const origOnclick = btn.onclick;
-                btn.onclick = (e) => {
-                    _localRpsName = sign.name;
-                    if (origOnclick) origOnclick.call(btn, e);
-                    body.innerHTML = `
-                        <div style="text-align:center;padding:24px;">
-                            <div style="font-size:1.1rem;font-weight:700;color:var(--accent-gold);margin-bottom:10px;">
-                                You chose ${sign.name}
-                            </div>
-                            <div style="font-size:0.85rem;opacity:0.6;">Waiting for opponent...</div>
-                        </div>
-                    `;
-                };
-                body.appendChild(btn);
-            });
-            ModalManager.show('rps-modal');
+        if (!modalEl || !body) {
+            RpsView._renderFallback(state, container);
             return;
         }
 
-        RpsView._renderInline(state, container);
+        renderFull(body, state, perspectivePlayer);
+        ModalManager.show('rps-modal');
     },
 
-    _renderInline: (state, container) => {
-        const rpsDiv = document.createElement('div');
-        rpsDiv.className = 'rps-selector';
-        rpsDiv.style.textAlign = 'center';
-        rpsDiv.style.padding = '15px';
-        rpsDiv.style.background = 'rgba(255, 255, 255, 0.05)';
-        rpsDiv.style.borderRadius = '12px';
-        rpsDiv.style.marginBottom = '20px';
+    hideIfOpen: () => {
+        const modalEl = document.getElementById('rps-modal');
+        if (modalEl && modalEl.style.display !== 'none') {
+            ModalManager.hide('rps-modal');
+        }
+    },
 
-        const title = i18n.t('choose_sign');
-        rpsDiv.innerHTML = `<h3 style="margin-top:0; color:var(--accent-gold);">${title}</h3>`;
+    _renderFallback: (state, container) => {
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'display:flex;justify-content:center;gap:12px;padding:16px;';
 
-        const btnContainer = document.createElement('div');
-        btnContainer.style.display = 'flex';
-        btnContainer.style.flexDirection = 'column';
-        btnContainer.style.alignItems = 'center';
-        btnContainer.style.gap = '10px';
-
-        const signs = [
-            { actionType: 'RockChoice', snakeType: 'rock_choice', name: i18n.t('rps_rock') },
-            { actionType: 'PaperChoice', snakeType: 'paper_choice', name: i18n.t('rps_paper') },
-            { actionType: 'ScissorsChoice', snakeType: 'scissors_choice', name: i18n.t('rps_scissors') }
-        ];
-
-        signs.forEach((sign, idx) => {
-            const found = state.legal_actions && state.legal_actions.find(a => 
+        SIGNS.forEach((sign, idx) => {
+            const found = state.legal_actions?.find(a =>
                 a.action_type === sign.actionType || a.action_type === sign.snakeType
             );
-            const a = found || { action_type: sign.snakeType, description: sign.name, index: idx };
+            const action = found || { action_type: sign.snakeType, description: i18n.t(sign.name), index: idx };
             if (found && found.index === undefined && state.legal_actions) {
                 found.index = state.legal_actions.indexOf(found);
             }
-            const btn = ActionButtons.createActionButton(a, false, 'rps-btn', state);
-            btn.style.width = '120px';
-            btnContainer.appendChild(btn);
+            const btn = ActionButtons.createActionButton(action, false, 'rps-btn', state);
+            wrapper.appendChild(btn);
         });
-
-        rpsDiv.appendChild(btnContainer);
-        container.appendChild(rpsDiv);
+        container.appendChild(wrapper);
     }
 };

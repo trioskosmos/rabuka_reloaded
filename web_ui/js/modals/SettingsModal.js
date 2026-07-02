@@ -5,7 +5,7 @@ function applyDataI18n() {
     const ui = i18n.getCurrentTranslations()?.ui || {};
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
-        if (ui[key]) el.textContent = ui[key];
+        if (ui[key]) el.innerHTML = ui[key];
     });
 }
 
@@ -17,8 +17,9 @@ export const SettingsModal = {
         await State.updateUiConfig({ current_lang: newLang });
         await i18n.loadTranslations(newLang);
         applyDataI18n();
-        const btn = document.getElementById('lang-btn');
-        if (btn) btn.textContent = newLang === 'jp' ? 'English' : '日本語';
+        document.querySelectorAll('[data-action="toggle-lang"]').forEach(btn => {
+            btn.textContent = newLang === 'jp' ? 'English' : '日本語';
+        });
         window.render?.();
     },
 };

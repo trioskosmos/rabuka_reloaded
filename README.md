@@ -1,3 +1,12 @@
+---
+title: Rabuka Reloaded
+emoji: 🃏
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # Rabuka Reloaded
 
 A web-based simulator of a certain card game.
@@ -51,7 +60,7 @@ start /b cargo run --release --bin rabuka_engine web-server
 
 REM Polls the /api/game-state endpoint until the server is ready.
 :wait_loop
-powershell -Command "try { (Invoke-WebRequest -Uri http://127.0.0.1:8080/api/game-state ...) } catch { exit 1 }"
+powershell -Command "try { (Invoke-WebRequest -Uri http://127.0.0.1:8080/api/game-state ...) } catch { { exit 1 }"
 if %errorlevel% neq 0 (
     timeout /t 2 /nobreak >nul
     goto wait_loop

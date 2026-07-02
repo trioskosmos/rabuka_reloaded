@@ -21,7 +21,7 @@
 
 
     <div class="mobile-btn-group" id="mobile-btn-group">
-        <button id="mobile-toggle-mode" data-action="toggle-ui-mode" class="mobile-toggle-btn">
+        <button id="mobile-toggle-mode" data-action="toggle-ui-mode" class="mobile-toggle-btn" style="color:var(--accent-red);">
             <span id="mobile-mode-label">PLAY</span>
         </button>
         <button id="mobile-toggle-actions" data-action="toggle-actions-sidebar" class="mobile-toggle-btn" data-i18n="mobile_actions">ACTS</button>
@@ -85,7 +85,7 @@
                 <button id="undo-btn" class="btn btn-secondary btn-sm" data-action="rewind" data-i18n="undo">Undo</button>
                 <button id="redo-btn" class="btn btn-secondary btn-sm" data-action="redo" data-i18n="redo">Redo</button>
                 <button id="ui-mode-toggle" class="btn btn-sm" data-action="toggle-ui-mode"
-                        style="border:1px solid var(--accent-gold);color:var(--accent-gold);">PLAY</button>
+                        style="border:1px solid var(--accent-red);color:var(--accent-red);">PLAY</button>
                 <button id="lang-btn" class="btn btn-sm" data-action="toggle-lang"
                         style="border:1px solid #aaa;">English</button>
                 <button id="ability-queue-btn" class="btn btn-sm" data-action="show-ability-queue"
@@ -459,29 +459,32 @@
     <div id="help-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
-                <span class="modal-title">ヘルプ & FAQ (Help)</span>
+                <span class="modal-title" data-i18n="faq_title">Help & FAQ</span>
                 <button class="close-btn" data-action="close-help-modal">×</button>
             </div>
             <div class="modal-body help-body">
-                <h3>デッキのセット方法 (Deck Setup)</h3>
+                <h3 data-i18n="faq_decklog_import">Import from Deck Log</h3>
+                <ol style="padding-left: 18px; margin-bottom: 12px;">
+                    <li data-i18n="faq_step1">Go to decklog.bushiroad.com, find a deck, and open its detail page.</li>
+                    <li data-i18n="faq_step2">Right-click → "View Page Source" (Ctrl+U), then Ctrl+A, Ctrl+C to copy the full HTML.</li>
+                    <li data-i18n="faq_step3">In the game setup modal, select "Paste Deck List" and paste the HTML into the text area.</li>
+                </ol>
+                <div style="text-align: center; margin: 8px 0;">
+                    <img src="img/tutorial/decklog-import.webp" alt="Deck Log HTML source copy example" style="max-width: 100%; border-radius: 6px; border: 1px solid var(--border-color, #333);">
+                </div>
+                <p style="font-size: 0.8rem; color: var(--text-muted, #aaa); text-align: center; margin-bottom: 12px;" data-i18n="faq_tip">Tip: You can also paste plain text like "PL!-bp3-012-RM x 3" or "3 x PL!-bp3-012-RM".</p>
+
+                <h3>📱 <span data-i18n="faq_mobile">Mobile</span></h3>
                 <ul>
-                    <li><b>Deck Log:</b> Bushiroad Deck Log からHTMLをコピーして「Option 2」に貼り付けます。</li>
-                    <li><b>Test Deck:</b> 「Load Test Deck」ボタンで、テスト用（2倍量）デッキを読み込みます。</li>
-                    <li><b>Random Deck:</b> 「Generate Random Deck」ボタンで、ランダムな有効デッキを生成します。</li>
+                    <li data-i18n="faq_mobile_menu">Use the Menu button (bottom-right) to toggle the sidebar.</li>
+                    <li data-i18n="faq_mobile_scroll">Zones like hand and stage are horizontally scrollable.</li>
                 </ul>
 
-                <h3>📱 モバイル操作 (Mobile)</h3>
+                <h3>🎮 <span data-i18n="faq_controls">Controls</span></h3>
                 <ul>
-                    <li>画面右下の <b>Menu ボタン</b> でサイドバー（アクション履歴、ログ）を開閉できます。</li>
-                    <li>手札やステージなどのゾーンは横スクロール可能です。</li>
-                </ul>
-
-                <h3>🎮 ゲーム操作 (Controls)</h3>
-                <ul>
-                    <li><b>更新 (Update):</b> ゲームの状態を再取得します。</li>
-                    <li><b>リセット (Reset):</b> ゲームを初期状態の最初からやり直します。</li>
-                    <li>カードをクリックして使用・移動します。</li>
-                    <li>アクションを選択したら、サイドバーの「Do Action」等は自動で進む場合があります。</li>
+                    <li data-i18n="faq_controls_update"><b>Update:</b> Re-fetches the game state.</li>
+                    <li data-i18n="faq_controls_reset"><b>Reset:</b> Restarts the game from the beginning.</li>
+                    <li data-i18n="faq_click_card">Click a card to use or move it.</li>
                 </ul>
             </div>
         </div>
@@ -523,9 +526,7 @@
                     <button class="btn btn-test-deck" data-action="load-test-deck">
                         Load Test Deck (Doubled)
                     </button>
-                    <button class="btn btn-random-deck" data-action="load-random-deck">
-                        Generate Random Deck
-                    </button>
+
                 </div>
 
                 <div class="setup-paste-area">
@@ -582,7 +583,6 @@
                             <label>Deck</label>
                             <select id="p0-deck-select" class="form-select highlight-hover"
                                 onchange="onDeckSelectChange(0, this.value)">
-                                <option value="random">Random</option>
                                 <option value="paste" selected>Paste Deck List...</option>
                             </select>
                         </div>
@@ -601,7 +601,6 @@
                             <select id="p1-deck-select" class="form-select highlight-hover"
                                 onchange="onDeckSelectChange(1, this.value)">
                                 <option value="paste">Paste Deck List...</option>
-                                <option value="random">Random</option>
                             </select>
                         </div>
                         <div id="p1-paste-area" class="setup-paste-container">
@@ -630,7 +629,8 @@
                 <div class="lobby-actions">
                     <button class="btn btn-primary lobby-btn" data-action="start-test-game">Test</button>
                     <button class="btn btn-primary lobby-btn" data-action="open-setup-modal" data-value="sandbox">Sandbox</button>
-                    <button class="btn btn-accent-green lobby-btn" data-action="create-room" style="background: #27ae60; border-color: #2ecc71;">PVP</button>
+                    <button class="btn btn-accent-orange lobby-btn" data-action="open-setup-modal" data-value="pve">VS AI</button>
+                    <button class="btn btn-accent-green lobby-btn" data-action="create-room" style="background: #27ae60; border-color: #2ecc71; color: #fff;">PVP</button>
                 </div>
                 <div class="lobby-join-section" style="margin-top: 16px;">
                     <div style="display: flex; gap: 8px; align-items: center;">
@@ -640,8 +640,10 @@
                     </div>
                 </div>
                 <div id="room-waiting-hint" style="margin-top: 12px; padding: 6px 10px; border-radius: 6px; color: var(--text-muted, #aaa); font-size: 0.85rem; text-align: center;"></div>
-                <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-color, #333); text-align: center;">
+                <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-color, #333); display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
                     <a href="/card_browser.html" target="_blank" class="btn btn-accent-pink" style="font-size: 0.85rem; padding: 8px 20px;">&#128269; Card Browser / Deck Builder</a>
+                    <button class="btn btn-accent-blue lobby-faq-btn" data-action="open-help-modal" style="font-size: 0.85rem; padding: 8px 20px;">FAQ</button>
+                    <button class="btn btn-accent-gray lobby-lang-btn" data-action="toggle-lang" style="font-size: 0.85rem; padding: 8px 20px;">English</button>
                 </div>
             </div>
         </div>
@@ -756,6 +758,7 @@
                     <div class="card-detail-info">
                         <div id="card-detail-stats" class="card-detail-stats"></div>
                         <div id="card-detail-text" class="card-detail-text"></div>
+                        <div id="card-detail-actions" class="card-detail-actions"></div>
                     </div>
                 </div>
             </div>
@@ -810,13 +813,12 @@
 
     <!-- RPS Modal -->
     <div id="rps-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content" style="max-width: 320px; text-align: center;">
+        <div class="modal-content">
             <div class="modal-header">
                 <span class="modal-title" data-i18n="choose_sign">Choose Your Sign</span>
                 <button class="close-btn" data-action="close-rps-modal">✕</button>
             </div>
-            <div class="modal-body" id="rps-modal-body" style="display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px 0;">
-                <!-- Populated by RpsView -->
+            <div class="modal-body" id="rps-modal-body">
             </div>
         </div>
     </div>

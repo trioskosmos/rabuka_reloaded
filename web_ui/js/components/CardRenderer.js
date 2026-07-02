@@ -293,11 +293,7 @@ export const CardRenderer = {
         if (resolvedCard.is_new) classNames.push('new-card');
         if (isLive) classNames.push('type-live');
 
-        if (isLive || (containerId && (
-            containerId.includes('live') ||
-            containerId.includes('success') ||
-            containerId.includes('selection')
-        ))) {
+        if (isLive) {
             classNames.push('orientation-landscape');
         }
 
@@ -785,13 +781,14 @@ export const CardRenderer = {
             // Play selection: show cost on my-stage only
             const _areaNames = ['left', 'center', 'right'];
             let playTargetCost = null;
-            if (containerId === 'my-stage' && State.uiMode === 'play' && window._playSel && !slot?.card_no) {
-                const matchAction = window._playSel.actions.find(a => {
+            let _playSelMatch = null;
+            if (containerId === 'my-stage' && State.uiMode === 'play' && window._playSel) {
+                _playSelMatch = window._playSel.actions.find(a => {
                     const p = a.parameters || {};
                     return p.stage_area === _areaNames[i] || p.available_areas?.some(av => av.area === _areaNames[i] && av.available);
                 });
-                if (matchAction) {
-                    const params = matchAction.parameters || {};
+                if (_playSelMatch) {
+                    const params = _playSelMatch.parameters || {};
                     const areaInfo = params.available_areas?.find(a => a.area === _areaNames[i]);
                     playTargetCost = areaInfo ? areaInfo.cost : (params.base_cost ?? 0);
                 }
@@ -810,19 +807,13 @@ export const CardRenderer = {
                 slotDiv.classList.remove('play-target');
             }
 
-            // Always attach play-target click handler (my-stage only)
-            if (containerId === 'my-stage' && window._playSel && State.uiMode === 'play' && !slot?.card_no) {
+            // Attach play-target click handler when _playSel matches this area
+            if (_playSelMatch) {
                 const playTargetClick = (e) => {
                     e.stopPropagation();
-                    const areaNames2 = ['left', 'center', 'right'];
-                    const zoneArea = areaNames2[i];
-                    const matchAction = window._playSel.actions.find(a => {
-                        const p = a.parameters || {};
-                        return p.stage_area === zoneArea || p.available_areas?.some(av => av.area === zoneArea && av.available);
-                    });
-                    if (matchAction && window.doAction) {
-                        // Clone action with correct stage_area
-                        const actionCopy = JSON.parse(JSON.stringify(matchAction));
+                    const zoneArea = _areaNames[i];
+                    if (window.doAction) {
+                        const actionCopy = JSON.parse(JSON.stringify(_playSelMatch));
                         actionCopy.parameters = actionCopy.parameters || {};
                         actionCopy.parameters.stage_area = zoneArea;
                         window.doAction(actionCopy);

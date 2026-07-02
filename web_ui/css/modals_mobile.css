@@ -69,30 +69,61 @@
         padding: 2px 6px;
     }
 
-    .card-detail-layout {
+    .card-detail-layout.layout-portrait {
+        flex-direction: row;
+        height: auto;
+    }
+    .card-detail-layout.layout-landscape {
         flex-direction: column;
         height: auto;
     }
+    .card-detail-layout:not(.layout-portrait):not(.layout-landscape) {
+        flex-direction: row;
+        height: auto;
+    }
 
-    .card-detail-image {
-        width: 100%;
-        max-height: 40vh;
+    .card-detail-layout.layout-portrait .card-detail-image {
+        flex: 0 0 40%;
+        max-width: 40%;
+        max-height: 60vh;
         display: flex;
         justify-content: center;
+        align-items: center;
         background: rgba(0,0,0,0.15);
         border-radius: 6px;
-        align-self: auto;
+    }
+    .card-detail-layout.layout-landscape .card-detail-image {
+        flex: 0 0 auto;
+        width: 100%;
+        max-height: 35vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: rgba(0,0,0,0.15);
+        border-radius: 6px;
+    }
+    .card-detail-layout:not(.layout-portrait):not(.layout-landscape) .card-detail-image {
+        flex: 0 0 40%;
+        max-width: 40%;
+        max-height: 60vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: rgba(0,0,0,0.15);
+        border-radius: 6px;
     }
 
     .card-detail-image img {
-        max-height: 40vh;
+        max-height: 60vh;
         width: auto;
         max-width: 100%;
         object-fit: contain;
     }
 
     .card-detail-info {
-        max-height: 35vh;
+        max-height: none;
+        flex: 1;
+        min-height: 0;
     }
 
     .play-action-card-preview {
@@ -152,22 +183,30 @@
         font-size: 1rem;
     }
 
-    #selection-content .choice-cards-row {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        align-items: stretch;
-    }
-
-    #selection-content .choice-cards-row > * {
-        width: 100%;
-        min-width: 0;
-    }
-
+    #selection-content.selection-grid,
     #selection-content .selection-grid {
         grid-template-columns: 1fr !important;
         gap: 4px;
         padding: 4px;
+    }
+
+    #selection-content .choice-cards-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        align-items: start;
+    }
+
+    #selection-content .choice-cards-row > .card {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 512 / 720;
+        min-width: 0;
+        overflow: visible;
+    }
+
+    #selection-content .choice-cards-row > .card.orientation-landscape {
+        aspect-ratio: 720 / 512;
     }
 
     #selection-content .action-btn,
@@ -240,19 +279,46 @@
 .card-detail-layout {
     display: flex;
     gap: 8px;
-    align-items: flex-start;
     height: 100%;
 }
 
-.card-detail-image {
-    flex: 0 0 auto;
-    width: clamp(160px, 40%, 300px);
+/* Portrait cards: image on left, info on right */
+.card-detail-layout.layout-portrait {
+    flex-direction: row;
+    align-items: stretch;
+}
+
+/* Landscape cards: image on top, info below */
+.card-detail-layout.layout-landscape {
+    flex-direction: column;
+}
+
+/* Default (before image loads): portrait assumption */
+.card-detail-layout:not(.layout-portrait):not(.layout-landscape) {
+    flex-direction: row;
+    align-items: stretch;
+}
+
+/* Image: portrait fills height, landscape fills width */
+.card-detail-layout.layout-portrait .card-detail-image {
+    flex: 0 0 45%;
+    max-width: 45%;
     display: flex;
     align-items: center;
     justify-content: center;
     background: rgba(0,0,0,0.15);
     border-radius: 6px;
-    align-self: stretch;
+}
+
+.card-detail-layout.layout-landscape .card-detail-image {
+    flex: 0 0 auto;
+    width: 100%;
+    max-height: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.15);
+    border-radius: 6px;
 }
 
 .card-detail-image img {
@@ -260,6 +326,7 @@
     max-height: 100%;
     object-fit: contain;
     display: block;
+    border-radius: 4px;
 }
 
 .card-detail-info {
@@ -336,6 +403,27 @@
 .card-detail-text::-webkit-scrollbar { display: none; }
 .card-detail-text { scrollbar-width: none; }
 
+.card-detail-actions {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+}
+.card-detail-actions-label {
+    font-size: 0.75em;
+    opacity: 0.5;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.card-detail-play-group {
+    margin-bottom: 6px;
+}
+.card-detail-play-header {
+    font-size: 0.85rem;
+    margin-bottom: 4px;
+    opacity: 0.8;
+}
+
 #card-detail-footer {
     padding-top: 4px;
     margin-top: 2px;
@@ -363,11 +451,16 @@
 
 /* Extra narrow: smaller image */
 @media (max-width: 360px) {
-    .card-detail-image {
+    .card-detail-layout.layout-portrait .card-detail-image,
+    .card-detail-layout:not(.layout-portrait):not(.layout-landscape) .card-detail-image {
+        flex: 0 0 35%;
+        max-width: 35%;
+    }
+    .card-detail-layout.layout-landscape .card-detail-image {
         max-height: 25vh;
     }
     .card-detail-image img {
-        max-height: 25vh;
+        max-height: 40vh;
     }
 }
 

@@ -12,6 +12,10 @@ export const ChoiceView = {
 
         // G2: in PVP mode, if the choice is for the opponent, show a waiting indicator.
         // In sandbox mode, show all choices with a player label — one person makes all decisions.
+        // In pve (vs AI) mode, choices for AI (P2) are auto-answered, not shown.
+        if (choice && state?.mode === 'pve' && choice.choice_player_id === 'p2') {
+            return;
+        }
         if (choice && state?.mode === 'pvp') {
             const viewerPlayerId = `p${State.perspectivePlayer + 1}`;
             if (choice.choice_player_id && choice.choice_player_id !== viewerPlayerId) {
@@ -406,7 +410,7 @@ export const ChoiceView = {
                         choiceEl.appendChild(backImg);
                         choiceEl.title = '??? (blind pick)';
                     } else {
-                        const vm = CardRenderer.getCardViewModel(cardData, { mini: true });
+                        const vm = CardRenderer.getCardViewModel(cardData, { mini: true, actionId: item.action?.index });
                         choiceEl = CardRenderer.createCardDOM(vm, cardData);
                         choiceEl.classList.add('card-choice');
                     }
@@ -440,7 +444,6 @@ export const ChoiceView = {
                     choiceEl.style.opacity = '0.35';
                     choiceEl.style.filter = 'grayscale(1)';
                     choiceEl.style.cursor = 'not-allowed';
-                    choiceEl.style.pointerEvents = 'none';
                 } else {
                     choiceEl.onclick = () => {
                         if (window.doAction) window.doAction(item.action);

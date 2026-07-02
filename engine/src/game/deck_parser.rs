@@ -87,7 +87,8 @@ impl DeckParser {
     }
 
     /// Parse deck content from HTML or plain text input.
-    /// Strips HTML tags, then extracts card identifiers from each line.
+    /// Strips HTML tags, then extracts card identifiers from each line,
+    /// expanding quantities (e.g. "card_no x 3" produces three copies).
     pub fn parse_deck_content(content: &str) -> Vec<String> {
         // Strip HTML tags (rough but effective for deck table rows)
         let cleaned = content
@@ -120,9 +121,10 @@ impl DeckParser {
             if line.is_empty() || line.starts_with("//") {
                 continue;
             }
-            // Try "card_no x quantity" format
-            if let Some(card_no) = Self::parse_line(line) {
-                card_numbers.push(card_no);
+            if let Some((card_no, quantity)) = Self::parse_line(line) {
+                for _ in 0..quantity {
+                    card_numbers.push(card_no.clone());
+                }
             }
         }
         card_numbers
@@ -136,25 +138,26 @@ impl DeckParser {
         Self::normalize_card_no(raw)
     }
 
-    fn parse_line(line: &str) -> Option<String> {
+    /// Parses a single line and returns (card_no, quantity).
+    /// Supports "card_no x quantity", "quantity x card_no", or bare card_no (qty=1).
+    fn parse_line(line: &str) -> Option<(String, u32)> {
         let line = line.trim();
         let parts: Vec<&str> = line.split(" x ").collect();
         if parts.len() == 2 {
-            let card_no = if let Ok(_q) = parts[0].trim().parse::<u32>() {
-                parts[1].trim()
-            } else if let Ok(_q) = parts[1].trim().parse::<u32>() {
-                parts[0].trim()
+            let (card_no, quantity) = if let Ok(q) = parts[0].trim().parse::<u32>() {
+                (parts[1].trim(), q)
+            } else if let Ok(q) = parts[1].trim().parse::<u32>() {
+                (parts[0].trim(), q)
             } else {
                 return None;
             };
-            // Validate card_no looks like a card identifier (has a dash)
             if card_no.contains('-') {
-                return Some(Self::clean_card_no(card_no));
+                return Some((Self::clean_card_no(card_no), quantity));
             }
         }
-        // Single identifier per line
+        // Single identifier per line (quantity defaults to 1)
         if line.contains('-') && !line.contains(' ') {
-            return Some(Self::clean_card_no(line));
+            return Some((Self::clean_card_no(line), 1));
         }
         None
     }

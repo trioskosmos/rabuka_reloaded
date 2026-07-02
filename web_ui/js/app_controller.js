@@ -150,7 +150,7 @@ const actionHandlers = {
     'close-deck-modal': Modals.closeDeckModal,
     'submit-deck': Modals.submitDeck,
     'load-test-deck': Modals.loadTestDeck,
-    'load-random-deck': Modals.loadRandomDeck,
+
 
     'toggle-perspective': () => window.Actions.togglePerspective(),
     'toggle-lang': Modals.toggleLang,

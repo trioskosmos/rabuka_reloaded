@@ -453,7 +453,7 @@ pub async fn get_game_state(
         let rooms = data.rooms.lock().unwrap();
         if let Some(room) = rooms.get(rid) {
             display.mode = room.mode.clone();
-            if room.mode == "pvp" {
+            if room.mode == "pvp" || room.mode == "pve" {
                 requester_player_id = session_token
                     .as_ref()
                     .and_then(|token| room.sessions.get(token))
@@ -761,7 +761,7 @@ pub async fn execute_action(
     let pvp_player_pid = exec_room_id_str.as_deref().and_then(|rid| {
         let rooms = data.rooms.lock().unwrap();
         rooms.get(rid).and_then(|room| {
-            if room.mode != "pvp" {
+            if room.mode != "pvp" && room.mode != "pve" {
                 return None;
             }
             let token = get_session_token_from_req(&http_req)?;
@@ -1936,9 +1936,8 @@ pub async fn rooms_create(
         .collect();
 
     let mut mode = req.mode.clone().unwrap_or_else(|| "sandbox".to_string());
-    if mode == "pve" {
-        mode = "sandbox".to_string();
-    }
+    // pve mode aliases to sandbox gameplay but preserves the mode string
+    // so the frontend can distinguish vs AI from sandbox
 
     let public = req.public.unwrap_or(false);
 

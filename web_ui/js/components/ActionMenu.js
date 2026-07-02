@@ -10,6 +10,56 @@ import { RpsView } from './RpsView.js';
 import { ChoiceView } from './ChoiceView.js';
 import { ActionListView } from './ActionListView.js';
 
+let _sentRpsP1 = false;
+let _sentRpsP2 = false;
+let _sentTurn = false;
+
+function resetSentFlags(state) {
+    if (state.phase !== Phase.ROCK_PAPER_SCISSORS) {
+        _sentRpsP1 = false;
+        _sentRpsP2 = false;
+    }
+    if (state.phase !== Phase.ROCK_PAPER_SCISSORS && !state.legal_actions?.some(a => a.action_type === 'choose_first_attacker' || a.action_type === 'ChooseFirstAttacker')) {
+        _sentTurn = false;
+    }
+}
+
+function autoResolveSandbox(state, actionsDiv) {
+    const isSandbox = state.mode && state.mode !== 'pvp' && state.mode !== 'pve';
+    if (!isSandbox) return false;
+
+    RpsView.hideIfOpen();
+    resetSentFlags(state);
+
+    const findAction = (types) => state.legal_actions?.find(a => types.includes(a.action_type));
+
+    // RPS phase — send for any player that hasn't chosen yet
+    if (state.phase === Phase.ROCK_PAPER_SCISSORS) {
+        // P1 sends Rock
+        if (state.player1_rps_choice == null && !_sentRpsP1) {
+            const a = findAction(['rock_choice', 'RockChoice']);
+            if (a) { _sentRpsP1 = true; window.doAction?.(a);
+                actionsDiv.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.9rem;">⚡ P1 Rock</div>`; return true; }
+        }
+        // P2 sends Paper
+        if (state.player2_rps_choice == null && !_sentRpsP2) {
+            const a = findAction(['paper_choice', 'PaperChoice']);
+            if (a) { _sentRpsP2 = true; window.doAction?.(a);
+                actionsDiv.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.9rem;">⚡ P2 Paper</div>`; return true; }
+        }
+        return false;
+    }
+
+    // Turn choice — send once
+    if (!_sentTurn) {
+        const a = findAction(['choose_first_attacker', 'ChooseFirstAttacker']);
+        if (a) { _sentTurn = true; window.doAction?.(a);
+            actionsDiv.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.9rem;">⚡ First attacker</div>`; return true; }
+    }
+
+    return false;
+}
+
 export const ActionMenu = {
     renderActions: () => {
         const state = State.data;
@@ -23,6 +73,9 @@ export const ActionMenu = {
 
         const actionsDiv = DOMUtils.getElement(DOM_IDS.CONTAINER_ACTIONS);
         if (!actionsDiv) return;
+
+        // Sandbox: auto-resolve RPS and turn choice
+        if (autoResolveSandbox(state, actionsDiv)) return;
 
         // Clear stale play selection
         if (window._playSel) {
@@ -39,9 +92,22 @@ export const ActionMenu = {
 
         // 1. RPS Phase — render before waiting gate so both players can choose
         if (state.phase === Phase.ROCK_PAPER_SCISSORS) {
+            const mode = state.mode;
+            if (mode === 'sandbox') {
+                RpsView.hideIfOpen();
+                actionsDiv.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.9rem;">⚡ Resolving RPS...</div>`;
+                return;
+            }
+            if (mode === 'pve') {
+                RpsView.render(state, perspectivePlayer, actionsDiv);
+                return;
+            }
             RpsView.render(state, perspectivePlayer, actionsDiv);
             return;
         }
+
+        // Hide RPS modal if phase ended
+        RpsView.hideIfOpen();
 
         // 0. PVP: Waiting for opponent (flag set by server via pvp_player_can_act)
         if (state.waiting_for_opponent) {
@@ -67,13 +133,15 @@ export const ActionMenu = {
         }
 
         // 4. System actions modal (choose first/second and similar) — mobile only
+        // After RPS, only the winner gets routed to the 先行 choice
         const isMobileActions = typeof window.__isMobile === 'function' ? window.__isMobile() : false;
         if (isMobileActions && !State._sysActionsDismissed && state.legal_actions) {
             const systemOnly = state.legal_actions.filter(a =>
                 a.action_type === 'choose_first_attacker' ||
                 a.action_type === 'choose_second_attacker'
             );
-            if (systemOnly.length > 0) {
+            const isRpsWinnerChoice = state.rps_winner != null && systemOnly.some(a => a.action_type === 'choose_first_attacker');
+            if (systemOnly.length > 0 && (!isRpsWinnerChoice || state.rps_winner === State.perspectivePlayer)) {
                 const sysBody = document.getElementById('system-actions-body');
                 if (sysBody) {
                     sysBody.innerHTML = '';

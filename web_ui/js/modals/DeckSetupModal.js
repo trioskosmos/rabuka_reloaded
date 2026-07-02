@@ -154,44 +154,4 @@ export const DeckSetupModal = {
         }
     },
 
-    loadRandomDeck: async () => {
-        const playerVal = document.getElementById('deck-player-select').value;
-        const playerIds = (playerVal === 'both') ? [0, 1] : [parseInt(playerVal)];
-
-        if (!confirm(`Generate Random Deck for Player ${playerVal === 'both' ? 'Both' : parseInt(playerVal) + 1}?`)) return;
-
-        try {
-            const res = await fetch('api/get_random_deck');
-            const data = await res.json();
-            if (!data.success) {
-                alert("Failed to generate deck: " + data.error);
-                return;
-            }
-
-            const cards = data.content;
-            const results = await Promise.all(playerIds.map(async (pid) => {
-                const resp = await fetch('api/set_deck', {
-                    method: 'POST',
-                    headers: Network.getHeaders(),
-                    body: JSON.stringify({
-                        player: pid,
-                        deck: cards,
-                        energy_deck: []
-                    })
-                });
-                const result = await resp.json();
-                return { pid, success: result.success };
-            }));
-            for (const { pid, success } of results) {
-                if (success) console.log(`Random Deck Loaded for P${pid + 1}`);
-            }
-            DeckSetupModal.closeDeckModal();
-            if (State.roomCode || State.offlineMode || State.gameHasStarted) {
-                await Network.fetchState();
-            }
-        } catch (e) {
-            console.error(e);
-            alert("Error loading random deck: " + e.message);
-        }
-    }
 };

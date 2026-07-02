@@ -250,6 +250,34 @@ impl AbilityResolver {
                 }
             }
         }
+        // Q240: Standalone activation_position check for effects with no condition.
+        // When an effect has activation_position but no condition field, the merge
+        // paths above never fire. Check the position directly here.
+        if effect.condition.is_none() {
+            if let Some(ref act_pos) = effect.activation_position {
+                let card_id = gs.activating_card;
+                let player = gs.resolve_target_player("self");
+                let passes = act_pos.split(',').any(|p| {
+                    let idx = match p.trim() {
+                        "left" | "left_side" => 0,
+                        "center" => 1,
+                        "right" | "right_side" => 2,
+                        _ => return false,
+                    };
+                    idx < player.stage.stage.len()
+                        && card_id.is_some()
+                        && player.stage.stage[idx] == card_id.unwrap()
+                });
+                if !passes {
+                    log::debug!(
+                        "[CAN_ACTIVATE] activation_position {:?} failed for {:?}",
+                        act_pos,
+                        card_id
+                    );
+                    return false;
+                }
+            }
+        }
         true
     }
 
