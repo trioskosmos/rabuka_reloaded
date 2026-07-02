@@ -384,6 +384,7 @@
     flex-wrap: nowrap; 
     flex: 1;
     overflow-x: auto;
+    overflow-y: hidden;
     position: relative;
     background: transparent;
 }

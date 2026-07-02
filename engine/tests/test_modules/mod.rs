@@ -145,6 +145,7 @@ pub mod opponent_choice_tests;
 pub mod parser_issues_e2e_test;
 pub mod parser_issues_e2e_test_part2;
 pub mod parser_issues_e2e_test_part3;
+pub mod pb2_under_member_test;
 pub mod per_unit_discard_fix;
 pub mod performance_pipeline_test;
 pub mod poppin_test;

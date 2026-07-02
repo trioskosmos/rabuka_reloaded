@@ -332,9 +332,9 @@
 }
 
 /* Mirror opponent stage: their left is on the viewer's right */
-.game-board.both-mode #opp-stage {
+#opp-stage {
     flex-direction: row-reverse;
-    justify-content: flex-start;
+    justify-content: center !important;
 }
 
 /* Flip perspective: put player on top */
@@ -580,7 +580,7 @@
     /* Stage & Live Zone: scroll to full content instead of centering (which splits overflow 50/50) */
     .card-area.stage,
     .live-zone-cards {
-        justify-content: flex-start;
+    justify-content: center;
         overflow-x: scroll;
     }
 

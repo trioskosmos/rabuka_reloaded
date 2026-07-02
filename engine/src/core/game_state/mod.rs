@@ -80,6 +80,7 @@ pub struct GameState {
     pub ability_applications: Vec<crate::types::AbilityApplication>,
     /// Synced from batch_movements by push_movement_event().
     pub recently_moved_cards: Option<Vec<i16>>,
+    pub recently_appeared_cards: Vec<i16>,
     pub recently_moved_from_zone: Option<String>,
     /// Explicit per-batch event log of stage-area-to-stage-area position changes.
     /// Each entry records the moved card, old/new position, and cause info.
@@ -277,6 +278,7 @@ impl GameState {
             looked_at_cards: Vec::new(),
             ability_applications: Vec::new(),
             recently_moved_cards: None,
+            recently_appeared_cards: Vec::new(),
             recently_moved_from_zone: None,
             position_change_events: Vec::new(),
             batch_movements: Vec::new(),

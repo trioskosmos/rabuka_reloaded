@@ -807,6 +807,9 @@ impl GameState {
 
     pub fn record_card_appearance(&mut self, card_id: i16, source: &str) {
         self.cards_appeared_this_turn.insert(card_id);
+        if !self.recently_appeared_cards.contains(&card_id) {
+            self.recently_appeared_cards.push(card_id);
+        }
         if !source.is_empty() {
             self.card_appearance_source
                 .insert(card_id, source.to_string());

@@ -399,6 +399,10 @@ impl GameState {
                                 }
                             }
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                            // Batch-scoped guard: use instance-aware key so
+                            // different copies of the same card (P1 vs P2) are
+                            // not blocked by each other's batch dedup.
+                            let batch_key = format!("{}_{}_{}", card_id, card.card_no, ability.full_text);
                             // Re-scan guard: skip re-enqueueing the exact auto
                             // ability that just completed.
                             if skip_this_card_auto_key.as_deref() == Some(&ability_id) {
@@ -406,9 +410,10 @@ impl GameState {
                             }
                             // Batch-scoped guard: prevent re-enqueue of any ability
                             // already triggered during this movement batch.
-                            if self.this_batch_triggered_ability_ids.contains(&ability_id) {
+                            if self.this_batch_triggered_ability_ids.contains(&batch_key) {
                                 continue;
                             }
+                            self.this_batch_triggered_ability_ids.insert(batch_key);
                             // §9.7.2.1: Multi-trigger — N trigger instances → N
                             // standby entries.  All entries share the same
                             // trigger_moved_cards (full batch) because each
@@ -469,12 +474,14 @@ impl GameState {
                                 }
                             }
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                            let batch_key = format!("{}_{}_{}", card_id, card.card_no, ability.full_text);
                             if skip_this_card_auto_key.as_deref() == Some(&ability_id) {
                                 continue;
                             }
-                            if self.this_batch_triggered_ability_ids.contains(&ability_id) {
+                            if self.this_batch_triggered_ability_ids.contains(&batch_key) {
                                 continue;
                             }
+                            self.this_batch_triggered_ability_ids.insert(batch_key);
                             abilities_to_trigger.push((ability_id, card.card_no.clone(), card_id));
                         }
                     }
@@ -543,12 +550,14 @@ impl GameState {
                                 }
                             }
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                            let batch_key = format!("{}_{}_{}", moved_card_id, card.card_no, ability.full_text);
                             if skip_this_card_auto_key.as_deref() == Some(&ability_id) {
                                 continue;
                             }
-                            if self.this_batch_triggered_ability_ids.contains(&ability_id) {
+                            if self.this_batch_triggered_ability_ids.contains(&batch_key) {
                                 continue;
                             }
+                            self.this_batch_triggered_ability_ids.insert(batch_key);
                             abilities_to_trigger.push((
                                 ability_id,
                                 card.card_no.clone(),
@@ -991,6 +1000,7 @@ impl GameState {
             self.process_current_ability();
             let had_recent_moves = self.recently_moved_cards.is_some();
             self.recently_moved_cards = None;
+            self.recently_appeared_cards.clear();
             self.recently_state_changed.clear();
             self.recently_moved_from_zone = None;
             // Save flag for the post-loop batch scan below;
@@ -1059,7 +1069,8 @@ impl GameState {
         //   trigger instance. The batch scan fires the ability once per batch,
         //   and the ability selects 1 card from the batch.
         let moved_marker = self.recently_moved_cards.is_some();
-        if (moved_marker || self.last_energy_placed_by_effect())
+        let appeared_marker = !self.recently_appeared_cards.is_empty();
+        if (moved_marker || self.last_energy_placed_by_effect() || appeared_marker)
             && self.current_phase == crate::types::Phase::Main
         {
             let batch_ids: Vec<i16> = self
@@ -1074,6 +1085,7 @@ impl GameState {
             };
             self.trigger_auto_abilities_for_player_with_event(player_id, &event);
             self.recently_moved_cards = None;
+            self.recently_appeared_cards.clear();
             self.recently_state_changed.clear();
             self.recently_moved_from_zone = None;
             // Re-enter the loop to process any abilities just enqueued
@@ -1336,7 +1348,7 @@ impl GameState {
             // Scan stage watchers (e.g. each_time triggers) BEFORE clearing
             // recently_moved_cards so their preceding_moved conditions pass.
             // Trigger types: each_time:discard, each_time:area_move, each_time:energy_placed
-            if (self.recently_moved_cards.is_some() || self.last_energy_placed_by_effect())
+            if (self.recently_moved_cards.is_some() || self.last_energy_placed_by_effect() || !self.recently_appeared_cards.is_empty())
                 && self.current_phase == crate::types::Phase::Main
             {
                 if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {

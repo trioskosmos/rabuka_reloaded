@@ -495,10 +495,19 @@ impl<'a> ConditionContext<'a> {
                     condition,
                 );
                 let tm_match = if !pce_match && self.activating_card_id.is_some() {
+                    let in_current_batch = |cid| {
+                        self.moved_cards.contains(&cid)
+                            || self.game_state.recently_moved_cards
+                                .as_ref().map_or(false, |v| v.contains(&cid))
+                    };
                     self.game_state
                         .turn_area_movements
                         .iter()
-                        .any(|m| self.activating_card_id == Some(m.moved_card_id) && m.effect_only)
+                        .any(|m| {
+                            self.activating_card_id == Some(m.moved_card_id)
+                                && m.effect_only
+                                && in_current_batch(m.moved_card_id)
+                        })
                 } else {
                     false
                 };
@@ -751,19 +760,30 @@ impl<'a> ConditionContext<'a> {
                 let snapshot_area_player =
                     self.game_state.entry_snapshot_last_area_move_by_player();
 
-                // Two sources: position_change_events (batch-scoped, from position
+                // Sources: position_change_events (batch-scoped, from position
                 // change executors) + turn_area_movements (turn-scoped, from
-                // push_movement_event). Both track stage→stage movement.
+                // push_movement_event) with a batch-scoped guard using the
+                // event's moved_cards or recently_moved_cards.
+                // This prevents stale turn-scoped data from matching when
+                // the card did not actually move in the current batch.
                 let this_card_moved = self.activating_card_id.is_some_and(|cid| {
-                    self.game_state
+                    let in_pce = self
+                        .game_state
                         .position_change_events
                         .iter()
-                        .any(|e| e.moved_card_id == cid)
+                        .any(|e| e.moved_card_id == cid);
+                    let in_tam = self
+                        .game_state
+                        .turn_area_movements
+                        .iter()
+                        .any(|m| m.moved_card_id == cid);
+                    let in_current_batch = self.moved_cards.contains(&cid)
                         || self
                             .game_state
-                            .turn_area_movements
-                            .iter()
-                            .any(|m| m.moved_card_id == cid)
+                            .recently_moved_cards
+                            .as_ref()
+                            .map_or(false, |v| v.contains(&cid));
+                    in_pce || (in_tam && in_current_batch)
                 });
                 let area_ok = if !this_card_moved {
                     // "このメンバーがエリアを移動する" — THIS card must have moved.
@@ -848,9 +868,18 @@ impl<'a> ConditionContext<'a> {
         });
 
         if condition.text.contains("登場") {
-            let has_appeared = self
-                .activating_card_id
-                .is_some_and(|cid| self.game_state.has_card_appeared_this_turn(cid));
+            let has_appeared = self.activating_card_id.is_some_and(|cid| {
+                // Batch-scoped guard: when moved_cards is non-empty, the card
+                // must be in the current batch to avoid stale turn-level data.
+                let batch_ok = self.moved_cards.is_empty()
+                    || self.moved_cards.contains(&cid)
+                    || self
+                        .game_state
+                        .recently_moved_cards
+                        .as_ref()
+                        .map_or(false, |v| v.contains(&cid));
+                batch_ok && self.game_state.has_card_appeared_this_turn(cid)
+            });
             has_appeared || card_moved_position
         } else {
             card_moved_position

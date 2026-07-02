@@ -835,6 +835,7 @@ impl super::TurnEngine {
                 game_state.process_pending_auto_abilities(&player_id);
                 game_state.just_completed_ability_key = None;
                 game_state.recently_moved_cards = None;
+                game_state.recently_appeared_cards.clear();
                 game_state.recently_state_changed.clear();
             } else if effect_ready {
                 log::debug!("RWC: calling process_current_ability");
@@ -914,7 +915,8 @@ impl super::TurnEngine {
                 game_state.clear_effect_tracking();
                 let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
                 if (game_state.recently_moved_cards.is_some()
-                    || game_state.last_energy_placed_by_effect())
+                    || game_state.last_energy_placed_by_effect()
+                    || !game_state.recently_appeared_cards.is_empty())
                     && game_state.current_phase == crate::types::Phase::Main
                 {
                     let event = crate::ability::types::TriggerEvent {
@@ -935,13 +937,15 @@ impl super::TurnEngine {
                 game_state.process_pending_auto_abilities(&player_id);
                 game_state.just_completed_ability_key = None;
                 game_state.recently_moved_cards = None;
+                game_state.recently_appeared_cards.clear();
                 game_state.recently_state_changed.clear();
             } else {
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
                 let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
                 if (game_state.recently_moved_cards.is_some()
-                    || game_state.last_energy_placed_by_effect())
+                    || game_state.last_energy_placed_by_effect()
+                    || !game_state.recently_appeared_cards.is_empty())
                     && game_state.current_phase == crate::types::Phase::Main
                 {
                     let event = crate::ability::types::TriggerEvent {
@@ -962,6 +966,7 @@ impl super::TurnEngine {
                 game_state.process_pending_auto_abilities(&player_id);
                 game_state.just_completed_ability_key = None;
                 game_state.recently_moved_cards = None;
+                game_state.recently_appeared_cards.clear();
                 game_state.recently_state_changed.clear();
             }
         }

@@ -2727,7 +2727,19 @@ impl<'a> ConditionContext<'a> {
                             return false;
                         }
                         let self_appeared = self.activating_card_id.is_some_and(|cid| {
-                            self.game_state.has_card_appeared_this_turn(cid)
+                            // Batch-scoped guard: when moved_cards is non-empty,
+                            // the card must have appeared in the current batch,
+                            // not the entire turn. Prevents stale turn-level data
+                            // from triggering re-scans on unrelated events.
+                            let batch_ok = self.moved_cards.is_empty()
+                                || self.moved_cards.contains(&cid)
+                                || self
+                                    .game_state
+                                    .recently_moved_cards
+                                    .as_ref()
+                                    .map_or(false, |v| v.contains(&cid));
+                            batch_ok
+                                && self.game_state.has_card_appeared_this_turn(cid)
                                 && stage_ids.contains(&cid)
                         });
                         if !self_appeared {

@@ -227,7 +227,10 @@ impl AbilityResolver {
             }
         }
         let pos_to_use = if Zone::from_str(destination) == Some(Zone::UnderMember) {
-            activating_card
+            // Use the resolver's stored activating_card_id first (survives choice
+            // pauses and ability queue transitions), then fall back to gs.activating_card.
+            let member_card = self.activating_card_id.or(activating_card);
+            member_card
                 .and_then(|cid| player.stage.stage.iter().position(|&id| id == cid))
                 .or(vacated_area)
                 .or_else(|| {

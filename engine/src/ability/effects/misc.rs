@@ -2345,6 +2345,19 @@ impl AbilityResolver {
             return Err(format!("Member not found: {}", target_member));
         }
         gs.position_change_occurred_this_turn = true;
+        let pid = gs
+            .ability_queue
+            .current_entry()
+            .map(|e| e.player_id.clone())
+            .unwrap_or_default();
+        gs.trigger_auto_abilities_for_player_with_event(
+            &pid,
+            &crate::ability::types::TriggerEvent {
+                moved_cards: gs.recently_moved_cards.clone().unwrap_or_default(),
+                position_change_occurred: gs.position_change_occurred_this_turn,
+                ..Default::default()
+            },
+        );
         gs.recalculate_constants();
         Ok(())
     }
@@ -2878,6 +2891,19 @@ impl AbilityResolver {
             }
         }
         gs.position_change_occurred_this_turn = true;
+        let pid = gs
+            .ability_queue
+            .current_entry()
+            .map(|e| e.player_id.clone())
+            .unwrap_or_default();
+        gs.trigger_auto_abilities_for_player_with_event(
+            &pid,
+            &crate::ability::types::TriggerEvent {
+                moved_cards: gs.recently_moved_cards.clone().unwrap_or_default(),
+                position_change_occurred: gs.position_change_occurred_this_turn,
+                ..Default::default()
+            },
+        );
         gs.recalculate_constants();
         Ok(())
     }
