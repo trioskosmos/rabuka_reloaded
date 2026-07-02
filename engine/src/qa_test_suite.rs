@@ -44,8 +44,8 @@ fn test_q23_member_card_to_stage_procedure() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     let member_card = cards
         .iter()
@@ -159,8 +159,8 @@ fn test_q24_baton_touch_procedure() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     let member_card_ids: Vec<_> = cards
         .iter()
@@ -306,8 +306,8 @@ fn test_q25_baton_touch_same_or_lower_cost() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Find a cost 4 member card for hand
     let hand_member_card = cards
@@ -442,8 +442,8 @@ fn test_q26_baton_touch_lower_cost_no_energy_gain() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Find a cost 2 member card for hand (lower cost)
     let hand_member_card = cards
@@ -578,8 +578,8 @@ fn test_q27_baton_touch_only_one_member() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Find a cost 10 member card for hand
     let hand_member_card = cards
@@ -718,8 +718,8 @@ fn test_q28_play_without_baton_touch_full_cost() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Find a cost 5 member card for hand
     let hand_member_card = cards
@@ -873,8 +873,8 @@ fn test_q29_cannot_baton_touch_same_turn() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Find a cost 5 member card for hand
     let hand_member_card = cards
@@ -980,8 +980,8 @@ fn test_q30_can_play_same_card_multiple_times() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Find a cost 2 member card - get 2 copies
     let member_cards: Vec<_> = cards
@@ -1131,8 +1131,8 @@ fn test_q31_can_play_same_live_card_multiple_times() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Find 2 live cards
     let live_cards: Vec<_> = cards.iter().filter(|c| c.is_live()).take(2).collect();
@@ -1246,8 +1246,8 @@ fn test_q32_no_cheer_checks_without_live_cards() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Add member to stage
     let member_card = cards
@@ -1312,8 +1312,8 @@ fn test_q33_live_start_timing() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Add live card to live card zone
     let live_card = cards
@@ -1377,8 +1377,8 @@ fn test_q34_live_cards_remain_when_hearts_met() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Add live card to live card zone
     let live_card = cards
@@ -1438,8 +1438,8 @@ fn test_q35_live_cards_to_waitroom_when_hearts_not_met() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Add live card to live card zone
     let live_card = cards
@@ -1497,8 +1497,8 @@ fn test_q36_live_success_timing() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Add live card to live card zone
     let live_card = cards
@@ -1547,8 +1547,8 @@ fn test_q37_live_start_success_abilities_once_per_timing() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Add live card to live card zone
     let live_card = cards
@@ -1594,8 +1594,8 @@ fn test_q38_card_during_live_definition() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Add live card to live card zone
     let live_card = cards
@@ -1630,8 +1630,8 @@ fn test_q37_auto_abilities_multiple_uses() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Setup: Add live card to hand to play it
     let live_card = cards
@@ -1678,8 +1678,8 @@ fn test_q39_cheer_checks_before_required_hearts() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Add live card to live card zone
     let live_card = cards
@@ -1733,8 +1733,8 @@ fn test_ability_optional_cost_user_choice() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Find a card with optional cost ability (桜坂しずく - PL!N-bp1-003-R＋)
     let _sakura_id = card_database
@@ -1773,8 +1773,8 @@ fn test_ability_cost_limit_filtering() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let _player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let _player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let mut player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Setup opponent stage with members of various costs
     let cost_2_member = cards
@@ -1838,8 +1838,8 @@ fn test_ability_group_filtering() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let _player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let _player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Setup discard with live cards from different groups
     let nijigasaki_live = cards
@@ -1911,8 +1911,8 @@ fn test_ability_sequential_effects() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let _player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let _player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Setup deck with cards
     let deck_cards: Vec<i16> = cards
@@ -1999,8 +1999,8 @@ fn test_ability_activation_cost_targeting() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Find a member with activation ability that costs moving itself (星空 凁E- PL!-sd1-005-SD)
     let rin_card = cards
@@ -2041,8 +2041,8 @@ fn test_ability_live_success_draw_then_discard() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Find the specific member card with live_success ability
     let member_card = cards
@@ -2109,7 +2109,7 @@ fn test_ability_live_success_draw_then_discard() {
     game_state.trigger_auto_ability(
         ability_id,
         crate::game_state::AbilityTrigger::LiveSuccess,
-        "player1".to_string(),
+        "p1".to_string(),
         Some(member_card.card_no.clone()),
         Some(member_id),
         None,
@@ -2123,7 +2123,7 @@ fn test_ability_live_success_draw_then_discard() {
     println!("Ability queue len: {}", game_state.ability_queue.len());
 
     // Process the ability
-    game_state.process_pending_auto_abilities("player1");
+    game_state.process_pending_auto_abilities("p1");
 
     println!(
         "After processing - pending_choice: {:?}",
@@ -2229,8 +2229,8 @@ fn test_baton_touch_discard_ability_triggers() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Card with baton_touch discard auto ability: PL!HS-sd1-001-SD (日野下花帆, cost 9, 蓮ノ空)
     let target_card = cards
@@ -2306,8 +2306,8 @@ fn test_baton_touch_discard_ability_skipped_low_cost() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Same target card
     let target_card = cards
@@ -2379,8 +2379,8 @@ fn test_constant_success_replacement_ability() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Find PL!-bp6-024-L (錯覚CROSSROADS) — the card with the replacement ability
     let target_card = cards
@@ -2543,8 +2543,8 @@ fn test_constant_success_replacement_ability_skip() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     let target_card = cards
         .iter()
@@ -2610,8 +2610,8 @@ fn test_constant_gain_ability_score() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     // Target: PL!HS-bp1-003-P (乙宗梢, cost 13, 蓮ノ空) — has 常時 gain_ability
     let target_card = cards

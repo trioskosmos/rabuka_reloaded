@@ -145,8 +145,8 @@ fn initialize_game() {
     );
 
     // Initialize players with decks
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let mut player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     player1.set_main_deck(player1_deck.main_deck);
     player1.set_energy_deck(player1_deck.energy_deck);

@@ -1906,8 +1906,8 @@ fn try_init_room_game_state(room: &mut Room, data: &AppState) -> bool {
         &mut card_database,
     );
 
-    let mut p1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut p2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut p1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let mut p2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
     p1.set_main_deck(player1_deck.main_deck);
     p1.set_energy_deck(player1_deck.energy_deck);
     p2.set_main_deck(player2_deck.main_deck);
@@ -1986,8 +1986,8 @@ pub async fn rooms_create(
         None
     } else {
         let card_database = data.card_database.clone();
-        let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-        let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+        let player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+        let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
         let mut fresh_game_state = GameState::new(player1, player2, card_database);
         crate::game_setup::setup_game(&mut fresh_game_state);
         println!(
@@ -2431,9 +2431,9 @@ async fn init_game(
 
     // Create fresh players
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let mut player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
 
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     player1.set_main_deck(player1_deck.main_deck);
 
@@ -2697,8 +2697,8 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
     let card_registry = Arc::new(build_cached_card_registry(&card_database));
 
     // Create default players
-    let player1 = Player::new("0".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("1".to_string(), "Player 2".to_string(), false);
+    let player1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
 
     let game_state = Arc::new(RwLock::new(GameState::new(
         player1.clone(),
