@@ -397,6 +397,12 @@
     background: transparent;
 }
 
+.live-zone-cards .card.card-back {
+    aspect-ratio: 720 / 512;
+    width: var(--card-loc-h, var(--card-sz-h, var(--card-h)));
+    height: auto;
+}
+
 .live-zone-cards .card {
     flex-shrink: 0;
     margin: 0 var(--space-xxs);

@@ -913,7 +913,7 @@ export const CardRenderer = {
             const hideForOpponent = shouldHideCards && card;
             const isMemberInLiveZone = card && card.card_no && !CardRenderer.isCardLive(card);
             if (hideForOpponent || isMemberInLiveZone) {
-                card = { card_no: -1, hidden: true };
+                card = { card_no: -1, hidden: true, card_type: 'live' };
             }
             const action = validActionMap[i];
             const isValid = action != null;

@@ -109,6 +109,15 @@ export const ActionMenu = {
         // Hide RPS modal if phase ended
         RpsView.hideIfOpen();
 
+        // PvE: show "AI is thinking..." when it's P2's turn (AI handles actions)
+        if (state.mode === 'pve' && (state.active_player === 'player2' || state.active_player === '1' || state.active_player === 1)) {
+            const aiDiv = document.createElement('div');
+            aiDiv.className = 'ai-thinking-indicator';
+            aiDiv.innerHTML = '<div style="font-weight:bold; color:#0096ff; padding:10px; border-left:4px solid #0096ff; background:rgba(0,150,255,0.1); border-radius:8px;">🤖 AI is thinking...</div>';
+            actionsDiv.appendChild(aiDiv);
+            return;
+        }
+
         // 0. PVP: Waiting for opponent (flag set by server via pvp_player_can_act)
         if (state.waiting_for_opponent) {
             const waitDiv = document.createElement('div');

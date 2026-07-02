@@ -461,7 +461,9 @@ pub async fn get_game_state(
 
                 if let Some(pid) = requester_player_id {
                     let gs = lock_state!(gs_arc, read);
-                    filter_display_for_player(&mut display, &gs, pid);
+                    if room.mode == "pvp" {
+                        filter_display_for_player(&mut display, &gs, pid);
+                    }
                     drop(gs);
                 } else {
                     // PVP room but no session — treat as spectator, block all actions
@@ -472,7 +474,7 @@ pub async fn get_game_state(
     }
     if let Some(pid) = requester_player_id {
         let gs = lock_state!(gs_arc, read);
-        if !pvp_player_can_act(&gs, pid) {
+        if display.mode != "pve" && !pvp_player_can_act(&gs, pid) {
             display.waiting_for_opponent = true;
         }
         drop(gs);
@@ -2045,6 +2047,8 @@ pub async fn rooms_create(
 
     let player_id = 0; // Creator always gets player 0
 
+    let ai_session_id;
+
     {
         let mut rooms = data.rooms.lock().unwrap();
 
@@ -2060,31 +2064,48 @@ pub async fn rooms_create(
                 },
             );
 
+            if mode == "pve" {
+                ai_session_id = Uuid::new_v4().to_string();
+                room.sessions.insert(
+                    ai_session_id.clone(),
+                    RoomSession {
+                        session_id: ai_session_id.clone(),
+                        player_id: 1,
+                        username: Some("AI".to_string()),
+                    },
+                );
+            } else {
+                ai_session_id = String::new();
+            }
+
             if let Some(name) = username {
                 room.usernames.insert(player_id, name);
             }
 
             room.last_active = now;
+        } else {
+            ai_session_id = String::new();
         }
     }
 
-    HttpResponse::Ok().json(serde_json::json!({
-
+    let mut response = serde_json::json!({
         "success": true,
-
         "room_id": room_id,
-
         "mode": mode,
-
         "session": {
-
             "session_id": session_id,
-
             "player_id": player_id
-
         }
+    });
 
-    }))
+    if mode == "pve" {
+        response["ai_session"] = serde_json::json!({
+            "session_id": ai_session_id,
+            "player_id": 1
+        });
+    }
+
+    HttpResponse::Ok().json(response)
 }
 
 pub async fn rooms_join(
@@ -2207,14 +2228,7 @@ pub async fn rooms_join(
 
         rooms
             .get(&room_id)
-            .map(|r| {
-                let m = r.mode.clone();
-                if m == "pve" {
-                    "sandbox".to_string()
-                } else {
-                    m
-                }
-            })
+            .map(|r| r.mode.clone())
             .unwrap_or_else(|| "sandbox".to_string())
     };
 

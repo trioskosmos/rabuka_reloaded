@@ -366,6 +366,9 @@ export const GameSetupModal = {
                 if (roomData.session && Network?.saveSession) {
                     Network.saveSession(roomData.room_id, roomData.session);
                 }
+                if (roomData.ai_session) {
+                    State._aiSessionToken = roomData.ai_session.session_id;
+                }
             }
         }
 

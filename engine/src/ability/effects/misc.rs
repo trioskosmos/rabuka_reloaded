@@ -1986,36 +1986,45 @@ impl AbilityResolver {
         if target_member == "select" {
             let valid_sources: Vec<String> = {
                 let card_db = self.card_db();
-                let player = gs.resolve_target_player(target);
                 let group_names = effect.group_names.as_ref();
                 let exclude_self = effect.exclude_self.unwrap_or(false);
                 let activating_card_id = gs.activating_card;
-                (0..3)
-                    .filter(|&i| {
+                let has_explicit_target = effect.target.is_some();
+
+                // When target is null (no "自分の" qualifier in card text),
+                // the ability can target ANY member on either player's stage.
+                // When target is explicitly set, only that player's stage.
+                let players_to_check: Vec<&str> = if has_explicit_target {
+                    vec![target]
+                } else {
+                    vec!["self", "opponent"]
+                };
+
+                let mut sources = Vec::new();
+                for player_key in &players_to_check {
+                    let player = gs.resolve_target_player(player_key);
+                    for i in 0..3 {
                         let card_id = player.stage.stage[i];
-                        if card_id == -1 {
-                            return false;
-                        }
-                        if exclude_self && Some(card_id) == activating_card_id {
-                            return false;
-                        }
+                        if card_id == -1 { continue; }
+                        if exclude_self && Some(card_id) == activating_card_id { continue; }
                         if let Some(gn) = group_names {
-                            gn.iter().any(|g| {
+                            if !gn.iter().any(|g| {
                                 util::card_matches_group_str(&card_db, card_id, Some(g.as_str()))
-                            })
-                        } else {
-                            true
+                            }) { continue; }
                         }
-                    })
-                    .map(|i| {
-                        match i {
+                        let pos = match i {
                             0 => "left",
                             1 => "center",
                             _ => "right",
+                        };
+                        if has_explicit_target {
+                            sources.push(pos.to_string());
+                        } else {
+                            sources.push(format!("{}:{}", player_key, pos));
                         }
-                        .to_string()
-                    })
-                    .collect()
+                    }
+                }
+                sources
             };
             if valid_sources.is_empty() {
                 return Ok(());

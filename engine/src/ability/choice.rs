@@ -2290,7 +2290,14 @@ impl super::resolver::AbilityResolver {
                         let parts: Vec<&str> = tgt.splitn(2, ':').collect();
                         modified.target = Some(parts[0].to_string());
                         if parts[1] == "select" {
-                            modified.source_position = Some(dest.to_string());
+                            // Check if the selected option encodes player info (e.g. "self:left",
+                            // "opponent:center") — used when effect.target was null (any member).
+                            if let Some((player_prefix, position)) = selected.split_once(':') {
+                                modified.target = Some(player_prefix.to_string());
+                                modified.source_position = Some(position.to_string());
+                            } else {
+                                modified.source_position = Some(dest.to_string());
+                            }
                         } else if super::util::stage_position_index(parts[1]).is_some() {
                             modified.source_position = Some(parts[1].to_string());
                         } else {
