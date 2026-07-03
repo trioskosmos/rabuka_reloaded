@@ -304,6 +304,7 @@ impl super::TurnEngine {
                             .get(&lc_id)
                             .is_some_and(|m| m.values().any(|e| e.set != 0));
                         if has_set {
+                            // Q115/Q127: Set-to-X applies first, then additive stacks.
                             for (color, me) in game_state
                                 .mods
                                 .need_heart_modifiers
@@ -313,6 +314,11 @@ impl super::TurnEngine {
                             {
                                 if me.set != 0 {
                                     required_arr[color.index()] = me.set as u32;
+                                }
+                                if me.additive != 0 {
+                                    let idx = color.index();
+                                    let current = required_arr[idx] as i32;
+                                    required_arr[idx] = (current + me.additive).max(0) as u32;
                                 }
                             }
                         } else {
@@ -1477,9 +1483,15 @@ impl super::TurnEngine {
                     .is_some_and(|m| m.values().any(|e| e.set != 0));
                 if let Some(ref nh) = card.need_heart {
                     if has_set {
+                        // Q115/Q127: Set-to-X applies first, then additive stacks.
                         for (color, me) in need_heart_modifiers.get(&lc_id).into_iter().flatten() {
                             if me.set != 0 {
                                 need[color.index()] = me.set as u32;
+                            }
+                            if me.additive != 0 {
+                                let idx = color.index();
+                                let current = need[idx] as i32;
+                                need[idx] = (current + me.additive).max(0) as u32;
                             }
                         }
                     } else {

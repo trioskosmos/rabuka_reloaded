@@ -619,7 +619,8 @@
                 </div>
                 <div id="room-waiting-hint" style="margin-top: 12px; padding: 6px 10px; border-radius: 6px; color: var(--text-muted, #aaa); font-size: 0.85rem; text-align: center;"></div>
                 <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-color, #333); display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
-                    <a href="/card_browser.html" target="_blank" class="btn btn-accent-pink" style="font-size: 0.85rem; padding: 8px 20px;">&#128269; Card Browser / Deck Builder</a>
+                    <!-- To switch back to local: change href to "/card_browser.html" -->
+                    <a id="card-browser-link" href="https://decklog.bushiroad.com" target="_blank" class="btn btn-accent-pink" style="font-size: 0.85rem; padding: 8px 20px;">Card Browser / Deck Builder</a>
                     <button class="btn btn-accent-blue lobby-faq-btn" data-action="open-help-modal" style="font-size: 0.85rem; padding: 8px 20px;">FAQ</button>
                     <button class="btn btn-accent-gray lobby-lang-btn" data-action="toggle-lang" style="font-size: 0.85rem; padding: 8px 20px;">English</button>
                 </div>
@@ -822,6 +823,10 @@
                 <button class="close-btn" data-action="close-help-modal">×</button>
             </div>
             <div class="modal-body help-body">
+                <div style="margin-bottom: 12px; padding: 8px 10px; background: var(--bg-secondary, #1a1a2e); border-radius: 6px; font-size: 0.85rem; line-height: 1.6;">
+                    <a href="https://github.com/trioskosmos/rabuka_reloaded" target="_blank" style="color: var(--accent-pink, #e94560);">GitHub Repository</a><br>
+                    <a href="https://www.youtube.com/watch?v=hZhCHykfCnI" target="_blank" style="color: var(--accent-pink, #e94560);">Tutorial Video</a>
+                </div>
                 <h3 data-i18n="faq_ui_mode">UI Mode: View vs Play</h3>
                 <p style="margin-bottom: 8px; line-height: 1.5;" data-i18n="faq_ui_mode_desc">The top-right button toggles between View and Play mode:</p>
                 <ul style="margin-bottom: 12px;">

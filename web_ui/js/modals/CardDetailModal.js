@@ -279,12 +279,6 @@ function render() {
                             groupDiv.appendChild(row);
                         });
                     }
-                            });
-                            dbDiv.appendChild(row);
-                        });
-
-                        groupDiv.appendChild(dbDiv);
-                    }
 
                     actionsEl.appendChild(groupDiv);
                 });
