@@ -23,7 +23,7 @@ fn advance_to_live_start(game: &mut TestGame) {
 /// 3 Printemps in hand → eligible unit (≥2). First prompt shows all,
 /// then re-prompt filters to chosen unit. Player picks 2.
 #[test]
-fn hanano_same_unit_choice_discards_2() {
+fn q175_hanano_cross_unit_discard_same_unit_as_each_other() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -79,6 +79,76 @@ fn hanano_same_unit_choice_discards_2() {
     assert!(
         game.state.player1.hand.cards.contains(&lily),
         "lilywhite (different unit) should remain"
+    );
+}
+
+/// Q175: Two qualifying units in hand (2 Printemps + 2 lilywhite).
+/// First prompt shows all 4 eligible cards. Player picks lilywhite.
+/// Second prompt filters to same unit; player picks remaining lilywhite.
+#[test]
+fn q175_multiple_qualifying_units_player_chooses_pair() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let hanano = game.id("PL!HS-PR-016-PR"); // スリーズブーケ
+    let live = game.id("PL!-sd1-019-SD");
+    let print_a = game.id("PL!-sd1-010-SD"); // Printemps
+    let print_b = game.id("PL!-sd1-008-SD"); // Printemps
+    let lily_a = game.id("PL!-sd1-013-SD"); // lilywhite
+    let lily_b = game.id("PL!-sd1-004-SD"); // lilywhite
+
+    game.state.player1.stage.stage[0] = hanano;
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(print_a);
+    game.state.player1.hand.cards.push(print_b);
+    game.state.player1.hand.cards.push(lily_a);
+    game.state.player1.hand.cards.push(lily_b);
+
+    for _ in 0..20 {
+        game.state
+            .player1
+            .main_deck
+            .cards
+            .push(game.id("PL!-sd1-002-SD"));
+    }
+    for _ in 0..20 {
+        game.state
+            .player2
+            .main_deck
+            .cards
+            .push(game.id("PL!-sd1-002-SD"));
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+
+    assert!(
+        game.has_pending_choice(),
+        "Two units with ≥2 → choice must exist"
+    );
+
+    // Hand: [live, print_a, print_b, lily_a, lily_b]
+    // eligible_indices (units with ≥2): [0,1,2,3] (2 Printemps + 2 lilywhite)
+    // filtered position 2 = lily_a, position 3 = lily_b
+    game.try_select_indices(&[2]).unwrap(); // pick lily_a
+    game.try_select_indices(&[0]).unwrap(); // pick lily_b (only remaining lilywhite)
+
+    assert!(
+        !game.state.player1.hand.cards.contains(&lily_a),
+        "lily_a discarded"
+    );
+    assert!(
+        !game.state.player1.hand.cards.contains(&lily_b),
+        "lily_b discarded"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&print_a),
+        "Printemps untouched"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&print_b),
+        "Printemps untouched"
     );
 }
 

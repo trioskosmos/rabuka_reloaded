@@ -1181,7 +1181,7 @@ impl super::TurnEngine {
         let total_blade =
             player
                 .stage
-                .total_blades(card_db, blade_modifiers, orientation_modifiers);
+                .total_blades(card_db, blade_modifiers, orientation_modifiers, false);
 
         // Q40: Yell must complete ALL checks — even if hearts are already satisfied,
         // the full blade-count of yell cards is always revealed.

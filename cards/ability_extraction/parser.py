@@ -8669,17 +8669,23 @@ def _walk(d, full_text, original_text, ctx_text=None):
     # Also skip card_count_condition (pure count check — heart colors don't apply).
     # Skip check_self conditions (they check a specific card's location, not collective
     # heart presence — heart_colors on the condition is effect metadata leakage).
+    # Q148: Skip blade-aggregate conditions — "ブレードの合計がN以上" is a blade total
+    # check, not a heart filter. The heart_colors in the effect text is the modification
+    # target (what gets decreased), not a condition filter (what triggers the effect).
     if "heart_colors" in d and "condition" in d:
         cond = d["condition"]
         if isinstance(cond, dict) and "heart_colors" not in cond:
             cond_type = cond.get("type", "")
             loc = cond.get("location", "")
+            cond_text = cond.get("text", "")
             if (
                 cond_type == "card_count_condition"
                 and cond.get("source") != "preceding_moved"
             ):
                 pass
             elif cond.get("check_self"):
+                pass
+            elif "ブレード" in cond_text and cond.get("aggregate") == "total":
                 pass
             elif loc in ("stage", "hand", "live_card_zone", ""):
                 if cond_type == "or_condition":
@@ -9130,6 +9136,18 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
             and nc.get("heart_colors")
         ):
             nc.pop("heart_colors", None)
+    # Q148: Strip heart_colors from blade-aggregate location_conditions.
+    # "ブレードの合計がN以上" is a blade total check, not a heart filter.
+    # heart_colors in the effect text is the modification target, not a condition filter.
+    nc = node.get("condition")
+    if isinstance(nc, dict) and nc.get("type") == "location_condition":
+        nc_text = nc.get("text", "")
+        if (
+            "ブレード" in nc_text
+            and nc.get("aggregate") == "total"
+            and nc.get("heart_colors")
+        ):
+            nc.pop("heart_colors", None)
     # Also check if node itself IS a card_count_condition (sub-condition
     # of a compound — no "condition" child, it IS the condition).
     if node.get("type") == "card_count_condition" and node is not nc:
@@ -9278,12 +9296,20 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     cond["area_direction"] = reparse["area_direction"]
             # Fix missing yell_trigger for "エールにより公開された" cards.
             # Only applies to auto abilities (自動) — not ライブ成功時 etc.
+            # Skip when the condition checks for a specific card_type with negation
+            # (e.g. "no live card among revealed") — yell_trigger would short-circuit
+            # to "did a yell happen?" instead of checking the actual revealed cards.
             if ability.get("triggers") == "自動":
                 has_yell_text = (
                     "エールしたとき" in cond_text
                     or "エールにより公開された" in cond_text
                 )
-                if cond.get("yell_trigger") is None and has_yell_text:
+                has_specific_type_check = cond.get("card_type") and cond.get("negation")
+                if (
+                    cond.get("yell_trigger") is None
+                    and has_yell_text
+                    and not has_specific_type_check
+                ):
                     cond["yell_trigger"] = True
 
         # --- 2. Fix target=both when comparison_target is set ---

@@ -970,6 +970,18 @@ impl AbilityResolver {
                 if cost.state_change.as_deref() == Some("wait") {
                     if cost.self_cost == Some(true) {
                         if let Some(id) = gs.activating_card {
+                            // Q159: The card must be on stage to be put to wait.
+                            // When activated from discard (e.g. via activate_ability),
+                            // the card is not on stage, so the cost cannot be paid.
+                            let on_stage = gs
+                                .resolve_target_player_mut("self")
+                                .stage
+                                .stage
+                                .iter()
+                                .any(|&sid| sid == id);
+                            if !on_stage {
+                                return Err("Cannot pay cost: member is not on stage".to_string());
+                            }
                             // Q137: 「ウェイトにする」はアクティブ状態のメンバーをウェイト
                             // 状態にすることを意味します。既にウェイト状態の場合、
                             // その行為自体が行われません（Rule 1.3.2.1）。

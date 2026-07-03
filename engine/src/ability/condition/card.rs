@@ -914,6 +914,7 @@ impl<'a> ConditionContext<'a> {
                     &self.game_state.card_database,
                     &self.game_state.mods.blade_modifiers,
                     &self.game_state.mods.orientation_modifiers,
+                    true,
                 ),
                 condition.count.unwrap_or(0),
             ))
@@ -2424,6 +2425,7 @@ impl<'a> ConditionContext<'a> {
                             card_db,
                             &self.game_state.mods.blade_modifiers,
                             &self.game_state.mods.orientation_modifiers,
+                            true,
                         );
                         if is_both {
                             let opp = self.resolve_condition_player("opponent");
@@ -2432,6 +2434,7 @@ impl<'a> ConditionContext<'a> {
                                     card_db,
                                     &self.game_state.mods.blade_modifiers,
                                     &self.game_state.mods.orientation_modifiers,
+                                    true,
                                 )) as usize
                         } else {
                             self_blade as usize
@@ -3363,6 +3366,7 @@ impl<'a> ConditionContext<'a> {
                 &self.game_state.card_database,
                 &self.game_state.mods.blade_modifiers,
                 &self.game_state.mods.orientation_modifiers,
+                true,
             ),
             Some(Zone::Hand) => player.hand.len() as u32,
             Some(Zone::Deck) => player.main_deck.len() as u32,

@@ -338,21 +338,28 @@ impl Stage {
     // Q133: Weighed members' blades do NOT count toward yell reveal count.
     // Q134: Baton touch with a weighed member is allowed; the new member enters active.
     // Q136: A weighed member moving areas remains weighed.
+    /// Q148: `include_waited` controls whether waited members count.
+    /// - `false` for yell draws (Rule 9.9: only active members yell)
+    /// - `true` for condition checks ("ステージにいるメンバーが持つブレードの合計"
+    ///   includes waited members per Q148)
     pub fn total_blades(
         &self,
         card_db: &CardDatabase,
         blade_entries: &HashMap<i16, ModifierEntry>,
         orientation_modifiers: &HashMap<i16, String>,
+        include_waited: bool,
     ) -> u32 {
         let mut total = 0;
         for &card_id in &self.stage {
             if card_id != -1 {
-                if orientation_modifiers
-                    .get(&card_id)
-                    .map(|o| o == "wait")
-                    .unwrap_or(false)
-                {
-                    continue;
+                if !include_waited {
+                    if orientation_modifiers
+                        .get(&card_id)
+                        .map(|o| o == "wait")
+                        .unwrap_or(false)
+                    {
+                        continue;
+                    }
                 }
                 if let Some(card) = card_db.get_card(card_id) {
                     let entry = blade_entries.get(&card_id).copied().unwrap_or_default();

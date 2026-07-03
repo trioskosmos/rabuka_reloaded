@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-03T13:27:40.517630",
+  "generated_at": "2026-07-03T21:25:55.354017",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -4043,8 +4043,7 @@
           "card_type": "member_card",
           "target": "self",
           "comparison_target": "self",
-          "card_property": "has_blade_heart",
-          "yell_trigger": true
+          "card_property": "has_blade_heart"
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -4768,8 +4767,7 @@
               "state_change": "active",
               "card_type": "member_card",
               "action": "change_state",
-              "count": 1,
-              "activation_position": "left_side"
+              "count": 1
             },
             {
               "text": "2枚ある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -4787,11 +4785,11 @@
               "action": "gain_resource",
               "resource": "blade",
               "count": 2,
-              "duration": "live_end",
-              "activation_position": "left_side"
+              "duration": "live_end"
             }
           ],
-          "activation_position": "left_side"
+          "activation_position": "left_side",
+          "self_target": true
         }
       }
     },
@@ -22933,10 +22931,7 @@
           "count": 10,
           "operator": ">=",
           "aggregate": "total",
-          "type": "location_condition",
-          "heart_colors": [
-            "heart00"
-          ]
+          "type": "location_condition"
         },
         "action": "modify_required_hearts",
         "heart_colors": [

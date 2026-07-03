@@ -19,3 +19,4 @@ cloudflared.exe
 .git-rewrite/
 .github/
 
+source_images/
