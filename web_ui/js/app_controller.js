@@ -187,23 +187,14 @@ const actionHandlers = {
             await Promise.all([0, 1].map(pid =>
                 fetch('api/set_deck', {
                     method: 'POST', headers,
-                    body: JSON.stringify({ player: pid, deck: cards, energy_deck: [] })
+                    body: JSON.stringify({ player: pid, deck: cards, room_id: State.roomCode })
                 })
             ));
-
-            const initRes = await fetch('api/init', {
-                method: 'POST', headers,
-                body: JSON.stringify({})
-            });
-            if (!initRes.ok) throw new Error('Init failed');
+            const initRes = await fetch('api/init', { method: 'POST', headers });
+            if (!initRes.ok) { const e = await initRes.json().catch(() => ({})); throw new Error(e.error || 'Init failed'); }
             State.offlineMode = false;
-            State.gameHasStarted = true;
-            ModalManager.hide(DOM_IDS.MODAL_ROOM);
             await Network.fetchState();
-        } catch (e) {
-            console.error(e);
-            alert("Test game error: " + e.message);
-        }
+        } catch (e) { console.error(e); alert('Test game error: ' + e.message); }
     },
     'force-reset': () => window.App.forceReset(),
     'set-perspective': ({ value }) => window.Actions.setPerspective(value),

@@ -278,6 +278,7 @@ export const GameSetupModal = {
         ModalManager.hide(DOM_IDS.MODAL_SETUP);
         Modals.pvpJoinPid = null;
         State._gameMode = null;
+        State._aiMode = false;
         // Only return to lobby if a game hasn't started yet
         if (!State.gameHasStarted) {
             ModalManager.show(DOM_IDS.MODAL_ROOM);
@@ -355,10 +356,14 @@ export const GameSetupModal = {
         const gameMode = State._gameMode || 'sandbox';
 
         if (!State.roomCode) {
+            const body = { mode: gameMode };
+            if (gameMode === 'pvp' && State._aiMode) {
+                body.is_ai = true;
+            }
             const roomRes = await fetch('api/rooms/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode: gameMode })
+                body: JSON.stringify(body)
             });
             const roomData = await roomRes.json();
             if (roomData.success) {
@@ -527,7 +532,8 @@ export const GameSetupModal = {
     },
 
     _openPveSetup: () => {
-        State._gameMode = 'pve';
+        State._gameMode = 'pvp';
+        State._aiMode = true;
         ModalManager.show(DOM_IDS.MODAL_SETUP);
         ModalManager.hide(DOM_IDS.MODAL_ROOM);
 

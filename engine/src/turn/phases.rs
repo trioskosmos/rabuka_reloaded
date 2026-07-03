@@ -56,50 +56,41 @@ impl super::TurnEngine {
                     game_state.reset_keyword_tracking();
                     game_state.recalculate_constants();
                     // Q135: Weighed members become active during the active phase (7.4.1).
-                    // Rule 7.4.1: Only the turn player activates their wait cards
-                    // Check if the turn player's activation is restricted
-                    let turn_player_id = &game_state.active_player().id.clone();
-                    let is_activation_blocked = game_state
-                        .cannot_activate_members
+                    // Rule 7.4.1: Only the turn player activates their wait cards.
+                    // Q180: "cannot_activate_by_effect" restrictions (e.g. PL!-pb1-009-R 矢澤にこ
+                    // ab#1) only block effect-based activation, not the natural Active phase
+                    // rule. Therefore cannot_activate_members is NOT checked here.
+                    // Per-card constant_cannot_activate_members (e.g. "このメンバーはアクティブ
+                    // フェイズにアクティブにしない") still applies.
+                    let turn_player = game_state.active_player();
+                    let to_activate: Vec<i16> = turn_player
+                        .stage
+                        .stage
                         .iter()
-                        .any(|t| t == turn_player_id)
-                        || game_state
-                            .constant_cannot_activate_members
-                            .iter()
-                            .any(|t| t == turn_player_id);
-                    let to_activate: Vec<i16> = if is_activation_blocked {
-                        Vec::new()
-                    } else {
-                        let turn_player = game_state.active_player();
-                        turn_player
-                            .stage
-                            .stage
-                            .iter()
-                            .filter_map(|&cid| {
-                                if cid == -1 {
-                                    return None;
-                                }
-                                if game_state.mods.get_orientation_modifier(cid)
-                                    != Some(&"wait".to_string())
-                                {
-                                    return None;
-                                }
-                                // Skip members with a constant cannot_activate restriction
-                                // (per-card, e.g. "このメンバーはアクティブフェイズにアクティブにしない")
-                                if game_state
-                                    .constant_cannot_activate_members
-                                    .contains(&cid.to_string())
-                                {
-                                    return None;
-                                }
-                                // Skip members with an active delayed_cannot_active flag
-                                if game_state.mods.is_delayed_cannot_active(cid) {
-                                    return None;
-                                }
-                                Some(cid)
-                            })
-                            .collect()
-                    };
+                        .filter_map(|&cid| {
+                            if cid == -1 {
+                                return None;
+                            }
+                            if game_state.mods.get_orientation_modifier(cid)
+                                != Some(&"wait".to_string())
+                            {
+                                return None;
+                            }
+                            // Skip members with a constant cannot_activate restriction
+                            // (per-card, e.g. "このメンバーはアクティブフェイズにアクティブにしない")
+                            if game_state
+                                .constant_cannot_activate_members
+                                .contains(&cid.to_string())
+                            {
+                                return None;
+                            }
+                            // Skip members with an active delayed_cannot_active flag
+                            if game_state.mods.is_delayed_cannot_active(cid) {
+                                return None;
+                            }
+                            Some(cid)
+                        })
+                        .collect();
                     for &cid in &to_activate {
                         game_state.mods.add_orientation_modifier(cid, "active");
                     }
@@ -196,6 +187,8 @@ impl super::TurnEngine {
                     game_state.revealed_cost_card_is_private.clear();
                     game_state.revealed_cost_card_owners.clear();
                     game_state.turn_limited_abilities_used.clear();
+                    game_state.cannot_activate_members.clear();
+                    game_state.cannot_live_players.clear();
                     game_state.turn_number += 1;
                     Self::log_turn_start(game_state);
                     Self::log_phase(game_state, "phase_active_first");
@@ -1147,8 +1140,8 @@ impl super::TurnEngine {
     fn rps_choice_name(choice: i32) -> &'static str {
         match choice {
             0 => "グー",
-            1 => "チョキ",
-            2 => "パー",
+            1 => "パー",
+            2 => "チョキ",
             _ => "?",
         }
     }

@@ -1,95 +1,95 @@
-import { State, updateStateData } from '../state.js';
-import { Phase } from '../constants.js';
+import { State } from '../state.js';
 
-const RPS_TYPES = ['RockChoice', 'rock_choice', 'PaperChoice', 'paper_choice', 'ScissorsChoice', 'scissors_choice'];
-const TURN_TYPES = ['ChooseFirstAttacker', 'choose_first_attacker'];
+const AI_ACTION_DELAY = 250;
+const AI_IDLE_DELAY = 500;
 
-function rpsPhase(p) { return p === Phase.ROCK_PAPER_SCISSORS; }
-
-function rpsWinner(p1, p2) {
-    if (p1 == null || p2 == null || p1 === p2) return 0;
-    if ((p1 === 0 && p2 === 1) || (p1 === 1 && p2 === 2) || (p1 === 2 && p2 === 0)) return 1;
-    return 2;
+function aiHeaders(token) {
+    return {
+        'Content-Type': 'application/json',
+        'X-Session-Token': token || '',
+        'X-Room-Id': State.roomCode || ''
+    };
 }
 
 export const AiDriver = {
     _running: false,
-    _processing: false,
 
-    start() { this._running = true; },
-    stop() { this._running = false; this._processing = false; },
-    isPve() { return State.data?.mode === 'pve'; },
+    start() {
+        if (this._running) return;
+        this._running = true;
+        this._loop();
+    },
 
-    async _send(action) {
-        const token = State._aiSessionToken;
-        if (!token || !State.roomCode) return;
-        try {
-            const res = await fetch('api/execute-action', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Session-Token': token,
-                    'X-Room-Id': State.roomCode
-                },
-                body: JSON.stringify({ action })
-            });
-            if (res.ok) {
-                const data = await res.json();
-                if (data) updateStateData(data);
+    stop() {
+        this._running = false;
+    },
+
+    async _loop() {
+        while (this._running) {
+            if (!State._aiSessionToken || !State.roomCode) {
+                this.stop();
+                return;
             }
-        } catch (_) {}
+
+            try {
+                const acted = await this._step();
+                if (!this._running) return;
+                await this._delay(acted ? AI_ACTION_DELAY : AI_IDLE_DELAY);
+            } catch (e) {
+                console.error('[AI]', e);
+                if (!this._running) return;
+                await this._delay(1000);
+            }
+        }
+    },
+
+    async _step() {
+        const res = await fetch('api/game-state', {
+            headers: aiHeaders(State._aiSessionToken)
+        });
+        if (!res.ok) return false;
+
+        const state = await res.json();
+        if (state.game_over) { this.stop(); return false; }
+
+        const actions = state.legal_actions;
+        if (!actions || actions.length === 0) return false;
+
+        const action = actions[Math.floor(Math.random() * actions.length)];
+        const p = action.parameters || {};
+
+        const sendRes = await fetch('api/execute-action', {
+            method: 'POST',
+            headers: aiHeaders(State._aiSessionToken),
+            body: JSON.stringify({
+                action_index: action.index ?? 0,
+                action_type: action.action_type,
+                card_id: p.card_id,
+                card_index: p.card_index ?? p.card_indices?.[0],
+                card_indices: p.card_indices,
+                card_no: p.card_no,
+                stage_area: p.stage_area,
+                use_baton_touch: p.use_baton_touch
+            })
+        });
+
+        if (!sendRes.ok) {
+            console.warn('[AI] action rejected:', sendRes.status);
+            return false;
+        }
+
+        return true;
+    },
+
+    _delay(ms) {
+        return new Promise(r => setTimeout(r, ms));
     },
 
     think() {
-        if (this._processing) return;
-        if (!this.isPve()) { if (this._running) this.stop(); return; }
-        if (!this._running) this.start();
-        if (!State._aiSessionToken) return;
-
-        this._processing = true;
-        try {
-            const state = State.data;
-            if (!state || state.game_over) { this.stop(); return; }
-
-            const actions = state.legal_actions;
-            if (!actions || actions.length === 0) return;
-
-            // RPS: wait for P1 to choose, then send any remaining RPS action for P2
-            if (rpsPhase(state.phase)) {
-                if (state.player1_rps_choice != null && state.player2_rps_choice == null) {
-                    const a = actions.find(a => RPS_TYPES.includes(a.action_type));
-                    if (a) this._send(a);
-                }
-                return;
-            }
-
-            // Turn choice: auto-send if P2 won
-            if (actions.some(a => TURN_TYPES.includes(a.action_type))) {
-                const winner = rpsWinner(state.player1_rps_choice, state.player2_rps_choice);
-                if (winner === 2) {
-                    const a = actions.find(a => TURN_TYPES.includes(a.action_type));
-                    if (a) this._send(a);
-                }
-                return;
-            }
-
-            // Pending choice for P2
-            if (state.pending_choice) {
-                const pid = state.pending_choice.choice_player_id;
-                if (pid === 'p2' || pid == null) {
-                    const valid = actions.filter(a => !a.parameters?.disabled);
-                    if (valid.length) this._send(valid[Math.random() * valid.length | 0]);
-                }
-                return;
-            }
-
-            // General: act on P2's turn
-            if (state.active_player === 'player2' || state.active_player === '1' || state.active_player === 1) {
-                const valid = actions.filter(a => !a.parameters?.disabled);
-                if (valid.length) this._send(valid[Math.random() * valid.length | 0]);
-            }
-        } finally {
-            this._processing = false;
+        if (!State._aiSessionToken) {
+            this.stop();
+            return;
         }
+        if (!this._running) this.start();
     }
 };

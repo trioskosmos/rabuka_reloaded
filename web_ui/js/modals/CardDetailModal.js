@@ -27,8 +27,9 @@ function buildAllCards() {
     const handArr = Array.isArray(p.hand?.cards) ? p.hand.cards : [];
     cards['hand'] = handArr.filter(isValid);
 
-    const stageArr = Array.isArray(p.stage) ? p.stage : [];
-    cards['stage'] = stageArr.filter(isValid);
+    const stageObj = p.stage || {};
+    const stageSlots = ['left_side', 'center', 'right_side'];
+    cards['stage'] = stageSlots.map(s => stageObj[s]).filter(isValid);
 
     const liveArr = Array.isArray(p.live_zone?.cards) ? p.live_zone.cards : [];
     cards['live'] = liveArr.filter(isValid);
@@ -37,14 +38,14 @@ function buildAllCards() {
     cards['discard'] = discArr.filter(isValid);
 
     const under = [];
-    stageArr.forEach(slot => {
-        const uArr = Array.isArray(slot.under) ? slot.under : [];
+    stageSlots.forEach(slot => {
+        const uArr = Array.isArray(stageObj[slot + '_under']) ? stageObj[slot + '_under'] : [];
         uArr.forEach(c => { if (isValid(c)) under.push(c); });
     });
     if (under.length) cards['under'] = under;
 
-    const oppStageArr = Array.isArray(opp?.stage) ? opp.stage : [];
-    const oppStage = oppStageArr.filter(isValid);
+    const oppStageObj = opp?.stage || {};
+    const oppStage = stageSlots.map(s => oppStageObj[s]).filter(isValid);
     if (oppStage.length) cards['opp_stage'] = oppStage;
 
     return cards;
@@ -151,7 +152,6 @@ function render() {
                     const idx = navCards.indexOf(card);
                     if (params.card_indices.includes(idx)) return true;
                 }
-                if (params.stage_area !== undefined && navCurrentZone === 'stage') return true;
                 return false;
             });
             if (cardActions.length > 0) {
@@ -217,6 +217,75 @@ function render() {
                         });
                         groupDiv.appendChild(areasDiv);
                     }
+
+                    const doubleBatonPairs = firstA.parameters?.double_baton_pairs;
+                    const hasDoubleBaton = doubleBatonPairs && doubleBatonPairs.length > 0;
+                    if (hasDoubleBaton) {
+                        const areaIndexMap = { left: 0, center: 1, right: 2 };
+                        const areaOrder = ['left', 'center', 'right'];
+                        const shortLabels = { left: 'L', center: 'C', right: 'R' };
+
+                        const dbDiv = document.createElement('div');
+                        dbDiv.style.cssText = 'margin-top: 6px; border-top: 1px dashed rgba(255, 215, 0, 0.3); background: rgba(0,0,0,0.15); padding: 6px; border-radius: 4px;';
+
+                        const dbLabel = document.createElement('div');
+                        dbLabel.style.cssText = 'font-size: 0.7em; color: #ffda79; margin-bottom: 4px; font-weight: bold;';
+                        dbLabel.textContent = i18n.t('double_baton') || 'DOUBLE BATON';
+                        dbDiv.appendChild(dbLabel);
+
+                        const pairGroups = {};
+                        doubleBatonPairs.forEach(pair => {
+                            const key = pair.areas.sort().join('&');
+                            if (!pairGroups[key]) pairGroups[key] = [];
+                            pairGroups[key].push(pair);
+                        });
+
+                        Object.keys(pairGroups).forEach(key => {
+                            const row = document.createElement('div');
+                            row.className = 'action-group-buttons grid-3';
+                            row.style.cssText = 'padding: 2px; border-radius: 4px; margin-top: 2px;';
+
+                            const areas = key.split('&');
+                            areaOrder.forEach(expectedArea => {
+                                const pairForPlacement = pairGroups[key].find(p => p.placement === expectedArea);
+                                if (pairForPlacement) {
+                                    const srcA = shortLabels[areas[0]] || areas[0];
+                                    const srcB = shortLabels[areas[1]] || areas[1];
+                                    const placeLabel = shortLabels[expectedArea] || expectedArea;
+
+                                    const replaceIndices = areas.map(a => areaIndexMap[a]);
+                                    const dbActionParams = {
+                                        card_id: firstA.parameters?.card_id,
+                                        card_index: firstA.parameters?.card_index,
+                                        card_indices: replaceIndices,
+                                        stage_area: expectedArea,
+                                        use_baton_touch: true,
+                                        card_name: firstA.parameters?.card_name,
+                                        card_no: firstA.parameters?.card_no,
+                                    };
+
+                                    const btn = ActionButtons.createActionButton(
+                                        { action_type: 'play_member_to_stage', parameters: dbActionParams },
+                                        true, '', State.data
+                                    );
+                                    btn.innerHTML = `<span style="display:flex;flex-direction:column;align-items:center;gap:1px;font-weight:600;"><span style="font-size:0.7rem;">${srcA} & ${srcB}</span><span style="font-size:0.65rem;opacity:0.7;">→ ${placeLabel} ${pairForPlacement.cost}</span></span>`;
+                                    btn.style.width = '100%';
+                                    btn.className = btn.className + ' action-btn';
+                                    btn.onclick = (e) => { e.stopPropagation(); CardDetailModal.close(); if (window.doAction) window.doAction({ action_type: 'play_member_to_stage', parameters: dbActionParams }); };
+                                    row.appendChild(btn);
+                                } else {
+                                    const spacer = document.createElement('div');
+                                    spacer.style.cssText = 'min-height: 30px; display: flex; align-items: center; justify-content: center; opacity: 0.2; font-size: 0.6em; border: 1px dashed rgba(255,255,255,0.1);';
+                                    spacer.textContent = '--';
+                                    row.appendChild(spacer);
+                                }
+                            });
+                            dbDiv.appendChild(row);
+                        });
+
+                        groupDiv.appendChild(dbDiv);
+                    }
+
                     actionsEl.appendChild(groupDiv);
                 });
 

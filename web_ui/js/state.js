@@ -58,6 +58,8 @@ const stateInternal = {
     _choiceStateId: null,
     _sysActionsDismissed: false,
     _aiSessionToken: null,
+    _aiMode: false,
+    _simulateBoth: false,
     _localPerspective: undefined,
     selectedHandIdx: -1,
     showingFullLog: false,
@@ -420,6 +422,8 @@ const stateInternal = {
         State._choiceModalDismissed = false;
         State._choiceStateId = null;
         State._aiSessionToken = null;
+        State._aiMode = false;
+        State._simulateBoth = false;
         State.showingFullLog = false;
         State.fullLogData = null;
         State.lastActionsHash = null;

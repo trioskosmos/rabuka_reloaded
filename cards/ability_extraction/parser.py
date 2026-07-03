@@ -5722,7 +5722,7 @@ def _try_activation_suffix(text):
     suffix = m.group(0).split("場合のみ")[-1]
     cond_text = "この能力は、" + m.group(1).strip() + "場合のみ" + suffix
     action_text = text.replace(cond_text, "").strip().rstrip("。")
-    action = parse_action(action_text)
+    action = parse_effect(action_text)
     result = {"text": text}
     result.update(action)
     cond_parsed = parse_condition(m.group(1).strip() + "場合")

@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-02T02:17:22.542294",
+  "generated_at": "2026-07-03T07:04:50.607023",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -12000,6 +12000,14 @@
       "cost": null,
       "effect": {
         "text": "ライブの合計スコアが相手より高い場合、このカードを手札に加えてもよい",
+        "condition": {
+          "text": "ライブの合計スコアが相手より高い場合",
+          "comparison_target": "opponent",
+          "operator": ">",
+          "comparison_type": "score",
+          "aggregate": "total",
+          "type": "comparison_condition"
+        },
         "source": "revealed_cards",
         "dynamic_count": {
           "type": "revealed_cards",
@@ -14926,17 +14934,32 @@
       },
       "effect": {
         "text": "カードを1枚引き、ライブ終了時まで、自分のステージにいる『虹ヶ咲』のメンバー1人は{{icon_blade.png|ブレード}}を得る",
-        "duration": "live_end",
-        "source": "deck",
-        "count": 1,
-        "card_type": "member_card",
-        "target": "self",
-        "group_names": [
-          "虹ヶ咲"
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "カードを1枚引き",
+            "count": 1,
+            "action": "draw_card",
+            "source": "deck",
+            "destination": "hand",
+            "group_names": [
+              "虹ヶ咲"
+            ]
+          },
+          {
+            "text": "自分のステージにいる『虹ヶ咲』のメンバー1人は{{icon_blade.png|ブレード}}を得る",
+            "duration": "live_end",
+            "count": 1,
+            "card_type": "member_card",
+            "target": "self",
+            "group_names": [
+              "虹ヶ咲"
+            ],
+            "target_count": 1,
+            "action": "gain_resource",
+            "resource": "blade"
+          }
         ],
-        "target_count": 1,
-        "action": "draw_card",
-        "destination": "hand",
         "activation_condition_parsed": {
           "text": "このカードが手札にある場合",
           "location": "hand",
@@ -14946,7 +14969,10 @@
           "operator": ">=",
           "target": "self",
           "type": "comparison_condition"
-        }
+        },
+        "group_names": [
+          "虹ヶ咲"
+        ]
       }
     },
     {
@@ -30601,17 +30627,29 @@
       },
       "effect": {
         "text": "カードを1枚引き、ライブ終了時まで、自分のステージにいる「藤島慈」か「大沢瑠璃乃」のうち1人は{{icon_blade.png|ブレード}}を得る",
-        "duration": "live_end",
-        "source": "deck",
-        "count": 1,
-        "target": "self",
-        "characters": [
-          "藤島慈",
-          "大沢瑠璃乃"
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "カードを1枚引き",
+            "count": 1,
+            "action": "draw_card",
+            "source": "deck",
+            "destination": "hand"
+          },
+          {
+            "text": "自分のステージにいる「藤島慈」か「大沢瑠璃乃」のうち1人は{{icon_blade.png|ブレード}}を得る",
+            "duration": "live_end",
+            "count": 1,
+            "target": "self",
+            "characters": [
+              "藤島慈",
+              "大沢瑠璃乃"
+            ],
+            "target_count": 1,
+            "action": "gain_resource",
+            "resource": "blade"
+          }
         ],
-        "target_count": 1,
-        "action": "draw_card",
-        "destination": "hand",
         "activation_condition_parsed": {
           "text": "このカードが手札にある場合",
           "location": "hand",

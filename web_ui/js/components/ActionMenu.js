@@ -93,24 +93,36 @@ export const ActionMenu = {
         // 1. RPS Phase — render before waiting gate so both players can choose
         if (state.phase === Phase.ROCK_PAPER_SCISSORS) {
             const mode = state.mode;
-            if (mode === 'sandbox') {
+            
+            // RPS resolved and turn-order actions available — fall through to action handling
+            if (state.rps_winner != null && state.legal_actions?.some(
+                a => a.action_type === 'choose_first_attacker' || a.action_type === 'choose_second_attacker' || a.action_type === 'ChooseFirstAttacker'
+            )) {
                 RpsView.hideIfOpen();
-                actionsDiv.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.9rem;">⚡ Resolving RPS...</div>`;
-                return;
-            }
-            if (mode === 'pve') {
+            } else {
+                if (mode === 'sandbox') {
+                    RpsView.hideIfOpen();
+                    actionsDiv.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.9rem;">⚡ Resolving RPS...</div>`;
+                    return;
+                }
+                if (mode === 'pve') {
+                    RpsView.render(state, perspectivePlayer, actionsDiv);
+                    return;
+                }
                 RpsView.render(state, perspectivePlayer, actionsDiv);
                 return;
             }
-            RpsView.render(state, perspectivePlayer, actionsDiv);
-            return;
         }
 
         // Hide RPS modal if phase ended
         RpsView.hideIfOpen();
 
-        // PvE: show "AI is thinking..." when it's P2's turn (AI handles actions)
-        if (state.mode === 'pve' && (state.active_player === 'player2' || state.active_player === '1' || state.active_player === 1)) {
+        // AI mode: show "AI is thinking..." when it's P2's turn
+        if (State._simulateBoth) {
+            actionsDiv.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.9rem;">🔄 Simulating...</div>';
+            return;
+        }
+        if (State._aiMode && (state.active_player === 'player2' || state.active_player === '1' || state.active_player === 1)) {
             const aiDiv = document.createElement('div');
             aiDiv.className = 'ai-thinking-indicator';
             aiDiv.innerHTML = '<div style="font-weight:bold; color:#0096ff; padding:10px; border-left:4px solid #0096ff; background:rgba(0,150,255,0.1); border-radius:8px;">🤖 AI is thinking...</div>';

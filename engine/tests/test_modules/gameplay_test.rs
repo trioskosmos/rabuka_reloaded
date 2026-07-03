@@ -195,7 +195,7 @@ fn ai_screeam_answer_both_discard() {
 }
 
 #[test]
-fn ai_screeam_answer_both_draw() {
+fn ai_screeam_q185_answer_both_draw() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 

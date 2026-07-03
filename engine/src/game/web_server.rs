@@ -193,6 +193,8 @@ pub struct CreateRoomRequest {
     pub p1_deck: Option<Vec<String>>,
 
     pub p1_energy: Option<Vec<String>>,
+
+    pub is_ai: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -461,9 +463,7 @@ pub async fn get_game_state(
 
                 if let Some(pid) = requester_player_id {
                     let gs = lock_state!(gs_arc, read);
-                    if room.mode == "pvp" {
-                        filter_display_for_player(&mut display, &gs, pid);
-                    }
+                    filter_display_for_player(&mut display, &gs, pid);
                     drop(gs);
                 } else {
                     // PVP room but no session — treat as spectator, block all actions
@@ -474,7 +474,7 @@ pub async fn get_game_state(
     }
     if let Some(pid) = requester_player_id {
         let gs = lock_state!(gs_arc, read);
-        if display.mode != "pve" && !pvp_player_can_act(&gs, pid) {
+        if !pvp_player_can_act(&gs, pid) {
             display.waiting_for_opponent = true;
         }
         drop(gs);
@@ -1984,7 +1984,8 @@ pub async fn rooms_create(
 
     // For PVP rooms, delay game init until both decks are submitted.
     // For sandbox mode, init game state immediately.
-    let room_game_state: Option<Arc<RwLock<GameState>>> = if mode == "pvp" {
+    let is_ai_game = req.is_ai.unwrap_or(false);
+    let room_game_state: Option<Arc<RwLock<GameState>>> = if mode == "pvp" && !is_ai_game {
         None
     } else {
         let card_database = data.card_database.clone();
@@ -2064,7 +2065,7 @@ pub async fn rooms_create(
                 },
             );
 
-            if mode == "pve" {
+            if is_ai_game {
                 ai_session_id = Uuid::new_v4().to_string();
                 room.sessions.insert(
                     ai_session_id.clone(),
@@ -2098,7 +2099,7 @@ pub async fn rooms_create(
         }
     });
 
-    if mode == "pve" {
+    if is_ai_game {
         response["ai_session"] = serde_json::json!({
             "session_id": ai_session_id,
             "player_id": 1

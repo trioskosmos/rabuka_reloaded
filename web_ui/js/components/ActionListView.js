@@ -194,6 +194,8 @@ export const ActionListView = {
                         dbLabel.textContent = i18n.t('double_baton') || 'DOUBLE BATON';
                         dbDiv.appendChild(dbLabel);
 
+                        const shortLabels = { left: 'L', center: 'C', right: 'R' };
+
                         // Group pairs by their 2 replacement areas
                         const pairGroups = {};
                         doubleBatonPairs.forEach(pair => {
@@ -211,13 +213,12 @@ export const ActionListView = {
                             areaOrder.forEach(expectedArea => {
                                 const pairForPlacement = pairGroups[key].find(p => p.placement === expectedArea);
                                 if (pairForPlacement) {
-                                    const labelA = areaLabels[areas[0]] || areas[0];
-                                    const labelB = areaLabels[areas[1]] || areas[1];
-                                    const placeLabel = areaLabels[expectedArea] || expectedArea;
+                                    const srcA = shortLabels[areas[0]] || areas[0];
+                                    const srcB = shortLabels[areas[1]] || areas[1];
+                                    const placeLabel = shortLabels[expectedArea] || expectedArea;
                                     
                                     // Build action params
                                     const replaceIndices = areas.map(a => areaIndexMap[a]);
-                                    const placement = areaIndexMap[expectedArea];
                                     
                                     const dbActionParams = {
                                         card_id: firstA.parameters?.card_id,
@@ -233,9 +234,14 @@ export const ActionListView = {
                                         { action_type: 'play_member_to_stage', parameters: dbActionParams },
                                         true, '', state
                                     );
-                                    const costText = `${labelA}&${labelB} → ${placeLabel} (${pairForPlacement.cost} - Double)`;
-                                    btn.innerHTML = `<span>${costText}</span>`;
+                                    btn.innerHTML = `<span style="display:flex;flex-direction:column;align-items:center;gap:1px;font-weight:600;"><span style="font-size:0.7rem;">${srcA} & ${srcB}</span><span style="font-size:0.65rem;opacity:0.7;">→ ${placeLabel} ${pairForPlacement.cost}</span></span>`;
                                     btn.style.width = '100%';
+                                    btn.className = btn.className + ' action-btn';
+                                    btn.onmouseenter = () => {
+                                        document.querySelectorAll('.action-btn.hover-highlight').forEach(s => s.classList.remove('hover-highlight'));
+                                        btn.classList.add('hover-highlight');
+                                    };
+                                    btn.onmouseleave = () => { btn.classList.remove('hover-highlight'); };
                                     btn.onclick = () => {
                                         if (window.doAction) window.doAction({ action_type: 'play_member_to_stage', parameters: dbActionParams });
                                     };

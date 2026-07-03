@@ -126,3 +126,45 @@ fn kotori_activate_works_without_restriction() {
         ori
     );
 }
+
+/// Q180: The cannot_activate_by_effect restriction only blocks *effects*
+/// that change orientation to active (like Kotori's debut). The natural
+/// Active phase activation still works — it is a game rule, not an effect.
+#[test]
+fn nico_q180_active_phase_still_activates() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let nico = game.id("PL!-pb1-009-R");
+    let filler2 = game.id("PL!-sd1-010-SD");
+
+    game.give_energy(6);
+    game.add_to_hand(nico);
+
+    // Deploy P2 member so P2's Active has something to activate
+    game.state.player2.stage.stage = [filler2, -1, -1];
+    game.state.mods.add_orientation_modifier(filler2, "wait");
+
+    // Deploy Nico to P1 stage → ab#1 adds both P1 and P2 to cannot_activate_members
+    game.play_to_stage(nico, MemberArea::Center);
+    game.drain_auto_ability_choices();
+    assert!(
+        game.state
+            .cannot_activate_members
+            .contains(&"p2".to_string()),
+        "Restriction active for P2"
+    );
+
+    // Advance from P1 Main → P2 Active (first pass transitions, second processes)
+    game.pass();
+    game.pass();
+
+    // Q180: P2's Active phase should activate P2's wait members naturally
+    // despite the cannot_activate_by_effect restriction.
+    let ori = game.state.mods.get_orientation_modifier(filler2).cloned();
+    assert!(
+        ori.is_none() || ori != Some("wait".to_string()),
+        "Q180: Active phase activates wait members despite restriction. Got: {:?}",
+        ori
+    );
+}

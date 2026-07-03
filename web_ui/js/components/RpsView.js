@@ -11,8 +11,8 @@ const SIGNS = [
 
 function signByValue(v) {
     if (v === 0) return SIGNS[0];
-    if (v === 1) return SIGNS[2];
-    if (v === 2) return SIGNS[1];
+    if (v === 1) return SIGNS[1];
+    if (v === 2) return SIGNS[2];
     return null;
 }
 
@@ -187,7 +187,7 @@ function renderFull(body, state, perspectivePlayer) {
                 renderFull(body, {
                     ...state,
                     legal_actions: [],
-                    [myIdx === 0 ? 'player1_rps_choice' : 'player2_rps_choice']: idx === 0 ? 0 : idx === 1 ? 2 : 1,
+                    [myIdx === 0 ? 'player1_rps_choice' : 'player2_rps_choice']: idx,
                 }, perspectivePlayer);
             }
         };

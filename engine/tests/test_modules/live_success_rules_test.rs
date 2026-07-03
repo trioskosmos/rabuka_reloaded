@@ -470,7 +470,7 @@ fn daydream_mermaid_no_niji_in_success_pick_one() {
 }
 
 #[test]
-fn daydream_mermaid_niji_in_success_pick_both() {
+fn daydream_mermaid_q191_niji_in_success_pick_both() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live = game.id("PL!N-bp4-030-L");
