@@ -182,8 +182,14 @@ fn sunny_branch2_two_mus_grants_heart() {
 
     // One μ's member should have heart03 modifier now
     use rabuka_engine::card::HeartColor;
-    let heart03_mod_1 = game.state.mods.get_heart_modifier(honoka, HeartColor::Heart03);
-    let heart03_mod_2 = game.state.mods.get_heart_modifier(kotori, HeartColor::Heart03);
+    let heart03_mod_1 = game
+        .state
+        .mods
+        .get_heart_modifier(honoka, HeartColor::Heart03);
+    let heart03_mod_2 = game
+        .state
+        .mods
+        .get_heart_modifier(kotori, HeartColor::Heart03);
     assert!(
         heart03_mod_1 >= 1 || heart03_mod_2 >= 1,
         "One μ's member should gain heart03 from Branch 2"
@@ -222,12 +228,21 @@ fn sunny_branch2_two_non_mus_no_heart() {
 
     // Branch 2 condition (count>=2) is met, but no μ's member exists to target.
     // The effect should skip the gain_resource silently (no choice presented).
-    assert!(!game.has_pending_choice(), "No heart target choice when no μ's members");
+    assert!(
+        !game.has_pending_choice(),
+        "No heart target choice when no μ's members"
+    );
 
     // Verify no heart03 was granted to either member
     use rabuka_engine::card::HeartColor;
-    let h_a = game.state.mods.get_heart_modifier(aqours_a, HeartColor::Heart03);
-    let h_b = game.state.mods.get_heart_modifier(aqours_b, HeartColor::Heart03);
+    let h_a = game
+        .state
+        .mods
+        .get_heart_modifier(aqours_a, HeartColor::Heart03);
+    let h_b = game
+        .state
+        .mods
+        .get_heart_modifier(aqours_b, HeartColor::Heart03);
     assert_eq!(h_a, 0, "Non-μ's member should not get heart03");
     assert_eq!(h_b, 0, "Non-μ's member should not get heart03");
 }
@@ -261,11 +276,17 @@ fn sunny_branch2_one_member_skips_b2() {
     }
 
     // Branch 2 should NOT fire (only 1 member)
-    assert!(!game.has_pending_choice(), "Branch 2 should not trigger with only 1 member");
+    assert!(
+        !game.has_pending_choice(),
+        "Branch 2 should not trigger with only 1 member"
+    );
 
     // No heart03 granted
     use rabuka_engine::card::HeartColor;
-    let heart03_mod = game.state.mods.get_heart_modifier(honoka, HeartColor::Heart03);
+    let heart03_mod = game
+        .state
+        .mods
+        .get_heart_modifier(honoka, HeartColor::Heart03);
     assert_eq!(heart03_mod, 0, "No heart03 granted with only 1 member");
 }
 
@@ -303,8 +324,14 @@ fn sunny_q210_joint_card_counts_as_one_member() {
 
     // Branch 2 should NOT have fired (count = 1, need >= 2).
     // Verify no heart03 was granted to the joint card.
-    let heart03_mod = game.state.mods.get_heart_modifier(joint, rabuka_engine::card::HeartColor::Heart03);
-    assert_eq!(heart03_mod, 0, "No heart03 granted with 1 joint member (Branch 2 should not fire)");
+    let heart03_mod = game
+        .state
+        .mods
+        .get_heart_modifier(joint, rabuka_engine::card::HeartColor::Heart03);
+    assert_eq!(
+        heart03_mod, 0,
+        "No heart03 granted with 1 joint member (Branch 2 should not fire)"
+    );
 }
 
 /// Q211: Joint card (LL-bp3-001-R+, contains μ's character 園田海未) + 1 other member = 2 members.
@@ -342,7 +369,10 @@ fn sunny_q211_joint_card_targetable_for_mus_heart() {
     game.drain_auto_ability_choices();
 
     // Branch 2 fires (2 members) → should present a heart target selection
-    assert!(game.has_pending_choice(), "Branch 2 should fire with joint card + 1 other = 2 members");
+    assert!(
+        game.has_pending_choice(),
+        "Branch 2 should fire with joint card + 1 other = 2 members"
+    );
 
     // The heart target choice is a SelectTarget for position|destination or similar.
     // Use generated actions to pick the first offered member.
@@ -355,10 +385,16 @@ fn sunny_q211_joint_card_targetable_for_mus_heart() {
 
     // Verify the joint card received heart03
     use rabuka_engine::card::HeartColor;
-    let heart03_mod = game.state.mods.get_heart_modifier(joint, HeartColor::Heart03);
+    let heart03_mod = game
+        .state
+        .mods
+        .get_heart_modifier(joint, HeartColor::Heart03);
     // The other member should also be checked
-    let heart03_mod_other = game.state.mods.get_heart_modifier(other, HeartColor::Heart03);
-    
+    let heart03_mod_other = game
+        .state
+        .mods
+        .get_heart_modifier(other, HeartColor::Heart03);
+
     // At least one member should have heart03 (the joint card is a valid μ's target)
     assert!(
         heart03_mod >= 1 || heart03_mod_other >= 1,

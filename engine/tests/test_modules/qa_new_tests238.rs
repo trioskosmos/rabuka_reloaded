@@ -47,7 +47,10 @@ fn q238_reposition_opponent_member() {
     trigger_rino_auto(&mut game, rino);
 
     // Should have a pending choice (optional position_change)
-    assert!(game.has_pending_choice(), "Rino's auto should fire on stage→discard");
+    assert!(
+        game.has_pending_choice(),
+        "Rino's auto should fire on stage→discard"
+    );
 
     // Options should include opponent:center (the only member on stage)
     let actions = count_position_actions(&game);
@@ -64,15 +67,16 @@ fn q238_reposition_opponent_member() {
     // Move opponent member to left
     game.select_generated(0);
 
-    assert!(!game.has_pending_choice(), "No more choices after reposition");
+    assert!(
+        !game.has_pending_choice(),
+        "No more choices after reposition"
+    );
     assert_eq!(
-        game.state.player2.stage.stage[0],
-        opp_member,
+        game.state.player2.stage.stage[0], opp_member,
         "Opponent member moved to left"
     );
     assert_eq!(
-        game.state.player2.stage.stage[1],
-        -1,
+        game.state.player2.stage.stage[1], -1,
         "Opponent center now empty"
     );
 }
@@ -179,13 +183,11 @@ fn q238_select_opponent_center() {
 
     assert!(!game.has_pending_choice(), "Done");
     assert_eq!(
-        game.state.player2.stage.stage[0],
-        opp_center,
+        game.state.player2.stage.stage[0], opp_center,
         "Center member moved to left"
     );
     assert_eq!(
-        game.state.player2.stage.stage[1],
-        opp_left,
+        game.state.player2.stage.stage[1], opp_left,
         "Left member stayed in place"
     );
 }
@@ -208,18 +210,13 @@ fn q238_optional_skip() {
     assert!(game.has_pending_choice(), "Rino's auto should fire");
 
     // Skip the optional reposition
-    rabuka_engine::turn::TurnEngine::resume_with_choice(
-        &mut game.state,
-        Some(-1),
-        None,
-    )
-    .expect("skip should succeed");
+    rabuka_engine::turn::TurnEngine::resume_with_choice(&mut game.state, Some(-1), None)
+        .expect("skip should succeed");
 
     assert!(!game.has_pending_choice(), "No more choices after skip");
     // Opponent member should remain in place
     assert_eq!(
-        game.state.player2.stage.stage[1],
-        opp_member,
+        game.state.player2.stage.stage[1], opp_member,
         "Opponent member unchanged after skip"
     );
 }

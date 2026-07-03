@@ -465,10 +465,37 @@ export const LogRenderer = {
                 <span class="ability-cond-text"><strong>結果: ${meta.result}</strong></span>
             </div>`;
             detailsContainer.appendChild(resultDiv);
-        } else {
-            detailsContainer.innerHTML = `<div class="log-entry effect detail">
-                <span class="ability-cond-text">結果: ${meta.result === 'pending' ? '条件評価待ち' : meta.result}</span>
+        } else if (meta.resolved && meta.items && meta.items.length === 0) {
+            // Resolved but no detailed items (e.g. negated, skipped)
+            if (meta.ability_text) {
+                const abilityTextDiv = document.createElement('div');
+                abilityTextDiv.className = 'log-entry effect detail ability-full-text';
+                abilityTextDiv.innerHTML = Tooltips.enrichAbilityText(meta.ability_text);
+                detailsContainer.appendChild(abilityTextDiv);
+            }
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'log-entry effect detail';
+            const resultClass = meta.result === 'success' ? 'ability-pass' : 'ability-fail';
+            const resultIcon = meta.result === 'success' ? '✓' : '✗';
+            const resultLabel = meta.result === 'skipped' ? 'スキップ' : meta.result === 'failure' ? '失敗' : meta.result === 'position_fail' ? '位置条件不成立' : meta.result;
+            resultDiv.innerHTML = `<div class="ability-cond-row">
+                <span class="ability-cond-icon ${resultClass}">${resultIcon}</span>
+                <span class="ability-cond-text"><strong>結果: ${resultLabel}</strong></span>
+                ${meta.error ? `<span class="ability-cond-detail">(${meta.error})</span>` : ''}
             </div>`;
+            detailsContainer.appendChild(resultDiv);
+        } else {
+            // Not yet resolved — show ability text if available
+            if (meta.ability_text) {
+                const abilityTextDiv = document.createElement('div');
+                abilityTextDiv.className = 'log-entry effect detail ability-full-text';
+                abilityTextDiv.innerHTML = Tooltips.enrichAbilityText(meta.ability_text);
+                detailsContainer.appendChild(abilityTextDiv);
+            }
+            const pendingDiv = document.createElement('div');
+            pendingDiv.className = 'log-entry effect detail';
+            pendingDiv.innerHTML = `<span class="ability-cond-text">結果: ${meta.result === 'pending' ? '条件評価待ち' : meta.result}</span>`;
+            detailsContainer.appendChild(pendingDiv);
         }
         blockDiv.appendChild(detailsContainer);
 

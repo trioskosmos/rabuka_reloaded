@@ -155,6 +155,7 @@ pub mod position_change_multi_test;
 pub mod position_change_non_optional_test;
 pub mod position_change_triggers_jidou_move_test;
 pub mod q38_live_card_zone_test;
+pub mod q137_already_waited_cost_test;
 pub mod qa_new_tests;
 pub mod qa_new_tests198;
 pub mod qa_new_tests202;
@@ -318,6 +319,11 @@ pub mod keke_pb2_013_debut_test;
 pub mod catchu_energy_activation_test;
 pub mod live_cards_disappear_test;
 
+// Q176: 園田海未 pb1-013 — opponent picks from your hand blind, reveal live → +1 score
+pub mod umi_pb1_013_test;
+// Q176 companion: 園田海未 PR-014 — you pick from opponent's hand blind, reveal → draw
+pub mod umi_pr014_test;
+
 // ノンフィクション!! (PL!SP-bp4-024) — LiveStart cost comparison (ab#0)
 pub mod nonfiction_cost_comparison_test;
 
@@ -329,6 +335,6 @@ pub mod self_control_position_change_test;
 pub mod riko_bp5_center_cost_equal_test;
 
 // Wonder zone (PL!-bp5-020-L) — modify_required_hearts per-unit with per_unit_heart_colors + max_repeats
-pub mod wonder_zone_max_repeats_test;
 pub mod auto_system_stress_test;
 pub mod baton_touch_order_test;
+pub mod wonder_zone_max_repeats_test;

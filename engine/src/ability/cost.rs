@@ -129,6 +129,30 @@ impl AbilityResolver {
                 }
                 Ok(())
             }
+            // Q137: 「ウェイトにする」はアクティブ状態のメンバーをウェイト状態にすること
+            // を意味します。既にウェイト状態のメンバーをコストで「ウェイトにする」ことは
+            // できません。対象がいない場合、そのコストは支払えません。
+            "change_state" => {
+                let state_change = cost.state_change.as_deref().unwrap_or("");
+                if state_change == "wait" {
+                    let target = cost.target.as_deref().unwrap_or("self");
+                    let exclude_self = cost.exclude_self.unwrap_or(false);
+                    let candidates = get_change_state_candidates(
+                        gs,
+                        target,
+                        cost.card_type.as_deref(),
+                        cost.group_names.as_ref(),
+                        exclude_self,
+                        cost.self_cost.unwrap_or(false),
+                        false,
+                        Some("active"),
+                    );
+                    if candidates.is_empty() {
+                        return Err("No active members on stage to wait (Q137)".to_string());
+                    }
+                }
+                Ok(())
+            }
             _ => Ok(()),
         }
     }
@@ -553,8 +577,12 @@ impl AbilityResolver {
                     .is_some_and(|t| t == crate::triggers::ACTIVATION);
 
                 if optional && !is_activation {
-                    // For non-self_cost change_state, verify active candidates exist before prompting
-                    if state_change == "wait" && cost.self_cost != Some(true) {
+                    // Q137: 「ウェイトにする」とは、アクティブ状態のメンバーをウェイト
+                    // 状態にすることを意味します。既にウェイト状態のメンバーをコストで
+                    // 「ウェイトにする」ことはできません。
+                    // Verify active candidates exist before prompting — applies to
+                    // both self_cost and non-self_cost.
+                    if state_change == "wait" {
                         let exclude_self = cost.exclude_self.unwrap_or(false);
                         let candidates = get_change_state_candidates(
                             gs,
@@ -562,7 +590,7 @@ impl AbilityResolver {
                             cost.card_type.as_deref(),
                             cost.group_names.as_ref(),
                             exclude_self,
-                            false,
+                            cost.self_cost.unwrap_or(false),
                             false,
                             Some("active"),
                         );
@@ -607,8 +635,11 @@ impl AbilityResolver {
                     );
                     log::debug!("[CHANGE_STATE] candidates={:?}", candidates);
 
+                    // Q137 / Rule 1.3.2.1: 「ウェイトにする」はアクティブ状態のメンバー
+                    // をウェイト状態にすることを意味します。対象がいない場合、その行為自体
+                    // が行われません（エラーではなく正常にスキップ）。
                     if candidates.is_empty() {
-                        return Err("No matching members on stage to change state".to_string());
+                        return Ok(());
                     }
 
                     if candidates.len() <= count {
@@ -939,7 +970,16 @@ impl AbilityResolver {
                 if cost.state_change.as_deref() == Some("wait") {
                     if cost.self_cost == Some(true) {
                         if let Some(id) = gs.activating_card {
-                            gs.mods.add_orientation_modifier(id, "wait");
+                            // Q137: 「ウェイトにする」はアクティブ状態のメンバーをウェイト
+                            // 状態にすることを意味します。既にウェイト状態の場合、
+                            // その行為自体が行われません（Rule 1.3.2.1）。
+                            let already_waited = gs
+                                .mods
+                                .get_orientation_modifier(id)
+                                .is_some_and(|o| o == "wait");
+                            if !already_waited {
+                                gs.mods.add_orientation_modifier(id, "wait");
+                            }
                         }
                     } else {
                         let target = cost.target.as_deref().unwrap_or("self");
@@ -958,8 +998,9 @@ impl AbilityResolver {
                             Some("active"),
                         );
 
+                        // Q137 / Rule 1.3.2.1: No active candidates — the act is not performed.
                         if candidates.is_empty() {
-                            return Err("No matching members on stage to change state".to_string());
+                            return Ok(());
                         }
 
                         if candidates.len() <= count {

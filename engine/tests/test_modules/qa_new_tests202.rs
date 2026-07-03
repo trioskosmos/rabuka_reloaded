@@ -11,8 +11,8 @@
 ///
 /// Ruling: the deployed card's 登場 ability fires normally.
 use crate::helpers::*;
-use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::game_setup::ActionType;
+use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
 
 /// Helper: play a deployer card, trigger its debut, deploy target, then
@@ -54,7 +54,9 @@ fn deploy_and_trigger(
                 game.select_option(0);
             }
             rabuka_engine::ability::types::Choice::SelectTarget { target, .. } => {
-                if target == "conditional_optional" || target == "pay_optional_cost:skip_optional_cost" {
+                if target == "conditional_optional"
+                    || target == "pay_optional_cost:skip_optional_cost"
+                {
                     // Pay the optional cost (option 1 = pay)
                     game.select_option(1);
                 } else if target == "position|destination" {
@@ -90,9 +92,9 @@ fn q202_mia_deploy_triggers_target_debut() {
 
     let (_deployer, target) = deploy_and_trigger(
         &mut game,
-        "PL!N-pb1-023-R",    // ミア・テイラー (cost 13)
-        "PL!N-PR-013-PR",    // ミア・テイラー (cost 4)
-        15,                   // 13 to play + 2 for ability
+        "PL!N-pb1-023-R", // ミア・テイラー (cost 13)
+        "PL!N-PR-013-PR", // ミア・テイラー (cost 4)
+        15,               // 13 to play + 2 for ability
     );
 
     // The target's debut ability should now present choices:
@@ -160,9 +162,9 @@ fn q201_miyashita_deploy_triggers_target_debut() {
 
     let (_deployer, target) = deploy_and_trigger(
         &mut game,
-        "PL!N-pb1-017-R",    // 宮下 愛 (cost 7)
-        "PL!N-bp4-005-R",    // 宮下 愛 (cost 4)
-        9,                    // 7 to play + 2 for ability
+        "PL!N-pb1-017-R", // 宮下 愛 (cost 7)
+        "PL!N-bp4-005-R", // 宮下 愛 (cost 4)
+        9,                // 7 to play + 2 for ability
     );
 
     // Target's debut: optional discard 1 → wait up to 2 cost≤4 members
@@ -190,9 +192,9 @@ fn q200_uehara_deploy_triggers_target_debut() {
 
     let (_deployer, target) = deploy_and_trigger(
         &mut game,
-        "PL!N-pb1-013-R",    // 上原歩夢 (cost 7)
-        "PL!N-sd1-013-SD",   // 上原歩夢 (cost 4)
-        9,                    // 7 to play + 2 for ability
+        "PL!N-pb1-013-R",  // 上原歩夢 (cost 7)
+        "PL!N-sd1-013-SD", // 上原歩夢 (cost 4)
+        9,                 // 7 to play + 2 for ability
     );
 
     // Target's debut: draw 1, discard 1 (mandatory).

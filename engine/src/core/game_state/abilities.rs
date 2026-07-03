@@ -402,7 +402,8 @@ impl GameState {
                             // Batch-scoped guard: use instance-aware key so
                             // different copies of the same card (P1 vs P2) are
                             // not blocked by each other's batch dedup.
-                            let batch_key = format!("{}_{}_{}", card_id, card.card_no, ability.full_text);
+                            let batch_key =
+                                format!("{}_{}_{}", card_id, card.card_no, ability.full_text);
                             // Re-scan guard: skip re-enqueueing the exact auto
                             // ability that just completed.
                             if skip_this_card_auto_key.as_deref() == Some(&ability_id) {
@@ -474,7 +475,8 @@ impl GameState {
                                 }
                             }
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                            let batch_key = format!("{}_{}_{}", card_id, card.card_no, ability.full_text);
+                            let batch_key =
+                                format!("{}_{}_{}", card_id, card.card_no, ability.full_text);
                             if skip_this_card_auto_key.as_deref() == Some(&ability_id) {
                                 continue;
                             }
@@ -550,7 +552,8 @@ impl GameState {
                                 }
                             }
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                            let batch_key = format!("{}_{}_{}", moved_card_id, card.card_no, ability.full_text);
+                            let batch_key =
+                                format!("{}_{}_{}", moved_card_id, card.card_no, ability.full_text);
                             if skip_this_card_auto_key.as_deref() == Some(&ability_id) {
                                 continue;
                             }
@@ -1157,6 +1160,110 @@ impl GameState {
                 "[NEGATED] card_id={:?} is negated — skipping ability resolution",
                 card_id
             );
+            // Update the matching trigger_evaluation entry so it doesn't stay "pending"
+            let card_name = card_id
+                .and_then(|id| self.card_database.get_card(id))
+                .map(|c| c.name.clone())
+                .unwrap_or_default();
+            let pp = self.player_prefix();
+            let trigger_str = match ability.triggers.as_deref() {
+                Some(t)
+                    if t.contains(crate::triggers::DEBUT)
+                        || t.contains(crate::triggers::DEBUT_EN) =>
+                {
+                    "debut"
+                }
+                Some(t) if t.contains(crate::triggers::LIVE_START) => "live_start",
+                Some(t)
+                    if t.contains(crate::triggers::LIVE_SUCCESS)
+                        || t.contains(crate::triggers::LIVE_SUCCESS_EN) =>
+                {
+                    "live_success"
+                }
+                Some(t) if t.contains(crate::triggers::ACTIVATION) => "activation",
+                Some(t) if t.contains(crate::triggers::CONSTANT) => "constant",
+                Some(t) if t.contains(crate::triggers::AUTO) => "auto",
+                _ => "unknown",
+            };
+            let ability_text = ability.full_text.clone();
+            let zone = card_id
+                .map(|cid| {
+                    if self.player1.stage.stage.contains(&cid) {
+                        "stage"
+                    } else if self.player1.live_card_zone.cards.contains(&cid) {
+                        "live_card_zone"
+                    } else if self.player2.stage.stage.contains(&cid) {
+                        "stage"
+                    } else if self.player2.live_card_zone.cards.contains(&cid) {
+                        "live_card_zone"
+                    } else {
+                        "?"
+                    }
+                })
+                .unwrap_or("?");
+            // Push ability_resolution entry
+            let log_text =
+                format!("{pp} {card_name} [{zone}]: 能力発動 [{trigger_str}] — skipped (negated)");
+            self.rule_log.push(log_text.clone());
+            self.structured_log.push(crate::types::LogEntry {
+                text: log_text,
+                turn: self.turn_number,
+                player_label: pp.clone(),
+                source_card_id: card_id,
+                source_card_name: Some(card_name),
+                category: "ability_resolution".to_string(),
+                metadata: Some(serde_json::json!({
+                    "result": "skipped",
+                    "items": [],
+                    "ability_text": ability_text,
+                    "zone": zone,
+                    "error": "card negated",
+                })),
+            });
+            // Update matching trigger_evaluation entry
+            let ability_index = ability_index;
+            if let Some(cid) = card_id {
+                for entry in self.structured_log.iter_mut().rev() {
+                    if entry.category != "trigger_evaluation" {
+                        continue;
+                    }
+                    if entry.source_card_id != Some(cid) {
+                        continue;
+                    }
+                    if entry.turn != self.turn_number {
+                        continue;
+                    }
+                    let trigger_match = entry
+                        .metadata
+                        .as_ref()
+                        .and_then(|m| m.get("trigger"))
+                        .and_then(|v| v.as_str())
+                        == Some(trigger_str);
+                    if !trigger_match {
+                        continue;
+                    }
+                    let eval_idx = entry
+                        .metadata
+                        .as_ref()
+                        .and_then(|m| m.get("ability_index"))
+                        .and_then(|v| v.as_u64())
+                        .map(|v| v as usize);
+                    if let Some(ei) = eval_idx {
+                        if ability_index != ei {
+                            continue;
+                        }
+                    }
+                    if let Some(ref mut meta) = entry.metadata {
+                        if let Some(obj) = meta.as_object_mut() {
+                            obj.insert("result".to_string(), serde_json::json!("skipped"));
+                            obj.insert("items".to_string(), serde_json::json!([]));
+                            obj.insert("ability_text".to_string(), serde_json::json!(ability_text));
+                            obj.insert("resolved".to_string(), serde_json::json!(true));
+                        }
+                    }
+                    break;
+                }
+            }
             self.ability_queue.complete_current();
             self.activating_card = None;
             self.activating_ability_index = None;
@@ -1350,7 +1457,10 @@ impl GameState {
             // Scan stage watchers (e.g. each_time triggers) BEFORE clearing
             // recently_moved_cards so their preceding_moved conditions pass.
             // Trigger types: each_time:discard, each_time:area_move, each_time:energy_placed
-            if self.recently_moved_cards.is_some() || self.last_energy_placed_by_effect() || !self.recently_appeared_cards.is_empty() {
+            if self.recently_moved_cards.is_some()
+                || self.last_energy_placed_by_effect()
+                || !self.recently_appeared_cards.is_empty()
+            {
                 if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
                     log::debug!(
                         "[PCA_TRIGGER] scanning stage watchers pid={} moved={:?}",
@@ -1571,8 +1681,12 @@ impl GameState {
                     if let Some(ref choice_text) = entry.choice_effect_text {
                         if !choice_text.is_empty() {
                             if let Some(ref effect) = entry.ability.effect {
-                                let prompt_ja = crate::ability::describe::describe_effect_ja(effect);
-                                obj.insert("prompt_ja".into(), serde_json::Value::String(prompt_ja));
+                                let prompt_ja =
+                                    crate::ability::describe::describe_effect_ja(effect);
+                                obj.insert(
+                                    "prompt_ja".into(),
+                                    serde_json::Value::String(prompt_ja),
+                                );
                             }
                         }
                     }

@@ -761,6 +761,11 @@ impl AbilityResolver {
         let ability_key = activating_card
             .map(|card_id| format!("{}_{}_{}", card_id, ability_index, gs.turn_number));
 
+        // Set these early so push_ability_result can access them on early exits
+        self.current_ability = Some(ability.clone());
+        self.current_ability_index = Some(ability_index);
+        gs.activating_card = activating_card;
+
         if let Some(ref key) = ability_key {
             if let Some(use_limit) = ability.use_limit {
                 let used = gs
@@ -774,6 +779,8 @@ impl AbilityResolver {
                         used, use_limit
                     );
                     dbg.p("RESULT", &msg);
+                    let items = drain_verdicts();
+                    self.push_ability_result(gs, "skipped", items, Some(&msg));
                     return Err(msg);
                 }
             }
@@ -783,15 +790,19 @@ impl AbilityResolver {
         if let Some(card_id) = activating_card {
             let position = gs.find_card_stage_position(card_id);
             if !self.check_keywords(gs, ability.keywords.as_ref().unwrap_or(&vec![]), position) {
+                let items = drain_verdicts();
+                self.push_ability_result(
+                    gs,
+                    "position_fail",
+                    items,
+                    Some("Activation keywords not satisfied"),
+                );
                 return Err(
                     "Activation keywords not satisfied (e.g. card not at required position)"
                         .to_string(),
                 );
             }
         }
-        self.current_ability = Some(ability.clone());
-        self.current_ability_index = Some(ability_index);
-        gs.activating_card = activating_card;
 
         let cost_already_paid = gs
             .ability_queue
@@ -906,13 +917,8 @@ impl AbilityResolver {
                             ));
                         }
                         dbg.p("RESULT", "position requirement not met — effect skipped");
-                        // Flush structured log for non-auto position failures
-                        if ability.triggers.as_deref() == Some(crate::triggers::ACTIVATION)
-                            || ability.triggers.as_deref() == Some(crate::triggers::DEBUT)
-                        {
-                            let items = drain_verdicts();
-                            self.push_ability_result(gs, "position_fail", items, None);
-                        }
+                        let items = drain_verdicts();
+                        self.push_ability_result(gs, "position_fail", items, None);
                         return Ok(());
                     }
                 }

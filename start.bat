@@ -8,6 +8,9 @@ powershell -NoProfile -Command "Start-Process netsh -Verb RunAs -ArgumentList 'a
 echo Starting Rust Backend on http://127.0.0.1:8080...
 cd /d "%~dp0engine"
 
+REM Enable structured verdict items in the in-game rule log
+set RABUKA_RULE_LOG=1
+
 REM If --ngrok specified, save its auth token argument
 if "%1"=="--ngrok" set NGROK_AUTHTOKEN=%2
 

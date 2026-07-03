@@ -223,15 +223,12 @@ function render() {
                     if (hasDoubleBaton) {
                         const areaIndexMap = { left: 0, center: 1, right: 2 };
                         const areaOrder = ['left', 'center', 'right'];
-                        const shortLabels = { left: 'L', center: 'C', right: 'R' };
-
-                        const dbDiv = document.createElement('div');
-                        dbDiv.style.cssText = 'margin-top: 6px; border-top: 1px dashed rgba(255, 215, 0, 0.3); background: rgba(0,0,0,0.15); padding: 6px; border-radius: 4px;';
+                        const areaLabels = { left: i18n.t('area_left'), center: i18n.t('area_center'), right: i18n.t('area_right') };
 
                         const dbLabel = document.createElement('div');
-                        dbLabel.style.cssText = 'font-size: 0.7em; color: #ffda79; margin-bottom: 4px; font-weight: bold;';
+                        dbLabel.style.cssText = 'font-size: 0.65em; color: #ffda79; margin-top: 4px; font-weight: bold;';
                         dbLabel.textContent = i18n.t('double_baton') || 'DOUBLE BATON';
-                        dbDiv.appendChild(dbLabel);
+                        groupDiv.appendChild(dbLabel);
 
                         const pairGroups = {};
                         doubleBatonPairs.forEach(pair => {
@@ -243,15 +240,14 @@ function render() {
                         Object.keys(pairGroups).forEach(key => {
                             const row = document.createElement('div');
                             row.className = 'action-group-buttons grid-3';
-                            row.style.cssText = 'padding: 2px; border-radius: 4px; margin-top: 2px;';
 
                             const areas = key.split('&');
                             areaOrder.forEach(expectedArea => {
                                 const pairForPlacement = pairGroups[key].find(p => p.placement === expectedArea);
                                 if (pairForPlacement) {
-                                    const srcA = shortLabels[areas[0]] || areas[0];
-                                    const srcB = shortLabels[areas[1]] || areas[1];
-                                    const placeLabel = shortLabels[expectedArea] || expectedArea;
+                                    const srcA = areaLabels[areas[0]] || areas[0];
+                                    const srcB = areaLabels[areas[1]] || areas[1];
+                                    const placeLabel = areaLabels[expectedArea] || expectedArea;
 
                                     const replaceIndices = areas.map(a => areaIndexMap[a]);
                                     const dbActionParams = {
@@ -268,17 +264,21 @@ function render() {
                                         { action_type: 'play_member_to_stage', parameters: dbActionParams },
                                         true, '', State.data
                                     );
-                                    btn.innerHTML = `<span style="display:flex;flex-direction:column;align-items:center;gap:1px;font-weight:600;"><span style="font-size:0.7rem;">${srcA} & ${srcB}</span><span style="font-size:0.65rem;opacity:0.7;">→ ${placeLabel} ${pairForPlacement.cost}</span></span>`;
-                                    btn.style.width = '100%';
+                                    btn.innerHTML = `<span style="display:flex;flex-direction:column;align-items:center;gap:1px;font-weight:600;"><span style="font-size:0.7rem;">${srcA}&${srcB}</span><span style="font-size:0.6rem;opacity:0.7;">→${placeLabel} ${pairForPlacement.cost}</span></span>`;
+                                    btn.dataset.zoneArea = expectedArea;
+                                    btn.style.cssText = '';
                                     btn.className = btn.className + ' action-btn';
                                     btn.onclick = (e) => { e.stopPropagation(); CardDetailModal.close(); if (window.doAction) window.doAction({ action_type: 'play_member_to_stage', parameters: dbActionParams }); };
                                     row.appendChild(btn);
                                 } else {
                                     const spacer = document.createElement('div');
-                                    spacer.style.cssText = 'min-height: 30px; display: flex; align-items: center; justify-content: center; opacity: 0.2; font-size: 0.6em; border: 1px dashed rgba(255,255,255,0.1);';
-                                    spacer.textContent = '--';
+                                    spacer.style.cssText = 'flex:1;min-height:36px;border:1px solid transparent;border-right:none;';
                                     row.appendChild(spacer);
                                 }
+                            });
+                            groupDiv.appendChild(row);
+                        });
+                    }
                             });
                             dbDiv.appendChild(row);
                         });

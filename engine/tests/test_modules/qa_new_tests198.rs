@@ -15,9 +15,9 @@
 ///     カードを1枚引き、ライブ終了時まで自分のステージの『虹ヶ咲』メンバー1人にブレード。
 ///   Ruling: Can activate even with 0 members on stage (draw still works).
 use crate::helpers::*;
-use rabuka_engine::zones::MemberArea;
-use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::game_setup::ActionType;
+use rabuka_engine::turn::TurnEngine;
+use rabuka_engine::zones::MemberArea;
 
 // ============================================================
 // Q198 — 鐘 嵐珠 (PL!N-pb1-012-R)
@@ -300,5 +300,8 @@ fn q196_activate_with_niji_member_grants_blade() {
 
     // Blade should be granted to the 虹ヶ咲 member
     let blade = game.state.mods.get_blade_modifier(niji);
-    assert!(blade > 0, "虹ヶ咲 member should gain blade from Q196 activation");
+    assert!(
+        blade > 0,
+        "虹ヶ咲 member should gain blade from Q196 activation"
+    );
 }

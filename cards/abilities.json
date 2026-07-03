@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-03T07:04:50.607023",
+  "generated_at": "2026-07-03T13:27:40.517630",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -13312,7 +13312,8 @@
           "count": 1,
           "target": "self",
           "action": "reveal",
-          "blind": true
+          "blind": true,
+          "picker": "opponent"
         },
         "result_condition": {
           "text": "これにより公開されたカードがライブカードの場合",
@@ -19990,7 +19991,8 @@
           "count": 3,
           "target": "opponent",
           "action": "reveal",
-          "blind": true
+          "blind": true,
+          "picker": "self"
         },
         "result_condition": {
           "text": "これにより公開されたカードの中にライブカードがない場合",

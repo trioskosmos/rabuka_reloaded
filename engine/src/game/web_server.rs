@@ -1937,7 +1937,7 @@ pub async fn rooms_create(
         })
         .collect();
 
-    let mut mode = req.mode.clone().unwrap_or_else(|| "sandbox".to_string());
+    let mode = req.mode.clone().unwrap_or_else(|| "sandbox".to_string());
     // pve mode aliases to sandbox gameplay but preserves the mode string
     // so the frontend can distinguish vs AI from sandbox
 
@@ -2693,6 +2693,11 @@ pub async fn run_web_server() -> std::io::Result<()> {
 }
 
 pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::io::Result<()> {
+    // Enable structured verdict items in the in-game rule log when RABUKA_RULE_LOG=1
+    if std::env::var("RABUKA_RULE_LOG").as_deref() == Ok("1") {
+        crate::ability::debug::set_rule_log_verbose(true);
+    }
+
     let rooms = Arc::new(Mutex::new(HashMap::new()));
 
     // Initialize card database (only loaded once at startup)

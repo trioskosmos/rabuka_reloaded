@@ -997,6 +997,10 @@ pub struct AbilityEffect {
     /// Blind selection: "見ないで" — the selecting player should not see card identities
     #[serde(default)]
     pub blind: Option<bool>,
+    /// Who performs the blind pick: "opponent" (opponent picks from your hand)
+    /// or "self" (you pick from opponent's hand). Absent when blind is false.
+    #[serde(default)]
+    pub picker: Option<String>,
     /// Dynamic group reference (same_group_name, different_group_names)
     #[serde(default)]
     pub group_reference: Option<String>,

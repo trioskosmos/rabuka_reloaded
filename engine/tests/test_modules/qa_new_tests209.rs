@@ -10,8 +10,8 @@
 ///   PL!N-bp5-014-N (中須かすみ) — activation(起動):
 ///     Pay 2E + discard 1 → retrieve 1 虹ヶ咲 live from waitroom
 use crate::helpers::*;
-use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::game_setup::ActionType;
+use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
 
 // ============================================================
@@ -447,7 +447,10 @@ fn q209_kasumi_use_limit_blocks_second() {
         None,
     );
 
-    assert!(result.is_err(), "Second activation should be blocked by use_limit");
+    assert!(
+        result.is_err(),
+        "Second activation should be blocked by use_limit"
+    );
 }
 
 /// Retrieve a 虹ヶ咲 live that was pre-existing in waitroom (not the discarded one).

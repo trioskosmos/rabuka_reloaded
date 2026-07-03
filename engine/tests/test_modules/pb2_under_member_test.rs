@@ -7,8 +7,12 @@ fn pb2_kinako_under_member_both_players() {
     let mut game = TestGame::new(db);
     let filler = game.id("PL!-sd1-010-SD");
 
-    for _ in 0..40 { game.state.player1.main_deck.cards.push(filler); }
-    for _ in 0..40 { game.state.player2.main_deck.cards.push(filler); }
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..40 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     game.give_energy(15);
     for _ in 0..15 {
         let e = game.id("LL-E-001-SD");
@@ -28,9 +32,10 @@ fn pb2_kinako_under_member_both_players() {
 
     assert!(game.has_pending_choice());
     let acts = game.generated_actions();
-    let left_idx = acts.iter().position(|a| {
-        a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("left")
-    }).expect("left destination");
+    let left_idx = acts
+        .iter()
+        .position(|a| a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("left"))
+        .expect("left destination");
     game.select_generated(left_idx);
 
     let under_center = game.state.player1.stage.under_cards[1].to_vec();
@@ -38,7 +43,8 @@ fn pb2_kinako_under_member_both_players() {
     assert!(
         under_center.contains(&p1_liella) || under_left.contains(&p1_liella),
         "P1: Liella! under きな子. center={:?} left={:?}",
-        under_center, under_left
+        under_center,
+        under_left
     );
 
     // P2's turn
@@ -62,13 +68,15 @@ fn pb2_kinako_under_member_both_players() {
         None,
         Some(MemberArea::Center),
         Some(false),
-    ).expect("P2 play");
+    )
+    .expect("P2 play");
 
     assert!(game.has_pending_choice());
     let acts = game.generated_actions();
-    let left_idx = acts.iter().position(|a| {
-        a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("left")
-    }).expect("P2 left destination");
+    let left_idx = acts
+        .iter()
+        .position(|a| a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("left"))
+        .expect("P2 left destination");
     game.select_generated(left_idx);
 
     let under_center_p2 = game.state.player2.stage.under_cards[1].to_vec();
@@ -76,6 +84,7 @@ fn pb2_kinako_under_member_both_players() {
     assert!(
         under_center_p2.contains(&p2_liella) || under_left_p2.contains(&p2_liella),
         "P2: Liella! under きな子. center={:?} left={:?}",
-        under_center_p2, under_left_p2
+        under_center_p2,
+        under_left_p2
     );
 }

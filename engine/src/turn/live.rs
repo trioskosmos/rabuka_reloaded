@@ -3,8 +3,7 @@ use crate::card::{BaseHeart, BladeColor, CardDatabase, HeartColor};
 use crate::core::game_modifiers::ModifierEntry;
 use crate::game_state::GameState;
 use crate::types::{
-    Allocation, BladeSource, HeartSource, LivePerformanceData, MemberContribution, Phase,
-    YellCardResult,
+    Allocation, BladeSource, HeartSource, LivePerformanceData, MemberContribution, YellCardResult,
 };
 use std::collections::HashMap;
 

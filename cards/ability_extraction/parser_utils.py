@@ -677,6 +677,21 @@ def extract_target(text: str) -> Optional[str]:
     return None
 
 
+def extract_picker(text: str) -> Optional[str]:
+    """Extract who performs the blind pick in a reveal effect.
+
+    Patterns:
+      '相手は見ないで' → opponent picks from your hand
+      '自分は見ないで' → you pick from opponent's hand
+    Returns 'opponent', 'self', or None.
+    """
+    if "相手は見ないで" in text:
+        return "opponent"
+    if "自分は見ないで" in text:
+        return "self"
+    return None
+
+
 def extract_card_type(text: str) -> Optional[str]:
     """Extract card type from text."""
     return extract_by_pattern(text, _CARD_TYPE_LONGEST_FIRST)

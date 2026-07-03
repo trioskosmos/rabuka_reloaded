@@ -497,17 +497,17 @@ impl<'a> ConditionContext<'a> {
                 let tm_match = if !pce_match && self.activating_card_id.is_some() {
                     let in_current_batch = |cid| {
                         self.moved_cards.contains(&cid)
-                            || self.game_state.recently_moved_cards
-                                .as_ref().map_or(false, |v| v.contains(&cid))
+                            || self
+                                .game_state
+                                .recently_moved_cards
+                                .as_ref()
+                                .map_or(false, |v| v.contains(&cid))
                     };
-                    self.game_state
-                        .turn_area_movements
-                        .iter()
-                        .any(|m| {
-                            self.activating_card_id == Some(m.moved_card_id)
-                                && m.effect_only
-                                && in_current_batch(m.moved_card_id)
-                        })
+                    self.game_state.turn_area_movements.iter().any(|m| {
+                        self.activating_card_id == Some(m.moved_card_id)
+                            && m.effect_only
+                            && in_current_batch(m.moved_card_id)
+                    })
                 } else {
                     false
                 };

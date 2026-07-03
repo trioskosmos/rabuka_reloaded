@@ -95,6 +95,29 @@ impl Drop for TestGame {
             // test running in parallel. Just flush the log buffer.
             AbDebug::flush_to_rule_log(&mut self.state.rule_log);
         }
+        // Dump structured log to stderr when RABUKA_RULE_LOG=1 is set.
+        // Run tests with `--nocapture` to see output.
+        if std::env::var("RABUKA_RULE_LOG").as_deref() == Ok("1")
+            && !self.state.structured_log.is_empty()
+        {
+            let test_name = std::thread::current()
+                .name()
+                .unwrap_or("unknown")
+                .to_string();
+            eprintln!("\n=== STRUCTURED LOG: {} ===", test_name);
+            for entry in &self.state.structured_log {
+                let meta_str = entry
+                    .metadata
+                    .as_ref()
+                    .map(|m| serde_json::to_string(m).unwrap_or_default())
+                    .unwrap_or_else(|| "null".to_string());
+                eprintln!("[{}] {}", entry.category, entry.text);
+                if meta_str != "null" {
+                    eprintln!("  {}", meta_str);
+                }
+            }
+            eprintln!("=== END STRUCTURED LOG ===\n");
+        }
     }
 }
 
@@ -116,6 +139,8 @@ impl TestGame {
         if debug_enabled {
             rabuka_engine::ability::debug::set_debug(true);
         }
+        // Always enable structured verdict items in tests so log assertions work
+        rabuka_engine::ability::debug::set_rule_log_verbose(true);
 
         TestGame {
             db: state.card_database.clone(),
@@ -208,6 +233,63 @@ impl TestGame {
             self.state.player1.energy_zone.cards.push(energy_card);
         }
         self.state.player1.energy_zone.add_active(count);
+    }
+
+    /// Dump structured_log entries to stderr for inspection.
+    /// Run tests with `--nocapture` to see output.
+    pub fn dump_structured_log(&self) {
+        for entry in &self.state.structured_log {
+            let meta_str = entry
+                .metadata
+                .as_ref()
+                .map(|m| serde_json::to_string_pretty(m).unwrap_or_default())
+                .unwrap_or_else(|| "null".to_string());
+            eprintln!(
+                "[LOG cat={} turn={} player={} card={:?} name={:?}] {}",
+                entry.category,
+                entry.turn,
+                entry.player_label,
+                entry.source_card_id,
+                entry.source_card_name,
+                entry.text
+            );
+            if meta_str != "null" {
+                eprintln!("  metadata: {}", meta_str);
+            }
+        }
+    }
+
+    /// Dump structured_log entries for a specific category.
+    pub fn dump_structured_log_category(&self, category: &str) {
+        for entry in &self.state.structured_log {
+            if entry.category != category {
+                continue;
+            }
+            let meta_str = entry
+                .metadata
+                .as_ref()
+                .map(|m| serde_json::to_string_pretty(m).unwrap_or_default())
+                .unwrap_or_else(|| "null".to_string());
+            eprintln!(
+                "[LOG cat={} turn={} player={} card={:?} name={:?}] {}",
+                entry.category,
+                entry.turn,
+                entry.player_label,
+                entry.source_card_id,
+                entry.source_card_name,
+                entry.text
+            );
+            if meta_str != "null" {
+                eprintln!("  metadata: {}", meta_str);
+            }
+        }
+    }
+
+    /// Dump rule_log entries to stderr for inspection.
+    pub fn dump_rule_log(&self) {
+        for line in &self.state.rule_log {
+            eprintln!("[RULE_LOG] {}", line);
+        }
     }
 
     // ---- Actions ----

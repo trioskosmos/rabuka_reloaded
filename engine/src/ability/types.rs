@@ -87,6 +87,8 @@ pub enum Choice {
         #[serde(default)]
         is_reveal: bool,
         #[serde(default)]
+        picker: Option<String>,
+        #[serde(default)]
         destination: Option<String>,
         #[serde(default)]
         discard_remaining: Option<bool>,
@@ -232,6 +234,7 @@ pub struct ChoiceBuilder {
     target_player_id: Option<String>,
     blind: bool,
     is_reveal: bool,
+    picker: Option<String>,
     destination: Option<String>,
     discard_remaining: Option<bool>,
 }
@@ -260,6 +263,7 @@ impl ChoiceBuilder {
             target_player_id: self.target_player_id,
             blind: self.blind,
             is_reveal: self.is_reveal,
+            picker: self.picker,
             destination: self.destination,
             discard_remaining: self.discard_remaining,
         }
@@ -397,6 +401,7 @@ impl Choice {
             target_player_id: None,
             blind: false,
             is_reveal: false,
+            picker: None,
             destination: None,
             discard_remaining: None,
         }

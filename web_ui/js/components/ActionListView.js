@@ -186,17 +186,13 @@ export const ActionListView = {
 
                     // Double Baton grid: render pair+placement buttons if available
                     if (hasDoubleBaton) {
-                        const dbDiv = document.createElement('div');
-                        dbDiv.style.cssText = 'margin-top: 6px; border-top: 1px dashed rgba(255, 215, 0, 0.3); background: rgba(0,0,0,0.15); padding: 6px; border-radius: 4px;';
-                        
+                        const areaLabels = { 'left': i18n.t('area_left'), 'center': i18n.t('area_center'), 'right': i18n.t('area_right') };
+
                         const dbLabel = document.createElement('div');
-                        dbLabel.style.cssText = 'font-size: 0.7em; color: #ffda79; margin-bottom: 4px; font-weight: bold;';
+                        dbLabel.style.cssText = 'font-size: 0.65em; color: #ffda79; margin-top: 4px; font-weight: bold;';
                         dbLabel.textContent = i18n.t('double_baton') || 'DOUBLE BATON';
-                        dbDiv.appendChild(dbLabel);
+                        groupDiv.appendChild(dbLabel);
 
-                        const shortLabels = { left: 'L', center: 'C', right: 'R' };
-
-                        // Group pairs by their 2 replacement areas
                         const pairGroups = {};
                         doubleBatonPairs.forEach(pair => {
                             const key = pair.areas.sort().join('&');
@@ -207,19 +203,17 @@ export const ActionListView = {
                         Object.keys(pairGroups).forEach(key => {
                             const row = document.createElement('div');
                             row.className = 'action-group-buttons grid-3';
-                            row.style.cssText = 'padding: 2px; border-radius: 4px; margin-top: 2px;';
 
                             const areas = key.split('&');
                             areaOrder.forEach(expectedArea => {
                                 const pairForPlacement = pairGroups[key].find(p => p.placement === expectedArea);
                                 if (pairForPlacement) {
-                                    const srcA = shortLabels[areas[0]] || areas[0];
-                                    const srcB = shortLabels[areas[1]] || areas[1];
-                                    const placeLabel = shortLabels[expectedArea] || expectedArea;
-                                    
-                                    // Build action params
+                                    const srcA = areaLabels[areas[0]] || areas[0];
+                                    const srcB = areaLabels[areas[1]] || areas[1];
+                                    const placeLabel = areaLabels[expectedArea] || expectedArea;
+
                                     const replaceIndices = areas.map(a => areaIndexMap[a]);
-                                    
+
                                     const dbActionParams = {
                                         card_id: firstA.parameters?.card_id,
                                         card_index: firstA.parameters?.card_index,
@@ -229,13 +223,14 @@ export const ActionListView = {
                                         card_name: firstA.parameters?.card_name,
                                         card_no: firstA.parameters?.card_no,
                                     };
-                                    
+
                                     const btn = ActionButtons.createActionButton(
                                         { action_type: 'play_member_to_stage', parameters: dbActionParams },
                                         true, '', state
                                     );
-                                    btn.innerHTML = `<span style="display:flex;flex-direction:column;align-items:center;gap:1px;font-weight:600;"><span style="font-size:0.7rem;">${srcA} & ${srcB}</span><span style="font-size:0.65rem;opacity:0.7;">→ ${placeLabel} ${pairForPlacement.cost}</span></span>`;
-                                    btn.style.width = '100%';
+                                    btn.innerHTML = `<span style="display:flex;flex-direction:column;align-items:center;gap:1px;font-weight:600;"><span style="font-size:0.7rem;">${srcA}&${srcB}</span><span style="font-size:0.6rem;opacity:0.7;">→${placeLabel} ${pairForPlacement.cost}</span></span>`;
+                                    btn.dataset.zoneArea = expectedArea;
+                                    btn.style.cssText = '';
                                     btn.className = btn.className + ' action-btn';
                                     btn.onmouseenter = () => {
                                         document.querySelectorAll('.action-btn.hover-highlight').forEach(s => s.classList.remove('hover-highlight'));
@@ -248,15 +243,12 @@ export const ActionListView = {
                                     row.appendChild(btn);
                                 } else {
                                     const spacer = document.createElement('div');
-                                    spacer.style.cssText = 'min-height: 30px; display: flex; align-items: center; justify-content: center; opacity: 0.2; font-size: 0.6em; border: 1px dashed rgba(255,255,255,0.1);';
-                                    spacer.textContent = '--';
+                                    spacer.style.cssText = 'flex:1;min-height:36px;border:1px solid transparent;border-right:none;';
                                     row.appendChild(spacer);
                                 }
                             });
-                            dbDiv.appendChild(row);
+                            groupDiv.appendChild(row);
                         });
-
-                        groupDiv.appendChild(dbDiv);
                     }
                 } else {
                     if (firstA) {

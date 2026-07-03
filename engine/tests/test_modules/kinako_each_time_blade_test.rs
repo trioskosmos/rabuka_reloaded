@@ -14,17 +14,27 @@ fn blade_mod(game: &TestGame, card_id: i16) -> i32 {
 }
 
 fn accept_position_swap(game: &mut TestGame, dest: &str) {
-    if !game.has_pending_choice() { return; }
+    if !game.has_pending_choice() {
+        return;
+    }
     match game.get_pending_choice().clone() {
-        rabuka_engine::ability::types::Choice::SelectTarget { target, .. } if target == "position|destination" => {
+        rabuka_engine::ability::types::Choice::SelectTarget { target, .. }
+            if target == "position|destination" =>
+        {
             let acts = game.generated_actions();
-            let idx = acts.iter().position(|a| {
-                a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some(dest)
-            }).unwrap_or(0);
+            let idx = acts
+                .iter()
+                .position(|a| {
+                    a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some(dest)
+                })
+                .unwrap_or(0);
             game.select_generated(idx);
             game.drain_auto_ability_choices();
         }
-        _ => { game.select_indices(&[]); game.drain_auto_ability_choices(); }
+        _ => {
+            game.select_indices(&[]);
+            game.drain_auto_ability_choices();
+        }
     }
 }
 
@@ -46,9 +56,10 @@ fn kinako_each_time_blade_stack_draft() {
     game.activate_ability(kinako_mover);
     game.drain_auto_ability_choices();
     let actions = game.generated_actions();
-    let left_idx = actions.iter().position(|a| {
-        a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("left")
-    }).unwrap();
+    let left_idx = actions
+        .iter()
+        .position(|a| a.parameters.as_ref().and_then(|p| p.stage_area.as_deref()) == Some("left"))
+        .unwrap();
     game.select_generated(left_idx);
     game.drain_auto_ability_choices();
 
@@ -67,7 +78,8 @@ fn kinako_each_time_blade_stack_draft() {
     accept_position_swap(&mut game, "right");
 
     assert_eq!(
-        blade_mod(&game, kinako_watcher), 8,
+        blade_mod(&game, kinako_watcher),
+        8,
         "1 appearance + 3 swaps = 4 triggers * 2 = 8"
     );
 }

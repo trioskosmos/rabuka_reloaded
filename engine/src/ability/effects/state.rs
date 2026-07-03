@@ -99,8 +99,37 @@ impl AbilityResolver {
                     }
                     true
                 })
+            } else if state_change == "wait" {
+                // Q137: 「ウェイトにする」とは、アクティブ状態のメンバーをウェイト状態に
+                // することを意味します。既にウェイト状態のメンバーは対象外です。
+                let p = gs.resolve_target_player(&target);
+                let ct = card_type_filter.as_deref();
+                let gf = group_filter.as_deref();
+                p.stage.stage.iter().any(|&cid| {
+                    if cid == -1 {
+                        return false;
+                    }
+                    let is_active = gs
+                        .mods
+                        .get_orientation_modifier(cid)
+                        .is_none_or(|o| o != "wait");
+                    if !is_active {
+                        return false;
+                    }
+                    if let Some(t) = ct {
+                        if !util::card_matches_type(&gs.card_database, cid, Some(t)) {
+                            return false;
+                        }
+                    }
+                    if let Some(g) = gf {
+                        if !util::card_matches_group_str(&gs.card_database, cid, Some(g)) {
+                            return false;
+                        }
+                    }
+                    true
+                })
             } else {
-                true // no state filter: any member is a valid target
+                true // no state filter for non-wait: any member is a valid target
             };
             if !can_target {
                 log::debug!(
@@ -457,7 +486,8 @@ impl AbilityResolver {
                 .activating_card
                 .map(|c| self.card_name(c))
                 .unwrap_or_default();
-            gs.rule_log.push(format!("{} {}: 状態変更→{}", pp, act_name, state_change));
+            gs.rule_log
+                .push(format!("{} {}: 状態変更→{}", pp, act_name, state_change));
             return Ok(());
         }
 
@@ -896,10 +926,8 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!(
-            "{} {}: カード同一性変更",
-            pp, act_name
-        ));
+        gs.rule_log
+            .push(format!("{} {}: カード同一性変更", pp, act_name));
         if !identities.is_empty() {
             gs.prohibition_effects
                 .push(format!("card_identity:{}", identities.join(",")));
@@ -1019,7 +1047,8 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!("{} {}: ハート色指定", pp, act_name));
+        gs.rule_log
+            .push(format!("{} {}: ハート色指定", pp, act_name));
     }
 
     pub(crate) fn execute_set_card_identity_all_regions(
@@ -1043,7 +1072,8 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!("{} {}: 全領域カード同一性変更", pp, act_name));
+        gs.rule_log
+            .push(format!("{} {}: 全領域カード同一性変更", pp, act_name));
     }
 
     pub(crate) fn execute_set_cost_to_use(
@@ -1060,7 +1090,8 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!("{} {}: 使用コスト設定", pp, act_name));
+        gs.rule_log
+            .push(format!("{} {}: 使用コスト設定", pp, act_name));
         Ok(())
     }
 
@@ -1082,7 +1113,8 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!("{} {}: 全ブレードタイミング", pp, act_name));
+        gs.rule_log
+            .push(format!("{} {}: 全ブレードタイミング", pp, act_name));
     }
 
     pub(crate) fn execute_modify_cost(

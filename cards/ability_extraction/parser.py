@@ -31,6 +31,7 @@ from parser_utils import (
     extract_operator,
     extract_cost_limit,
     extract_cost_limit_with_operator,
+    extract_picker,
     detect_card_property,
     detect_require_all_hearts,
     SOURCE_PATTERNS,
@@ -2194,6 +2195,7 @@ def parse_action(text: str) -> Dict[str, Any]:
             {
                 "source": source or "hand",
                 **({"blind": True} if "見ないで" in t else {}),
+                **({"picker": extract_picker(t)} if extract_picker(t) else {}),
             }
         ),
     )

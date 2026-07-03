@@ -3,9 +3,13 @@ use rabuka_engine::zones::MemberArea;
 
 fn fill_decks(game: &mut TestGame) {
     let f1 = game.id("PL!-sd1-010-SD");
-    for _ in 0..40 { game.state.player1.main_deck.cards.push(f1); }
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(f1);
+    }
     let f2 = game.id("PL!-sd1-010-SD");
-    for _ in 0..40 { game.state.player2.main_deck.cards.push(f2); }
+    for _ in 0..40 {
+        game.state.player2.main_deck.cards.push(f2);
+    }
 }
 
 fn give_energy_p2(game: &mut TestGame, n: usize) {
@@ -16,15 +20,33 @@ fn give_energy_p2(game: &mut TestGame, n: usize) {
     game.state.player2.energy_zone.add_active(n);
 }
 
-fn energy_p1(g: &TestGame) -> usize { g.state.player1.energy_zone.active_count() }
-fn energy_p2(g: &TestGame) -> usize { g.state.player2.energy_zone.active_count() }
+fn energy_p1(g: &TestGame) -> usize {
+    g.state.player1.energy_zone.active_count()
+}
+fn energy_p2(g: &TestGame) -> usize {
+    g.state.player2.energy_zone.active_count()
+}
 
 fn dbg(g: &TestGame) {
     let s1 = &g.state.player1.stage.stage;
-    eprintln!("  P1 stage: [{},{},{}] e={} ph={:?} tp={:?} t={}",
-        s1[0], s1[1], s1[2], energy_p1(g), g.state.current_phase, g.state.current_turn_phase, g.state.turn_number);
+    eprintln!(
+        "  P1 stage: [{},{},{}] e={} ph={:?} tp={:?} t={}",
+        s1[0],
+        s1[1],
+        s1[2],
+        energy_p1(g),
+        g.state.current_phase,
+        g.state.current_turn_phase,
+        g.state.turn_number
+    );
     let s2 = &g.state.player2.stage.stage;
-    eprintln!("  P2 stage: [{},{},{}] e={}", s2[0], s2[1], s2[2], energy_p2(g));
+    eprintln!(
+        "  P2 stage: [{},{},{}] e={}",
+        s2[0],
+        s2[1],
+        s2[2],
+        energy_p2(g)
+    );
 }
 
 fn drain(game: &mut TestGame, _label: &str) {
@@ -33,17 +55,29 @@ fn drain(game: &mut TestGame, _label: &str) {
         safety += 1;
         use rabuka_engine::ability::types::Choice;
         match game.state.get_pending_choice().unwrap().clone() {
-            Choice::SelectAutoAbility { .. } => { game.select_indices(&[]); }
+            Choice::SelectAutoAbility { .. } => {
+                game.select_indices(&[]);
+            }
             Choice::SelectCard { count, .. } => {
                 if count > 0 && count < 10 {
                     game.select_indices(&(0..count).collect::<Vec<_>>());
-                } else { game.select_indices(&[0]); }
+                } else {
+                    game.select_indices(&[0]);
+                }
             }
-            Choice::SelectTarget { target, .. } if target == "position|destination" || target == "area_select" => {
+            Choice::SelectTarget { target, .. }
+                if target == "position|destination" || target == "area_select" =>
+            {
                 let acts = game.generated_actions();
-                if acts.is_empty() { game.select_indices(&[]); } else { game.select_generated(0); }
+                if acts.is_empty() {
+                    game.select_indices(&[]);
+                } else {
+                    game.select_generated(0);
+                }
             }
-            _ => { game.select_indices(&[0]); }
+            _ => {
+                game.select_indices(&[0]);
+            }
         }
     }
 }
@@ -56,7 +90,9 @@ fn activate_and_drain(game: &mut TestGame, card: i16, label: &str) {
     dbg(game);
 }
 
-fn pass_phase(game: &mut TestGame) { game.pass(); }
+fn pass_phase(game: &mut TestGame) {
+    game.pass();
+}
 
 // ====================================================================
 // Step 1: P1 Main phase position change → auto ability fires
@@ -102,7 +138,10 @@ fn step2_p1_then_p2() {
     activate_and_drain(&mut game, p1_m, "p1");
     assert_eq!(energy_p1(&game) - e1, 2);
     // Advance: Main→Active→Energy→Draw→Main (P2's turn)
-    pass_phase(&mut game); pass_phase(&mut game); pass_phase(&mut game); pass_phase(&mut game);
+    pass_phase(&mut game);
+    pass_phase(&mut game);
+    pass_phase(&mut game);
+    pass_phase(&mut game);
     // P2
     let e2 = energy_p2(&game);
     activate_and_drain(&mut game, p2_m, "p2");
@@ -164,7 +203,10 @@ fn step4_turn2_reset() {
     assert_eq!(energy_p1(&game), 2);
 
     // T1 P2 Main
-    pass_phase(&mut game); pass_phase(&mut game); pass_phase(&mut game); pass_phase(&mut game);
+    pass_phase(&mut game);
+    pass_phase(&mut game);
+    pass_phase(&mut game);
+    pass_phase(&mut game);
     let p2e = energy_p2(&game);
     activate_and_drain(&mut game, p2_mover, "t1p2");
     assert_eq!(energy_p2(&game) - p2e, 2);
@@ -181,16 +223,24 @@ fn step4_turn2_reset() {
     pass_phase(&mut game); // LiveVictory→T2 Active (P1)
 
     assert_eq!(game.state.turn_number, 2);
-    assert_eq!(game.state.current_turn_phase, rabuka_engine::types::TurnPhase::FirstAttackerNormal);
+    assert_eq!(
+        game.state.current_turn_phase,
+        rabuka_engine::types::TurnPhase::FirstAttackerNormal
+    );
 
     // T2 P1 Main
-    pass_phase(&mut game); pass_phase(&mut game); pass_phase(&mut game);
+    pass_phase(&mut game);
+    pass_phase(&mut game);
+    pass_phase(&mut game);
     let e_before = energy_p1(&game);
     activate_and_drain(&mut game, mover, "t2p1");
     assert_eq!(energy_p1(&game) - e_before, 2);
 
     // T2 P2 Main
-    pass_phase(&mut game); pass_phase(&mut game); pass_phase(&mut game); pass_phase(&mut game);
+    pass_phase(&mut game);
+    pass_phase(&mut game);
+    pass_phase(&mut game);
+    pass_phase(&mut game);
     let p2e_before = energy_p2(&game);
     activate_and_drain(&mut game, p2_mover, "t2p2");
     assert_eq!(energy_p2(&game) - p2e_before, 2);
@@ -216,5 +266,8 @@ fn step5_each_time_area_move() {
     let hand_before = game.state.player1.hand.cards.len();
     activate_and_drain(&mut game, mover, "s5");
     let hand_delta = game.state.player1.hand.cards.len() - hand_before;
-    assert_eq!(hand_delta, 1, "natsumi's each_time:area_move draws 1 when she's swapped");
+    assert_eq!(
+        hand_delta, 1,
+        "natsumi's each_time:area_move draws 1 when she's swapped"
+    );
 }
