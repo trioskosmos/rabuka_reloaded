@@ -120,7 +120,7 @@ fn umi_pr014_live_card_present_no_draw() {
     let mut game = TestGame::new(db);
     let umi = game.id("PL!-PR-014-PR");
     let filler = game.id("PL!-sd1-010-SD");
-    let live_card = game.id("PL!-sd1-001-SD"); // live card
+    let live_card = game.id("PL!-sd1-020-SD"); // live card
 
     game.give_energy(3);
     game.state.player1.hand.cards.clear();

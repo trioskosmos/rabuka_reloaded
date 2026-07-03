@@ -218,7 +218,9 @@ pub fn push_cond_verdict(
             format!("資源{}{}", op, threshold)
         }
         Some(ConditionType::StateCondition) => {
-            condition.state.as_deref().unwrap_or("状態").to_string()
+            let state = condition.state.as_deref().unwrap_or("状態");
+            let loc = condition.location.as_deref().unwrap_or("stage");
+            format!("{}状態を{}で確認", state, loc)
         }
         Some(ConditionType::MovementCondition) => {
             format!("移動={}", condition.movement.as_deref().unwrap_or("?"))
@@ -422,8 +424,10 @@ impl<'a> ConditionContext<'a> {
         } else {
             result
         };
-        // Push ONE verdict per condition with actual game state value
-        {
+        // Push ONE verdict per condition with actual game state value.
+        // Skip if the sub-type-specific evaluator already pushed a verdict
+        // (e.g. comparison_condition, card_count_condition).
+        if crate::ability::log::buffer_len() <= _before {
             let actual = self.describe_condition_actual(condition);
             push_cond_verdict(condition, &actual, final_result, vec![]);
         }
@@ -627,7 +631,42 @@ impl<'a> ConditionContext<'a> {
                 }
             }
             Some(ConditionType::StateCondition) => {
-                condition.state.as_deref().unwrap_or("状態").to_string()
+                let state = condition.state.as_deref().unwrap_or("状態");
+                let target = condition.target.as_deref().unwrap_or("self");
+                let player = self.resolve_condition_player(target);
+                let resource_type = condition.resource_type.as_deref();
+                if resource_type == Some("energy") {
+                    let active = player.energy_zone.active_count();
+                    let total = player.energy_zone.cards.len();
+                    format!("エネルギー active={}/{}", active, total)
+                } else {
+                    let loc = condition.location.as_deref().unwrap_or("stage");
+                    let stage_cards: Vec<i16> = match Zone::from_str(loc) {
+                        Some(Zone::Stage) => player
+                            .stage
+                            .stage
+                            .iter()
+                            .filter(|&&id| id != -1)
+                            .copied()
+                            .collect(),
+                        _ => vec![],
+                    };
+                    let matching = stage_cards
+                        .iter()
+                        .filter(|&&cid| {
+                            self.game_state
+                                .mods
+                                .get_orientation_modifier(cid)
+                                .map_or(state == "active", |o| o.as_str() == state)
+                        })
+                        .count();
+                    format!(
+                        "{}状態のメンバー={}枚 (ステージ計{}枚)",
+                        state,
+                        matching,
+                        stage_cards.len()
+                    )
+                }
             }
             Some(ConditionType::MovementCondition) => {
                 let mov = condition.movement.as_deref().unwrap_or("?");

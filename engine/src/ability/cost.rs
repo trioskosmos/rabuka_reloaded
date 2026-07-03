@@ -635,11 +635,11 @@ impl AbilityResolver {
                     );
                     log::debug!("[CHANGE_STATE] candidates={:?}", candidates);
 
-                    // Q137 / Rule 1.3.2.1: 「ウェイトにする」はアクティブ状態のメンバー
-                    // をウェイト状態にすることを意味します。対象がいない場合、その行為自体
-                    // が行われません（エラーではなく正常にスキップ）。
+                    // Q137: 「ウェイトにする」はアクティブ状態のメンバーをウェイト状態に
+                    // することを意味します。対象がいない場合、その行為自体が行われません。
+                    // For mandatory costs this means the cost cannot be paid.
                     if candidates.is_empty() {
-                        return Ok(());
+                        return Err("No matching members on stage to change state".to_string());
                     }
 
                     if candidates.len() <= count {
@@ -998,9 +998,9 @@ impl AbilityResolver {
                             Some("active"),
                         );
 
-                        // Q137 / Rule 1.3.2.1: No active candidates — the act is not performed.
+                        // Q137 / Rule 1.3.2.1: No active members to wait — cost cannot be paid.
                         if candidates.is_empty() {
-                            return Ok(());
+                            return Err("No matching members on stage to change state".to_string());
                         }
 
                         if candidates.len() <= count {

@@ -184,9 +184,15 @@ impl AbilityResolver {
                         merged_cond.activation_position = Some(act_pos.clone());
                     }
                 }
-                if !ctx.evaluate_condition(&merged_cond) {
-                    return false;
+                let snapshot = crate::ability::log::buffer_len();
+                let result = ctx.evaluate_condition(&merged_cond);
+                // On success: drain pre-check verdicts (condition will be re-evaluated
+                // during effect execution, avoiding duplicates).
+                // On failure: keep verdicts (they're the only info for the failure path).
+                if result {
+                    let _pre_check_verdicts = crate::ability::log::drain_verdicts_since(snapshot);
                 }
+                return result;
             }
         }
         if let Some(ref condition) = effect.condition {
@@ -241,7 +247,14 @@ impl AbilityResolver {
                 }
                 let gns = effect.group_names.as_ref();
                 merge_group_names(&mut cond, gns);
+                let cond_snapshot = crate::ability::log::buffer_len();
                 let passed = ctx.evaluate_condition(&cond);
+                // On success: drain (will be re-evaluated during execution).
+                // On failure: keep verdicts.
+                if passed {
+                    let _pre_check_verdicts2 =
+                        crate::ability::log::drain_verdicts_since(cond_snapshot);
+                }
                 // Cache the result if the condition asks for it
                 if condition.cache.unwrap_or(false) {
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {

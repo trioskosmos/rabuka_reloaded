@@ -29,9 +29,16 @@ impl AbilityResolver {
             effect.source_or("none"),
             effect.destination.as_deref().unwrap_or("none")
         );
+        let exec_snapshot = crate::ability::log::buffer_len();
         if !self.can_activate_effect(gs, effect) {
             log::debug!("DEBUG: cannot activate effect");
+            // Keep verdicts — condition failure info will be captured by push_ability_result
             return Ok(());
+        }
+        // Drain condition verdicts from the can_activate_effect pre-check;
+        // the effect execution will produce its own items and we don't want duplicates.
+        {
+            let _pre = crate::ability::log::drain_verdicts_since(exec_snapshot);
         }
 
         // non_stackable check: skip if this effect is already active

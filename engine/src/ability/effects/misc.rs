@@ -1914,8 +1914,10 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: エネルギー配置(メンバー下) count={}", pp, act_name, count));
+        gs.rule_log.push(format!(
+            "{} {}: エネルギー配置(メンバー下) count={}",
+            pp, act_name, count
+        ));
     }
 
     pub fn execute_position_change(
@@ -2005,12 +2007,18 @@ impl AbilityResolver {
                     let player = gs.resolve_target_player(player_key);
                     for i in 0..3 {
                         let card_id = player.stage.stage[i];
-                        if card_id == -1 { continue; }
-                        if exclude_self && Some(card_id) == activating_card_id { continue; }
+                        if card_id == -1 {
+                            continue;
+                        }
+                        if exclude_self && Some(card_id) == activating_card_id {
+                            continue;
+                        }
                         if let Some(gn) = group_names {
                             if !gn.iter().any(|g| {
                                 util::card_matches_group_str(&card_db, card_id, Some(g.as_str()))
-                            }) { continue; }
+                            }) {
+                                continue;
+                            }
                         }
                         let pos = match i {
                             0 => "left",
@@ -2628,7 +2636,11 @@ impl AbilityResolver {
             .or_else(|| effect.position.as_ref().and_then(|p| p.get_position()));
         log::debug!(
             "[EPCWD] entry: target={} target_member={} source_pos={:?} dest={} activating={:?}",
-            target, target_member, source_position, destination, self.activating_card_id
+            target,
+            target_member,
+            source_position,
+            destination,
+            self.activating_card_id
         );
         // "both" at resolution time means "self" (the ability controller resolves choices)
         let target = if raw_target == "both" {
@@ -2864,7 +2876,11 @@ impl AbilityResolver {
         }
 
         if target_member == "this_member" {
-            log::debug!("[EPCWD] this_member branch: target={} dest_idx={}", target, target_index);
+            log::debug!(
+                "[EPCWD] this_member branch: target={} dest_idx={}",
+                target,
+                target_index
+            );
             if let Some(activating_card_id) = self.activating_card_id {
                 let player = gs.resolve_target_player_mut(target);
                 log::debug!("[EPCWD] stage: {:?}", player.stage.stage);
@@ -3048,8 +3064,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: 回転", pp, act_name));
+        gs.rule_log.push(format!("{} {}: 回転", pp, act_name));
         Ok(())
     }
 
@@ -3253,10 +3268,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!(
-            "{} {}: 制限追加",
-            pp, act_name
-        ));
+        gs.rule_log.push(format!("{} {}: 制限追加", pp, act_name));
         let restriction_str = format!(
             "restriction:{}:{}",
             restriction_type.unwrap_or("unknown"),
@@ -3328,8 +3340,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: 再エール", pp, act_name));
+        gs.rule_log.push(format!("{} {}: 再エール", pp, act_name));
     }
 
     pub(crate) fn execute_activation_restriction(&mut self, gs: &mut GameState, target: &str) {
@@ -3354,8 +3365,7 @@ impl AbilityResolver {
             options: None,
         });
         let pp = self.player_prefix(gs);
-        gs.rule_log
-            .push(format!("{}: 要求ハート選択", pp));
+        gs.rule_log.push(format!("{}: 要求ハート選択", pp));
     }
 
     pub(crate) fn execute_choose_target_player(
@@ -3402,8 +3412,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: シャッフル", pp, act_name));
+        gs.rule_log.push(format!("{} {}: シャッフル", pp, act_name));
     }
 
     pub(crate) fn player_prefix(&self, gs: &GameState) -> String {

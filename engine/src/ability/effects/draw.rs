@@ -486,7 +486,11 @@ impl AbilityResolver {
             }
         }
         self.step_state.last_draw_count = final_count;
-        let dst = if destination.is_empty() { "手札" } else { destination };
+        let dst = if destination.is_empty() {
+            "手札"
+        } else {
+            destination
+        };
         gs.rule_log.push(format!(
             "{} {}: {}枚ドロー({}→{})",
             pp, act_name, final_count, source, dst

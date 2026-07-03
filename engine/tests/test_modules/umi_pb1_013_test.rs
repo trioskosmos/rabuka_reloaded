@@ -231,7 +231,7 @@ fn q176_opponent_picks_exactly_one_from_many_cards() {
 }
 
 #[test]
-fn q176_reveal_with_multiple_live_and_non_live_picks_from_hand() {
+fn q176_choice_path_pick_live_from_mixed_hand() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let umi = game.id("PL!-pb1-013-R");
@@ -246,16 +246,19 @@ fn q176_reveal_with_multiple_live_and_non_live_picks_from_hand() {
 
     game.activate_ability(umi);
     assert!(game.has_pending_choice(), "3 cards → choice needed");
-    // Pick index 1 (the live card)
     game.select_indices(&[1]);
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
 
-    // Verify the picked card was revealed
+    assert_eq!(
+        game.state.mods.get_score_modifier(umi),
+        1,
+        "Pick live card → +1 score"
+    );
     assert!(
         game.state.revealed_cards.contains(&live),
-        "Picked live card should be revealed"
+        "Live card should be revealed"
     );
     assert_eq!(
         game.state.player1.hand.len(),
@@ -265,11 +268,42 @@ fn q176_reveal_with_multiple_live_and_non_live_picks_from_hand() {
 }
 
 #[test]
+fn q176_choice_path_pick_non_live_from_mixed_hand() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let umi = game.id("PL!-pb1-013-R");
+    let live = game.id("PL!-sd1-020-SD");
+    let non_live = game.id("LL-E-001-SD");
+
+    game.state.player1.stage.stage[1] = umi;
+    game.state.player1.hand.cards.push(non_live);
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(non_live);
+    game.give_energy(3);
+
+    game.activate_ability(umi);
+    game.select_indices(&[0]);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert_eq!(
+        game.state.mods.get_score_modifier(umi),
+        0,
+        "Pick non-live card → no score modifier"
+    );
+    assert!(
+        game.state.revealed_cards.contains(&non_live),
+        "Non-live card should be revealed"
+    );
+}
+
+#[test]
 fn q176_picked_card_tracked_in_revealed_cards() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let umi = game.id("PL!-pb1-013-R");
-    let card_a = game.id("PL!-sd1-001-SD");
+    let card_a = game.id("PL!-sd1-020-SD");
     let card_b = game.id("LL-E-001-SD");
 
     game.state.player1.stage.stage[1] = umi;
