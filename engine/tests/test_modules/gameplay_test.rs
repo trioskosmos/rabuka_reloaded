@@ -2719,6 +2719,60 @@ fn wien_q117_another_member_triggers_yell_reduction() {
     );
 }
 
+/// Q111: Wien's LiveStart subtracts 8 from yell count. Blade total is additive:
+/// Wien(6) + 松岡切乃(1) = 7 → Wien fires (subtract 8) → MY舞 grants +1 blade
+/// to all stage members → blade=9, yell=1.
+#[test]
+fn wien_q111_blade_additive_after_yell_subtract() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let wien = game.id("PL!SP-bp2-010-R\u{ff0b}"); // blade=6
+    let partner = game.id("PL!S-bp2-015-PR"); // Aqours, blade=1, no ability
+    let mymai = game.id("PL!S-bp2-023-L"); // MY舞: grants +1 blade to all stage
+    let aqours_live = game.id("PL!S-PR-022-PR"); // Aqours live, no ability
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
+
+    // Wien at Center (blade=6) + partner at LeftSide (blade=1) → base=7
+    game.state.player1.stage.stage = [partner, wien, -1];
+
+    // MY舞 + Aqours live in zone → MY舞 condition met
+    game.state.player1.live_card_zone.cards.push(mymai);
+    game.state.player1.live_card_zone.cards.push(aqours_live);
+
+    let live_card = game.id("PL!-sd1-020-SD");
+    game.state.player1.hand.cards.push(live_card);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live_card);
+    advance_to_live_start(&mut game);
+
+    // Wien's LiveStart: subtract 8 from yell count
+    // MY舞's LiveStart: grants +1 blade to all stage members
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // Q111: Blade modifiers are additive with base blade.
+    // Wien: base=6 + modifier=1 = 7. Partner: base=1 + modifier=1 = 2.
+    // Total blade = 7 + 2 = 9. Subtract modifier = -8. Yell = 9-8 = 1.
+    let blade_wien = game.state.mods.get_blade_modifier(wien);
+    let blade_partner = game.state.mods.get_blade_modifier(partner);
+    assert_eq!(
+        blade_wien, 1,
+        "Q111: Wien gained +1 blade from MY舞 (additive with base 6)"
+    );
+    assert_eq!(
+        blade_partner, 1,
+        "Q111: Partner gained +1 blade from MY舞 (additive with base 1)"
+    );
+}
+
 // ====================================================================
 //  Edge case: turn limit enforcement
 // ====================================================================

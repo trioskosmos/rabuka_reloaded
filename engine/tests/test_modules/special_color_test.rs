@@ -363,3 +363,94 @@ fn q195_existing_modifier_stacks_on_set_value() {
         "Q195: existing +1 + set_blade(3) → modifier should be 4 (set=3, additive=1)"
     );
 }
+
+/// Liella! with blade=4 at center gets set to 3.
+/// This proves set_blade(3) SETS blade to 3, not adds +3.
+/// (If it were +3, effective blade would be 4+3=7, not 3.)
+#[test]
+fn liella_blade_4_gets_set_to_3_not_plus_3() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let special = game.id("PL!SP-bp4-025-L");
+    let kinako = game.id("PL!SP-bp5-006-R"); // Liella!, blade=4
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [-1, kinako, -1];
+    game.state.player1.hand.cards.push(special);
+    game.state.player1.hand.cards.push(filler);
+    fill_decks(&mut game);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(special);
+    advance_to_live_start(&mut game);
+
+    // set_blade(3) on blade=4 member: set=3, additive=0 → total modifier = 3
+    // total_blades() uses set value (ignores base blade of 4) → effective blade = 3
+    assert_eq!(
+        game.state.mods.get_blade_modifier(kinako),
+        3,
+        "Liella! blade=4: set_blade(3) → modifier=3 (SET to 3, not +3 which would give 7)"
+    );
+}
+
+/// Liella! with blade=1 at center also gets set to 3.
+/// Proves set_blade(3) works the same regardless of original blade count.
+#[test]
+fn liella_blade_1_also_gets_set_to_3() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let special = game.id("PL!SP-bp4-025-L");
+    let liella_blade1 = game.id("PL!SP-PR-008-PR"); // Liella!, blade=1
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [-1, liella_blade1, -1];
+    game.state.player1.hand.cards.push(special);
+    game.state.player1.hand.cards.push(filler);
+    fill_decks(&mut game);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(special);
+    advance_to_live_start(&mut game);
+
+    // set_blade(3) on blade=1 member: set=3, additive=0 → total modifier = 3
+    // total_blades() uses set value (ignores base blade of 1) → effective blade = 3
+    assert_eq!(
+        game.state.mods.get_blade_modifier(liella_blade1),
+        3,
+        "Liella! blade=1: set_blade(3) → modifier=3 (SET to 3, same result as blade=4)"
+    );
+}
+
+/// Liella! blade=4 with existing +1 additive before set_blade(3).
+/// After set: set=3, additive=1 → total modifier = 4, effective blade = 3+1=4.
+#[test]
+fn liella_blade_4_with_existing_modifier() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let special = game.id("PL!SP-bp4-025-L");
+    let kinako = game.id("PL!SP-bp5-006-R"); // Liella!, blade=4
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [-1, kinako, -1];
+    game.state.player1.hand.cards.push(special);
+    game.state.player1.hand.cards.push(filler);
+    fill_decks(&mut game);
+
+    // Existing +1 blade modifier before set_blade(3)
+    game.state.mods.add_blade_modifier(kinako, 1);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(special);
+    advance_to_live_start(&mut game);
+
+    // set_blade(3) + existing additive(1) → set=3, additive=1 → total modifier = 4
+    // total_blades() uses set value + additive → effective blade = 3+1=4
+    assert_eq!(
+        game.state.mods.get_blade_modifier(kinako),
+        4,
+        "Liella! blade=4 + existing +1: set_blade(3) → modifier=4 (set=3, additive=1)"
+    );
+}

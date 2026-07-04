@@ -219,9 +219,9 @@ fn mymai_with_aqours_and_non_aqours_live_gains_blade() {
     );
 }
 
-/// ALL stage members get blade, not just one.
+/// Q121: ALL stage members get blade, not just one.
 #[test]
-fn mymai_all_stage_members_gain_blade() {
+fn mymai_q121_all_stage_members_gain_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let aqours_live = game.id("PL!S-bp5-023-L");

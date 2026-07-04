@@ -32,6 +32,7 @@ WORKDIR /app
 COPY --from=rust-builder /build/engine/target/release/rabuka_engine  /app/engine/rabuka_engine
 COPY web_ui/                                                          /app/web_ui/
 COPY cards/cards.json                                                 /app/cards/cards.json
+COPY cards/abilities.json                                             /app/cards/abilities.json
 COPY web_ui/decks/                                                    /app/game/decks/
 
 ENV PORT=7860

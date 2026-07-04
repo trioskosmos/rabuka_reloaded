@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-03T21:25:55.354017",
+  "generated_at": "2026-07-04T10:20:23.579814",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1022,7 +1022,8 @@
               "card_type": "live_card",
               "group_names": [
                 "虹ヶ咲"
-              ]
+              ],
+              "location": "live_card_zone"
             }
           ],
           "text": "自分のライブ中のカードが3枚以上あり、その中に『虹ヶ咲』のライブカードを1枚以上含む場合",
@@ -3584,7 +3585,8 @@
               },
               "group_names": [
                 "Liella!"
-              ]
+              ],
+              "location": "energy_zone"
             },
             {
               "type": "card_count_condition",
@@ -4767,7 +4769,8 @@
               "state_change": "active",
               "card_type": "member_card",
               "action": "change_state",
-              "count": 1
+              "count": 1,
+              "activation_position": "left_side"
             },
             {
               "text": "2枚ある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -4785,11 +4788,11 @@
               "action": "gain_resource",
               "resource": "blade",
               "count": 2,
-              "duration": "live_end"
+              "duration": "live_end",
+              "activation_position": "left_side"
             }
           ],
-          "activation_position": "left_side",
-          "self_target": true
+          "activation_position": "left_side"
         }
       }
     },
@@ -16818,7 +16821,8 @@
                   "text": "コストが選んだ数以上の場合",
                   "operator": ">=",
                   "comparison_type": "cost",
-                  "type": "comparison_condition"
+                  "type": "comparison_condition",
+                  "location": "revealed_cards"
                 }
               ],
               "text": "公開したカードがメンバーカードで、かつコストが選んだ数以上の場合",
@@ -24862,11 +24866,8 @@
           "text": "このゲームの1ターン目のライブフェイズの場合",
           "trigger_event": {
             "type": "temporal",
-            "scope": "game",
-            "phase": "live_phase",
-            "turn_number": 1
-          },
-          "turn_number": 1
+            "phase": "live_phase"
+          }
         },
         "action": "sequential",
         "actions": [
@@ -29195,7 +29196,8 @@
               "target": "self",
               "count": 1,
               "operator": ">=",
-              "type": "comparison_condition"
+              "type": "comparison_condition",
+              "location": "hand"
             },
             {
               "type": "comparison_condition",

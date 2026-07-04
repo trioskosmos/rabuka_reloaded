@@ -456,9 +456,21 @@
 
 .hearts-compact {
     display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
+    flex-wrap: nowrap;
+    gap: 1px;
     align-items: center;
+    overflow: hidden;
+    max-height: 1.5em;
+}
+
+.hearts-compact .heart-tag {
+    font-size: inherit;
+    padding: 0;
+}
+
+.hearts-compact .heart-mini-icon {
+    height: 1em;
+    width: auto;
 }
 
 .perf-panel-header {

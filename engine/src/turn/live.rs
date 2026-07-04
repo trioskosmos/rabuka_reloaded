@@ -1101,8 +1101,14 @@ impl super::TurnEngine {
                 }
             }
 
-            let bl_mod = blade_modifiers.get(&cid).map(|e| e.total()).unwrap_or(0);
-            let bonus_blades = if bl_mod > 0 { bl_mod as u32 } else { 0u32 };
+            let entry = blade_modifiers.get(&cid).copied().unwrap_or_default();
+            let (effective_base_blades, bonus_blades) = if entry.set != 0 {
+                // set replaces the base blade — additive stacks on top
+                (entry.total().max(0) as u32, 0u32)
+            } else {
+                (base_blades, entry.total().max(0) as u32)
+            };
+            base_blades = effective_base_blades;
 
             if let Some(mods) = heart_modifiers.get(&cid) {
                 for (color, delta) in mods {

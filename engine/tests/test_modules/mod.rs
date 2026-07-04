@@ -154,6 +154,7 @@ pub mod position_change_condition_test;
 pub mod position_change_multi_test;
 pub mod position_change_non_optional_test;
 pub mod position_change_triggers_jidou_move_test;
+pub mod q46_kanako_all_heart_timing_test;
 pub mod q127_heart_set_plus_global_test;
 pub mod q137_already_waited_cost_test;
 pub mod q146_per_member_draw_test;

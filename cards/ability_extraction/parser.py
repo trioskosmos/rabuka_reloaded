@@ -1181,6 +1181,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
         _try_both,
         # Tier 4: Temporal constraints
         _try_temporal_this_turn,
+        _try_phase_gate,
         _try_temporal_turn_phase,
         _try_baton_touch,
         _try_temporal_count,
@@ -2669,6 +2670,16 @@ def _try_compound(text):
         result["distinct"] = "card_name"
     elif "グループ名が異なる" in text:
         result["distinct"] = "group_name"
+    # Propagate location from first sub-condition to subsequent ones that
+    # reference "その中に" (among those) — e.g. "ライブ中のカードが3枚以上あり、
+    # その中に『虹ヶ咲』のライブカードを1枚以上含む" → both sub-conditions
+    # should use live_card_zone.
+    first_loc = None
+    for sub in parsed:
+        if not first_loc:
+            first_loc = sub.get("location")
+        elif first_loc and not sub.get("location") and "その中に" in (sub.get("text") or ""):
+            sub["location"] = first_loc
     return result
 
 
@@ -3130,6 +3141,36 @@ def _try_temporal_this_turn(text):
                 result["condition"]["no_excess_heart"] = True
             return result
     return None
+
+
+def _try_phase_gate(text):
+    """Simple phase gate: Xフェイズの場合 — restricts activation to a specific phase."""
+    m = re.search(r"(?:自分の|相手の)?(メイン|ライブ|セット|エール)フェイズの場合", text)
+    if not m:
+        return None
+    phase_name = m.group(1)
+    phase_map = {
+        "メイン": "main",
+        "ライブ": "live_phase",
+        "セット": "set_phase",
+        "エール": "yell_phase",
+    }
+    phase = phase_map.get(phase_name)
+    if not phase:
+        return None
+    result = {
+        "type": "temporal_condition",
+        "phase": phase,
+        "text": text,
+        "trigger_event": {"type": "temporal", "phase": phase},
+    }
+    if text.startswith("自分の"):
+        result["phase_target"] = "self"
+        result["trigger_event"]["phase_target"] = "self"
+    elif text.startswith("相手の"):
+        result["phase_target"] = "opponent"
+        result["trigger_event"]["phase_target"] = "opponent"
+    return result
 
 
 def _try_temporal_turn_phase(text):
@@ -9035,9 +9076,18 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
 
     # Inherit location into compound sub-conditions (from compound's own context)
     if node.get("type") == "compound" and "conditions" in node:
+        # Also inherit from first sub-condition to later ones (e.g. "ライブ中のカードが
+        # 3枚以上あり、その中に『虹ヶ咲』のライブカードを1枚以上" → both should use
+        # live_card_zone from the first sub-condition).
+        first_loc = None
+        for sub in node["conditions"]:
+            if isinstance(sub, dict) and sub.get("location"):
+                first_loc = sub["location"]
+                break
         for sub in node["conditions"]:
             if isinstance(sub, dict):
-                if new_ctx.get("location") and not sub.get("location"):
+                loc_source = new_ctx.get("location") or first_loc
+                if loc_source and not sub.get("location"):
                     # Don't propagate location to score comparison conditions
                     # — they need live_card_zone / success_live_zone, not stage
                     if (
@@ -9045,7 +9095,7 @@ def _propagate_context(node, ctx=None, *, t="", eff_root=None):
                         and not sub.get("resource_type")
                         and sub.get("comparison_type") != "score"
                     ):
-                        sub["location"] = new_ctx["location"]
+                        sub["location"] = loc_source
                 _propagate_context(sub, new_ctx, t=t, eff_root=eff_root)
 
     # Restore duration for sequential sub-actions when the parser lost it

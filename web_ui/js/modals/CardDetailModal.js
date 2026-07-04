@@ -81,23 +81,12 @@ function render() {
     // Image
     if (imageEl) {
         imageEl.innerHTML = '';
-        const layoutEl = imageEl.closest('.card-detail-layout');
-        if (layoutEl) layoutEl.classList.remove('layout-portrait', 'layout-landscape');
         if (cardNo && cardNo !== -1 && cardNo !== -2 && cardNo !== '-1' && cardNo !== '-2') {
             const imgPath = resolveCardImagePath(cardNo);
             if (imgPath) {
                 const img = document.createElement('img');
                 img.src = fixImg(imgPath);
                 img.alt = cardObj.name || '';
-                img.onload = () => {
-                    if (layoutEl) {
-                        if (img.naturalWidth > img.naturalHeight) {
-                            layoutEl.classList.add('layout-landscape');
-                        } else {
-                            layoutEl.classList.add('layout-portrait');
-                        }
-                    }
-                };
                 imageEl.appendChild(img);
             }
         }

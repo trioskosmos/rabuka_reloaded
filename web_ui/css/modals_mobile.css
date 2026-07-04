@@ -70,7 +70,7 @@
     }
 
     .card-detail-layout.layout-portrait {
-        flex-direction: row;
+        flex-direction: column;
         height: auto;
     }
     .card-detail-layout.layout-landscape {
@@ -78,46 +78,14 @@
         height: auto;
     }
     .card-detail-layout:not(.layout-portrait):not(.layout-landscape) {
-        flex-direction: row;
+        flex-direction: column;
         height: auto;
     }
 
-    .card-detail-layout.layout-portrait .card-detail-image {
-        flex: 0 0 40%;
-        max-width: 40%;
-        max-height: 60vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background: rgba(0,0,0,0.15);
-        border-radius: 6px;
-    }
-    .card-detail-layout.layout-landscape .card-detail-image {
-        flex: 0 0 auto;
-        width: 100%;
-        max-height: 35vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background: rgba(0,0,0,0.15);
-        border-radius: 6px;
-    }
-    .card-detail-layout:not(.layout-portrait):not(.layout-landscape) .card-detail-image {
-        flex: 0 0 40%;
-        max-width: 40%;
-        max-height: 60vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background: rgba(0,0,0,0.15);
-        border-radius: 6px;
-    }
-
     .card-detail-image img {
-        max-height: 60vh;
-        width: auto;
         max-width: 100%;
-        object-fit: contain;
+        width: auto;
+        height: auto;
     }
 
     .card-detail-info {
@@ -142,7 +110,7 @@
     }
 
     .stage-ability-card-preview {
-        max-height: 20vh;
+        max-height: 35vh;
         overflow: hidden;
         display: flex;
         justify-content: center;
@@ -152,8 +120,18 @@
     }
 
     .stage-ability-card-preview img {
-        max-height: 20vh;
+        max-height: 35vh;
         object-fit: contain;
+    }
+
+    .stage-ability-card-text {
+        padding: 6px 8px;
+        font-size: 0.8rem;
+        background: rgba(0,0,0,0.08);
+        border-radius: 6px;
+        margin-bottom: 8px;
+        max-height: 25vh;
+        overflow-y: auto;
     }
 
     /* Pending choice modal - full width each component */
@@ -271,6 +249,16 @@
     max-width: 420px;
 }
 
+.stage-ability-card-text {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+    background: rgba(0,0,0,0.08);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    max-height: 25vh;
+    overflow-y: auto;
+}
+
 .modal-content.ability-queue-content {
     max-width: 500px;
 }
@@ -278,45 +266,20 @@
 /* Card detail layout */
 .card-detail-layout {
     display: flex;
+    flex-direction: column;
     gap: 8px;
     height: 100%;
+    overflow-y: auto;
 }
 
-/* Portrait cards: image on left, info on right */
-.card-detail-layout.layout-portrait {
-    flex-direction: row;
-    align-items: stretch;
-}
-
-/* Landscape cards: image on top, info below */
-.card-detail-layout.layout-landscape {
-    flex-direction: column;
-}
-
-/* Default (before image loads): portrait assumption */
-.card-detail-layout:not(.layout-portrait):not(.layout-landscape) {
-    flex-direction: row;
-    align-items: stretch;
-}
-
-/* Image: portrait fills height, landscape fills width */
-.card-detail-layout.layout-portrait .card-detail-image {
-    flex: 0 0 45%;
-    max-width: 45%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0,0,0,0.15);
-    border-radius: 6px;
-}
-
-.card-detail-layout.layout-landscape .card-detail-image {
-    flex: 0 0 auto;
+/* Image: full width, capped at 50% of modal height */
+.card-detail-image {
     width: 100%;
     max-height: 50%;
+    flex: 0 0 auto;
     display: flex;
-    align-items: center;
     justify-content: center;
+    align-items: center;
     background: rgba(0,0,0,0.15);
     border-radius: 6px;
 }
@@ -324,6 +287,8 @@
 .card-detail-image img {
     max-width: 100%;
     max-height: 100%;
+    width: auto;
+    height: auto;
     object-fit: contain;
     display: block;
     border-radius: 4px;
@@ -380,9 +345,10 @@
 
 .card-detail-header-left .modal-title {
     font-size: 0.9rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    word-break: break-word;
 }
 
 .card-detail-meta {
@@ -449,18 +415,10 @@
     padding: 3px 6px;
 }
 
-/* Extra narrow: smaller image */
+/* Extra narrow: image still full width */
 @media (max-width: 360px) {
-    .card-detail-layout.layout-portrait .card-detail-image,
-    .card-detail-layout:not(.layout-portrait):not(.layout-landscape) .card-detail-image {
-        flex: 0 0 35%;
-        max-width: 35%;
-    }
-    .card-detail-layout.layout-landscape .card-detail-image {
-        max-height: 25vh;
-    }
     .card-detail-image img {
-        max-height: 40vh;
+        max-width: 100%;
     }
 }
 

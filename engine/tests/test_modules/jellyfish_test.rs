@@ -64,8 +64,9 @@ fn jellyfish_two_members_appeared_reduce_by_2() {
     check_heart_reduction(&game, jellyfish, -2);
 }
 
+/// Q99: A member who both appeared AND moved counts as 1, not 2.
 #[test]
-fn jellyfish_one_member_both_flags_counts_once() {
+fn jellyfish_q99_one_member_both_flags_counts_once() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
@@ -261,4 +262,69 @@ fn jellyfish_member_neither_appeared_nor_moved_does_not_count() {
     advance_to_live_start(&mut game);
 
     check_heart_reduction(&game, jellyfish, 0);
+}
+
+/// Q98: Member who appeared/moved but left stage → NOT counted.
+/// Place Chisato (5yncri5e!) on stage directly, mark as appeared this turn,
+/// then remove her. At Jellyfish resolution: Chisato not on stage → not counted.
+#[test]
+fn jellyfish_q98_member_appeared_then_left_not_counted() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let jellyfish = game.id("PL!SP-pb1-025-L");
+    let chisato = game.id("PL!SP-pb1-014-N"); // 5yncri5e!
+
+    fill_decks(&mut game);
+    game.add_to_hand(jellyfish);
+    game.give_energy(20);
+
+    // Place Chisato on stage directly (bypasses area lock)
+    game.state.player1.stage.stage = [-1, chisato, -1];
+
+    // Now remove Chisato from stage (simulates leaving via baton-touch, discard, etc.)
+    game.state.player1.stage.stage[1] = -1;
+
+    advance_to_live_card_set_p1(&mut game);
+
+    // Mark Chisato as appeared this turn AFTER phase advance (tracking may be cleared during passes)
+    game.state.cards_appeared_this_turn.insert(chisato);
+
+    game.set_live_card(jellyfish);
+    advance_to_live_start(&mut game);
+
+    // Q98: Chisato appeared + moved but is NOT on stage → not counted. Reduction = 0.
+    check_heart_reduction(&game, jellyfish, 0);
+}
+
+/// Q98 edge: 1 member left + 1 stays → only the one who stays counts.
+#[test]
+fn jellyfish_q98_one_left_one_stays() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let jellyfish = game.id("PL!SP-pb1-025-L");
+    let chisato = game.id("PL!SP-pb1-014-N"); // 5yncri5e!
+    let natsumi = game.id("PL!SP-pb1-009-R"); // 5yncri5e!
+
+    fill_decks(&mut game);
+    game.add_to_hand(jellyfish);
+    game.give_energy(20);
+
+    // Place both on stage
+    game.state.player1.stage.stage = [chisato, natsumi, -1];
+
+    // Remove Chisato (she left), Natsumi stays
+    game.state.player1.stage.stage[0] = -1;
+
+    advance_to_live_card_set_p1(&mut game);
+
+    // Re-insert appeared tracking AFTER phase advance (it may be cleared during passes)
+    game.state.cards_appeared_this_turn.insert(natsumi);
+
+    game.set_live_card(jellyfish);
+    advance_to_live_start(&mut game);
+
+    // Q98: Only Natsumi (5yncri5e!) is on stage → reduction = 1
+    check_heart_reduction(&game, jellyfish, -1);
 }

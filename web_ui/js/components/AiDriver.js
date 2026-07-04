@@ -1,7 +1,7 @@
 import { State } from '../state.js';
 
-const AI_ACTION_DELAY = 250;
-const AI_IDLE_DELAY = 500;
+const AI_ACTION_DELAY = 0;
+const AI_IDLE_DELAY = 0;
 
 function aiHeaders(token) {
     return {
@@ -38,7 +38,7 @@ export const AiDriver = {
             } catch (e) {
                 console.error('[AI]', e);
                 if (!this._running) return;
-                await this._delay(1000);
+                await this._delay(0);
             }
         }
     },

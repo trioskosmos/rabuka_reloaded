@@ -853,6 +853,10 @@ pub async fn execute_action(
                         );
                         room.frame_history
                             .push(FrameSnapshot::capture(&game_state, frame, label));
+                        room.last_active = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs();
                     }
                 }
             } else {
@@ -1040,6 +1044,10 @@ async fn undo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
         if let Ok(mut rooms) = data.rooms.lock() {
             if let Some(room) = rooms.get_mut(rid) {
                 room.frame_counter += 1;
+                room.last_active = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
             }
         }
     } else if let Ok(mut fc) = data.frame_counter.lock() {
@@ -1105,6 +1113,10 @@ async fn redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
         if let Ok(mut rooms) = data.rooms.lock() {
             if let Some(room) = rooms.get_mut(rid) {
                 room.frame_counter += 1;
+                room.last_active = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
             }
         }
     } else if let Ok(mut fc) = data.frame_counter.lock() {
@@ -2760,21 +2772,22 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
     // Try to launch cloudflared tunnel for internet access (silent if not found)
     launch_cloudflared_sync(port);
 
-    // Periodic room cleanup: every 60s, remove rooms with no sessions
+    // Periodic room cleanup: every 60s, remove rooms with no sessions or stale rooms
     {
         let rooms = rooms.clone();
         tokio::spawn(async move {
             loop {
                 tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
                 let mut rooms_lock = rooms.lock().unwrap();
                 let before = rooms_lock.len();
                 rooms_lock.retain(|id, room| {
-                    let keep = !room.sessions.is_empty();
+                    let empty = room.sessions.is_empty();
+                    let stale = now.saturating_sub(room.last_active) > 1200; // 20 min
+                    let keep = !empty && !stale;
                     if !keep {
-                        println!(
-                            "[CLEANUP] Removing stale room {} (no sessions, {}s idle)",
-                            id, 0
-                        );
+                        let reason = if empty { "no sessions" } else { "idle 20m" };
+                        println!("[CLEANUP] Removing stale room {} ({})", id, reason);
                     }
                     keep
                 });

@@ -5,6 +5,7 @@ import { resolveCardImagePath } from '../components/CardRenderer.js';
 import { DOM_IDS } from '../constants_dom.js';
 import { fixImg } from '../constants.js';
 import * as i18n from '../i18n/index.js';
+import { TextEnricher } from '../utils/TextEnricher.js';
 
 export const StageAbilityModal = {
     open(cardData, abilityActions) {
@@ -40,6 +41,16 @@ export const StageAbilityModal = {
             const translated = window.translateCard ? window.translateCard(cardData) : null;
             const displayName = (translated && translated.name) ? translated.name : cardName;
             cardNameEl.textContent = displayName;
+        }
+
+        // Render full ability text
+        const textContainer = document.getElementById('stage-ability-card-text');
+        if (textContainer) {
+            textContainer.innerHTML = '';
+            const rawText = cardData.ability_text || cardData.text || cardData.original_text || '';
+            if (rawText) {
+                textContainer.innerHTML = TextEnricher.enrichAbilityText(rawText);
+            }
         }
 
         if (abilityContainer) {

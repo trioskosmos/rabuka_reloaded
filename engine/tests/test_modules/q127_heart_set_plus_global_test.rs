@@ -24,6 +24,8 @@
 ///         heart02×2 + heart03×2 + heart06×2
 ///
 /// Rule Q115: Set-to-X applies first, then add/subtract modifiers stack.
+///
+/// KEY: Wien is on P2's stage → affects P1's live cards.
 use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
 
@@ -37,39 +39,6 @@ fn advance_to_live_card_set_p1(game: &mut TestGame) {
 fn advance_to_live_start(game: &mut TestGame) {
     game.pass();
     game.pass();
-}
-
-fn advance_to_live_victory(game: &mut TestGame) {
-    for _ in 0..3 {
-        game.pass();
-    }
-}
-
-fn setup_game_with_wien_and_live_card(
-    live_card_id: i16,
-    p2_stage: Option<[i16; 3]>,
-) -> TestGame {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    let wien = game.id("PL!SP-bp2-010-P");
-    let filler = game.id("PL!-sd1-010-SD");
-
-    // Wien on player1's stage (opponent's perspective for the constant ability)
-    game.state.player1.stage.stage = [-1, wien, -1];
-
-    // Opponent (player2) gets the live card and stage setup
-    game.state.player2.live_card_zone.cards.push(live_card_id);
-    if let Some(stage) = p2_stage {
-        game.state.player2.stage.stage = stage;
-    }
-
-    for _ in 0..50 {
-        game.state.player1.main_deck.cards.push(filler);
-        game.state.player2.main_deck.cards.push(filler);
-    }
-
-    game
 }
 
 // ====================================================================
@@ -93,8 +62,11 @@ fn q127_wien_plus1_stacks_on_bloom_set() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    // Wien on player1's stage (opponent perspective)
-    game.state.player1.stage.stage = [-1, wien, hasunosuka_member];
+    // Wien on P2's stage → affects P1's live cards
+    game.state.player2.stage.stage = [-1, wien, -1];
+
+    // P1 has Hasunosuka member + Bloom in hand
+    game.state.player1.stage.stage = [-1, hasunosuka_member, -1];
     game.state.player1.hand.cards.push(bloom);
     game.state.player1.hand.cards.push(filler);
 
@@ -108,7 +80,6 @@ fn q127_wien_plus1_stacks_on_bloom_set() {
     );
     game.select_option(0); // heart01 pattern: heart01×2 + heart0×1
 
-    // Drain remaining choices
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
@@ -153,10 +124,10 @@ fn q127_wien_plus1_stacks_on_hareruya_set() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    // Wien on player1's stage
-    game.state.player1.stage.stage = [-1, wien, -1];
+    // Wien on P2's stage → affects P1's live cards
+    game.state.player2.stage.stage = [-1, wien, -1];
 
-    // Put 5 distinct Liella! members in waitroom for Hareruya condition
+    // P1 has 5 distinct Liella! members in waitroom for Hareruya condition
     game.state
         .player1
         .waitroom
@@ -243,8 +214,10 @@ fn q127_two_wien_stack_plus2_heart00() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    // Two Wienen on stage + Hasunosuka member
-    game.state.player1.stage.stage = [wien1, wien2, hasunosuka_member];
+    // Two Wienen on P2's stage → each adds +1 to P1's live cards
+    game.state.player2.stage.stage = [wien1, wien2, -1];
+
+    game.state.player1.stage.stage = [-1, hasunosuka_member, -1];
     game.state.player1.hand.cards.push(bloom);
     game.state.player1.hand.cards.push(filler);
 
@@ -290,7 +263,10 @@ fn q127_wien_leaves_stage_modifier_removed() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    game.state.player1.stage.stage = [-1, wien, hasunosuka_member];
+    // Wien on P2's stage
+    game.state.player2.stage.stage = [-1, wien, -1];
+
+    game.state.player1.stage.stage = [-1, hasunosuka_member, -1];
     game.state.player1.hand.cards.push(bloom);
     game.state.player1.hand.cards.push(filler);
 
@@ -314,8 +290,8 @@ fn q127_wien_leaves_stage_modifier_removed() {
         .get_need_heart_modifier(bloom_id, HeartColor::Heart00);
     assert_eq!(h00_with_wien, 2, "With Wien: heart00 = 2");
 
-    // Remove Wien from stage and recalculate constants
-    game.state.player1.stage.stage = [-1, hasunosuka_member, -1];
+    // Remove Wien from P2's stage and recalculate constants
+    game.state.player2.stage.stage = [-1, -1, -1];
     game.state.recalculate_constants();
 
     // Wien gone: heart00 = set(1) + additive(0) = 1
@@ -332,8 +308,8 @@ fn q127_wien_leaves_stage_modifier_removed() {
 // ====================================================================
 // Test 5: Wien +1 heart00 on card with ONLY set (no base heart00)
 // ====================================================================
-// Card originally has heart00=2 in base. After Hareruya set:
-// heart02=2, heart03=2, heart06=2 (heart00 NOT in set)
+// Hareruya base: heart00=2 in need_heart, but set replaces it
+// Hareruya sets: heart02=2, heart03=2, heart06=2 (heart00 NOT in set)
 // Wien adds +1 heart00 → effective heart00=1
 #[test]
 fn q127_wien_adds_heart00_not_in_set() {
@@ -349,7 +325,8 @@ fn q127_wien_adds_heart00_not_in_set() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    game.state.player1.stage.stage = [-1, wien, -1];
+    // Wien on P2's stage
+    game.state.player2.stage.stage = [-1, wien, -1];
 
     // 5 distinct Liella! members for Hareruya condition
     game.state
@@ -422,7 +399,7 @@ fn q127_wien_adds_heart00_not_in_set() {
 }
 
 // ====================================================================
-// Test 6: Wien + set on non-heart00 colors
+// Test 6: Wien only affects heart00, not other colors
 // ====================================================================
 // Bloom sets heart01=2 + heart00=1
 // Wien adds +1 heart00 → effective: heart01=2, heart00=2
@@ -441,7 +418,10 @@ fn q127_wien_only_affects_heart00() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    game.state.player1.stage.stage = [-1, wien, hasunosuka_member];
+    // Wien on P2's stage
+    game.state.player2.stage.stage = [-1, wien, -1];
+
+    game.state.player1.stage.stage = [-1, hasunosuka_member, -1];
     game.state.player1.hand.cards.push(bloom);
     game.state.player1.hand.cards.push(filler);
 
@@ -501,7 +481,10 @@ fn q127_wien_plus_bloom_heart04_pattern() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    game.state.player1.stage.stage = [-1, wien, hasunosuka_member];
+    // Wien on P2's stage
+    game.state.player2.stage.stage = [-1, wien, -1];
+
+    game.state.player1.stage.stage = [-1, hasunosuka_member, -1];
     game.state.player1.hand.cards.push(bloom);
     game.state.player1.hand.cards.push(filler);
 
@@ -552,7 +535,10 @@ fn q127_wien_plus_bloom_heart05_pattern() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    game.state.player1.stage.stage = [-1, wien, hasunosuka_member];
+    // Wien on P2's stage
+    game.state.player2.stage.stage = [-1, wien, -1];
+
+    game.state.player1.stage.stage = [-1, hasunosuka_member, -1];
     game.state.player1.hand.cards.push(bloom);
     game.state.player1.hand.cards.push(filler);
 
@@ -586,42 +572,7 @@ fn q127_wien_plus_bloom_heart05_pattern() {
 }
 
 // ====================================================================
-// Test 9: Wien on opponent's live card zone (not player1's)
-// ====================================================================
-// Wien is on P2's stage, affecting P1's live cards.
-// This tests that Wien's constant affects the OPPOSITE player.
-#[test]
-fn q127_wien_affects_opponent_live_cards() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
-    // Wien on P1's stage (affects P2's live cards)
-    let wien = game.id("PL!SP-bp2-010-P");
-    let p2_live = game.id("PL!-sd1-019-SD");
-    let filler = game.id("PL!-sd1-010-SD");
-
-    for _ in 0..50 {
-        game.state.player1.main_deck.cards.push(filler);
-        game.state.player2.main_deck.cards.push(filler);
-    }
-
-    game.state.player1.stage.stage = [-1, wien, -1];
-    game.state.player2.live_card_zone.cards.push(p2_live);
-
-    game.state.recalculate_constants();
-
-    let h00 = game
-        .state
-        .mods
-        .get_need_heart_modifier(p2_live, HeartColor::Heart00);
-    assert_eq!(
-        h00, 1,
-        "Wien on P1 stage: P2's live card gets +1 heart00"
-    );
-}
-
-// ====================================================================
-// Test 10: No Wien → no extra heart00
+// Test 9: No Wien → no extra heart00
 // ====================================================================
 #[test]
 fn q127_no_wien_bloom_set_standalone() {
@@ -637,7 +588,9 @@ fn q127_no_wien_bloom_set_standalone() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    // No Wien on stage
+    // No Wien on P2's stage
+    game.state.player2.stage.stage = [-1, -1, -1];
+
     game.state.player1.stage.stage = [-1, hasunosuka_member, -1];
     game.state.player1.hand.cards.push(bloom);
     game.state.player1.hand.cards.push(filler);
@@ -666,7 +619,7 @@ fn q127_no_wien_bloom_set_standalone() {
 }
 
 // ====================================================================
-// Test 11: build_card_needs correctly applies set + additive
+// Test 10: build_card_needs correctly applies set + additive
 // ====================================================================
 // This directly tests the build_card_needs code path.
 #[test]
@@ -684,7 +637,10 @@ fn q127_build_card_needs_set_plus_additive() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    game.state.player1.stage.stage = [-1, wien, hasunosuka_member];
+    // Wien on P2's stage
+    game.state.player2.stage.stage = [-1, wien, -1];
+
+    game.state.player1.stage.stage = [-1, hasunosuka_member, -1];
     game.state.player1.hand.cards.push(bloom);
     game.state.player1.hand.cards.push(filler);
 
@@ -712,7 +668,7 @@ fn q127_build_card_needs_set_plus_additive() {
         .is_some_and(|m| m.values().any(|e| e.set != 0));
     assert!(has_set, "Bloom should have set modifiers");
 
-    if let Some(ref nh) = card.need_heart {
+    if let Some(ref _nh) = card.need_heart {
         if has_set {
             // Fixed Path 1: set first, then additive
             if let Some(card_mods) = mods.get(&bloom_id) {

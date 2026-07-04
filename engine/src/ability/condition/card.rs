@@ -2734,13 +2734,21 @@ impl<'a> ConditionContext<'a> {
                             // the card must have appeared in the current batch,
                             // not the entire turn. Prevents stale turn-level data
                             // from triggering re-scans on unrelated events.
+                            // Also accept cards in recently_appeared_cards — during
+                            // baton touch the arriving card's movement event is not
+                            // pushed (only the replaced member's is), but the card
+                            // DID appear in this batch via record_card_appearance.
                             let batch_ok = self.moved_cards.is_empty()
                                 || self.moved_cards.contains(&cid)
                                 || self
                                     .game_state
                                     .recently_moved_cards
                                     .as_ref()
-                                    .map_or(false, |v| v.contains(&cid));
+                                    .map_or(false, |v| v.contains(&cid))
+                                || self
+                                    .game_state
+                                    .recently_appeared_cards
+                                    .contains(&cid);
                             batch_ok
                                 && self.game_state.has_card_appeared_this_turn(cid)
                                 && stage_ids.contains(&cid)

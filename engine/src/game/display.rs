@@ -695,7 +695,11 @@ pub fn card_to_display_full(
             };
             set_hearts[idx] += val;
         }
-        let total_blade_mod = blade_additive + blade_set;
+        let total_blade = if blade_set != 0 {
+            (blade_set + blade_additive).max(0) as u32
+        } else {
+            ((card.blade as i32) + blade_additive).max(0) as u32
+        };
         let transform_str = heart_transform.map(|hc| {
             let s = match hc {
                 crate::card::HeartColor::Heart00 => "heart00",
@@ -720,7 +724,7 @@ pub fn card_to_display_full(
             total_blade: if orientation == Some(Orientation::Wait) {
                 0
             } else {
-                ((card.blade as i32) + total_blade_mod).max(0) as u32
+                total_blade
             },
             id: card_id,
             ability_text: Some(card.ability.clone()),

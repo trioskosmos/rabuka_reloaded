@@ -49,4 +49,9 @@ name = "rabuka_engine"
 path = "src/main.rs"
 test = false
 
+[[bin]]
+name = "profile_target"
+path = "src/bin/profile_target.rs"
+test = false
+
 

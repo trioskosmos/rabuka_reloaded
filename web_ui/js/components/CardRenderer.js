@@ -851,6 +851,8 @@ export const CardRenderer = {
                             const m = window.__modals?.StageAbilityModal;
                             if (m) { m.open(slotCard, abilityActions); return; }
                         }
+                        const m = window.__modals?.CardDetailModal;
+                        if (m) { m.open(slotCard, containerId); return; }
                     }
 
                     if (isValid) {

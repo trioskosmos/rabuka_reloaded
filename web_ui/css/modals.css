@@ -149,12 +149,12 @@
 }
 
 #discard-modal-cards .card-mini {
-    width: calc(var(--card-w) * 1);
-    height: calc(var(--card-h) * 1);
+    width: var(--card-w-mini);
+    height: var(--card-h-mini);
 }
 #discard-modal-cards .card-mini.orientation-landscape {
-    width: calc(var(--card-h) * 1);
-    height: calc(var(--card-w) * 1);
+    width: var(--card-h-mini);
+    height: var(--card-w-mini);
 }
 
 .discard-grid {

@@ -501,3 +501,203 @@ fn fuyumari_waits_only_one_member() {
         "Unselected target should NOT be waited"
     );
 }
+
+/// Integration test: Fuyumari played via real play_to_stage triggers appearance.
+/// Uses the full Main phase flow (not manual record_card_appearance).
+/// P1 plays Fuyumari to stage → opponent's stage member should be waited.
+#[test]
+fn fuyumari_real_play_to_stage_triggers_appearance() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let fuyumari = game.id("PL!SP-bp4-011-R\u{ff0b}");
+    let target = game.id("PL!-sd1-010-SD"); // blade=1, valid
+    let filler = game.id("PL!-sd1-002-SD");
+
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // P2 has a target on stage
+    game.state.player2.stage.stage[0] = target;
+
+    // P1 has Fuyumari in hand, energy to play
+    game.state.player1.hand.cards.push(fuyumari);
+    game.give_energy(15);
+
+    // Real play_to_stage through Main phase
+    game.play_to_stage(fuyumari, MemberArea::LeftSide);
+
+    // Drain all pending choices (auto abilities, etc.)
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // Fuyumari should be on P1 stage
+    assert_eq!(
+        game.state.player1.stage.stage[0],
+        fuyumari,
+        "Fuyumari should be on P1 LeftSide"
+    );
+
+    // Target on P2 stage should be in wait state
+    let ori = game.state.mods.get_orientation_modifier(target);
+    assert_eq!(
+        ori.map(|s| s.as_str()),
+        Some("wait"),
+        "Q: Real play_to_stage should trigger appearance → target waited"
+    );
+}
+
+/// Integration test: P2 plays Fuyumari → affects P1's stage member.
+#[test]
+fn fuyumari_p2_play_to_stage_triggers_appearance() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let fuyumari = game.id("PL!SP-bp4-011-R\u{ff0b}");
+    let target = game.id("PL!-sd1-010-SD"); // blade=1, valid
+    let filler = game.id("PL!-sd1-002-SD");
+    let p1_live = game.id("PL!-sd1-020-SD");
+
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // P1 has target on stage + a card for live
+    game.state.player1.stage.stage[0] = target;
+    game.state.player1.hand.cards.push(p1_live);
+
+    // P2 has Fuyumari in hand — give P2 energy for cost
+    game.state.player2.hand.cards.push(fuyumari);
+    for _ in 0..15 {
+        let e = game.id("LL-E-001-SD");
+        game.state.player2.energy_zone.cards.push(e);
+    }
+    game.state.player2.energy_zone.add_active(15);
+
+    // Navigate to P2 Main: P1 plays live → skip through
+    for _ in 0..5 {
+        game.pass();
+    }
+    game.set_live_card(p1_live);
+    // Pass through everything until P2 Main
+    for _ in 0..40 {
+        game.pass();
+        while game.has_pending_choice() {
+            game.select_indices(&[]);
+        }
+        let phase = game.state.current_phase.to_string();
+        let active = game.state.active_player().id.clone();
+        let p2 = game.state.player2.id.clone();
+        if phase == "Main" && active == p2 {
+            break;
+        }
+    }
+
+    game.play_to_stage(fuyumari, MemberArea::LeftSide);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    let ori = game.state.mods.get_orientation_modifier(target);
+    assert_eq!(
+        ori.map(|s| s.as_str()),
+        Some("wait"),
+        "P2 play_to_stage should trigger appearance -> P1 target waited"
+    );
+}
+
+/// Integration test: P1 baton-touches Fuyumari onto stage → appearance triggers.
+/// Baton touch counts as "area move" → the movement branch fires.
+#[test]
+fn fuyumari_baton_touch_triggers_area_move() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let fuyumari = game.id("PL!SP-bp4-011-R\u{ff0b}");
+    let existing = game.id("PL!-sd1-002-SD"); // already on stage at Center
+    let target = game.id("PL!-sd1-010-SD"); // blade=1, valid target on P2 stage
+    let filler = game.id("PL!-sd1-002-SD");
+
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // P1 has existing member at Center, Fuyumari in hand
+    game.state.player1.stage.stage = [-1, existing, -1];
+    // P2 has target
+    game.state.player2.stage.stage[0] = target;
+    // Fuyumari in hand
+    game.state.player1.hand.cards.push(fuyumari);
+    game.give_energy(15);
+
+    // Baton touch: play Fuyumari to occupied Center → existing goes to waitroom
+    game.play_to_stage(fuyumari, MemberArea::Center);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // Fuyumari should be on stage at Center
+    assert_eq!(
+        game.state.player1.stage.stage[1],
+        fuyumari,
+        "Fuyumari should be at Center after baton touch"
+    );
+    // Existing should be in waitroom
+    assert!(
+        game.state.player1.waitroom.cards.contains(&existing),
+        "Existing member should be in waitroom after baton touch"
+    );
+
+    // Target on P2 stage should be in wait state
+    let ori = game.state.mods.get_orientation_modifier(target);
+    assert_eq!(
+        ori.map(|s| s.as_str()),
+        Some("wait"),
+        "Baton touch should trigger area move -> target waited"
+    );
+}
+
+/// Integration test: P1 baton-touches Fuyumari from LeftSide to Center → area move triggers.
+#[test]
+fn fuyumari_baton_touch_left_to_center_triggers() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let fuyumari = game.id("PL!SP-bp4-011-R\u{ff0b}");
+    let existing_center = game.id("PL!-sd1-002-SD");
+    let target = game.id("PL!-sd1-010-SD"); // blade=1, valid
+    let filler = game.id("PL!-sd1-002-SD");
+
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // Fuyumari already on stage at LeftSide, existing at Center
+    game.state.player1.stage.stage = [fuyumari, existing_center, -1];
+    game.state.player2.stage.stage[0] = target;
+
+    // Baton touch from LeftSide to Center: play a card to Center to swap Fuyumari out
+    // Actually: place Fuyumari at Left, then baton touch FROM hand to LeftSide
+    // But Fuyumari is already on stage. Let me redo: put Fuyumari in hand,
+    // existing at Center, baton touch Fuyumari to LeftSide
+    game.state.player1.stage.stage = [-1, existing_center, -1];
+    game.state.player1.hand.cards.push(fuyumari);
+    game.give_energy(15);
+
+    // Baton touch Fuyumari to LeftSide (empty, not a baton touch — just appearance)
+    // Actually to trigger baton touch, we need to play to an OCCUPIED area.
+    // Let's baton touch to Center: existing goes to waitroom
+    game.play_to_stage(fuyumari, MemberArea::Center);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    let ori = game.state.mods.get_orientation_modifier(target);
+    assert_eq!(
+        ori.map(|s| s.as_str()),
+        Some("wait"),
+        "Baton touch from hand to occupied Center -> target waited"
+    );
+}

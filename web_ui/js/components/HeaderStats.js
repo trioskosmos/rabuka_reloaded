@@ -224,9 +224,18 @@ export const HeaderStats = {
         };
 
         // Helper: get need hearts (backend or local preview)
-        const getNeedHearts = (player, isPerspectivePlayer) => {
+        const getNeedHearts = (player, isPerspectivePlayer, isOpponent) => {
             if (isSetPhase && isPerspectivePlayer && State.localLiveCardSelection.size > 0) {
                 return HeaderStats.computeLocalNeedHearts(player);
+            }
+            // Rule 8.2.x: live cards are face-down until performance.
+            // Opponent's need hearts are hidden until their cards are revealed.
+            if (isOpponent) {
+                const isOppFirst = perspective === 0 ? !!p1.is_first_attacker : !!p0.is_first_attacker;
+                const performed = state.phase === 'SecondAttackerPerformance'
+                    || state.phase === 'LiveVictoryDetermination'
+                    || (state.phase === 'FirstAttackerPerformance' && isOppFirst);
+                if (!performed) return null;
             }
             if (player.live_need_hearts && player.live_need_hearts.some(v => v > 0)) {
                 return player.live_need_hearts;
@@ -246,7 +255,7 @@ export const HeaderStats = {
             </span>`;
         }
         if (HeaderStats.cache.player1NeedHearts) {
-            const nh = getNeedHearts(pPerspective, true);
+            const nh = getNeedHearts(pPerspective, true, false);
             HeaderStats.cache.player1NeedHearts.innerHTML = nh ? '<span class="stat-separator"></span>' + PerformanceRenderer.renderHeartsCompact(nh) : '';
         }
 
@@ -262,7 +271,7 @@ export const HeaderStats = {
             </span>`;
         }
         if (HeaderStats.cache.player2NeedHearts) {
-            const nh = getNeedHearts(pOpponent, false);
+            const nh = getNeedHearts(pOpponent, false, true);
             HeaderStats.cache.player2NeedHearts.innerHTML = nh ? '<span class="stat-separator"></span>' + PerformanceRenderer.renderHeartsCompact(nh) : '';
         }
 

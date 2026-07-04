@@ -78,10 +78,11 @@ fn kinako_activate_discards_matching_card() {
     );
 }
 
-/// Q240: Discard Sumire (center-gated debut) via Kinako's activation.
+/// Q108/Q240: Discard Sumire (center-gated debut) via Kinako's activation.
 /// Sumire's debut fires from waitroom → center check fails → no blade+2.
+/// Proves the triggered ability belongs to Sumire, not Kinako.
 #[test]
-fn kinako_q240_sumire_discard_no_blade() {
+fn kinako_q108_sumire_discard_no_blade() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 

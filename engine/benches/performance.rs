@@ -1,421 +1,214 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
 use rabuka_engine::deck_builder;
 use rabuka_engine::deck_parser;
 use rabuka_engine::game_setup;
-use rabuka_engine::game_state::{GameState, Phase};
+use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
-use rand::SeedableRng;
-use rand_chacha::ChaCha8Rng;
-use rayon::prelude::*;
+use rabuka_engine::zones::MemberArea;
 use std::sync::{Arc, OnceLock};
 
-static GLOBAL_CARD_DATABASE: OnceLock<Arc<CardDatabase>> = OnceLock::new();
-
-fn setup_test_game_state() -> GameState {
-    let cards = CardDatabase::new();
-    let card_db = Arc::new(cards);
-
-    let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
-
-    let mut game_state = GameState::new(player1, player2, card_db);
-    game_state.current_phase = Phase::Main;
-    game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
-
-    // Add some cards to player1's hand for benchmarking
-    for i in 0..10 {
-        game_state.player1.hand.cards.push(i);
-    }
-
-    game_state
+struct BenchContext {
+    card_database: Arc<CardDatabase>,
+    deck_templates: Vec<(String, deck_builder::Deck, deck_builder::Deck)>,
 }
 
-fn benchmark_generate_possible_actions(c: &mut Criterion) {
-    let game_state = setup_test_game_state();
+static CTX: OnceLock<BenchContext> = OnceLock::new();
 
-    c.bench_function("generate_possible_actions", |b| {
-        b.iter(|| {
-            game_setup::generate_possible_actions(black_box(&game_state));
-        });
+fn ctx() -> &'static BenchContext {
+    CTX.get().expect("BenchContext not initialized")
+}
+
+fn init_ctx() {
+    let _ = CTX.get_or_init(|| {
+        let cards_path = std::path::Path::new("../cards/cards.json");
+        let cards =
+            card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
+        let card_database = Arc::new(CardDatabase::load_or_create(cards));
+
+        let deck_lists =
+            deck_parser::DeckParser::parse_all_decks().expect("Failed to load decks");
+
+        let mut deck_templates = Vec::new();
+        for deck_list in &deck_lists {
+            let card_numbers = deck_parser::DeckParser::deck_list_to_card_numbers(deck_list);
+            let mut p1 = deck_builder::DeckBuilder::build_deck_from_database(
+                &mut Arc::clone(&card_database),
+                card_numbers.clone(),
+            )
+            .expect("Failed to build P1 deck");
+            let mut p2 = deck_builder::DeckBuilder::build_deck_from_database(
+                &mut Arc::clone(&card_database),
+                card_numbers,
+            )
+            .expect("Failed to build P2 deck");
+            let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
+                &mut p1,
+                &mut Arc::clone(&card_database),
+            );
+            let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
+                &mut p2,
+                &mut Arc::clone(&card_database),
+            );
+            deck_templates.push((deck_list.name.clone(), p1, p2));
+        }
+
+        BenchContext {
+            card_database,
+            deck_templates,
+        }
     });
 }
 
-fn benchmark_check_timing(c: &mut Criterion) {
-    c.bench_function("check_timing", |b| {
-        b.iter(|| {
-            let mut game_state = setup_test_game_state();
-            TurnEngine::check_timing(black_box(&mut game_state));
-        });
-    });
-}
-
-fn setup_full_game(deck_name: &str) -> GameState {
-    // Load cards from the cards.json file
-    let cards_path = std::path::Path::new("../cards/cards.json");
-    let cards =
-        card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
-
-    let card_database = Arc::new(CardDatabase::load_or_create(cards));
-
-    // Load actual decks from game/decks folder
-    let decks = deck_parser::DeckParser::parse_all_decks().expect("Failed to load decks");
-
-    // Find the requested deck
-    let deck = decks
-        .iter()
-        .find(|d| d.name == deck_name)
-        .unwrap_or_else(|| {
-            eprintln!("Deck '{}' not found, using first available deck", deck_name);
-            &decks[0]
-        });
-
-    let card_numbers = deck_parser::DeckParser::deck_list_to_card_numbers(deck);
-
-    let mut player1_deck =
-        deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers.clone())
-            .expect("Failed to build deck for Player 1");
-    let mut player2_deck =
-        deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers)
-            .expect("Failed to build deck for Player 2");
-
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut player1_deck,
-        &card_database,
-    );
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut player2_deck,
-        &card_database,
-    );
-
-    player1_deck.shuffle_main_deck();
-    player1_deck.shuffle_energy_deck();
-    player2_deck.shuffle_main_deck();
-    player2_deck.shuffle_energy_deck();
+fn build_game(deck_idx: usize) -> GameState {
+    let c = ctx();
+    let (_, p1_template, p2_template) = &c.deck_templates[deck_idx];
+    let mut p1_deck = p1_template.clone();
+    let mut p2_deck = p2_template.clone();
+    p1_deck.shuffle_main_deck();
+    p1_deck.shuffle_energy_deck();
+    p2_deck.shuffle_main_deck();
+    p2_deck.shuffle_energy_deck();
 
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    player1.set_main_deck(p1_deck.main_deck);
+    player1.set_energy_deck(p1_deck.energy_deck);
+    player2.set_main_deck(p2_deck.main_deck);
+    player2.set_energy_deck(p2_deck.energy_deck);
 
-    player1.set_main_deck(player1_deck.main_deck);
-    player1.set_energy_deck(player1_deck.energy_deck);
-    player2.set_main_deck(player2_deck.main_deck);
-    player2.set_energy_deck(player2_deck.energy_deck);
-
-    let mut game_state = GameState::new(player1, player2, card_database);
-    game_setup::setup_game(&mut game_state);
-
-    game_state
+    let mut gs = GameState::new(player1, player2, Arc::clone(&c.card_database));
+    game_setup::setup_game(&mut gs);
+    gs
 }
 
-#[derive(Debug, Clone, Copy)]
-enum GameEndReason {
-    Victory,
-    Stuck,
+fn parse_stage_area(s: &str) -> Option<MemberArea> {
+    match s {
+        "left" => Some(MemberArea::LeftSide),
+        "center" => Some(MemberArea::Center),
+        "right" => Some(MemberArea::RightSide),
+        _ => None,
+    }
 }
 
-fn run_single_game_to_completion(mut game_state: GameState) -> (GameState, u64, GameEndReason) {
-    let max_iterations = 1000; // Reduced for faster benchmarking
-    let mut iteration_count = 0;
-    let mut action_count = 0;
-    let mut end_reason = GameEndReason::Stuck;
-    let mut last_turn_number = 0;
-    let mut stuck_counter = 0;
+fn run_game_to_completion(gs: &mut GameState) -> u64 {
+    let mut actions = 0u64;
+    let mut last_turn = 0u32;
+    let mut stuck = 0u32;
 
-    while iteration_count < max_iterations {
-        iteration_count += 1;
-
-        // Check if game is finished
-        let game_result = game_state.check_victory();
-        if game_result != rabuka_engine::game_state::GameResult::Ongoing {
-            end_reason = GameEndReason::Victory;
+    for _ in 0..2000 {
+        TurnEngine::check_victory_condition(gs);
+        if gs.game_result != GameResult::Ongoing {
             break;
         }
-
-        // Detect stuck state (very lenient)
-        if game_state.turn_number == last_turn_number {
-            stuck_counter += 1;
-            if stuck_counter > 500 {
-                // Reduced threshold
-                end_reason = GameEndReason::Stuck;
+        if gs.turn_number == last_turn {
+            stuck += 1;
+            if stuck > 300 {
                 break;
             }
         } else {
-            stuck_counter = 0;
-            last_turn_number = game_state.turn_number;
+            stuck = 0;
+            last_turn = gs.turn_number;
         }
 
-        // Auto-advance automatic phases
-        match game_state.current_phase {
+        match gs.current_phase {
             Phase::Active
             | Phase::Energy
             | Phase::Draw
             | Phase::FirstAttackerPerformance
             | Phase::SecondAttackerPerformance
             | Phase::LiveVictoryDetermination => {
-                TurnEngine::advance_phase(&mut game_state);
+                TurnEngine::advance_phase(gs);
                 continue;
             }
             _ => {}
         }
 
-        // Get available actions
-        let actions = game_setup::generate_possible_actions(&game_state);
-
-        if actions.is_empty() {
-            TurnEngine::advance_phase(&mut game_state);
+        let action_list = game_setup::generate_possible_actions(gs);
+        if action_list.is_empty() {
+            TurnEngine::advance_phase(gs);
             continue;
         }
 
-        // Pick random action to avoid repeating same action
         use rand::seq::SliceRandom;
-        let mut rng = rand::thread_rng();
-        let action = actions.choose(&mut rng).unwrap();
+        let action = action_list.choose(&mut rand::thread_rng()).unwrap();
 
         let _ = TurnEngine::execute_main_phase_action(
-            &mut game_state,
+            gs,
             &action.action_type,
             action.parameters.as_ref().and_then(|p| p.card_id),
+            action.parameters.as_ref().and_then(|p| p.card_indices.clone()),
             action
                 .parameters
                 .as_ref()
-                .and_then(|p| p.card_indices.clone()),
-            action.parameters.as_ref().and_then(|p| p.stage_area),
+                .and_then(|p| p.stage_area.as_deref().and_then(parse_stage_area)),
             action.parameters.as_ref().and_then(|p| p.use_baton_touch),
         );
-        action_count += 1;
+        actions += 1;
     }
-
-    (game_state, action_count, end_reason)
+    actions
 }
 
-fn run_games_for_duration(
-    card_database: Arc<CardDatabase>,
-    player1_deck_template: deck_builder::Deck,
-    player2_deck_template: deck_builder::Deck,
-    duration_secs: u64,
-) -> (u64, u64, u64) {
-    use std::time::{Duration, Instant};
+fn bench_micro(c: &mut Criterion) {
+    init_ctx();
+    let mut gs = build_game(0);
+    gs.current_phase = Phase::Main;
+    gs.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
 
-    let max_time = Duration::from_secs(duration_secs);
-    let start_time = Instant::now();
-    let mut total_actions = 0;
-    let mut victory_count = 0;
-    let mut stuck_count = 0;
-    let mut game_count = 0;
+    c.bench_function("generate_possible_actions", |b| {
+        b.iter(|| game_setup::generate_possible_actions(black_box(&gs)));
+    });
 
-    while start_time.elapsed() < max_time {
-        // Clone and shuffle decks for new game
-        let mut p1_deck = player1_deck_template.clone();
-        let mut p2_deck = player2_deck_template.clone();
-        p1_deck.shuffle_main_deck();
-        p1_deck.shuffle_energy_deck();
-        p2_deck.shuffle_main_deck();
-        p2_deck.shuffle_energy_deck();
-
-        let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-        let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
-        player1.set_main_deck(p1_deck.main_deck);
-        player1.set_energy_deck(p1_deck.energy_deck);
-        player2.set_main_deck(p2_deck.main_deck);
-        player2.set_energy_deck(p2_deck.energy_deck);
-
-        let mut game_state = GameState::new(player1, player2, card_database.clone());
-        game_setup::setup_game(&mut game_state);
-
-        let (_state, action_count, end_reason) = run_single_game_to_completion(game_state);
-
-        total_actions += action_count;
-        game_count += 1;
-
-        match end_reason {
-            GameEndReason::Victory => victory_count += 1,
-            GameEndReason::Stuck => stuck_count += 1,
-        }
-    }
-
-    (total_actions, victory_count, game_count)
+    c.bench_function("check_timing", |b| {
+        b.iter(|| {
+            let mut gs = build_game(0);
+            TurnEngine::check_timing(black_box(&mut gs))
+        });
+    });
 }
 
-fn benchmark_full_game(c: &mut Criterion) {
-    let decks = [
-        "aqours_cup",
-        "fade_deck",
-        "hasunosora_cup",
-        "liella_cup",
-        "muse_cup",
-        "nijigaku_cup",
-    ];
+fn bench_single_game(c: &mut Criterion) {
+    init_ctx();
+    let mut group = c.benchmark_group("single_game");
+    group.sample_size(20);
 
-    // Load cards once outside the benchmark loop
-    let cards_path = std::path::Path::new("../cards/cards.json");
-    let cards =
-        card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
-    let card_database = Arc::new(CardDatabase::load_or_create(cards));
-
-    // Load all decks once outside the benchmark loop
-    let deck_lists = deck_parser::DeckParser::parse_all_decks().expect("Failed to load decks");
-
-    for deck_name in decks.iter() {
-        // Find the requested deck
-        let deck = deck_lists
-            .iter()
-            .find(|d| d.name == *deck_name)
-            .unwrap_or_else(|| {
-                eprintln!("Deck '{}' not found, using first available deck", deck_name);
-                &deck_lists[0]
+    for (i, (name, _, _)) in ctx().deck_templates.iter().enumerate() {
+        group.bench_with_input(BenchmarkId::from_parameter(name), &name, |b, _| {
+            b.iter(|| {
+                let mut gs = build_game(i);
+                run_game_to_completion(&mut gs)
             });
-
-        let card_numbers = deck_parser::DeckParser::deck_list_to_card_numbers(deck);
-
-        // Pre-build decks for both players
-        let mut player1_deck_template = deck_builder::DeckBuilder::build_deck_from_database(
-            &card_database,
-            card_numbers.clone(),
-        )
-        .expect("Failed to build deck for Player 1");
-        let mut player2_deck_template =
-            deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers)
-                .expect("Failed to build deck for Player 2");
-
-        let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-            &mut player1_deck_template,
-            &card_database,
-        );
-        let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-            &mut player2_deck_template,
-            &card_database,
-        );
-
-        // Run a quick test to get approximate actions per second for throughput
-        let (test_actions, test_victories, test_games) = run_games_for_duration(
-            card_database.clone(),
-            player1_deck_template.clone(),
-            player2_deck_template.clone(),
-            1,
-        );
-
-        let mut group = c.benchmark_group("full_game_2sec");
-        group.throughput(Throughput::Elements(test_actions * 2)); // Scale to 2 seconds
-        group.bench_with_input(
-            BenchmarkId::from_parameter(deck_name),
-            deck_name,
-            |b, &_deck_name| {
-                b.iter(|| {
-                    let (actions, victories, games) = run_games_for_duration(
-                        card_database.clone(),
-                        player1_deck_template.clone(),
-                        player2_deck_template.clone(),
-                        2,
-                    );
-                    actions
-                });
-            },
-        );
-        group.finish();
+        });
     }
+    group.finish();
 }
 
-fn benchmark_full_game_parallel(c: &mut Criterion) {
-    let decks = [
-        "aqours_cup",
-        "fade_deck",
-        "hasunosora_cup",
-        "liella_cup",
-        "muse_cup",
-        "nijigaku_cup",
-    ];
+fn bench_game_throughput(c: &mut Criterion) {
+    init_ctx();
+    let mut group = c.benchmark_group("game_throughput");
+    group.sample_size(10);
 
-    // Load cards once and store in static global to avoid Arc cloning
-    let cards_path = std::path::Path::new("../cards/cards.json");
-    let cards =
-        card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
-    let card_database = Arc::new(CardDatabase::load_or_create(cards));
-    GLOBAL_CARD_DATABASE
-        .set(card_database)
-        .expect("Failed to set global card database");
-
-    // Get reference to global database
-    let card_database = GLOBAL_CARD_DATABASE.get().unwrap();
-
-    // Load all decks once outside the benchmark loop
-    let deck_lists = deck_parser::DeckParser::parse_all_decks().expect("Failed to load decks");
-
-    for deck_name in decks.iter() {
-        // Find the requested deck
-        let deck = deck_lists
-            .iter()
-            .find(|d| d.name == *deck_name)
-            .unwrap_or_else(|| {
-                eprintln!("Deck '{}' not found, using first available deck", deck_name);
-                &deck_lists[0]
+    for (i, (name, _, _)) in ctx().deck_templates.iter().enumerate() {
+        group.bench_with_input(BenchmarkId::from_parameter(name), &name, |b, _| {
+            b.iter(|| {
+                let mut total = 0u64;
+                for _ in 0..5 {
+                    let mut gs = build_game(i);
+                    total += run_game_to_completion(&mut gs);
+                }
+                total
             });
-
-        let card_numbers = deck_parser::DeckParser::deck_list_to_card_numbers(deck);
-
-        // Pre-build decks for both players
-        let mut player1_deck_template = deck_builder::DeckBuilder::build_deck_from_database(
-            card_database,
-            card_numbers.clone(),
-        )
-        .expect("Failed to build deck for Player 1");
-        let mut player2_deck_template =
-            deck_builder::DeckBuilder::build_deck_from_database(card_database, card_numbers)
-                .expect("Failed to build deck for Player 2");
-
-        let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-            &mut player1_deck_template,
-            card_database,
-        );
-        let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-            &mut player2_deck_template,
-            card_database,
-        );
-
-        // Run a quick test to get approximate actions per second for throughput
-        let (test_actions, test_victories, test_games) = run_games_for_duration(
-            Arc::clone(card_database),
-            player1_deck_template.clone(),
-            player2_deck_template.clone(),
-            1,
-        );
-
-        let num_threads = rayon::current_num_threads();
-
-        let mut group = c.benchmark_group("full_game_parallel_2sec");
-        group.throughput(Throughput::Elements(test_actions * 2)); // Scale to 2 seconds
-        group.bench_with_input(
-            BenchmarkId::from_parameter(deck_name),
-            deck_name,
-            |b, &_deck_name| {
-                b.iter(|| {
-                    // Run games in parallel using rayon for 2 seconds total
-                    let total_actions: u64 = (0..num_threads)
-                        .into_par_iter()
-                        .map(|_| {
-                            run_games_for_duration(
-                                Arc::clone(card_database),
-                                player1_deck_template.clone(),
-                                player2_deck_template.clone(),
-                                2 / num_threads as u64, // Divide time among threads
-                            )
-                            .0
-                        })
-                        .sum();
-                    total_actions
-                });
-            },
-        );
-        group.finish();
+        });
     }
+    group.finish();
 }
 
 criterion_group!(
     benches,
-    benchmark_generate_possible_actions,
-    benchmark_check_timing,
-    benchmark_full_game,
-    benchmark_full_game_parallel
+    bench_micro,
+    bench_single_game,
+    bench_game_throughput
 );
 criterion_main!(benches);

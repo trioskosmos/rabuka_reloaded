@@ -162,7 +162,9 @@ export const ActionMenu = {
                 a.action_type === 'choose_second_attacker'
             );
             const isRpsWinnerChoice = state.rps_winner != null && systemOnly.some(a => a.action_type === 'choose_first_attacker');
-            if (systemOnly.length > 0 && (!isRpsWinnerChoice || state.rps_winner === State.perspectivePlayer)) {
+            // rps_winner is 1-indexed (1=P1, 2=P2) from Rust backend; perspectivePlayer is 0-indexed
+            const rpsWinnerIdx = state.rps_winner != null ? state.rps_winner - 1 : -1;
+            if (systemOnly.length > 0 && (!isRpsWinnerChoice || rpsWinnerIdx === State.perspectivePlayer)) {
                 const sysBody = document.getElementById('system-actions-body');
                 if (sysBody) {
                     sysBody.innerHTML = '';
