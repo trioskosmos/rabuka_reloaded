@@ -40,6 +40,9 @@ criterion = "0.5"
 rayon = "1.8"
 rand_chacha = "0.3"
 
+[profile.bench]
+debug = true
+
 [[bench]]
 name = "performance"
 harness = false

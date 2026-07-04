@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-04T10:20:23.579814",
+  "generated_at": "2026-07-04T11:21:45.652806",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -24499,7 +24499,9 @@
           },
           "target": "self",
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "phase": "main",
+          "phase_target": "self"
         },
         "action": "sequential",
         "actions": [
@@ -24707,7 +24709,9 @@
           "target": "self",
           "self_target": true,
           "source": "discard",
-          "destination": "hand"
+          "destination": "hand",
+          "phase": "main",
+          "phase_target": "self"
         }
       }
     },
@@ -32286,7 +32290,9 @@
           "movement": "position_change",
           "target": "self",
           "card_type": "member_card",
-          "self_target": true
+          "self_target": true,
+          "phase": "main",
+          "phase_target": "self"
         },
         "state_change": "active",
         "count": 2,

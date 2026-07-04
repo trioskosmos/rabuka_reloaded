@@ -1261,17 +1261,6 @@ def parse_condition(text: str) -> Dict[str, Any]:
             _enrich_or_location(result, text)
             # Heart-content filter: 必要ハートに含まれるheartXXがN → add heart_colors
             _enrich_heart_content(result, text)
-            # Propagate phase/phase_target from trigger_event to top level
-            # when the text contains a phase gate pattern, so all phase-gated
-            # conditions expose them consistently.
-            te = result.get("trigger_event")
-            if isinstance(te, dict) and re.search(
-                r"(?:自分の|相手の)?(?:メイン|ライブ|セット|エール)フェイズ", text
-            ):
-                if not result.get("phase") and te.get("phase"):
-                    result["phase"] = te["phase"]
-                if not result.get("phase_target") and te.get("phase_target"):
-                    result["phase_target"] = te["phase_target"]
             return result
 
     # Fall-through: generic field extraction + type inference
@@ -2689,11 +2678,7 @@ def _try_compound(text):
     for sub in parsed:
         if not first_loc:
             first_loc = sub.get("location")
-        elif (
-            first_loc
-            and not sub.get("location")
-            and "その中に" in (sub.get("text") or "")
-        ):
+        elif first_loc and not sub.get("location") and "その中に" in (sub.get("text") or ""):
             sub["location"] = first_loc
     return result
 
@@ -3160,9 +3145,7 @@ def _try_temporal_this_turn(text):
 
 def _try_phase_gate(text):
     """Simple phase gate: Xフェイズの場合 — restricts activation to a specific phase."""
-    m = re.search(
-        r"(?:自分の|相手の)?(メイン|ライブ|セット|エール)フェイズの場合", text
-    )
+    m = re.search(r"(?:自分の|相手の)?(メイン|ライブ|セット|エール)フェイズの場合", text)
     if not m:
         return None
     phase_name = m.group(1)
