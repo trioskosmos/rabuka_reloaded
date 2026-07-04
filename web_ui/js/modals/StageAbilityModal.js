@@ -47,7 +47,7 @@ export const StageAbilityModal = {
         const textContainer = document.getElementById('stage-ability-card-text');
         if (textContainer) {
             textContainer.innerHTML = '';
-            const rawText = cardData.ability_text || cardData.text || cardData.original_text || '';
+            const rawText = TextEnricher.getEffectiveRawText(cardData) || '';
             if (rawText) {
                 textContainer.innerHTML = TextEnricher.enrichAbilityText(rawText);
             }

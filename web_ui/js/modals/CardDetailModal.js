@@ -118,7 +118,7 @@ function render() {
             if (units) parts.push(`Units: ${units}`);
             if (parts.length) html += `<div style="font-size:0.75em;opacity:0.7;margin-bottom:4px;">${parts.join(' | ')}</div>`;
 
-            const rawText = cardObj.ability_text || cardObj.text || cardObj.original_text || '';
+            const rawText = TextEnricher.getEffectiveRawText(cardObj) || '';
             if (rawText) html += `<div class="card-detail-ability">${TextEnricher.enrichAbilityText(rawText)}</div>`;
             textEl.innerHTML = html;
         }
