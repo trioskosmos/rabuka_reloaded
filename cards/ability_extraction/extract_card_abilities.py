@@ -33,7 +33,6 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from parser import (
     parse_cost,
-    parse_condition,
     parse_effect,
     _normalize_effect_tree,
     _collapse_to_effect_steps,
@@ -411,31 +410,6 @@ def extract_all_abilities(cards_file: Path) -> dict:
 
             traceback.print_exc()
             effect = {"text": effect_text, "actions": []}
-
-        # Fill missing condition from triggerless_text (same logic as parse_ability)
-        if isinstance(effect, dict) and not effect.get("condition"):
-            txt = sample["triggerless_text"]
-            for sep in ["とき、", "場合、", "たび、", "なら、"]:
-                idx = txt.find(sep)
-                if idx >= 0:
-                    cond_text = txt[
-                        : idx
-                        + len(
-                            "とき"
-                            if sep == "とき、"
-                            else "場合"
-                            if sep == "場合、"
-                            else "たび"
-                            if sep == "たび、"
-                            else "なら"
-                        )
-                    ]
-                    if ")" in cond_text or "\uff09" in cond_text:
-                        continue
-                    tc = parse_condition(cond_text)
-                    if tc and tc.get("type") not in (None, "custom"):
-                        effect["condition"] = tc
-                        break
 
         # If the effect handler embedded a cost (e.g. "unless pay N energy"),
         # lift it to the ability level (Q92: player chooses whether to pay)
