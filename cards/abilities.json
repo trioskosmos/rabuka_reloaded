@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-05T11:03:46.917360",
+  "generated_at": "2026-07-05T11:16:11.651117",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -4971,20 +4971,37 @@
         "conditional": true,
         "trigger_type": "each_time",
         "condition": {
-          "type": "card_count_condition",
-          "count": 1,
-          "operator": ">=",
-          "text": "自分のカードが1枚以上いずれかの領域から控え室に置かれる",
-          "location": "discard",
-          "target": "self",
-          "source": "preceding_moved"
+          "type": "compound",
+          "operator": "and",
+          "conditions": [
+            {
+              "type": "temporal_condition",
+              "phase": "main",
+              "text": "自分のメインフェイズの間",
+              "trigger_event": {
+                "type": "temporal",
+                "phase": "main",
+                "phase_target": "self"
+              },
+              "phase_target": "self",
+              "location": "discard"
+            },
+            {
+              "type": "card_count_condition",
+              "count": 1,
+              "operator": ">=",
+              "text": "自分のカードが1枚以上いずれかの領域から控え室に置かれる",
+              "location": "discard",
+              "target": "self",
+              "source": "preceding_moved"
+            }
+          ]
         },
         "optional_action": {
           "text": "{{icon_energy.png|E}}支払ってもよい。",
           "action": "pay_energy",
           "energy": 1,
-          "count": 1,
-          "location": "discard"
+          "count": 1
         },
         "conditional_action": {
           "text": "それらのカードの中から1枚手札に加える",
@@ -4992,20 +5009,8 @@
           "destination": "hand",
           "count": 1,
           "action": "move_cards",
-          "card_type": "card",
-          "location": "discard"
+          "card_type": "card"
         }
-      },
-      "condition": {
-        "type": "temporal_condition",
-        "phase": "main",
-        "text": "自分のメインフェイズの間",
-        "trigger_event": {
-          "type": "temporal",
-          "phase": "main",
-          "phase_target": "self"
-        },
-        "phase_target": "self"
       }
     },
     {
@@ -7861,18 +7866,18 @@
         "restriction_type": "cannot_activate",
         "target": null,
         "phase": null,
-        "count": 1
-      },
-      "condition": {
-        "type": "temporal_condition",
-        "phase": "active_phase",
-        "text": "自分のアクティブフェイズに",
-        "trigger_event": {
-          "type": "temporal",
+        "count": 1,
+        "condition": {
+          "type": "temporal_condition",
           "phase": "active_phase",
+          "text": "自分のアクティブフェイズに",
+          "trigger_event": {
+            "type": "temporal",
+            "phase": "active_phase",
+            "phase_target": "self"
+          },
           "phase_target": "self"
-        },
-        "phase_target": "self"
+        }
       }
     },
     {
@@ -17098,15 +17103,15 @@
         "action": "restriction",
         "restriction_type": "cannot_activate",
         "target": "opponent",
-        "card_type": "member_card"
-      },
-      "condition": {
-        "type": "temporal_condition",
-        "phase": "active_phase",
-        "text": "アクティブフェイズに",
-        "trigger_event": {
-          "type": "temporal",
-          "phase": "active_phase"
+        "card_type": "member_card",
+        "condition": {
+          "type": "temporal_condition",
+          "phase": "active_phase",
+          "text": "アクティブフェイズに",
+          "trigger_event": {
+            "type": "temporal",
+            "phase": "active_phase"
+          }
         }
       }
     },
@@ -22176,18 +22181,18 @@
             "card_type": "live_card",
             "action": "reduce_live_card_set_limit"
           }
-        ]
-      },
-      "condition": {
-        "type": "temporal_condition",
-        "phase": "main",
-        "text": "自分のメインフェイズの場合",
-        "trigger_event": {
-          "type": "temporal",
+        ],
+        "condition": {
+          "type": "temporal_condition",
           "phase": "main",
+          "text": "自分のメインフェイズの場合",
+          "trigger_event": {
+            "type": "temporal",
+            "phase": "main",
+            "phase_target": "self"
+          },
           "phase_target": "self"
-        },
-        "phase_target": "self"
+        }
       }
     },
     {
@@ -24530,15 +24535,32 @@
       "effect": {
         "text": "このメンバーがアクティブ状態からウェイト状態になったとき、カードを1枚引き、手札を1枚控え室に置く",
         "condition": {
-          "type": "state_change_condition",
-          "text": "このメンバーがアクティブ状態からウェイト状態になったとき",
-          "trigger_event": {
-            "type": "state_change",
-            "from_state": "active",
-            "to_state": "wait"
-          },
-          "card_type": "member_card",
-          "self_target": true
+          "type": "compound",
+          "operator": "and",
+          "conditions": [
+            {
+              "type": "temporal_condition",
+              "phase": "main",
+              "text": "自分のメインフェイズの間",
+              "trigger_event": {
+                "type": "temporal",
+                "phase": "main",
+                "phase_target": "self"
+              },
+              "phase_target": "self"
+            },
+            {
+              "type": "state_change_condition",
+              "text": "このメンバーがアクティブ状態からウェイト状態になったとき",
+              "trigger_event": {
+                "type": "state_change",
+                "from_state": "active",
+                "to_state": "wait"
+              },
+              "card_type": "member_card",
+              "self_target": true
+            }
+          ]
         },
         "action": "sequential",
         "actions": [
@@ -24558,17 +24580,6 @@
             "card_type": "card"
           }
         ]
-      },
-      "condition": {
-        "type": "temporal_condition",
-        "phase": "main",
-        "text": "自分のメインフェイズの間",
-        "trigger_event": {
-          "type": "temporal",
-          "phase": "main",
-          "phase_target": "self"
-        },
-        "phase_target": "self"
       }
     },
     {
@@ -24743,30 +24754,36 @@
         ],
         "conditional": true,
         "condition": {
-          "type": "card_count_condition",
-          "count": 1,
-          "operator": ">=",
-          "text": "このカードが控え室から手札に加えられたとき",
-          "trigger_event": {
-            "type": "zone_change",
-            "source": "discard",
-            "destination": "hand"
-          },
-          "self_target": true,
-          "source": "discard",
-          "destination": "hand"
+          "type": "compound",
+          "operator": "and",
+          "conditions": [
+            {
+              "type": "temporal_condition",
+              "phase": "main",
+              "text": "自分のメインフェイズに",
+              "trigger_event": {
+                "type": "temporal",
+                "phase": "main",
+                "phase_target": "self"
+              },
+              "phase_target": "self"
+            },
+            {
+              "type": "card_count_condition",
+              "count": 1,
+              "operator": ">=",
+              "text": "このカードが控え室から手札に加えられたとき",
+              "trigger_event": {
+                "type": "zone_change",
+                "source": "discard",
+                "destination": "hand"
+              },
+              "self_target": true,
+              "source": "discard",
+              "destination": "hand"
+            }
+          ]
         }
-      },
-      "condition": {
-        "type": "temporal_condition",
-        "phase": "main",
-        "text": "自分のメインフェイズに",
-        "trigger_event": {
-          "type": "temporal",
-          "phase": "main",
-          "phase_target": "self"
-        },
-        "phase_target": "self"
       }
     },
     {
@@ -24946,18 +24963,18 @@
         ],
         "group_names": [
           "虹ヶ咲"
-        ]
-      },
-      "condition": {
-        "type": "temporal_condition",
-        "phase": "live_phase",
-        "text": "このゲームの1ターン目のライブフェイズの場合",
-        "trigger_event": {
-          "type": "temporal",
+        ],
+        "condition": {
+          "type": "temporal_condition",
           "phase": "live_phase",
+          "text": "このゲームの1ターン目のライブフェイズの場合",
+          "trigger_event": {
+            "type": "temporal",
+            "phase": "live_phase",
+            "turn_number": 1
+          },
           "turn_number": 1
-        },
-        "turn_number": 1
+        }
       }
     },
     {
@@ -32337,31 +32354,37 @@
       "effect": {
         "text": "このメンバーがエリアを移動したとき、エネルギーを2枚アクティブにする",
         "condition": {
-          "type": "movement_condition",
-          "text": "このメンバーがエリアを移動したとき",
-          "trigger_event": {
-            "type": "area_move",
-            "tense": "past"
-          },
-          "movement": "position_change",
-          "card_type": "member_card",
-          "self_target": true
+          "type": "compound",
+          "operator": "and",
+          "conditions": [
+            {
+              "type": "temporal_condition",
+              "phase": "main",
+              "text": "自分のメインフェイズの間",
+              "trigger_event": {
+                "type": "temporal",
+                "phase": "main",
+                "phase_target": "self"
+              },
+              "phase_target": "self"
+            },
+            {
+              "type": "movement_condition",
+              "text": "このメンバーがエリアを移動したとき",
+              "trigger_event": {
+                "type": "area_move",
+                "tense": "past"
+              },
+              "movement": "position_change",
+              "card_type": "member_card",
+              "self_target": true
+            }
+          ]
         },
         "state_change": "active",
         "count": 2,
         "action": "change_state",
         "card_type": "energy_card"
-      },
-      "condition": {
-        "type": "temporal_condition",
-        "phase": "main",
-        "text": "自分のメインフェイズの間",
-        "trigger_event": {
-          "type": "temporal",
-          "phase": "main",
-          "phase_target": "self"
-        },
-        "phase_target": "self"
       }
     },
     {

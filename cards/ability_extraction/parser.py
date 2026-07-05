@@ -677,8 +677,6 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
     # The gate is a pure pre-check: "only during X phase" — no point
     # evaluating anything else if the phase is wrong.
     phase_gate, remaining_text = extract_phase_gate(triggerless_text)
-    if phase_gate:
-        ability["condition"] = phase_gate
 
     # Split cost and effect on the text with the phase prefix removed
     cost_text, effect_text = split_cost_effect(remaining_text)
@@ -761,6 +759,19 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         effect = _clean(effect)
         _validate_effect(effect, triggerless_text[:40])
         ability["effect"] = effect
+
+    # Merge phase gate into effect["condition"] (not ability["condition"])
+    # so the Rust Ability struct picks it up via AbilityEffect.condition.
+    if phase_gate and ability.get("effect") and isinstance(ability["effect"], dict):
+        existing_cond = ability["effect"].get("condition")
+        if existing_cond and isinstance(existing_cond, dict):
+            ability["effect"]["condition"] = {
+                "type": "compound",
+                "operator": "and",
+                "conditions": [phase_gate, existing_cond],
+            }
+        else:
+            ability["effect"]["condition"] = phase_gate
 
     # Clean cost too
     if "cost" in ability:

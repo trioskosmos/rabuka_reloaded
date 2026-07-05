@@ -64,19 +64,16 @@ impl super::TurnEngine {
             }
         }
 
-        let p1_mult = &game_state.mods.heart_color_multiplier.clone();
-        let p2_mult = &game_state.mods.heart_color_multiplier.clone();
-        // Include yell blade hearts in stage_hearts so should_trigger_live_success
-        // checks against the same total hearts the performance used.
+        let mult_ref = &game_state.mods.heart_color_multiplier;
         let mut p1_stage = game_state.player1.calculate_stage_hearts(
             &game_state.card_database,
-            p1_mult,
+            mult_ref,
             &game_state.mods.heart_override,
             &game_state.mods.heart_modifiers,
         );
         let mut p2_stage = game_state.player2.calculate_stage_hearts(
             &game_state.card_database,
-            p2_mult,
+            mult_ref,
             &game_state.mods.heart_override,
             &game_state.mods.heart_modifiers,
         );
@@ -2525,11 +2522,16 @@ fn card_name_by_no(card_db: &CardDatabase, card_no: &str) -> String {
 }
 
 fn fmt_player_id(id: &str) -> String {
-    let digits: String = id.chars().filter(|c| c.is_ascii_digit()).collect();
-    if digits.is_empty() {
-        "?".to_string()
-    } else {
-        format!("P{}", digits)
+    let mut digits = id.chars().filter(|c| c.is_ascii_digit());
+    match digits.next() {
+        None => "?".to_string(),
+        Some(first) => {
+            let mut s = String::with_capacity(8);
+            s.push('P');
+            s.push(first);
+            s.extend(digits);
+            s
+        }
     }
 }
 

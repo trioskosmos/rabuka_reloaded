@@ -67,8 +67,12 @@ impl GameState {
                 } else {
                     Some(&self.player2)
                 };
-                let ctx =
+                let mut ctx =
                     crate::ability::condition::ConditionContext::new_with_self(self, self_player);
+                // Constant abilities should register their effects regardless
+                // of the current phase — the phase gate only matters at trigger
+                // evaluation time, not during constant registration.
+                ctx.skip_phase_gate = true;
 
                 // Check effect-level position requirement
                 let pos_ok = if let Some(ref pos) = effect.position {

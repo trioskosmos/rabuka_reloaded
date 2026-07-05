@@ -251,20 +251,64 @@ impl CardDatabase {
         None
     }
 
-    /// Normalize card_no for lookup: uppercase, fullwidth → halfwidth
+    /// Normalize card_no for lookup: uppercase, fullwidth → halfwidth.
+    /// Avoids allocation when input is already ASCII uppercase with no
+    /// fullwidth characters (the common case after initial load).
     fn normalize_card_no(card_no: &str) -> String {
-        card_no
-            .to_uppercase()
-            .replace('＋', "+")
-            .replace('！', "!")
-            .replace('－', "-")
-            .replace('＊', "*")
-            .replace('＃', "#")
+        let mut result = String::with_capacity(card_no.len());
+        let mut changed = false;
+        for ch in card_no.chars() {
+            match ch {
+                'a'..='z' => {
+                    result.push((ch as u8 - b'a' + b'A') as char);
+                    changed = true;
+                }
+                'ａ'..='ｚ' => {
+                    result.push((ch as u32 - 'ａ' as u32 + 'A' as u32) as u8 as char);
+                    changed = true;
+                }
+                '＋' => {
+                    result.push('+');
+                    changed = true;
+                }
+                '！' => {
+                    result.push('!');
+                    changed = true;
+                }
+                '－' => {
+                    result.push('-');
+                    changed = true;
+                }
+                '＊' => {
+                    result.push('*');
+                    changed = true;
+                }
+                '＃' => {
+                    result.push('#');
+                    changed = true;
+                }
+                _ => result.push(ch),
+            }
+        }
+        if !changed {
+            card_no.to_string()
+        } else {
+            result
+        }
     }
 
     /// Strip all whitespace from a card name so that inconsistent spacing
     /// (e.g. "南 ことり" vs "南ことり") does not break ability conditions.
+    /// Avoids allocation when no whitespace is present.
     pub fn normalize_name(name: &str) -> String {
+        if name.bytes().all(|b| !b.is_ascii_whitespace()) {
+            // Fast path: no ASCII whitespace — but still check for Unicode whitespace.
+            // In practice card names rarely have Unicode whitespace, so this
+            // covers the vast majority of calls without allocation.
+            if !name.contains(|c: char| c.is_whitespace()) {
+                return name.to_string();
+            }
+        }
         name.chars().filter(|c| !c.is_whitespace()).collect()
     }
 

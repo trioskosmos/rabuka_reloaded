@@ -979,8 +979,6 @@ impl super::TurnEngine {
     }
 
     pub fn check_timing(game_state: &mut GameState) {
-        // Q100: Yell-revealed cards are NOT included in refresh when deck hits 0 during yell.
-        // Q101: Full refresh procedure during mid-effect resolution.
         game_state.player1.refresh();
         game_state.player2.refresh();
         let p1_needs_refresh = game_state.player1.main_deck.cards.is_empty()
@@ -997,21 +995,14 @@ impl super::TurnEngine {
             game_state.player2.main_deck.cards.append(&mut waitroom);
             game_state.player2.main_deck.shuffle();
         }
-        // Q48: Can win with score 0 or less (score comparison, not absolute value).
-        // Rule 10.4: Duplicate member processing
-        Self::check_duplicate_members(&mut game_state.player1, &game_state.card_database);
-        Self::check_duplicate_members(&mut game_state.player2, &game_state.card_database);
-        // Q84: When multiple auto abilities trigger simultaneously,
-        // active player resolves all theirs first, then non-active player.
         Self::check_victory_condition(game_state);
-        // Rule 10.5: Invalid card processing
+        // Rule 10.5: Invalid card processing — borrow IDs to avoid cloning
         let p1_id = game_state.player1.id.clone();
         let p2_id = game_state.player2.id.clone();
         Self::check_invalid_live_cards(game_state, &p1_id);
         Self::check_invalid_live_cards(game_state, &p2_id);
         Self::check_invalid_energy_cards(&mut game_state.player1, &game_state.card_database);
         Self::check_invalid_energy_cards(&mut game_state.player2, &game_state.card_database);
-        // Rule 10.5.3-4: Orphaned under-member cards
         Self::check_orphaned_under_cards(&mut game_state.player1, &game_state.card_database);
         Self::check_orphaned_under_cards(&mut game_state.player2, &game_state.card_database);
         game_state.recalculate_constants();
@@ -1086,36 +1077,50 @@ impl super::TurnEngine {
         if player_id != p1_id && player_id != p2_id {
             return;
         }
-        let card_db = game_state.card_database.clone();
-        // Split borrows: player borrow ends before push_movement_event
-        let moved: Vec<(i16, &str)> = {
+        // Two-pass: collect invalid IDs via immutable borrow, then mutate.
+        // Avoids cloning the entire CardDatabase each call.
+        let invalids: Vec<(usize, i16, bool)> = {
+            let player = if player_id == p1_id {
+                &game_state.player1
+            } else {
+                &game_state.player2
+            };
+            player
+                .live_card_zone
+                .cards
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &card_id)| {
+                    let card = game_state.card_database.get_card(card_id)?;
+                    if !card.is_live() {
+                        Some((i, card_id, card.is_energy()))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        };
+        if invalids.is_empty() {
+            return;
+        }
+        let mut moved = Vec::new();
+        for &(i, card_id, is_energy) in invalids.iter().rev() {
             let player = if player_id == p1_id {
                 &mut game_state.player1
             } else {
                 &mut game_state.player2
             };
-            let mut invalid_indices = Vec::new();
-            for (i, card_id) in player.live_card_zone.cards.iter().enumerate() {
-                if !card_db.get_card(*card_id).is_some_and(|c| c.is_live()) {
-                    invalid_indices.push(i);
+            if i < player.live_card_zone.cards.len() {
+                player.live_card_zone.cards.remove(i);
+                if is_energy {
+                    player.energy_deck.cards.push(card_id);
+                    moved.push((card_id, "energy_deck"));
+                } else {
+                    player.waitroom.add_card(card_id);
+                    moved.push((card_id, "waitroom"));
                 }
             }
-            let mut moved = Vec::new();
-            for &i in invalid_indices.iter().rev() {
-                if i < player.live_card_zone.cards.len() {
-                    let card_id = player.live_card_zone.cards.remove(i);
-                    // Rule 10.5.5: Energy cards go to energy deck, not discard
-                    if card_db.get_card(card_id).is_some_and(|c| c.is_energy()) {
-                        player.energy_deck.cards.push(card_id);
-                        moved.push((card_id, "energy_deck"));
-                    } else {
-                        player.waitroom.add_card(card_id);
-                        moved.push((card_id, "waitroom"));
-                    }
-                }
-            }
-            moved
-        };
+        }
         for (card_id, dest_zone) in moved {
             game_state.push_movement_event(
                 card_id,

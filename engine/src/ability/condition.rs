@@ -31,6 +31,10 @@ pub struct ConditionContext<'a> {
     pub position_change_occurred: bool,
     /// Cached player reference for "self" target — resolved once at creation.
     self_player: Option<&'a crate::player::Player>,
+    /// When true, skip the phase gate check in `check_phase_gate`.
+    /// Used by `recalculate_constants` so constant abilities with phase
+    /// restrictions (e.g. "during active phase") are always tracked.
+    pub skip_phase_gate: bool,
 }
 
 impl<'a> ConditionContext<'a> {
@@ -71,6 +75,7 @@ impl<'a> ConditionContext<'a> {
             selected_card_ids: &[],
             position_change_occurred: game_state.position_change_occurred_this_turn,
             self_player: Self::resolve_self_player(game_state),
+            skip_phase_gate: false,
         }
     }
 
@@ -88,6 +93,7 @@ impl<'a> ConditionContext<'a> {
             selected_card_ids: &[],
             position_change_occurred: game_state.position_change_occurred_this_turn,
             self_player,
+            skip_phase_gate: false,
         }
     }
 
@@ -103,6 +109,7 @@ impl<'a> ConditionContext<'a> {
             selected_card_ids: &[],
             position_change_occurred: game_state.position_change_occurred_this_turn,
             self_player: Self::resolve_self_player(game_state),
+            skip_phase_gate: false,
         }
     }
 
@@ -119,6 +126,7 @@ impl<'a> ConditionContext<'a> {
             selected_card_ids,
             position_change_occurred: game_state.position_change_occurred_this_turn,
             self_player: Self::resolve_self_player(game_state),
+            skip_phase_gate: false,
         }
     }
 
@@ -271,6 +279,9 @@ impl<'a> ConditionContext<'a> {
     /// "相手のメインフェイズ" (opponent's main phase), and plain
     /// "メインフェイズ" (any main phase).
     pub fn check_phase_gate(&self, condition: &Condition) -> bool {
+        if self.skip_phase_gate {
+            return true;
+        }
         let te = condition.trigger_event.as_ref();
         let Some(phase) = condition
             .phase
@@ -282,6 +293,53 @@ impl<'a> ConditionContext<'a> {
         match phase {
             "main" | "main_phase" => {
                 if self.game_state.current_phase != Phase::Main {
+                    return false;
+                }
+                let pt = condition
+                    .phase_target
+                    .as_deref()
+                    .or_else(|| te.and_then(|t| t.phase_target.as_deref()));
+                match pt {
+                    Some("self") => self
+                        .self_player
+                        .map(|p| p.id == self.game_state.active_player().id)
+                        .unwrap_or(true),
+                    Some("opponent") => self
+                        .self_player
+                        .map(|p| p.id != self.game_state.active_player().id)
+                        .unwrap_or(true),
+                    _ => true,
+                }
+            }
+            "active_phase" => {
+                if self.game_state.current_phase != Phase::Active {
+                    return false;
+                }
+                let pt = condition
+                    .phase_target
+                    .as_deref()
+                    .or_else(|| te.and_then(|t| t.phase_target.as_deref()));
+                match pt {
+                    Some("self") => self
+                        .self_player
+                        .map(|p| p.id == self.game_state.active_player().id)
+                        .unwrap_or(true),
+                    Some("opponent") => self
+                        .self_player
+                        .map(|p| p.id != self.game_state.active_player().id)
+                        .unwrap_or(true),
+                    _ => true,
+                }
+            }
+            "live_phase" => {
+                if !matches!(
+                    self.game_state.current_phase,
+                    Phase::LiveCardSetFirstAttacker
+                        | Phase::LiveCardSetSecondAttacker
+                        | Phase::FirstAttackerPerformance
+                        | Phase::SecondAttackerPerformance
+                        | Phase::LiveVictoryDetermination
+                ) {
                     return false;
                 }
                 let pt = condition

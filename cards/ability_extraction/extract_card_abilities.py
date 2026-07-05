@@ -433,8 +433,18 @@ def extract_all_abilities(cards_file: Path) -> dict:
             "cost": cost,
             "effect": effect,
         }
-        if phase_gate:
-            ability_entry["condition"] = phase_gate
+        # Merge phase gate into effect["condition"] (not ability_entry["condition"])
+        # so the Rust Ability struct picks it up via AbilityEffect.condition.
+        if phase_gate and isinstance(effect, dict):
+            existing_cond = effect.get("condition")
+            if existing_cond and isinstance(existing_cond, dict):
+                effect["condition"] = {
+                    "type": "compound",
+                    "operator": "and",
+                    "conditions": [phase_gate, existing_cond],
+                }
+            else:
+                effect["condition"] = phase_gate
         unique_abilities.append(ability_entry)
 
     # Sort by card count
