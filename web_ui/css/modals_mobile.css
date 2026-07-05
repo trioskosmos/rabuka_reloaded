@@ -169,10 +169,10 @@
     }
 
     #selection-content .choice-cards-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
+        display: flex;
+        flex-wrap: wrap;
         gap: 4px;
-        align-items: start;
+        align-items: stretch;
     }
 
     #selection-content .choice-cards-row > .card {

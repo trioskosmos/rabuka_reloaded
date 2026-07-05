@@ -558,8 +558,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
-    margin-top: 6px;
-    justify-content: center;
+    margin-top: 4px;
     align-items: flex-start;
 }
 

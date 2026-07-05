@@ -680,11 +680,12 @@ body.sidebar-open::after {
 
 .card-desc-image {
     padding: 0 10px 8px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .card-desc-image img {
-    max-width: 100%;
-    max-height: 200px;
+    width: 100%;
     border-radius: 6px;
     object-fit: contain;
 }
