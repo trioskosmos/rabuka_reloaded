@@ -34,6 +34,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from parser import (
     parse_cost,
     parse_effect,
+    extract_phase_gate,
     _normalize_effect_tree,
     _collapse_to_effect_steps,
     _enrich_effect_type,
@@ -347,6 +348,9 @@ def extract_all_abilities(cards_file: Path) -> dict:
         # Parse semantic effect and cost
         effect_text = sample["triggerless_text"]
 
+        # Extract phase gate as its own condition before splitting
+        phase_gate, remaining_text = extract_phase_gate(effect_text)
+
         # Skip parsing for is_null abilities (notes without triggers)
         if sample.get("is_null", False):
             unique_abilities.append(
@@ -368,10 +372,12 @@ def extract_all_abilities(cards_file: Path) -> dict:
 
         # Split cost and effect
         cost_text = None
-        if "：" in effect_text:
-            parts = effect_text.split("：", 1)
+        if "：" in remaining_text:
+            parts = remaining_text.split("：", 1)
             cost_text = parts[0].strip()
             effect_text = parts[1].strip()
+        else:
+            effect_text = remaining_text
 
         # Parse cost
         cost = None
@@ -416,21 +422,20 @@ def extract_all_abilities(cards_file: Path) -> dict:
         if isinstance(effect, dict) and "cost" in effect:
             cost = effect.pop("cost")
 
-        unique_abilities.append(
-            {
-                "full_text": full_text,
-                "triggerless_text": sample["triggerless_text"],
-                "card_count": len(card_examples),
-                "cards": card_examples,
-                "triggers": ", ".join(sample["triggers"])
-                if sample["triggers"]
-                else None,
-                "use_limit": sample["use_limit"],
-                "is_null": sample.get("is_null", False),
-                "cost": cost,
-                "effect": effect,
-            }
-        )
+        ability_entry = {
+            "full_text": full_text,
+            "triggerless_text": sample["triggerless_text"],
+            "card_count": len(card_examples),
+            "cards": card_examples,
+            "triggers": ", ".join(sample["triggers"]) if sample["triggers"] else None,
+            "use_limit": sample["use_limit"],
+            "is_null": sample.get("is_null", False),
+            "cost": cost,
+            "effect": effect,
+        }
+        if phase_gate:
+            ability_entry["condition"] = phase_gate
+        unique_abilities.append(ability_entry)
 
     # Sort by card count
     unique_abilities.sort(key=lambda x: -x["card_count"])

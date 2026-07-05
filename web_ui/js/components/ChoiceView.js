@@ -6,6 +6,55 @@ import { ModalManager } from '../utils/ModalManager.js';
 import { DOM_IDS } from '../constants_dom.js';
 import * as i18n from '../i18n/index.js';
 
+let _selViewBtn = null;
+let _selSelectBtn = null;
+let _choiceCards = [];
+let _choiceIndex = -1;
+
+function _syncSelNav() {
+    if (!_selViewBtn) _selViewBtn = document.getElementById('selection-view-card-btn');
+    if (!_selSelectBtn) _selSelectBtn = document.getElementById('selection-select-btn');
+    const hasCard = _choiceIndex >= 0 && _choiceIndex < _choiceCards.length;
+    if (_selViewBtn) _selViewBtn.disabled = !hasCard;
+    if (_selSelectBtn) _selSelectBtn.disabled = !hasCard;
+}
+
+function _highlightChoice() {
+    const content = document.getElementById(DOM_IDS.SELECTION_CONTENT);
+    if (content) content.querySelectorAll('.choice-item.selected, .card.selected, .card-choice.selected').forEach(el => el.classList.remove('selected'));
+    if (_choiceIndex >= 0 && _choiceIndex < _choiceCards.length) {
+        const entry = _choiceCards[_choiceIndex];
+        if (entry?.el) {
+            entry.el.classList.add('selected');
+            entry.el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    }
+    _syncSelNav();
+}
+
+function _selectByIndex(index) {
+    if (index < 0 || index >= _choiceCards.length) return;
+    _choiceIndex = index;
+    _highlightChoice();
+}
+
+function _openChoiceDetail() {
+    if (_choiceIndex < 0 || _choiceIndex >= _choiceCards.length) return;
+    const entry = _choiceCards[_choiceIndex];
+    const card = entry?.card;
+    if (!card) return;
+    const m = window.__modals?.CardDetailModal;
+    if (m) m.open(card, _selectCurrentChoice);
+}
+
+function _selectCurrentChoice() {
+    if (_choiceIndex < 0 || _choiceIndex >= _choiceCards.length) return;
+    const entry = _choiceCards[_choiceIndex];
+    const action = entry?.action;
+    ModalManager.hide(DOM_IDS.SELECTION_MODAL);
+    if (action && window.doAction) window.doAction(action);
+}
+
 export const ChoiceView = {
     render: (state, container, useModal = true) => {
         const choice = state.pending_choice;
@@ -457,6 +506,8 @@ export const ChoiceView = {
                         if (window.doAction) window.doAction(item.action);
                     };
                 }
+                choiceEl._choiceCard = item.card || null;
+                choiceEl._choiceAction = item.action || null;
                 optContainer.appendChild(choiceEl);
             });
 
@@ -469,7 +520,6 @@ export const ChoiceView = {
         if (hasContent) {
             const isMobileChoice = typeof window.__isMobile === 'function' ? window.__isMobile() : false;
             if (useModal && isMobileChoice) {
-                // Check if user dismissed this specific pending choice
                 const choiceStateId = state.state_id || 0;
                 if (State._choiceModalDismissed && State._choiceStateId === choiceStateId) {
                     const cb = document.getElementById('mobile-choice-btn');
@@ -484,11 +534,18 @@ export const ChoiceView = {
                 const selTitle = document.getElementById('selection-title');
                 if (selModal && selContent) {
                     selContent.innerHTML = '';
-                    // Move choiceDiv children into the selection modal content
-                    while (choiceDiv.children.length > 0) {
-                        selContent.appendChild(choiceDiv.children[0]);
+                    _choiceCards = [];
+                    _choiceIndex = -1;
+
+                    _selViewBtn = document.getElementById('selection-view-card-btn');
+                    _selSelectBtn = document.getElementById('selection-select-btn');
+                    if (_selViewBtn) _selViewBtn.onclick = _openChoiceDetail;
+                    if (_selSelectBtn) _selSelectBtn.onclick = _selectCurrentChoice;
+
+                    const modalClone = choiceDiv.cloneNode(true);
+                    while (modalClone.children.length > 0) {
+                        selContent.appendChild(modalClone.children[0]);
                     }
-                    // Also add choice header/prompt text if present in choiceDiv
                     const headerClone = choiceDiv.cloneNode(true);
                     headerClone.querySelectorAll('.choice-cards-row').forEach(r => r.remove());
                     if (headerClone.children.length > 0 && selContent.firstChild) {
@@ -498,7 +555,7 @@ export const ChoiceView = {
                         const cardName = choice?.card_name || choice?.source_member || '';
                         selTitle.textContent = cardName ? `${i18n.t('sel_title') || 'Select'}: ${cardName}` : (i18n.t('sel_title') || 'Select');
                     }
-                    // Close selection modal after any choice is made
+
                     selContent.querySelectorAll('.choice-item, .choice-cards-row > *').forEach(el => {
                         if (el.onclick) {
                             const orig = el.onclick;
@@ -510,38 +567,32 @@ export const ChoiceView = {
                         }
                     });
 
-                    // In view mode, make selection items open detail modal instead
-                    if (State.uiMode === 'view') {
-                        selContent.querySelectorAll('.choice-item').forEach(el => {
-                            const origClick = el.onclick;
-                            el.onclick = (e) => {
-                                const cardEl = el.querySelector('.card-mini, .card-compact, .card');
-                                if (cardEl) {
-                                    const cardId = cardEl.dataset.cardId;
-                                    const name = cardEl.dataset.cardName;
-                                    if (cardId || name) {
-                                        const card = cardId ? State.resolveCardData(parseInt(cardId)) : (name ? State.resolveCardDataByName(name) : null);
-                                        if (card) {
-                                            const m = window.__modals?.CardDetailModal;
-                                            if (m) m.open(card);
-                                            return;
-                                        }
-                                    }
-                                }
-                                // Fallback: try to find card data from the item's action
-                                if (origClick) {
-                                    const fakeEvent = { stopPropagation: () => {} };
-                                    el.onclick = null;
-                                    origClick.call(el, fakeEvent);
-                                    el.onclick = origClick;
-                                }
-                            };
+                    selContent.querySelectorAll('.choice-item, .card-choice, .card').forEach(el => {
+                        const existingOnclick = el.onclick;
+                        el.onclick = null;
+                        el.style.cursor = 'pointer';
+                        const idx = _choiceCards.length;
+                        const entry = { card: el._choiceCard || null, action: el._choiceAction || null, el };
+                        if (entry.card) _choiceCards.push(entry);
+                        el.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            if (!entry.card && existingOnclick) {
+                                existingOnclick.call(el, e);
+                                return;
+                            }
+                            if (entry.card) {
+                                _selectByIndex(idx);
+                            }
                         });
-                    }
+                    });
+
                     ModalManager.show(DOM_IDS.SELECTION_MODAL);
                     const cb = document.getElementById('mobile-choice-btn');
                     if (cb) cb.style.display = 'none';
+                    choiceDiv.style.display = 'none';
                 }
+
+                container.appendChild(choiceDiv);
             } else {
                 container.appendChild(choiceDiv);
             }

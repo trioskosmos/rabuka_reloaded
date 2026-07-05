@@ -117,9 +117,12 @@ impl AbilityResolver {
                         format!("Apply replacement effect for action '{}'?", action_str);
                     self.pending_choice = Some(Choice::SelectTarget {
                         target: "apply_replacement".to_string(),
-                        description,
-                        description_en: None,
-                        description_ja: None,
+                        description: description.clone(),
+                        description_en: Some(description.clone()),
+                        description_ja: Some(format!(
+                            "アクション「{}」の置き換え効果を適用？",
+                            action_str
+                        )),
                         allow_skip: false,
                         options: None,
                     });

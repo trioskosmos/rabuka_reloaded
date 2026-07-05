@@ -535,8 +535,7 @@ fn fuyumari_real_play_to_stage_triggers_appearance() {
 
     // Fuyumari should be on P1 stage
     assert_eq!(
-        game.state.player1.stage.stage[0],
-        fuyumari,
+        game.state.player1.stage.stage[0], fuyumari,
         "Fuyumari should be on P1 LeftSide"
     );
 
@@ -640,8 +639,7 @@ fn fuyumari_baton_touch_triggers_area_move() {
 
     // Fuyumari should be on stage at Center
     assert_eq!(
-        game.state.player1.stage.stage[1],
-        fuyumari,
+        game.state.player1.stage.stage[1], fuyumari,
         "Fuyumari should be at Center after baton touch"
     );
     // Existing should be in waitroom

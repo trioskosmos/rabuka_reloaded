@@ -454,3 +454,102 @@
     opacity: 0.4;
     cursor: not-allowed;
 }
+
+/* --- Bottom Footer Bar (all modals) --- */
+.modal-footer-bar {
+    display: none;
+    flex-shrink: 0;
+}
+
+@media (orientation: portrait), (max-aspect-ratio: 13/9) {
+    .modal-footer-bar {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        border-top: 1px solid rgba(255,255,255,0.08);
+        flex-shrink: 0;
+    }
+
+    .modal-footer-bar .nav-btn {
+        flex: 0 0 auto;
+        padding: 8px 12px;
+        font-size: 0.9rem;
+        background: rgba(255,255,255,0.04);
+        border: none;
+        border-right: 1px solid rgba(255,255,255,0.08);
+        color: var(--text, #fff);
+        cursor: pointer;
+        touch-action: manipulation;
+        line-height: 1;
+    }
+    .modal-footer-bar .nav-btn:disabled {
+        opacity: 0.25;
+        cursor: not-allowed;
+    }
+    .modal-footer-bar .nav-btn:active:not(:disabled) {
+        background: rgba(255,255,255,0.12);
+    }
+
+    .modal-footer-bar .btn-view-card {
+        flex: 1;
+        padding: 8px 14px;
+        font-size: 0.85rem;
+        background: rgba(153,102,255,0.12);
+        border: none;
+        border-right: 1px solid rgba(255,255,255,0.08);
+        color: #cc88ff;
+        cursor: pointer;
+        touch-action: manipulation;
+        font-weight: 600;
+    }
+    .modal-footer-bar .btn-view-card:disabled {
+        opacity: 0.25;
+        cursor: not-allowed;
+        color: #cc88ff;
+    }
+    .modal-footer-bar .btn-view-card:active:not(:disabled) {
+        background: rgba(153,102,255,0.25);
+    }
+
+    .modal-footer-bar .btn-select-card {
+        flex: 1;
+        padding: 8px 14px;
+        font-size: 0.85rem;
+        background: rgba(120,208,139,0.15);
+        border: none;
+        border-right: 1px solid rgba(255,255,255,0.08);
+        color: #78d08b;
+        cursor: pointer;
+        touch-action: manipulation;
+        font-weight: 600;
+    }
+    .modal-footer-bar .btn-select-card:disabled {
+        opacity: 0.25;
+        cursor: not-allowed;
+    }
+    .modal-footer-bar .btn-select-card:active:not(:disabled) {
+        background: rgba(120,208,139,0.3);
+    }
+
+    .modal-footer-bar .btn-close-bottom {
+        flex: 1;
+        padding: 8px 14px;
+        font-size: 0.85rem;
+        background: transparent;
+        border: none;
+        color: rgba(255,255,255,0.5);
+        cursor: pointer;
+        touch-action: manipulation;
+    }
+    .modal-footer-bar .btn-close-bottom:active {
+        background: rgba(255,255,255,0.08);
+    }
+
+    /* Selected card highlight in discard/choice modals */
+    #discard-modal-cards .selected,
+    #selection-content .selected {
+        outline: 2px solid #9966ff;
+        outline-offset: 2px;
+        box-shadow: 0 0 8px rgba(153,102,255,0.4);
+    }
+}

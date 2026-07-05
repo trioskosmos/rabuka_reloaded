@@ -141,8 +141,14 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "pay_optional_cost:skip_optional_cost".to_string(),
                 description: format!("Change state to {} (pay optional cost)?", state_change),
-                description_en: None,
-                description_ja: None,
+                description_en: Some(format!(
+                    "Change state to {} (pay optional cost)?",
+                    state_change
+                )),
+                description_ja: Some(format!(
+                    "状態を{}に変更（オプションコスト）？",
+                    state_change
+                )),
                 allow_skip: optional,
                 options: None,
             });
@@ -1038,8 +1044,8 @@ impl AbilityResolver {
                     "heart06".into(),
                 ],
                 description: "Choose a heart color".to_string(),
-                description_en: None,
-                description_ja: None,
+                description_en: Some("Choose a heart color".to_string()),
+                description_ja: Some("ハートの色を選択".to_string()),
             });
         }
         let pp = self.player_prefix(gs);

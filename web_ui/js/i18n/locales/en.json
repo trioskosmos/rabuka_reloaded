@@ -391,6 +391,7 @@
     "faq_step1": "Go to <a href=\"https://decklog.bushiroad.com/\" target=\"_blank\">decklog.bushiroad.com</a>, find a deck, and open its detail page.",
     "faq_step2": "Right-click → \"View Page Source\" (Ctrl+U), then Ctrl+A, Ctrl+C to copy the full HTML.",
     "faq_step3": "In the game setup modal, select \"Paste Deck List\" and paste the HTML into the text area.",
+    "faq_step4": "Alternatively, use a browser extension like <a href=\"https://chromewebstore.google.com/detail/copy-html/indfogjkdbmkihaohndcnkoaheopbhjf\" target=\"_blank\">Copy HTML</a> to copy the page source with one click.",
     "faq_tip": "Tip: You can also paste plain text like \"PL!-bp3-012-RM x 3\" or \"3 x PL!-bp3-012-RM\".",
 
     "faq_mobile": "Mobile",

@@ -199,6 +199,7 @@ const actionHandlers = {
     'force-reset': () => window.App.forceReset(),
     'set-perspective': ({ value }) => window.Actions.setPerspective(value),
     'close-log-viewer': LogViewerModal.close,
+    'close-log-viewer-modal': LogViewerModal.close,
     'open-log-viewer': ({ value, event }) => { event.stopPropagation(); LogViewerModal.open(value); },
     'debug-rewind': DebugModal.rewind,
     'debug-redo': DebugModal.redo,
@@ -271,6 +272,8 @@ const actionHandlers = {
         State._sysActionsDismissed = true;
         ModalManager.hide('system-actions-modal');
     },
+    'close-room-modal': () => ModalManager.hide('room-modal'),
+    'close-perspective-modal': () => ModalManager.hide('perspective-modal'),
     'cheat-move': ({ player, zone }) => {
         const cardId = document.getElementById('cheat-card-id')?.value?.trim();
         if (!cardId) { alert('Enter a card ID'); return; }
@@ -444,6 +447,7 @@ export const AppController = {
 
         DragDrop.init();
         LogDetailModal.init();
+        ModalManager.initFooterBars();
 
         if (!healthCheckInterval) {
             healthCheckInterval = window.setInterval(() => {

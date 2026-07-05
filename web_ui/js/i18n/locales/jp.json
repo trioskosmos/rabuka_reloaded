@@ -391,6 +391,7 @@
     "faq_step1": "<a href=\"https://decklog.bushiroad.com/\" target=\"_blank\">decklog.bushiroad.com</a> でデッキを探し、詳細ページを開きます。",
     "faq_step2": "右クリック → 「ページのソースを表示」(Ctrl+U)、Ctrl+A、Ctrl+C でHTMLをコピーします。",
     "faq_step3": "ゲームセットアップで「デッキリストを貼り付け」を選び、HTMLをテキストエリアに貼り付けます。",
+    "faq_step4": "または、<a href=\"https://chromewebstore.google.com/detail/copy-html/indfogjkdbmkihaohndcnkoaheopbhjf\" target=\"_blank\">Copy HTML</a> のようなブラウザ拡張機能を使って、ワンクリックでページソースをコピーできます。",
     "faq_tip": "ヒント: 「PL!-bp3-012-RM x 3」や「3 x PL!-bp3-012-RM」のようなプレーンテキストも貼り付け可能です。",
 
     "faq_mobile": "モバイル操作",

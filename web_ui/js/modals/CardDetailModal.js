@@ -11,6 +11,7 @@ import * as i18n from '../i18n/index.js';
 let navCards = [];
 let navIndex = 0;
 let navCurrentZone = '';
+let _selectCallback = null;
 
 function buildAllCards() {
     const state = State.data;
@@ -20,32 +21,46 @@ function buildAllCards() {
     const opp = pp === 0 ? state.player2 : state.player1;
     if (!p) return {};
 
-    const isValid = (c) => c && c.card_no && c.card_no !== -1 && c.card_no !== -2 && c.card_no !== '-1' && c.card_no !== '-2';
+    const resolve = (c) => {
+        if (!c) return null;
+        if (typeof c === 'number') return State.resolveCardData(c);
+        if (c.card_no && !c.name) {
+            const resolved = State.resolveCardData(c.card_no);
+            if (resolved) return resolved;
+        }
+        return c;
+    };
+
+    const isValid = (c) => {
+        if (!c) return false;
+        const card = resolve(c);
+        return card && card.card_no && card.card_no !== -1 && card.card_no !== -2 && card.card_no !== '-1' && card.card_no !== '-2';
+    };
 
     const cards = {};
 
     const handArr = Array.isArray(p.hand?.cards) ? p.hand.cards : [];
-    cards['hand'] = handArr.filter(isValid);
+    cards['hand'] = handArr.map(resolve).filter(isValid);
 
     const stageObj = p.stage || {};
     const stageSlots = ['left_side', 'center', 'right_side'];
-    cards['stage'] = stageSlots.map(s => stageObj[s]).filter(isValid);
+    cards['stage'] = stageSlots.map(s => resolve(stageObj[s])).filter(isValid);
 
     const liveArr = Array.isArray(p.live_zone?.cards) ? p.live_zone.cards : [];
-    cards['live'] = liveArr.filter(isValid);
+    cards['live'] = liveArr.map(resolve).filter(isValid);
 
     const discArr = Array.isArray(p.discard?.cards) ? p.discard.cards : [];
-    cards['discard'] = discArr.filter(isValid);
+    cards['discard'] = discArr.map(resolve).filter(isValid);
 
     const under = [];
     stageSlots.forEach(slot => {
         const uArr = Array.isArray(stageObj[slot + '_under']) ? stageObj[slot + '_under'] : [];
-        uArr.forEach(c => { if (isValid(c)) under.push(c); });
+        uArr.forEach(c => { const r = resolve(c); if (isValid(r)) under.push(r); });
     });
     if (under.length) cards['under'] = under;
 
     const oppStageObj = opp?.stage || {};
-    const oppStage = stageSlots.map(s => oppStageObj[s]).filter(isValid);
+    const oppStage = stageSlots.map(s => resolve(oppStageObj[s])).filter(isValid);
     if (oppStage.length) cards['opp_stage'] = oppStage;
 
     return cards;
@@ -288,7 +303,8 @@ function render() {
 }
 
 export const CardDetailModal = {
-    open(card) {
+    open(card, selectCallback) {
+        _selectCallback = selectCallback || null;
         const cards = buildAllCards();
         navCards = [card];
         navIndex = 0;
@@ -302,6 +318,22 @@ export const CardDetailModal = {
                 navIndex = idx;
                 navCurrentZone = zone;
                 break;
+            }
+        }
+
+        // Show/hide Select button in footer bar
+        const selectBtn = document.getElementById('card-detail-select-btn');
+        if (selectBtn) {
+            if (_selectCallback) {
+                selectBtn.style.display = '';
+                selectBtn.onclick = () => {
+                    const cb = _selectCallback;
+                    _selectCallback = null;
+                    CardDetailModal.close();
+                    if (cb) cb();
+                };
+            } else {
+                selectBtn.style.display = 'none';
             }
         }
 
@@ -347,6 +379,9 @@ export const CardDetailModal = {
     },
 
     close() {
+        _selectCallback = null;
+        const selectBtn = document.getElementById('card-detail-select-btn');
+        if (selectBtn) selectBtn.style.display = 'none';
         ModalManager.hide(DOM_IDS.MODAL_CARD_DETAIL);
     }
 };

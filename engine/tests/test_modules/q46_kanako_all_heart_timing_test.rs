@@ -56,8 +56,7 @@ fn q46_kanako_condition_less_than_3_live_cards_no_gain() {
 
     // Only 2 live cards → condition fails
     game.state.player1.live_card_zone.cards.push(niji_live);
-    game
-        .state
+    game.state
         .player1
         .live_card_zone
         .cards
@@ -66,10 +65,7 @@ fn q46_kanako_condition_less_than_3_live_cards_no_gain() {
     game.state.recalculate_constants();
 
     let blade = game.state.mods.get_blade_modifier(kanako);
-    assert_eq!(
-        blade, 0,
-        "Q46: < 3 live cards → no blade gain"
-    );
+    assert_eq!(blade, 0, "Q46: < 3 live cards → no blade gain");
 }
 
 /// Q46 edge: 3+ live cards but NONE are 虹ヶ咲 → condition fails.
@@ -84,20 +80,17 @@ fn q46_kanako_no_nijigasaki_live_card_no_gain() {
     game.state.player1.stage.stage = [filler, kanako, filler];
 
     // 3 live cards, none are 虹ヶ咲
-    game
-        .state
+    game.state
         .player1
         .live_card_zone
         .cards
         .push(game.new_id("PL!-sd1-019-SD"));
-    game
-        .state
+    game.state
         .player1
         .live_card_zone
         .cards
         .push(game.new_id("PL!-sd1-019-SD"));
-    game
-        .state
+    game.state
         .player1
         .live_card_zone
         .cards
@@ -106,10 +99,7 @@ fn q46_kanako_no_nijigasaki_live_card_no_gain() {
     game.state.recalculate_constants();
 
     let blade = game.state.mods.get_blade_modifier(kanako);
-    assert_eq!(
-        blade, 0,
-        "Q46: 3 live cards but no 虹ヶ咲 → no blade gain"
-    );
+    assert_eq!(blade, 0, "Q46: 3 live cards but no 虹ヶ咲 → no blade gain");
 }
 
 /// Q46 edge: Kanako not on stage → constant doesn't evaluate.
@@ -126,14 +116,12 @@ fn q46_kanako_not_on_stage_no_constant() {
     game.state.player1.stage.stage = [filler, -1, filler];
 
     game.state.player1.live_card_zone.cards.push(niji_live);
-    game
-        .state
+    game.state
         .player1
         .live_card_zone
         .cards
         .push(game.new_id("PL!-sd1-019-SD"));
-    game
-        .state
+    game.state
         .player1
         .live_card_zone
         .cards
@@ -161,14 +149,12 @@ fn q46_kanako_leaves_stage_blade_removed() {
     game.state.player1.stage.stage = [filler, kanako, filler];
 
     game.state.player1.live_card_zone.cards.push(niji_live);
-    game
-        .state
+    game.state
         .player1
         .live_card_zone
         .cards
         .push(game.new_id("PL!-sd1-019-SD"));
-    game
-        .state
+    game.state
         .player1
         .live_card_zone
         .cards
@@ -203,14 +189,12 @@ fn q46_live_card_removed_condition_fails_blade_removed() {
     game.state.player1.stage.stage = [filler, kanako, filler];
 
     game.state.player1.live_card_zone.cards.push(niji_live);
-    game
-        .state
+    game.state
         .player1
         .live_card_zone
         .cards
         .push(game.new_id("PL!-sd1-019-SD"));
-    game
-        .state
+    game.state
         .player1
         .live_card_zone
         .cards
@@ -246,14 +230,12 @@ fn q46_multiple_kanako_each_gains_blades() {
     game.state.player1.stage.stage = [kanako1, kanako2, filler];
 
     game.state.player1.live_card_zone.cards.push(niji_live);
-    game
-        .state
+    game.state
         .player1
         .live_card_zone
         .cards
         .push(game.new_id("PL!-sd1-019-SD"));
-    game
-        .state
+    game.state
         .player1
         .live_card_zone
         .cards
@@ -263,12 +245,6 @@ fn q46_multiple_kanako_each_gains_blades() {
 
     let blade1 = game.state.mods.get_blade_modifier(kanako1);
     let blade2 = game.state.mods.get_blade_modifier(kanako2);
-    assert_eq!(
-        blade1, 2,
-        "Q46: First Kanako gains 2 blades"
-    );
-    assert_eq!(
-        blade2, 2,
-        "Q46: Second Kanako gains 2 blades"
-    );
+    assert_eq!(blade1, 2, "Q46: First Kanako gains 2 blades");
+    assert_eq!(blade2, 2, "Q46: Second Kanako gains 2 blades");
 }

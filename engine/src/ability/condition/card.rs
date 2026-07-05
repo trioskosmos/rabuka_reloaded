@@ -445,6 +445,48 @@ impl<'a> ConditionContext<'a> {
             .any(|&sc| compare_counts(Some(operator), sc, max_opp))
     }
 
+    /// "センターエリアにいるメンバーが最も大きいコストを持つ"
+    /// Checks if the card at `position` has strictly the highest cost among all
+    /// stage members (excluding empty slots and the card itself).
+    pub(crate) fn evaluate_highest_cost_on_stage_condition(&self, condition: &Condition) -> bool {
+        let position = match condition.position.as_ref().and_then(|p| p.get_position()) {
+            Some(p) => p,
+            None => return false,
+        };
+        let target = condition.target.as_deref().unwrap_or("self");
+        let player = self.resolve_condition_player(target);
+        let card_db = &self.game_state.card_database;
+
+        let card_at_pos = match util::card_at_position(player, position) {
+            Some(id) => id,
+            None => return false,
+        };
+
+        let pos_cost = {
+            let base = card_db
+                .get_card(card_at_pos)
+                .and_then(|c| c.cost)
+                .unwrap_or(0) as i32;
+            (base + self.game_state.mods.get_cost_modifier(card_at_pos)).max(0) as u32
+        };
+
+        let operator = condition.operator.as_deref().unwrap_or(">");
+
+        for &other_id in &player.stage.stage {
+            if other_id == -1 || other_id == card_at_pos {
+                continue;
+            }
+            let other_cost = {
+                let base = card_db.get_card(other_id).and_then(|c| c.cost).unwrap_or(0) as i32;
+                (base + self.game_state.mods.get_cost_modifier(other_id)).max(0) as u32
+            };
+            if !compare_counts(Some(operator), pos_cost, other_cost) {
+                return false;
+            }
+        }
+        true
+    }
+
     pub(crate) fn check_heart_type_all(
         &self,
         condition: &Condition,
@@ -2745,10 +2787,7 @@ impl<'a> ConditionContext<'a> {
                                     .recently_moved_cards
                                     .as_ref()
                                     .map_or(false, |v| v.contains(&cid))
-                                || self
-                                    .game_state
-                                    .recently_appeared_cards
-                                    .contains(&cid);
+                                || self.game_state.recently_appeared_cards.contains(&cid);
                             batch_ok
                                 && self.game_state.has_card_appeared_this_turn(cid)
                                 && stage_ids.contains(&cid)

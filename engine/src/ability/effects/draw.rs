@@ -421,8 +421,8 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "draw_any_number".to_string(),
                 description: format!("Choose how many cards to draw (0-{})", available),
-                description_en: None,
-                description_ja: None,
+                description_en: Some(format!("Choose how many cards to draw (0-{})", available)),
+                description_ja: Some(format!("ドローする枚数を選択（0〜{}枚）", available)),
                 allow_skip: effect.optional.unwrap_or(false),
                 options: None,
             });
@@ -550,8 +550,8 @@ impl AbilityResolver {
             count: count as usize,
             options: unique_colors,
             description: "Choose a heart color".to_string(),
-            description_en: None,
-            description_ja: None,
+            description_en: Some("Choose a heart color".to_string()),
+            description_ja: Some("ハートの色を選択".to_string()),
         });
     }
 
@@ -588,8 +588,30 @@ impl AbilityResolver {
                     options.join(", ")
                 }
             ),
-            description_en: None,
-            description_ja: None,
+            description_en: Some(format!(
+                "Choose a number: {}",
+                if options.len() > 10 {
+                    format!(
+                        "{}~{}",
+                        options.first().unwrap_or(&"1".to_string()),
+                        options.last().unwrap_or(&"67".to_string())
+                    )
+                } else {
+                    options.join(", ")
+                }
+            )),
+            description_ja: Some(format!(
+                "数値を選択: {}",
+                if options.len() > 10 {
+                    format!(
+                        "{}〜{}",
+                        options.first().unwrap_or(&"1".to_string()),
+                        options.last().unwrap_or(&"67".to_string())
+                    )
+                } else {
+                    options.join(", ")
+                }
+            )),
             allow_skip: effect.optional.unwrap_or(false),
             options: Some(options),
         });
@@ -631,8 +653,8 @@ impl AbilityResolver {
         self.pending_choice = Some(Choice::SelectTarget {
             target: "area_select".to_string(),
             description: "Choose an area".to_string(),
-            description_en: None,
-            description_ja: None,
+            description_en: Some("Choose an area".to_string()),
+            description_ja: Some("エリアを選択".to_string()),
             allow_skip: effect.optional.unwrap_or(false),
             options: Some(valid),
         });
@@ -689,8 +711,8 @@ impl AbilityResolver {
                 count: count as usize,
                 options: unique_colors,
                 description: "Choose a heart color".to_string(),
-                description_en: None,
-                description_ja: None,
+                description_en: Some("Choose a heart color".to_string()),
+                description_ja: Some("ハートの色を選択".to_string()),
             });
             Ok(None)
         }

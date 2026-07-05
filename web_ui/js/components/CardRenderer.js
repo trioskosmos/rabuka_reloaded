@@ -825,7 +825,7 @@ export const CardRenderer = {
                 slotDiv.onclick = playTargetClick;
                 area.style.cursor = 'pointer';
                 slotDiv.style.cursor = 'pointer';
-            } else if (clickable && (isValid || !hasGlobalSelection)) {
+            } else if (clickable) {
                 const clickHandler = () => {
                     const _uiMode = State.uiMode;
                     const slotCard = slot || null;
@@ -973,7 +973,7 @@ export const CardRenderer = {
                     CardRenderer.renderCardBonuses(slot, card, true);
                 }
 
-                if (isValid || State.uiMode === 'view') {
+                if (card && card.card_no) {
                     slot.style.cursor = 'pointer';
                     slot.onclick = () => {
                         const _uiMode = State.uiMode;

@@ -362,8 +362,8 @@ impl AbilityResolver {
                     self.pending_choice = Some(Choice::SelectTarget {
                         target: "choice_string".to_string(),
                         description: format!("Choose: {}", desc_parts.join(", or ")),
-                        description_en: None,
-                        description_ja: None,
+                        description_en: Some(format!("Choose: {}", desc_parts.join(", or "))),
+                        description_ja: Some(format!("選択: {}", desc_parts.join(", または "))),
                         allow_skip: false,
                         options: Some(desc_parts.clone()),
                     });
@@ -615,9 +615,9 @@ impl AbilityResolver {
                         .collect();
                     self.pending_choice = Some(Choice::SelectTarget {
                         target: "choice_string".to_string(),
-                        description: format!("Choose: {}", desc_parts.join(", ")),
-                        description_en: None,
-                        description_ja: None,
+                        description: format!("Choose: {}", desc_parts.join(", or ")),
+                        description_en: Some(format!("Choose: {}", desc_parts.join(", or "))),
+                        description_ja: Some(format!("選択: {}", desc_parts.join(", または "))),
                         allow_skip: false,
                         options: Some(desc_parts.clone()),
                     });
@@ -760,7 +760,8 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!("{} {}: カード選択 {}枚", pp, act_name, count));
+        gs.rule_log
+            .push(format!("{} {}: カード選択 {}枚", pp, act_name, count));
         Ok(())
     }
     pub fn execute_look_at(
@@ -775,8 +776,8 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "pay_optional_cost:skip_optional_cost".to_string(),
                 description: format!("Look at {} card(s) (optional cost)?", count),
-                description_en: None,
-                description_ja: None,
+                description_en: Some(format!("Look at {} card(s) (optional cost)?", count)),
+                description_ja: Some(format!("{}枚確認（オプションコスト）？", count)),
                 allow_skip: true,
                 options: None,
             });
@@ -828,7 +829,8 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!("{} {}: 確認 {}枚", pp, act_name, count));
+        gs.rule_log
+            .push(format!("{} {}: 確認 {}枚", pp, act_name, count));
         Ok(())
     }
 

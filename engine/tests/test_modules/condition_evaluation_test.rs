@@ -111,7 +111,8 @@ fn opponent_cost_self_lower_no_score_in_snapshot() {
 // Condition: left_side heart02 >= 3 → +2 blade to left_side member
 // ======================================================================
 
-/// Left_side heart02=4 >= 3 → condition passes → left_side member gains +2 blade
+/// Left_side heart02=4 >= 3 → condition passes → only left_side member gains +2 blade
+/// Center and right side members must NOT receive blade even if they also have heart02=4.
 #[test]
 fn left_side_heart_meets_threshold_gains_blade() {
     let db = load_real_database();
@@ -119,14 +120,19 @@ fn left_side_heart_meets_threshold_gains_blade() {
 
     let nonfiction = game.id("PL!SP-bp4-024-L");
     let left_high = game.id("PL!SP-pb1-001-R"); // heart02=4
-    let filler = game.id("PL!-sd1-010-SD");
+    let center_high = game.id("PL!SP-pb1-001-R"); // heart02=4
+    let right_high = game.id("PL!SP-pb1-001-R"); // heart02=4
     assert_eq!(base_heart02(&game.db, left_high), 4);
+    assert_eq!(base_heart02(&game.db, center_high), 4);
+    assert_eq!(base_heart02(&game.db, right_high), 4);
 
     game.state.player1.hand.cards.push(nonfiction);
-    game.state.player1.stage.stage = [left_high, filler, filler];
-    fill_both_decks(&mut game, filler);
+    game.state.player1.stage.stage = [left_high, center_high, right_high];
+    fill_both_decks(&mut game, left_high);
 
-    let blade_before = game.state.mods.get_blade_modifier(left_high);
+    let left_blade_before = game.state.mods.get_blade_modifier(left_high);
+    let center_blade_before = game.state.mods.get_blade_modifier(center_high);
+    let right_blade_before = game.state.mods.get_blade_modifier(right_high);
 
     for _ in 0..5 {
         game.pass();
@@ -139,9 +145,19 @@ fn left_side_heart_meets_threshold_gains_blade() {
     game.pass();
 
     assert_eq!(
-        game.state.mods.get_blade_modifier(left_high) - blade_before,
+        game.state.mods.get_blade_modifier(left_high) - left_blade_before,
         2,
         "Left_side heart02=4 >= 3 → should gain +2 blade"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(center_high),
+        center_blade_before,
+        "Center member must NOT gain blade — only left_side qualifies"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(right_high),
+        right_blade_before,
+        "Right member must NOT gain blade — only left_side qualifies"
     );
 }
 

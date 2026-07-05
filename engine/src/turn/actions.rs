@@ -426,7 +426,10 @@ impl super::TurnEngine {
             } => {
                 log::debug!(
                     "[BCR] SelectTarget target={} card_id={:?} card_indices={:?} options={:?}",
-                    target, card_id, card_indices, options
+                    target,
+                    card_id,
+                    card_indices,
+                    options
                 );
                 let selected = match target.as_str() {
                     "pay_optional_cost:skip_optional_cost" => {

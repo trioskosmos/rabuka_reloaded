@@ -780,8 +780,8 @@ impl super::TurnEngine {
             count: 1,
             options,
             description: "Choose which live card goes to your success zone".to_string(),
-            description_en: None,
-            description_ja: None,
+            description_en: Some("Choose which live card goes to your success zone".to_string()),
+            description_ja: Some("ライブエリアからサクセスゾーンに送るカードを選択".to_string()),
         };
         game_state.ability_queue.pause_for_choice(choice);
         true

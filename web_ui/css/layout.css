@@ -655,4 +655,38 @@ body.sidebar-open::after {
     z-index: calc(var(--z-sidebar) - 1);
     pointer-events: auto;
 }
+} /* end @media portrait */
+
+/* Card description panel (desktop + mobile) */
+.card-desc-panel {
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    overflow: visible;
 }
+
+.card-desc-title {
+    font-size: 0.85rem;
+    padding: 8px 10px 4px;
+    color: var(--accent-gold);
+    margin: 0;
+}
+
+.card-desc-content {
+    padding: 4px 10px 8px;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--text);
+}
+
+.card-desc-image {
+    padding: 0 10px 8px;
+}
+
+.card-desc-image img {
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: 6px;
+    object-fit: contain;
+}
+
+

@@ -120,8 +120,8 @@ impl super::resolver::AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "pay_optional_cost:skip_optional_cost".to_string(),
                 description: "Repeat effect?".to_string(),
-                description_en: None,
-                description_ja: None,
+                description_en: Some("Repeat effect?".to_string()),
+                description_ja: Some("効果を繰り返しますか？".to_string()),
                 allow_skip: true,
                 options: Some(vec!["Stop".to_string(), "Continue".to_string()]),
             });
@@ -452,6 +452,7 @@ impl super::resolver::AbilityResolver {
         let common_re = |zone: &str,
                          count: usize,
                          desc: String,
+                         desc_ja: String,
                          skip: bool,
                          fi: Option<Vec<usize>>,
                          tpid: Option<String>,
@@ -459,6 +460,7 @@ impl super::resolver::AbilityResolver {
                          cto: Option<String>|
          -> ChoiceBuilder {
             Choice::select_cards(zone, count, desc, skip)
+                .description_ja(Some(desc_ja))
                 .card_type(card_type.clone())
                 .cost_limit(cost_limit, cost_limit_operator.clone())
                 .cost_total(ct, cto)
@@ -576,6 +578,7 @@ impl super::resolver::AbilityResolver {
                         Zone::Hand.to_str(),
                         remaining,
                         format!("Select {} more card(s) from hand for cost", remaining),
+                        format!("コストとして手札からさらに{}枚選択", remaining),
                         false, // Rule 9.4.2.3: no bail-out once committed
                         fi,
                         Some(target.clone()),
@@ -629,6 +632,7 @@ impl super::resolver::AbilityResolver {
                                         "Select {} more card(s) with the same unit name",
                                         remaining
                                     ),
+                                    format!("同じユニット名のカードをさらに{}枚選択", remaining),
                                     false,
                                     Some(same_unit_idxs),
                                     Some(target.clone()),
@@ -666,11 +670,17 @@ impl super::resolver::AbilityResolver {
                 } else {
                     "No more matching cards in hand (skip to finish)".to_string()
                 };
+                let desc_ja = if fi.as_ref().map_or(0, |v| v.len()) > 0 {
+                    "コストとして手札からさらに選択（スキップで終了）".to_string()
+                } else {
+                    "手札に一致するカードがありません（スキップで終了）".to_string()
+                };
                 self.pending_choice = Some(
                     common_re(
                         Zone::Hand.to_str(),
                         0,
                         desc,
+                        desc_ja,
                         true,
                         fi,
                         Some(target.clone()),
@@ -727,6 +737,10 @@ impl super::resolver::AbilityResolver {
                         0,
                         format!(
                             "Select energy card to pay (active: {}). Skip when done",
+                            energy_left
+                        ),
+                        format!(
+                            "エネルギーカードを選択（アクティブ: {}）完了でスキップ",
                             energy_left
                         ),
                         true,
@@ -919,6 +933,9 @@ impl super::resolver::AbilityResolver {
                                 "Select more energy cards (or skip to finish)",
                                 true,
                             )
+                            .description_ja(Some(
+                                "エネルギーカードをさらに選択（スキップで終了）".to_string(),
+                            ))
                             .card_type(Some("energy_card".to_string()))
                             .target_player_id(Some(tgt.clone()))
                             .filtered_indices(Some(remaining_idxs))
@@ -954,6 +971,7 @@ impl super::resolver::AbilityResolver {
         zone: &str,
         count: usize,
         desc: String,
+        desc_ja: String,
         skip: bool,
         fi: Option<Vec<usize>>,
         tpid: Option<String>,
@@ -961,6 +979,7 @@ impl super::resolver::AbilityResolver {
         cto: Option<String>,
     ) -> ChoiceBuilder {
         Choice::select_cards(zone, count, desc, skip)
+            .description_ja(Some(desc_ja))
             .card_type(ctx.card_type.clone())
             .cost_limit(ctx.cost_limit, ctx.cost_limit_operator.clone())
             .cost_total(ct, cto)
@@ -1032,12 +1051,22 @@ impl super::resolver::AbilityResolver {
                     remaining,
                     if ctx.blind { " (blind)" } else { "" }
                 );
+                let desc_ja = format!(
+                    "手札からさらに{}枚選択{}",
+                    remaining,
+                    if ctx.blind {
+                        "（控えに選択）"
+                    } else {
+                        ""
+                    }
+                );
                 self.pending_choice = Some(
                     self.build_reprompt(
                         ctx,
                         Zone::Hand.to_str(),
                         remaining,
                         desc,
+                        desc_ja,
                         false,
                         fi,
                         Some(target.clone()),
@@ -1102,6 +1131,7 @@ impl super::resolver::AbilityResolver {
                         Zone::Hand.to_str(),
                         0,
                         "Select more card(s) from hand (or skip to finish)".to_string(),
+                        "手札からさらに選択（スキップで終了）".to_string(),
                         true,
                         fi,
                         Some(target),
@@ -1209,6 +1239,15 @@ impl super::resolver::AbilityResolver {
                     ),
                     false,
                 )
+                .description_ja(Some(format!(
+                    "手札からさらに{}枚選択{}",
+                    remaining,
+                    if ctx.blind {
+                        "（控えに選択）"
+                    } else {
+                        ""
+                    }
+                )))
                 .target_player_id(Some(target.clone()))
                 .blind(ctx.blind)
                 .is_reveal(true)
@@ -1284,6 +1323,9 @@ impl super::resolver::AbilityResolver {
                         "Select more cards to reveal from hand (or skip to finish)",
                         true,
                     )
+                    .description_ja(Some(
+                        "手札からさらにカードを選択して公開（スキップで終了）".to_string(),
+                    ))
                     .filtered_indices(Some(remaining_indices))
                     .card_type(ctx.card_type.clone())
                     .is_reveal(true)
@@ -1568,6 +1610,10 @@ impl super::resolver::AbilityResolver {
                             format!("Select up to {} more card(s) from the {} remaining looked-at cards", remaining_max, remaining),
                             is_optional || any_number,
                         )
+                        .description_ja(Some(format!(
+                            "残り{}枚の確認済みカードから最大{}枚選択",
+                            remaining, remaining_max
+                        )))
                         .card_type(ct)
                         .cost_limit(
                             sa.and_then(|s| s.cost_limit),
@@ -1766,12 +1812,17 @@ impl super::resolver::AbilityResolver {
                     "Select {} more card(s) from discard from {} remaining",
                     remaining, remaining_count
                 );
+                let desc_ja = format!(
+                    "控え室から残り{}枚中さらに{}枚選択",
+                    remaining_count, remaining
+                );
                 self.pending_choice = Some(
                     self.build_reprompt(
                         ctx,
                         Zone::Discard.to_str(),
                         remaining,
                         desc,
+                        desc_ja,
                         false,
                         fi,
                         Some(target.clone()),
@@ -1854,6 +1905,15 @@ impl super::resolver::AbilityResolver {
                                     ""
                                 }
                             );
+                            let desc_ja = format!(
+                                "控え室からさらに{}枚選択{}",
+                                remaining,
+                                if ctx.allow_skip {
+                                    "（スキップで終了）"
+                                } else {
+                                    ""
+                                }
+                            );
                             let fi = if all_idxs.is_empty() {
                                 Some(vec![])
                             } else {
@@ -1865,6 +1925,7 @@ impl super::resolver::AbilityResolver {
                                     Zone::Discard.to_str(),
                                     remaining,
                                     desc,
+                                    desc_ja,
                                     ctx.allow_skip,
                                     fi,
                                     Some(target),
@@ -1895,6 +1956,15 @@ impl super::resolver::AbilityResolver {
                         ""
                     }
                 );
+                let desc_ja = format!(
+                    "控え室からさらに{}枚選択{}",
+                    remaining,
+                    if ctx.allow_skip {
+                        "（スキップで終了）"
+                    } else {
+                        ""
+                    }
+                );
                 let fi = if all_idxs.is_empty() {
                     Some(vec![])
                 } else {
@@ -1906,6 +1976,7 @@ impl super::resolver::AbilityResolver {
                         Zone::Discard.to_str(),
                         remaining,
                         desc,
+                        desc_ja,
                         ctx.allow_skip,
                         fi,
                         Some(target),
@@ -1980,7 +2051,10 @@ impl super::resolver::AbilityResolver {
         let conditional_choice = gs.entry_conditional_choice();
         log::debug!(
             "[HST] target={} selected={} choice_card_no={:?} activating={:?}",
-            target, selected, choice_card_no, gs.activating_card
+            target,
+            selected,
+            choice_card_no,
+            gs.activating_card
         );
 
         // choice_card_no-based routing
@@ -2037,8 +2111,8 @@ impl super::resolver::AbilityResolver {
                                 self.pending_reprompt_choice = Some(Choice::SelectTarget {
                                     target: "choice".to_string(),
                                     description: desc.join(" / "),
-                                    description_en: None,
-                                    description_ja: None,
+                                    description_en: Some(desc.join(" / ")),
+                                    description_ja: Some(desc.join(" / ")),
                                     allow_skip: true,
                                     options: None,
                                 });
@@ -2058,7 +2132,11 @@ impl super::resolver::AbilityResolver {
                 return self.handle_choice_string_selection(gs, selected, conditional_choice);
             }
             Some(ChoiceRoute::Raw(s)) if s.starts_with("position_change") => {
-                log::debug!("[HPCC_MATCH] routing to handle_position_change_choice: s={} selected={}", s, selected);
+                log::debug!(
+                    "[HPCC_MATCH] routing to handle_position_change_choice: s={} selected={}",
+                    s,
+                    selected
+                );
                 return self.handle_position_change_choice(gs, choice_card_no, selected);
             }
             _ => {}
@@ -2239,7 +2317,8 @@ impl super::resolver::AbilityResolver {
     ) -> Result<(), String> {
         log::debug!(
             "[HPCC] entry: choice_card_no={:?} selected={} entry_effect={:?} activating={:?}",
-            choice_card_no, selected,
+            choice_card_no,
+            selected,
             gs.entry_effect().map(|e| e.action.clone()),
             gs.activating_card
         );
@@ -2407,8 +2486,14 @@ impl super::resolver::AbilityResolver {
                                 "Choose destination for {} (currently at {})",
                                 next_cname, pos_name
                             ),
-                            description_en: None,
-                            description_ja: None,
+                            description_en: Some(format!(
+                                "Choose destination for {} (currently at {})",
+                                next_cname, pos_name
+                            )),
+                            description_ja: Some(format!(
+                                "{}の移動先を選択（現在: {}）",
+                                next_cname, pos_name
+                            )),
                             allow_skip: effect.optional.unwrap_or(false),
                             options: Some(valid_destinations),
                         });

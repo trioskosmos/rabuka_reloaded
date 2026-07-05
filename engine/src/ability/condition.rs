@@ -397,6 +397,9 @@ impl<'a> ConditionContext<'a> {
             Some(ConditionType::AllCostComparisonCondition) => {
                 self.evaluate_all_cost_comparison_condition(condition)
             }
+            Some(ConditionType::HighestCostOnStageCondition) => {
+                self.evaluate_highest_cost_on_stage_condition(condition)
+            }
             Some(ConditionType::OtherwiseCondition) => true,
             Some(ConditionType::ActionSuccessCondition) => true,
             Some(ConditionType::BothCondition) => self.evaluate_both_condition(condition),

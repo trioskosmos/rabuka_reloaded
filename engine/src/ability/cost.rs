@@ -235,8 +235,11 @@ impl AbilityResolver {
                 self.pending_choice = Some(Choice::SelectTarget {
                     target: "choice_condition".to_string(),
                     description: format!("Choose cost option: {}", texts.join(" OR ")),
-                    description_en: None,
-                    description_ja: None,
+                    description_en: Some(format!("Choose cost option: {}", texts.join(" OR "))),
+                    description_ja: Some(format!(
+                        "コストオプションを選択: {}",
+                        texts.join(" または ")
+                    )),
                     allow_skip: false,
                     options: Some(texts),
                 });
@@ -407,6 +410,19 @@ impl AbilityResolver {
                                 desc,
                                 is_optional,
                             )
+                            .description_ja(Some(if is_any_number {
+                                format!("手札から任意枚選択（スキップ可）")
+                            } else {
+                                format!(
+                                    "手札から{}枚選択{}",
+                                    effective_count,
+                                    if is_optional {
+                                        "（スキップ可）"
+                                    } else {
+                                        ""
+                                    }
+                                )
+                            }))
                             .card_type(card_type.clone())
                             .cost_limit(cost.cost_limit, cost.cost_limit_operator.clone())
                             .group(
@@ -609,8 +625,15 @@ impl AbilityResolver {
                             "Pay optional cost: {}? (pay or skip)",
                             cost_description
                         ),
-                        description_en: None,
-                        description_ja: None,
+                        description_en: Some(format!(
+                            "Pay optional cost: {}? (pay or skip)",
+                            cost_description
+                        )),
+                        description_ja: Some(if state_change == "wait" {
+                            "このメンバーをレスト状態にする（支払う/スキップ）？".to_string()
+                        } else {
+                            "コストを支払う（支払う/スキップ）？".to_string()
+                        }),
                         allow_skip: true,
                         options: None,
                     });
@@ -717,6 +740,10 @@ impl AbilityResolver {
                             ),
                             true,
                         )
+                        .description_ja(Some(format!(
+                            "エネルギーカードを選択（アクティブ: {}）完了でスキップ",
+                            active_count
+                        )))
                         .filtered_indices(Some(filtered_indices))
                         .target_player_id(Some(target.to_string()))
                         .build(),
@@ -731,8 +758,8 @@ impl AbilityResolver {
                     self.pending_choice = Some(Choice::SelectTarget {
                         target: "pay_optional_cost:skip_optional_cost".to_string(),
                         description: format!("Pay {} energy (or skip)?", energy),
-                        description_en: None,
-                        description_ja: None,
+                        description_en: Some(format!("Pay {} energy (or skip)?", energy)),
+                        description_ja: Some(format!("{}エネルギー支払う（スキップ可）？", energy)),
                         allow_skip: true,
                         options: None,
                     });
@@ -832,6 +859,7 @@ impl AbilityResolver {
                             "Select cards to reveal from hand".to_string(),
                             true,
                         )
+                        .description_ja(Some("手札からカードを選択して公開".to_string()))
                         .card_type(card_type.clone())
                         .cost_limit(cost.cost_limit, cost.cost_limit_operator.clone())
                         .group(group)

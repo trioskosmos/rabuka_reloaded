@@ -154,13 +154,13 @@ pub mod position_change_condition_test;
 pub mod position_change_multi_test;
 pub mod position_change_non_optional_test;
 pub mod position_change_triggers_jidou_move_test;
-pub mod q46_kanako_all_heart_timing_test;
 pub mod q127_heart_set_plus_global_test;
 pub mod q137_already_waited_cost_test;
 pub mod q146_per_member_draw_test;
 pub mod q148_blade_total_waited_test;
 pub mod q159_debut_from_discard_self_cost_test;
 pub mod q38_live_card_zone_test;
+pub mod q46_kanako_all_heart_timing_test;
 pub mod qa_new_tests;
 pub mod qa_new_tests198;
 pub mod qa_new_tests202;
@@ -343,3 +343,6 @@ pub mod riko_bp5_center_cost_equal_test;
 pub mod auto_system_stress_test;
 pub mod baton_touch_order_test;
 pub mod wonder_zone_max_repeats_test;
+
+// 平安名すみれ (PL!SP-bp2-004-R) — constant: center has highest cost → heart03
+pub mod sumire_bp2_center_cost_test;

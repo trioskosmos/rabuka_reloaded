@@ -19,8 +19,8 @@ impl AbilityResolver {
                 self.pending_choice = Some(Choice::SelectTarget {
                     target: "pay_optional_cost:skip_optional_cost".to_string(),
                     description: "Reveal cards from deck (optional cost)?".to_string(),
-                    description_en: None,
-                    description_ja: None,
+                    description_en: Some("Reveal cards from deck (optional cost)?".to_string()),
+                    description_ja: Some("山札からカードを公開（オプションコスト）？".to_string()),
                     allow_skip: true,
                     options: None,
                 });
@@ -167,8 +167,8 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "choice_string".to_string(),
                 description: desc,
-                description_en: None,
-                description_ja: None,
+                description_en: Some(format!("Choose: {}", or_types.join(", or "))),
+                description_ja: Some(format!("選択: {}", or_types.join(", or "))),
                 allow_skip: false,
                 options: Some(
                     or_types
@@ -1736,8 +1736,8 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "double_baton_touch".to_string(),
                 description: "Choose 2 occupied areas for double baton touch".to_string(),
-                description_en: None,
-                description_ja: None,
+                description_en: Some("Choose 2 occupied areas for double baton touch".to_string()),
+                description_ja: Some("ダブルバトンのエリア2つを選択".to_string()),
                 allow_skip: true,
                 options: Some(options),
             });
@@ -1825,8 +1825,12 @@ impl AbilityResolver {
                     self.pending_choice = Some(Choice::SelectTarget {
                         target: "pay_optional_cost:skip_optional_cost".to_string(),
                         description: "Place energy under member? (pay or skip)".to_string(),
-                        description_en: None,
-                        description_ja: None,
+                        description_en: Some(
+                            "Place energy under member? (pay or skip)".to_string(),
+                        ),
+                        description_ja: Some(
+                            "メンバーの下にエネルギーを置く（支払う/スキップ）？".to_string(),
+                        ),
                         allow_skip: false,
                         options: None,
                     });
@@ -1973,8 +1977,8 @@ impl AbilityResolver {
                 self.pending_choice = Some(Choice::SelectTarget {
                     target: "position|destination".to_string(),
                     description: "Choose which opponent member to move".to_string(),
-                    description_en: None,
-                    description_ja: None,
+                    description_en: Some("Choose which opponent member to move".to_string()),
+                    description_ja: Some("移動する相手のメンバーを選択".to_string()),
                     allow_skip: effect.optional.unwrap_or(false),
                     options: Some(valid_sources),
                 });
@@ -2046,8 +2050,8 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "position|destination".to_string(),
                 description: "Choose which member to move".to_string(),
-                description_en: None,
-                description_ja: None,
+                description_en: Some("Choose which member to move".to_string()),
+                description_ja: Some("移動するメンバーを選択".to_string()),
                 allow_skip: effect.optional.unwrap_or(false),
                 options: Some(valid_sources),
             });
@@ -2155,8 +2159,22 @@ impl AbilityResolver {
                             .unwrap_or("member"),
                         pos_name
                     ),
-                    description_en: None,
-                    description_ja: None,
+                    description_en: Some(format!(
+                        "Choose destination for {} (currently at {})",
+                        card_db
+                            .get_card(first_card_id)
+                            .map(|c| c.name.as_str())
+                            .unwrap_or("member"),
+                        pos_name
+                    )),
+                    description_ja: Some(format!(
+                        "{}の移動先を選択（現在: {}）",
+                        card_db
+                            .get_card(first_card_id)
+                            .map(|c| c.name.as_str())
+                            .unwrap_or("member"),
+                        pos_name
+                    )),
                     allow_skip: effect.optional.unwrap_or(false),
                     options: Some(valid_destinations),
                 });
@@ -2195,8 +2213,11 @@ impl AbilityResolver {
                         "Choose destination for position change (currently at {})",
                         from_label
                     ),
-                    description_en: None,
-                    description_ja: None,
+                    description_en: Some(format!(
+                        "Choose destination for position change (currently at {})",
+                        from_label
+                    )),
+                    description_ja: Some(format!("移動先を選択（現在: {}）", from_label)),
                     allow_skip: effect.optional.unwrap_or(false),
                     options: Some(valid_destinations),
                 });
@@ -2244,8 +2265,11 @@ impl AbilityResolver {
                     "Choose destination for position change (currently at {})",
                     from_label
                 ),
-                description_en: None,
-                description_ja: None,
+                description_en: Some(format!(
+                    "Choose destination for position change (currently at {})",
+                    from_label
+                )),
+                description_ja: Some(format!("移動先を選択（現在: {}）", from_label)),
                 allow_skip: effect.optional.unwrap_or(false),
                 options: Some(valid_destinations),
             });
@@ -2306,8 +2330,14 @@ impl AbilityResolver {
                         "Choose destination for {} (currently at {})",
                         card_name, pos_name
                     ),
-                    description_en: None,
-                    description_ja: None,
+                    description_en: Some(format!(
+                        "Choose destination for {} (currently at {})",
+                        card_name, pos_name
+                    )),
+                    description_ja: Some(format!(
+                        "{}の移動先を選択（現在: {}）",
+                        card_name, pos_name
+                    )),
                     allow_skip: optional,
                     options: Some(valid_destinations),
                 });
@@ -3166,9 +3196,9 @@ impl AbilityResolver {
                 .join(" / ");
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "choice".to_string(),
-                description,
-                description_en: None,
-                description_ja: None,
+                description: description.clone(),
+                description_en: Some(description.clone()),
+                description_ja: Some(format!("選択: {}", description)),
                 allow_skip: effect.optional.unwrap_or(false),
                 options: None,
             });
@@ -3179,8 +3209,8 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "choice_string".to_string(),
                 description: format!("Choose one: {}", string_options.join(", ")),
-                description_en: None,
-                description_ja: None,
+                description_en: Some(format!("Choose one: {}", string_options.join(", "))),
+                description_ja: Some(format!("選択: {}", string_options.join(", "))),
                 allow_skip: effect.optional.unwrap_or(false),
                 options: None,
             });
@@ -3188,8 +3218,8 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "choice".to_string(),
                 description: format!("Choose: {}", ct),
-                description_en: None,
-                description_ja: None,
+                description_en: Some(format!("Choose: {}", ct)),
+                description_ja: Some(format!("選択: {}", ct)),
                 allow_skip: effect.optional.unwrap_or(false),
                 options: None,
             });
@@ -3359,8 +3389,8 @@ impl AbilityResolver {
         self.pending_choice = Some(Choice::SelectTarget {
             target: "choose_required_hearts".to_string(),
             description: "Choose required hearts".to_string(),
-            description_en: None,
-            description_ja: None,
+            description_en: Some("Choose required hearts".to_string()),
+            description_ja: Some("必要なハートを選択".to_string()),
             allow_skip: false,
             options: None,
         });
@@ -3381,8 +3411,8 @@ impl AbilityResolver {
         self.pending_choice = Some(Choice::SelectTarget {
             target: "self_or_opponent".to_string(),
             description: "Choose self or opponent".to_string(),
-            description_en: None,
-            description_ja: None,
+            description_en: Some("Choose self or opponent".to_string()),
+            description_ja: Some("自分または相手を選択".to_string()),
             allow_skip: false,
             options: Some(options),
         });

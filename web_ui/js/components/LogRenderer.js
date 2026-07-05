@@ -1,6 +1,7 @@
 import { State } from '../state.js';
 import * as i18n from '../i18n/index.js';
 import { Tooltips } from '../ui_tooltips.js';
+import { TextEnricher } from '../utils/TextEnricher.js';
 import { LogFilter } from '../utils/LogFilter.js';
 import { PerformanceMonitor } from '../utils/PerformanceMonitor.js';
 import { LogViewerModal } from '../modals/LogViewerModal.js';
@@ -391,7 +392,7 @@ export const LogRenderer = {
         if (meta.ability_text) {
             const abilityTextDiv = document.createElement('div');
             abilityTextDiv.className = 'log-entry effect detail ability-full-text';
-            abilityTextDiv.innerHTML = Tooltips.enrichAbilityText(meta.ability_text);
+            abilityTextDiv.innerHTML = Tooltips.enrichAbilityText(LogRenderer._enrichAbilityFromCard(meta.ability_text, entry));
             detailsContainer.appendChild(abilityTextDiv);
         }
 
@@ -448,7 +449,7 @@ export const LogRenderer = {
             if (meta.ability_text) {
                 const abilityTextDiv = document.createElement('div');
                 abilityTextDiv.className = 'log-entry effect detail ability-full-text';
-                abilityTextDiv.innerHTML = Tooltips.enrichAbilityText(meta.ability_text);
+                abilityTextDiv.innerHTML = Tooltips.enrichAbilityText(LogRenderer._enrichAbilityFromCard(meta.ability_text, entry));
                 detailsContainer.appendChild(abilityTextDiv);
             }
             // Render condition/cost/effect items
@@ -470,7 +471,7 @@ export const LogRenderer = {
             if (meta.ability_text) {
                 const abilityTextDiv = document.createElement('div');
                 abilityTextDiv.className = 'log-entry effect detail ability-full-text';
-                abilityTextDiv.innerHTML = Tooltips.enrichAbilityText(meta.ability_text);
+                abilityTextDiv.innerHTML = Tooltips.enrichAbilityText(LogRenderer._enrichAbilityFromCard(meta.ability_text, entry));
                 detailsContainer.appendChild(abilityTextDiv);
             }
             const resultDiv = document.createElement('div');
@@ -489,7 +490,7 @@ export const LogRenderer = {
             if (meta.ability_text) {
                 const abilityTextDiv = document.createElement('div');
                 abilityTextDiv.className = 'log-entry effect detail ability-full-text';
-                abilityTextDiv.innerHTML = Tooltips.enrichAbilityText(meta.ability_text);
+                abilityTextDiv.innerHTML = Tooltips.enrichAbilityText(LogRenderer._enrichAbilityFromCard(meta.ability_text, entry));
                 detailsContainer.appendChild(abilityTextDiv);
             }
             const pendingDiv = document.createElement('div');
@@ -507,6 +508,16 @@ export const LogRenderer = {
         };
 
         return blockDiv;
+    },
+
+    _enrichAbilityFromCard: (text, entry) => {
+        if (!text || text.includes('{{')) return text;
+        const srcCardId = entry.source_card_id ?? entry.metadata?.source_card_id ?? entry.metadata?.card_id;
+        if (srcCardId == null || srcCardId === -1) return text;
+        const srcCard = State.resolveCardData(srcCardId);
+        if (!srcCard) return text;
+        const fullText = TextEnricher.getEffectiveRawText(srcCard);
+        return (fullText && fullText.includes('{{')) ? fullText : text;
     },
 
     _renderAbilityLogItem: (item, container) => {

@@ -113,8 +113,14 @@ impl AbilityResolver {
         } else {
             format!("Select {} card(s) from {}", count, zone_display)
         };
+        let description_ja = if effect.any_number.unwrap_or(false) {
+            format!("{}から任意枚選択", zone_display)
+        } else {
+            format!("{}から{}枚選択", zone_display, count)
+        };
         self.pending_choice = Some(
             Choice::select_cards(zone, count, description, can_skip)
+                .description_ja(Some(description_ja))
                 .card_type(filter.card_type.map(|s| s.to_string()))
                 .cost_limit(filter.cost_limit, effect.cost_limit_operator.clone())
                 .cost_total(filter.cost_total, effect.cost_total_operator.clone())
@@ -200,8 +206,18 @@ impl AbilityResolver {
                             .get_card(card_id)
                             .map_or("card", |c| c.name.as_str())
                     ),
-                    description_en: None,
-                    description_ja: None,
+                    description_en: Some(format!(
+                        "Choose position for {}",
+                        gs.card_database
+                            .get_card(card_id)
+                            .map_or("card", |c| c.name.as_str())
+                    )),
+                    description_ja: Some(format!(
+                        "{}の配置位置を選択",
+                        gs.card_database
+                            .get_card(card_id)
+                            .map_or("カード", |c| c.name.as_str())
+                    )),
                     allow_skip: false,
                 });
                 self.execution_context = ExecutionContext::MoveCardsPosition {
@@ -593,8 +609,13 @@ impl AbilityResolver {
                             .and_then(|_| group_name)
                             .map(|g| format!("Select 1 {g} card to place on deck"))
                             .unwrap_or_else(|| "Select 1 card to place on deck".to_string());
+                        let description_ja = card_type_filter
+                            .and_then(|_| group_name)
+                            .map(|g| format!("{g}カードを山札に置く1枚を選択"))
+                            .unwrap_or_else(|| "山札に置く1枚を選択".to_string());
                         self.pending_choice = Some(
                             Choice::select_cards(Zone::Discard.to_str(), 1, description, false)
+                                .description_ja(Some(description_ja))
                                 .card_type(card_type_filter.map(|s| s.to_string()))
                                 .group(group_name.map(|s| s.to_string()))
                                 .filtered_indices(Some(filtered_indices))
@@ -626,6 +647,10 @@ impl AbilityResolver {
                             .and_then(|_| group_name)
                             .map(|g| format!("Select {count} {g} card(s)"))
                             .unwrap_or_else(|| "Select card(s)".to_string());
+                        let description_ja = card_type_filter
+                            .and_then(|_| group_name)
+                            .map(|g| format!("{g}カードを{count}枚選択"))
+                            .unwrap_or_else(|| "カードを選択".to_string());
                         self.pending_choice = Some(
                             Choice::select_cards(
                                 Zone::Discard.to_str(),
@@ -633,6 +658,7 @@ impl AbilityResolver {
                                 description,
                                 effect.optional.unwrap_or(false),
                             )
+                            .description_ja(Some(description_ja))
                             .card_type(card_type_filter.map(|s| s.to_string()))
                             .group(group_name.map(|s| s.to_string()))
                             .filtered_indices(Some(filtered_indices))
@@ -662,8 +688,10 @@ impl AbilityResolver {
                         self.pending_choice = Some(Choice::SelectTarget {
                             target: "pay_optional_cost:skip_optional_cost".to_string(),
                             description: "Place top card of deck to waiting room?".to_string(),
-                            description_en: None,
-                            description_ja: None,
+                            description_en: Some(
+                                "Place top card of deck to waiting room?".to_string(),
+                            ),
+                            description_ja: Some("山札の上を控え室に置きますか？".to_string()),
                             allow_skip: true,
                             options: Some(vec!["No".to_string(), "Yes".to_string()]),
                         });
@@ -1153,8 +1181,14 @@ impl AbilityResolver {
                         self.pending_choice = Some(Choice::SelectTarget {
                             target: "choice_string".to_string(),
                             description: format!("Pick card type: {}", type_labels.join(" / ")),
-                            description_en: None,
-                            description_ja: None,
+                            description_en: Some(format!(
+                                "Pick card type: {}",
+                                type_labels.join(" / ")
+                            )),
+                            description_ja: Some(format!(
+                                "カードタイプを選択: {}",
+                                type_labels.join(" / ")
+                            )),
                             allow_skip: false,
                             options: Some(type_labels),
                         });
@@ -1281,8 +1315,11 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "order".to_string(),
                 description: format!("Choose order for cards on deck ({} cards)", taken_count),
-                description_en: None,
-                description_ja: None,
+                description_en: Some(format!(
+                    "Choose order for cards on deck ({} cards)",
+                    taken_count
+                )),
+                description_ja: Some(format!("山札のカード順を選択（{}枚）", taken_count)),
                 allow_skip: false,
                 options: None,
             });
@@ -1405,8 +1442,8 @@ impl AbilityResolver {
                     self.pending_choice = Some(Choice::SelectTarget {
                         target: "position|destination".to_string(),
                         description: "Choose deck top or bottom".to_string(),
-                        description_en: None,
-                        description_ja: None,
+                        description_en: Some("Choose deck top or bottom".to_string()),
+                        description_ja: Some("山札の上または下を選択".to_string()),
                         allow_skip: can_skip,
                         options: Some(vec![
                             Zone::DeckTop.to_str().to_string(),
@@ -2102,8 +2139,8 @@ impl AbilityResolver {
                             self.pending_choice = Some(Choice::SelectTarget {
                                 target: "position|destination".to_string(),
                                 description: "Choose deck top or bottom".to_string(),
-                                description_en: None,
-                                description_ja: None,
+                                description_en: Some("Choose deck top or bottom".to_string()),
+                                description_ja: Some("山札の上または下を選択".to_string()),
                                 allow_skip: false,
                                 options: Some(vec![
                                     Zone::DeckTop.to_str().to_string(),
@@ -2408,8 +2445,11 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "order".to_string(),
                 description: format!("Choose order for cards on deck ({} cards)", card_count),
-                description_en: None,
-                description_ja: None,
+                description_en: Some(format!(
+                    "Choose order for cards on deck ({} cards)",
+                    card_count
+                )),
+                description_ja: Some(format!("山札のカード順を選択（{}枚）", card_count)),
                 allow_skip: false,
                 options: None,
             });

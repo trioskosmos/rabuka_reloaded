@@ -598,6 +598,73 @@ def _try_duration_prefix(text):
 # ======================================================================
 
 
+_PHASE_GATE_RE = re.compile(
+    r"(?:このゲームの\d+ターン目の)?"
+    r"(?:自分の|相手の)?"
+    r"(?:メイン|ライブ|セット|エール|アクティブ)フェイズ"
+    r"(?:の場合|の間|に)"
+)
+
+_PHASE_MAP = {
+    "メイン": "main",
+    "ライブ": "live_phase",
+    "セット": "set_phase",
+    "エール": "yell_phase",
+    "アクティブ": "active_phase",
+}
+
+
+def extract_phase_gate(text: str) -> Tuple[Optional[Dict[str, Any]], str]:
+    """Extract a phase gate from ability text.
+
+    Returns (gate_condition, remaining_text) or (None, original_text) if no
+    phase gate is found or the match is a consequence (next-phase reference).
+    """
+    m = _PHASE_GATE_RE.search(text)
+    if not m:
+        return None, text
+
+    # Skip consequence references (次のターンのXフェイズに)
+    before = text[: m.start()]
+    if "次の" in before or "来" in before:
+        return None, text
+
+    gate_phrase = m.group(0)
+    remaining = text[: m.start()] + text[m.end() :]
+    # Clean leading/trailing commas and orphaned particles
+    remaining = re.sub(r"^[、，]\s*", "", remaining)
+    remaining = re.sub(r"\s+$", "", remaining)
+
+    # Determine phase
+    phase_name = re.search(r"(メイン|ライブ|セット|エール|アクティブ)", gate_phrase)
+    phase = _PHASE_MAP.get(phase_name.group(1)) if phase_name else None
+    if not phase:
+        return None, text
+
+    gate: Dict[str, Any] = {
+        "type": "temporal_condition",
+        "phase": phase,
+        "text": gate_phrase,
+        "trigger_event": {"type": "temporal", "phase": phase},
+    }
+
+    # Phase target
+    if gate_phrase.startswith("自分の"):
+        gate["phase_target"] = "self"
+        gate["trigger_event"]["phase_target"] = "self"
+    elif gate_phrase.startswith("相手の"):
+        gate["phase_target"] = "opponent"
+        gate["trigger_event"]["phase_target"] = "opponent"
+
+    # Turn number (e.g. このゲームの1ターン目のライブフェイズの場合)
+    turn_m = re.search(r"(\d+)ターン目", gate_phrase)
+    if turn_m:
+        gate["turn_number"] = int(turn_m.group(1))
+        gate["trigger_event"]["turn_number"] = int(turn_m.group(1))
+
+    return gate, remaining
+
+
 def parse_ability(triggerless_text: str) -> Dict[str, Any]:
     """Parse a complete ability text."""
     triggerless_text = normalize(triggerless_text.strip())
@@ -606,9 +673,15 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         "triggerless_text": triggerless_text,
     }
 
-    # Split cost and effect (no need to pre-strip parenthetical —
-    # the activation conditions in （...） are needed for later processing)
-    cost_text, effect_text = split_cost_effect(triggerless_text)
+    # Extract phase gate as its own condition BEFORE splitting cost/effect.
+    # The gate is a pure pre-check: "only during X phase" — no point
+    # evaluating anything else if the phase is wrong.
+    phase_gate, remaining_text = extract_phase_gate(triggerless_text)
+    if phase_gate:
+        ability["condition"] = phase_gate
+
+    # Split cost and effect on the text with the phase prefix removed
+    cost_text, effect_text = split_cost_effect(remaining_text)
 
     # Parse cost
     if cost_text:
@@ -641,7 +714,7 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
 
         # Fill missing condition from text — unified single field
         if not effect.get("condition"):
-            txt = triggerless_text
+            txt = remaining_text
             for sep in ["とき、", "場合、", "たび、", "なら、"]:
                 idx = txt.find(sep)
                 if idx >= 0:
@@ -1177,6 +1250,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
         _try_blade_count,
         # Tier 3: Card counts & cost comparisons
         _try_card_count,
+        _try_highest_cost_on_stage,
         _try_cost_override_condition,
         _try_both,
         # Tier 4: Temporal constraints
@@ -1261,17 +1335,6 @@ def parse_condition(text: str) -> Dict[str, Any]:
             _enrich_or_location(result, text)
             # Heart-content filter: 必要ハートに含まれるheartXXがN → add heart_colors
             _enrich_heart_content(result, text)
-            # Propagate phase/phase_target from trigger_event to top level
-            # when the text contains a phase gate pattern, so all phase-gated
-            # conditions expose them consistently.
-            te = result.get("trigger_event")
-            if isinstance(te, dict) and re.search(
-                r"(?:自分の|相手の)?(?:メイン|ライブ|セット|エール)フェイズ", text
-            ):
-                if not result.get("phase") and te.get("phase"):
-                    result["phase"] = te["phase"]
-                if not result.get("phase_target") and te.get("phase_target"):
-                    result["phase_target"] = te["phase_target"]
             return result
 
     # Fall-through: generic field extraction + type inference
@@ -3124,6 +3187,37 @@ def _try_cost_override_condition(text):
     }
 
 
+def _try_highest_cost_on_stage(text):
+    """Detect 'positionにいるメンバーが最も大きいコストを持つ' (member at position has the highest cost among stage members)."""
+    m = re.search(
+        r"(センターエリア|センター|左サイドエリア|左サイド|右サイドエリア|右サイド)(?:エリア)?にいる(?:メンバー|カード)が最も大きいコストを持つ",
+        text,
+    )
+    if not m:
+        return None
+    pos_raw = m.group(1)
+    pos_map = {
+        "センターエリア": "center",
+        "センター": "center",
+        "左サイドエリア": "left_side",
+        "左サイド": "left_side",
+        "右サイドエリア": "right_side",
+        "右サイド": "right_side",
+    }
+    position = pos_map.get(pos_raw.strip())
+    if not position:
+        return None
+    return {
+        "type": "highest_cost_on_stage_condition",
+        "position": position,
+        "operator": ">",
+        "location": "stage",
+        "target": "self",
+        "card_type": "member_card",
+        "text": text,
+    }
+
+
 def _try_both(text):
     if "それらが両方ある" not in text:
         return None
@@ -3159,9 +3253,10 @@ def _try_temporal_this_turn(text):
 
 
 def _try_phase_gate(text):
-    """Simple phase gate: Xフェイズの場合 — restricts activation to a specific phase."""
+    """Simple phase gate: Xフェイズの場合/の間/に — restricts activation to a specific phase."""
     m = re.search(
-        r"(?:自分の|相手の)?(メイン|ライブ|セット|エール)フェイズの場合", text
+        r"(?:このゲームの\d+ターン目の)?(?:自分の|相手の)?(メイン|ライブ|セット|エール|アクティブ)フェイズ(?:の場合|の間|に)",
+        text,
     )
     if not m:
         return None
@@ -3171,6 +3266,7 @@ def _try_phase_gate(text):
         "ライブ": "live_phase",
         "セット": "set_phase",
         "エール": "yell_phase",
+        "アクティブ": "active_phase",
     }
     phase = phase_map.get(phase_name)
     if not phase:
@@ -3187,6 +3283,10 @@ def _try_phase_gate(text):
     elif text.startswith("相手の"):
         result["phase_target"] = "opponent"
         result["trigger_event"]["phase_target"] = "opponent"
+    turn_m = re.search(r"(\d+)ターン目", text)
+    if turn_m:
+        result["turn_number"] = int(turn_m.group(1))
+        result["trigger_event"]["turn_number"] = int(turn_m.group(1))
     return result
 
 
@@ -8958,13 +9058,32 @@ def _clean_gain_resource(node):
             if res in ("blade", "ブレード"):
                 node.pop("heart_colors", None)
             node.pop("source", None)
-            # Remove position from gain_resource when the condition also has the
-            # same position — it leaked from _extract_generic_fields parsing the
-            # full text (condition + effect) at the same time. Constant abilities
-            # (常時) may legitimately use position for targeting, so left alone.
+            # Remove position from gain_resource when the condition has the same
+            # position. Position on gain_resource tells the engine which card
+            # position must hold the ability card (pos_ok gate in recalculate_constants).
+            # That's wrong when position describes something else:
+            # - Trigger conditions: position = WHERE the event happened (not target)
+            # - Comparison with comparison_type: position = which member to compare
+            #   (e.g. "center has highest cost" — position is the subject, not target)
+            # Keep position when condition has resource_type (e.g. heart_02 >= 3 at
+            # left_side) because position IS the effect target.
             cond = node.get("condition", {})
             if node.get("position") and cond.get("position") == node.get("position"):
-                node.pop("position", None)
+                trigger_types = (
+                    "movement_condition",
+                    "appearance_condition",
+                    "baton_touch",
+                    "state_change_condition",
+                )
+                is_trigger = cond.get("type") in trigger_types
+                # comparison_type (e.g. "cost") means position is the comparison
+                # subject, not the effect target — strip it.
+                is_comparison_subject = cond.get("comparison_type") is not None
+                # highest_cost_on_stage: position describes WHICH member to check,
+                # not where the ability card must be.
+                is_highest_cost = cond.get("type") == "highest_cost_on_stage_condition"
+                if is_trigger or is_comparison_subject or is_highest_cost:
+                    node.pop("position", None)
         for v in node.values():
             _clean_gain_resource(v)
     elif isinstance(node, list):

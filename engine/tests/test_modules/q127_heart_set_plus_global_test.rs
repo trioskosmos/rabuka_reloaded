@@ -239,10 +239,7 @@ fn q127_two_wien_stack_plus2_heart00() {
         .state
         .mods
         .get_need_heart_modifier(bloom_id, HeartColor::Heart00);
-    assert_eq!(
-        h00, 3,
-        "Q127: Bloom set heart00=1 + 2 Wienen (+2) = 3"
-    );
+    assert_eq!(h00, 3, "Q127: Bloom set heart00=1 + 2 Wienen (+2) = 3");
 }
 
 // ====================================================================
@@ -376,16 +373,10 @@ fn q127_wien_adds_heart00_not_in_set() {
         .state
         .mods
         .get_need_heart_modifier(hareruya_id, HeartColor::Heart00);
-    assert_eq!(
-        h00, 1,
-        "Q127: Set has no heart00, Wien adds +1 → heart00=1"
-    );
+    assert_eq!(h00, 1, "Q127: Set has no heart00, Wien adds +1 → heart00=1");
 
     // Verify base need_heart had heart00=2 but it's wiped by set
-    let card = game
-        .db
-        .get_card(hareruya_id)
-        .expect("card should exist");
+    let card = game.db.get_card(hareruya_id).expect("card should exist");
     let base_h00 = card
         .need_heart
         .as_ref()
@@ -457,7 +448,10 @@ fn q127_wien_only_affects_heart00() {
         .mods
         .get_need_heart_modifier(bloom_id, HeartColor::Heart03);
 
-    assert_eq!(h01, 2, "heart01 stays at 2 (Bloom's set, Wien doesn't touch it)");
+    assert_eq!(
+        h01, 2,
+        "heart01 stays at 2 (Bloom's set, Wien doesn't touch it)"
+    );
     assert_eq!(h00, 2, "heart00 = Bloom's set(1) + Wien's +1 = 2");
     assert_eq!(h02, 0, "heart02 not affected");
     assert_eq!(h03, 0, "heart03 not affected");
@@ -612,10 +606,7 @@ fn q127_no_wien_bloom_set_standalone() {
         .state
         .mods
         .get_need_heart_modifier(bloom_id, HeartColor::Heart00);
-    assert_eq!(
-        h00, 1,
-        "No Wien: Bloom set heart00=1, no additive"
-    );
+    assert_eq!(h00, 1, "No Wien: Bloom set heart00=1, no additive");
 }
 
 // ====================================================================

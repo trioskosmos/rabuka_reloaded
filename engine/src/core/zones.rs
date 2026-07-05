@@ -769,7 +769,7 @@ impl MainDeck {
 
 #[derive(Debug, Clone)]
 pub struct EnergyDeck {
-    pub cards: SmallVec<[i16; 20]>, // Card IDs - stack-allocated for up to 20 energy cards
+    pub cards: SmallVec<[i16; 20]>,
 }
 
 impl Default for EnergyDeck {

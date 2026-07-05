@@ -441,6 +441,10 @@
             <div class="modal-footer" id="selection-footer">
                 <!-- Cancel button if optional -->
             </div>
+            <div class="modal-footer-bar" id="selection-footer-bar">
+                <button class="btn-view-card" id="selection-view-card-btn" disabled>View</button>
+                <button class="btn-select-card" id="selection-select-btn" disabled>Select</button>
+            </div>
         </div>
     </div>
 
@@ -685,6 +689,12 @@
             <div class="modal-body">
                 <div id="discard-modal-cards" class="discard-grid"></div>
             </div>
+            <div class="modal-footer-bar" id="discard-footer-bar">
+                <button class="nav-btn" id="discard-nav-prev" disabled>◀</button>
+                <button class="btn-view-card" id="discard-view-card-btn" disabled>View</button>
+                <button class="nav-btn" id="discard-nav-next" disabled>▶</button>
+                <button class="btn-close-bottom" data-action="close-discard-modal">Close</button>
+            </div>
         </div>
     </div>
 
@@ -743,6 +753,10 @@
             </div>
             <div class="modal-footer" id="card-detail-footer">
                 <span id="card-detail-position" style="font-size:0.75em;opacity:0.5;"></span>
+            </div>
+            <div class="modal-footer-bar" id="card-detail-footer-bar">
+                <button class="btn-select-card" id="card-detail-select-btn" style="display:none;">Select</button>
+                <button class="btn-close-bottom" data-action="close-card-detail-modal">Close</button>
             </div>
         </div>
     </div>
@@ -840,6 +854,7 @@
                     <li data-i18n="faq_step1">Go to decklog.bushiroad.com, find a deck, and open its detail page.</li>
                     <li data-i18n="faq_step2">Open DevTools (usually F12) and do as the picture shows.</li>
                     <li data-i18n="faq_step3">In the game setup modal, select "Paste Deck List" and paste the HTML into the text area.</li>
+                    <li data-i18n="faq_step4">Can also use an extension like https://chromewebstore.google.com/detail/copy-html/indfogjkdbmkihaohndcnkoaheopbhjf</li>
                 </ol>
                 <div style="text-align: center; margin: 8px 0;">
                     <img src="img/tutorial/decklog-import.webp" alt="Deck Log HTML source copy example" style="max-width: 100%; border-radius: 6px; border: 1px solid var(--border-color, #333);">

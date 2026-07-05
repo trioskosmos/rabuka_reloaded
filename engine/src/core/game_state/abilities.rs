@@ -953,8 +953,8 @@ impl GameState {
                     description:
                         "複数の自動能力が同時に発動しました。使用する順番を選択してください。"
                             .to_string(),
-                    description_en: None,
-                    description_ja: None,
+                    description_en: Some("Multiple auto abilities triggered simultaneously. Choose the order to use them.".to_string()),
+                    description_ja: Some("複数の自動能力が同時に発動しました。使用する順番を選択してください。".to_string()),
                 };
 
                 self.ability_queue.pause_for_auto_ability_choice(choice);
