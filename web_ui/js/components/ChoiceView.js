@@ -539,17 +539,13 @@ export const ChoiceView = {
 
                     _selViewBtn = document.getElementById('selection-view-card-btn');
                     _selSelectBtn = document.getElementById('selection-select-btn');
-                    if (_selViewBtn) _selViewBtn.onclick = _openChoiceDetail;
-                    if (_selSelectBtn) _selSelectBtn.onclick = _selectCurrentChoice;
+                    const selCloseBtn = document.getElementById('selection-close-btn');
+                    if (_selViewBtn) { _selViewBtn.style.display = ''; _selViewBtn.onclick = _openChoiceDetail; }
+                    if (_selSelectBtn) { _selSelectBtn.style.display = ''; _selSelectBtn.onclick = _selectCurrentChoice; }
+                    if (selCloseBtn) selCloseBtn.style.display = 'none';
 
-                    const modalClone = choiceDiv.cloneNode(true);
-                    while (modalClone.children.length > 0) {
-                        selContent.appendChild(modalClone.children[0]);
-                    }
-                    const headerClone = choiceDiv.cloneNode(true);
-                    headerClone.querySelectorAll('.choice-cards-row').forEach(r => r.remove());
-                    if (headerClone.children.length > 0 && selContent.firstChild) {
-                        selContent.prepend(headerClone);
+                    while (choiceDiv.children.length > 0) {
+                        selContent.appendChild(choiceDiv.children[0]);
                     }
                     if (selTitle) {
                         const cardName = choice?.card_name || choice?.source_member || '';

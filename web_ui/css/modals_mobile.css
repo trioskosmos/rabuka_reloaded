@@ -169,22 +169,29 @@
     }
 
     #selection-content .choice-cards-row {
-        display: flex;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         gap: 4px;
-        align-items: stretch;
+        align-items: start;
     }
 
     #selection-content .choice-cards-row > .card {
         width: 100%;
-        height: auto;
-        aspect-ratio: 512 / 720;
+        height: auto !important;
+        aspect-ratio: unset !important;
         min-width: 0;
         overflow: visible;
+        flex-shrink: 0;
     }
 
-    #selection-content .choice-cards-row > .card.orientation-landscape {
-        aspect-ratio: 720 / 512;
+    #selection-content .choice-cards-row > .card img {
+        width: 100%;
+        height: auto;
+        object-fit: contain;
+    }
+
+    #selection-content .choice-cards-row > .choice-item {
+        grid-column: 1 / -1;
     }
 
     #selection-content .action-btn,

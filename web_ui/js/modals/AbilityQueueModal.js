@@ -6,12 +6,6 @@ import * as i18n from '../i18n/index.js';
 
 export const AbilityQueueModal = {
     open() {
-        const modal = document.getElementById(DOM_IDS.MODAL_ABILITY_QUEUE);
-        if (!modal) return;
-
-        const body = document.getElementById('ability-queue-body');
-        if (!body) { ModalManager.show(DOM_IDS.MODAL_ABILITY_QUEUE); return; }
-
         const state = State.data;
         const queue = state?.ability_queue || [];
         const queueDepth = state?.queue_depth ?? 0;
@@ -45,12 +39,43 @@ export const AbilityQueueModal = {
                 html += `</div>`;
             });
         }
-        body.innerHTML = html;
 
-        ModalManager.show(DOM_IDS.MODAL_ABILITY_QUEUE);
+        const isMobile = typeof window.__isMobile === 'function' ? window.__isMobile() : false;
+        if (isMobile) {
+            const selModal = document.getElementById(DOM_IDS.SELECTION_MODAL);
+            const selContent = document.getElementById(DOM_IDS.SELECTION_CONTENT);
+            const selTitle = document.getElementById('selection-title');
+            const viewBtn = document.getElementById('selection-view-card-btn');
+            const selectBtn = document.getElementById('selection-select-btn');
+            if (viewBtn) viewBtn.style.display = 'none';
+            if (selectBtn) selectBtn.style.display = 'none';
+            const closeBtn = document.getElementById('selection-close-btn');
+            if (closeBtn) closeBtn.style.display = '';
+            if (selTitle) selTitle.textContent = i18n.t('ability_queue') || 'Ability Queue';
+            if (selContent) {
+                selContent.innerHTML = html;
+                selContent.style.overflowY = 'auto';
+            }
+            ModalManager.show(DOM_IDS.SELECTION_MODAL);
+        } else {
+            const body = document.getElementById('ability-queue-body');
+            if (body) body.innerHTML = html;
+            ModalManager.show(DOM_IDS.MODAL_ABILITY_QUEUE);
+        }
     },
 
     close() {
-        ModalManager.hide(DOM_IDS.MODAL_ABILITY_QUEUE);
+        const isMobile = typeof window.__isMobile === 'function' ? window.__isMobile() : false;
+        if (isMobile && ModalManager.isVisible(DOM_IDS.SELECTION_MODAL)) {
+            ModalManager.hide(DOM_IDS.SELECTION_MODAL);
+            const viewBtn = document.getElementById('selection-view-card-btn');
+            const selectBtn = document.getElementById('selection-select-btn');
+            const closeBtn = document.getElementById('selection-close-btn');
+            if (viewBtn) viewBtn.style.display = '';
+            if (selectBtn) selectBtn.style.display = '';
+            if (closeBtn) closeBtn.style.display = 'none';
+        } else {
+            ModalManager.hide(DOM_IDS.MODAL_ABILITY_QUEUE);
+        }
     }
 };

@@ -221,8 +221,26 @@ export const PlayActionModal = {
             if (found >= 0) _currentIdx = found;
         }
 
-        ModalManager.show(DOM_IDS.MODAL_PLAY_ACTION);
+        const isMobile = typeof window.__isMobile === 'function' ? window.__isMobile() : false;
+        if (isMobile) {
+            ModalManager.show(DOM_IDS.MODAL_PLAY_ACTION);
+        }
         renderHandCard(_currentIdx);
+
+        const actionsDiv = document.getElementById(DOM_IDS.CONTAINER_ACTIONS);
+        if (actionsDiv) {
+            actionsDiv.innerHTML = '';
+            const buttonsContainer = document.getElementById('play-action-buttons');
+            if (buttonsContainer) {
+                const clone = buttonsContainer.cloneNode(true);
+                const origBtns = buttonsContainer.querySelectorAll('button');
+                const cloneBtns = clone.querySelectorAll('button');
+                origBtns.forEach((orig, i) => {
+                    if (cloneBtns[i] && orig.onclick) cloneBtns[i].onclick = orig.onclick;
+                });
+                actionsDiv.appendChild(clone);
+            }
+        }
     },
 
     navigatePrev() {

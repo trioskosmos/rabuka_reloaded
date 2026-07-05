@@ -92,7 +92,25 @@ export const StageAbilityModal = {
             }
         }
 
-        ModalManager.show(DOM_IDS.MODAL_STAGE_ABILITY);
+        const isMobile = typeof window.__isMobile === 'function' ? window.__isMobile() : false;
+        if (isMobile) {
+            ModalManager.show(DOM_IDS.MODAL_STAGE_ABILITY);
+        }
+
+        const actionsDiv = document.getElementById(DOM_IDS.CONTAINER_ACTIONS);
+        if (actionsDiv) {
+            actionsDiv.innerHTML = '';
+            const abilityContainer = document.getElementById('stage-ability-list');
+            if (abilityContainer) {
+                const clone = abilityContainer.cloneNode(true);
+                const origBtns = abilityContainer.querySelectorAll('button');
+                const cloneBtns = clone.querySelectorAll('button');
+                origBtns.forEach((orig, i) => {
+                    if (cloneBtns[i] && orig.onclick) cloneBtns[i].onclick = orig.onclick;
+                });
+                actionsDiv.appendChild(clone);
+            }
+        }
     },
 
     close() {
