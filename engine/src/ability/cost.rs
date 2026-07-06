@@ -726,6 +726,11 @@ impl AbilityResolver {
                             entry.cost_paid = true;
                             entry.optional_cost_result = Some(false);
                         }
+                        let pp = gs.player_prefix();
+                        gs.rule_log.push(format!(
+                            "{}: [[log_cost_skip:reason=no_active_energy,need=any,active=0]]",
+                            pp
+                        ));
                         return Ok(());
                     }
                     // Show active energy cards for selection (one by one with skip)
@@ -755,6 +760,20 @@ impl AbilityResolver {
                 }
 
                 if optional && !is_activation {
+                    let player = gs.resolve_target_player(target);
+                    let active = player.energy_zone.active_count() as u32;
+                    if active < energy {
+                        if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                            entry.cost_paid = true;
+                            entry.optional_cost_result = Some(false);
+                        }
+                        let pp = gs.player_prefix();
+                        gs.rule_log.push(format!(
+                            "{}: [[log_cost_skip:reason=insufficient_energy,need={},active={}]]",
+                            pp, energy, active
+                        ));
+                        return Ok(());
+                    }
                     self.pending_choice = Some(Choice::SelectTarget {
                         target: "pay_optional_cost:skip_optional_cost".to_string(),
                         description: format!("Pay {} energy (or skip)?", energy),

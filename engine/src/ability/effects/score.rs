@@ -230,7 +230,7 @@ impl AbilityResolver {
                 .map(|c| c.name.clone())
                 .unwrap_or_default();
             gs.rule_log.push(format!(
-                "{} {}: スコア{} {} ({}枚適用)",
+                "{} {}: [[log_score_modify:op={},value={},applied={}]]",
                 pp, act_name, operation, final_value, count_applied
             ));
         }
@@ -442,12 +442,6 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        let op_jp = match operation {
-            "decrease" => "減少",
-            "increase" => "増加",
-            "set" => "設定",
-            _ => operation,
-        };
         let colors = if heart_colors.is_empty() {
             vec!["heart00".to_string()]
         } else {
@@ -459,8 +453,8 @@ impl AbilityResolver {
         for hc in &colors {
             let color = crate::zones::parse_heart_color(hc);
             gs.rule_log.push(format!(
-                "{} {}: 要求ハート{} {} {}",
-                pp, act_name, op_jp, per_color_value, hc
+                "{} {}: [[log_required_hearts:op={},value={},color={}]]",
+                pp, act_name, operation, per_color_value, hc
             ));
             for card_id in &card_ids {
                 match operation {
@@ -518,7 +512,7 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         gs.rule_log.push(format!(
-            "{} {}: 要求ハート標準{} {}",
+            "{} {}: [[log_required_hearts_std:op={},value={}]]",
             pp, act_name, operation, value
         ));
         Ok(())
@@ -535,15 +529,9 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        let op_jp = match operation {
-            "add" => "増加",
-            "subtract" => "減少",
-            "set" => "設定",
-            _ => operation,
-        };
         gs.rule_log.push(format!(
-            "{} {}: エール回数{} {}",
-            pp, act_name, op_jp, count
+            "{} {}: [[log_yell_count:op={},n={}]]",
+            pp, act_name, operation, count
         ));
         match operation {
             "add" => {
@@ -571,7 +559,7 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         gs.rule_log.push(format!(
-            "{} {}: ステージ上限{} {}",
+            "{} {}: [[log_stage_limit:op={},n={}]]",
             pp, act_name, operation, count
         ));
         match operation {
@@ -603,7 +591,7 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         gs.rule_log.push(format!(
-            "{} {}: 成功ライブ要求ハート{} {}",
+            "{} {}: [[log_success_hearts:op={},value={}]]",
             pp, act_name, operation, value
         ));
         let player = gs.resolve_target_player_mut(target);

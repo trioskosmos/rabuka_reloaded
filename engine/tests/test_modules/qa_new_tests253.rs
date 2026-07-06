@@ -1,4 +1,5 @@
 use crate::helpers::*;
+use rabuka_engine::game_setup::ActionType;
 use rabuka_engine::zones::MemberArea;
 
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
@@ -86,14 +87,35 @@ fn q253_kanan_first_galaxy_gets_nothing() {
         game.select_indices(&[]);
     }
 
+    // First performance phase — yell, then Kanan's LiveSuccess
+    game.pass();
+    // Process all pending choices: auto-skip yell-triggered abilities,
+    // but explicitly select a card for Kanan's non-optional move.
+    while game.has_pending_choice() {
+        let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
+        let has_skip = actions
+            .iter()
+            .any(|a| a.action_type == ActionType::ChoiceSkip);
+        if !has_skip
+            && actions
+                .iter()
+                .any(|a| a.action_type == ActionType::ChoiceSelect)
+        {
+            game.select_indices(&[0]);
+            break;
+        }
+        game.select_indices(&[]);
+    }
+    // Consume any remaining choices from performance phase
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    // Second performance phase
     game.pass();
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
-    game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Victory determination
     game.pass();
     while game.has_pending_choice() {
         game.select_indices(&[]);
@@ -128,14 +150,35 @@ fn q253_both_succeed_two_live_cards() {
         game.select_indices(&[]);
     }
 
+    // First performance phase — yell, then Kanan's LiveSuccess
+    game.pass();
+    // Process all pending choices: auto-skip yell-triggered abilities,
+    // but explicitly select a card for Kanan's non-optional move.
+    while game.has_pending_choice() {
+        let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
+        let has_skip = actions
+            .iter()
+            .any(|a| a.action_type == ActionType::ChoiceSkip);
+        if !has_skip
+            && actions
+                .iter()
+                .any(|a| a.action_type == ActionType::ChoiceSelect)
+        {
+            game.select_indices(&[0]);
+            break;
+        }
+        game.select_indices(&[]);
+    }
+    // Consume any remaining choices from performance phase
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    // Second performance phase
     game.pass();
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
-    game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Victory determination
     game.pass();
     while game.has_pending_choice() {
         game.select_indices(&[]);

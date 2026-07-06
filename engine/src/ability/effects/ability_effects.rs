@@ -106,14 +106,13 @@ impl AbilityResolver {
                             gs.activating_card = saved_activating;
                         }
                         let pp = self.player_prefix(gs);
+                        let act_name = gs
+                            .activating_card
+                            .map(|c| self.card_name(c))
+                            .unwrap_or_default();
                         gs.rule_log.push(format!(
-                            "{} {}: activated {} ability from {}",
-                            pp,
-                            gs.activating_card
-                                .map(|c| self.card_name(c))
-                                .unwrap_or_default(),
-                            trig,
-                            cn
+                            "{} {}: [[log_activated_ability:trigger={}]]: {}",
+                            pp, act_name, trig, cn
                         ));
                         return;
                     }
@@ -145,7 +144,8 @@ impl AbilityResolver {
             if let Some(card_id) = gs.activating_card {
                 let pp = self.player_prefix(gs);
                 let cn = self.card_name(card_id);
-                gs.rule_log.push(format!("{} {}: 能力無効化(自身)", pp, cn));
+                gs.rule_log
+                    .push(format!("{} {}: [[log_negate_ability_self]]", pp, cn));
                 gs.negated_abilities.insert(card_id);
                 return Ok(());
             }
@@ -175,7 +175,8 @@ impl AbilityResolver {
         if let Some(activating) = gs.activating_card {
             let pp = self.player_prefix(gs);
             let cn = self.card_name(activating);
-            gs.rule_log.push(format!("{} {}: 能力無効化", pp, cn));
+            gs.rule_log
+                .push(format!("{} {}: [[log_negate_ability]]", pp, cn));
             if let Some(&target_id) = valid.first() {
                 gs.negated_abilities.insert(target_id);
             }
@@ -192,8 +193,10 @@ impl AbilityResolver {
         if let Some(card_id) = gs.activating_card {
             let pp = self.player_prefix(gs);
             let cn = self.card_name(card_id);
-            gs.rule_log
-                .push(format!("{} {}: {}能力抑制", pp, cn, trigger));
+            gs.rule_log.push(format!(
+                "{} {}: [[log_suppress_ability:trigger={}]]",
+                pp, cn, trigger
+            ));
         }
         log::info!(
             "[SUPPRESS] suppressing trigger={} for card={:?}",
@@ -288,7 +291,7 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         gs.rule_log.push(format!(
-            "{} {}: 能力獲得 「{}」",
+            "{} {}: [[log_gain_ability]]: {}",
             pp, act_name, ability_text
         ));
 
@@ -433,10 +436,10 @@ impl AbilityResolver {
             .map(|&cid| self.card_name(cid))
             .collect();
         gs.rule_log.push(format!(
-            "{} {}: {}から能力獲得",
+            "{} {}: [[log_gain_ability_from_source]]: {}",
             pp,
             act_name,
-            source_names.join(",")
+            source_names.join(", ")
         ));
         Ok(())
     }

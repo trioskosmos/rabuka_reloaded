@@ -654,9 +654,14 @@ impl super::TurnEngine {
                 );
             }
             let perf_result = if snap.success { "PASS" } else { "FAIL" };
+            let detail_str = if live_details.is_empty() {
+                String::new()
+            } else {
+                format!(" [{}]", live_details)
+            };
             game_state.rule_log.push(format!(
-                "[Turn {}] {} Performance: total_score={} {} [{}]",
-                snap.turn, player, snap.total_score, perf_result, live_details,
+                "[Turn {}] {} [[log_performance:score={},result={}]]{}",
+                snap.turn, player, snap.total_score, perf_result, detail_str,
             ));
         }
 

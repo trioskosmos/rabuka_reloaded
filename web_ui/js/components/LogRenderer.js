@@ -367,7 +367,8 @@ export const LogRenderer = {
         const triggerText = meta.trigger || '?';
         const triggerIcon = TRIGGER_ICONS[triggerText] || '';
         const triggerImg = triggerIcon ? `<img src="img/texticon/${triggerIcon}.png" class="heart-mini-icon" title="${triggerText}" style="width:14px;height:14px;vertical-align:middle;">` : '';
-        const zoneLabel = meta.zone === 'stage' ? 'ステージ' : meta.zone === 'live_card_zone' ? 'ライブ置場' : meta.zone === 'success_live_card_zone' ? '成功ライブ置場' : meta.zone || '';
+        const ZONE_LABELS = { 'stage': i18n.t('zone_stage'), 'live_card_zone': i18n.t('zone_live_card'), 'success_live_card_zone': i18n.t('zone_success_live') };
+        const zoneLabel = ZONE_LABELS[meta.zone] || meta.zone || '';
         const cardName = entry.source_card_name || meta.card_name || '';
         const playerLabel = entry.player_label || '';
         headerDiv.innerHTML = `
@@ -522,6 +523,31 @@ export const LogRenderer = {
 
     _renderAbilityLogItem: (item, container) => {
         if (!item) return;
+        const _t = (text) => {
+            if (!text) return '';
+            let result = text;
+            if (result.includes('[[')) {
+                result = result.replace(/\[\[([^\]]+)\]\]/g, (match, content) => {
+                    const parts = content.split(":");
+                    const key = parts[0];
+                    const params = {};
+                    for (let i = 1; i < parts.length; i++) {
+                        const eqIdx = parts[i].indexOf("=");
+                        if (eqIdx > 0) {
+                            const k = parts[i].slice(0, eqIdx);
+                            let v = parts[i].slice(eqIdx + 1);
+                            if (v.startsWith("zone_") || v.startsWith("card_type_") || v.startsWith("trigger_") || v.startsWith("cost_skip_") || v.startsWith("result_")) {
+                                v = i18n.t(v);
+                            }
+                            params[k] = v;
+                        }
+                    }
+                    const translated = i18n.t(key, params);
+                    return translated === key ? match : translated;
+                });
+            }
+            return Tooltips.enrichAbilityText(result);
+        };
         const e = (text) => Tooltips.enrichAbilityText(text || '');
         const div = document.createElement('div');
         div.className = 'log-entry effect detail ability-log-item';
@@ -532,15 +558,15 @@ export const LogRenderer = {
                 const iconChar = item.passed ? '✓' : '✗';
                 let html = `<div class="ability-cond-row">
                     <span class="ability-cond-icon">${iconChar}</span>
-                    <span class="ability-cond-text">${e(item.text)}</span>
+                    <span class="ability-cond-text">${_t(item.text)}</span>
                 </div>
                 ${item.type ? `<div class="ability-cond-type">${item.type}</div>` : ''}`;
                 if (item.expectation || item.actual) {
                     html += `<div class="ability-cond-detail">
                         <span class="ability-label">期待:</span>
-                        <span class="ability-value">${e(item.expectation)}</span>
+                        <span class="ability-value">${_t(item.expectation)}</span>
                         <span class="ability-label">実際:</span>
-                        <span class="ability-value">${e(item.actual)}</span>
+                        <span class="ability-value">${_t(item.actual)}</span>
                         <span class="ability-result ${item.passed ? 'pass' : 'fail'}">
                             ${iconChar}
                         </span>
@@ -565,11 +591,11 @@ export const LogRenderer = {
                 const iconChar = item.passed ? '✓' : '✗';
                 div.innerHTML = `<div class="ability-cost-row">
                     <span class="ability-cond-icon"> </span>
-                    <span class="ability-cond-text">${e(item.text)}</span>
+                    <span class="ability-cond-text">${_t(item.text)}</span>
                     <span class="ability-label">期待:</span>
-                    <span class="ability-value">${e(item.expectation)}</span>
+                    <span class="ability-value">${_t(item.expectation)}</span>
                     <span class="ability-label">実際:</span>
-                    <span class="ability-value">${e(item.actual)}</span>
+                    <span class="ability-value">${_t(item.actual)}</span>
                     <span class="ability-result ${item.passed ? 'pass' : 'fail'}">${iconChar}</span>
                 </div>`;
                 break;
@@ -577,8 +603,8 @@ export const LogRenderer = {
             case 'Effect': {
                 div.innerHTML = `<div class="ability-effect-row">
                     <span class="ability-cond-icon"> </span>
-                    <span class="ability-cond-text">${e(item.text)}</span>
-                    <span class="ability-effect-detail">${e(item.details || item.action || '')}</span>
+                    <span class="ability-cond-text">${_t(item.text)}</span>
+                    <span class="ability-effect-detail">${_t(item.details || item.action || '')}</span>
                 </div>`;
                 break;
             }
@@ -586,7 +612,7 @@ export const LogRenderer = {
                 const iconChar = item.passed ? '✓' : '✗';
                 div.innerHTML = `<div class="ability-kv-row">
                     <span class="ability-cond-icon"> </span>
-                    <span class="ability-cond-text">${item.key}: ${e(item.value)}</span>
+                    <span class="ability-cond-text">${_t(item.key)}: ${_t(item.value)}</span>
                     <span class="ability-result ${item.passed ? 'pass' : 'fail'}">${iconChar}</span>
                 </div>`;
                 break;
@@ -882,24 +908,29 @@ export const LogRenderer = {
     formatLogEntry: (body, turnPrefix, currentLang, showFriendlyAbilities) => {
         if (!body) return "";
 
-        // Handle translatable markers [[key:p1=v1:p2=v2]]
-        if (body.startsWith("[[") && body.endsWith("]]")) {
-            const content = body.slice(2, -2);
-            const parts = content.split(":");
-            const key = parts[0];
-            const params = {};
-            for (let i = 1; i < parts.length; i++) {
-                const [k, v] = parts[i].split("=");
-                if (k && v !== undefined) {
-                    // If the value itself is an i18n key (like rps_rock), translate it
-                    if (v.startsWith("rps_")) {
-                        params[k] = i18n.t(v);
-                    } else {
+        // Handle inline translatable markers [[key:p1=v1:p2=v2]] anywhere in text.
+        // Translates each marker and also resolves known zone/type values.
+        if (body.includes('[[')) {
+            body = body.replace(/\[\[([^\]]+)\]\]/g, (match, content) => {
+                const parts = content.split(":");
+                const key = parts[0];
+                const params = {};
+                for (let i = 1; i < parts.length; i++) {
+                    const eqIdx = parts[i].indexOf("=");
+                    if (eqIdx > 0) {
+                        const k = parts[i].slice(0, eqIdx);
+                        let v = parts[i].slice(eqIdx + 1);
+                        // Translate known value types: zones, card types, trigger names
+                        if (v.startsWith("zone_") || v.startsWith("card_type_") || v.startsWith("rps_") || v.startsWith("trigger_") || v.startsWith("cost_skip_") || v.startsWith("result_") || v.startsWith("op_")) {
+                            v = i18n.t(v);
+                        }
                         params[k] = v;
                     }
                 }
-            }
-            return i18n.t(key, params);
+                const translated = i18n.t(key, params);
+                // If translation returns the key itself (missing), keep the original [[...]] visible for debugging
+                return translated === key ? match : translated;
+            });
         }
 
         let displayText = body;

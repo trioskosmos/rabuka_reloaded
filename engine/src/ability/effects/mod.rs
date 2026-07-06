@@ -257,7 +257,7 @@ impl AbilityResolver {
                     .and_then(|id| gs.card_database.get_card(id))
                     .map(|c| c.name.clone())
                     .unwrap_or_default();
-                gs.rule_log.push(format!("{} {}: カード破棄", pp, cn));
+                gs.rule_log.push(format!("{} {}: [[log_discard]]", pp, cn));
                 self.execute_move_cards(gs, effect)
             }
             ActionType::MoveCards => {
@@ -267,7 +267,7 @@ impl AbilityResolver {
                     .and_then(|id| gs.card_database.get_card(id))
                     .map(|c| c.name.clone())
                     .unwrap_or_default();
-                gs.rule_log.push(format!("{} {}: カード移動", pp, cn));
+                gs.rule_log.push(format!("{} {}: [[log_move]]", pp, cn));
                 if effect.multiple_targets.unwrap_or(false)
                     && effect.target.as_deref() == Some("deck")
                 {
@@ -503,7 +503,7 @@ impl AbilityResolver {
                     .and_then(|id| gs.card_database.get_card(id))
                     .map(|c| c.name.clone())
                     .unwrap_or_default();
-                gs.rule_log.push(format!("{} {}: カード選択", pp, cn));
+                gs.rule_log.push(format!("{} {}: [[log_select]]", pp, cn));
                 self.execute_select_effect(gs, effect)
             }
             ActionType::SelectNumber => self.execute_select_number(gs, effect),

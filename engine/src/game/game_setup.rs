@@ -567,9 +567,13 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         .collect(),
                     Some(Zone::RevealedCards) => {
                         let cheer = game_state.cheer_revealed_cards();
-                        if !cheer.is_empty() {
-                            cheer.iter().copied().enumerate().collect()
-                        } else {
+                        // Try to use game_state.revealed_cards when possible since it's
+                        // kept in sync with ability resolution (cheer buffer may be stale
+                        // after live_success check moves cards to waitroom).
+                        // Only use cheer buffer if revealed_cards is empty but cheer isn't.
+                        let use_gs_revealed =
+                            !game_state.revealed_cards.is_empty() || cheer.is_empty();
+                        if use_gs_revealed {
                             let player = game_state.resolve_target_player(target);
                             game_state
                                 .revealed_cards
@@ -589,6 +593,8 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                         || game_state.resolution_zone.cards.contains(cid)
                                 })
                                 .collect()
+                        } else {
+                            cheer.iter().copied().enumerate().collect()
                         }
                     }
                     Some(Zone::SelectedCards) => game_state

@@ -308,11 +308,11 @@ impl AbilityResolver {
             let master = gs.ability_master_id();
             let player_label = super::util::target_player_label(target, master.as_deref());
             gs.rule_log.push(format!(
-                "[Turn {}] {} reveals {} from {}",
+                "[Turn {}] {} [[log_reveal_zone:source={}]] » {}",
                 turn,
                 player_label,
-                names.join(", "),
-                source
+                source,
+                names.join(", ")
             ));
         }
 
@@ -922,7 +922,7 @@ impl AbilityResolver {
             let master = gs.ability_master_id();
             let player_label = super::util::target_player_label(target, master.as_deref());
             gs.rule_log.push(format!(
-                "[Turn {}] {} reveals {} cards from {} per group",
+                "[Turn {}] {} [[log_reveal_group:n={},source=zone_{}]]",
                 turn,
                 player_label,
                 card_ids.len(),
@@ -992,18 +992,18 @@ impl AbilityResolver {
             let turn = gs.turn_number;
             let master = gs.ability_master_id();
             let player_label = super::util::target_player_label(target, master.as_deref());
-            let found_str = matched_idx.map(|_| " (found target)").unwrap_or("");
+            let found = matched_idx.is_some();
             let names: Vec<String> = all_revealed
                 .iter()
                 .filter_map(|id| card_db.get_card(*id))
                 .map(|c| c.name.clone())
                 .collect();
             gs.rule_log.push(format!(
-                "[Turn {}] {} reveals {} from deck{}",
+                "[Turn {}] {} [[log_reveal_deck_until:found={}]]: {}",
                 turn,
                 player_label,
-                names.join(", "),
-                found_str
+                found,
+                names.join(", ")
             ));
         }
 

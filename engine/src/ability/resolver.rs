@@ -546,7 +546,7 @@ impl AbilityResolver {
             meta["error"] = serde_json::json!(e);
         }
         let log_text = format!(
-            "{pp} {card_name} [{zone}]: 能力発動 [{trigger_str}] — {}",
+            "{pp} {card_name} [{zone}]: [[log_ability_result:trigger=trigger_{trigger_str},result=result_{}]]",
             result
         );
         gs.rule_log.push(log_text.clone());
@@ -800,7 +800,7 @@ impl AbilityResolver {
                         {
                             let pp2 = gs.player_prefix();
                             gs.rule_log.push(format!(
-                                "{pp2} {card_name}: 位置条件不成立 ({kw:?}) - スキップ"
+                                "{pp2} {card_name}: [[log_position_fail:keyword={kw:?}]]"
                             ));
                         }
                         dbg.p("RESULT", "position requirement not met — effect skipped");

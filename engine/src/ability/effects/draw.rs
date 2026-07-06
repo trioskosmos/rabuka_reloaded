@@ -487,12 +487,12 @@ impl AbilityResolver {
         }
         self.step_state.last_draw_count = final_count;
         let dst = if destination.is_empty() {
-            "手札"
+            "hand"
         } else {
             destination
         };
         gs.rule_log.push(format!(
-            "{} {}: {}枚ドロー({}→{})",
+            "{} {}: [[log_draw:n={},from=zone_{},to=zone_{}]]",
             pp, act_name, final_count, source, dst
         ));
         Ok(())
@@ -620,7 +620,8 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!("{} {}: 数字選択", pp, act_name));
+        gs.rule_log
+            .push(format!("{} {}: [[log_number_select]]", pp, act_name));
         Ok(())
     }
 

@@ -308,7 +308,7 @@ impl super::TurnEngine {
         );
         game_state.process_pending_auto_abilities(&player_id);
         game_state.rule_log.push(format!(
-            "{} [Activated] {}: {}",
+            "{} [[log_activation]] {}: {}",
             log_prefix, card.name, ability.full_text
         ));
         Ok(())

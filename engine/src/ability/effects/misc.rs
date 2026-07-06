@@ -119,7 +119,7 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         gs.rule_log
-            .push(format!("{} {}: カスタム効果", pp, act_name));
+            .push(format!("{} {}: [[log_custom_effect]]", pp, act_name));
         Ok(())
     }
 
@@ -1679,7 +1679,7 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         gs.rule_log.push(format!(
-            "{} {}: 資源獲得 {} {}",
+            "{} {}: [[log_gain_resource:n={},type={}]]",
             pp,
             act_name,
             effect.count.unwrap_or(1),
@@ -1919,7 +1919,7 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         gs.rule_log.push(format!(
-            "{} {}: エネルギー配置(メンバー下) count={}",
+            "{} {}: [[log_energy_under:n={}]]",
             pp, act_name, count
         ));
     }
@@ -1937,7 +1937,8 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!("{} {}: 位置変更", pp, act_name));
+        gs.rule_log
+            .push(format!("{} {}: [[log_position_change]]", pp, act_name));
         // Check source_position from effect (new parser field), fall back to position param
         let source_pos = effect
             .source_position
@@ -3094,7 +3095,8 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!("{} {}: 回転", pp, act_name));
+        gs.rule_log
+            .push(format!("{} {}: [[log_rotation]]", pp, act_name));
         Ok(())
     }
 
@@ -3279,7 +3281,7 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         gs.rule_log.push(format!(
-            "{} {}: {}枚になるまで破棄",
+            "{} {}: [[log_discard_until:n={}]]",
             pp, act_name, target_count
         ));
         Ok(())
@@ -3298,7 +3300,8 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!("{} {}: 制限追加", pp, act_name));
+        gs.rule_log
+            .push(format!("{} {}: [[log_restriction]]", pp, act_name));
         let restriction_str = format!(
             "restriction:{}:{}",
             restriction_type.unwrap_or("unknown"),
@@ -3370,7 +3373,8 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!("{} {}: 再エール", pp, act_name));
+        gs.rule_log
+            .push(format!("{} {}: [[log_re_yell]]", pp, act_name));
     }
 
     pub(crate) fn execute_activation_restriction(&mut self, gs: &mut GameState, target: &str) {
@@ -3379,8 +3383,10 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: 起動制限 target={}", pp, act_name, target));
+        gs.rule_log.push(format!(
+            "{} {}: [[log_activation_restriction:target={}]]",
+            pp, act_name, target
+        ));
         gs.prohibition_effects
             .push(format!("activation_restriction:{}", target));
     }
@@ -3395,7 +3401,7 @@ impl AbilityResolver {
             options: None,
         });
         let pp = self.player_prefix(gs);
-        gs.rule_log.push(format!("{}: 要求ハート選択", pp));
+        gs.rule_log.push(format!("{}: [[log_heart_select]]", pp));
     }
 
     pub(crate) fn execute_choose_target_player(
@@ -3442,7 +3448,8 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!("{} {}: シャッフル", pp, act_name));
+        gs.rule_log
+            .push(format!("{} {}: [[log_shuffle]]", pp, act_name));
     }
 
     pub(crate) fn player_prefix(&self, gs: &GameState) -> String {
@@ -3517,7 +3524,9 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: エール実行 {}回", pp, act_name, count));
+        gs.rule_log.push(format!(
+            "{} {}: [[log_yell_execute:n={}]]",
+            pp, act_name, count
+        ));
     }
 }

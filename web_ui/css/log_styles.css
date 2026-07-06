@@ -306,11 +306,15 @@
     align-items: flex-start;
     gap: 4px;
     padding: 3px 6px;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .log-entry-content {
     flex: 1;
     min-width: 0;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .log-group-header .log-card-thumb {

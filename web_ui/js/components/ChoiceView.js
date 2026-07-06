@@ -478,7 +478,8 @@ export const ChoiceView = {
             state.legal_actions.forEach(a => {
                 if (a.action_type !== 'select_card' && a.action_type !== 'select_skip') return;
                 const cardNo = a.parameters?.card_no;
-                if (!cardNo || !selByNo[cardNo]) return;
+                // select_skip has card_no="skip" which isn't in selByNo — let it through
+                if (!cardNo || (a.action_type !== 'select_skip' && !selByNo[cardNo])) return;
                 const item = _buildCardItemFromAction(a, selByNo);
                 if (item) items.push(item);
             });

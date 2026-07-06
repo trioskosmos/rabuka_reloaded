@@ -787,9 +787,16 @@ impl AbilityResolver {
             if opt.action == "pay_energy" {
                 let need = opt.energy_count.unwrap_or(0) as usize;
                 if need > 0 {
-                    let player =
-                        gs.resolve_target_player_mut(opt.target.as_deref().unwrap_or("self"));
-                    if (player.energy_zone.active_count() as usize) < need {
+                    let pp = gs.player_prefix();
+                    let active = gs
+                        .resolve_target_player(opt.target.as_deref().unwrap_or("self"))
+                        .energy_zone
+                        .active_count() as usize;
+                    if active < need {
+                        gs.rule_log.push(format!(
+                            "{}: [[log_cost_skip:reason=compound_insufficient_energy,need={},active={}]]",
+                            pp, need, active
+                        ));
                         let cmd = if is_negation {
                             *cond.clone()
                         } else {

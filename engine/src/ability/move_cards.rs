@@ -108,15 +108,16 @@ impl AbilityResolver {
         filtered_indices: Option<Vec<usize>>,
     ) {
         let zone_display = crate::ability::describe::zone_label(Some(zone));
+        let zone_display_ja = crate::ability::describe::zone_label_ja(Some(zone));
         let description = if effect.any_number.unwrap_or(false) {
             format!("Select any number of card(s) from {}", zone_display)
         } else {
             format!("Select {} card(s) from {}", count, zone_display)
         };
         let description_ja = if effect.any_number.unwrap_or(false) {
-            format!("{}から任意枚選択", zone_display)
+            format!("{}から任意枚選択", zone_display_ja)
         } else {
-            format!("{}から{}枚選択", zone_display, count)
+            format!("{}から{}枚選択", zone_display_ja, count)
         };
         self.pending_choice = Some(
             Choice::select_cards(zone, count, description, can_skip)
@@ -1276,6 +1277,16 @@ impl AbilityResolver {
                 position.as_ref().and_then(|s| s.parse::<usize>().ok())
             }
         });
+
+        // For empty_area / stage destinations: skip selection prompt entirely
+        // if the target has no empty slots (card text says "メンバーのいないエリアに").
+        if Zone::from_str(&destination) == Some(Zone::EmptyArea) {
+            let player = gs.resolve_target_player(target);
+            let has_empty_slot = (0..3).any(|i| player.stage.stage[i] == -1);
+            if !has_empty_slot {
+                return Ok(());
+            }
+        }
 
         let mut taken = self.resolve_cards_from_source(
             gs,

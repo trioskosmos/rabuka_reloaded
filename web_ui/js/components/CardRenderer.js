@@ -390,6 +390,11 @@ export const CardRenderer = {
      * Updates an existing card DOM element with new ViewModel
      */
     updateCardDOM: (el, viewModel, cardData, onClick = null) => {
+        // Keep .selected only if it still matches the active action
+        if (el.classList.contains('selected')) {
+            const stillValid = window.selectedAction && viewModel.actionId !== undefined && viewModel.actionId === window.selectedAction.index;
+            if (!stillValid) el.classList.remove('selected');
+        }
         DOMUtils.patchClasses(el, viewModel.classes);
         
         // Stickiness: Only apply if we have a match, but DON'T aggressively remove if actionId is briefly missing
@@ -1259,7 +1264,7 @@ export const CardRenderer = {
         if (bonuses.length === 0) return;
 
         const container = document.createElement('div');
-        container.className = 'card-bonuses' + (overlay ? ' overlay' : '');
+        container.className = 'card-bonuses';
 
         bonuses.forEach(b => {
             const badge = document.createElement('div');

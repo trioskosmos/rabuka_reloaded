@@ -223,14 +223,14 @@ impl super::resolver::AbilityResolver {
             if !names.is_empty() {
                 let turn = gs.turn_number;
                 gs.rule_log.push(format!(
-                    "[Turn {}] P{} reveals {} from looked-at cards",
+                    "[Turn {}] P{} [[log_reveal_looked:n={}]]",
                     turn,
                     if std::ptr::eq(gs.active_player(), &gs.player1) {
                         1
                     } else {
                         2
                     },
-                    names.join(", ")
+                    names.len()
                 ));
             }
         }
@@ -1292,7 +1292,7 @@ impl super::resolver::AbilityResolver {
             let player_label =
                 super::util::target_player_label(&target, gs.ability_master_id().as_deref());
             gs.rule_log.push(format!(
-                "[Turn {}] {} reveals {} from hand",
+                "[Turn {}] {} [[log_reveal_hand]]: {}",
                 gs.turn_number,
                 player_label,
                 names.join(", ")
@@ -1506,7 +1506,7 @@ impl super::resolver::AbilityResolver {
             };
             if !names.is_empty() {
                 gs.rule_log.push(format!(
-                    "[Turn {}] P{} reveals {} from hand as cost",
+                    "[Turn {}] P{} [[log_reveal_cost]]: {}",
                     turn,
                     player_num,
                     names.join(", ")

@@ -748,7 +748,8 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!("{} {}: コスト設定", pp, act_name));
+        gs.rule_log
+            .push(format!("{} {}: [[log_set_cost]]", pp, act_name));
         for card_id in card_ids {
             gs.mods.set_cost_modifier(card_id, value as i32);
         }
@@ -765,7 +766,7 @@ impl AbilityResolver {
             .unwrap_or_default();
         let bt_str = blade_type.unwrap_or("none");
         gs.rule_log.push(format!(
-            "{} {}: ブレード種類を{}に設定",
+            "{} {}: [[log_set_blade_type:type={}]]",
             pp, act_name, bt_str
         ));
         let card_db = self.card_db();
@@ -857,8 +858,10 @@ impl AbilityResolver {
             other => other,
         };
         let ht = resolved_heart_type.unwrap_or("heart00").to_string();
-        gs.rule_log
-            .push(format!("{} {}: ハート種類を{}に設定", pp, act_name, ht));
+        gs.rule_log.push(format!(
+            "{} {}: [[log_set_heart_type:type={}]]",
+            pp, act_name, ht
+        ));
         // Use selected_target from self.selected_cards if available (member-targeting
         // abilities like PL!HS-bp5-021-L), otherwise fall back to activating_card
         // (self-targeting abilities like Kanan PL!S-pb1-003-R).
@@ -906,7 +909,7 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         gs.rule_log.push(format!(
-            "{} {}: 起動コスト{} {}",
+            "{} {}: [[log_activation_cost:op={},value={}]]",
             pp, act_name, operation, value
         ));
         let prohibition_text = format!("activation_cost_{}_{}", operation, value);
@@ -947,7 +950,7 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         gs.rule_log.push(format!(
-            "{} {}: ライブカードセット上限を{}減らす",
+            "{} {}: [[log_reduce_live_set_limit:n={}]]",
             pp, act_name, count
         ));
         let player = gs.resolve_target_player_mut("self");
@@ -966,8 +969,10 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log
-            .push(format!("{} {}: ブレード数を{}に設定", pp, act_name, value));
+        gs.rule_log.push(format!(
+            "{} {}: [[log_set_blade_count:n={}]]",
+            pp, act_name, value
+        ));
         let mut stage_cards: Vec<i16> = {
             let player = gs.resolve_target_player_mut(target);
             player.stage.stage.to_vec()
@@ -1139,7 +1144,7 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         gs.rule_log.push(format!(
-            "{} {}: コスト{} {}",
+            "{} {}: [[log_modify_cost:op={},value={}]]",
             pp, act_name, operation, value
         ));
         let player = gs.resolve_target_player_mut(target);

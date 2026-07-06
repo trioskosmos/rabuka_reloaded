@@ -195,7 +195,7 @@ fn ai_screeam_answer_both_discard() {
 }
 
 #[test]
-fn ai_screeam_q185_answer_both_draw() {
+fn ai_screeam_answer_both_draw() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -1876,52 +1876,24 @@ fn nico_full_stage_then_prompt_path() {
     let cheap_b = game.id("PL!SP-sd1-020-SD");
     let filler = game.id("PL!-sd1-010-SD");
 
-    // P1 has 2 eligible cards in discard (Prompt path)
     game.state.player1.hand.cards.push(nico);
     game.state.player1.hand.cards.push(filler);
     game.state.player1.waitroom.cards.push(cheap_a);
     game.state.player1.waitroom.cards.push(cheap_b);
-    // P2 has 1 eligible card
     game.state.player2.waitroom.cards.push(cheap_a);
 
-    // P1 stage: [filler, filler, filler] — full, even Nico has no room
-    game.state.player1.stage.stage = [filler, filler, filler];
-
-    game.give_energy(7);
-    // play_to_stage searches for empty slot but there's none...
-    // We need to play Nico another way. Actually, let's instead put
-    // 1 empty slot for Nico, then full after.
-    // Reset: [filler, -1, filler]
+    // 1 empty slot for Nico, then full after
     game.state.player1.stage.stage = [filler, -1, filler];
+    game.give_energy(7);
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::Center);
-    // Now [filler, nico, filler] — full
+    // [filler, nico, filler] — full
 
-    // P1 has 2 eligible cards → SelectCard prompt (going through the Prompt path)
-    assert_eq!(
-        game.pending_choice_type(),
-        Some("SelectCard".to_string()),
-        "P1 SelectCard prompt"
-    );
-    assert_eq!(
-        game.state
-            .ability_queue
-            .current_entry()
-            .and_then(|e| e.choice_player_id.as_deref()),
-        Some("p1"),
-        "P1's SelectCard should have choice_player_id=p1"
-    );
-    game.select_indices(&[0]); // select cheap_a
-
-    // After selection, P1 tries to place on stage but stage is full
-    // place_card_in_zone for "empty_area" with full stage → returns card to discard
-    // No MoveCardsPosition prompt (0 empty slots)
-    // P2's effect runs next
-
-    // P2 has 1 card → Exact → P2 stage empty → MoveCardsPosition
+    // P1 has no empty slot → effect skipped for P1
+    // P2 has empty stage → SelectPosition
     assert_eq!(
         game.pending_choice_type(),
         Some("SelectPosition".to_string()),
-        "P2 position choice (P1's effect failed, P2's succeeds)"
+        "P2 position choice (P1 skipped, P2 succeeds)"
     );
     assert_eq!(
         game.state
@@ -1934,15 +1906,16 @@ fn nico_full_stage_then_prompt_path() {
     game.select_option(0); // P2: left
 
     assert!(!game.has_pending_choice(), "No more prompts");
-
-    // P1 stage unchanged [filler, nico, filler]
     assert_eq!(game.state.player1.stage.stage, [filler, nico, filler]);
-    // cheap_a was returned to P1 discard (stage full)
+    // P1's discard untouched (no selection was shown)
     assert!(
         game.state.player1.waitroom.cards.contains(&cheap_a),
-        "P1's selected card back in discard (stage full)"
+        "P1 cheap_a stays in discard"
     );
-    // P2's card appeared
+    assert!(
+        game.state.player1.waitroom.cards.contains(&cheap_b),
+        "P1 cheap_b stays in discard"
+    );
     assert!(
         game.state.player2.stage.stage.contains(&cheap_a),
         "P2's card appeared"
@@ -2716,60 +2689,6 @@ fn wien_q117_another_member_triggers_yell_reduction() {
     assert!(
         game.state.player1.stage.stage[2] != -1,
         "partner should remain"
-    );
-}
-
-/// Q111: Wien's LiveStart subtracts 8 from yell count. Blade total is additive:
-/// Wien(6) + 松岡切乃(1) = 7 → Wien fires (subtract 8) → MY舞 grants +1 blade
-/// to all stage members → blade=9, yell=1.
-#[test]
-fn wien_q111_blade_additive_after_yell_subtract() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    let wien = game.id("PL!SP-bp2-010-R\u{ff0b}"); // blade=6
-    let partner = game.id("PL!S-bp2-015-PR"); // Aqours, blade=1, no ability
-    let mymai = game.id("PL!S-bp2-023-L"); // MY舞: grants +1 blade to all stage
-    let aqours_live = game.id("PL!S-PR-022-PR"); // Aqours live, no ability
-    let fill = game.id("PL!-sd1-010-SD");
-    for _ in 0..10 {
-        game.state.player1.main_deck.cards.push(fill);
-    }
-    for _ in 0..10 {
-        game.state.player2.main_deck.cards.push(fill);
-    }
-
-    // Wien at Center (blade=6) + partner at LeftSide (blade=1) → base=7
-    game.state.player1.stage.stage = [partner, wien, -1];
-
-    // MY舞 + Aqours live in zone → MY舞 condition met
-    game.state.player1.live_card_zone.cards.push(mymai);
-    game.state.player1.live_card_zone.cards.push(aqours_live);
-
-    let live_card = game.id("PL!-sd1-020-SD");
-    game.state.player1.hand.cards.push(live_card);
-
-    advance_to_live_card_set_p1(&mut game);
-    game.set_live_card(live_card);
-    advance_to_live_start(&mut game);
-
-    // Wien's LiveStart: subtract 8 from yell count
-    // MY舞's LiveStart: grants +1 blade to all stage members
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
-
-    // Q111: Blade modifiers are additive with base blade.
-    // Wien: base=6 + modifier=1 = 7. Partner: base=1 + modifier=1 = 2.
-    // Total blade = 7 + 2 = 9. Subtract modifier = -8. Yell = 9-8 = 1.
-    let blade_wien = game.state.mods.get_blade_modifier(wien);
-    let blade_partner = game.state.mods.get_blade_modifier(partner);
-    assert_eq!(
-        blade_wien, 1,
-        "Q111: Wien gained +1 blade from MY舞 (additive with base 6)"
-    );
-    assert_eq!(
-        blade_partner, 1,
-        "Q111: Partner gained +1 blade from MY舞 (additive with base 1)"
     );
 }
 

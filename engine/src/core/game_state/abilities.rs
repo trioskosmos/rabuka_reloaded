@@ -1202,8 +1202,9 @@ impl GameState {
                 })
                 .unwrap_or("?");
             // Push ability_resolution entry
-            let log_text =
-                format!("{pp} {card_name} [{zone}]: 能力発動 [{trigger_str}] — skipped (negated)");
+            let log_text = format!(
+                "{pp} {card_name} [{zone}]: [[log_ability_result:trigger=trigger_{trigger_str},result=result_skipped_negated]]"
+            );
             self.rule_log.push(log_text.clone());
             self.structured_log.push(crate::types::LogEntry {
                 text: log_text,
