@@ -493,19 +493,18 @@ impl AbilityResolver {
                                 count
                             ));
                         }
+                        let desc_en =
+                            format!("Select 1 card (need {} with the same unit name)", count);
+                        let desc_ja = format!("同名ユニットが{}枚必要なカードを1枚選択", count);
                         self.pending_choice = Some(
-                            Choice::select_cards(
-                                Zone::Hand.to_str(),
-                                1,
-                                format!("Select 1 card (need {} with the same unit name)", count),
-                                is_optional,
-                            )
-                            .card_type(cost.card_type.clone())
-                            .target_player_id(Some(
-                                cost.target.clone().unwrap_or_else(|| "self".to_string()),
-                            ))
-                            .filtered_indices(Some(eligible_indices))
-                            .build(),
+                            Choice::select_cards(Zone::Hand.to_str(), 1, desc_en, is_optional)
+                                .description_ja(Some(desc_ja))
+                                .card_type(cost.card_type.clone())
+                                .target_player_id(Some(
+                                    cost.target.clone().unwrap_or_else(|| "self".to_string()),
+                                ))
+                                .filtered_indices(Some(eligible_indices))
+                                .build(),
                         );
                         return Ok(());
                     }
@@ -675,6 +674,7 @@ impl AbilityResolver {
                             gs.mods.add_orientation_modifier(card_id, "wait");
                         }
                     } else {
+                        let desc_ja = format!("ウェイトにするステージメンバーを{}体選択", count);
                         self.pending_choice = Some(
                             Choice::select_cards(
                                 Zone::Stage.to_str(),
@@ -682,6 +682,7 @@ impl AbilityResolver {
                                 format!("Select {} stage member(s) to wait", count),
                                 false,
                             )
+                            .description_ja(Some(desc_ja))
                             .card_type(cost.card_type.clone())
                             .is_select_action(true)
                             .target_player_id(Some(

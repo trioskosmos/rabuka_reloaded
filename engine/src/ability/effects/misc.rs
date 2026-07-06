@@ -946,20 +946,21 @@ impl AbilityResolver {
                 let mut pending = gs.ability_queue.take_pending_actions();
                 pending.insert(0, saved);
                 gs.ability_queue.set_pending_actions(pending);
+                let desc_en = format!("Select {} card(s) to receive {} {}", tc, count, resource);
+                let desc_ja = format!(
+                    "リソースを受け取る{}枚のカードを選択（{} {}）",
+                    tc, count, resource
+                );
                 self.pending_choice = Some(
-                    Choice::select_cards(
-                        Zone::Stage.to_str().to_string(),
-                        tc,
-                        format!("Select {} card(s) to receive {} {}", tc, count, resource),
-                        false,
-                    )
-                    .card_type(effect.card_type.clone())
-                    .group(effect.group_name().map(|s| s.to_string()))
-                    .characters(effect.characters.clone())
-                    .filtered_indices(Some(filtered_indices))
-                    .target_player_id(Some(target.clone()))
-                    .is_select_action(true)
-                    .build(),
+                    Choice::select_cards(Zone::Stage.to_str().to_string(), tc, desc_en, false)
+                        .description_ja(Some(desc_ja))
+                        .card_type(effect.card_type.clone())
+                        .group(effect.group_name().map(|s| s.to_string()))
+                        .characters(effect.characters.clone())
+                        .filtered_indices(Some(filtered_indices))
+                        .target_player_id(Some(target.clone()))
+                        .is_select_action(true)
+                        .build(),
                 );
                 // Don't call store_pending_choice — keep self.pending_choice set
                 // so the caller (e.g. resume_pending_commands) can detect the
@@ -1804,6 +1805,9 @@ impl AbilityResolver {
                     "Select energy cards to move from under member to energy deck",
                     optional,
                 )
+                .description_ja(Some(
+                    "メンバーの下からエネルギーデッキに戻すエネルギーカードを選択".to_string(),
+                ))
                 .card_type(Some("energy_card".to_string()))
                 .target_player_id(Some(target.to_string()))
                 .build(),
@@ -3269,18 +3273,19 @@ impl AbilityResolver {
             return Ok(());
         }
         let cards_to_discard = current_count - target_count as usize;
+        let desc_en = format!(
+            "Discard {} cards from hand (target: {} cards in hand)",
+            cards_to_discard, target_count
+        );
+        let desc_ja = format!(
+            "手札から{}枚捨てる（目標: 手札{}枚）",
+            cards_to_discard, target_count
+        );
         self.pending_choice = Some(
-            Choice::select_cards(
-                Zone::Hand.to_str(),
-                cards_to_discard,
-                format!(
-                    "Discard {} cards from hand (target: {} cards in hand)",
-                    cards_to_discard, target_count
-                ),
-                false,
-            )
-            .target_player_id(Some(target.to_string()))
-            .build(),
+            Choice::select_cards(Zone::Hand.to_str(), cards_to_discard, desc_en, false)
+                .description_ja(Some(desc_ja))
+                .target_player_id(Some(target.to_string()))
+                .build(),
         );
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         let pp = self.player_prefix(gs);

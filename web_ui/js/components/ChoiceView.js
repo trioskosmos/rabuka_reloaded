@@ -136,6 +136,152 @@ function _localizePositionLabel(action, name) {
     return name;
 }
 
+const STAGE_POSITIONS = [
+    { key: 'left', areaKey: 'left_side', labelEn: 'Left', labelJp: '左' },
+    { key: 'center', areaKey: 'center', labelEn: 'Center', labelJp: '中央' },
+    { key: 'right', areaKey: 'right_side', labelEn: 'Right', labelJp: '右' },
+];
+
+function _posLabel(pos) {
+    return State.currentLang === 'jp' ? pos.labelJp : pos.labelEn;
+}
+
+function _isPositionItem(item) {
+    const at = item.action?.action_type;
+    return at === 'select_position' || at === 'SelectPosition';
+}
+
+function _renderStageChoice(items, choice) {
+    const container = document.createElement('div');
+    container.className = 'stage-choice-container';
+
+    const allItems = items.filter(_isPositionItem);
+    if (allItems.length === 0) return null;
+
+    let sourceCard = null;
+    const srcId = choice?.source_card_id ?? choice?.card_id;
+    if (srcId !== undefined && srcId >= 0) {
+        sourceCard = State.resolveCardData(srcId);
+    }
+    if (!sourceCard && choice?.card_no) {
+        sourceCard = State.resolveCardData(choice.card_no);
+    }
+    if (!sourceCard && choice?.source_member && State.resolveCardDataByName) {
+        sourceCard = State.resolveCardDataByName(choice.source_member);
+    }
+    if (sourceCard) {
+        const srcRow = document.createElement('div');
+        srcRow.className = 'stage-choice-source';
+        const thumb = CardRenderer.createCardDOM(
+            CardRenderer.getCardViewModel(sourceCard, { mini: true }),
+            sourceCard
+        );
+        thumb.classList.add('card-mini');
+        srcRow.appendChild(thumb);
+        const arrow = document.createElement('span');
+        arrow.className = 'stage-choice-arrow';
+        arrow.textContent = '↓';
+        srcRow.appendChild(arrow);
+        container.appendChild(srcRow);
+    }
+
+    // Determine player targeting from choice-level context
+    const choiceText = (choice?.prompt_en || choice?.description || choice?.title || '');
+    const allOpponent = /opponent/i.test(choiceText) && !/your|self/i.test(choiceText);
+
+    function parsePlayerAndPos(item) {
+        const params = item.action?.parameters || {};
+        const area = params.stage_area || '';
+        const raw = area.replace('_side', '');
+        const idx = STAGE_POSITIONS.findIndex(p => p.key === raw);
+        if (idx < 0) return null;
+        const optIdx = params.card_id;
+        const optText = (optIdx !== undefined && choice?.options?.[optIdx]) ? String(choice.options[optIdx]) : '';
+        const prefixed = optText.startsWith('opponent:') || optText.startsWith('self:');
+        const isOpp = prefixed ? optText.startsWith('opponent:') : allOpponent;
+        return { player: isOpp ? 1 : 0, posKey: STAGE_POSITIONS[idx].key, slotIdx: idx, item };
+    }
+
+    const parsed = allItems.map(parsePlayerAndPos).filter(p => p !== null);
+    const playerGroups = {};
+    for (const p of parsed) {
+        if (!playerGroups[p.player]) playerGroups[p.player] = {};
+        playerGroups[p.player][p.posKey] = p.item;
+    }
+
+    const pp = State.perspectivePlayer;
+    const state = State.data;
+
+    for (const [playerStr, posMap] of Object.entries(playerGroups)) {
+        const playerIdx = parseInt(playerStr);
+        const player = playerIdx === 0 ? state?.player1 : state?.player2;
+        const stage = player?.stage;
+        if (!stage) continue;
+
+        const stageBlock = document.createElement('div');
+        stageBlock.className = 'stage-choice-block';
+
+        const isSelf = (pp === 0 && playerIdx === 0) || (pp === 1 && playerIdx === 1);
+        const titleEl = document.createElement('div');
+        titleEl.className = 'stage-choice-player-title';
+        titleEl.textContent = isSelf ? 'Your Stage' : 'Opponent Stage';
+        stageBlock.appendChild(titleEl);
+
+        const row = document.createElement('div');
+        row.className = 'stage-choice-row';
+
+        for (const pos of STAGE_POSITIONS) {
+            const slotData = stage[pos.areaKey];
+            const actionItem = posMap[pos.key];
+            const isValid = !!actionItem;
+            const occupied = slotData && slotData.card_no && slotData.card_no !== -1;
+
+            const slot = document.createElement('div');
+            slot.className = 'stage-choice-slot' + (isValid ? ' valid' : '') + (occupied ? ' occupied' : '');
+
+            if (occupied) {
+                const vm = CardRenderer.getCardViewModel(slotData, { mini: true });
+                const cardEl = CardRenderer.createCardDOM(vm, slotData);
+                cardEl.classList.add('card-mini');
+                cardEl.onclick = (e) => {
+                    e.stopPropagation();
+                    const m = window.__modals?.CardDetailModal;
+                    if (m) m.open(slotData);
+                };
+                slot.appendChild(cardEl);
+            } else {
+                const empty = document.createElement('div');
+                empty.className = 'stage-choice-empty';
+                empty.textContent = '—';
+                slot.appendChild(empty);
+            }
+
+            const label = document.createElement('div');
+            label.className = 'stage-choice-label';
+            label.textContent = _posLabel(pos);
+            slot.appendChild(label);
+
+            if (isValid) {
+                slot.tabIndex = 0;
+                slot.setAttribute('role', 'button');
+                slot.addEventListener('click', (e) => {
+                    if (e.target.closest('.card-mini')) return;
+                    ModalManager.hide(DOM_IDS.SELECTION_MODAL);
+                    if (window.doAction) window.doAction(actionItem.action);
+                });
+            }
+
+            row.appendChild(slot);
+        }
+
+        stageBlock.appendChild(row);
+        container.appendChild(stageBlock);
+    }
+
+    if (container.children.length === 0) return null;
+    return container;
+}
+
 function _buildCardItemFromAction(a, cardByNo) {
     const cardNo = a.parameters?.card_no;
     if (a.action_type === 'Pass') return null;
@@ -288,8 +434,10 @@ export const ChoiceView = {
                 return true;
             });
 
-            // ── Phase 3: Render each item ──
+            // ── Phase 3: Render items ──
+            const hasPositionItems = unique.some(_isPositionItem);
             unique.forEach(item => {
+                if (hasPositionItems && _isPositionItem(item)) return;
                 const el = ChoiceView._renderItem(item, choice);
                 if (!el) return;
                 const isDisabled = item.action?.parameters?.disabled === true;
@@ -305,7 +453,15 @@ export const ChoiceView = {
                 optContainer.appendChild(el);
             });
 
-            if (unique.length > 0) {
+            if (hasPositionItems) {
+                const stageEl = _renderStageChoice(unique, choice);
+                if (stageEl) {
+                    optContainer.className = '';
+                    optContainer.appendChild(stageEl);
+                }
+            }
+
+            if (optContainer.children.length > 0) {
                 choiceDiv.appendChild(optContainer);
                 hasContent = true;
             }

@@ -113,12 +113,29 @@ impl AbilityResolver {
                 )
             };
 
+            let desc_ja = if any_number {
+                format!(
+                    "確認した{}枚のカードから好きな枚数を選択（スキップ可）",
+                    total_count
+                )
+            } else if is_max || optional {
+                format!(
+                    "確認した{}枚のカードから最大{}枚を選択（スキップ可）",
+                    total_count, max_select
+                )
+            } else {
+                format!(
+                    "確認した{}枚のカードから{}枚を選択",
+                    total_count, max_select
+                )
+            };
             let choice = Choice::select_cards(
                 Zone::LookedAt.to_str(),
                 max_select,
                 description.clone(),
                 optional || is_max || any_number,
             )
+            .description_ja(Some(desc_ja))
             .card_type(select_action.card_type.clone())
             .cost_limit(
                 select_action.cost_limit,
@@ -211,38 +228,39 @@ impl AbilityResolver {
                     allow_skip
                 );
 
+                let desc_en = format!(
+                    "Select card(s) to reveal from {}",
+                    crate::ability::describe::zone_label(Some(&source))
+                );
+                let desc_ja = format!(
+                    "{}から公開するカードを選択",
+                    crate::ability::describe::zone_label(Some(&source))
+                );
                 self.pending_choice = Some(
-                    Choice::select_cards(
-                        source.to_string(),
-                        choices_count,
-                        format!(
-                            "Select card(s) to reveal from {}",
-                            crate::ability::describe::zone_label(Some(&source))
-                        ),
-                        allow_skip,
-                    )
-                    .card_type(card_type.map(|s| s.to_string()))
-                    .cost_limit(
-                        self.current_effect.as_ref().and_then(|e| e.cost_limit),
-                        self.current_effect
-                            .as_ref()
-                            .and_then(|e| e.cost_limit_operator.clone()),
-                    )
-                    .group(
-                        self.current_effect
-                            .as_ref()
-                            .and_then(|e| e.group_names.as_ref())
-                            .and_then(|v| v.first().cloned()),
-                    )
-                    .characters(
-                        self.current_effect
-                            .as_ref()
-                            .and_then(|e| e.characters.clone()),
-                    )
-                    .target_player_id(Some(target.to_string()))
-                    .blind(blind)
-                    .is_reveal(true)
-                    .build(),
+                    Choice::select_cards(source.to_string(), choices_count, desc_en, allow_skip)
+                        .description_ja(Some(desc_ja))
+                        .card_type(card_type.map(|s| s.to_string()))
+                        .cost_limit(
+                            self.current_effect.as_ref().and_then(|e| e.cost_limit),
+                            self.current_effect
+                                .as_ref()
+                                .and_then(|e| e.cost_limit_operator.clone()),
+                        )
+                        .group(
+                            self.current_effect
+                                .as_ref()
+                                .and_then(|e| e.group_names.as_ref())
+                                .and_then(|v| v.first().cloned()),
+                        )
+                        .characters(
+                            self.current_effect
+                                .as_ref()
+                                .and_then(|e| e.characters.clone()),
+                        )
+                        .target_player_id(Some(target.to_string()))
+                        .blind(blind)
+                        .is_reveal(true)
+                        .build(),
                 );
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
@@ -502,28 +520,41 @@ impl AbilityResolver {
                     })
                     .collect(),
             )
+        } else if effect.distinct.is_some()
+            || (gs.looked_at_cards.len() < card_ids.len()
+                && Zone::from_str(source) == Some(Zone::Discard))
+        {
+            let looked = gs.looked_at_cards.clone();
+            Some(
+                looked
+                    .iter()
+                    .map(|&id| card_ids.iter().position(|&cid| cid == id).unwrap_or(0))
+                    .collect(),
+            )
         } else {
             None
         };
+        let desc_en = format!(
+            "Select {} card(s) from {}",
+            count,
+            crate::ability::describe::zone_label(Some(&source))
+        );
+        let desc_ja = format!(
+            "{}から{}枚のカードを選択",
+            crate::ability::describe::zone_label(Some(&source)),
+            count
+        );
         self.pending_choice = Some(
-            Choice::select_cards(
-                source.to_string(),
-                count as usize,
-                format!(
-                    "Select {} card(s) from {}",
-                    count,
-                    crate::ability::describe::zone_label(Some(&source))
-                ),
-                optional,
-            )
-            .card_type(effect.card_type.clone())
-            .cost_limit(effect.cost_limit, effect.cost_limit_operator.clone())
-            .group(effect.group_names.as_ref().and_then(|v| v.first().cloned()))
-            .characters(effect.characters.clone())
-            .filtered_indices(filtered_indices.clone())
-            .target_player_id(Some(target.clone()))
-            .is_select_action(true)
-            .build(),
+            Choice::select_cards(source.to_string(), count as usize, desc_en, optional)
+                .description_ja(Some(desc_ja))
+                .card_type(effect.card_type.clone())
+                .cost_limit(effect.cost_limit, effect.cost_limit_operator.clone())
+                .group(effect.group_names.as_ref().and_then(|v| v.first().cloned()))
+                .characters(effect.characters.clone())
+                .filtered_indices(filtered_indices.clone())
+                .target_player_id(Some(target.clone()))
+                .is_select_action(true)
+                .build(),
         );
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(())
@@ -568,6 +599,7 @@ impl AbilityResolver {
                 format!("Select card(s) from revealed cards"),
                 optional || any_number || available == 0,
             )
+            .description_ja(Some("公開されたカードからカードを選択".to_string()))
             .card_type(effect.card_type.clone())
             .cost_limit(effect.cost_limit, effect.cost_limit_operator.clone())
             .group(effect.group_names.as_ref().and_then(|v| v.first().cloned()))
@@ -732,12 +764,29 @@ impl AbilityResolver {
             )
         };
 
+        let desc_ja = if any_number {
+            format!(
+                "確認した{}枚のカードから好きな枚数を選択（スキップ可）",
+                total_count
+            )
+        } else if is_max || optional {
+            format!(
+                "確認した{}枚のカードから最大{}枚を選択（スキップ可）",
+                total_count, max_select
+            )
+        } else {
+            format!(
+                "確認した{}枚のカードから{}枚を選択",
+                total_count, max_select
+            )
+        };
         let choice = Choice::select_cards(
             Zone::LookedAt.to_str(),
             max_select,
             description.clone(),
             optional || is_max || any_number,
         )
+        .description_ja(Some(desc_ja))
         .card_type(
             override_card_type
                 .clone()

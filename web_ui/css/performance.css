@@ -355,9 +355,6 @@
     font-size: 0.6rem;
     color: var(--text-muted);
     margin-left: 19px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 .perf-agg-desc {
     font-size: 0.6rem;
@@ -600,25 +597,10 @@
     .perf-route-grid,
     .perf-contrib-grid,
     .perf-live-grid,
-    .perf-effects-grid,
     .perf-flow-grid,
     .perf-source-lists {
         grid-template-columns: 1fr;
     }
-}
-
-/* --- Performance Effects Grid --- */
-.perf-effects-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    margin-top: 6px;
-}
-
-.perf-effects-column {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
 }
 
 .perf-mini-heading {

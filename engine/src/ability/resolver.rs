@@ -136,18 +136,20 @@ impl AbilityResolver {
             return Err(format!("Not enough cards in {}: need {}", zone_name, count));
         }
         if idxs.len() > count {
+            let desc_en = format!(
+                "Select {} card(s) to {} for cost",
+                count,
+                crate::ability::describe::zone_label(Some(zone_name))
+            );
+            let desc_ja = format!(
+                "コストとして{}に置くカードを{}枚選択",
+                crate::ability::describe::zone_label(Some(zone_name)),
+                count
+            );
             self.pending_choice = Some(
-                Choice::select_cards(
-                    zone_name.to_string(),
-                    0,
-                    format!(
-                        "Select {} card(s) to {} for cost",
-                        count,
-                        crate::ability::describe::zone_label(Some(zone_name))
-                    ),
-                    true,
-                )
-                .build(),
+                Choice::select_cards(zone_name.to_string(), 0, desc_en, true)
+                    .description_ja(Some(desc_ja))
+                    .build(),
             );
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return Ok(None);

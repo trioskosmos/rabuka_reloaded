@@ -327,9 +327,9 @@ fn fuyumari_q118_duplicate_names_distinct_filter_works() {
 
     // Step 1: Player should have a choice
     // The choice only offers 2 distinct-named cards (live_a and live_c).
-    // player picks both by their actual waitroom indices 0 and 2.
+    // Player picks both by choice-relative indices 0 and 1 (looked_at_cards order).
     assert!(game.has_pending_choice(), "Should have select choice");
-    game.try_select_indices(&[0, 2]).unwrap();
+    game.try_select_indices(&[0, 1]).unwrap();
 
     // Step 2: Opponent picks from the 2 selected cards
     assert!(

@@ -9960,11 +9960,16 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             _infer_heart_source(rc, rct)
             _infer_baton_touch(rc, rct)
 
-        # FIX 9b: followup_action with "このメンバー" → self_target
+        # FIX 9b: followup_action with "このメンバー" → self_target / self_cost
         fa = eff.get("followup_action")
         if isinstance(fa, dict) and "このメンバー" in fa.get("text", ""):
             if not fa.get("target") and fa.get("self_target") is None:
                 fa["self_target"] = True
+            # For change_state, also set self_cost so the Rust handler
+            # restricts targets to the activating card and skips when
+            # the card is already in the target state (e.g. already wait).
+            if fa.get("action") == "change_state" and fa.get("self_cost") is None:
+                fa["self_cost"] = True
 
         # FIX 10: Primary effect fixes — negation condition
         pe = eff.get("primary_effect")
@@ -10404,6 +10409,26 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     eff.pop("primary_effect", None)
                     eff.pop("result_condition", None)
                     eff.pop("followup_action", None)
+
+        # ---- B1: Post-restructuring fix — self_cost on このメンバー change_state ----
+        # FIX 9b in _apply_recursive_fixes runs before COR restructuring creates
+        # followup_action, so we add self_cost here after the structure is final.
+        def _fix_change_state_self_cost(cor_eff):
+            fa = cor_eff.get("followup_action")
+            if isinstance(fa, dict) and fa.get("action") == "change_state":
+                if "このメンバー" in fa.get("text", ""):
+                    if fa.get("self_cost") is None:
+                        fa["self_cost"] = True
+
+        if eff.get("action") == "conditional_on_result":
+            _fix_change_state_self_cost(eff)
+        elif eff.get("action") == "sequential":
+            for act in eff.get("actions", []):
+                if (
+                    isinstance(act, dict)
+                    and act.get("action") == "conditional_on_result"
+                ):
+                    _fix_change_state_self_cost(act)
 
         # ---- B: Scoped context propagation (inherits specific fields) ----
         _propagate_context(eff, t=t, eff_root=eff)

@@ -50,7 +50,7 @@ def scan_test_files():
             card_to_tests[cid].append(
                 {
                     "file": tf.name,
-                    "functions": test_funcs[:5],
+                    "functions": test_funcs,
                 }
             )
             all_tested_cards.add(cid)
@@ -191,9 +191,7 @@ def main():
                 limit_str = (
                     " (limit={})".format(ab["use_limit"]) if ab["use_limit"] else ""
                 )
-                sample_cards = ", ".join(ab["card_ids"][:3])
-                if len(ab["card_ids"]) > 3:
-                    sample_cards += " +{} more".format(len(ab["card_ids"]) - 3)
+                sample_cards = ", ".join(ab["card_ids"])
                 safe_write(
                     "  Trigger: {}{}\n".format(ab["trigger"] or "none", limit_str), f
                 )
@@ -201,12 +199,7 @@ def main():
                 safe_write(
                     "  Cards ({}): {}\n".format(ab["card_count"], sample_cards), f
                 )
-                text_preview = (
-                    ab["full_text"][:120] + "..."
-                    if len(ab["full_text"]) > 120
-                    else ab["full_text"]
-                )
-                safe_write("  Text:    {}\n\n".format(text_preview), f)
+                safe_write("  Text:    {}\n\n".format(ab["full_text"]), f)
 
         # Also write a compact list for quick reference
         safe_write("\n" + "=" * 60 + "\n", f)

@@ -114,6 +114,77 @@ fn toubatsu_q118_1_live_card_fails() {
     );
 }
 
+/// Bug repro: discard has duplicate-named live cards — player picks 2 distinct,
+/// opponent must select from only those 2, not from the full discard set.
+#[test]
+fn toubatsu_duplicate_names_in_discard_opponent_only_sees_correct_cards() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let toubatsu = game.id("PL!SP-bp2-011-R");
+    let live_a = game.id("PL!-sd1-019-SD"); // START:DASH!!
+    let live_b = game.id("PL!N-sd1-028-SD"); // Dream with You (different name)
+    let live_a2 = game.id("PL!-sd1-019-SD"); // second copy of live_a (same name)
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.add_to_hand(toubatsu);
+    game.add_to_hand(filler);
+
+    // Discard: [live_a, live_a2, live_b] — live_a appears twice (same name)
+    game.add_to_discard(live_a);
+    game.add_to_discard(live_a2);
+    game.add_to_discard(live_b);
+
+    game.give_energy(15);
+    game.play_to_stage(toubatsu, MemberArea::Center);
+
+    // Player selects 2 distinct-name live cards
+    assert!(game.has_pending_choice(), "First select choice expected");
+    game.try_select_indices(&[0, 1]).unwrap();
+
+    // Opponent selects 1 of the 2
+    assert!(game.has_pending_choice(), "Opponent select choice expected");
+    {
+        let entry = game.state.ability_queue.current_entry();
+        assert_eq!(
+            entry.as_ref().and_then(|e| e.choice_player_id.as_deref()),
+            Some("p2"),
+            "Opponent-select choice should be routed to opponent"
+        );
+    }
+    game.select_option(0);
+
+    // The card added to hand must be one of the two originally selected (distinct)
+    let got = if game.state.player1.hand.cards.contains(&live_a) {
+        live_a
+    } else if game.state.player1.hand.cards.contains(&live_b) {
+        live_b
+    } else {
+        panic!(
+            "Hand must contain one of the two distinct selected cards, got: {:?}",
+            game.state
+                .player1
+                .hand
+                .cards
+                .iter()
+                .filter(|&&c| c != filler)
+                .collect::<Vec<_>>()
+        );
+    };
+
+    // live_a2 (the duplicate) must never have left discard
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live_a2),
+        "Duplicate live_a2 must remain in discard — opponent should not select it"
+    );
+
+    // The first of the two distinct picks must have moved (either to hand or left discard)
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&got),
+        "Selected card should have moved out of discard"
+    );
+}
+
 /// Q263: Auto ability triggers when member moves from center area to another area.
 /// The auto ability offers a choice of 3 options: +2 blades until live end,
 /// weigh 1 opponent member with ≤2 blades, or draw 1 card.

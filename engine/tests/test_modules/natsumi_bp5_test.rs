@@ -432,6 +432,118 @@ fn natsumi_bp5_stop_after_two_iterations() {
 }
 
 // ============================================================
+// BUG REPRO: When natsumi is already wait, subsequent repeats
+// must NOT wait other members on stage
+// ============================================================
+#[test]
+fn natsumi_bp5_repeat_does_not_wait_fillers_when_self_is_wait() {
+    let (mut game, natsumi, live_card, filler_live) = base_setup();
+    let filler_member = game.id("PL!-sd1-010-SD");
+    let filler_2 = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler_member, -1, -1];
+    game.state.player1.stage.stage[2] = filler_2;
+    game.state.player1.stage.stage[1] = natsumi;
+    // Deck has enough live cards for all iterations
+    setup_deck(&mut game, vec![live_card; 10]);
+    game.give_energy(4);
+    trigger_live_start(&mut game, filler_live);
+
+    // iter 0: mill → Yes (mill live card, natsumi gets wait)
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    // repeat → Continue
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+
+    // iter 1: mill → Yes (mill live card again, natsumi already wait
+    //   so change_state should be a no-op for other members)
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    // repeat → Continue
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+
+    // iter 2: mill → Yes, then Stop
+    game.select_option(1);
+    game.drain_auto_ability_choices();
+    game.select_option(0);
+    game.drain_auto_ability_choices();
+
+    // Verify: only natsumi is wait
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(natsumi),
+        Some(&"wait".to_string()),
+        "Natsumi should be wait after milling live cards"
+    );
+    assert!(
+        game.state
+            .mods
+            .get_orientation_modifier(filler_member)
+            .is_none_or(|o| o != "wait"),
+        "Filler member at position 0 should NOT be wait"
+    );
+    assert!(
+        game.state
+            .mods
+            .get_orientation_modifier(filler_2)
+            .is_none_or(|o| o != "wait"),
+        "Filler member at position 2 should NOT be wait"
+    );
+}
+
+// ============================================================
+// BUG REPRO: All 5 iterations with live cards, other members on
+// stage — only natsumi may be waited, never the fillers
+// ============================================================
+#[test]
+fn natsumi_bp5_all_iterations_live_never_waits_fillers() {
+    let (mut game, natsumi, live_card, filler_live) = base_setup();
+    let filler_member = game.id("PL!-sd1-010-SD");
+    let filler_2 = game.id("PL!-sd1-010-SD");
+    game.state.player1.stage.stage = [filler_member, -1, -1];
+    game.state.player1.stage.stage[2] = filler_2;
+    game.state.player1.stage.stage[1] = natsumi;
+    setup_deck(&mut game, vec![live_card; 10]);
+    game.give_energy(4);
+    trigger_live_start(&mut game, filler_live);
+
+    // Run all 5 iterations (initial + 4 repeats)
+    for i in 0..5 {
+        game.select_option(1);
+        game.drain_auto_ability_choices();
+        if i < 4 {
+            game.select_option(1);
+            game.drain_auto_ability_choices();
+        }
+    }
+
+    assert_eq!(
+        game.state.mods.get_blade_modifier(natsumi),
+        5,
+        "5 blades gained"
+    );
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(natsumi),
+        Some(&"wait".to_string()),
+        "Natsumi should be wait"
+    );
+    assert!(
+        game.state
+            .mods
+            .get_orientation_modifier(filler_member)
+            .is_none_or(|o| o != "wait"),
+        "Filler should NOT be wait at any point"
+    );
+    assert!(
+        game.state
+            .mods
+            .get_orientation_modifier(filler_2)
+            .is_none_or(|o| o != "wait"),
+        "Filler 2 should NOT be wait at any point"
+    );
+}
+
+// ============================================================
 // LEGACY: Q222 repeat continues after wait — all live, all runs
 // ============================================================
 #[test]

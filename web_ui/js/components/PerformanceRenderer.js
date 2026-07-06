@@ -297,16 +297,19 @@ function renderAggregateHeartSummary(result) {
             const consumedSum = sumHearts(consumedArr);
             const totalShort = Math.max(0, reqSum - consumedSum);
 
-            const detail1a = phase1aAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
-            const detail1b = phase1bAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
-            const detail1c = phase1cAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
-            const detail2 = phase2Allocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
+            const _hIcon = (ci) => ci === 7
+                ? '<img src="img/texticon/icon_all.png" class="heart-mini-icon">'
+                : `<img src="img/texticon/heart_0${ci}.png" class="heart-mini-icon">`;
+            const detail1a = phase1aAllocs.map(a => `${a.amount}×${_hIcon(a.color)}`).join(', ');
+            const detail1b = phase1bAllocs.map(a => `${a.amount}×${_hIcon(a.color)}`).join(', ');
+            const detail1c = phase1cAllocs.map(a => `${a.amount}×${_hIcon(a.color)}`).join(', ');
+            const detail2 = phase2Allocs.map(a => `${a.amount}×${_hIcon(a.color)}`).join(', ');
             const detail3a = phase3aAllocs.map(a => {
                 const srcIcon = `img/texticon/heart_0${a.color}.png`;
                 return `${a.amount}×<img src="${srcIcon}" class="heart-mini-icon"> → <img src="img/texticon/heart_00.png" class="heart-mini-icon"> Any`;
             }).join(', ');
-            const detail3b = phase3bAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
-            const detail3c = phase3cAllocs.map(a => `${a.amount}×${HEART_LABELS[a.color] || a.color}`).join(', ');
+            const detail3b = phase3bAllocs.map(a => `${a.amount}×${_hIcon(a.color)}`).join(', ');
+            const detail3c = phase3cAllocs.map(a => `${a.amount}×${_hIcon(a.color)}`).join(', ');
             const detail4 = phase4Allocs.map(a => {
                 if (a.wildcard) {
                     const targetIcon = `img/texticon/heart_0${a.color}.png`;
@@ -1108,75 +1111,6 @@ function renderYellSection(result) {
     `;
 }
 
-function renderEffectsSection(result) {
-    const requirementEffects = result.breakdown.requirements;
-    const transforms = result.breakdown.transforms;
-    const scoreLines = result.breakdown.scores;
-    const triggered = result.triggered_abilities;
-
-    return `
-        <section class="perf-section-card">
-            <div class="perf-section-heading-row compact">
-                <div>
-                    <div class="perf-eyebrow">${tr('perf_effects_title')}</div>
-                    <h3>${tr('perf_effects_subtitle')}</h3>
-                </div>
-            </div>
-            <div class="perf-effects-grid">
-                <div class="perf-effects-column">
-                    <div class="perf-mini-heading">${tr('perf_requirements_title')}</div>
-                    <div class="perf-list-block">
-                        ${requirementEffects.length > 0 || transforms.length > 0 ? `
-                            ${requirementEffects.map((effect) => `<div class="perf-list-row">${escapeHtml(effect?.source || 'Effect')}: ${escapeHtml(effect?.value || effect?.desc || 'adjustment')}</div>`).join('')}
-                            ${transforms.map((effect) => `<div class="perf-list-row">${escapeHtml(effect?.source || 'Effect')}: ${escapeHtml(effect?.desc || 'transform')}</div>`).join('')}
-                        ` : `<div class="perf-empty-state small">${tr('perf_no_effects')}</div>`}
-                    </div>
-                </div>
-                <div class="perf-effects-column">
-                    <div class="perf-mini-heading">${tr('perf_score_line_title')}</div>
-                    <div class="perf-list-block">
-                        ${scoreLines.length > 0 ? scoreLines.map((line) => `
-                            <div class="perf-score-line">
-                                <span>${escapeHtml(line?.source || 'Score source')}</span>
-                                <strong>+${line?.value || 0}</strong>
-                            </div>
-                        `).join('') : `<div class="perf-empty-state small">${tr('perf_no_scores')}</div>`}
-                    </div>
-                </div>
-                <div class="perf-effects-column">
-                    <div class="perf-mini-heading">${tr('perf_triggered_title')}</div>
-                    <div class="perf-list-block">
-                        ${triggered.length > 0 ? triggered.map((ability) => {
-                            const effectText = ability?.effect_text || '';
-                            const condText = ability?.condition_text || '';
-                            const abilityDisplay = effectText ? enrichText(effectText) : '';
-                            const condDisplay = condText ? enrichText(condText) : '';
-                            const triggeredType = effectText.includes('ライブ開始時') || effectText.includes('live_start') ? 'live_start' :
-                                effectText.includes('ライブ成功時') || effectText.includes('live_success') ? 'live_success' :
-                                effectText.includes('常時') || effectText.includes('jyouji') ? 'jyouji' : '';
-                            const durationLabel = {
-                                'live_start': tr('perf_effect_duration_live_start'),
-                                'live_success': tr('perf_effect_duration_live_success'),
-                                'jyouji': tr('perf_effect_duration_jyouji'),
-                            }[triggeredType] || '';
-                            return `
-                                <div class="perf-list-row">
-                                    <div class="effect-title-row">
-                                        <strong>${escapeHtml(ability?.card_name || 'Unknown card')}</strong>
-                                        ${durationLabel ? `<span class="effect-duration">${escapeHtml(durationLabel)}</span>` : ''}
-                                    </div>
-                                    ${abilityDisplay ? `<div class="perf-bonus-text" style="margin-top: 4px; margin-left: 0;">${abilityDisplay}</div>` : ''}
-                                    ${condDisplay ? `<div class="perf-ability-condition">Cond: ${condDisplay}</div>` : ''}
-                                </div>
-                            `;
-                        }).join('') : `<div class="perf-empty-state small">${tr('perf_no_triggers')}</div>`}
-                    </div>
-                </div>
-            </div>
-        </section>
-    `;
-}
-
 function renderPlayerPanel(playerId, result) {
     if (!result) return '';
     const lives = result.lives || [];
@@ -1275,7 +1209,6 @@ function renderPlayerPanel(playerId, result) {
                     ${renderAggregateHeartSummary(result)}
                     ${renderTotalSection(result)}
                     ${renderYellSection(result)}
-                    ${renderEffectsSection(result)}
                 </div>
                 <div class="perf-column right">
                     ${renderContributionSection(result)}

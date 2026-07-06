@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-06T19:43:55.874200",
+  "generated_at": "2026-07-06T22:57:05.509521",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -8306,7 +8306,8 @@
               "state_change": "wait",
               "card_type": "member_card",
               "action": "change_state",
-              "count": 1
+              "count": 1,
+              "self_cost": true
             },
             "text": "自分のデッキの一番上のカードを控え室に置いてもよい。そうした場合、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。これにより控え室に置いたカードがライブカードの場合、このメンバーをウェイトにする。自分はこの手順をさらに4回まで繰り返してもよい"
           },
@@ -14070,7 +14071,8 @@
           "card_type": "member_card",
           "action": "change_state",
           "count": 1,
-          "self_target": true
+          "self_target": true,
+          "self_cost": true
         },
         "group_names": [
           "虹ヶ咲"

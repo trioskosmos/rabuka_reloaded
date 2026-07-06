@@ -448,13 +448,16 @@ impl AbilityResolver {
                         let mut pending = gs.ability_queue.take_pending_actions();
                         pending.insert(0, saved);
                         gs.ability_queue.set_pending_actions(pending);
+                        let desc_en = format!("Select {} member(s) for heart type conversion", tc);
+                        let desc_ja = format!("ハート種類変換のメンバーを{}体選択", tc);
                         self.pending_choice = Some(
                             Choice::select_cards(
                                 Zone::Stage.to_str().to_string(),
                                 tc,
-                                format!("Select {} member(s) for heart type conversion", tc),
+                                desc_en,
                                 false,
                             )
+                            .description_ja(Some(desc_ja))
                             .card_type(effect.card_type.clone())
                             .group(effect.group_name().map(|s| s.to_string()))
                             .characters(effect.characters.clone())
@@ -601,12 +604,14 @@ impl AbilityResolver {
                         return Ok(());
                     }
                     let target_str = effect.target_name().to_string();
+                    let desc_ja = "このメンバーの下から出すメンバーカードを選択".to_string();
                     let mut b = Choice::select_cards(
                         Zone::UnderMember.to_str(),
                         actual_count as usize,
                         "Select a member card to deploy from under this member",
                         effect.optional.unwrap_or(false),
                     )
+                    .description_ja(Some(desc_ja))
                     .card_type(effect.card_type.clone())
                     .target_player_id(Some(target_str));
                     if let Some(ref groups) = effect.group_names {
@@ -681,11 +686,14 @@ impl AbilityResolver {
                         return Ok(());
                     }
                     self.pending_energy_payment = Some(count);
-                    self.pending_choice = Some(Choice::select_target(
-                        "pay_optional_cost:skip_optional_cost",
-                        format!("Pay {} energy?", count),
-                        false,
-                    ));
+                    self.pending_choice = Some(Choice::SelectTarget {
+                        target: "pay_optional_cost:skip_optional_cost".to_string(),
+                        description: format!("Pay {} energy?", count),
+                        description_en: Some(format!("Pay {} energy?", count)),
+                        description_ja: Some(format!("{}エネルギー支払う？", count)),
+                        allow_skip: false,
+                        options: None,
+                    });
                     return Ok(());
                 }
                 self.execute_pay_energy(gs, count, effect.target_name())

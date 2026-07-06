@@ -990,6 +990,7 @@ impl super::TurnEngine {
             description,
             true,
         )
+        .description_ja(Some("控え室から成功ゾーンに置くμ'sのライブカードを選んでください（スキップで元のカードを置きます）".to_string()))
         .card_type(Some("live_card".to_string()))
         .group(Some(group_name))
         .target_player_id(Some("self".to_string()))

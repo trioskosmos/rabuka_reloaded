@@ -583,6 +583,101 @@
     margin: 0;
 }
 
+/* --- Stage Choice Widget (position selection) --- */
+.stage-choice-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 0;
+}
+.stage-choice-source {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    justify-content: center;
+}
+.stage-choice-source .card-mini {
+    max-height: 70px;
+    width: auto;
+}
+.stage-choice-arrow {
+    font-size: 1.4rem;
+    color: var(--accent-gold);
+    font-weight: bold;
+}
+.stage-choice-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.stage-choice-player-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 2px 0;
+}
+.stage-choice-row {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+}
+.stage-choice-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 4px;
+    border-radius: 6px;
+    border: 2px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.2);
+    min-width: 80px;
+    max-width: 100px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    cursor: default;
+}
+.stage-choice-slot.valid {
+    border-color: var(--accent-gold);
+    cursor: pointer;
+    background: rgba(245, 158, 11, 0.06);
+}
+.stage-choice-slot.valid:hover {
+    border-color: #fbbf24;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.25);
+    background: rgba(245, 158, 11, 0.12);
+}
+.stage-choice-slot.valid:focus-visible {
+    outline: 2px solid var(--accent-gold);
+    outline-offset: 2px;
+}
+.stage-choice-slot .card-mini {
+    max-height: 65px;
+    width: auto;
+    pointer-events: auto;
+}
+.stage-choice-slot .card-mini:hover {
+    filter: brightness(1.15);
+}
+.stage-choice-empty {
+    width: 60px;
+    height: 85px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    opacity: 0.4;
+}
+.stage-choice-label {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
 .choice-options-container {
     overflow: visible;
     max-height: none;

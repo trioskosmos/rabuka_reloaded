@@ -253,6 +253,44 @@ impl AbilityResolver {
                 }
             }
 
+            // When self_cost or self_target explicitly restricts to "this member"
+            // (e.g. "このメンバーをウェイトにする"), filter candidates to only the
+            // activating card. If the card is already in the target state, skip.
+            if (self_cost || effect.self_target.unwrap_or(false)) && self.selected_cards.is_empty()
+            {
+                if let Some(act_id) = gs.activating_card {
+                    if candidates.iter().any(|(_, cid)| *cid == act_id) {
+                        candidates.retain(|(_, cid)| *cid == act_id);
+                    } else {
+                        let player = gs.resolve_target_player(&target);
+                        let on_stage = player.stage.stage.contains(&act_id);
+                        if !on_stage {
+                            log::debug!(
+                                "[EXEC_CHANGE_STATE] self_cost: activating card not on stage"
+                            );
+                            return Ok(());
+                        }
+                        let ori = gs.mods.get_orientation_modifier(act_id);
+                        let already_target = match state_change.as_str() {
+                            "wait" => ori.is_some_and(|o| o == "wait"),
+                            "active" => ori.is_none_or(|o| o != "wait"),
+                            _ => false,
+                        };
+                        if already_target {
+                            log::debug!(
+                                "[EXEC_CHANGE_STATE] self_cost: already {}, skipping",
+                                state_change
+                            );
+                            return Ok(());
+                        }
+                        // Should be in candidates but wasn't — add it back
+                        if let Some(pos) = player.stage.stage.iter().position(|&id| id == act_id) {
+                            candidates.push((pos, act_id));
+                        }
+                    }
+                }
+            }
+
             if candidates.is_empty() {
                 let has_energy_in_text =
                     effect.text.contains("エネルギー") || effect.text.contains("energy");
@@ -302,16 +340,23 @@ impl AbilityResolver {
                 // Map candidate positions to stage indices for filtered_indices
                 let candidate_positions: Vec<usize> =
                     candidates.iter().map(|(pos, _)| *pos).collect();
+                let desc_ja = format!("{}に変更するメンバーを{}体選択", state_change, pick_count);
                 self.pending_choice = Some(
-                    Choice::select_cards(Zone::Stage.to_str(), pick_count, desc, allow_skip)
-                        .card_type(card_type_filter.clone())
-                        .cost_limit(cost_limit, cost_limit_operator.clone())
-                        .group(group_filter.clone())
-                        .characters(characters.cloned())
-                        .filtered_indices(Some(candidate_positions))
-                        .is_select_action(true)
-                        .target_player_id(Some(target.clone()))
-                        .build(),
+                    Choice::select_cards(
+                        Zone::Stage.to_str(),
+                        pick_count,
+                        desc.clone(),
+                        allow_skip,
+                    )
+                    .description_ja(Some(desc_ja))
+                    .card_type(card_type_filter.clone())
+                    .cost_limit(cost_limit, cost_limit_operator.clone())
+                    .group(group_filter.clone())
+                    .characters(characters.cloned())
+                    .filtered_indices(Some(candidate_positions))
+                    .is_select_action(true)
+                    .target_player_id(Some(target.clone()))
+                    .build(),
                 );
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 // Store a re-apply effect so finalize_choice applies the state
@@ -619,16 +664,19 @@ impl AbilityResolver {
                 && state_change != "active"
                 && state_change != "アクティブ"
             {
+                let desc_en = format!(
+                    "Select {} energy card(s) to deactivate (set to wait)",
+                    effective_count
+                );
+                let desc_ja = format!("待機状態にするエネルギーカードを{}枚選択", effective_count);
                 self.pending_choice = Some(
                     Choice::select_cards(
                         Zone::Energy.to_str(),
                         effective_count as usize,
-                        format!(
-                            "Select {} energy card(s) to deactivate (set to wait)",
-                            effective_count
-                        ),
+                        desc_en,
                         false,
                     )
+                    .description_ja(Some(desc_ja))
                     .card_type(card_type_filter.map(|s| s.to_string()))
                     .group(group_filter.map(|s| s.to_string()))
                     .target_player_id(Some(target.to_string()))
