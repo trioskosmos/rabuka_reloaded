@@ -934,6 +934,62 @@ impl AbilityResolver {
                     filter.groups = effect.group_names.as_ref();
                 }
                 filter.card_property = effect.card_property.as_deref();
+
+                // ── group_reference: "different_group_names" ──────────────────
+                // Q89: Multi-name cards have the group name(s) from their series.
+                // Q105: A multi-name card contributes ONE constituent group for
+                //   "different group names" conditions.
+                // Q208: When checking "different from ALL members on stage", all
+                //   groups a multi-name card can match via its series are blocked.
+                // → Exclude discard cards whose group matches ANY stage member's group.
+                // Only apply stage-group exclusion when the effect itself has
+                // group_reference and there's no condition with the same reference.
+                // Bring the LOVE ab#1 has effect.group_reference without a condition
+                // (genuine stage-group exclusion).  Mia option 1 has BOTH
+                // condition.group_reference and effect.group_reference — the
+                // condition already handles different-group counting; we should
+                // NOT also exclude stage groups (which would over-filter).
+                let cond_has_grp = effect
+                    .condition
+                    .as_ref()
+                    .and_then(|c| {
+                        if c.group_reference.as_deref() == Some("different_group_names") {
+                            Some(true)
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or(false);
+                if !cond_has_grp
+                    && effect.group_reference.as_deref() == Some("different_group_names")
+                    && source_str == "discard"
+                {
+                    let mut stage_groups: std::collections::BTreeSet<String> =
+                        std::collections::BTreeSet::new();
+                    for &cid in &player.stage.stage {
+                        if cid == -1 {
+                            continue;
+                        }
+                        if let Some(card) = card_db.get_card(cid) {
+                            if !card.group.is_empty() {
+                                stage_groups.insert(card.group.clone());
+                            } else {
+                                for known_group in ["μ's", "Aqours", "虹ヶ咲", "Liella!", "蓮ノ空"]
+                                {
+                                    if util::card_matches_group_str(card_db, cid, Some(known_group))
+                                    {
+                                        stage_groups.insert(known_group.to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if !stage_groups.is_empty() {
+                        let groups_vec: Vec<String> = stage_groups.into_iter().collect();
+                        filter.exclude_group_names = Some(Box::leak(Box::new(groups_vec)));
+                    }
+                }
+
                 log::debug!(
                     "[NEED_HEART] filter: color={:?} total={:?} op={:?} src={:?} card_type={:?}",
                     filter.need_heart_color,

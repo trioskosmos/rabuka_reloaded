@@ -665,7 +665,15 @@ impl AbilityResolver {
             let has_explicit_target = effect.target.is_some();
             let player = gs.resolve_target_player_mut(&target_str);
             let card_id = triggering_member.or_else(|| {
-                if has_explicit_target {
+                if let Some(ref pos) = effect.position {
+                    let pos_str = pos.get_position()?;
+                    let idx = crate::ability::util::stage_position_index(pos_str)?;
+                    if idx < player.stage.stage.len() && player.stage.stage[idx] != -1 {
+                        Some(player.stage.stage[idx])
+                    } else {
+                        None
+                    }
+                } else if has_explicit_target {
                     player.stage.stage.iter().find(|&&id| id != -1).copied()
                 } else {
                     activating
