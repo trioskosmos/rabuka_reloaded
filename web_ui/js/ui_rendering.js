@@ -287,53 +287,7 @@ export const Rendering = {
         }
     },
 
-    renderSelectionModal: (selectionModal = null) => {
-        const modalState = selectionModal || { isVisible: false, cards: [], actions: [] };
-        const panel = document.getElementById(DOM_IDS.SELECTION_MODAL);
-        const content = document.getElementById(DOM_IDS.SELECTION_CONTENT);
-        if (!panel || !content) return;
-
-        // Filter to only cards that have a valid action
-        const validPairs = [];
-        modalState.cards.forEach((c, idx) => {
-            const action = modalState.actions[idx];
-            if (action) validPairs.push({ card: c, action });
-        });
-        const filteredCards = validPairs.map(p => p.card);
-        const filteredActions = validPairs.map(p => p.action);
-
-        // Hide selection modal when there's no pending choice (choice was resolved)
-        if (!State.data?.pending_choice) {
-            panel.style.display = DISPLAY_VALUES.NONE;
-            return;
-        }
-
-        // ChoiceView already populates the modal — don't override
-        return;
-
-        panel.style.display = DISPLAY_VALUES.FLEX;
-
-        content.innerHTML = '';
-        filteredCards.forEach((c, idx) => {
-            const action = filteredActions[idx];
-            const viewModel = CardRenderer.getCardViewModel(c, {
-                containerId: DOM_IDS.SELECTION_CONTENT,
-                actionId: action?.index,
-            });
-            const onClick = () => {
-                if (State.uiMode === 'view') {
-                    const m = window.__modals?.CardDetailModal;
-                    if (m) m.open(c);
-                } else if (window.doAction) {
-                    window.doAction(action);
-                }
-            };
-            const cardEl = CardRenderer.createCardDOM(viewModel, c, onClick);
-            CardRenderer.renderCardBonuses(cardEl, c, true);
-            cardEl.className = `selection-card-item ${viewModel.classes}`;
-            content.appendChild(cardEl);
-        });
-    },
+    renderSelectionModal: () => {}, // ChoiceView handles all selection modals
 
     renderGameOver: (state) => {
         ActionMenu.renderGameOver(state);

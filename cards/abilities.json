@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-05T11:16:11.651117",
+  "generated_at": "2026-07-06T17:35:29.723657",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -23261,14 +23261,6 @@
         "actions": [
           {
             "text": "エールにより自分のカードを1枚以上公開したとき、それらのカードの中にブレードハートを持つカードが2枚以下の場合、それらのカードをすべて控え室に置いてもよい",
-            "condition": {
-              "type": "card_count_condition",
-              "count": 2,
-              "operator": "<=",
-              "text": "エールにより自分のカードを1枚以上公開したとき、それらのカードの中にブレードハートを持つカードが2枚以下の場合",
-              "location": "revealed_cards",
-              "target": "self"
-            },
             "destination": "discard",
             "optional": true,
             "action": "move_cards",
@@ -23295,11 +23287,12 @@
         ],
         "condition": {
           "type": "card_count_condition",
-          "count": 1,
-          "operator": ">=",
-          "text": "エールにより自分のカードを1枚以上公開したとき",
+          "count": 2,
+          "operator": "<=",
+          "text": "エールにより自分のカードを1枚以上公開したとき、それらのカードの中にブレードハートを持つカードが2枚以下の場合",
           "location": "revealed_cards",
-          "target": "self"
+          "target": "self",
+          "card_property": "has_blade_heart"
         }
       }
     },

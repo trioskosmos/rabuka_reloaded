@@ -55,6 +55,102 @@ function _selectCurrentChoice() {
     if (action && window.doAction) window.doAction(action);
 }
 
+const ACTION_LABELS = {
+    'PlayMemberToStage': i18n.t('set_deck'),
+    'play_member_to_stage': i18n.t('set_deck'),
+    'UseAbility': i18n.t('act_ability'),
+    'use_ability': i18n.t('act_ability'),
+    'SetLiveCard': i18n.t('live_card_set'),
+    'set_live_card': i18n.t('live_card_set'),
+    'EnergyCharge': i18n.t('energy'),
+    'energy_charge': i18n.t('energy'),
+    'Pass': i18n.t('pass_no'),
+    'pass': i18n.t('pass_no'),
+    'pass_remaining': i18n.t('pass_no'),
+    'SkipMulligan': i18n.t('skip'),
+    'skip_mulligan': i18n.t('skip'),
+    'Decision': i18n.t('done'),
+    'decision': i18n.t('done'),
+    'ChooseOption': i18n.t('select'),
+    'choose_option': i18n.t('select'),
+    'SelectMulligan': i18n.t('mulligan'),
+    'select_mulligan': i18n.t('mulligan'),
+    'RockChoice': i18n.t('rps_rock'),
+    'rock_choice': i18n.t('rps_rock'),
+    'PaperChoice': i18n.t('rps_paper'),
+    'paper_choice': i18n.t('rps_paper'),
+    'ScissorsChoice': i18n.t('rps_scissors'),
+    'scissors_choice': i18n.t('rps_scissors'),
+    'ChooseFirstAttacker': i18n.t('go_first'),
+    'choose_first_attacker': i18n.t('go_first'),
+    'ChooseSecondAttacker': i18n.t('go_second'),
+    'choose_second_attacker': i18n.t('go_second'),
+    'ConfirmMulligan': i18n.t('confirm'),
+    'confirm_mulligan': i18n.t('confirm'),
+    'FinishLiveCardSet': i18n.t('finish_live_card_set'),
+    'finish_live_card_set': i18n.t('finish_live_card_set'),
+    'SelectCard': i18n.t('select'),
+    'select_card': i18n.t('select'),
+    'SelectSkip': i18n.t('skip'),
+    'select_skip': i18n.t('skip'),
+};
+
+function _resolveActionLabel(action) {
+    const name = action.parameters?.card_name || action.description || '';
+    if (!name || name.startsWith('ACT_') || name.startsWith('CHOOSE_')) {
+        return ACTION_LABELS[action.action_type] || action.action_type || '';
+    }
+    return name;
+}
+
+function _resolveSpecialLabel(cardNo, name) {
+    if (cardNo === 'pay_optional_cost') return i18n.t('pay_optional_cost');
+    if (cardNo === 'skip_optional_cost') return i18n.t('skip');
+    if (cardNo === 'primary') return i18n.t('primary_option');
+    if (cardNo === 'alternative') return i18n.t('alternative_option');
+    if (cardNo === 'yes') return i18n.t('yes_label');
+    if (cardNo === 'no') return i18n.t('no_label');
+    if (name.startsWith('Draw ')) {
+        const m = name.match(/^Draw (\d+)/);
+        if (m) return parseInt(m[1]) === 0 ? i18n.t('draw_skip') : i18n.t('draw_count', { count: parseInt(m[1]) });
+    }
+    if (name.startsWith('Move card ')) {
+        const m = name.match(/^Move card (\d+) to top/);
+        if (m) return i18n.t('move_to_top', { n: m[1] });
+    }
+    if (name === "Skip (don't change position)") return i18n.t('skip');
+    if (name === 'Apply replacement') return i18n.t('apply_replacement');
+    if (name === "Don't apply") return i18n.t('dont_apply');
+    return name;
+}
+
+function _localizePositionLabel(action, name) {
+    if ((action.action_type === 'select_position' || action.action_type === 'SelectPosition') && name && State.currentLang === 'jp') {
+        return name
+            .replace('Left', i18n.t('area_left'))
+            .replace('Center', i18n.t('area_center'))
+            .replace('Right', i18n.t('area_right'))
+            .replace('Select ', '')
+            .replace('Move to ', '');
+    }
+    return name;
+}
+
+function _buildCardItemFromAction(a, cardByNo) {
+    const cardNo = a.parameters?.card_no;
+    if (a.action_type === 'Pass') return null;
+    const resolved = cardNo ? State.resolveCardData(cardNo) : null;
+    const cardData = cardNo ? (resolved || (cardByNo ? cardByNo[cardNo] : null) || null) : null;
+    const isTextAction = cardNo === '-1' || (cardNo && !cardData);
+    let name = cardData?.name || a.parameters?.card_name || a.description || '';
+    if (!name || name.startsWith('ACT_') || name.startsWith('CHOOSE_')) {
+        name = _resolveActionLabel(a);
+    }
+    name = _localizePositionLabel(a, name);
+    name = _resolveSpecialLabel(cardNo, name);
+    return { card: cardData, name, action: a, isText: isTextAction };
+}
+
 export const ChoiceView = {
     render: (state, container, useModal = true) => {
         const choice = state.pending_choice;
@@ -177,189 +273,13 @@ export const ChoiceView = {
             choiceDiv.appendChild(confirmBtn);
             hasContent = true;
         } else {
-            // Build options: from choice.options (WASM-style), selection_cards, or legal_actions
             const optContainer = document.createElement('div');
             optContainer.className = 'choice-cards-row';
 
-            const optItems = [];
+            // ── Phase 1: Build unified items from available data sources ──
+            const optItems = ChoiceView._buildItems(choice, state);
 
-            // Check for SelectAutoAbility choice (Rule 9.5.3)
-            // The choice's options array has ability_text fields, distinguishing
-            // it from WASM-style card options.
-            if (choice.options && choice.options.length > 0 && choice.options[0].ability_text) {
-                choice.options.forEach((opt, idx) => {
-                    const cardName = opt.card_name || `Ability ${idx + 1}`;
-                    let abilityText = opt.ability_text || '';
-                    if (State.currentLang === 'en' && window.translateAbility) {
-                        abilityText = window.translateAbility(abilityText, 'en');
-                    }
-                    const optCard = opt.card_id !== undefined ? (State.resolveCardData(opt.card_id) || Tooltips.findCardById(opt.card_id)) : (opt.card_no ? State.resolveCardData(opt.card_no) : null);
-                    const action = state.legal_actions?.find(a => {
-                        return a.parameters?.card_id === idx || a.description?.startsWith(cardName);
-                    });
-                    optItems.push({
-                        card: optCard,
-                        name: cardName,
-                        desc: abilityText,
-                        action: action || { index: idx },
-                    });
-                });
-            } else if (choice.options && choice.options.length > 0 && choice.options[0].card_index !== undefined) {
-                // SelectLiveSuccess: options have card_name + card_index
-                // Try to show card images by resolving card data from selection_cards or card_no
-                const selByNo = {};
-                (choice.selection_cards || []).forEach(sc => { if (sc.card_no) selByNo[sc.card_no] = sc; });
-                choice.options.forEach((opt, idx) => {
-                    const resolved = opt.card_no ? (selByNo[opt.card_no] || State.resolveCardData(opt.card_no) || State.resolveCardDataByName(opt.card_name)) : null;
-                    const action = state.legal_actions?.find(a =>
-                        (a.action_type === 'select_card' || a.action_type === 'select_live_card') &&
-                        (a.parameters?.card_id === idx || a.parameters?.card_indices?.includes(idx) || a.parameters?.card_no === opt.card_no)
-                    );
-                    optItems.push({
-                        card: resolved,
-                        name: opt.card_name || `Card ${idx + 1}`,
-                        action: action || { action_type: 'select_card', parameters: { card_indices: [idx] } },
-                        isText: !resolved,
-                    });
-                });
-            } else if (choice.options && choice.options.length > 0) {
-                // Check if options are plain strings (heart colors, etc.) vs WASM objects
-                const isStringOptions = typeof choice.options[0] === 'string';
-                if (isStringOptions) {
-                    state.legal_actions && state.legal_actions.forEach(a => {
-                        const cardNo = a.parameters?.card_no;
-                        const isHeart = cardNo && cardNo.startsWith('heart');
-                        const optIdx = a.parameters?.card_id;
-                        const optText = optIdx !== undefined && choice.options[optIdx] ? choice.options[optIdx] : null;
-                        const name = isHeart
-                            ? cardNo.replace('heart0', '♥').replace('heart', '♥')
-                            : (a.description || optText || a.parameters?.card_name || '');
-                        optItems.push({ card: null, name, action: a, isText: !isHeart });
-                    });
-                } else {
-                    // WASM-style options with action IDs
-                    choice.options.forEach((opt, idx) => {
-                        const actionId = choice.actions?.[idx];
-                        if (actionId === undefined || actionId === null || actionId === 0) return;
-                        const optCardId = opt.card_id !== undefined ? opt.card_id : null;
-                        const fallbackName = opt.name || opt.text || `Option ${idx + 1}`;
-                        const optCard = optCardId !== null ? (State.resolveCardData(optCardId) || Tooltips.findCardById(optCardId)) : null;
-                        optItems.push({ card: optCard, name: fallbackName, action: { index: actionId } });
-                    });
-                }
-            } else if (choice.selection_cards && choice.selection_cards.length > 0 && state.legal_actions) {
-                // REST-style: selection_cards + legal_actions
-                const cardByNo = {};
-                choice.selection_cards.forEach(sc => { cardByNo[sc.card_no] = sc; });
-                state.legal_actions.forEach(a => {
-                    if (a.action_type !== 'select_card' && a.action_type !== 'select_skip') return;
-                    const cardNo = a.parameters?.card_no;
-                    const resolved = cardNo ? State.resolveCardData(cardNo) : null;
-                    const cardData = cardNo ? (resolved || cardByNo[cardNo] || null) : null;
-                    const name = cardData?.name || a.parameters?.card_name || a.description || '';
-                     const isTextAction = cardNo === '-1' || (cardNo && !cardData);
-                    optItems.push({ card: cardData, name, action: a, isText: isTextAction });
-                });
-            } else if (state.legal_actions && state.legal_actions.length > 0) {
-                // Fallback: show legal_actions as text buttons or cards
-                state.legal_actions.forEach(a => {
-                    if (a.action_type === 'Pass') return;
-                    const cardNo = a.parameters?.card_no;
-                    const resolved = cardNo ? State.resolveCardData(cardNo) : null;
-                    const cardData = cardNo ? resolved : null;
-                    // Text-only action (yes/no/skip/digit) → render as text button, not empty card
-                     const isTextAction = cardNo === '-1' || (cardNo && !cardData);
-                    let name = cardData?.name || a.parameters?.card_name || a.description || '';
-                    if (!name || name.startsWith('ACT_') || name.startsWith('CHOOSE_')) {
-                        const ACTION_LABELS = {
-                            'PlayMemberToStage': i18n.t('set_deck'),
-                            'play_member_to_stage': i18n.t('set_deck'),
-                            'UseAbility': i18n.t('act_ability'),
-                            'use_ability': i18n.t('act_ability'),
-                            'SetLiveCard': i18n.t('live_card_set'),
-                            'set_live_card': i18n.t('live_card_set'),
-                            'EnergyCharge': i18n.t('energy'),
-                            'energy_charge': i18n.t('energy'),
-                            'Pass': i18n.t('pass_no'),
-                            'pass': i18n.t('pass_no'),
-                            'pass_remaining': i18n.t('pass_no'),
-                            'SkipMulligan': i18n.t('skip'),
-                            'skip_mulligan': i18n.t('skip'),
-                            'Decision': i18n.t('done'),
-                            'decision': i18n.t('done'),
-                            'ChooseOption': i18n.t('select'),
-                            'choose_option': i18n.t('select'),
-                            'SelectMulligan': i18n.t('mulligan'),
-                            'select_mulligan': i18n.t('mulligan'),
-                            'RockChoice': i18n.t('rps_rock'),
-                            'rock_choice': i18n.t('rps_rock'),
-                            'PaperChoice': i18n.t('rps_paper'),
-                            'paper_choice': i18n.t('rps_paper'),
-                            'ScissorsChoice': i18n.t('rps_scissors'),
-                            'scissors_choice': i18n.t('rps_scissors'),
-                            'ChooseFirstAttacker': i18n.t('go_first'),
-                            'choose_first_attacker': i18n.t('go_first'),
-                            'ChooseSecondAttacker': i18n.t('go_second'),
-                            'choose_second_attacker': i18n.t('go_second'),
-                            'ConfirmMulligan': i18n.t('confirm'),
-                            'confirm_mulligan': i18n.t('confirm'),
-                            'FinishLiveCardSet': i18n.t('finish_live_card_set'),
-                            'finish_live_card_set': i18n.t('finish_live_card_set'),
-
-                            'SelectCard': i18n.t('select'),
-                            'select_card': i18n.t('select'),
-                            'SelectSkip': i18n.t('skip'),
-                            'select_skip': i18n.t('skip'),
-                        };
-                        name = ACTION_LABELS[a.action_type] || a.action_type || '';
-                    }
-                    // Position choice labels: localize position names for JP
-                    if ((a.action_type === 'select_position' || a.action_type === 'SelectPosition') && name) {
-                        if (State.currentLang === 'jp') {
-                            name = name
-                                .replace('Left', i18n.t('area_left'))
-                                .replace('Center', i18n.t('area_center'))
-                                .replace('Right', i18n.t('area_right'))
-                                .replace('Select ', '')
-                                .replace('Move to ', '');
-                        }
-                    }
-                    // Special card_no-based text actions — use locale
-                    if (cardNo === 'pay_optional_cost') {
-                        name = i18n.t('pay_optional_cost');
-                    } else if (cardNo === 'skip_optional_cost') {
-                        name = i18n.t('skip');
-                    } else if (cardNo === 'primary') {
-                        name = i18n.t('primary_option');
-                    } else if (cardNo === 'alternative') {
-                        name = i18n.t('alternative_option');
-                    } else if (cardNo === 'yes') {
-                        name = i18n.t('yes_label');
-                    } else if (cardNo === 'no') {
-                        name = i18n.t('no_label');
-                    } else if (name.startsWith('Draw ')) {
-                        const drawMatch = name.match(/^Draw (\d+)/);
-                        if (drawMatch) {
-                            const n = parseInt(drawMatch[1]);
-                            name = n === 0 ? i18n.t('draw_skip') : i18n.t('draw_count', { count: n });
-                        }
-                    } else if (name.startsWith('Move card ')) {
-                        const orderMatch = name.match(/^Move card (\d+) to top/);
-                        if (orderMatch) {
-                            name = i18n.t('move_to_top', { n: orderMatch[1] });
-                        }
-                    } else if (name === "Skip (don't change position)") {
-                        name = i18n.t('skip');
-                    } else if (name === 'Apply replacement') {
-                        name = i18n.t('apply_replacement');
-                    } else if (name === "Don't apply") {
-                        name = i18n.t('dont_apply');
-                    }
-                    optItems.push({ card: cardData, name, action: a, isText: isTextAction });
-                });
-            }
-
-            // Deduplicate by action index
+            // ── Phase 2: Deduplicate by action identity ──
             const seen = new Set();
             const unique = optItems.filter(item => {
                 const key = item.action.index || JSON.stringify(item.action);
@@ -368,147 +288,21 @@ export const ChoiceView = {
                 return true;
             });
 
+            // ── Phase 3: Render each item ──
             unique.forEach(item => {
-                const cardData = item.card;
-                let choiceEl;
-
-                // Auto-ability option: show card image + name + ability text
-                if (item.desc) {
-                    choiceEl = document.createElement('div');
-                    choiceEl.className = 'choice-item text-option auto-ability';
-                    choiceEl.style.cssText = `
-                        display: flex;
-                        flex-direction: row;
-                        align-items: center;
-                        gap: 8px;
-                        padding: 4px 8px;
-                        width: 100%;
-                        height: auto;
-                        min-height: 0;
-                        flex-shrink: 1;
-                        box-sizing: border-box;
-                        cursor: pointer;
-                        font-size: 0.9rem;
-                        background: var(--input-bg, #2a2a3a);
-                        border: 1px solid var(--accent-purple, #9966ff);
-                        border-radius: 6px;
-                        color: var(--text, #eee);
-                        text-align: left;
-                    `;
-                    if (cardData && cardData.card_no) {
-                        const vm = CardRenderer.getCardViewModel(cardData, { mini: true });
-                        const cardPortion = CardRenderer.createCardDOM(vm, cardData);
-                        choiceEl.appendChild(cardPortion);
-                    }
-                    const textWrap = document.createElement('div');
-                    textWrap.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;';
-                    textWrap.innerHTML = `
-                        <div style="font-weight:bold;color:#cc88ff;font-size:0.85rem;">${Tooltips.enrichAbilityText(item.name)}</div>
-                        <div style="opacity:0.8;font-size:0.75rem;line-height:1.3;">${Tooltips.enrichAbilityText(item.desc)}</div>
-                    `;
-                    choiceEl.appendChild(textWrap);
-                } else if (item.isText) {
-                    choiceEl = document.createElement('div');
-                    choiceEl.className = 'choice-item text-option';
-                    choiceEl.style.cssText = `
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        padding: 12px 16px;
-                        width: auto;
-                        height: auto;
-                        min-width: 80px;
-                        min-height: 48px;
-                        flex-shrink: 1;
-                        cursor: pointer;
-                        font-size: 0.95rem;
-                        background: var(--input-bg, #2a2a3a);
-                        border: 2px solid var(--border, #555);
-                        border-radius: 8px;
-                        color: var(--text, #eee);
-                    `;
-                    if (item.name.includes('{{')) {
-                        choiceEl.innerHTML = Tooltips.enrichAbilityText(item.name);
-                    } else {
-                        choiceEl.textContent = item.name;
-                    }
-                } else if (item.name.startsWith('♥') || item.name.match(/heart\d{2}/)) {
-                    const heartIdx = parseInt(item.name.replace(/\D/g, '')) || 1;
-                    choiceEl = document.createElement('div');
-                    choiceEl.className = 'choice-item heart-option';
-                    choiceEl.style.cssText = `
-                        background: none;
-                        border: 2px solid var(--border);
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 2rem;
-                        min-width: 64px;
-                        min-height: 64px;
-                        cursor: pointer;
-                    `;
-                    const heartImg = document.createElement('img');
-                    heartImg.src = `img/texticon/heart_0${heartIdx}.png`;
-                    heartImg.className = 'heart-mini-icon';
-                    heartImg.style.width = '48px';
-                    heartImg.style.height = '48px';
-                    choiceEl.innerHTML = '';
-                    choiceEl.appendChild(heartImg);
-                } else if (cardData && cardData.card_no) {
-                    if (choice.blind) {
-                        choiceEl = document.createElement('div');
-                        choiceEl.className = 'card card-compact card-back';
-                        const backImg = document.createElement('img');
-                        backImg.src = fixImg('img/texticon/lltcg-back.png');
-                        backImg.style.width = '100%';
-                        backImg.style.height = '100%';
-                        backImg.style.objectFit = 'cover';
-                        backImg.draggable = false;
-                        choiceEl.appendChild(backImg);
-                        choiceEl.title = '??? (blind pick)';
-                    } else {
-                        const vm = CardRenderer.getCardViewModel(cardData, { mini: true, actionId: item.action?.index });
-                        choiceEl = CardRenderer.createCardDOM(vm, cardData);
-                        choiceEl.classList.add('card-choice');
-                    }
-                } else {
-                    choiceEl = document.createElement('div');
-                    choiceEl.className = 'choice-item text-option';
-                    choiceEl.style.cssText = `
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        padding: 8px 12px;
-                        width: 100%;
-                        height: auto;
-                        flex-shrink: 1;
-                        font-size: 0.85rem;
-                        background: var(--input-bg, #2a2a3a);
-                        border: 1px solid var(--border, #555);
-                        border-radius: 6px;
-                        color: var(--text, #eee);
-                        box-sizing: border-box;
-                    `;
-                    if (item.name.includes('{{')) {
-                        choiceEl.innerHTML = Tooltips.enrichAbilityText(item.name);
-                    } else {
-                        choiceEl.textContent = item.name;
-                    }
-                }
-
+                const el = ChoiceView._renderItem(item, choice);
+                if (!el) return;
                 const isDisabled = item.action?.parameters?.disabled === true;
                 if (isDisabled) {
-                    choiceEl.style.opacity = '0.35';
-                    choiceEl.style.filter = 'grayscale(1)';
-                    choiceEl.style.cursor = 'not-allowed';
+                    el.style.opacity = '0.35';
+                    el.style.filter = 'grayscale(1)';
+                    el.style.cursor = 'not-allowed';
                 } else {
-                    choiceEl.onclick = () => {
-                        if (window.doAction) window.doAction(item.action);
-                    };
+                    el.onclick = () => { if (window.doAction) window.doAction(item.action); };
                 }
-                choiceEl._choiceCard = item.card || null;
-                choiceEl._choiceAction = item.action || null;
-                optContainer.appendChild(choiceEl);
+                el._choiceCard = item.card || null;
+                el._choiceAction = item.action || null;
+                optContainer.appendChild(el);
             });
 
             if (unique.length > 0) {
@@ -593,5 +387,218 @@ export const ChoiceView = {
                 container.appendChild(choiceDiv);
             }
         }
-    }
+    },
+
+    /// Build a unified optItems array from whatever data source the choice provides.
+    _buildItems(choice, state) {
+        const items = [];
+        const selByNo = {};
+        if (choice.selection_cards) {
+            choice.selection_cards.forEach(sc => { if (sc.card_no) selByNo[sc.card_no] = sc; });
+        }
+        const hasOptions = choice.options && choice.options.length > 0;
+        const firstOpt = hasOptions ? choice.options[0] : null;
+
+        // 1) Auto-ability options (Rule 9.5.3)
+        if (hasOptions && firstOpt.ability_text) {
+            choice.options.forEach((opt, idx) => {
+                const cardName = opt.card_name || `Ability ${idx + 1}`;
+                let abilityText = opt.ability_text || '';
+                if (State.currentLang === 'en' && window.translateAbility) {
+                    abilityText = window.translateAbility(abilityText, 'en');
+                }
+                const optCard = opt.card_id !== undefined
+                    ? (State.resolveCardData(opt.card_id) || Tooltips.findCardById(opt.card_id))
+                    : (opt.card_no ? State.resolveCardData(opt.card_no) : null);
+                const action = state.legal_actions?.find(a =>
+                    a.parameters?.card_id === idx || a.description?.startsWith(cardName)
+                );
+                items.push({ card: optCard, name: cardName, desc: abilityText, action: action || { index: idx } });
+            });
+            return items;
+        }
+
+        // 2) Live success options
+        if (hasOptions && firstOpt.card_index !== undefined) {
+            choice.options.forEach((opt, idx) => {
+                const resolved = opt.card_no
+                    ? (selByNo[opt.card_no] || State.resolveCardData(opt.card_no) || State.resolveCardDataByName(opt.card_name))
+                    : null;
+                const action = state.legal_actions?.find(a =>
+                    (a.action_type === 'select_card' || a.action_type === 'select_live_card') &&
+                    (a.parameters?.card_id === idx || a.parameters?.card_indices?.includes(idx) || a.parameters?.card_no === opt.card_no)
+                );
+                items.push({
+                    card: resolved,
+                    name: opt.card_name || `Card ${idx + 1}`,
+                    action: action || { action_type: 'select_card', parameters: { card_indices: [idx] } },
+                    isText: !resolved,
+                });
+            });
+            return items;
+        }
+
+        // 3) String options (heart colors, yes/no, etc.)
+        if (hasOptions && typeof firstOpt === 'string') {
+            (state.legal_actions || []).forEach(a => {
+                const cardNo = a.parameters?.card_no;
+                const isHeart = cardNo && cardNo.startsWith('heart');
+                const optIdx = a.parameters?.card_id;
+                const optText = optIdx !== undefined && choice.options[optIdx] ? choice.options[optIdx] : null;
+                const name = isHeart
+                    ? cardNo.replace('heart0', '♥').replace('heart', '♥')
+                    : (a.description || optText || a.parameters?.card_name || '');
+                items.push({ card: null, name, action: a, isText: !isHeart });
+            });
+            return items;
+        }
+
+        // 4) WASM-style options with action IDs
+        if (hasOptions && choice.actions) {
+            choice.options.forEach((opt, idx) => {
+                const actionId = choice.actions?.[idx];
+                if (actionId === undefined || actionId === null || actionId === 0) return;
+                const optCardId = opt.card_id !== undefined ? opt.card_id : null;
+                const fallbackName = opt.name || opt.text || `Option ${idx + 1}`;
+                const optCard = optCardId !== null
+                    ? (State.resolveCardData(optCardId) || Tooltips.findCardById(optCardId))
+                    : null;
+                items.push({ card: optCard, name: fallbackName, action: { index: actionId } });
+            });
+            return items;
+        }
+
+        // 5) REST-style: selection_cards + legal_actions
+        // Only render cards present in selection_cards — non-matching cards that
+        // exist in legal_actions (as disabled) are for look-and-select (all cards
+        // shown, some greyed out) and already have full selection_cards data.
+        // For non-look choices (hand/discard/stage), selection_cards only includes
+        // matching cards, so non-matching legal_actions are silently skipped.
+        if (choice.selection_cards && choice.selection_cards.length > 0 && state.legal_actions) {
+            state.legal_actions.forEach(a => {
+                if (a.action_type !== 'select_card' && a.action_type !== 'select_skip') return;
+                const cardNo = a.parameters?.card_no;
+                if (!cardNo || !selByNo[cardNo]) return;
+                const item = _buildCardItemFromAction(a, selByNo);
+                if (item) items.push(item);
+            });
+            return items;
+        }
+
+        // 6) Fallback: legal_actions only
+        if (state.legal_actions && state.legal_actions.length > 0) {
+            state.legal_actions.forEach(a => {
+                if (a.action_type === 'Pass') return;
+                const item = _buildCardItemFromAction(a, null);
+                if (item) items.push(item);
+            });
+            return items;
+        }
+
+        return items;
+    },
+
+    /// Render a single item to a DOM element based on its visual type.
+    _renderItem(item, choice) {
+        const cardData = item.card;
+
+        if (item.desc) {
+            // Auto-ability option: show card thumbnail + name + ability text
+            const el = document.createElement('div');
+            el.className = 'choice-item text-option auto-ability';
+            el.style.cssText = `
+                display: flex; flex-direction: row; align-items: center; gap: 8px;
+                padding: 4px 8px; width: 100%; height: auto; min-height: 0;
+                flex-shrink: 1; box-sizing: border-box; cursor: pointer;
+                font-size: 0.9rem; background: var(--input-bg, #2a2a3a);
+                border: 1px solid var(--accent-purple, #9966ff); border-radius: 6px;
+                color: var(--text, #eee); text-align: left;
+            `;
+            if (cardData && cardData.card_no) {
+                const vm = CardRenderer.getCardViewModel(cardData, { mini: true });
+                el.appendChild(CardRenderer.createCardDOM(vm, cardData));
+            }
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;';
+            wrap.innerHTML = `
+                <div style="font-weight:bold;color:#cc88ff;font-size:0.85rem;">${Tooltips.enrichAbilityText(item.name)}</div>
+                <div style="opacity:0.8;font-size:0.75rem;line-height:1.3;">${Tooltips.enrichAbilityText(item.desc)}</div>
+            `;
+            el.appendChild(wrap);
+            return el;
+        }
+
+        if (item.isText) {
+            const el = document.createElement('div');
+            el.className = 'choice-item text-option';
+            el.style.cssText = `
+                display: flex; align-items: center; justify-content: center;
+                padding: 12px 16px; width: auto; height: auto; min-width: 80px;
+                min-height: 48px; flex-shrink: 1; cursor: pointer; font-size: 0.95rem;
+                background: var(--input-bg, #2a2a3a); border: 2px solid var(--border, #555);
+                border-radius: 8px; color: var(--text, #eee);
+            `;
+            if (item.name.includes('{{')) {
+                el.innerHTML = Tooltips.enrichAbilityText(item.name);
+            } else {
+                el.textContent = item.name;
+            }
+            return el;
+        }
+
+        if (item.name.startsWith('♥') || item.name.match(/heart\d{2}/)) {
+            const heartIdx = parseInt(item.name.replace(/\D/g, '')) || 1;
+            const el = document.createElement('div');
+            el.className = 'choice-item heart-option';
+            el.style.cssText = `
+                background: none; border: 2px solid var(--border);
+                display: flex; align-items: center; justify-content: center;
+                font-size: 2rem; min-width: 64px; min-height: 64px; cursor: pointer;
+            `;
+            const img = document.createElement('img');
+            img.src = `img/texticon/heart_0${heartIdx}.png`;
+            img.className = 'heart-mini-icon';
+            img.style.width = '48px';
+            img.style.height = '48px';
+            el.appendChild(img);
+            return el;
+        }
+
+        if (cardData && cardData.card_no) {
+            if (choice.blind) {
+                const el = document.createElement('div');
+                el.className = 'card card-compact card-back';
+                const img = document.createElement('img');
+                img.src = fixImg('img/texticon/lltcg-back.png');
+                img.style.width = '100%';
+                img.style.height = '100%';
+                img.style.objectFit = 'cover';
+                img.draggable = false;
+                el.appendChild(img);
+                el.title = '??? (blind pick)';
+                return el;
+            }
+            const vm = CardRenderer.getCardViewModel(cardData, { mini: true, actionId: item.action?.index });
+            const el = CardRenderer.createCardDOM(vm, cardData);
+            el.classList.add('card-choice');
+            return el;
+        }
+
+        // Fallback text element
+        const el = document.createElement('div');
+        el.className = 'choice-item text-option';
+        el.style.cssText = `
+            display: flex; align-items: center; justify-content: center;
+            padding: 8px 12px; width: 100%; height: auto; flex-shrink: 1;
+            font-size: 0.85rem; background: var(--input-bg, #2a2a3a);
+            border: 1px solid var(--border, #555); border-radius: 6px;
+            color: var(--text, #eee); box-sizing: border-box;
+        `;
+        if (item.name.includes('{{')) {
+            el.innerHTML = Tooltips.enrichAbilityText(item.name);
+        } else {
+            el.textContent = item.name;
+        }
+        return el;
+    },
 };

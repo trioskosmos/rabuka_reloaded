@@ -1294,6 +1294,15 @@ async fn exec_code(
         }
     }
 
+    if code.contains("add_to_deck_top") {
+        let card_no = parse_param(code, "card_no").unwrap_or_default();
+        if let Some(card_id) = game_state.card_database.get_card_id(&card_no) {
+            with_player!(p, {
+                p.main_deck.cards.insert(0, card_id);
+            });
+        }
+    }
+
     let exec_room_id = get_room_id_from_req(&http_req);
     // Push snapshot to history so exec_code can be undone like any other action
     if let Some(ref rid) = exec_room_id {

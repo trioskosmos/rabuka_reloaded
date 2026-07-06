@@ -1726,6 +1726,7 @@ impl GameState {
                         ref cost_limit_operator,
                         ref target_player_id,
                         ref group,
+                        ref characters,
                         ref filtered_indices,
                         ..
                     } = choice
@@ -1763,22 +1764,20 @@ impl GameState {
                         let filtered: Vec<i16> = if filtered_indices.is_some() {
                             card_ids
                         } else {
+                            let card_db = &self.card_database;
                             card_ids
                                 .into_iter()
                                 .filter(|&cid| {
                                     let type_ok = match card_type.as_deref() {
-                                        Some("member_card") => self
-                                            .card_database
+                                        Some("member_card") => card_db
                                             .get_card(cid)
                                             .map(|c| c.is_member())
                                             .unwrap_or(false),
-                                        Some("live_card") => self
-                                            .card_database
+                                        Some("live_card") => card_db
                                             .get_card(cid)
                                             .map(|c| c.is_live())
                                             .unwrap_or(false),
-                                        Some("energy_card") => self
-                                            .card_database
+                                        Some("energy_card") => card_db
                                             .get_card(cid)
                                             .map(|c| c.is_energy())
                                             .unwrap_or(false),
@@ -1787,24 +1786,33 @@ impl GameState {
                                     };
                                     let group_ok = match group.as_ref() {
                                         Some(g) => crate::ability::util::card_matches_group_str(
-                                            &self.card_database,
+                                            card_db,
                                             cid,
                                             Some(g),
                                         ),
                                         None => true,
                                     };
-                                    type_ok
-                                        && group_ok
-                                        && if let Some(lim) = cost_limit {
-                                            crate::ability::util::card_matches_cost_limit_op(
-                                                &self.card_database,
+                                    let chars_ok = match characters.as_ref() {
+                                        Some(chars) => {
+                                            crate::ability::util::card_matches_characters(
+                                                card_db,
                                                 cid,
-                                                Some(*lim),
-                                                cost_limit_operator.as_deref(),
+                                                Some(chars),
                                             )
-                                        } else {
-                                            true
                                         }
+                                        None => true,
+                                    };
+                                    let cost_ok = if let Some(lim) = cost_limit {
+                                        crate::ability::util::card_matches_cost_limit_op(
+                                            card_db,
+                                            cid,
+                                            Some(*lim),
+                                            cost_limit_operator.as_deref(),
+                                        )
+                                    } else {
+                                        true
+                                    };
+                                    type_ok && group_ok && chars_ok && cost_ok
                                 })
                                 .collect()
                         };

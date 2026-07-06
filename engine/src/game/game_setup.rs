@@ -609,24 +609,30 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 _ => None,
             };
 
+            let is_look_zone = Zone::from_str(zone) == Some(Zone::LookedAt);
+
             for (zone_index, card_id) in &card_ids {
                 let card = game_state.card_database.get_card(*card_id);
                 let card_name = card.map(|c| c.name.as_str()).unwrap_or("Unknown");
                 let real_card_no = card.map(|c| c.card_no.clone()).unwrap_or_default();
 
                 // Hard filter: card_type mismatch → hide entirely
-                let matches_type = match card_type.as_deref() {
-                    Some("member_card") => card.map(|c| c.is_member()).unwrap_or(false),
-                    Some("live_card") => card.map(|c| c.is_live()).unwrap_or(false),
-                    Some("energy_card") => card.map(|c| c.is_energy()).unwrap_or(false),
-                    None => true,
-                    _ => true,
-                };
-                if !matches_type {
-                    continue;
+                // For looked_at zone (look abilities), skip this — show all cards,
+                // non-matching ones get blacked out via disabled below.
+                if !is_look_zone {
+                    let matches_type = match card_type.as_deref() {
+                        Some("member_card") => card.map(|c| c.is_member()).unwrap_or(false),
+                        Some("live_card") => card.map(|c| c.is_live()).unwrap_or(false),
+                        Some("energy_card") => card.map(|c| c.is_energy()).unwrap_or(false),
+                        None => true,
+                        _ => true,
+                    };
+                    if !matches_type {
+                        continue;
+                    }
                 }
 
-                // Soft filters: any failure → shown greyed out
+                // Soft filters: any failure → greyed out (look) or hidden (non-look)
                 let in_fi = fi_set.as_ref().map_or(true, |s| s.contains(zone_index));
                 let matches_chars = characters.as_ref().map_or(true, |chars| {
                     crate::ability::util::card_matches_characters(
@@ -651,6 +657,11 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     )
                 });
                 let is_selectable = in_fi && matches_chars && matches_group && matches_cost;
+
+                // For non-look zones: skip non-selectable cards entirely
+                if !is_look_zone && !is_selectable {
+                    continue;
+                }
 
                 // Map to filtered-index position for card_indices
                 let fi_index = match filtered_indices {

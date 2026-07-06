@@ -11,12 +11,56 @@ Architecture overview:
           3. parse_condition()- trigger conditions (場合/とき/たび)
           4. parse_action()   - individual actions (move, gain, etc.)
       → abilities.json (structured output consumed by Rust engine)
+
+Condition types produced (type field in condition dict):
+  complex                - nested compound conditions (AかつBかつC)
+  compound               - "AかつB" / "Aあり、B" → {operator: "and", conditions: [...]}
+  compound (or)          - "Aか、Bか" → {operator: "or", conditions: [...]}
+  location_condition     - location-based count with optional distinct/card_type filters
+  card_count_condition   - "N枚以上" / "N人以上" → {count, operator, card_type}
+  card_blade_condition   - "ブレードがNつ以上" → {count, operator}
+  comparison_condition   - cost/resource comparisons → {comparison_target, ...}
+  highest_cost_on_stage_condition - "センターにいるメンバーが最も大きいコストを持つ"
+  both_condition         - "それらが両方ある"
+  temporal_condition     - "このターン" / live during / phase-gate → {temporal, phase}
+  movement_condition     - "エリアを移動" / "このターン中にエリアを移動した"
+  appearance             - "登場した" / "場に出た" → {type: "appearance"}
+  zone_placement         - zone-to-zone movement (discard → waitroom, etc.)
+  state_change_condition - "アクティブ状態からウェイト状態になった"
+  energy_state           - energy <= N / >= N → {resource_type: "energy", count, operator}
+  member_state           - "アクティブ状態" / "ウェイト状態" → {member_state}
+  revealed_condition     - revealed card matching
+  opponent_choice        - opponent-driven selection condition
+  position_condition     - position check (センター/左サイド/右サイド)
+  position_change_condition - "ポジションチェンジ"
+  ability_filter_condition - "能力を持たない" / "能力も持たない"
+  otherwise_condition    - "それ以外の場合"
+  temporal_during_live   - "ライブ中" (without count) → {temporal: "during_live"}
+  custom                 - fallback when no handler matches
+
+On every run, abilities_debug.txt is written next to abilities.json
+with a trace of every condition and effect handler call.
 """
 
 import json
 import re
 import copy
 from typing import Dict, Any, Optional, Tuple, List, Union
+
+# Debug log accumulator: every parse_condition and parse_effect call appends
+# a trace entry. Written to abilities_debug.txt at the end of the pipeline.
+_DEBUG_LOG: List[str] = []
+_DEBUG_CURRENT_SECTION: str = ""
+
+
+def set_debug_section(section: str) -> None:
+    """Emit a section header when starting to parse a new ability."""
+    global _DEBUG_CURRENT_SECTION
+    if section != _DEBUG_CURRENT_SECTION:
+        _DEBUG_LOG.append(f"\n==== {section} ====")
+        _DEBUG_CURRENT_SECTION = section
+
+
 from parser_utils import (
     extract_count,
     extract_dynamic_count,
@@ -711,46 +755,57 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
             effect = {}
 
         # Fill missing condition from text — unified single field
-        if not effect.get("condition"):
-            txt = remaining_text
-            for sep in ["とき、", "場合、", "たび、", "なら、"]:
-                idx = txt.find(sep)
-                if idx >= 0:
-                    cond_text = txt[
-                        : idx
-                        + len(
-                            "とき"
-                            if sep == "とき、"
-                            else "場合"
-                            if sep == "場合、"
-                            else "たび"
-                            if sep == "たび、"
-                            else "なら"
-                        )
-                    ]
-                    if ")" in cond_text or "）" in cond_text:
-                        continue
-                    tc = parse_condition(cond_text)
-                    if tc and tc.get("type") not in (None, "custom"):
-                        effect["condition"] = tc
+        trigger_condition = None
+        txt = remaining_text
+        for sep in ["とき、", "場合、", "たび、", "なら、"]:
+            idx = txt.find(sep)
+            if idx >= 0:
+                cond_text = txt[
+                    : idx
+                    + len(
+                        "とき"
+                        if sep == "とき、"
+                        else "場合"
+                        if sep == "場合、"
+                        else "たび"
+                        if sep == "たび、"
+                        else "なら"
+                    )
+                ]
+                if ")" in cond_text or "）" in cond_text:
+                    continue
+                tc = parse_condition(cond_text)
+                if tc and tc.get("type") not in (None, "custom"):
+                    trigger_condition = tc
+                    break
+        # Merge trigger condition with any condition already on the effect
+        # (e.g. promoted from a sub-action by _try_re_yell).
+        existing = effect.get("condition")
+        if existing and isinstance(existing, dict) and trigger_condition:
+            effect["condition"] = {
+                "type": "compound",
+                "operator": "and",
+                "conditions": [trigger_condition, existing],
+            }
+        elif not existing and trigger_condition:
+            effect["condition"] = trigger_condition
+        elif not existing:
+            for key in ("actions", "primary_effect", "conditional_action"):
+                sub = effect.get(key)
+                if isinstance(sub, dict):
+                    sv = sub.get("condition")
+                    if sv and isinstance(sv, dict):
+                        effect["condition"] = copy.deepcopy(sv)
                         break
-            if not effect.get("condition"):
-                for key in ("actions", "primary_effect", "conditional_action"):
-                    sub = effect.get(key)
-                    if isinstance(sub, dict):
-                        sv = sub.get("condition")
-                        if sv and isinstance(sv, dict):
-                            effect["condition"] = copy.deepcopy(sv)
-                            break
-                    elif isinstance(sub, list):
-                        for item in sub:
-                            if isinstance(item, dict):
-                                sv = item.get("condition")
-                                if sv and isinstance(sv, dict):
-                                    effect["condition"] = copy.deepcopy(sv)
-                                    break
-                        if effect.get("condition"):
-                            break
+                elif isinstance(sub, list):
+                    for item in sub:
+                        if isinstance(item, dict):
+                            sv = item.get("condition")
+                            if sv and isinstance(sv, dict):
+                                effect["condition"] = copy.deepcopy(sv)
+                                break
+                    if effect.get("condition"):
+                        break
 
         # Apply activation_position from cost text to the effect
         if extra_pos_from_cost and "activation_position" not in effect:
@@ -1061,6 +1116,11 @@ def parse_effect(text: str) -> Dict[str, Any]:
         hn = handler.__name__ if hasattr(handler, "__name__") else "?"
         result = handler(text)
         if result is not None:
+            _DEBUG_LOG.append(
+                f"parse_effect({text!r})\n"
+                f"  [effect] {hn}: MATCH → action={result.get('action')}\n"
+                f"  output: {json.dumps(result, ensure_ascii=False)}"
+            )
             _merge_parenthetical(result, parenthetical)
             # Apply duration prefix info
             if "duration" in effect and "duration" not in result:
@@ -1132,6 +1192,11 @@ def parse_effect(text: str) -> Dict[str, Any]:
 
     action = parse_action(fallback_text)
     effect.update(action)
+    _DEBUG_LOG.append(
+        f"parse_effect({text!r})\n"
+        f"  → no handler matched, parse_action fallback\n"
+        f"  output: {json.dumps(effect, ensure_ascii=False)}"
+    )
 
     _merge_parenthetical(effect, parenthetical)
     if extra_activation_cond and "activation_condition_parsed" not in effect:
@@ -1248,51 +1313,16 @@ def parse_condition(text: str) -> Dict[str, Any]:
         heart_possession, live_mid
     """
     text = strip_parenthetical(text)
-    # Try early-return handlers (most specific first)
-    for handler in [
-        # Tier 1: Complex/compound patterns
-        _try_complex,
-        _try_compound,
-        _try_distinct,
-        _try_dual_distinct,
-        # Tier 2: State changes & OR triggers
-        _try_state_change,
-        _try_or,
-        _try_blade_count,
-        # Tier 3: Card counts & cost comparisons
-        _try_card_count,
-        _try_highest_cost_on_stage,
-        _try_cost_override_condition,
-        _try_both,
-        # Tier 4: Temporal constraints
-        _try_temporal_this_turn,
-        _try_phase_gate,
-        _try_temporal_turn_phase,
-        _try_baton_touch,
-        _try_temporal_count,
-        # Tier 5: Target/location/zone patterns
-        _try_either_target,
-        _try_live_success_or_move,
-        _try_appear_or_move,
-        _try_movement,
-        _try_appearance,
-        _try_zone_placement,
-        # Tier 6: State/resource checks
-        _try_energy_state,
-        _try_state,
-        _try_revealed,
-        _try_opponent_choice,
-        _try_unless_pay,
-        # Tier 7: Position, ability, and other filters
-        _try_position_change,
-        _try_position,
-        _try_ability_filter,
-        _try_otherwise,
-        _try_heart_possession,
-        _try_live_mid,
-    ]:
+    # Try early-return handlers (most specific first).
+    # See CONDITION_PATTERNS for the priority-ordered registry.
+    for name, tier, handler in CONDITION_PATTERNS:
         result = handler(text)
         if result is not None:
+            _DEBUG_LOG.append(
+                f"parse_condition({text!r})\n"
+                f"  [T{tier}] {name}: MATCH → type={result['type']}\n"
+                f"  output: {json.dumps(result, ensure_ascii=False)}"
+            )
             # Extract cost_limit and card_property from text for handlers
             # that don't set these fields themselves (e.g. _try_heart_possession).
             # Only extract when the key is truly absent (not just None) to avoid
@@ -1349,7 +1379,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
             return result
 
     # Fall-through: generic field extraction + type inference
-    condition = {"text": text}
+    condition: Dict[str, Any] = {"text": text}
     _extract_generic_fields(condition, text)
     # Add scope for conditions that span both players
     if "scope" not in condition and "自分と相手" in text:
@@ -1386,6 +1416,11 @@ def parse_condition(text: str) -> Dict[str, Any]:
     # OR-location and heart-content enrichment for fallthrough path
     _enrich_or_location(condition, text)
     _enrich_heart_content(condition, text)
+    _DEBUG_LOG.append(
+        f"parse_condition({text!r})\n"
+        f"  → no handler matched, fallthrough\n"
+        f"  output: {json.dumps(condition, ensure_ascii=False)}"
+    )
     return _infer_condition_type(condition, text)
 
     # Parse gained ability text into structured effect
@@ -2679,11 +2714,12 @@ def parse_action(text: str) -> Dict[str, Any]:
 # ====================================================================
 # COMPONENT PARSING: CONDITION HANDLER CASCADE
 # ====================================================================
-# The condition parser (parse_condition) dispatches through ~25+ handlers
-# in priority order. Each handler tries to match a specific Japanese pattern
-# (e.g. "N枚以上" → card_count_condition, "エリアを移動" → movement_condition).
-# The first match wins. If no handler matches, generic field extraction
-# runs and _infer_condition_type assigns the most likely type.
+# The condition parser (parse_condition) dispatches through the
+# CONDITION_PATTERNS registry in priority order. Each handler tries to
+# match a specific Japanese pattern (e.g. "N枚以上" → card_count_condition,
+# "エリアを移動" → movement_condition). The first match wins. If no handler
+# matches, generic field extraction runs and _infer_condition_type assigns
+# the most likely type.
 #
 # Priority ordering is CRITICAL — more specific patterns must come first
 # to prevent generic matchers from catching them incorrectly.
@@ -4156,6 +4192,157 @@ def _try_live_mid(text):
     if loc and "location" not in result:
         result["location"] = loc
     return result
+
+
+# ====================================================================
+# CONDITION HANDLER REGISTRY (priority-ordered)
+# ====================================================================
+# Each entry: (name, priority_tier, handler_function).
+# Priority tiers match the order in parse_condition's docstring.
+# Handlers earlier in the list take precedence over later ones.
+# Annotations show representative Japanese text → JSON type produced.
+CONDITION_PATTERNS = [
+    # Tier 1: Complex/compound patterns (most specific)
+    ("complex", 1, _try_complex),  # nested "AかつB、CかつD" → {type: "complex"}
+    (
+        "compound",
+        1,
+        _try_compound,
+    ),  # "AかつB" / "Aあり、B" → {type: "compound", operator: "and"}
+    (
+        "distinct",
+        1,
+        _try_distinct,
+    ),  # "名前が異なる" → {type: "location_condition", distinct: "card_name"}
+    (
+        "dual_distinct",
+        1,
+        _try_dual_distinct,
+    ),  # "名前とコストが両方ともそれぞれ異なる" → {type: "compound"}
+    # Tier 2: State changes & OR triggers
+    (
+        "state_change",
+        2,
+        _try_state_change,
+    ),  # "アクティブ状態→ウェイト状態" → {type: "state_change_condition"}
+    ("or", 2, _try_or),  # "Aか、B" → {type: "compound", operator: "or"}
+    (
+        "blade_count",
+        2,
+        _try_blade_count,
+    ),  # "ブレードがNつ以上" → {type: "card_blade_condition", count: N}
+    # Tier 3: Card counts & cost comparisons
+    (
+        "card_count",
+        3,
+        _try_card_count,
+    ),  # "N枚以上" / "N人以上" → {type: "card_count_condition", count: N}
+    (
+        "highest_cost_on_stage",
+        3,
+        _try_highest_cost_on_stage,
+    ),  # "位置にいるメンバーが最も大きいコスト" → {type: "highest_cost_on_stage_condition"}
+    (
+        "cost_override_condition",
+        3,
+        _try_cost_override_condition,
+    ),  # cost override comparison → {type: "comparison_condition"}
+    ("both", 3, _try_both),  # "それらが両方ある" → {type: "both_condition"}
+    # Tier 4: Temporal constraints
+    (
+        "temporal_this_turn",
+        4,
+        _try_temporal_this_turn,
+    ),  # "このターン" + sub-pattern → {type: "temporal_condition", temporal: "this_turn"}
+    (
+        "phase_gate",
+        4,
+        _try_phase_gate,
+    ),  # "メインフェイズの場合" → {type: "temporal_condition", phase: "main"}
+    (
+        "temporal_turn_phase",
+        4,
+        _try_temporal_turn_phase,
+    ),  # turn+phase combo → {type: "temporal_condition"}
+    (
+        "baton_touch",
+        4,
+        _try_baton_touch,
+    ),  # "バトンタッチして登場" → baton touch conditions
+    (
+        "temporal_count",
+        4,
+        _try_temporal_count,
+    ),  # "このターンN回登場" → {type: "temporal_condition", count: N}
+    # Tier 5: Target/location/zone patterns
+    ("either_target", 5, _try_either_target),  # "自分か相手" → target selection
+    (
+        "live_success_or_move",
+        5,
+        _try_live_success_or_move,
+    ),  # "ライブ成功時かエリアを移動" → compound OR
+    (
+        "appear_or_move",
+        5,
+        _try_appear_or_move,
+    ),  # "登場するかエリアを移動" → compound OR
+    ("movement", 5, _try_movement),  # "エリアを移動" → {type: "movement_condition"}
+    ("appearance", 5, _try_appearance),  # "登場した" → {type: "appearance"}
+    (
+        "zone_placement",
+        5,
+        _try_zone_placement,
+    ),  # "控え室に置かれた" → {type: "zone_placement_condition"}
+    # Tier 6: State/resource checks
+    (
+        "energy_state",
+        6,
+        _try_energy_state,
+    ),  # "エネルギーがN以下" → {type: "comparison_condition", resource_type: "energy"}
+    (
+        "state",
+        6,
+        _try_state,
+    ),  # "アクティブ状態" / "ウェイト状態" → {type: "member_state"}
+    ("revealed", 6, _try_revealed),  # "公開されたカード" → {type: "revealed_condition"}
+    (
+        "opponent_choice",
+        6,
+        _try_opponent_choice,
+    ),  # "相手は" → opponent choice condition
+    (
+        "unless_pay",
+        6,
+        _try_unless_pay,
+    ),  # "支払わないかぎり" → {type: "comparison_condition", negation: True}
+    # Tier 7: Position, ability, other filters
+    (
+        "position_change",
+        7,
+        _try_position_change,
+    ),  # "ポジションチェンジ" → {type: "position_change_condition"}
+    ("position", 7, _try_position),  # POSITION_KEYWORDS → {type: "position_condition"}
+    (
+        "ability_filter",
+        7,
+        _try_ability_filter,
+    ),  # "能力を持たない" → {type: "ability_filter_condition"}
+    (
+        "otherwise",
+        7,
+        _try_otherwise,
+    ),  # "それ以外の場合" → {type: "otherwise_condition"}
+    (
+        "heart_possession",
+        7,
+        _try_heart_possession,
+    ),  # "ハートを持つ/持たない" → {type: "location_condition"}
+    (
+        "live_mid",
+        7,
+        _try_live_mid,
+    ),  # "ライブ中" → {type: "card_count_condition"|"temporal_condition", temporal: "during_live"}
+]
 
 
 def _extract_generic_fields(condition, text):
@@ -8046,9 +8233,13 @@ def _try_both_discard_until(text):
 def _try_re_yell(text):
     """もう一度エールを行う + ブレードハートを失い — re-yell with perform_yell.
     Handles preceding actions before the re-yell sentence (e.g. optional discard)
-    when the text has a 。 separator."""
+    when the text has a 。 separator.
+
+    The preceding action's condition (e.g. ≤2 blade_heart) gates the ENTIRE
+    sequential — not just the first action. It is promoted to the outer level."""
     if "もう一度エールを行う" not in text or "ブレードハートを失い" not in text:
         return None
+    promoted_condition = None
     actions = []
     # If there are preceding sentences before the re-yell instruction, parse them
     if "。" in text:
@@ -8062,6 +8253,11 @@ def _try_re_yell(text):
                 else:
                     actions.append(parsed)
         text = parts[1].strip().lstrip("、")
+    # Promote condition from the first action so it gates the entire re-yell sequence
+    if actions:
+        first = actions[0]
+        if "condition" in first and isinstance(first.get("condition"), dict):
+            promoted_condition = first.pop("condition")
     actions.append(
         {
             "text": "ブレードハートを失い",
@@ -8078,7 +8274,10 @@ def _try_re_yell(text):
             "target": "self",
         }
     )
-    return {"text": text, "action": "sequential", "actions": actions}
+    result = {"text": text, "action": "sequential", "actions": actions}
+    if promoted_condition:
+        result["condition"] = promoted_condition
+    return result
 
 
 def _try_energy_under_member(text):
@@ -9468,6 +9667,9 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
     # 3. Infer action for effects with no action; apply sequential chain fixes.
     # ─────────────────────────────────────────────────────────────────────────────
     for ability in data["unique_abilities"]:
+        ability_text = ability.get("full_text") or ability.get("triggerless_text", "")
+        if ability_text:
+            set_debug_section(f"Ability: {ability_text}")
         eff = ability.get("effect")
         if not isinstance(eff, dict):
             continue
@@ -10254,6 +10456,9 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
     # self.moved_cards directly — per_unit_type and count are not used for yell.
     _clean_per_unit_source(data["unique_abilities"])
 
+    # Validate parsed JSON against text patterns for missing mechanics
+    _validate_semantic(data["unique_abilities"])
+
     # Group/unit filter fields are validated in extract_card_abilities.py
     return data
 
@@ -10469,16 +10674,344 @@ def _enrich_effect_type(effect, triggerless=""):
             cond["heart_colors"] = effect["heart_colors"]
 
 
+def _json_has(obj, pred):
+    """Recursively check if any nested dict/list satisfies pred."""
+    if isinstance(obj, dict):
+        if pred(obj):
+            return True
+        for v in obj.values():
+            if _json_has(v, pred):
+                return True
+    elif isinstance(obj, list):
+        for item in obj:
+            if _json_has(item, pred):
+                return True
+    return False
+
+
+def _json_has_action(obj, action_str):
+    return _json_has(
+        obj, lambda d: isinstance(d, dict) and d.get("action") == action_str
+    )
+
+
+def _json_has_field(obj, field, value=None):
+    def check(d):
+        if not isinstance(d, dict):
+            return False
+        if field not in d:
+            return False
+        if value is not None:
+            return d[field] == value
+        return True
+
+    return _json_has(obj, check)
+
+
 def _validate_semantic(abilities):
-    """Quick semantic validation: checks parsed JSON against text patterns."""
+    """Validate parsed JSON against text patterns to find missing mechanics.
+
+    Each rule: (name, regex, check_fn(entry, effect) -> bool, description)
+    check_fn returns True if the mechanic IS correctly handled.
+    """
     issues = []
+
+    # Matched text inside 「」 quotes is probably an ability name, not effect context.
+    def _in_quotes(text, m):
+        start = text.rfind("「", 0, m.start())
+        end = text.find("」", m.end())
+        return start != -1 and end != -1 and m.start() > start and m.end() < end
+
+    # Matched text inside parenthetical clauses ( ... ) is game-rule reminder text,
+    # not actual card effect.  Check for both ASCII and full-width parens.
+    def _in_parens(text, m):
+        for o, c in [("(", ")"), ("（", "）")]:
+            before = text[: m.start()]
+            after = text[m.end() :]
+            last_open = before.rfind(o)
+            if last_open == -1:
+                continue
+            between = before[last_open + 1 :]
+            if c in between:
+                continue
+            next_close = after.find(c)
+            if next_close != -1:
+                return True
+        return False
+
+    RULES = [
+        # ─── Number selection ───
+        (
+            "select_number",
+            r"(数を選ん|[数数字]を[選選え])",
+            lambda e, eff: _json_has_action(eff, "select_number")
+            or _json_has_field(eff, "action", "select"),
+            "Text says 'choose a number' but no select_number action found",
+        ),
+        # ─── Opponent choice ───
+        (
+            "opponent_choice",
+            r"相手[はが].*[選選え]ぶ",
+            lambda e, eff: _json_has_field(eff, "action_by", "opponent"),
+            "Opponent chooses but no action_by: opponent",
+        ),
+        # ─── Distinct card names ───
+        (
+            "distinct_name",
+            r"(カード名の異なる|カード名が異なる|名前の異なる|名前が異なる|異なるカード名)",
+            lambda e, eff: _json_has_field(eff, "distinct", "card_name"),
+            "Distinct card names required but no distinct field",
+        ),
+        # ─── Reveal until condition ───
+        (
+            "reveal_until",
+            r"(公開するまで|まで公開し続け|現れるまで)",
+            lambda e, eff: _json_has_action(eff, "reveal_until_live_card")
+            or _json_has_action(eff, "reveal_until_chosen_card"),
+            "Reveal until condition but no reveal_until action",
+        ),
+        # ─── Repeat procedure ───
+        (
+            "repeat_procedure",
+            r"(繰り返す|まで繰り返|もう一度行う|再度)",
+            lambda e, eff: _json_has_action(eff, "repeat_procedure")
+            or _json_has_field(eff, "repeat_limit"),
+            "Repeat/loop described but no repeat_procedure or repeat_limit",
+        ),
+        # ─── Conditional alternative (if not, otherwise) ───
+        (
+            "conditional_alt",
+            r"(なかった場合|なければ|ない場合|なけれ|以外の場合)",
+            lambda e, eff: _json_has_action(eff, "conditional_alternative")
+            or _json_has_action(eff, "conditional_on_result"),
+            "Fallback/alternative (if not) but no conditional_alternative",
+        ),
+        # ─── Placement order ───
+        (
+            "placement_order",
+            r"(好きな順番|任意の順番|好きな順序|任意の順|好きな順)",
+            lambda e, eff: _json_has_field(eff, "placement_order"),
+            "Any-order placement but no placement_order field",
+        ),
+        # ─── Discard until hand count ───
+        (
+            "discard_until",
+            r"(枚になるまで.*捨て|枚になるまで.*トラッシュ|枚になるまで.*墓地|になるまで捨て|になるまでトラッシュ)",
+            lambda e, eff: _json_has_action(eff, "discard_until_count"),
+            "Discard until hand size but no discard_until_count",
+        ),
+        # ─── Pay energy as cost ───
+        (
+            "pay_energy_cost",
+            r"(エネルギーを.*支払|エネルギー.*払う)",
+            lambda e, eff: _json_has_action(eff, "pay_energy"),
+            "Pay energy described but no pay_energy action",
+        ),
+        # ─── ALL blade / any-color handling ───
+        (
+            "all_blade",
+            r"(ALLブレード|全てのブレード|任意の色のブレード|ALL blade)",
+            lambda e, eff: _json_has_field(eff, "all_blade_timing")
+            or _json_has_action(eff, "all_blade_timing")
+            or _json_has_action(eff, "set_blade_type"),
+            "ALL blade / any-color handling but no all_blade_timing",
+        ),
+        # ─── Invalidate / suppress ability ───
+        (
+            "invalidate_ability",
+            r"(無効|発動しな|発動を防|無効にす|能力を.*失)",
+            lambda e, eff: _json_has_action(eff, "invalidate_ability")
+            or _json_has_action(eff, "suppress_ability_trigger"),
+            "Ability nullification but no invalidate_ability or suppress_ability_trigger",
+        ),
+        # ─── Both players / both targets ───
+        (
+            "both_targets",
+            r"(お互い|両プレイヤー|相手と自分|自分と相手|両方)",
+            lambda e, eff: _json_has_field(eff, "target", "both"),
+            "Both players affected but no target='both'",
+        ),
+        # ─── Additional Yell ───
+        (
+            "additional_yell",
+            r"(追加で.*エール|エール.*追加|もう一度.*エール|さらに.*エール|追エール)",
+            lambda e, eff: _json_has_action(eff, "perform_yell")
+            or _json_has_action(eff, "re_yell"),
+            "Additional Yell but no perform_yell or re_yell",
+        ),
+        # ─── Under member (place or reference) ───
+        (
+            "under_member",
+            r"(の下に置|の下にあ|下から|下に置かれ|(?<!以)下の)",
+            lambda e, eff: _json_has_field(eff, "source", "under_member")
+            or _json_has_field(eff, "destination", "under_member"),
+            "Under-member operation but no under_member source/destination",
+        ),
+        # ─── Energy deck/zone operation ───
+        (
+            "energy_deck_to_zone",
+            r"(エネルギー置き場|エネルギーデッキ)",
+            lambda e, eff: _json_has_field(eff, "source", "energy_deck")
+            or _json_has_field(eff, "destination", "energy_zone"),
+            "Energy deck/zone operation but no energy_deck/energy_zone field",
+        ),
+        # ─── Blade type conversion ───
+        (
+            "blade_type",
+            r"ブレード(?:として扱|とみな|treat)",
+            lambda e, eff: _json_has_action(eff, "set_blade_type"),
+            "Blade type conversion but no set_blade_type",
+        ),
+        # ─── Cost modification ───
+        (
+            "set_cost",
+            r"(コストを.*変更|コスト.*になる|コスト.*変え|支払うコスト)",
+            lambda e, eff: _json_has_action(eff, "set_cost")
+            or _json_has_action(eff, "modify_cost"),
+            "Cost modification but no set_cost or modify_cost",
+        ),
+        # ─── Draw until hand count ───
+        (
+            "draw_until_hand",
+            r"(枚になるまで.*引|になるまで.*ドロー)",
+            lambda e, eff: _json_has_action(eff, "draw_until_count"),
+            "Draw until hand size but no draw_until_count",
+        ),
+        # ─── Heart type conversion ───
+        (
+            "heart_type",
+            r"ハート(?:として扱|とみな|treat)",
+            lambda e, eff: _json_has_action(eff, "set_heart_type")
+            or _json_has_action(eff, "all_blade_timing"),
+            "Heart type conversion but no set_heart_type",
+        ),
+        # ─── Card identity setting ───
+        (
+            "card_identity",
+            r"(としても扱|として扱う|同一として扱|として見な)",
+            lambda e, eff: _json_has_action(eff, "set_card_identity")
+            or _json_has_action(eff, "all_blade_timing")
+            or _json_has_action(eff, "set_heart_type"),
+            "Card identity/card name treated as but no set_card_identity",
+        ),
+        # ─── Multiple targets ───
+        (
+            "multiple_targets",
+            r"(?:枚|人|体)(?:.*まで|まで)",
+            lambda e, eff: _json_has_field(eff, "multiple_targets"),
+            "Multiple target count but no multiple_targets field",
+        ),
+        # ─── Exclude self ───
+        (
+            "exclude_self",
+            r"(自分以外|自身以外|このカード以外|このメンバー以外|自分を除く)",
+            lambda e, eff: _json_has_field(eff, "exclude_self"),
+            "Exclude self described but no exclude_self field",
+        ),
+        # ─── Shuffle ───
+        (
+            "shuffle",
+            r"(シャッフルする|シャッフルして)",
+            lambda e, eff: _json_has_action(eff, "shuffle"),
+            "Shuffle described but no shuffle action",
+        ),
+        # ─── Restriction ───
+        (
+            "restriction",
+            r"(できない|することができない|できなく)",
+            lambda e, eff: _json_has_action(eff, "restriction"),
+            "Restriction/cannot described but no restriction action",
+        ),
+        # ─── Look at cards ───
+        (
+            "look_at",
+            r"(見てもよい|見ることができる|(?<!必要ハートを)確認する)",
+            lambda e, eff: _json_has_action(eff, "look_at"),
+            "Look at cards described but no look_at action",
+        ),
+        # ─── Non-stackable ───
+        (
+            "non_stackable",
+            r"重複しない",
+            lambda e, eff: _json_has_field(eff, "non_stackable"),
+            "Non-stackable described but no non_stackable flag",
+        ),
+        # ─── Per-group ───
+        (
+            "per_group",
+            r"各グループ",
+            lambda e, eff: _json_has_field(eff, "per_group")
+            or _json_has_field(eff, "per_group_count")
+            or _json_has_field(eff, "per_unit_type"),
+            "Per-group described but no per_group/per_group_count/per_unit_type field",
+        ),
+        # ─── Baton touch ───
+        (
+            "baton_touch",
+            r"バトンタッチして登場",
+            lambda e, eff: _json_has_field(eff, "baton_touch_trigger")
+            or _json_has_field(eff, "baton_touch_source"),
+            "Baton touch but no baton_touch_trigger or baton_touch_source",
+        ),
+        # ─── Lose resource (should have sign: negative) ───
+        (
+            "lose_resource",
+            r"失う",
+            lambda e, eff: _json_has_field(eff, "sign", "negative"),
+            "Lose resource described but no sign: negative",
+        ),
+        # ─── Same name ───
+        (
+            "same_name",
+            r"同じ名前",
+            lambda e, eff: _json_has_field(eff, "same_name")
+            or _json_has_field(eff.get("condition", {}), "same_name"),
+            "Same name required but no same_name field",
+        ),
+        # ─── Card property (has_blade_heart / has_score_icon) ───
+        (
+            "card_property",
+            r"(ブレードハートを持|ブレードハートがない|スコアを持つ)",
+            lambda e, eff: _json_has_field(eff, "card_property")
+            or _json_has_field(e.get("cost", {}), "card_property"),
+            "Card property (blade heart / score icon) but no card_property field",
+        ),
+    ]
+
+    seen_by_rule = {}  # rule_name -> set of frozenset(cards)
+    all_issues = []  # (rule_name, cards, trigger, snippet, desc)
+
     for i, entry in enumerate(abilities):
-        t = entry.get("triggerless_text", "")
+        t = entry.get("triggerless_text", "") or entry.get("full_text", "")
         eff = entry.get("effect") or {}
-        if not t:
+        if not t or not isinstance(eff, dict):
             continue
         cards = entry.get("cards", [])
         card_lbl = cards[0] if cards else "???"
+        trigger = entry.get("triggers", "")
+
+        for rule_name, pattern, check_fn, desc in RULES:
+            for m in re.finditer(pattern, t):
+                # Skip matches inside quoted ability names (「」) — those are text
+                # references, not actual mechanic descriptions.
+                if _in_quotes(t, m):
+                    continue
+                # Skip matches inside parenthetical clauses ( ) / （） — those
+                # are game-rule reminder text, not card effect descriptions.
+                if _in_parens(t, m):
+                    continue
+                # Check if JSON correctly handles the mechanic
+                if not check_fn(entry, eff):
+                    matched = m.group(0)
+                    start = max(0, m.start() - 20)
+                    end = min(len(t), m.end() + 30)
+                    snippet = t[start:end]
+                    dedup_key = (rule_name, frozenset(cards) if cards else i)
+                    if dedup_key not in seen_by_rule:
+                        seen_by_rule[dedup_key] = True
+                        all_issues.append((rule_name, cards, trigger, snippet, desc))
+
+        # ─── Structural checks (not regex-based) ─────────────────────────
         # change_state: energy needs card_type=energy_card
         if (
             eff.get("action") == "change_state"
@@ -10486,9 +11019,19 @@ def _validate_semantic(abilities):
             and "メンバー" not in t
         ):
             if eff.get("card_type") != "energy_card":
-                issues.append(
-                    f"  #{i} ({card_lbl}): energy change_state without card_type=energy_card"
+                all_issues.append(
+                    (
+                        "energy_card_type",
+                        cards,
+                        trigger,
+                        t[
+                            max(0, t.find("エネルギー") - 10) : t.find("エネルギー")
+                            + 30
+                        ],
+                        "energy change_state without card_type=energy_card",
+                    ),
                 )
+
         # move_cards: cost_limit in text but not in effect
         if eff.get("action") == "move_cards" and re.search(r"コスト\d+", t):
             has_cl = (
@@ -10497,7 +11040,6 @@ def _validate_semantic(abilities):
                 or eff.get("cost_limit_max") is not None
                 or eff.get("cost_limit_operator") is not None
             )
-            # Also check in condition
             if not has_cl:
                 cond = eff.get("condition") or {}
                 has_cl = (
@@ -10506,9 +11048,19 @@ def _validate_semantic(abilities):
                     or cond.get("cost_limit_max") is not None
                 )
             if not has_cl:
-                issues.append(
-                    f"  #{i} ({card_lbl}): 'コスト' referenced in text but no cost_limit in effect or condition"
-                )
+                dedup_key = ("cost_limit", frozenset(cards) if cards else i)
+                if dedup_key not in seen_by_rule:
+                    seen_by_rule[dedup_key] = True
+                    all_issues.append(
+                        (
+                            "cost_limit",
+                            cards,
+                            trigger,
+                            t[max(0, t.find("コスト") - 10) : t.find("コスト") + 30],
+                            "'コスト' referenced in text but no cost_limit in effect or condition",
+                        ),
+                    )
+
         # look_and_select: heart_colors on select parent but not on reveal sub-action
         if eff.get("action") == "look_and_select":
             sa = eff.get("select_action")
@@ -10520,37 +11072,67 @@ def _validate_semantic(abilities):
                         and not act.get("heart_colors")
                     ):
                         if sa.get("heart_colors"):
-                            issues.append(
-                                f"  #{i}: heart_colors on select parent but not on reveal sub-action"
+                            dedup_key = (
+                                "reveal_heart_colors",
+                                frozenset(cards) if cards else i,
                             )
-        # --- Structural validation: sequential action patterns ---
+                            if dedup_key not in seen_by_rule:
+                                seen_by_rule[dedup_key] = True
+                                all_issues.append(
+                                    (
+                                        "reveal_heart_colors",
+                                        cards,
+                                        trigger,
+                                        t[:60],
+                                        "heart_colors on select parent but not on reveal sub-action",
+                                    ),
+                                )
+
+        # Structural validation: sequential action patterns
         if eff.get("action") == "sequential":
             acts = eff.get("actions", [])
             for j, sub in enumerate(acts):
                 if not isinstance(sub, dict):
                     continue
-                # Flag: group_names on specify_heart_color or reveal (should not happen)
                 if sub.get("action") in ("specify_heart_color", "reveal"):
                     if sub.get("group_names"):
-                        issues.append(
-                            f"  #{i} ({card_lbl}) [{j}]: sub-action '{sub['action']}' "
-                            f"has leaked group_names={sub['group_names']}"
+                        dedup_key = (
+                            f"leaked_group_names[{j}]",
+                            frozenset(cards) if cards else i,
                         )
-                # Flag: select_cards with discard_remaining when also followed by move_cards
+                        if dedup_key not in seen_by_rule:
+                            seen_by_rule[dedup_key] = True
+                            all_issues.append(
+                                (
+                                    f"leaked_group_names",
+                                    cards,
+                                    trigger,
+                                    f"[{j}] action={sub['action']} group_names={sub['group_names']}",
+                                    f"sub-action '{sub['action']}' has leaked group_names={sub['group_names']}",
+                                ),
+                            )
                 if sub.get("action") == "select_cards" and sub.get("discard_remaining"):
                     for k in range(j + 1, len(acts)):
                         if (
                             isinstance(acts[k], dict)
                             and acts[k].get("action") == "move_cards"
                         ):
-                            issues.append(
-                                f"  #{i} ({card_lbl}) [{j}]: select_cards with "
-                                f"discard_remaining=True conflicts with explicit move_cards at [{k}]"
+                            dedup_key = (
+                                f"discard_remaining_conflict[{j},{k}]",
+                                frozenset(cards) if cards else i,
                             )
+                            if dedup_key not in seen_by_rule:
+                                seen_by_rule[dedup_key] = True
+                                all_issues.append(
+                                    (
+                                        "discard_remaining_conflict",
+                                        cards,
+                                        trigger,
+                                        f"[{j}] select_cards discard_remaining + [{k}] move_cards",
+                                        f"select_cards with discard_remaining=True conflicts with explicit move_cards at [{k}]",
+                                    ),
+                                )
                             break
-                # Flag: consecutive conditional actions sharing the same condition text
-                # without cache:true — the second won't re-evaluate correctly after
-                # the first modifies game state (e.g. revealed_cards filtered by select).
                 if sub.get("condition") and j > 0:
                     prev = acts[j - 1]
                     if isinstance(prev, dict) and prev.get("condition"):
@@ -10558,34 +11140,121 @@ def _validate_semantic(abilities):
                         cur_text = sub["condition"].get("text")
                         if prev_text and cur_text and prev_text == cur_text:
                             if not sub["condition"].get("cache"):
-                                issues.append(
-                                    f"  #{i} ({card_lbl}) [{j}]: actions {j - 1} and {j} share "
-                                    f"condition text but the second lacks cache:true "
-                                    f"(sub.action={sub.get('action')}, prev.action={prev.get('action')})"
+                                dedup_key = (
+                                    f"shared_condition_no_cache[{j}]",
+                                    frozenset(cards) if cards else i,
                                 )
-    if issues:
-        print(f"[Semantic] {len(issues)} issues:")
-        for issue in issues[:15]:
-            print(issue)
-        if len(issues) > 15:
-            print(f"  ... and {len(issues) - 15} more")
+                                if dedup_key not in seen_by_rule:
+                                    seen_by_rule[dedup_key] = True
+                                    all_issues.append(
+                                        (
+                                            "shared_condition_no_cache",
+                                            cards,
+                                            trigger,
+                                            f"[{j}] {sub.get('action')} shares condition with [{j - 1}]",
+                                            f"actions {j - 1} and {j} share condition text but the second lacks cache:true",
+                                        ),
+                                    )
+
+    # ─── Print report ────────────────────────────────────────────────────
+    # Group by rule
+    by_rule = {}
+    for r in all_issues:
+        by_rule.setdefault(r[0], []).append(r)
+
+    print("=" * 80)
+    print("MISSING MECHANICS ANALYSIS")
+    print("=" * 80)
+    print(f"\nTotal abilities checked: {len(abilities)}")
+    print(f"Total mismatches found: {len(all_issues)}")
+    print(f"Unique rule types triggered: {len(by_rule)}")
+    print()
+
+    priority_order = [
+        "select_number",
+        "distinct_name",
+        "opponent_choice",
+        "reveal_until",
+        "repeat_procedure",
+        "discard_until",
+        "draw_until_hand",
+        "additional_yell",
+        "under_member",
+        "baton_touch",
+        "non_stackable",
+        "placement_order",
+        "multiple_targets",
+        "energy_deck_to_zone",
+        "conditional_alt",
+        "both_targets",
+        "blade_type",
+        "set_cost",
+        "heart_type",
+        "card_identity",
+        "invalidate_ability",
+        "exclude_self",
+        "pay_energy_cost",
+        "all_blade",
+        "energy_card_type",
+        "cost_limit",
+        "shuffle",
+        "restriction",
+        "look_at",
+        "per_group",
+        "lose_resource",
+        "same_name",
+        "card_property",
+        "reveal_heart_colors",
+        "leaked_group_names",
+        "discard_remaining_conflict",
+        "shared_condition_no_cache",
+    ]
+
+    SEP = "-" * 60
+    printed_rules = set()
+
+    for rule_name in priority_order:
+        if rule_name not in by_rule:
+            continue
+        printed_rules.add(rule_name)
+        entries = by_rule[rule_name]
+        desc = entries[0][4]
+        print(f"\n{SEP}")
+        print(f">> {rule_name}  ({len(entries)} abilities)")
+        print(f"   {desc}")
+        print(SEP)
+        for r in entries[:10]:
+            _, cards, trigger, snippet, _ = r
+            card_str = cards[0] if cards else "(no card)"
+            print(f"\n  CARD: {card_str}")
+            if trigger:
+                print(f"  TRIGGER: {trigger}")
+            print(f"  TEXT: ...{snippet}...")
+
+    for rule_name in sorted(by_rule.keys()):
+        if rule_name in printed_rules:
+            continue
+        printed_rules.add(rule_name)
+        entries = by_rule[rule_name]
+        desc = entries[0][4]
+        print(f"\n{SEP}")
+        print(f">> {rule_name}  ({len(entries)} abilities)")
+        print(f"   {desc}")
+        print(SEP)
+        for r in entries[:5]:
+            _, cards, trigger, snippet, _ = r
+            card_str = cards[0] if cards else "(no card)"
+            print(f"\n  CARD: {card_str}")
+            if trigger:
+                print(f"  TRIGGER: {trigger}")
+            print(f"  TEXT: ...{snippet}...")
+
+    print(f"\n\n{'=' * 80}")
+    print("END OF MISSING MECHANICS REPORT")
+    print(f"{'=' * 80}")
 
 
 if __name__ == "__main__":
-    import json
-    from pathlib import Path
+    from extract_card_abilities import main
 
-    abilities_file = Path(__file__).parent.parent / "abilities.json"
-
-    with open(abilities_file, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    result = process_abilities(data)
-
-    with open(abilities_file, "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2)
-
-    print("Normalized abilities.json with parser.py")
-
-    # Run semantic validation on the output
-    _validate_semantic(data["unique_abilities"])
+    main()

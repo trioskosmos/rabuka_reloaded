@@ -1390,6 +1390,17 @@ impl super::resolver::AbilityResolver {
             }
             gs.revealed_cards.clear();
         }
+        // When user skips an optional revealed_cards selection, clear any
+        // pending sequential actions (e.g. re_yell should not fire after skip).
+        let is_opponent_action = ctx.target_player_id.as_deref() == Some("opponent");
+        if ctx.indices.is_empty()
+            && ctx.allow_skip
+            && ctx.count > 0
+            && !is_opponent_action
+            && moved.is_empty()
+        {
+            gs.ability_queue.take_pending_actions();
+        }
         Ok(())
     }
 

@@ -178,18 +178,18 @@ fn triple_discard_re_prompt_shows_correct_actions() {
         .iter()
         .filter(|a| a.action_type == ActionType::ChoiceSelect)
         .collect();
-    // 4 cards in hand: 2 matching copies + live + filler. All 4 are shown,
-    // but only the 2 matching copies are selectable (non-disabled).
-    assert_eq!(select_actions.len(), 4, "All 4 cards should be visible");
+    // 4 cards in hand: 2 matching copies + live + filler.
+    // Only the 2 matching copies have actions (non-look zone, non-matching hidden).
+    assert_eq!(
+        select_actions.len(),
+        2,
+        "Only 2 matching cards should have actions"
+    );
     let selectable: Vec<_> = select_actions
         .iter()
         .filter(|a| a.parameters.as_ref().and_then(|p| p.disabled) != Some(true))
         .collect();
-    assert_eq!(
-        selectable.len(),
-        2,
-        "Only 2 matching cards should be selectable"
-    );
+    assert_eq!(selectable.len(), 2, "All 2 actions should be selectable");
 
     // Select both matching cards in one batch, then skip to finalize
     game.select_indices(&[0, 1]);
@@ -410,12 +410,16 @@ fn non_contiguous_matches_via_action_pipeline() {
         .iter()
         .filter(|a| a.action_type == ActionType::ChoiceSelect)
         .collect();
-    assert_eq!(select_actions.len(), 4, "4 total cards visible");
+    assert_eq!(
+        select_actions.len(),
+        2,
+        "Only 2 matching cards should have actions"
+    );
     let selectable: Vec<_> = select_actions
         .iter()
         .filter(|a| a.parameters.as_ref().and_then(|p| p.disabled) != Some(true))
         .collect();
-    assert_eq!(selectable.len(), 2, "2 matching cards should be selectable");
+    assert_eq!(selectable.len(), 2, "All 2 actions should be selectable");
 
     // Select matching cards one at a time (like the real game frontend),
     // then skip to finalize.
