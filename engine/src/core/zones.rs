@@ -719,7 +719,7 @@ pub struct MainDeck {
     /// Card IDs. **Index 0 = top of deck.** Drawing/peeking reads from index 0.
     /// Pushing to the end (`cards.push()`) adds to the bottom.
     /// To put a card on top, use `cards.insert(0, id)`.
-    pub cards: SmallVec<[i16; 60]>,
+    pub cards: SmallVec<[i16; 64]>,
 }
 
 impl Default for MainDeck {
@@ -736,8 +736,7 @@ impl MainDeck {
     }
 
     pub fn shuffle(&mut self) {
-        use rand::seq::SliceRandom;
-        self.cards.shuffle(&mut rand::thread_rng());
+        crate::rng::shuffle_slice(&mut self.cards);
     }
 
     /// Draw the top card (index 0). Returns None if deck is empty.
@@ -867,8 +866,7 @@ impl Waitroom {
     }
 
     pub fn shuffle(&mut self) {
-        use rand::seq::SliceRandom;
-        self.cards.shuffle(&mut rand::thread_rng());
+        crate::rng::shuffle_slice(&mut self.cards);
     }
 
     pub fn len(&self) -> usize {

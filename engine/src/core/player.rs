@@ -9,7 +9,6 @@ use crate::core::game_modifiers::{GameModifiers, ModifierEntry};
 
 use std::collections::VecDeque;
 
-use rand::prelude::SliceRandom;
 
 #[derive(Debug, Clone)]
 
@@ -583,7 +582,7 @@ impl Player {
         // Rule 10.2.2.1: Deck empty AND waitroom has cards
         if self.main_deck.is_empty() && !self.waitroom.cards.is_empty() {
             let mut waitroom_cards = self.waitroom.take_all();
-            waitroom_cards.shuffle(&mut rand::thread_rng());
+            crate::rng::shuffle_slice(&mut waitroom_cards);
             // Rule 10.2.3: Refreshed cards go to the bottom
             // (existing deck cards stay on top)
             for card in waitroom_cards {

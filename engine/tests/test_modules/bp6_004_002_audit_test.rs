@@ -660,7 +660,7 @@ fn riko_bp6_auto_single_card_deck_top_exact_identity() {
     game.state.player1.waitroom.cards.push(live);
     fill_decks(&mut game, filler);
 
-    let deck_snapshot: smallvec::SmallVec<[i16; 60]> = game.state.player1.main_deck.cards.clone();
+    let deck_snapshot: smallvec::SmallVec<[i16; 64]> = game.state.player1.main_deck.cards.clone();
 
     trigger_riko_auto(&mut game, vec![live]);
 
@@ -715,7 +715,7 @@ fn riko_bp6_auto_single_card_deck_bottom_exact_identity() {
     game.state.player1.waitroom.cards.push(live);
     fill_decks(&mut game, filler);
 
-    let deck_snapshot: smallvec::SmallVec<[i16; 60]> = game.state.player1.main_deck.cards.clone();
+    let deck_snapshot: smallvec::SmallVec<[i16; 64]> = game.state.player1.main_deck.cards.clone();
 
     trigger_riko_auto(&mut game, vec![live]);
 

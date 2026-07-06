@@ -24,6 +24,7 @@ pub fn game_state_to_display(game_state: &game_state::GameState) -> display::Gam
 static GAME_STATE: Mutex<Option<game_state::GameState>> = Mutex::new(None);
 
 fn main() {
+    #[cfg(feature = "env_logger")]
     env_logger::init();
     let args: Vec<String> = std::env::args().collect();
 
@@ -46,13 +47,20 @@ fn main() {
                 initialize_game();
             }
             "web-server" => {
-                let ngrok_flag = args.iter().any(|a| a == "--ngrok");
-                let ngrok_token = if ngrok_flag {
-                    std::env::var("NGROK_AUTHTOKEN").ok()
-                } else {
-                    None
-                };
-                run_web_server(ngrok_token);
+                #[cfg(feature = "server")]
+                {
+                    let ngrok_flag = args.iter().any(|a| a == "--ngrok");
+                    let ngrok_token = if ngrok_flag {
+                        std::env::var("NGROK_AUTHTOKEN").ok()
+                    } else {
+                        None
+                    };
+                    run_web_server(ngrok_token);
+                }
+                #[cfg(not(feature = "server"))]
+                {
+                    log::debug!("web-server feature disabled in this build");
+                }
             }
             _ => {
                 log::debug!("Unknown command: {}", args[1]);
@@ -262,6 +270,7 @@ fn choose_deck(deck_lists: &[deck_parser::DeckList], player_name: &str) -> deck_
     deck_lists[0].clone()
 }
 
+#[cfg(feature = "server")]
 fn run_web_server(ngrok_authtoken: Option<String>) {
     println!("Web server starting on http://127.0.0.1:8080");
     match tokio::runtime::Runtime::new() {

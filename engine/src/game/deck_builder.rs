@@ -10,16 +10,14 @@ pub struct Deck {
 
 impl Deck {
     pub fn shuffle_main_deck(&mut self) {
-        use rand::seq::SliceRandom;
         let mut cards: Vec<i16> = self.main_deck.drain(..).collect();
-        cards.shuffle(&mut rand::thread_rng());
+        crate::rng::shuffle_slice(&mut cards);
         self.main_deck = cards.into();
     }
 
     pub fn shuffle_energy_deck(&mut self) {
-        use rand::seq::SliceRandom;
         let mut cards: Vec<i16> = self.energy_deck.drain(..).collect();
-        cards.shuffle(&mut rand::thread_rng());
+        crate::rng::shuffle_slice(&mut cards);
         self.energy_deck = cards.into();
     }
 }

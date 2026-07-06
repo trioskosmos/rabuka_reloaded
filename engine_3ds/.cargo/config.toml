@@ -1,0 +1,5 @@
+# Rabuka 3DS — Cross-compilation target config
+[target.armv6k-nintendo-3ds]
+# When cross-compiling for 3DS with devkitARM:
+# rustflags = ["-C", "link-arg=-specs=3dsx.specs"]
+# linker = "arm-none-eabi-gcc"

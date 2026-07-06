@@ -986,13 +986,21 @@ impl super::TurnEngine {
         let p2_needs_refresh = game_state.player2.main_deck.cards.is_empty()
             && !game_state.player2.waitroom.cards.is_empty();
         if p1_needs_refresh {
-            let mut waitroom = std::mem::take(&mut game_state.player1.waitroom.cards);
-            game_state.player1.main_deck.cards.append(&mut waitroom);
+            let waitroom = std::mem::take(&mut game_state.player1.waitroom.cards);
+            game_state
+                .player1
+                .main_deck
+                .cards
+                .extend(waitroom.iter().copied());
             game_state.player1.main_deck.shuffle();
         }
         if p2_needs_refresh {
-            let mut waitroom = std::mem::take(&mut game_state.player2.waitroom.cards);
-            game_state.player2.main_deck.cards.append(&mut waitroom);
+            let waitroom = std::mem::take(&mut game_state.player2.waitroom.cards);
+            game_state
+                .player2
+                .main_deck
+                .cards
+                .extend(waitroom.iter().copied());
             game_state.player2.main_deck.shuffle();
         }
         Self::check_victory_condition(game_state);
@@ -1055,17 +1063,6 @@ impl super::TurnEngine {
 
     // Q88: Players cannot voluntarily discard, retire members, move members,
     // or weigh active cards without an effect or cost.
-    /// Rule 10.4: Duplicate member processing.
-    /// If the stage area itself somehow has more than one top-level member,
-    /// keep only the most recent one. This is a safety check — under-card members
-    /// are intentional and not duplicates (they follow rule 4.5.5).
-    fn check_duplicate_members(player: &mut crate::player::Player, _card_db: &CardDatabase) {
-        // The stage array is already enforced to have 1 card per slot by the engine.
-        // Under-cards (4.5.5) are intentional stacking and NOT duplicates.
-        // This function is kept as a safety check but currently does nothing
-        // beyond what the stage enforces.
-        let _ = player;
-    }
 
     /// Rule 10.5.1: Non-live cards in live card zone → moved to discard.
     /// Also records movement events so turn-level tracking (turn_movements)

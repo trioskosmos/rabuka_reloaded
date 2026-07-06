@@ -16,6 +16,7 @@ pub use game::deck_builder;
 pub use game::deck_parser;
 pub use game::display;
 pub use game::game_setup;
+#[cfg(feature = "server")]
 pub use game::web_server;
 
 // Effect/condition system
@@ -23,5 +24,6 @@ pub use game::web_server;
 pub mod ability;
 pub mod ability_queue;
 pub mod qa_test_suite;
+pub mod rng;
 pub mod triggers;
 pub mod turn;
