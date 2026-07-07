@@ -3,6 +3,23 @@ use crate::ability::types::ChoiceRoute;
 use crate::card::CardDatabase;
 use crate::game_state::GameState;
 use crate::game_state::Phase;
+#[cfg(feature = "3ds")]
+extern "C" {
+    fn _3ds_tdbg(msg: *const u8);
+}
+
+#[cfg(feature = "3ds")]
+macro_rules! tdbg {
+    ($($arg:tt)*) => {{
+        let msg = format!($($arg)*);
+        let s = format!("{}\0", msg);
+        unsafe { _3ds_tdbg(s.as_ptr()); }
+    }};
+}
+#[cfg(not(feature = "3ds"))]
+macro_rules! tdbg {
+    ($($arg:tt)*) => {{ let _ = format!($($arg)*); }};
+}
 
 impl super::TurnEngine {
     pub fn execute_main_phase_action(
@@ -979,8 +996,11 @@ impl super::TurnEngine {
     }
 
     pub fn check_timing(game_state: &mut GameState) {
+        tdbg!("CHECK_TIMING:0");
         game_state.player1.refresh();
+        tdbg!("CHECK_TIMING:1 p1.refresh OK");
         game_state.player2.refresh();
+        tdbg!("CHECK_TIMING:2 p2.refresh OK");
         let p1_needs_refresh = game_state.player1.main_deck.cards.is_empty()
             && !game_state.player1.waitroom.cards.is_empty();
         let p2_needs_refresh = game_state.player2.main_deck.cards.is_empty()
@@ -993,6 +1013,7 @@ impl super::TurnEngine {
                 .cards
                 .extend(waitroom.iter().copied());
             game_state.player1.main_deck.shuffle();
+            tdbg!("CHECK_TIMING:1b p1 refresh shuffled");
         }
         if p2_needs_refresh {
             let waitroom = std::mem::take(&mut game_state.player2.waitroom.cards);
@@ -1002,26 +1023,37 @@ impl super::TurnEngine {
                 .cards
                 .extend(waitroom.iter().copied());
             game_state.player2.main_deck.shuffle();
+            tdbg!("CHECK_TIMING:2b p2 refresh shuffled");
         }
+        tdbg!("CHECK_TIMING:3 refresh done");
         Self::check_victory_condition(game_state);
-        // Rule 10.5: Invalid card processing — borrow IDs to avoid cloning
+        tdbg!("CHECK_TIMING:4 victory OK");
         let p1_id = game_state.player1.id.clone();
         let p2_id = game_state.player2.id.clone();
         Self::check_invalid_live_cards(game_state, &p1_id);
+        tdbg!("CHECK_TIMING:5 invalid live p1 OK");
         Self::check_invalid_live_cards(game_state, &p2_id);
+        tdbg!("CHECK_TIMING:6 invalid live p2 OK");
         Self::check_invalid_energy_cards(&mut game_state.player1, &game_state.card_database);
         Self::check_invalid_energy_cards(&mut game_state.player2, &game_state.card_database);
+        tdbg!("CHECK_TIMING:7 invalid energy OK");
         Self::check_orphaned_under_cards(&mut game_state.player1, &game_state.card_database);
         Self::check_orphaned_under_cards(&mut game_state.player2, &game_state.card_database);
+        tdbg!("CHECK_TIMING:8 orphaned under OK");
         game_state.recalculate_constants();
+        tdbg!("CHECK_TIMING:9 recalc_constants OK");
         Self::check_invalid_resolution_zone(game_state);
+        tdbg!("CHECK_TIMING:10 invalid resolution OK");
         if game_state.check_permanent_loop() {
             game_state.game_result = crate::game_state::GameResult::Draw;
             game_state.game_ended = true;
         }
+        tdbg!("CHECK_TIMING:11 perm_loop OK");
         Self::check_victory_condition(game_state);
+        tdbg!("CHECK_TIMING:12 victory2 OK");
         let active_player_id = game_state.active_player().id.clone();
         game_state.process_pending_auto_abilities(&active_player_id);
+        tdbg!("CHECK_TIMING:13 auto_abilities OK");
     }
 
     pub fn check_victory_condition(game_state: &mut GameState) {

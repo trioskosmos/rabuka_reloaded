@@ -35,14 +35,8 @@ fn main() {
         }
     };
 
-    let deck1 = deck_lists
-        .get(0)
-        .cloned()
-        .unwrap_or_else(|| deck_lists[0].clone());
-    let deck2 = deck_lists
-        .get(0)
-        .cloned()
-        .unwrap_or_else(|| deck_lists[0].clone());
+    let deck1 = deck_lists.get(0).cloned().unwrap_or_else(|| deck_lists[0].clone());
+    let deck2 = deck_lists.get(0).cloned().unwrap_or_else(|| deck_lists[0].clone());
 
     let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(&deck1);
     let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(&deck2);
@@ -51,44 +45,27 @@ fn main() {
         &mut card_database.clone(),
         card_numbers1,
     ) {
-        Ok(mut d) => {
-            d.shuffle_main_deck();
-            d.shuffle_energy_deck();
-            d
-        }
-        Err(e) => {
-            eprintln!("Failed to build deck1: {}", e);
-            return;
-        }
+        Ok(mut d) => { d.shuffle_main_deck(); d.shuffle_energy_deck(); d }
+        Err(e) => { eprintln!("Failed to build deck1: {}", e); return; }
     };
 
     let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(
         &mut card_database.clone(),
         card_numbers2,
     ) {
-        Ok(mut d) => {
-            d.shuffle_main_deck();
-            d.shuffle_energy_deck();
-            d
-        }
-        Err(e) => {
-            eprintln!("Failed to build deck2: {}", e);
-            return;
-        }
+        Ok(mut d) => { d.shuffle_main_deck(); d.shuffle_energy_deck(); d }
+        Err(e) => { eprintln!("Failed to build deck2: {}", e); return; }
     };
 
     let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut player1_deck,
-        &mut card_database.clone(),
+        &mut player1_deck, &mut card_database.clone(),
     );
     let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
-        &mut player2_deck,
-        &mut card_database.clone(),
+        &mut player2_deck, &mut card_database.clone(),
     );
 
     let mut p1 = Player::new("p1".to_string(), "Player 1".to_string(), true);
     let mut p2 = Player::new("p2".to_string(), "Player 2".to_string(), false);
-
     p1.set_main_deck(player1_deck.main_deck);
     p1.set_energy_deck(player1_deck.energy_deck);
     p2.set_main_deck(player2_deck.main_deck);
@@ -97,26 +74,63 @@ fn main() {
     let mut game_state = GameState::new(p1, p2, card_database);
     game_setup::setup_game(&mut game_state);
 
+    // How many consecutive pre-game actions we've auto-resolved (RPS / attacker
+    // choice / mulligan).  Capped so we don't loop forever if something breaks.
+    let mut auto_turns = 0;
+
     loop {
-        // Print a compact representation of the game state
+        // --- identical to web_server: drive through automatic phases ---
+        game_setup::settle_single_player_state(&mut game_state);
+
+        if game_state.game_result != game_state_mod::GameResult::Ongoing {
+            println!("\nGame Over: {:?}", game_state.game_result);
+            break;
+        }
+
         let display = display::game_state_to_display(&game_state);
-        println!("\n--- Game State (turn {}) ---", game_state.turn_number);
         println!(
-            "{}",
-            serde_json::to_string_pretty(&display).unwrap_or_default()
+            "\n--- Game State (turn {}) phase={:?} ---",
+            game_state.turn_number, game_state.current_phase
         );
+        println!("{}", serde_json::to_string_pretty(&display).unwrap_or_default());
 
         let actions = game_setup::generate_possible_actions(&game_state);
         if actions.is_empty() {
-            println!("No legal actions available. Exiting.");
+            println!(
+                "No legal actions (no auto-phase either). phase={:?}. Exiting.",
+                game_state.current_phase
+            );
             break;
         }
 
         println!("\nLegal actions:");
         for (i, a) in actions.iter().enumerate() {
-            println!("  [{}] {}", i, a.description);
+            println!("  [{}] {:?} — {}", i, a.action_type, a.description);
         }
-        println!("Enter action index (or q to quit): ");
+
+        // Auto-pilot through the pre-game ceremony so the harness drops you
+        // straight at Main phase ready to play.
+        let pregame = matches!(
+            game_state.current_phase,
+            game_state_mod::Phase::RockPaperScissors
+                | game_state_mod::Phase::ChooseFirstAttacker
+                | game_state_mod::Phase::MulliganFirstAttacker
+                | game_state_mod::Phase::MulliganSecondAttacker
+        );
+        if pregame && auto_turns < 20 {
+            auto_turns += 1;
+            // Always pick the last listed action:
+            //   RPS         → ScissorsChoice
+            //   Attacker    → ChooseFirstAttacker (or Second)
+            //   Mulligan    → SkipMulligan
+            let idx = actions.len() - 1;
+            let action = &actions[idx];
+            println!("[AUTO] {} — {}", idx, action.description);
+            execute_action(&mut game_state, action);
+            continue;
+        }
+
+        println!("Enter action index (or q to quit):");
         print!("> ");
         io::stdout().flush().ok();
 
@@ -130,78 +144,35 @@ fn main() {
         }
         let idx: usize = match line.parse() {
             Ok(n) => n,
-            Err(_) => {
-                println!("Invalid input");
-                continue;
-            }
+            Err(_) => { println!("Invalid input"); continue; }
         };
         if idx >= actions.len() {
-            println!("Index out of range");
-            continue;
+            println!("Index out of range"); continue;
         }
 
         let action = &actions[idx];
-        let params = action.parameters.clone();
-
-        let res = turn::TurnEngine::execute_main_phase_action(
-            &mut game_state,
-            &action.action_type,
-            params.as_ref().and_then(|p| p.card_id),
-            params.as_ref().and_then(|p| p.card_indices.clone()),
-            params
-                .as_ref()
-                .and_then(|p| p.stage_area.as_ref().and_then(|s| s.parse().ok())),
-            params.as_ref().and_then(|p| p.use_baton_touch),
-        );
-
-        match res {
-            Ok(_) => {
-                println!("Action applied.");
-                // Auto-advance automatic phases until a human decision or pending choice
-                let _ = settle_single_player_state(&mut game_state);
-            }
-            Err(e) => {
-                println!("Action failed: {}", e);
-            }
+        if execute_action(&mut game_state, action) {
+            auto_turns = 0;
         }
     }
 
     println!("Exiting harness.");
 }
 
-fn is_automatic_phase(game_state: &GameState) -> bool {
-    matches!(
-        game_state.current_phase,
-        game_state_mod::Phase::Active
-            | game_state_mod::Phase::Energy
-            | game_state_mod::Phase::Draw
-            | game_state_mod::Phase::FirstAttackerPerformance
-            | game_state_mod::Phase::SecondAttackerPerformance
-            | game_state_mod::Phase::LiveVictoryDetermination
-    )
-}
-
-fn is_live_card_set_phase(game_state: &GameState) -> bool {
-    matches!(
-        game_state.current_phase,
-        game_state_mod::Phase::LiveCardSetFirstAttacker
-            | game_state_mod::Phase::LiveCardSetSecondAttacker
-    )
-}
-
-fn settle_single_player_state(game_state: &mut GameState) -> Result<(), String> {
-    loop {
-        if game_state.has_pending_choice() {
-            break;
-        }
-
-        if is_automatic_phase(game_state) {
-            turn::TurnEngine::advance_phase(game_state);
-        } else if is_live_card_set_phase(game_state) {
-            break;
-        } else {
-            break;
-        }
+/// Execute one action against the game state — exactly as the web server does.
+/// Returns true on success, false on error.
+fn execute_action(game_state: &mut GameState, action: &rabuka_engine::game_setup::Action) -> bool {
+    let params = action.parameters.clone();
+    let res = turn::TurnEngine::execute_main_phase_action(
+        game_state,
+        &action.action_type,
+        params.as_ref().and_then(|p| p.card_id),
+        params.as_ref().and_then(|p| p.card_indices.clone()),
+        params.as_ref().and_then(|p| p.stage_area.as_ref().and_then(|s| s.parse().ok())),
+        params.as_ref().and_then(|p| p.use_baton_touch),
+    );
+    match res {
+        Ok(_) => { println!("Action applied."); true }
+        Err(e) => { println!("Action failed: {}", e); false }
     }
-    Ok(())
 }

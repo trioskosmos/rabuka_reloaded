@@ -31,26 +31,28 @@ cargo 3ds --version >nul 2>&1
 if %errorlevel% neq 0 ( cargo install cargo-3ds )
 echo [3/5] cargo-3ds ready
 
-:: Step 4 - Bundle assets into romfs directory
-echo [4/5] Bundling assets into romfs...
+:: Step 4 - Pre-bake abilities into cards_baked.json (runs on fast desktop CPU)
+echo [4/5] Pre-baking abilities into cards_baked.json...
 if not exist "%~dp0engine_3ds\romfs" mkdir "%~dp0engine_3ds\romfs"
 if not exist "%~dp0engine_3ds\romfs\decks" mkdir "%~dp0engine_3ds\romfs\decks"
-copy /Y "%~dp0cards\cards.json" "%~dp0engine_3ds\romfs\cards.json" >nul
+cd /d "%~dp0engine_3ds"
+set RUSTFLAGS=-C link-arg=/STACK:8388608
+cargo run --bin bake -- "%~dp0engine_3ds/romfs"
+if %errorlevel% neq 0 (
+    echo [FAIL] bake failed.
+    pause
+    exit /b 1
+)
+echo [4/5] cards.json ready
+
+:: Copy deck files
 copy /Y "%~dp0web_ui\decks\*.txt" "%~dp0engine_3ds\romfs\decks\" >nul
 
-:: Pre-bake abilities_map.json for 3DS (avoids serde_json::Value parsing at runtime)
-echo [4/5] Pre-baking abilities map...
-cd /d "%~dp0"
-cargo run --bin gen_abilities_map --manifest-path engine/Cargo.toml --release
-if %errorlevel% neq 0 (
-    echo   [WARN] gen_abilities_map failed - abilities will not be loaded on 3DS
-)
-echo [4/5] Assets bundled
-
-:: Step 5 - Clean previous build artifacts to avoid stale cache issues
+:: Step 5 - Build 3DS binary
 echo [5/5] Building 3DS binary (first build takes ~10 min)...
 if exist "%~dp0engine_3ds\target" rmdir /s /q "%~dp0engine_3ds\target"
 cd /d "%~dp0engine_3ds"
+set RUSTFLAGS=
 cargo +nightly 3ds build --bin rabuka_3ds --release --features 3ds
 if %errorlevel% neq 0 (
     echo Build FAILED.
@@ -65,7 +67,7 @@ copy /Y "C:\rust_targets\armv6k-nintendo-3ds\release\rabuka_3ds.3dsx" "%~dp0outp
 
 echo.
 echo === Build Complete ===
-echo File: output_3ds\rabuka_3ds.3dsx (cards + decks bundled inside)
+echo File: output_3ds\rabuka_3ds.3dsx (abilities pre-baked into cards.json)
 echo.
 echo Just load this .3dsx in Azahar - no extra files needed.
 pause

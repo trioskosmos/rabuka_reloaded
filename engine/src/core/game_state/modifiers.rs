@@ -1,12 +1,39 @@
+#[cfg(feature = "3ds")]
+extern "C" {
+    // Outputs to both debug console (svcOutputDebugString) AND top screen (consoleSelect+printf)
+    fn _3ds_tdbg(msg: *const u8);
+}
+
+#[cfg(feature = "3ds")]
+macro_rules! tdbg {
+    ($($arg:tt)*) => {{
+        let msg = format!($($arg)*);
+        let s = format!("{}\0", msg);
+        unsafe { _3ds_tdbg(s.as_ptr()); }
+    }};
+}
+#[cfg(not(feature = "3ds"))]
+macro_rules! tdbg {
+    ($($arg:tt)*) => {{ let _ = format!($($arg)*); }};
+}
+
 impl GameState {
     /// Re-evaluate all constant (常時) abilities on all stage members.
     /// Handles gain_resource(blade, heart), modify_score, modify_cost.
     /// Clears old constant-derived values and re-applies those whose conditions pass.
+    #[inline(never)]
     pub fn recalculate_constants(&mut self) {
+        tdbg!("RC:0 ENTERED");
+        // HANG WORKAROUND (3DS ARMv6K): AtomicBool::load uses 8-bit atomics
+        // that may deadlock via Mutex fallback. Use a plain bool on GameState
+        // OR skip the debug check entirely on 3DS.
+        #[cfg(not(feature = "3ds"))]
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
             log::debug!("[SZ_DEBUG] recalculate_constants ENTERED");
         }
+        tdbg!("RC:1 ATOMIC_LOAD_OK");
         let entries = self.collect_constant_stage_effects();
+        tdbg!("RC:2 COLLECT_EFFECTS_OK len={}", entries.len());
         self.mods.constant_score_sources.clear();
 
         let mut exp_blade: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
@@ -20,6 +47,7 @@ impl GameState {
         let mut p1_constant_score_bonus: i32 = 0;
         let mut p2_constant_score_bonus: i32 = 0;
         let mut jyouji_statuses: Vec<crate::types::ConstantAbilityStatus> = Vec::new();
+        tdbg!("RC:3 VEC_HASHMAP_INIT_OK");
 
         // Compute stage positions for all entries before creating resolver
         let mut entry_positions: std::collections::HashMap<i16, Option<usize>> =
@@ -43,8 +71,10 @@ impl GameState {
                 .or_else(|| self.player2.stage.stage.iter().position(|&c| c == cid));
             entry_positions.insert(cid, pos);
         }
+        tdbg!("RC:4 ENTRY_POSITIONS_DONE count={}", entry_positions.len());
 
         for (card_id, effect) in &entries {
+            tdbg!("RC:5_LOOP card_id={}", card_id);
             // Set activating_card so condition evaluators (e.g. exclude_self in
             // location_condition) know which card is "self" for this entry.
             let prev_activating = self.activating_card;
@@ -468,9 +498,12 @@ impl GameState {
             // Restore the previous activating_card
             self.activating_card = prev_activating;
         }
+        let jyouji_len = jyouji_statuses.len();
         self.constant_ability_statuses = jyouji_statuses;
+        tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", jyouji_len);
 
         // Blade
+        tdbg!("RC:7 BLADE");
         let old_blade = std::mem::take(&mut self.mods.constant_blade_bonuses);
         for (cid, val) in &old_blade {
             self.mods.remove_blade_modifier(*cid, *val);
@@ -481,6 +514,7 @@ impl GameState {
         self.mods.constant_blade_bonuses = exp_blade;
 
         // Cost
+        tdbg!("RC:8 COST");
         let old_cost = std::mem::take(&mut self.mods.constant_cost_bonuses);
         for (cid, val) in &old_cost {
             self.mods.remove_cost_modifier(*cid, *val);
@@ -491,6 +525,7 @@ impl GameState {
         self.mods.constant_cost_bonuses = exp_cost;
 
         // Score
+        tdbg!("RC:9 SCORE");
         let old_score = std::mem::take(&mut self.mods.constant_score_bonuses);
         for (cid, val) in &old_score {
             self.mods.remove_score_modifier(*cid, *val);
@@ -505,6 +540,7 @@ impl GameState {
         self.mods.p2_constant_total_score_bonus = p2_constant_score_bonus;
 
         // Heart — clear old constant heart modifiers first, then re-apply new ones.
+        tdbg!("RC:10 HEART");
         // Must drain the OLD map so bonuses from cards that left the stage are removed.
         let old_heart = std::mem::take(&mut self.mods.constant_heart_bonuses);
         for (cid, cols) in &old_heart {
@@ -521,6 +557,7 @@ impl GameState {
         }
         self.mods.constant_heart_bonuses = exp_heart;
 
+        tdbg!("RC:11 PROHIBITION");
         // Apply restriction effects from constant abilities.
         // Use "const_restriction:" prefix to distinguish from debut/live ability restrictions
         // so we can safely clear and re-add constant restrictions on each recalculate call.
@@ -530,6 +567,7 @@ impl GameState {
             self.prohibition_effects.push(p.clone());
         }
 
+        tdbg!("RC:12 GLOBAL_NEED_HEART");
         // Clear old constant global need_heart modifiers, then re-apply new ones.
         let old_global_nh = std::mem::take(&mut self.mods.constant_global_need_heart);
         for (card_id, color_str, delta) in &old_global_nh {
@@ -541,13 +579,18 @@ impl GameState {
             self.mods.add_need_heart_modifier(*card_id, hc, *delta);
         }
         self.mods.constant_global_need_heart = exp_global_need_heart;
+        tdbg!("RC:12b GLOBAL_NEED_HEART_DONE");
 
         // Also recalculate cost modifiers from hand cards (hand-based cost reductions)
         // Pass pre-collected stage effects to avoid re-scanning the stage
+        tdbg!("RC:13 COST_MODIFIERS_WITH_ENTRIES");
         self.recalculate_constant_cost_modifiers_with_entries(&entries);
+        tdbg!("RC:13b COST_MODIFIERS_DONE");
 
         // Evaluate constant abilities from success live card zone (e.g. Love wing bell)
+        tdbg!("RC:14 SUCCESS_ZONE");
         self.evaluate_success_zone_constant_modifiers();
+        tdbg!("RC:14b SUCCESS_ZONE_DONE");
     }
 
     pub fn recalculate_constant_blade_modifiers(&mut self) {

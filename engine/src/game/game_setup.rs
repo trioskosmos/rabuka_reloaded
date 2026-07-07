@@ -157,6 +157,66 @@ pub fn setup_game(game_state: &mut GameState) {
     game_state.current_phase = crate::game_state::Phase::RockPaperScissors;
 }
 
+/// Returns true for phases that the engine advances automatically with no user input.
+pub fn is_automatic_phase(game_state: &GameState) -> bool {
+    matches!(
+        game_state.current_phase,
+        crate::game_state::Phase::Active
+            | crate::game_state::Phase::Energy
+            | crate::game_state::Phase::Draw
+            | crate::game_state::Phase::FirstAttackerPerformance
+            | crate::game_state::Phase::SecondAttackerPerformance
+            | crate::game_state::Phase::LiveVictoryDetermination
+    )
+}
+
+/// Returns true for the live-card-set phases (user must act, but it's a distinct
+/// kind of "must stop" from a normal human-decision phase).
+pub fn is_live_card_set_phase(game_state: &GameState) -> bool {
+    matches!(
+        game_state.current_phase,
+        crate::game_state::Phase::LiveCardSetFirstAttacker
+            | crate::game_state::Phase::LiveCardSetSecondAttacker
+    )
+}
+
+/// Drives the engine forward through all automatic phases until it reaches
+/// a phase that requires user input (Main, Mulligan, LiveCardSet, etc.)
+/// or a pending ability choice appears.
+/// This is identical to the logic used by web_server.rs.
+pub fn settle_single_player_state(game_state: &mut GameState) {
+    let mut iters = 0u32;
+    loop {
+        iters += 1;
+        if iters > 500 {
+            log::error!("[SETTLE] infinite-loop guard hit after 500 iters, phase={:?}", game_state.current_phase);
+            eprintln!("[SETTLE] LOOP GUARD phase={:?}", game_state.current_phase);
+            break;
+        }
+        if game_state.has_pending_choice() {
+            log::debug!("[SETTLE] break: has_pending_choice, phase={:?}", game_state.current_phase);
+            eprintln!("[SETTLE] pending_choice -> {:?}", game_state.current_phase);
+            break;
+        }
+        if is_automatic_phase(game_state) {
+            let old = game_state.current_phase.clone();
+            log::debug!("[SETTLE] advance_phase from {:?}", old);
+            eprintln!("[SETTLE] adv {:?}", old);
+            crate::turn::TurnEngine::advance_phase(game_state);
+            log::debug!("[SETTLE] advance_phase done -> {:?} pending={}", game_state.current_phase, game_state.has_pending_choice());
+            eprintln!("[SETTLE] adv done -> {:?} pend={}", game_state.current_phase, game_state.has_pending_choice());
+        } else if is_live_card_set_phase(game_state) {
+            log::debug!("[SETTLE] break: live_card_set_phase {:?}", game_state.current_phase);
+            eprintln!("[SETTLE] break live {:?}", game_state.current_phase);
+            break;
+        } else {
+            log::debug!("[SETTLE] break: non-automatic phase {:?}", game_state.current_phase);
+            eprintln!("[SETTLE] break non-auto {:?}", game_state.current_phase);
+            break;
+        }
+    }
+}
+
 fn make_action(action_type: ActionType, description: &str) -> Action {
     Action {
         description: description.to_string(),
@@ -889,7 +949,6 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
         ActionType::ConfirmMulligan,
         &format!("Confirm {}'s mulligan", player_name),
         ActionParameters {
-            card_indices: Some(vec![]),
             ..make_params()
         },
     ));
@@ -1378,10 +1437,16 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
     }
 
     actions.push(make_action_params(
+        ActionType::SkipLiveCardSet,
+        &format!("Skip {}'s live card set", player_name),
+        ActionParameters {
+            ..make_params()
+        },
+    ));
+    actions.push(make_action_params(
         ActionType::ConfirmLiveCardSet,
         &format!("Confirm {}'s live card set", player_name),
         ActionParameters {
-            card_indices: Some(vec![]),
             ..make_params()
         },
     ));

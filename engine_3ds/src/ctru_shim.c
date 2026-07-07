@@ -19,15 +19,37 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <3ds.h>
 #include <errno.h>
 // Increase default heap size to 64MB for parsing large JSON files
 u32 __ctru_heap_size = 64 * 1024 * 1024;
+// Increase default stack size to 4MB (ctru-rs uses __stacksize__, not __ctru_stack_size).
+// The default ~32KB stack is insufficient for large Rust functions with many HashMap/Vec
+// locals when the compiler aggressively inlines callees into the caller's stack frame.
+u32 __stacksize__ = 4 * 1024 * 1024;
+
+static PrintConsole top_console;
+static PrintConsole bot_console;
 
 void _3ds_init() {
     gfxInitDefault();
-    consoleInit(GFX_TOP, NULL);
+    consoleInit(GFX_TOP, &top_console);
+    consoleInit(GFX_BOTTOM, &bot_console);
+    consoleSelect(&bot_console);
     romfsInit();
+}
+
+void _3ds_select_top() {
+    consoleSelect(&top_console);
+}
+
+void _3ds_select_bottom() {
+    consoleSelect(&bot_console);
+}
+
+void _3ds_clear_console() {
+    consoleClear();
 }
 
 void _3ds_exit() {
@@ -39,9 +61,34 @@ int _3ds_main_loop() {
     return aptMainLoop();
 }
 
-void _3ds_swap_buffers() {
-    gspWaitForVBlank();
+// Called periodically during long operations (JSON parsing, etc.)
+// to keep the 3DS OS responsive.  Returns 0 when the app should exit.
+int _3ds_keep_alive() {
+    int alive = aptMainLoop();
+    gfxFlushBuffers();
     gfxSwapBuffers();
+    return alive;
+}
+
+void _3ds_swap_buffers() {
+    gfxFlushBuffers();
+    gfxSwapBuffers();
+    gspWaitForVBlank();
+}
+
+void _3ds_debug_print(const char *msg) {
+    svcOutputDebugString(msg, strlen(msg));
+}
+
+// Print a debug message to both:
+// 1. Debug console (via svcOutputDebugString) — ALWAYS works, visible in Luma3DS/emulator
+// 2. Top screen (via consoleSelect + printf) — visible on physical 3DS screen
+void _3ds_tdbg(const char *msg) {
+    svcOutputDebugString(msg, strlen(msg));
+    svcOutputDebugString("\n", 1);
+    consoleSelect(&top_console);
+    printf("%s\n", msg);
+    consoleSelect(&bot_console);
 }
 
 void _3ds_scan_input() {

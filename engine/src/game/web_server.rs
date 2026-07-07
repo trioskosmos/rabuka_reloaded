@@ -516,55 +516,18 @@ fn actions_with_index(game_state: &GameState) -> Vec<ActionIndex> {
         .collect()
 }
 
+// Thin wrappers — canonical implementations live in game_setup so all
+// callers (web_server, harness, rabuka_3ds) stay in sync.
 fn is_automatic_phase(game_state: &GameState) -> bool {
-    matches!(
-        game_state.current_phase,
-        crate::game_state::Phase::Active
-            | crate::game_state::Phase::Energy
-            | crate::game_state::Phase::Draw
-            | crate::game_state::Phase::FirstAttackerPerformance
-            | crate::game_state::Phase::SecondAttackerPerformance
-            | crate::game_state::Phase::LiveVictoryDetermination
-    )
+    crate::game_setup::is_automatic_phase(game_state)
 }
 
 fn is_live_card_set_phase(game_state: &GameState) -> bool {
-    matches!(
-        game_state.current_phase,
-        crate::game_state::Phase::LiveCardSetFirstAttacker
-            | crate::game_state::Phase::LiveCardSetSecondAttacker
-    )
+    crate::game_setup::is_live_card_set_phase(game_state)
 }
 
 fn settle_single_player_state(game_state: &mut GameState) -> Result<(), String> {
-    loop {
-        // If the player needs to make a choice, stop and wait for their input
-        if game_state.has_pending_choice() {
-            break;
-        }
-
-        if is_automatic_phase(game_state) {
-            let old_phase = game_state.current_phase.clone();
-
-            crate::turn::TurnEngine::advance_phase(game_state);
-
-            log::debug!(
-                "DEBUG: Auto-advanced from {:?} to {:?}",
-                old_phase, game_state.current_phase
-            );
-        } else if is_live_card_set_phase(game_state) {
-            // Live card set phases are manual - don't auto-advance
-
-            log::debug!("DEBUG: Live card set phase reached, stopping auto-advance");
-
-            break;
-        } else {
-            // Reached a human decision phase, stop auto-advancing
-
-            break;
-        }
-    }
-
+    crate::game_setup::settle_single_player_state(game_state);
     Ok(())
 }
 

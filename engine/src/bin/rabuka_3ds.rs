@@ -21,7 +21,7 @@ fn main() {
         }
     };
 
-    let card_database = Arc::new(rabuka_engine::card::CardDatabase::load_or_create(cards));
+    let mut card_database = Arc::new(rabuka_engine::card::CardDatabase::load_or_create(cards));
 
     let deck_lists = match deck_parser::DeckParser::parse_all_decks() {
         Ok(d) => d,
@@ -44,7 +44,7 @@ fn main() {
     let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(&deck2);
 
     let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(
-        &mut card_database.clone(),
+        &mut card_database,
         card_numbers1,
     ) {
         Ok(mut d) => {
@@ -59,7 +59,7 @@ fn main() {
     };
 
     let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(
-        &mut card_database.clone(),
+        &mut card_database,
         card_numbers2,
     ) {
         Ok(mut d) => {
@@ -75,11 +75,11 @@ fn main() {
 
     let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
         &mut player1_deck,
-        &mut card_database.clone(),
+        &mut card_database,
     );
     let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
         &mut player2_deck,
-        &mut card_database.clone(),
+        &mut card_database,
     );
 
     let mut p1 = Player::new("p1".to_string(), "Player 1".to_string(), true);

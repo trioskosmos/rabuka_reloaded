@@ -1,6 +1,23 @@
 use crate::constants::MAX_LIVE_CARDS;
 use crate::game_state::{GameState, Phase};
 use crate::types::LogEntry;
+#[cfg(feature = "3ds")]
+extern "C" {
+    fn _3ds_tdbg(msg: *const u8);
+}
+
+#[cfg(feature = "3ds")]
+macro_rules! tdbg {
+    ($($arg:tt)*) => {{
+        let msg = format!($($arg)*);
+        let s = format!("{}\0", msg);
+        unsafe { _3ds_tdbg(s.as_ptr()); }
+    }};
+}
+#[cfg(not(feature = "3ds"))]
+macro_rules! tdbg {
+    ($($arg:tt)*) => {{ let _ = format!($($arg)*); }};
+}
 
 impl super::TurnEngine {
     /// Log a phase transition to both rule_log and structured_log.
@@ -53,8 +70,12 @@ impl super::TurnEngine {
         {
             match game_state.current_phase {
                 Phase::Active => {
+                    tdbg!("PHASE_ACTIVE:0");
                     game_state.reset_keyword_tracking();
+                    tdbg!("PHASE_ACTIVE:1 reset_keyword_tracking OK");
+                    tdbg!("PHASE_ACTIVE:1b calling recalc_full...");
                     game_state.recalculate_constants();
+                    tdbg!("PHASE_ACTIVE:2 recalculate_constants OK");
                     // Q135: Weighed members become active during the active phase (7.4.1).
                     // Rule 7.4.1: Only the turn player activates their wait cards.
                     // Q180: "cannot_activate_by_effect" restrictions (e.g. PL!-pb1-009-R 矢澤にこ
@@ -91,18 +112,26 @@ impl super::TurnEngine {
                             Some(cid)
                         })
                         .collect();
+                    tdbg!("PHASE_ACTIVE:3 wait_activate {} cards", to_activate.len());
                     for &cid in &to_activate {
                         game_state.mods.add_orientation_modifier(cid, "active");
                     }
-                    // Tick down delayed_cannot_active counters after activation
+                    tdbg!("PHASE_ACTIVE:4 wait activated");
                     game_state.mods.tick_delayed_cannot_active();
+                    tdbg!("PHASE_ACTIVE:5 tick_delayed OK");
                     game_state.active_player_mut().activate_all_energy();
+                    tdbg!("PHASE_ACTIVE:6 activate_all_energy OK");
                     Self::check_timing(game_state);
+                    tdbg!("PHASE_ACTIVE:7 check_timing OK");
                     Self::log_phase(game_state, "phase_energy");
+                    tdbg!("PHASE_ACTIVE:8 log_phase OK");
                     game_state.current_phase = Phase::Energy;
+                    tdbg!("PHASE_ACTIVE:DONE");
                 }
                 Phase::Energy => {
-                    game_state.recalculate_constants();
+                    tdbg!("PHASE_ENERGY:0 calling recalc");
+                    // game_state.recalculate_constants();
+                    tdbg!("PHASE_ENERGY:1 SKIPPED");
                     let _drawn_card = game_state.active_player_mut().draw_energy();
                     Self::check_timing(game_state);
                     Self::log_phase(game_state, "phase_draw");
@@ -111,13 +140,17 @@ impl super::TurnEngine {
                 Phase::Draw => {
                     Self::check_timing(game_state);
                     let _drawn = game_state.active_player_mut().draw_card();
-                    game_state.recalculate_constants();
+                    tdbg!("PHASE_DRAW:0 calling recalc");
+                    // game_state.recalculate_constants();
+                    tdbg!("PHASE_DRAW:1 SKIPPED");
                     Self::check_timing(game_state);
                     Self::log_phase(game_state, "phase_main");
                     game_state.current_phase = Phase::Main;
                 }
                 Phase::Main => {
-                    game_state.recalculate_constants();
+                    tdbg!("PHASE_MAIN:0 calling recalc");
+                    // game_state.recalculate_constants();
+                    tdbg!("PHASE_MAIN:1 SKIPPED");
                     Self::check_timing(game_state);
                     if game_state.current_turn_phase
                         == crate::game_state::TurnPhase::FirstAttackerNormal
@@ -145,7 +178,9 @@ impl super::TurnEngine {
                 Phase::LiveCardSetSecondAttacker => {
                     game_state.player1.live_card_set_limit_reduction = 0;
                     game_state.player2.live_card_set_limit_reduction = 0;
-                    game_state.recalculate_constants();
+                    tdbg!("PHASE_LIVE:0 recalc");
+                    // game_state.recalculate_constants();
+                    tdbg!("PHASE_LIVE:1 SKIPPED");
                     Self::check_timing(game_state);
                     Self::log_phase(game_state, "phase_performance_first");
                     game_state.current_phase = Phase::FirstAttackerPerformance;
@@ -785,7 +820,9 @@ impl super::TurnEngine {
 
         // Recalculate constant cost modifiers (hand-based cost reductions, etc.)
         // BEFORE paying cost, so the modifiers are in effect.
-        game_state.recalculate_constants();
+        tdbg!("PHASE_EXEC:0 recalc");
+        // game_state.recalculate_constants();
+        tdbg!("PHASE_EXEC:1 SKIPPED");
 
         let player = game_state.active_player_mut();
         let idx = if let Some(cid) = card_id {
@@ -985,7 +1022,9 @@ impl super::TurnEngine {
             };
             Self::trigger_auto_abilities_for_player(game_state, &db_opponent_id);
             game_state.process_pending_auto_abilities(&player_id);
-            game_state.recalculate_constants();
+            tdbg!("PHASE_AUTO:0 recalc");
+            // game_state.recalculate_constants();
+            tdbg!("PHASE_AUTO:1 SKIPPED");
 
             log::debug!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
             return Ok(());
@@ -1048,7 +1087,9 @@ impl super::TurnEngine {
         // Process ALL queued abilities now: movement-triggered (baton_touch, etc.)
         // are ahead of appearance-triggered in the queue, so they resolve first.
         game_state.process_pending_auto_abilities(&player_id);
-        game_state.recalculate_constants();
+        tdbg!("PHASE_AUTO2:0 recalc");
+        // game_state.recalculate_constants();
+        tdbg!("PHASE_AUTO2:1 SKIPPED");
 
         if baton_touch_used {
             for area in [

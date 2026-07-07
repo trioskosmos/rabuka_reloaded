@@ -1,60 +1,115 @@
-// Rabuka 3DS — step-by-step loading + auto-play across frames.
-//
-// DESIGN NOTES (3DS pitfalls):
-//
-// 1. APT main loop: ALL game processing must happen inside the
-//    `while aptMainLoop() { }` frame loop. If you block for more than
-//    ~1 frame without calling aptMainLoop, the OS kills the app.
-//    This is why loading is split into states, one per frame.
-//
-// 2. RomFS: cards.json and deck files are bundled into the .3dsx via
-//    Cargo.toml's `[package.metadata.cargo-3ds] romfs_dir = "romfs"`.
-//    Access via `romfs:/` paths (requires romfsInit() in ctru_shim.c).
-//
-// 3. pthread_atfork: rand 0.8.6's ReseedingRng calls libc::pthread_atfork
-//    during thread_rng() initialization. On the 3DS this returns ENOSYS
-//    (code 88) and panics. We override it with a no-op via #[no_mangle]
-//    and `--allow-multiple-definition` in build.rs / linker flags.
-//
-// 4. Shuffle: DeckBuilder::shuffle_main/shuffle_energy use thread_rng()
-//    which crashes on 3DS (TLS not supported). Currently skipped — the
-//    deck plays in original file order. Replace once a TLS-free RNG
-//    approach is available (e.g. SmallRng from_entropy).
-//
-// 5. getrandom: Provided via ctru_shim.c using svcGetSystemTick + xorshift64.
-//    This is sufficient for card shuffling and the rand crate's needs.
+// Rabuka 3DS — interactive card game.  All work inside APT main loop.
 
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
 
 use rabuka_engine::card::CardDatabase;
-use rabuka_engine::card_loader::CardLoader;
-use rabuka_engine::deck_builder::DeckBuilder;
+use rabuka_engine::deck_builder::{Deck, DeckBuilder};
 use rabuka_engine::deck_parser::DeckParser;
 use rabuka_engine::game_setup;
-use rabuka_engine::game_state::GameState;
+use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn;
 
+/// 3DS system tick rate: 268.12 MHz (ARM11)
+const TICK_HZ: u64 = 268_120_000;
+/// Print debug timing every N frames (0 = disabled)
+const DBG_EVERY_N: u64 = 60;
+
 #[cfg(feature = "3ds")]
-enum LoadState {
+struct AptReader<R> {
+    inner: R,
+    threshold: usize,
+    counter: usize,
+}
+
+#[cfg(feature = "3ds")]
+impl<R: Read> Read for AptReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let n = self.inner.read(buf)?;
+        self.counter += n;
+        if self.counter >= self.threshold {
+            self.counter = 0;
+            let _ = unsafe { _3ds_keep_alive() };
+        }
+        Ok(n)
+    }
+}
+
+/// Reader wrapper that calls aptMainLoop() every `threshold` bytes without
+/// any GPU buffer operations. Keeps the 3DS OS alive during long deserialization
+/// without the overhead/cost of _3ds_keep_alive().
+#[cfg(feature = "3ds")]
+struct YieldReader<R> {
+    inner: R,
+    threshold: usize,
+    counter: usize,
+}
+
+#[cfg(feature = "3ds")]
+impl<R: Read> Read for YieldReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let n = self.inner.read(buf)?;
+        self.counter += n;
+        if self.counter >= self.threshold {
+            self.counter = 0;
+            if unsafe { _3ds_main_loop() } == 0 {
+                // App should exit; return empty read to signal EOF
+                return Ok(0);
+            }
+        }
+        Ok(n)
+    }
+}
+
+// dprintln! — game output on BOTTOM screen (user choices).
+// Also sends to debug console via 3dslink.
+#[cfg(feature = "3ds")]
+macro_rules! dprintln {
+    ($($arg:tt)*) => {{
+        let msg = format!($($arg)*);
+        let s = format!("{}\n\0", msg);
+        unsafe { _3ds_debug_print(s.as_ptr()); }
+        // Default console is BOTTOM — println! goes there
+        println!("{}", msg);
+    }};
+}
+
+// tprintln! — debug output on TOP screen (timing/status).
+// Switches to top console temporarily, then back to bottom.
+#[cfg(feature = "3ds")]
+macro_rules! tprintln {
+    ($($arg:tt)*) => {{
+        let msg = format!($($arg)*);
+        let s = format!("{}\n\0", msg);
+        unsafe {
+            _3ds_debug_print(s.as_ptr());
+            _3ds_select_top();
+        }
+        println!("{}", msg);
+        unsafe { _3ds_select_bottom(); }
+    }};
+}
+
+#[cfg(feature = "3ds")]
+fn ticks_to_ms(ticks: u64) -> f64 {
+    (ticks as f64) / (TICK_HZ as f64) * 1000.0
+}
+
+#[cfg(feature = "3ds")]
+enum Step {
     ReadFile,
-    ReadAbilitiesMap(String),
-    ParseCards(String, Vec<u8>),
-    AttachAbilities(Vec<rabuka_engine::card::Card>, Vec<u8>),
-    BuildGame(Vec<rabuka_engine::card::Card>),
-    Playing(GameState, usize),
+    ParseCards(Vec<u8>),
+    LoadDb(Vec<rabuka_engine::card::Card>),
+    LoadDecks(Arc<CardDatabase>),
+    BuildGame(Arc<CardDatabase>, Deck, Deck),
+    Play(GameState, usize, Vec<game_setup::Action>, bool, bool),
     Done(Result<(), String>),
 }
 
 #[cfg(feature = "3ds")]
-/// Override pthread_atfork to avoid panics in rand 0.8.6's ReseedingRng.
-/// The 3DS doesn't support fork(), so this function is a no-op.
-/// Rust's #[no_mangle] ensures this definition takes precedence over
-/// the one in libsysbase (which returns ENOSYS, causing a panic).
 #[no_mangle]
 pub unsafe extern "C" fn pthread_atfork(
     _prepare: Option<unsafe extern "C" fn()>,
@@ -84,203 +139,316 @@ fn main() {
             }
         }
     }));
-
     unsafe {
         _3ds_init();
     }
-    let mut state = LoadState::ReadFile;
+
+    let mut frame: u64 = 0;
+    let mut step = Step::ReadFile;
 
     while unsafe { _3ds_main_loop() != 0 } {
-        print!("\x1b[2J");
-        println!("Rabuka 3DS");
-        println!();
+        let tick_start = unsafe { _3ds_system_tick() };
 
-        match &state {
-            LoadState::Done(result) => match result {
-                Ok(_) => println!("Done! Press START to exit."),
-                Err(e) => println!("ERROR: {}", e),
-            },
-            LoadState::Playing(gs, _) => {
-                println!("Turn {} | Phase: {:?}", gs.turn_number, gs.current_phase);
-                println!(
-                    "P1 hand:{} energy:{} stage:{}/3",
-                    gs.player1.hand.cards.len(),
-                    gs.player1.energy_zone.cards.len(),
-                    gs.player1.stage.stage.iter().filter(|&&s| s != -1).count()
-                );
-                println!(
-                    "P2 hand:{} energy:{} stage:{}/3",
-                    gs.player2.hand.cards.len(),
-                    gs.player2.energy_zone.cards.len(),
-                    gs.player2.stage.stage.iter().filter(|&&s| s != -1).count()
-                );
-            }
-            _ => {}
+        unsafe {
+            _3ds_scan_input();
+        }
+        let keys = unsafe { _3ds_keys_down() };
+        if keys & 0x00000008 != 0 {
+            break;
         }
 
-        state = match state {
-            LoadState::ReadFile => {
-                println!("[1/5] Reading cards.json...");
-                let path = Path::new("romfs:/cards.json");
+        if frame >= DBG_EVERY_N && frame % DBG_EVERY_N == 0 {
+            tprintln!("[DBG] frame={} step={}", frame, step_name(&step));
+        }
+        let current_step = step_name(&step);
+        frame += 1;
+
+        step = match step {
+            Step::ReadFile => {
+                let t0 = unsafe { _3ds_system_tick() };
+                println!("[1/4] Reading cards.bin...");
+                let path = Path::new("romfs:/cards.bin");
                 match File::open(path).and_then(|mut f| {
-                    let mut s = String::new();
-                    f.read_to_string(&mut s).map(|_| s)
+                    let mut v = Vec::new();
+                    f.read_to_end(&mut v).map(|_| v)
                 }) {
-                    Ok(c) => {
-                        println!("  {} bytes read", c.len());
-                        LoadState::ReadAbilitiesMap(c)
+                    Ok(v) => {
+                        let t1 = unsafe { _3ds_system_tick() };
+                        dprintln!("  {} B ({} ms)", v.len(), ticks_to_ms(t1 - t0));
+                        Step::ParseCards(v)
                     }
-                    Err(e) => LoadState::Done(Err(format!("Read cards: {}", e))),
+                    Err(e) => Step::Done(Err(format!("Read: {}", e))),
                 }
             }
-            LoadState::ReadAbilitiesMap(cards_json) => {
-                // Load the pre-baked compact abilities map (card_no -> Vec<Ability>).
-                // Generated at build time by gen_abilities_map desktop tool.
-                // Uses bincode for instantaneous loading on the 3DS ARM11.
-                println!("[2/5] Reading abilities_map.bin...");
-                let path = Path::new("romfs:/abilities_map.bin");
-                match File::open(path).and_then(|mut f| {
-                    let mut s = Vec::new();
-                    f.read_to_end(&mut s).map(|_| s)
-                }) {
-                    Ok(c) => {
-                        println!("  {} bytes read", c.len());
-                        LoadState::ParseCards(cards_json, c)
+            Step::ParseCards(bytes) => {
+                let t0 = unsafe { _3ds_system_tick() };
+                println!("[2/4] Parsing cards...");
+                // Use a yielding reader so aptMainLoop() is called every 8KB
+                // during deserialization. Without this, parsing 1-2MB of
+                // MessagePack on a 268MHz ARM11 can take 2+ seconds, triggering
+                // the 3DS OS watchdog.
+                let reader = YieldReader {
+                    inner: std::io::Cursor::new(&bytes),
+                    threshold: 8192,
+                    counter: 0,
+                };
+                match rmp_serde::from_read::<_, Vec<rabuka_engine::card::Card>>(reader) {
+                    Ok(cards) => {
+                        let t1 = unsafe { _3ds_system_tick() };
+                        dprintln!("  {} cards ({} ms)", cards.len(), ticks_to_ms(t1 - t0));
+                        drop(bytes);
+                        Step::LoadDb(cards)
                     }
                     Err(_) => {
-                        println!("  No abilities_map.bin, proceeding without.");
-                        LoadState::ParseCards(cards_json, Vec::new())
-                    }
-                }
-            }
-            LoadState::ParseCards(cards_json, abilities_map_json) => {
-                println!("[3/5] Parsing cards...");
-                unsafe { _3ds_swap_buffers(); }
-                match CardLoader::load_cards_from_strs(&cards_json, None) {
-                    Ok(cards) => {
-                        println!("  {} cards parsed", cards.len());
-                        if abilities_map_json.is_empty() {
-                            LoadState::BuildGame(cards)
-                        } else {
-                            // cards_json dropped here — frees ~3MB before ability map parse
-                            LoadState::AttachAbilities(cards, abilities_map_json)
+                        let reader2 = YieldReader {
+                            inner: std::io::Cursor::new(&bytes),
+                            threshold: 8192,
+                            counter: 0,
+                        };
+                        match rmp_serde::from_read::<
+                            _,
+                            std::collections::HashMap<String, rabuka_engine::card::Card>,
+                        >(reader2)
+                        {
+                            Ok(map) => {
+                                let t1 = unsafe { _3ds_system_tick() };
+                                let cards: Vec<_> = map.into_values().collect();
+                                dprintln!(
+                                    "  {} cards (object) ({} ms)",
+                                    cards.len(),
+                                    ticks_to_ms(t1 - t0)
+                                );
+                                drop(bytes);
+                                Step::LoadDb(cards)
+                            }
+                            Err(e) => Step::Done(Err(format!("Parse: {}", e))),
                         }
                     }
-                    Err(e) => LoadState::Done(Err(format!("Parse cards: {}", e))),
                 }
             }
-            LoadState::AttachAbilities(cards, abilities_map_bin) => {
-                println!("[4/5] Attaching abilities...");
-                unsafe { _3ds_swap_buffers(); }
-                // Deserialize directly from bincode bytes.
-                #[derive(serde::Deserialize)]
-                struct AbilitiesMapFile {
-                    abilities: Vec<rabuka_engine::card::Ability>,
-                    cards: HashMap<String, Vec<usize>>,
-                }
-                match rmp_serde::from_slice::<AbilitiesMapFile>(&abilities_map_bin) {
-                    Ok(map_file) => {
-                        let cards = CardLoader::apply_abilities_index(
-                            cards,
-                            &map_file.abilities,
-                            &map_file.cards,
-                        );
-                        println!("  {} cards with abilities", map_file.cards.len());
-                        LoadState::BuildGame(cards)
-                    }
-                    Err(e) => {
-                        println!("  abilities map error: {}", e);
-                        LoadState::BuildGame(cards)
-                    }
-                }
-            }
-            LoadState::BuildGame(cards) => {
-                println!("[5/6] Building game state...");
-                println!("  Creating database...");
+            Step::LoadDb(cards) => {
+                let t0 = unsafe { _3ds_system_tick() };
+                println!("  Building database...");
                 let db = Arc::new(CardDatabase::load_or_create(cards));
+                let t1 = unsafe { _3ds_system_tick() };
+                dprintln!("  DB done ({} ms)", ticks_to_ms(t1 - t0));
                 println!("  Loading decks...");
+                Step::LoadDecks(db)
+            }
+            Step::LoadDecks(mut db) => {
+                let t0 = unsafe { _3ds_system_tick() };
                 match DeckParser::parse_all_decks_from_directory(Path::new("romfs:/decks/")) {
-                    Ok(decks) if !decks.is_empty() => {
-                        let d = decks[0].clone();
-                        let nums = DeckParser::deck_list_to_card_numbers(&d);
-                        println!("  Building deck...");
-                        match DeckBuilder::build_deck_from_database(&mut db.clone(), nums) {
-                            Ok(mut pd) => {
-                                // Skip shuffle on 3DS: thread_rng() uses TLS which
-                                // isn't supported on this target and causes a crash.
-                                // The deck is still playable in original file order.
-                                println!("  Building deck...");
-                                DeckBuilder::add_default_energy_cards_from_database(
-                                    &mut pd,
-                                    &mut db.clone(),
-                                )
-                                .ok();
+                    Ok(v) if !v.is_empty() => {
+                        let nums = DeckParser::deck_list_to_card_numbers(&v[0]);
+                        // Build TWO separate decks so that card instance IDs are unique
+                        let pd1_res = DeckBuilder::build_deck_from_database(&mut db, nums.clone());
+                        let pd2_res = DeckBuilder::build_deck_from_database(&mut db, nums);
+                        match (pd1_res, pd2_res) {
+                            (Ok(mut pd1), Ok(mut pd2)) => {
+                                let t1 = unsafe { _3ds_system_tick() };
+                                dprintln!("  Decks built ({} ms)", ticks_to_ms(t1 - t0));
 
-                                println!("  Creating players...");
-                                let mut p1 = Player::new("p1".into(), "P1".into(), true);
-                                p1.set_main_deck(pd.main_deck.clone());
-                                p1.set_energy_deck(pd.energy_deck.clone());
-                                let mut p2 = Player::new("p2".into(), "P2".into(), false);
-                                p2.set_main_deck(pd.main_deck);
-                                p2.set_energy_deck(pd.energy_deck);
+                                pd1.shuffle_main_deck();
+                                pd1.shuffle_energy_deck();
+                                pd2.shuffle_main_deck();
+                                pd2.shuffle_energy_deck();
 
-                                println!("  Initializing game...");
-                                let mut gs = GameState::new(p1, p2, db);
-                                game_setup::setup_game(&mut gs);
-                                println!("  Game ready!");
-                                LoadState::Playing(gs, 0)
+                                println!("  Building players...");
+                                Step::BuildGame(db, pd1, pd2)
                             }
-                            Err(e) => LoadState::Done(Err(format!("Build deck: {}", e))),
+                            _ => Step::Done(Err("Failed to build decks".into())),
                         }
                     }
-                    Ok(_) => LoadState::Done(Err("No decks found".into())),
-                    Err(e) => LoadState::Done(Err(format!("Decks: {}", e))),
+                    _ => Step::Done(Err("No decks".into())),
                 }
             }
-            LoadState::Playing(mut gs, mut cursor) => {
-                if gs.game_result != rabuka_engine::game_state::GameResult::Ongoing {
-                    println!("Game ended: {:?}", gs.game_result);
-                    LoadState::Done(Ok(()))
-                } else {
-                    let actions = game_setup::generate_possible_actions(&gs);
-                    if actions.is_empty() {
-                        LoadState::Done(Err("No actions".into()))
+            Step::BuildGame(mut db, mut pd1, mut pd2) => {
+                let t0 = unsafe { _3ds_system_tick() };
+                DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
+                DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
+
+                let mut p1 = Player::new("p1".into(), "P1".into(), true);
+                p1.set_main_deck(pd1.main_deck);
+                p1.set_energy_deck(pd1.energy_deck);
+                let mut p2 = Player::new("p2".into(), "P2".into(), false);
+                p2.set_main_deck(pd2.main_deck);
+                p2.set_energy_deck(pd2.energy_deck);
+
+                let mut gs = GameState::new(p1, p2, db);
+                game_setup::setup_game(&mut gs);
+                let t1 = unsafe { _3ds_system_tick() };
+                dprintln!("  Game ready ({} ms)", ticks_to_ms(t1 - t0));
+                Step::Play(gs, 0, Vec::new(), true, true)
+            }
+            Step::Play(mut gs, mut cur, mut acts_cache, mut dirty, mut redraw) => {
+                // Handle cursor movement via D-pad
+                let n = acts_cache.len();
+                if keys & 0x00000040 != 0 && cur > 0 {
+                    cur -= 1;
+                    redraw = true;
+                } else if keys & 0x00000080 != 0 && cur + 1 < n {
+                    cur += 1;
+                    redraw = true;
+                }
+
+                // Handle action selection via A button
+                if keys & 0x00000001 != 0 && cur < n {
+                    let action = acts_cache[cur].clone();
+                    let p = action.parameters.clone();
+                    tprintln!(
+                        "[ACT] {:?} phase={:?}",
+                        action.action_type,
+                        gs.current_phase
+                    );
+                    let t_exec = unsafe { _3ds_system_tick() };
+                    let result = turn::TurnEngine::execute_main_phase_action(
+                        &mut gs,
+                        &action.action_type,
+                        p.as_ref().and_then(|x| x.card_id),
+                        p.as_ref().and_then(|x| x.card_indices.clone()),
+                        p.as_ref()
+                            .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
+                        p.as_ref().and_then(|x| x.use_baton_touch),
+                    );
+                    let t_exec_end = unsafe { _3ds_system_tick() };
+                    let exec_ms = ticks_to_ms(t_exec_end - t_exec);
+                    tprintln!(
+                        "[ACT] done in {} ms -> phase={:?} err={}",
+                        exec_ms,
+                        gs.current_phase,
+                        if let Err(ref e) = result {
+                            e.as_str()
+                        } else {
+                            "ok"
+                        }
+                    );
+                    gs.reset_loop_detection();
+                    gs.reset_loop_detection();
+                    cur = 0;
+                    dirty = true;
+                    redraw = true;
+                }
+
+                // Recalculate bounds after action may have changed act count
+                let n2 = acts_cache.len();
+                if n2 > 0 && cur >= n2 {
+                    cur = n2 - 1;
+                }
+
+                // --- AUTO-ADVANCE ---
+                // Mirror the web server exactly: run settle_single_player_state which loops
+                // through Active→Energy→Draw→Main in one synchronous call, then stops at the
+                // first phase requiring user input or a pending ability choice.
+                let auto = !gs.has_pending_choice()
+                    && gs.game_result == GameResult::Ongoing
+                    && game_setup::is_automatic_phase(&gs);
+                tprintln!(
+                    "[LOOP] phase={:?} turn={} pend={} auto={}",
+                    gs.current_phase,
+                    gs.turn_number,
+                    gs.has_pending_choice(),
+                    auto
+                );
+                if auto {
+                    tprintln!("[SETTLE] start {:?}", gs.current_phase);
+                    settle_3ds(&mut gs);
+                    tprintln!("[SETTLE] end -> {:?}", gs.current_phase);
+                    dirty = true;
+                }
+
+                // Redraw on state change or cursor move
+                if dirty || redraw {
+                    let t_gen = unsafe { _3ds_system_tick() };
+                    acts_cache = game_setup::generate_possible_actions(&gs);
+                    let t_gen_end = unsafe { _3ds_system_tick() };
+                    let gen_ms = ticks_to_ms(t_gen_end - t_gen);
+                    if gen_ms > 100.0 {
+                        tprintln!("[WARN] generate took {} ms", gen_ms);
+                    }
+                    unsafe {
+                        _3ds_clear_console();
+                    }
+                    dprintln!(
+                        "phase={:?} turn={} result={:?}  [A]=select",
+                        gs.current_phase,
+                        gs.turn_number,
+                        gs.game_result,
+                    );
+                    let n = acts_cache.len();
+                    if n > 0 && cur >= n {
+                        cur = n - 1;
+                    }
+                    let window_size = 20;
+                    let start_idx = if n > window_size {
+                        cur.saturating_sub(window_size / 2).min(n - window_size)
                     } else {
-                        if cursor >= actions.len() {
-                            cursor = actions.len() - 1;
-                        }
-                        
-                        println!("  {} actions available", actions.len());
-                        let start_idx = if cursor >= 10 { cursor - 10 } else { 0 };
-                        for (i, action) in actions.iter().enumerate().skip(start_idx).take(15) {
-                            if i == cursor {
-                                println!("> [{}] {}", i, action.description);
-                            } else {
-                                println!("  [{}] {}", i, action.description);
+                        0
+                    };
+                    let end_idx = (start_idx + window_size).min(n);
+
+                    if start_idx > 0 {
+                        dprintln!("... ({} more above)", start_idx);
+                    }
+
+                    for (i, a) in acts_cache
+                        .iter()
+                        .enumerate()
+                        .skip(start_idx)
+                        .take(end_idx - start_idx)
+                    {
+                        let arrow = if i == cur { ">" } else { " " };
+                        let mut desc = a.description.clone();
+                        if let Some(p) = &a.parameters {
+                            if let Some(card_id) = p.card_id {
+                                if let Some(card) = gs.card_database.get_card(card_id) {
+                                    desc = format!("[{}] {}", card.card_no, desc);
+                                }
                             }
                         }
-
-                        unsafe { _3ds_scan_input(); }
-                        let keys = unsafe { _3ds_keys_down() };
-                        const KEY_A: u32 = 1 << 0;
-                        const KEY_DPAD_UP: u32 = 1 << 6;
-                        const KEY_DPAD_DOWN: u32 = 1 << 7;
-
-                        if (keys & KEY_DPAD_UP) != 0 && cursor > 0 {
-                            cursor -= 1;
-                        } else if (keys & KEY_DPAD_DOWN) != 0 && cursor + 1 < actions.len() {
-                            cursor += 1;
-                        } else if (keys & KEY_A) != 0 {
-                            execute_action(&mut gs, &actions, cursor);
-                            cursor = 0;
-                        }
-                        LoadState::Playing(gs, cursor)
+                        let safe_desc: String = desc
+                            .chars()
+                            .map(|c| if c.is_ascii() { c } else { '?' })
+                            .collect();
+                        dprintln!("{} [{}] {:?} {}", arrow, i, a.action_type, safe_desc);
                     }
-                }
-            }
-            LoadState::Done(_) => state,
-        };
 
+                    if end_idx < n {
+                        dprintln!("... ({} more below)", n - end_idx);
+                    }
+
+                    if gs.game_result != GameResult::Ongoing {
+                        dprintln!("Game ended: {:?}", gs.game_result);
+                    }
+                    dirty = false;
+                    redraw = false;
+                }
+                Step::Play(gs, cur, acts_cache, dirty, redraw)
+            }
+            Step::Done(ref r) => {
+                print!("\x1b[2J");
+                match r {
+                    Ok(_) => println!("Done! Press START."),
+                    Err(e) => println!("ERROR: {}", e),
+                }
+                if keys & 0x00000008 != 0 {
+                    break;
+                }
+                Step::Done(match r {
+                    Ok(_) => Ok(()),
+                    Err(e) => Err(e.clone()),
+                })
+            }
+        };
+        let tick_end = unsafe { _3ds_system_tick() };
+        let frame_ms = ticks_to_ms(tick_end - tick_start);
+        if frame_ms > 33.0 {
+            tprintln!(
+                "[WARN] frame {}: {} ms (step: {})",
+                frame,
+                frame_ms,
+                current_step
+            );
+        }
         unsafe {
             _3ds_swap_buffers();
         }
@@ -290,61 +458,63 @@ fn main() {
     }
 }
 
-// pick_action is removed in interactive mode
-
+/// 3DS-native settle: same logic as game_setup::settle_single_player_state but
+/// calls aptMainLoop() every 10 iterations to keep the OS watchdog happy, and
+/// avoids ALL eprintln!/log calls (which can deadlock the GPU console renderer).
 #[cfg(feature = "3ds")]
-fn execute_action(gs: &mut GameState, actions: &[game_setup::Action], idx: usize) {
-    if idx >= actions.len() {
-        return;
-    }
-    let a = &actions[idx];
-    let p = a.parameters.clone();
-
-    if let Err(e) = rabuka_engine::turn::TurnEngine::execute_main_phase_action(
-        gs,
-        &a.action_type,
-        p.as_ref().and_then(|p| p.card_id),
-        p.as_ref().and_then(|p| p.card_indices.clone()),
-        p.as_ref()
-            .and_then(|p| p.stage_area.as_ref().and_then(|s| s.parse().ok())),
-        p.as_ref().and_then(|p| p.use_baton_touch),
-    ) {
-        println!("Action error: {}", e);
-        return;
-    }
-
-    gs.reset_loop_detection();
-
+fn settle_3ds(gs: &mut GameState) {
+    let mut iters = 0u32;
     loop {
+        iters += 1;
+        // Yield to OS every 10 iterations to avoid watchdog timeout
+        if iters % 10 == 0 {
+            if unsafe { _3ds_main_loop() } == 0 {
+                return;
+            }
+        }
+        if iters > 500 {
+            break;
+        }
         if gs.has_pending_choice() {
             break;
         }
-        if gs.game_result != rabuka_engine::game_state::GameResult::Ongoing {
+        if gs.game_result != GameResult::Ongoing {
             break;
         }
-        let auto = matches!(
-            gs.current_phase,
-            rabuka_engine::game_state::Phase::Active
-                | rabuka_engine::game_state::Phase::Energy
-                | rabuka_engine::game_state::Phase::Draw
-                | rabuka_engine::game_state::Phase::FirstAttackerPerformance
-                | rabuka_engine::game_state::Phase::SecondAttackerPerformance
-                | rabuka_engine::game_state::Phase::LiveVictoryDetermination
-        );
-        if !auto {
+        if game_setup::is_automatic_phase(gs) {
+            turn::TurnEngine::advance_phase(gs);
+        } else {
             break;
         }
-        turn::TurnEngine::advance_phase(gs);
+    }
+}
+
+#[cfg(feature = "3ds")]
+fn step_name(s: &Step) -> &'static str {
+    match s {
+        Step::ReadFile => "ReadFile",
+        Step::ParseCards(_) => "ParseCards",
+        Step::LoadDb(_) => "LoadDb",
+        Step::LoadDecks(_) => "LoadDecks",
+        Step::BuildGame(..) => "BuildGame",
+        Step::Play(_, _, _, _, _) => "Play",
+        Step::Done(_) => "Done",
     }
 }
 
 extern "C" {
     fn _3ds_init();
     fn _3ds_main_loop() -> i32;
+    fn _3ds_keep_alive() -> i32;
     fn _3ds_exit();
     fn _3ds_swap_buffers();
     fn _3ds_scan_input();
     fn _3ds_keys_down() -> u32;
+    fn _3ds_system_tick() -> u64;
+    fn _3ds_debug_print(msg: *const u8);
+    fn _3ds_select_top();
+    fn _3ds_select_bottom();
+    fn _3ds_clear_console();
 }
 
 #[cfg(not(feature = "3ds"))]

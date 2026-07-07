@@ -20,7 +20,7 @@ echo Waiting for Rust backend to be ready...
 :wait_loop
 powershell -Command "try { (Invoke-WebRequest -Uri http://127.0.0.1:8080/api/game-state -UseBasicParsing -TimeoutSec 1).StatusCode } catch { exit 1 }" >nul 2>&1
 if %errorlevel% neq 0 (
-    timeout /t 2 /nobreak >nul
+    powershell -NoProfile -Command "Start-Sleep -Seconds 2" >nul 2>&1
     goto wait_loop
 )
 echo Rust backend is ready!
