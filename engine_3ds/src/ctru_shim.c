@@ -27,7 +27,7 @@ u32 __ctru_heap_size = 64 * 1024 * 1024;
 // Increase default stack size to 4MB (ctru-rs uses __stacksize__, not __ctru_stack_size).
 // The default ~32KB stack is insufficient for large Rust functions with many HashMap/Vec
 // locals when the compiler aggressively inlines callees into the caller's stack frame.
-u32 __stacksize__ = 4 * 1024 * 1024;
+u32 __stacksize__ = 2 * 1024 * 1024;
 
 static PrintConsole top_console;
 static PrintConsole bot_console;

@@ -114,11 +114,15 @@ fn main() {
     );
 
     let out_bin = "engine_3ds/romfs/abilities_map.bin";
-    let bin_data = rmp_serde::to_vec(&file)
+    let bin_data = rmp_serde::to_vec_named(&file)
         .unwrap_or_else(|e| panic!("Could not serialize map with MessagePack: {}", e));
-
-    fs::write(out_bin, &bin_data)
-        .unwrap_or_else(|e| panic!("Could not write {}: {}", out_bin, e));
-
+    fs::write(out_bin, &bin_data).unwrap_or_else(|e| panic!("Could not write {}: {}", out_bin, e));
     println!("Written {} bytes to {}", bin_data.len(), out_bin);
+
+    let out_json = "engine_3ds/romfs/abilities_index.json";
+    let json_data = serde_json::to_vec(&file)
+        .unwrap_or_else(|e| panic!("Could not serialize map with JSON: {}", e));
+    fs::write(out_json, &json_data)
+        .unwrap_or_else(|e| panic!("Could not write {}: {}", out_json, e));
+    println!("Written {} bytes to {}", json_data.len(), out_json);
 }

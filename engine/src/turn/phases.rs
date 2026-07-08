@@ -129,9 +129,9 @@ impl super::TurnEngine {
                     tdbg!("PHASE_ACTIVE:DONE");
                 }
                 Phase::Energy => {
-                    tdbg!("PHASE_ENERGY:0 calling recalc");
-                    // game_state.recalculate_constants();
-                    tdbg!("PHASE_ENERGY:1 SKIPPED");
+                    tdbg!("PHASE_ENERGY:0 recalc");
+                    game_state.recalculate_constants();
+                    tdbg!("PHASE_ENERGY:1 OK");
                     let _drawn_card = game_state.active_player_mut().draw_energy();
                     Self::check_timing(game_state);
                     Self::log_phase(game_state, "phase_draw");
@@ -140,17 +140,17 @@ impl super::TurnEngine {
                 Phase::Draw => {
                     Self::check_timing(game_state);
                     let _drawn = game_state.active_player_mut().draw_card();
-                    tdbg!("PHASE_DRAW:0 calling recalc");
-                    // game_state.recalculate_constants();
-                    tdbg!("PHASE_DRAW:1 SKIPPED");
+                    tdbg!("PHASE_DRAW:0 recalc");
+                    game_state.recalculate_constants();
+                    tdbg!("PHASE_DRAW:1 OK");
                     Self::check_timing(game_state);
                     Self::log_phase(game_state, "phase_main");
                     game_state.current_phase = Phase::Main;
                 }
                 Phase::Main => {
-                    tdbg!("PHASE_MAIN:0 calling recalc");
-                    // game_state.recalculate_constants();
-                    tdbg!("PHASE_MAIN:1 SKIPPED");
+                    tdbg!("PHASE_MAIN:0 recalc");
+                    game_state.recalculate_constants();
+                    tdbg!("PHASE_MAIN:1 OK");
                     Self::check_timing(game_state);
                     if game_state.current_turn_phase
                         == crate::game_state::TurnPhase::FirstAttackerNormal
@@ -179,8 +179,8 @@ impl super::TurnEngine {
                     game_state.player1.live_card_set_limit_reduction = 0;
                     game_state.player2.live_card_set_limit_reduction = 0;
                     tdbg!("PHASE_LIVE:0 recalc");
-                    // game_state.recalculate_constants();
-                    tdbg!("PHASE_LIVE:1 SKIPPED");
+                    game_state.recalculate_constants();
+                    tdbg!("PHASE_LIVE:1 recalc OK");
                     Self::check_timing(game_state);
                     Self::log_phase(game_state, "phase_performance_first");
                     game_state.current_phase = Phase::FirstAttackerPerformance;
@@ -821,8 +821,8 @@ impl super::TurnEngine {
         // Recalculate constant cost modifiers (hand-based cost reductions, etc.)
         // BEFORE paying cost, so the modifiers are in effect.
         tdbg!("PHASE_EXEC:0 recalc");
-        // game_state.recalculate_constants();
-        tdbg!("PHASE_EXEC:1 SKIPPED");
+        game_state.recalculate_constants();
+        tdbg!("PHASE_EXEC:1 recalc OK");
 
         let player = game_state.active_player_mut();
         let idx = if let Some(cid) = card_id {
@@ -1023,8 +1023,8 @@ impl super::TurnEngine {
             Self::trigger_auto_abilities_for_player(game_state, &db_opponent_id);
             game_state.process_pending_auto_abilities(&player_id);
             tdbg!("PHASE_AUTO:0 recalc");
-            // game_state.recalculate_constants();
-            tdbg!("PHASE_AUTO:1 SKIPPED");
+            game_state.recalculate_constants();
+            tdbg!("PHASE_AUTO:1 recalc OK");
 
             log::debug!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
             return Ok(());
@@ -1088,8 +1088,8 @@ impl super::TurnEngine {
         // are ahead of appearance-triggered in the queue, so they resolve first.
         game_state.process_pending_auto_abilities(&player_id);
         tdbg!("PHASE_AUTO2:0 recalc");
-        // game_state.recalculate_constants();
-        tdbg!("PHASE_AUTO2:1 SKIPPED");
+        game_state.recalculate_constants();
+        tdbg!("PHASE_AUTO2:1 recalc OK");
 
         if baton_touch_used {
             for area in [

@@ -12,8 +12,8 @@ use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState};
 use rabuka_engine::player::Player;
 
-fn build_game(json_str: &str) -> Result<GameState, String> {
-    let cards = CardLoader::load_cards_from_strs(json_str, None)?;
+fn build_game(json_str: &str, abilities_str: &str) -> Result<GameState, String> {
+    let cards = CardLoader::load_cards_from_strs(json_str, Some(abilities_str))?;
     let mut db = Arc::new(CardDatabase::load_or_create(cards));
     let decks = DeckParser::parse_all_decks_from_directory(Path::new("../web_ui/decks/"))
         .map_err(|e| format!("decks: {}", e))?;
@@ -36,11 +36,16 @@ fn build_game(json_str: &str) -> Result<GameState, String> {
 
 #[test]
 fn load_and_play() {
-    let json_str = std::fs::read_to_string("../engine_3ds/romfs/cards.json")
-        .expect("cards.json not found — run bake first");
-    eprintln!("cards.json: {} KB", json_str.len() / 1024);
+    let json_str = std::fs::read_to_string("../cards/cards.json").expect("cards.json not found");
+    let abilities_str =
+        std::fs::read_to_string("../cards/abilities.json").expect("abilities.json not found");
+    eprintln!(
+        "cards: {} KB, abilities: {} KB",
+        json_str.len() / 1024,
+        abilities_str.len() / 1024
+    );
 
-    let mut gs = build_game(&json_str).expect("build_game failed");
+    let mut gs = build_game(&json_str, &abilities_str).expect("build_game failed");
     eprintln!("phase: {}, result: {:?}", gs.current_phase, gs.game_result);
     assert_eq!(gs.game_result, GameResult::Ongoing);
 
@@ -50,11 +55,7 @@ fn load_and_play() {
         acts.len() > 0,
         "should have at least one action at game start"
     );
-    for (i, a) in acts.iter().enumerate() {
-        eprintln!("  [{}] {} {}", i, a.action_type, a.description);
-    }
 
-    // Execute action 0 (Rock)
     let a = &acts[0];
     let p = a.parameters.clone();
     rabuka_engine::turn::TurnEngine::execute_main_phase_action(

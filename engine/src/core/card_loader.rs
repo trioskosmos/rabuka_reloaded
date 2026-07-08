@@ -30,10 +30,10 @@ impl CardLoader {
         // Try parsing as array first
         let mut cards: Vec<Card> = match serde_json::from_str::<Vec<Card>>(cards_json) {
             Ok(cards) => cards,
-            Err(_) => {
+            Err(e1) => {
                 // If that fails, try parsing as object (map) and convert to array
                 let card_map: HashMap<String, Card> = serde_json::from_str(cards_json)
-                    .map_err(|e| format!("Failed to parse JSON as object: {}", e))?;
+                    .map_err(|e| format!("Vec: {}; Object: {}", e1, e))?;
                 card_map.into_values().collect()
             }
         };

@@ -32,12 +32,12 @@ if %errorlevel% neq 0 ( cargo install cargo-3ds )
 echo [3/5] cargo-3ds ready
 
 :: Step 4 - Pre-bake abilities into cards_baked.json (runs on fast desktop CPU)
-echo [4/5] Pre-baking abilities into cards_baked.json...
+echo [4/5] Pre-baking abilities...
 if not exist "%~dp0engine_3ds\romfs" mkdir "%~dp0engine_3ds\romfs"
 if not exist "%~dp0engine_3ds\romfs\decks" mkdir "%~dp0engine_3ds\romfs\decks"
 cd /d "%~dp0engine_3ds"
 set RUSTFLAGS=-C link-arg=/STACK:8388608
-cargo run --bin bake -- "%~dp0engine_3ds/romfs"
+cargo run --bin bake --release -- "%~dp0engine_3ds/romfs"
 if %errorlevel% neq 0 (
     echo [FAIL] bake failed.
     pause
@@ -47,6 +47,8 @@ echo [4/5] cards.json ready
 
 :: Copy deck files
 copy /Y "%~dp0web_ui\decks\*.txt" "%~dp0engine_3ds\romfs\decks\" >nul
+
+echo [4/5] cards.json with baked abilities ready
 
 :: Step 5 - Build 3DS binary
 echo [5/5] Building 3DS binary (first build takes ~10 min)...
@@ -67,7 +69,7 @@ copy /Y "C:\rust_targets\armv6k-nintendo-3ds\release\rabuka_3ds.3dsx" "%~dp0outp
 
 echo.
 echo === Build Complete ===
-echo File: output_3ds\rabuka_3ds.3dsx (abilities pre-baked into cards.json)
+echo File: output_3ds\rabuka_3ds.3dsx (abilities baked into cards.json)
 echo.
 echo Just load this .3dsx in Azahar - no extra files needed.
 pause

@@ -189,12 +189,18 @@ pub fn settle_single_player_state(game_state: &mut GameState) {
     loop {
         iters += 1;
         if iters > 500 {
-            log::error!("[SETTLE] infinite-loop guard hit after 500 iters, phase={:?}", game_state.current_phase);
+            log::error!(
+                "[SETTLE] infinite-loop guard hit after 500 iters, phase={:?}",
+                game_state.current_phase
+            );
             eprintln!("[SETTLE] LOOP GUARD phase={:?}", game_state.current_phase);
             break;
         }
         if game_state.has_pending_choice() {
-            log::debug!("[SETTLE] break: has_pending_choice, phase={:?}", game_state.current_phase);
+            log::debug!(
+                "[SETTLE] break: has_pending_choice, phase={:?}",
+                game_state.current_phase
+            );
             eprintln!("[SETTLE] pending_choice -> {:?}", game_state.current_phase);
             break;
         }
@@ -203,14 +209,28 @@ pub fn settle_single_player_state(game_state: &mut GameState) {
             log::debug!("[SETTLE] advance_phase from {:?}", old);
             eprintln!("[SETTLE] adv {:?}", old);
             crate::turn::TurnEngine::advance_phase(game_state);
-            log::debug!("[SETTLE] advance_phase done -> {:?} pending={}", game_state.current_phase, game_state.has_pending_choice());
-            eprintln!("[SETTLE] adv done -> {:?} pend={}", game_state.current_phase, game_state.has_pending_choice());
+            log::debug!(
+                "[SETTLE] advance_phase done -> {:?} pending={}",
+                game_state.current_phase,
+                game_state.has_pending_choice()
+            );
+            eprintln!(
+                "[SETTLE] adv done -> {:?} pend={}",
+                game_state.current_phase,
+                game_state.has_pending_choice()
+            );
         } else if is_live_card_set_phase(game_state) {
-            log::debug!("[SETTLE] break: live_card_set_phase {:?}", game_state.current_phase);
+            log::debug!(
+                "[SETTLE] break: live_card_set_phase {:?}",
+                game_state.current_phase
+            );
             eprintln!("[SETTLE] break live {:?}", game_state.current_phase);
             break;
         } else {
-            log::debug!("[SETTLE] break: non-automatic phase {:?}", game_state.current_phase);
+            log::debug!(
+                "[SETTLE] break: non-automatic phase {:?}",
+                game_state.current_phase
+            );
             eprintln!("[SETTLE] break non-auto {:?}", game_state.current_phase);
             break;
         }
@@ -948,9 +968,7 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
     actions.push(make_action_params(
         ActionType::ConfirmMulligan,
         &format!("Confirm {}'s mulligan", player_name),
-        ActionParameters {
-            ..make_params()
-        },
+        ActionParameters { ..make_params() },
     ));
     actions.push(make_action(
         ActionType::SkipMulligan,
@@ -1163,65 +1181,78 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     };
 
                     if has_any_available || any_double_baton_available {
-                        let cost_details: Vec<String> = available_areas
-                            .iter()
-                            .filter(|a| a.available)
-                            .map(|a| {
-                                let name = match a.area.as_str() {
-                                    "left" => "Left",
-                                    "center" => "Center",
-                                    "right" => "Right",
-                                    o => o,
-                                };
-                                if a.is_baton_touch {
-                                    format!(
-                                        "{}: {} (baton touch from {})",
-                                        name,
-                                        a.cost,
-                                        a.existing_member_name.as_deref().unwrap_or("existing")
-                                    )
-                                } else {
-                                    format!("{}: {}", name, a.cost)
-                                }
-                            })
-                            .collect();
-                        let db_cost_str = double_baton_pairs.as_ref().map(|pairs| {
-                            let parts: Vec<String> = pairs
-                                .iter()
-                                .map(|p| {
-                                    format!(
-                                        "{} (baton touch {}): {}",
-                                        p.placement,
-                                        p.areas.join(" & "),
-                                        p.cost
-                                    )
-                                })
-                                .collect();
-                            parts.join(", ")
-                        });
-                        let cost_str = match (cost_details.is_empty(), &db_cost_str) {
-                            (true, None) => format!("Cost: {}", card_cost),
-                            (true, Some(db)) => format!("Cost: {} (Double: {})", card_cost, db),
-                            (false, None) => format!("Cost: {}", cost_details.join(", ")),
-                            (false, Some(db)) => {
-                                format!("Cost: {} (Double: {})", cost_details.join(", "), db)
+                        for area in &available_areas {
+                            if !area.available {
+                                continue;
                             }
-                        };
-
-                        actions.push(make_action_params(
-                            ActionType::PlayMemberToStage,
-                            &format!("{} ({}) - {}", card.name, card.card_no, cost_str),
-                            ActionParameters {
-                                card_id: Some(*card_id),
-                                card_index: Some(hand_index),
-                                card_name: Some(card.name.clone()),
-                                card_no: Some(card.card_no.clone()),
-                                base_cost: Some(card_cost),
-                                available_areas: Some(available_areas),
-                                double_baton_pairs,
-                                ..make_params()
-                            },
-                        ));
+                            let area_label = match area.area.as_str() {
+                                "left" => "Left",
+                                "center" => "Center",
+                                "right" => "Right",
+                                o => o,
+                            };
+                            let bt = if area.is_baton_touch {
+                                format!(
+                                    " bt from {}",
+                                    area.existing_member_name.as_deref().unwrap_or("?")
+                                )
+                            } else {
+                                String::new()
+                            };
+                            actions.push(make_action_params(
+                                ActionType::PlayMemberToStage,
+                                &format!(
+                                    "{} → {} (cost:{}){}",
+                                    card.name, area_label, area.cost, bt
+                                ),
+                                ActionParameters {
+                                    card_id: Some(*card_id),
+                                    card_index: Some(hand_index),
+                                    card_name: Some(card.name.clone()),
+                                    card_no: Some(card.card_no.clone()),
+                                    base_cost: Some(card_cost),
+                                    stage_area: Some(area.area.clone()),
+                                    available_areas: Some(available_areas.clone()),
+                                    ..make_params()
+                                },
+                            ));
+                        }
+                        if let Some(ref pairs) = double_baton_pairs {
+                            for pair in pairs {
+                                let area_indices: Vec<usize> = pair
+                                    .areas
+                                    .iter()
+                                    .map(|a| match a.as_str() {
+                                        "left" => 0,
+                                        "center" => 1,
+                                        "right" => 2,
+                                        _ => 0,
+                                    })
+                                    .collect();
+                                actions.push(make_action_params(
+                                    ActionType::PlayMemberToStage,
+                                    &format!(
+                                        "{} → {} (double {}&{} cost:{})",
+                                        card.name,
+                                        pair.placement,
+                                        pair.areas[0],
+                                        pair.areas[1],
+                                        pair.cost
+                                    ),
+                                    ActionParameters {
+                                        card_id: Some(*card_id),
+                                        card_index: Some(hand_index),
+                                        card_name: Some(card.name.clone()),
+                                        card_no: Some(card.card_no.clone()),
+                                        base_cost: Some(card_cost),
+                                        stage_area: Some(pair.placement.clone()),
+                                        card_indices: Some(area_indices),
+                                        available_areas: Some(available_areas.clone()),
+                                        ..make_params()
+                                    },
+                                ));
+                            }
+                        }
                     }
                 }
             }
@@ -1439,16 +1470,12 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
     actions.push(make_action_params(
         ActionType::SkipLiveCardSet,
         &format!("Skip {}'s live card set", player_name),
-        ActionParameters {
-            ..make_params()
-        },
+        ActionParameters { ..make_params() },
     ));
     actions.push(make_action_params(
         ActionType::ConfirmLiveCardSet,
         &format!("Confirm {}'s live card set", player_name),
-        ActionParameters {
-            ..make_params()
-        },
+        ActionParameters { ..make_params() },
     ));
     actions
 }

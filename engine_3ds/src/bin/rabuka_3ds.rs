@@ -1,15 +1,32 @@
 // Rabuka 3DS — interactive card game.  All work inside APT main loop.
+//
+// RAM constraints (measured with --release on desktop, 3DS ARM11 ~10x slower):
+//   sizeof(Ability) = 19968 bytes  // 20 KB each — dozens of Option<Box<...>> fields
+//   sizeof(Card) = 504 bytes
+//   2280 cards → ~1.1 MB
+//   cards.bin: 2100 KB (MessagePack, 33% smaller than JSON)
+//   abilities.json: 1453 KB on disk
+//
+// Loading strategy (abilities deferred to after deck selection):
+//   1) Read cards.bin via rmp_serde + YieldReader → Vec<Card> (no abilities, ~2s)
+//   2) Select two player decks → ~120 unique card_nos
+//   3) Read abilities.json, build ability map, attach ONLY for deck cards
+//      (~120 clones × 20KB = ~3MB instead of 33MB for all 1727)
+//   4) Build game and play
+// This avoids the 3DS watchdog (no extended JSON parsing) and saves ~30MB RAM.
 
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
 
-use rabuka_engine::card::CardDatabase;
+use rabuka_engine::card::{Card, CardDatabase};
+use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::deck_builder::{Deck, DeckBuilder};
 use rabuka_engine::deck_parser::DeckParser;
 use rabuka_engine::game_setup;
-use rabuka_engine::game_state::{GameResult, GameState, Phase};
+use rabuka_engine::game_state::{GameResult, GameState};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn;
 
@@ -100,11 +117,9 @@ fn ticks_to_ms(ticks: u64) -> f64 {
 
 #[cfg(feature = "3ds")]
 enum Step {
-    ReadFile,
+    ReadCardsBin,
     ParseCards(Vec<u8>),
-    LoadDb(Vec<rabuka_engine::card::Card>),
-    LoadDecks(Arc<CardDatabase>),
-    BuildGame(Arc<CardDatabase>, Deck, Deck),
+    LoadDecks(Vec<Card>),
     Play(GameState, usize, Vec<game_setup::Action>, bool, bool),
     Done(Result<(), String>),
 }
@@ -144,7 +159,7 @@ fn main() {
     }
 
     let mut frame: u64 = 0;
-    let mut step = Step::ReadFile;
+    let mut step = Step::ReadCardsBin;
 
     while unsafe { _3ds_main_loop() != 0 } {
         let tick_start = unsafe { _3ds_system_tick() };
@@ -164,9 +179,9 @@ fn main() {
         frame += 1;
 
         step = match step {
-            Step::ReadFile => {
+            Step::ReadCardsBin => {
                 let t0 = unsafe { _3ds_system_tick() };
-                println!("[1/4] Reading cards.bin...");
+                println!("[1/2] Reading cards.bin...");
                 let path = Path::new("romfs:/cards.bin");
                 match File::open(path).and_then(|mut f| {
                     let mut v = Vec::new();
@@ -182,88 +197,103 @@ fn main() {
             }
             Step::ParseCards(bytes) => {
                 let t0 = unsafe { _3ds_system_tick() };
-                println!("[2/4] Parsing cards...");
-                // Use a yielding reader so aptMainLoop() is called every 8KB
-                // during deserialization. Without this, parsing 1-2MB of
-                // MessagePack on a 268MHz ARM11 can take 2+ seconds, triggering
-                // the 3DS OS watchdog.
+                println!("[2/3] Deserializing cards...");
                 let reader = YieldReader {
                     inner: std::io::Cursor::new(&bytes),
                     threshold: 8192,
                     counter: 0,
                 };
-                match rmp_serde::from_read::<_, Vec<rabuka_engine::card::Card>>(reader) {
-                    Ok(cards) => {
+                match rmp_serde::from_read::<_, HashMap<String, Card>>(reader) {
+                    Ok(map) => {
                         let t1 = unsafe { _3ds_system_tick() };
+                        let cards: Vec<_> = map.into_values().collect();
                         dprintln!("  {} cards ({} ms)", cards.len(), ticks_to_ms(t1 - t0));
                         drop(bytes);
-                        Step::LoadDb(cards)
+                        Step::LoadDecks(cards)
                     }
-                    Err(_) => {
-                        let reader2 = YieldReader {
-                            inner: std::io::Cursor::new(&bytes),
-                            threshold: 8192,
-                            counter: 0,
-                        };
-                        match rmp_serde::from_read::<
-                            _,
-                            std::collections::HashMap<String, rabuka_engine::card::Card>,
-                        >(reader2)
-                        {
-                            Ok(map) => {
-                                let t1 = unsafe { _3ds_system_tick() };
-                                let cards: Vec<_> = map.into_values().collect();
-                                dprintln!(
-                                    "  {} cards (object) ({} ms)",
-                                    cards.len(),
-                                    ticks_to_ms(t1 - t0)
-                                );
-                                drop(bytes);
-                                Step::LoadDb(cards)
-                            }
-                            Err(e) => Step::Done(Err(format!("Parse: {}", e))),
-                        }
-                    }
+                    Err(e) => Step::Done(Err(format!("Parse: {}", e))),
                 }
             }
-            Step::LoadDb(cards) => {
+            Step::LoadDecks(cards) => {
                 let t0 = unsafe { _3ds_system_tick() };
-                println!("  Building database...");
-                let db = Arc::new(CardDatabase::load_or_create(cards));
-                let t1 = unsafe { _3ds_system_tick() };
-                dprintln!("  DB done ({} ms)", ticks_to_ms(t1 - t0));
-                println!("  Loading decks...");
-                Step::LoadDecks(db)
-            }
-            Step::LoadDecks(mut db) => {
-                let t0 = unsafe { _3ds_system_tick() };
-                match DeckParser::parse_all_decks_from_directory(Path::new("romfs:/decks/")) {
-                    Ok(v) if !v.is_empty() => {
-                        let nums = DeckParser::deck_list_to_card_numbers(&v[0]);
-                        // Build TWO separate decks so that card instance IDs are unique
-                        let pd1_res = DeckBuilder::build_deck_from_database(&mut db, nums.clone());
-                        let pd2_res = DeckBuilder::build_deck_from_database(&mut db, nums);
-                        match (pd1_res, pd2_res) {
-                            (Ok(mut pd1), Ok(mut pd2)) => {
-                                let t1 = unsafe { _3ds_system_tick() };
-                                dprintln!("  Decks built ({} ms)", ticks_to_ms(t1 - t0));
+                println!("[3/3] Building game...");
 
-                                pd1.shuffle_main_deck();
-                                pd1.shuffle_energy_deck();
-                                pd2.shuffle_main_deck();
-                                pd2.shuffle_energy_deck();
+                let mut db = Arc::new(CardDatabase::load_or_create(cards));
 
-                                println!("  Building players...");
-                                Step::BuildGame(db, pd1, pd2)
+                // Build decks
+                let decks =
+                    match DeckParser::parse_all_decks_from_directory(Path::new("romfs:/decks/")) {
+                        Ok(v) if !v.is_empty() => v,
+                        _ => {
+                            step = Step::Done(Err("No decks".into()));
+                            continue;
+                        }
+                    };
+                let nums = DeckParser::deck_list_to_card_numbers(&decks[0]);
+                let (mut pd1, mut pd2) = match (
+                    DeckBuilder::build_deck_from_database(&mut db, nums.clone()),
+                    DeckBuilder::build_deck_from_database(&mut db, nums),
+                ) {
+                    (Ok(pd1), Ok(pd2)) => (pd1, pd2),
+                    _ => {
+                        step = Step::Done(Err("Failed to build decks".into()));
+                        continue;
+                    }
+                };
+                pd1.shuffle_main_deck();
+                pd1.shuffle_energy_deck();
+                pd2.shuffle_main_deck();
+                pd2.shuffle_energy_deck();
+                let decks_t = unsafe { _3ds_system_tick() };
+                dprintln!("  Decks built ({} ms)", ticks_to_ms(decks_t - t0));
+
+                // 3. Collect unique card_nos from both decks
+                let mut deck_nos: HashSet<String> = HashSet::new();
+                for cid in pd1
+                    .main_deck
+                    .iter()
+                    .chain(pd1.energy_deck.iter())
+                    .chain(pd2.main_deck.iter())
+                    .chain(pd2.energy_deck.iter())
+                {
+                    if let Some(card) = db.get_card(*cid) {
+                        deck_nos.insert(card.card_no.clone());
+                    }
+                }
+
+                // 4. Attach abilities ONLY for deck cards
+                let ab_path = Path::new("romfs:/abilities.json");
+                match File::open(ab_path).and_then(|mut f| {
+                    let mut v = String::new();
+                    f.read_to_string(&mut v).map(|_| v)
+                }) {
+                    Ok(json) => {
+                        let attach_t0 = unsafe { _3ds_system_tick() };
+                        if let Ok(abilities_data) = CardLoader::load_abilities_from_str(&json) {
+                            let ability_map = CardLoader::build_abilities_map(&abilities_data);
+                            drop(abilities_data);
+                            let db_inner = Arc::make_mut(&mut db);
+                            for (_, card) in db_inner.cards.iter_mut() {
+                                if deck_nos.contains(&card.card_no) {
+                                    if let Some(ab) = ability_map.get(&card.card_no) {
+                                        card.abilities = ab.clone();
+                                    }
+                                }
                             }
-                            _ => Step::Done(Err("Failed to build decks".into())),
+                            let attach_t1 = unsafe { _3ds_system_tick() };
+                            dprintln!(
+                                "  Abilities attached ({} ms, {} deck cards)",
+                                ticks_to_ms(attach_t1 - attach_t0),
+                                deck_nos.len()
+                            );
+                        } else {
+                            dprintln!("  abilities.json parse failed");
                         }
                     }
-                    _ => Step::Done(Err("No decks".into())),
+                    Err(e) => dprintln!("  abilities.json read failed: {}", e),
                 }
-            }
-            Step::BuildGame(mut db, mut pd1, mut pd2) => {
-                let t0 = unsafe { _3ds_system_tick() };
+
+                // 5. Add energy cards and build players
                 DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
                 DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
 
@@ -374,6 +404,33 @@ fn main() {
                         gs.turn_number,
                         gs.game_result,
                     );
+                    // Board state header
+                    let ap = gs.active_player();
+                    let card_name = |cid| {
+                        gs.card_database
+                            .get_card(cid)
+                            .map(|c| c.card_no.as_str())
+                            .unwrap_or("??")
+                    };
+                    let stage_cids = [ap.stage.stage[0], ap.stage.stage[1], ap.stage.stage[2]];
+                    let stage_str = if (0..3).any(|i| stage_cids[i] != -1) {
+                        let parts: Vec<String> = (0..3)
+                            .map(|i| {
+                                if stage_cids[i] == -1 {
+                                    " - ".into()
+                                } else {
+                                    format!("{}", card_name(stage_cids[i]))
+                                }
+                            })
+                            .collect();
+                        format!("St:L{} C{} R{}", parts[0], parts[1], parts[2])
+                    } else {
+                        "St: empty".into()
+                    };
+                    let hand_n = ap.hand.cards.len();
+                    let energy_n = ap.energy_zone.active_count();
+                    let live_n = ap.success_live_card_zone.cards.len();
+                    dprintln!("{} | H:{} E:{} L:{}", stage_str, hand_n, energy_n, live_n);
                     let n = acts_cache.len();
                     if n > 0 && cur >= n {
                         cur = n - 1;
@@ -492,11 +549,9 @@ fn settle_3ds(gs: &mut GameState) {
 #[cfg(feature = "3ds")]
 fn step_name(s: &Step) -> &'static str {
     match s {
-        Step::ReadFile => "ReadFile",
+        Step::ReadCardsBin => "ReadCards",
         Step::ParseCards(_) => "ParseCards",
-        Step::LoadDb(_) => "LoadDb",
         Step::LoadDecks(_) => "LoadDecks",
-        Step::BuildGame(..) => "BuildGame",
         Step::Play(_, _, _, _, _) => "Play",
         Step::Done(_) => "Done",
     }

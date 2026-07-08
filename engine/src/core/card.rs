@@ -654,9 +654,13 @@ impl<'de> serde::Deserialize<'de> for AbilityCost {
                             // Sub-costs become sub-effects in compound.actions.
                             // Deserialize as AbilityCost so the rename mappings
                             // (type→action, energy→energy_count) are applied.
-                            let sub: Vec<AbilityCost> = map.next_value()?;
-                            effect.compound.actions =
-                                Some(sub.into_iter().map(AbilityCost::into_effect).collect());
+                            // Use Option because AbilityEffect's derive Serialize
+                            // writes null for empty Option<Vec> fields.
+                            let sub: Option<Vec<AbilityCost>> = map.next_value()?;
+                            if let Some(sub) = sub {
+                                effect.compound.actions =
+                                    Some(sub.into_iter().map(AbilityCost::into_effect).collect());
+                            }
                         }
                         "group_reference" => effect.group_reference = map.next_value()?,
                         "exclude_group_names" => effect.exclude_group_names = map.next_value()?,
