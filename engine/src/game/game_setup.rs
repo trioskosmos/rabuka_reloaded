@@ -938,9 +938,10 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
     };
     let mulligan_player = game_state.active_player();
 
-    let mut actions = vec![make_action(
-        ActionType::MulliganHeader,
-        &format!("{}'s Mulligan Phase", player_name),
+    let mut actions = vec![make_action_params(
+        ActionType::ConfirmMulligan,
+        &format!("Confirm {}'s mulligan", player_name),
+        ActionParameters { ..make_params() },
     )];
 
     for (hand_index, card_id) in mulligan_player.hand.cards.iter().enumerate() {
@@ -965,15 +966,6 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
         ));
     }
 
-    actions.push(make_action_params(
-        ActionType::ConfirmMulligan,
-        &format!("Confirm {}'s mulligan", player_name),
-        ActionParameters { ..make_params() },
-    ));
-    actions.push(make_action(
-        ActionType::SkipMulligan,
-        &format!("Skip {}'s mulligan (keep all cards)", player_name),
-    ));
     actions
 }
 
@@ -1431,9 +1423,10 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
         "Player 1"
     };
 
-    let mut actions = vec![make_action(
-        ActionType::LiveCardHeader,
-        &format!("{}'s Live Card Set", player_name),
+    let mut actions = vec![make_action_params(
+        ActionType::ConfirmLiveCardSet,
+        &format!("Confirm {}'s live card set", player_name),
+        ActionParameters { ..make_params() },
     )];
 
     let max_live_cards =
@@ -1467,15 +1460,5 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
         ));
     }
 
-    actions.push(make_action_params(
-        ActionType::SkipLiveCardSet,
-        &format!("Skip {}'s live card set", player_name),
-        ActionParameters { ..make_params() },
-    ));
-    actions.push(make_action_params(
-        ActionType::ConfirmLiveCardSet,
-        &format!("Confirm {}'s live card set", player_name),
-        ActionParameters { ..make_params() },
-    ));
     actions
 }

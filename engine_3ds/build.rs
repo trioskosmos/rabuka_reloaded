@@ -51,8 +51,34 @@ fn main() {
     println!("cargo:rustc-link-search=native={}", out_dir.display());
     println!("cargo:rustc-link-arg=-Wl,--start-group");
     println!("cargo:rustc-link-arg=-lctru_shim");
+    println!("cargo:rustc-link-arg=-lcitro2d");
+    println!("cargo:rustc-link-arg=-lcitro3d");
     println!("cargo:rustc-link-arg=-lctru");
+    println!("cargo:rustc-link-arg=-lm");
     println!("cargo:rustc-link-arg=-Wl,--end-group");
 
-    println!("cargo:rerun-if-changed=src/ctru_shim.c");
+    // --- Card texture conversion ---
+    // Rerun if any webp source changed
+    let webp_dir = std::path::Path::new("../web_ui/img/cards_webp");
+    if webp_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(webp_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().map(|e| e == "webp").unwrap_or(false) {
+                    println!("cargo:rerun-if-changed={}", path.display());
+                }
+            }
+        }
+    }
+    println!("cargo:rerun-if-changed=scripts/convert_cards.py");
+    println!("cargo:rerun-if-changed=romfs/cards_manifest.json");
+    if let Ok(entries) = std::fs::read_dir("romfs/cards") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().map(|e| e == "t3x").unwrap_or(false) {
+                println!("cargo:rerun-if-changed={}", path.display());
+            }
+        }
+    }
+    println!("cargo:rerun-if-changed=romfs/font.bcfnt");
 }
