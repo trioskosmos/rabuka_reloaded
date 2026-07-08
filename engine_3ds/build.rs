@@ -42,6 +42,9 @@ fn main() {
         .expect("failed to create archive");
     assert!(status.success(), "archive creation failed");
 
+    // Tell cargo to rerun this build script if the C source changes
+    println!("cargo:rerun-if-changed=src/ctru_shim.c");
+
     // Allow-multiple-definition for pthread_atfork:
     // - libsysbase (linked via -lc) defines pthread_atfork but returns ENOSYS
     // - our Rust code overrides it to return 0 (3DS never forks)

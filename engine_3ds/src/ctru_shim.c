@@ -41,20 +41,24 @@ typedef struct {
     bool tapped;
 } CardSlot;
 
-static bool board_mode = false;
-static bool show_opponent = false;
-static int board_sel_slot = -1;     // -1 = no selection
-static int board_sel_type = 0;      // 0=stage, 1=live, 2=energy, 3=hand
+typedef struct {
+    CardSlot stage[3];
+    CardSlot live[3];
+    CardSlot energy[MAX_SLOTS];
+    int energy_count;
+    CardSlot hand[MAX_SLOTS];
+    int hand_count;
+    int deck, edeck, discard, success;
+} PlayerBoard;
 
-// Slots
-static CardSlot bot_stage[3];
-static CardSlot bot_live[3];
-static CardSlot bot_energy[MAX_SLOTS];
-static int bot_energy_count;
-static CardSlot bot_hand[MAX_SLOTS];
-static int bot_hand_count;
-// Utility counts
-static int bot_deck_count, bot_edeck_count, bot_discard_count, bot_success_count;
+static bool board_mode = false;
+static int board_view = 0;
+static int top_scroll_y = 0;          // 0=player, 1=opponent, 2=both
+static int board_sel_slot = -1;
+static int board_sel_type = 0;
+
+static PlayerBoard p_board;  // player (self)
+static PlayerBoard o_board;  // opponent
 
 // Colors
 static u32 COL_BG        = 0xFF0F141E; // navy
@@ -124,6 +128,9 @@ void _3ds_text_add_top(const char* msg) {
     text_dirty = true;
 }
 
+void _3ds_text_set_scroll_y(int y) { top_scroll_y = y; }
+int  _3ds_text_get_scroll_y() { return top_scroll_y; }
+
 void _3ds_text_add_bot(const char* msg) {
     // Board mode: redirect to top (debug info)
     strncat(top_text, msg, TEXTLEN - strlen(top_text) - 1);
@@ -141,71 +148,67 @@ void _3ds_clear_both() {
 }
 
 // ---- Board API ----
-void _3ds_board_enable(bool on) {
-    board_mode = on;
-}
-
-void _3ds_board_toggle_side() {
-    show_opponent = !show_opponent;
-}
-
-bool _3ds_board_is_opponent() {
-    return show_opponent;
-}
-
-void _3ds_board_clear_cache() {
-    for (int i = 0; i < atlas_count; i++) {
-        C2D_SpriteSheetFree(atlases[i].sheet);
-    }
-    atlas_count = 0;
-}
-
-void _3ds_board_set_slot(CardSlot* slot, bool active, const char* atlas, int index, bool landscape, bool tapped) {
+static void set_slot(CardSlot* slot, bool active, const char* atlas, int index, bool landscape, bool tapped) {
     slot->active = active;
-    if (atlas) {
-        strncpy(slot->atlas, atlas, 63);
-        slot->atlas[63] = '\0';
-    } else {
-        slot->atlas[0] = '\0';
-    }
+    if (atlas) { strncpy(slot->atlas, atlas, 63); slot->atlas[63] = '\0'; }
+    else { slot->atlas[0] = '\0'; }
     slot->index = index;
     slot->landscape = landscape;
     slot->tapped = tapped;
 }
 
-void _3ds_board_set_stage(int slot_i, bool active, const char* atlas, int index, bool landscape, bool tapped) {
-    if (slot_i >= 0 && slot_i < 3)
-        _3ds_board_set_slot(&bot_stage[slot_i], active, atlas, index, landscape, tapped);
+static void set_player_slot(PlayerBoard* pb, CardSlot slots[], int i, bool active, const char* atlas, int index, bool landscape, bool tapped) {
+    if (i >= 0 && i < MAX_SLOTS) set_slot(&slots[i], active, atlas, index, landscape, tapped);
 }
 
-void _3ds_board_set_live(int slot_i, bool active, const char* atlas, int index, bool landscape, bool tapped) {
-    if (slot_i >= 0 && slot_i < 3)
-        _3ds_board_set_slot(&bot_live[slot_i], active, atlas, index, landscape, tapped);
+void _3ds_board_enable(bool on) { board_mode = on; }
+
+void _3ds_board_cycle_view() {
+    board_view = (board_view + 1) % 3;  // 0=player, 1=opponent, 2=both
+}
+int  _3ds_board_current_view() { return board_view; }
+
+void _3ds_board_clear_cache() {
+    for (int i = 0; i < atlas_count; i++) C2D_SpriteSheetFree(atlases[i].sheet);
+    atlas_count = 0;
 }
 
-void _3ds_board_set_energy(int slot_i, bool active, const char* atlas, int index, bool landscape, bool tapped) {
-    if (slot_i >= 0 && slot_i < MAX_SLOTS)
-        _3ds_board_set_slot(&bot_energy[slot_i], active, atlas, index, landscape, tapped);
+// Player slots
+void _3ds_board_set_stage(int i, bool a, const char* atlas, int idx, bool l, bool t) {
+    if (i >= 0 && i < 3) set_slot(&p_board.stage[i], a, atlas, idx, l, t);
 }
-
-void _3ds_board_set_energy_count(int count) {
-    bot_energy_count = count > MAX_SLOTS ? MAX_SLOTS : count;
+void _3ds_board_set_live(int i, bool a, const char* atlas, int idx, bool l, bool t) {
+    if (i >= 0 && i < 3) set_slot(&p_board.live[i], a, atlas, idx, l, t);
 }
-
-void _3ds_board_set_hand(int slot_i, bool active, const char* atlas, int index, bool landscape, bool tapped) {
-    if (slot_i >= 0 && slot_i < MAX_SLOTS)
-        _3ds_board_set_slot(&bot_hand[slot_i], active, atlas, index, landscape, tapped);
+void _3ds_board_set_energy(int i, bool a, const char* atlas, int idx, bool l, bool t) {
+    set_player_slot(&p_board, p_board.energy, i, a, atlas, idx, l, t);
 }
-
-void _3ds_board_set_hand_count(int count) {
-    bot_hand_count = count > MAX_SLOTS ? MAX_SLOTS : count;
+void _3ds_board_set_energy_count(int c) { p_board.energy_count = c > MAX_SLOTS ? MAX_SLOTS : c; }
+void _3ds_board_set_hand(int i, bool a, const char* atlas, int idx, bool l, bool t) {
+    set_player_slot(&p_board, p_board.hand, i, a, atlas, idx, l, t);
 }
-
+void _3ds_board_set_hand_count(int c) { p_board.hand_count = c > MAX_SLOTS ? MAX_SLOTS : c; }
 void _3ds_board_set_utility(int deck, int edeck, int discard, int success) {
-    bot_deck_count = deck;
-    bot_edeck_count = edeck;
-    bot_discard_count = discard;
-    bot_success_count = success;
+    p_board.deck = deck; p_board.edeck = edeck; p_board.discard = discard; p_board.success = success;
+}
+
+// Opponent slots
+void _3ds_board_set_opp_stage(int i, bool a, const char* atlas, int idx, bool l, bool t) {
+    if (i >= 0 && i < 3) set_slot(&o_board.stage[i], a, atlas, idx, l, t);
+}
+void _3ds_board_set_opp_live(int i, bool a, const char* atlas, int idx, bool l, bool t) {
+    if (i >= 0 && i < 3) set_slot(&o_board.live[i], a, atlas, idx, l, t);
+}
+void _3ds_board_set_opp_energy(int i, bool a, const char* atlas, int idx, bool l, bool t) {
+    set_player_slot(&o_board, o_board.energy, i, a, atlas, idx, l, t);
+}
+void _3ds_board_set_opp_energy_count(int c) { o_board.energy_count = c > MAX_SLOTS ? MAX_SLOTS : c; }
+void _3ds_board_set_opp_hand(int i, bool a, const char* atlas, int idx, bool l, bool t) {
+    set_player_slot(&o_board, o_board.hand, i, a, atlas, idx, l, t);
+}
+void _3ds_board_set_opp_hand_count(int c) { o_board.hand_count = c > MAX_SLOTS ? MAX_SLOTS : c; }
+void _3ds_board_set_opp_utility(int deck, int edeck, int discard, int success) {
+    o_board.deck = deck; o_board.edeck = edeck; o_board.discard = discard; o_board.success = success;
 }
 
 void _3ds_board_set_selection(int slot_idx, int slot_type) {
@@ -291,128 +294,110 @@ void _3ds_draw_card_at(CardSlot* slot, float x, float y, float w, float h) {
     }
 }
 
-// ---- Board render (bottom screen) ----
+static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent) {
+    const float W = 320.0f, M = 2.0f;
+    float live_h = h * 0.18f;
+    float stage_h = h * 0.42f;
+    float energy_h = h * 0.08f;
+    float hand_h = h * 0.32f;
+
+    float live_y = y0;
+    float stage_y = live_y + live_h + 1;
+    float energy_y = stage_y + stage_h + 1;
+    float hand_y = energy_y + energy_h + 1;
+
+    float st_slot_w = stage_h * 0.8f;
+    float st_slot_h = stage_h - 3;
+
+    float util_x = M + 3 * (st_slot_w + 2) + 5;
+    float util_w = W - util_x - M;
+
+    // === LIVE ZONE ===
+    _3ds_draw_rect(M, live_y, W - 2 * M, live_h, COL_ZONE_BG);
+    _3ds_draw_border(M, live_y, W - 2 * M, live_h, COL_PINK, 1);
+    float lx = M + 3;
+    float live_slot_w = live_h > 20 ? 40 : 32;
+    float live_slot_h = live_h - 3;
+    for (int i = 0; i < 3; i++) {
+        _3ds_draw_rect(lx, live_y + 1, live_slot_w, live_slot_h, 0x33000000);
+        if (pb->live[i].active) _3ds_draw_card_at(&pb->live[i], lx, live_y + 1, live_slot_w, live_slot_h);
+        lx += live_slot_w + 2;
+    }
+
+    // === STAGE + UTILITY ===
+    float st_x = M;
+    // Stage slots: opponent displayed in reverse (R C L)
+    for (int i = 0; i < 3; i++) {
+        int si = opponent ? (2 - i) : i;
+        float sy = stage_y + 1;
+        _3ds_draw_rect(st_x, sy, st_slot_w, st_slot_h, COL_ZONE_BG);
+        _3ds_draw_border(st_x, sy, st_slot_w, st_slot_h, COL_BLUE, 1);
+        if (pb->stage[si].active) _3ds_draw_card_at(&pb->stage[si], st_x + 1, sy + 1, st_slot_w - 2, st_slot_h - 2);
+        st_x += st_slot_w + 2;
+    }
+
+    // Utility counts
+    _3ds_draw_rect(util_x, stage_y, util_w, stage_h, COL_ZONE_BG);
+    _3ds_draw_border(util_x, stage_y, util_w, stage_h, COL_ZONE_BDR, 1);
+    char buf[40];
+    float fs = stage_h > 40 ? 0.45f : 0.35f;
+    float fy = stage_y + 1;
+    snprintf(buf, sizeof(buf), "D:%d", pb->deck);
+    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 9;
+    snprintf(buf, sizeof(buf), "E:%d", pb->edeck);
+    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 9;
+    snprintf(buf, sizeof(buf), "W:%d", pb->discard);
+    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 9;
+    snprintf(buf, sizeof(buf), "S:%d", pb->success);
+    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs);
+
+    // === ENERGY ===
+    _3ds_draw_rect(M, energy_y, W - 2 * M, energy_h, COL_ZONE_BG);
+    _3ds_draw_border(M, energy_y, W - 2 * M, energy_h, COL_GOLD, 1);
+    float ex = M + 2;
+    float e_sz = energy_h - 4;
+    for (int i = 0; i < pb->energy_count && i < MAX_SLOTS; i++) {
+        if (pb->energy[i].active) _3ds_draw_card_at(&pb->energy[i], ex, energy_y + 2, e_sz * 0.7f, e_sz);
+        else _3ds_draw_rect(ex, energy_y + 2, e_sz * 0.7f, e_sz, 0x33000000);
+        ex += e_sz * 0.7f + 1;
+        if (ex > W - M - e_sz) break;
+    }
+
+    // === HAND ===
+    _3ds_draw_rect(M, hand_y, W - 2 * M, hand_h, COL_ZONE_BG);
+    _3ds_draw_border(M, hand_y, W - 2 * M, hand_h, COL_TEXT, 1);
+    float hx = M + 2;
+    float h_slot_w = hand_h * 0.65f;
+    float h_slot_h = hand_h - 3;
+    for (int i = 0; i < pb->hand_count && i < MAX_SLOTS; i++) {
+        if (pb->hand[i].active) _3ds_draw_card_at(&pb->hand[i], hx, hand_y + 1, h_slot_w, h_slot_h);
+        hx += h_slot_w + 1;
+        if (hx > W - M - h_slot_w) break;
+    }
+}
+
 void _3ds_render_board() {
     C2D_SceneBegin(bot_target);
     C2D_TargetClear(bot_target, COL_BG);
 
-    C2D_Font f = custom_font ? custom_font : NULL;
-    float depth = 0.0f;
-
-    // ======= LAYOUT CONSTANTS (320x240) =======
-    const float W = 320.0f;
-    const float H = 240.0f;
-    const float M = 2.0f;  // margin
-
-    // Live zone: top
-    float live_y = M;
-    float live_h = 48.0f;
-    float slot_w = 90.0f;
-    float slot_h = live_h - 4;
-
-    // Stage row: below live
-    float stage_y = live_y + live_h + M;
-    float stage_h = 80.0f;
-    float st_slot_w = 60.0f;
-    float st_slot_h = stage_h - 4;
-
-    // Utility column: right of stage
-    float util_x = M + 3 * (st_slot_w + 2) + 90;
-    float util_w = W - util_x - M;
-
-    // Energy: below stage
-    float energy_y = stage_y + stage_h + M;
-    float energy_h = 20.0f;
-
-    // Hand: bottom
-    float hand_y = energy_y + energy_h + M;
-    float hand_h = H - hand_y - M;
-
-    // ======= 1. LIVE ZONE =======
-    _3ds_draw_rect(M, live_y, W - 2 * M, live_h, COL_ZONE_BG);
-    _3ds_draw_border(M, live_y, W - 2 * M, live_h, COL_PINK, 1.0f);
-    // Slot backgrounds
-    float lx = M + 4;
-    for (int i = 0; i < 3; i++) {
-        float sy = live_y + 2;
-        _3ds_draw_rect(lx, sy, slot_w, slot_h, 0x33000000);
-        if (bot_live[i].active) {
-            _3ds_draw_card_at(&bot_live[i], lx, sy, slot_w, slot_h);
-        }
-        lx += slot_w + 2;
-    }
-    _3ds_draw_label("LIVE", M + 4, live_y + live_h - 12, COL_PINK, 0.5f);
-
-    // ======= 2. STAGE + UTILITY =======
-    float st_x = M;
-    for (int i = 0; i < 3; i++) {
-        float sy = stage_y + 2;
-        _3ds_draw_rect(st_x, sy, st_slot_w, st_slot_h, COL_ZONE_BG);
-        _3ds_draw_border(st_x, sy, st_slot_w, st_slot_h, COL_BLUE, 1.0f);
-        if (bot_stage[i].active) {
-            _3ds_draw_card_at(&bot_stage[i], st_x + 1, sy + 1, st_slot_w - 2, st_slot_h - 2);
-        }
-        st_x += st_slot_w + 2;
+    if (board_view == 2) {
+        // === DUAL MODE: opponent top, player bottom ===
+        float half = 114.0f;
+        float div_y = half + 2;
+        draw_section(&o_board, 2, half, true);
+        _3ds_draw_rect(0, div_y, 320, 4, COL_ZONE_BDR);
+        draw_section(&p_board, div_y + 4, 240 - div_y - 4, false);
+    } else if (board_view == 1) {
+        // === OPPONENT ONLY ===
+        draw_section(&o_board, 0, 240, true);
+    } else {
+        // === PLAYER ONLY ===
+        draw_section(&p_board, 0, 240, false);
     }
 
-    // Utility column
-    _3ds_draw_rect(util_x, stage_y, util_w, stage_h, COL_ZONE_BG);
-    _3ds_draw_border(util_x, stage_y, util_w, stage_h, COL_ZONE_BDR, 1.0f);
-
-    char util_buf[64];
-    // We'll draw small text labels
-    snprintf(util_buf, sizeof(util_buf), "D:%d", bot_deck_count);
-    _3ds_draw_label(util_buf, util_x + 2, stage_y + 2, COL_TEXT, 0.45f);
-    snprintf(util_buf, sizeof(util_buf), "E:%d", bot_edeck_count);
-    _3ds_draw_label(util_buf, util_x + 2, stage_y + 14, COL_TEXT, 0.45f);
-    snprintf(util_buf, sizeof(util_buf), "W:%d", bot_discard_count);
-    _3ds_draw_label(util_buf, util_x + 2, stage_y + 26, COL_TEXT, 0.45f);
-    snprintf(util_buf, sizeof(util_buf), "S:%d", bot_success_count);
-    _3ds_draw_label(util_buf, util_x + 2, stage_y + 38, COL_TEXT, 0.45f);
-
-    // Stage label
-    _3ds_draw_label("STAGE", M + 4, stage_y + stage_h - 12, COL_BLUE, 0.5f);
-
-    // ======= 3. ENERGY =======
-    _3ds_draw_rect(M, energy_y, W - 2 * M, energy_h, COL_ZONE_BG);
-    _3ds_draw_border(M, energy_y, W - 2 * M, energy_h, COL_GOLD, 1.0f);
-    float ex = M + 2;
-    float e_sz = energy_h - 4;
-    for (int i = 0; i < bot_energy_count && i < MAX_SLOTS; i++) {
-        if (bot_energy[i].active) {
-            _3ds_draw_card_at(&bot_energy[i], ex, energy_y + 2, e_sz * 0.7f, e_sz);
-        } else {
-            _3ds_draw_rect(ex, energy_y + 2, e_sz * 0.7f, e_sz, 0x33000000);
-        }
-        ex += e_sz * 0.7f + 1;
-        if (ex > W - M - e_sz) break;
-    }
-    _3ds_draw_label("ENERGY", M + 4, energy_y + energy_h - 12, COL_GOLD, 0.5f);
-
-    // ======= 4. HAND =======
-    _3ds_draw_rect(M, hand_y, W - 2 * M, hand_h, COL_ZONE_BG);
-    _3ds_draw_border(M, hand_y, W - 2 * M, hand_h, COL_TEXT, 1.0f);
-    float hx = M + 2;
-    float h_slot_w = 40.0f;
-    float h_slot_h = hand_h - 4;
-    for (int i = 0; i < bot_hand_count && i < MAX_SLOTS; i++) {
-        if (bot_hand[i].active) {
-            _3ds_draw_card_at(&bot_hand[i], hx, hand_y + 2, h_slot_w, h_slot_h);
-        }
-        hx += h_slot_w + 1;
-        if (hx > W - M - h_slot_w) break;
-    }
-    _3ds_draw_label("HAND", M + 4, hand_y + hand_h - 12, COL_TEXT, 0.5f);
-
-    // ======= 5. SELECTION HIGHLIGHT =======
-    if (board_sel_slot >= 0 && board_sel_type == 0 && board_sel_slot < 3) {
-        float sx = M + board_sel_slot * (st_slot_w + 2);
-        _3ds_draw_border(sx, stage_y + 2, st_slot_w, st_slot_h, COL_SEL, 2.0f);
-    }
-    if (board_sel_slot >= 0 && board_sel_type == 1 && board_sel_slot < 3) {
-        float sx = M + 4 + board_sel_slot * (slot_w + 2);
-        _3ds_draw_border(sx, live_y + 2, slot_w, slot_h, COL_SEL, 2.0f);
-    }
+    // View indicator
+    const char* view_label = board_view == 0 ? "YOU" : (board_view == 1 ? "OPP" : "BOTH");
+    _3ds_draw_label(view_label, 280, 230, COL_GOLD, 0.5f);
 }
 
 // ---- Main render ----
@@ -439,7 +424,7 @@ void _3ds_swap_buffers() {
     if (top_parsed) {
         C2D_DrawText(&top_obj,
             C2D_WithColor | C2D_WordWrap,
-            2.0f, 2.0f, 0.5f,
+            2.0f, 2.0f - (float)top_scroll_y, 0.5f,
             0.85f, 0.85f,
             C2D_Color32(0, 255, 0, 255),
             390.0f);

@@ -24,6 +24,9 @@
 // ~7ms per frame at 268MHz (memset + half-scale glyph blit for 600 chars).
 // See ctru_shim.c for detailed memory breakdown.
 
+// Desktop mode uses none of these; suppress warnings
+#![cfg_attr(not(feature = "3ds"), allow(unused_imports, dead_code))]
+
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
@@ -33,16 +36,15 @@ use std::sync::Arc;
 use rabuka_engine::card::{Card, CardDatabase};
 use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::deck_builder::DeckBuilder;
+use rabuka_engine::deck_parser::DeckList;
 use rabuka_engine::deck_parser::DeckParser;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn;
 
-/// 3DS system tick rate: 268.12 MHz (ARM11)
+#[cfg(feature = "3ds")]
 const TICK_HZ: u64 = 268_120_000;
-/// Print debug timing every N frames (0 = disabled)
-const DBG_EVERY_N: u64 = 60;
 
 /// Reader wrapper that calls aptMainLoop() every `threshold` bytes without
 /// any GPU buffer operations. Keeps the 3DS OS alive during long deserialization
@@ -94,17 +96,49 @@ macro_rules! tprintln {
     }};
 }
 
+/// Word-wrap text to fit within `max_chars` per line, breaking at spaces.
+/// Inserts `\n` to split long lines. Works with multi-byte UTF-8.
+#[cfg(feature = "3ds")]
+fn wrap_text(s: &str, max_chars: usize) -> String {
+    let mut out = String::with_capacity(s.len() + 32);
+    for line in s.lines() {
+        let chars: Vec<char> = line.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            let remain = chars.len() - i;
+            if remain <= max_chars {
+                out.extend(&chars[i..]);
+                break;
+            }
+            let end = (i + max_chars).min(chars.len());
+            if let Some(space) = chars[i..end].iter().rposition(|&c| c == ' ') {
+                out.extend(&chars[i..i + space]);
+                out.push('\n');
+                i = i + space + 1;
+            } else {
+                out.extend(&chars[i..end]);
+                out.push('\n');
+                i = end;
+            }
+        }
+        out.push('\n');
+    }
+    out
+}
+
 #[cfg(feature = "3ds")]
 fn ticks_to_ms(ticks: u64) -> f64 {
     (ticks as f64) / (TICK_HZ as f64) * 1000.0
 }
 
+#[cfg(feature = "3ds")]
 #[derive(Clone)]
 struct CardAtlas {
     /// Map card_no -> (atlas_filename, index)
     map: HashMap<String, (String, usize)>,
 }
 
+#[cfg(feature = "3ds")]
 impl CardAtlas {
     fn load() -> Self {
         let path = Path::new("romfs:/cards_manifest.json");
@@ -147,17 +181,29 @@ impl CardAtlas {
 }
 
 #[cfg(feature = "3ds")]
+#[derive(Clone)]
+enum SetupPhase {
+    PickMode(usize),               // cursor: 0=sandbox, 1=vsAI
+    PickDeck(usize, bool),         // cursor, vs_ai flag
+    PickDeck2(usize, usize, bool), // cursor, p1_idx, vs_ai
+    Loading(usize, usize, bool),   // p1_idx, p2_idx, vs_ai
+}
+
+#[cfg(feature = "3ds")]
+#[derive(Clone)]
 enum Step {
     ReadCardsBin,
     ParseCards(Vec<u8>),
-    LoadDecks(Vec<Card>),
+    Setup(Vec<Card>, Vec<DeckList>, SetupPhase, bool), // +dirty flag
     Play(
         GameState,
-        usize,
+        usize, // cursor
         Vec<game_setup::Action>,
-        bool,
-        bool,
+        bool, // dirty
+        bool, // redraw
         CardAtlas,
+        bool, // vs_ai
+        bool, // detail_mode (top screen shows card detail)
     ),
     Done(Result<(), String>),
 }
@@ -226,9 +272,6 @@ fn main() {
             break;
         }
 
-        if frame >= DBG_EVERY_N && frame % DBG_EVERY_N == 0 {
-            tprintln!("[DBG] frame={} step={}", frame, step_name(&step));
-        }
         let current_step = step_name(&step);
         frame += 1;
 
@@ -263,131 +306,300 @@ fn main() {
                         let cards: Vec<_> = map.into_values().collect();
                         dprintln!("  {} cards ({} ms)", cards.len(), ticks_to_ms(t1 - t0));
                         drop(bytes);
-                        Step::LoadDecks(cards)
+                        // Load deck list and go to setup
+                        let decks = match DeckParser::parse_all_decks_from_directory(Path::new(
+                            "romfs:/decks/",
+                        )) {
+                            Ok(d) => d,
+                            Err(e) => {
+                                step = Step::Done(Err(format!("No decks: {}", e)));
+                                continue;
+                            }
+                        };
+                        if decks.is_empty() {
+                            step = Step::Done(Err("No decks found!".into()));
+                            continue;
+                        }
+                        Step::Setup(cards, decks, SetupPhase::PickMode(0), true)
                     }
                     Err(e) => Step::Done(Err(format!("Parse: {}", e))),
                 }
             }
-            Step::LoadDecks(cards) => {
-                let t0 = unsafe { _3ds_system_tick() };
-                dprintln!("[3/3] Building game...");
-
-                let mut db = Arc::new(CardDatabase::load_or_create(cards));
-
-                // Build decks
-                let decks =
-                    match DeckParser::parse_all_decks_from_directory(Path::new("romfs:/decks/")) {
-                        Ok(v) if !v.is_empty() => v,
-                        _ => {
-                            step = Step::Done(Err("No decks".into()));
-                            continue;
+            Step::Setup(ref cards, ref decks, ref phase, ref dirty) => {
+                let n = decks.len();
+                let was_dirty = *dirty;
+                let new_step = match *phase {
+                    SetupPhase::PickMode(cur) => unsafe {
+                        if was_dirty {
+                            _3ds_clear_top();
+                            _3ds_text_add_top("SELECT MODE\n\0".as_ptr());
+                            for (i, m) in ["Sandbox (2 players)", "VS AI"].iter().enumerate() {
+                                let arrow = if i == cur { ">" } else { " " };
+                                _3ds_text_add_top(format!("{} [{}] {}\n\0", arrow, i, m).as_ptr());
+                            }
+                            _3ds_text_add_top("\nUP/DOWN=select A=confirm\0".as_ptr());
                         }
-                    };
-                let nums = DeckParser::deck_list_to_card_numbers(&decks[0]);
-                let (mut pd1, mut pd2) = match (
-                    DeckBuilder::build_deck_from_database(&mut db, nums.clone()),
-                    DeckBuilder::build_deck_from_database(&mut db, nums),
-                ) {
-                    (Ok(pd1), Ok(pd2)) => (pd1, pd2),
-                    _ => {
-                        step = Step::Done(Err("Failed to build decks".into()));
-                        continue;
+                        if keys & 0x00000040 != 0 && cur > 0 {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::PickMode(cur - 1),
+                                true,
+                            )
+                        } else if keys & 0x00000080 != 0 && cur + 1 < 2 {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::PickMode(cur + 1),
+                                true,
+                            )
+                        } else if keys & 0x00000001 != 0 {
+                            if n == 0 {
+                                Step::Done(Err("No decks!".into()))
+                            } else {
+                                Step::Setup(
+                                    cards.clone(),
+                                    decks.clone(),
+                                    SetupPhase::PickDeck(0, cur == 1),
+                                    true,
+                                )
+                            }
+                        } else {
+                            step.clone()
+                        }
+                    },
+                    SetupPhase::PickDeck(cur, vs_ai) => {
+                        if was_dirty {
+                            let label = if !vs_ai { "P1 DECK" } else { "YOUR DECK" };
+                            unsafe {
+                                _3ds_clear_top();
+                            }
+                            unsafe {
+                                _3ds_text_add_top(format!("SELECT {}\n\0", label).as_ptr());
+                            }
+                            for i in cur.saturating_sub(6).min(n.saturating_sub(12))
+                                ..(0usize.min(n) + 12).min(n)
+                            {
+                                let arrow = if i == cur { ">" } else { " " };
+                                unsafe {
+                                    _3ds_text_add_top(
+                                        format!("{} {}\n\0", arrow, decks[i].name).as_ptr(),
+                                    );
+                                }
+                            }
+                            unsafe {
+                                _3ds_text_add_top("\nA=select\0".as_ptr());
+                            }
+                        }
+                        if keys & 0x00000040 != 0 && cur > 0 {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::PickDeck(cur - 1, vs_ai),
+                                true,
+                            )
+                        } else if keys & 0x00000080 != 0 && cur + 1 < n {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::PickDeck(cur + 1, vs_ai),
+                                true,
+                            )
+                        } else if keys & 0x00000001 != 0 {
+                            if vs_ai {
+                                Step::Setup(
+                                    cards.clone(),
+                                    decks.clone(),
+                                    SetupPhase::Loading(cur, cur, true),
+                                    true,
+                                )
+                            } else {
+                                Step::Setup(
+                                    cards.clone(),
+                                    decks.clone(),
+                                    SetupPhase::PickDeck2(0, cur, false),
+                                    true,
+                                )
+                            }
+                        } else {
+                            step.clone()
+                        }
                     }
-                };
-                pd1.shuffle_main_deck();
-                pd1.shuffle_energy_deck();
-                pd2.shuffle_main_deck();
-                pd2.shuffle_energy_deck();
-                let decks_t = unsafe { _3ds_system_tick() };
-                dprintln!("  Decks built ({} ms)", ticks_to_ms(decks_t - t0));
-
-                // 3. Collect unique card_nos from both decks
-                let mut deck_nos: HashSet<String> = HashSet::new();
-                for cid in pd1
-                    .main_deck
-                    .iter()
-                    .chain(pd1.energy_deck.iter())
-                    .chain(pd2.main_deck.iter())
-                    .chain(pd2.energy_deck.iter())
-                {
-                    if let Some(card) = db.get_card(*cid) {
-                        deck_nos.insert(card.card_no.clone());
+                    SetupPhase::PickDeck2(cur, p1_idx, vs_ai) => {
+                        if was_dirty {
+                            unsafe {
+                                _3ds_clear_top();
+                                _3ds_text_add_top("SELECT P2 DECK\n\0".as_ptr());
+                            }
+                            for i in cur.saturating_sub(6).min(n.saturating_sub(12))
+                                ..(0usize.min(n) + 12).min(n)
+                            {
+                                let arrow = if i == cur { ">" } else { " " };
+                                unsafe {
+                                    _3ds_text_add_top(
+                                        format!("{} {}\n\0", arrow, decks[i].name).as_ptr(),
+                                    );
+                                }
+                            }
+                            unsafe {
+                                _3ds_text_add_top("\nA=select B=same\0".as_ptr());
+                            }
+                        }
+                        if keys & 0x00000040 != 0 && cur > 0 {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::PickDeck2(cur - 1, p1_idx, vs_ai),
+                                true,
+                            )
+                        } else if keys & 0x00000080 != 0 && cur + 1 < n {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::PickDeck2(cur + 1, p1_idx, vs_ai),
+                                true,
+                            )
+                        } else if keys & 0x00000001 != 0 {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::Loading(p1_idx, cur, false),
+                                true,
+                            )
+                        } else if keys & 0x00000002 != 0 {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::Loading(p1_idx, p1_idx, false),
+                                true,
+                            )
+                        } else {
+                            step.clone()
+                        }
                     }
-                }
-
-                // 4. Attach abilities ONLY for deck cards
-                let ab_path = Path::new("romfs:/abilities.json");
-                match File::open(ab_path).and_then(|mut f| {
-                    let mut v = String::new();
-                    f.read_to_string(&mut v).map(|_| v)
-                }) {
-                    Ok(json) => {
-                        let attach_t0 = unsafe { _3ds_system_tick() };
-                        if let Ok(abilities_data) = CardLoader::load_abilities_from_str(&json) {
-                            let ability_map = CardLoader::build_abilities_map(&abilities_data);
-                            drop(abilities_data);
-                            let db_inner = Arc::make_mut(&mut db);
-                            for (_, card) in db_inner.cards.iter_mut() {
-                                if deck_nos.contains(&card.card_no) {
-                                    if let Some(ab) = ability_map.get(&card.card_no) {
-                                        card.abilities = ab.clone();
+                    SetupPhase::Loading(p1_idx, p2_idx, vs_ai) => {
+                        let r = (|| -> Result<(GameState, CardAtlas), String> {
+                            let mut db = Arc::new(CardDatabase::load_or_create(cards.clone()));
+                            let nums1 = DeckParser::deck_list_to_card_numbers(&decks[p1_idx]);
+                            let nums2 = if p1_idx == p2_idx {
+                                nums1.clone()
+                            } else {
+                                DeckParser::deck_list_to_card_numbers(&decks[p2_idx])
+                            };
+                            let mut pd1 = DeckBuilder::build_deck_from_database(&mut db, nums1)
+                                .map_err(|e| format!("Deck: {}", e))?;
+                            let mut pd2 = DeckBuilder::build_deck_from_database(&mut db, nums2)
+                                .map_err(|e| format!("Deck: {}", e))?;
+                            pd1.shuffle_main_deck();
+                            pd1.shuffle_energy_deck();
+                            pd2.shuffle_main_deck();
+                            pd2.shuffle_energy_deck();
+                            let mut deck_nos: HashSet<String> = HashSet::new();
+                            for cid in pd1
+                                .main_deck
+                                .iter()
+                                .chain(pd1.energy_deck.iter())
+                                .chain(pd2.main_deck.iter())
+                                .chain(pd2.energy_deck.iter())
+                            {
+                                if let Some(card) = db.get_card(*cid) {
+                                    deck_nos.insert(card.card_no.clone());
+                                }
+                            }
+                            if let Ok(json) = File::open(Path::new("romfs:/abilities.json"))
+                                .and_then(|mut f| {
+                                    let mut v = String::new();
+                                    f.read_to_string(&mut v).map(|_| v)
+                                })
+                            {
+                                if let Ok(a) = CardLoader::load_abilities_from_str(&json) {
+                                    let am = CardLoader::build_abilities_map(&a);
+                                    for (_, card) in Arc::make_mut(&mut db).cards.iter_mut() {
+                                        if deck_nos.contains(&card.card_no) {
+                                            if let Some(ab) = am.get(&card.card_no) {
+                                                card.abilities = ab.clone();
+                                            }
+                                        }
                                     }
                                 }
                             }
-                            let attach_t1 = unsafe { _3ds_system_tick() };
-                            dprintln!(
-                                "  Abilities attached ({} ms, {} deck cards)",
-                                ticks_to_ms(attach_t1 - attach_t0),
-                                deck_nos.len()
-                            );
-                        } else {
-                            dprintln!("  abilities.json parse failed");
+                            DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db)
+                                .ok();
+                            DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db)
+                                .ok();
+                            let mut p1 = Player::new("p1".into(), "P1".into(), true);
+                            p1.set_main_deck(pd1.main_deck);
+                            p1.set_energy_deck(pd1.energy_deck);
+                            let mut p2 = Player::new("p2".into(), "P2".into(), false);
+                            p2.set_main_deck(pd2.main_deck);
+                            p2.set_energy_deck(pd2.energy_deck);
+                            let mut gs = GameState::new(p1, p2, db);
+                            game_setup::setup_game(&mut gs);
+                            Ok((gs, CardAtlas::load()))
+                        })();
+                        match r {
+                            Ok((gs, atlas)) => {
+                                unsafe {
+                                    _3ds_board_enable(true);
+                                }
+                                Step::Play(gs, 0, Vec::new(), true, true, atlas, vs_ai, false)
+                            }
+                            Err(e) => Step::Done(Err(e)),
                         }
                     }
-                    Err(e) => dprintln!("  abilities.json read failed: {}", e),
-                }
-
-                // 5. Add energy cards and build players
-                DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
-                DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
-
-                let mut p1 = Player::new("p1".into(), "P1".into(), true);
-                p1.set_main_deck(pd1.main_deck);
-                p1.set_energy_deck(pd1.energy_deck);
-                let mut p2 = Player::new("p2".into(), "P2".into(), false);
-                p2.set_main_deck(pd2.main_deck);
-                p2.set_energy_deck(pd2.energy_deck);
-
-                let mut gs = GameState::new(p1, p2, db);
-                game_setup::setup_game(&mut gs);
-                let atlas = CardAtlas::load();
-                unsafe {
-                    _3ds_board_enable(true);
-                }
-                let t1 = unsafe { _3ds_system_tick() };
-                dprintln!("  Game ready ({} ms)", ticks_to_ms(t1 - t0));
-                Step::Play(gs, 0, Vec::new(), true, true, atlas)
+                };
+                new_step
             }
-            Step::Play(mut gs, mut cur, mut acts_cache, mut dirty, mut redraw, ref atlas) => {
+            Step::Play(
+                mut gs,
+                mut cur,
+                mut acts_cache,
+                mut dirty,
+                mut redraw,
+                ref atlas,
+                ref vs_ai,
+                mut detail_mode,
+            ) => {
                 // Input handling
-                if keys & 0x00000040 != 0 {
-                    // DPAD_UP
-                    if cur > 0 {
+                if detail_mode {
+                    // In detail mode: DPAD scrolls text
+                    if keys & 0x00000040 != 0 {
+                        let sy = unsafe { _3ds_text_get_scroll_y() };
+                        unsafe {
+                            _3ds_text_set_scroll_y((sy - 10).max(0));
+                        }
+                    }
+                    if keys & 0x00000080 != 0 {
+                        let sy = unsafe { _3ds_text_get_scroll_y() };
+                        unsafe {
+                            _3ds_text_set_scroll_y(sy + 10);
+                        }
+                    }
+                } else {
+                    if keys & 0x00000040 != 0 && cur > 0 {
                         cur -= 1;
                         redraw = true;
-                    }
-                } else if keys & 0x00000080 != 0 {
-                    // DPAD_DOWN
-                    if cur + 1 < acts_cache.len() {
+                    } else if keys & 0x00000080 != 0 && cur + 1 < acts_cache.len() {
                         cur += 1;
                         redraw = true;
                     }
                 }
 
-                // SELECT toggles opponent board view
+                // SELECT cycles board view: player / opponent / both
                 if keys & 0x00000004 != 0 {
                     unsafe {
-                        _3ds_board_toggle_side();
+                        _3ds_board_cycle_view();
+                    }
+                    redraw = true;
+                }
+
+                // X toggles card detail mode on top screen
+                if keys & 0x00000400 != 0 {
+                    detail_mode = !detail_mode;
+                    if !detail_mode {
+                        unsafe {
+                            _3ds_text_set_scroll_y(0);
+                        }
                     }
                     redraw = true;
                 }
@@ -422,6 +634,31 @@ fn main() {
                     cur = n2 - 1;
                 }
 
+                // AI: auto-pick randomly when it's the AI player's turn with choices
+                if *vs_ai && gs.has_pending_choice() {
+                    let ap = gs.active_player();
+                    let is_human = ap.id == gs.player1.id; // P1 is human
+                    if !is_human && acts_cache.len() > 0 {
+                        let ai_idx = (unsafe { _3ds_system_tick() } as usize) % acts_cache.len();
+                        let action = acts_cache[ai_idx].clone();
+                        let p = action.parameters.clone();
+                        let _ = turn::TurnEngine::execute_main_phase_action(
+                            &mut gs,
+                            &action.action_type,
+                            p.as_ref().and_then(|x| x.card_id),
+                            p.as_ref().and_then(|x| x.card_indices.clone()),
+                            p.as_ref()
+                                .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
+                            p.as_ref().and_then(|x| x.use_baton_touch),
+                        );
+                        gs.reset_loop_detection();
+                        gs.reset_loop_detection();
+                        cur = 0;
+                        dirty = true;
+                        redraw = true;
+                    }
+                }
+
                 let auto = !gs.has_pending_choice()
                     && gs.game_result == GameResult::Ongoing
                     && game_setup::is_automatic_phase(&gs);
@@ -434,34 +671,20 @@ fn main() {
                 if dirty || redraw {
                     acts_cache = game_setup::generate_possible_actions(&gs);
 
-                    let show_opp = unsafe { _3ds_board_is_opponent() };
-                    let view_player = if show_opp { &gs.player2 } else { &gs.player1 };
+                    let p1 = &gs.player1;
+                    let p2 = &gs.player2;
                     let ap = gs.active_player();
-
-                    // ---- Set up board slots ----
                     unsafe {
                         _3ds_clear_top();
                     }
 
-                    // Top screen: stats + turn info
-                    unsafe {
-                        _3ds_text_add_top(
-                            format!(
-                                "Turn {} | {:?} | P{}\n\0",
-                                gs.turn_number,
-                                gs.current_phase,
-                                if ap.id == gs.player1.id { "1" } else { "2" }
-                            )
-                            .as_ptr(),
-                        );
-                    }
-
-                    // Helper: get card_no from card ID
+                    // Helper closures
                     let card_no = |cid: i16| -> Option<String> {
                         gs.card_database.get_card(cid).map(|c| c.card_no.clone())
                     };
-
-                    // Helper: set a card slot (returns card_no if set)
+                    let is_tapped = |cid: i16| -> bool {
+                        gs.mods.orientation_modifiers.get(&cid).map(|s| s.as_str()) == Some("Wait")
+                    };
                     let set_slot =
                         |slot_fn: unsafe extern "C" fn(i32, bool, *const u8, i32, bool, bool),
                          slot_i: i32,
@@ -498,161 +721,264 @@ fn main() {
                             }
                             cn
                         };
-
-                    // Helper: check if a card is tapped/waited
-                    let is_tapped = |cid: i16| -> bool {
-                        gs.mods.orientation_modifiers.get(&cid).map(|s| s.as_str()) == Some("Wait")
-                    };
-
-                    // ---- STAGE ----
-                    let st = &view_player.stage.stage;
-                    for i in 0..3 {
-                        let cid = st[i];
-                        let tapped = if cid != -1 { is_tapped(cid) } else { false };
-                        set_slot(_3ds_board_set_stage, i as i32, cid, false, tapped);
+                    // Macro to set all slots for one player
+                    macro_rules! fill_player_board {
+                        ($pb:expr,
+                         $stage_fn:ident, $live_fn:ident,
+                         $energy_fn:ident, $ecount_fn:ident,
+                         $hand_fn:ident, $hcount_fn:ident,
+                         $util_fn:ident) => {{
+                            let pb = $pb;
+                            // Stage
+                            let st = &pb.stage.stage;
+                            for i in 0..3 {
+                                let cid = st[i];
+                                let tapped = if cid != -1 { is_tapped(cid) } else { false };
+                                set_slot($stage_fn, i as i32, cid, false, tapped);
+                            }
+                            // Live zone
+                            let lc = &pb.live_card_zone.cards;
+                            for i in 0..3.min(lc.len()) {
+                                let cid = lc[i];
+                                let tapped = if cid != -1 { is_tapped(cid) } else { false };
+                                set_slot($live_fn, i as i32, cid, true, tapped);
+                            }
+                            for i in lc.len()..3 {
+                                unsafe {
+                                    $live_fn(i as i32, false, std::ptr::null(), 0, false, false);
+                                }
+                            }
+                            // Energy
+                            let ec = &pb.energy_zone.cards;
+                            let ecount = ec.len().min(30);
+                            unsafe {
+                                $ecount_fn(ecount as i32);
+                            }
+                            for (i, cid) in ec.iter().enumerate().take(30) {
+                                set_slot($energy_fn, i as i32, *cid, false, is_tapped(*cid));
+                            }
+                            // Hand
+                            let hc = &pb.hand.cards;
+                            let hcount = hc.len().min(15);
+                            unsafe {
+                                $hcount_fn(hcount as i32);
+                            }
+                            for (i, cid) in hc.iter().enumerate().take(15) {
+                                set_slot($hand_fn, i as i32, *cid, false, false);
+                            }
+                            // Utility
+                            unsafe {
+                                $util_fn(
+                                    pb.main_deck.cards.len() as i32,
+                                    pb.energy_deck.cards.len() as i32,
+                                    pb.waitroom.cards.len() as i32,
+                                    pb.success_live_card_zone.cards.len() as i32,
+                                );
+                            }
+                        }};
                     }
+                    fill_player_board!(
+                        p1,
+                        _3ds_board_set_stage,
+                        _3ds_board_set_live,
+                        _3ds_board_set_energy,
+                        _3ds_board_set_energy_count,
+                        _3ds_board_set_hand,
+                        _3ds_board_set_hand_count,
+                        _3ds_board_set_utility
+                    );
+                    fill_player_board!(
+                        p2,
+                        _3ds_board_set_opp_stage,
+                        _3ds_board_set_opp_live,
+                        _3ds_board_set_opp_energy,
+                        _3ds_board_set_opp_energy_count,
+                        _3ds_board_set_opp_hand,
+                        _3ds_board_set_opp_hand_count,
+                        _3ds_board_set_opp_utility
+                    );
 
-                    // Top screen: stage info
-                    unsafe {
-                        let s0 = if st[0] == -1 {
-                            "-".into()
-                        } else {
-                            card_no(st[0]).unwrap_or("?".into())
-                        };
-                        let s1 = if st[1] == -1 {
-                            "-".into()
-                        } else {
-                            card_no(st[1]).unwrap_or("?".into())
-                        };
-                        let s2 = if st[2] == -1 {
-                            "-".into()
-                        } else {
-                            card_no(st[2]).unwrap_or("?".into())
-                        };
-                        _3ds_text_add_top(
-                            format!(
-                                "P{} St:{} {} {}\n\0",
-                                if view_player.id == gs.player1.id {
-                                    "1"
-                                } else {
-                                    "2"
-                                },
-                                s0,
-                                s1,
-                                s2
-                            )
-                            .as_ptr(),
-                        );
-                    }
-
-                    // ---- LIVE ZONE ----
-                    let live_cards = &view_player.live_card_zone.cards;
-                    for i in 0..3.min(live_cards.len()) {
-                        let cid = live_cards[i];
-                        let tapped = if cid != -1 { is_tapped(cid) } else { false };
-                        set_slot(_3ds_board_set_live, i as i32, cid, true, tapped);
-                    }
-                    for i in live_cards.len()..3 {
+                    // ---- TOP SCREEN (detail mode vs normal mode) ----
+                    if detail_mode {
                         unsafe {
-                            _3ds_board_set_live(i as i32, false, std::ptr::null(), 0, false, false);
+                            _3ds_text_set_scroll_y(0);
+                        }
+                        // Show just the selected card's full info
+                        if cur < acts_cache.len() {
+                            let act = &acts_cache[cur];
+                            if let Some(ref p) = act.parameters {
+                                if let Some(cid) = p.card_id {
+                                    if let Some(card) = gs.card_database.get_card(cid) {
+                                        let desc_w = wrap_text(&act.description, 38);
+                                        unsafe {
+                                            _3ds_text_add_top(
+                                                format!(
+                                                    "[{}] {} | {}\n\0",
+                                                    card.card_no, card.name, desc_w
+                                                )
+                                                .as_ptr(),
+                                            );
+                                        }
+                                        for ab in &card.abilities {
+                                            let w = wrap_text(&ab.full_text, 40);
+                                            unsafe {
+                                                _3ds_text_add_top(format!("{}\n\0", w).as_ptr());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        unsafe {
+                            _3ds_text_add_top("\n[X]=back\0".as_ptr());
+                        }
+                    } else {
+                        // Normal mode: compact stats + action list
+                        let ap_label = if ap.id == p1.id { "P1" } else { "P2" };
+                        unsafe {
+                            _3ds_text_add_top(
+                                format!(
+                                    "Turn {} | {:?} | {}\n\0",
+                                    gs.turn_number, gs.current_phase, ap_label
+                                )
+                                .as_ptr(),
+                            );
+                            _3ds_text_add_top(format!(
+                                "P1 H:{} E:{}/{} D:{} W:{} L:{}  P2 H:{} E:{}/{} D:{} W:{} L:{}\n\0",
+                                p1.hand.cards.len(), p1.energy_zone.active_count(), p1.energy_zone.cards.len(),
+                                p1.main_deck.cards.len(), p1.waitroom.cards.len(), p1.success_live_card_zone.cards.len(),
+                                p2.hand.cards.len(), p2.energy_zone.active_count(), p2.energy_zone.cards.len(),
+                                p2.main_deck.cards.len(), p2.waitroom.cards.len(), p2.success_live_card_zone.cards.len(),
+                            ).as_ptr());
+                        }
+                        if cur < acts_cache.len() {
+                            let desc_w = wrap_text(&acts_cache[cur].description, 36);
+                            unsafe {
+                                _3ds_text_add_top(format!("> {}\n\0", desc_w).as_ptr());
+                            }
+                        }
+                        // Action list (centered around cursor)
+                        let n = acts_cache.len();
+                        let max_vis = 7usize;
+                        let start = if cur + max_vis >= n {
+                            n.saturating_sub(max_vis)
+                        } else {
+                            cur
+                        };
+                        let end = (start + max_vis).min(n);
+                        if n > max_vis && start > 0 {
+                            unsafe {
+                                _3ds_text_add_top(format!("\u{25b2} +{}\n\0", start).as_ptr());
+                            }
+                        }
+                        for i in start..end {
+                            let arrow = if i == cur { ">" } else { " " };
+                            let cp = acts_cache[i]
+                                .parameters
+                                .as_ref()
+                                .and_then(|p| p.card_id)
+                                .and_then(|cid| gs.card_database.get_card(cid))
+                                .map(|c| format!("[{}] ", c.card_no))
+                                .unwrap_or_default();
+                            let desc_w = wrap_text(&acts_cache[i].description, 30);
+                            unsafe {
+                                _3ds_text_add_top(
+                                    format!("{}[{:02}] {}{}\n\0", arrow, i, cp, desc_w).as_ptr(),
+                                );
+                            }
+                        }
+                        if n > max_vis && end < n {
+                            unsafe {
+                                _3ds_text_add_top(format!("\u{25bc} +{}\n\0", n - end).as_ptr());
+                            }
+                        }
+                        unsafe {
+                            _3ds_text_add_top("[X]=detail\0".as_ptr());
                         }
                     }
-                    for i in live_cards.len()..3 {
-                        unsafe {
-                            _3ds_board_set_live(i as i32, false, std::ptr::null(), 0, false, false);
-                        }
-                    }
 
-                    // ---- ENERGY ----
-                    let energy_cards = &view_player.energy_zone.cards;
-                    let e_count = energy_cards.len().min(30);
-                    unsafe {
-                        _3ds_board_set_energy_count(e_count as i32);
-                    }
-                    for (i, cid) in energy_cards.iter().enumerate().take(30) {
-                        let tapped = is_tapped(*cid);
-                        set_slot(_3ds_board_set_energy, i as i32, *cid, false, tapped);
-                    }
-
-                    // ---- HAND ----
-                    let hand_cards = &view_player.hand.cards;
-                    let h_count = hand_cards.len().min(15);
-                    unsafe {
-                        _3ds_board_set_hand_count(h_count as i32);
-                    }
-                    for (i, cid) in hand_cards.iter().enumerate().take(15) {
-                        set_slot(_3ds_board_set_hand, i as i32, *cid, false, false);
-                    }
-
-                    // ---- UTILITY COUNTS ----
-                    unsafe {
-                        _3ds_board_set_utility(
-                            view_player.main_deck.cards.len() as i32,
-                            view_player.energy_deck.cards.len() as i32,
-                            view_player.waitroom.cards.len() as i32,
-                            view_player.success_live_card_zone.cards.len() as i32,
-                        );
-                    }
-
-                    // ---- TOP SCREEN: stats + selected card info ----
-                    unsafe {
-                        _3ds_text_add_top(
-                            format!(
-                                "H:{} E:{}/{} D:{} W:{} L:{}\n\0",
-                                view_player.hand.cards.len(),
-                                view_player.energy_zone.active_count(),
-                                view_player.energy_zone.cards.len(),
-                                view_player.main_deck.cards.len(),
-                                view_player.waitroom.cards.len(),
-                                view_player.success_live_card_zone.cards.len()
-                            )
-                            .as_ptr(),
-                        );
-                    }
-
-                    // Selected card info (from action cursor)
+                    // ---- CARD DETAILS (from action cursor) ----
                     if cur < acts_cache.len() {
                         let act = &acts_cache[cur];
-                        let desc = &act.description;
                         if let Some(ref p) = act.parameters {
                             if let Some(cid) = p.card_id {
                                 if let Some(card) = gs.card_database.get_card(cid) {
+                                    let desc_w = wrap_text(&act.description, 38);
                                     unsafe {
                                         _3ds_text_add_top(
                                             format!(
                                                 "[{}] {} | {}\n\0",
-                                                card.card_no, card.name, desc
+                                                card.card_no, card.name, desc_w
                                             )
                                             .as_ptr(),
                                         );
                                     }
-                                } else {
-                                    unsafe {
-                                        _3ds_text_add_top(format!("{}\n\0", desc).as_ptr());
+                                    // Show abilities (word-wrapped)
+                                    for ab in &card.abilities {
+                                        let wrapped = wrap_text(&ab.full_text, 42);
+                                        unsafe {
+                                            _3ds_text_add_top(format!("{}\n\0", wrapped).as_ptr());
+                                        }
                                     }
                                 }
-                            } else {
-                                unsafe {
-                                    _3ds_text_add_top(format!("{}\n\0", desc).as_ptr());
-                                }
-                            }
-                        } else {
-                            unsafe {
-                                _3ds_text_add_top(format!("{}\n\0", desc).as_ptr());
                             }
                         }
                     }
 
-                    // Frame timing
-                    let gen_ms = ticks_to_ms(unsafe { _3ds_system_tick() });
-                    unsafe {
-                        _3ds_text_add_top(format!("f:{} {}ms\n\0", frame, gen_ms as u64).as_ptr());
+                    // ---- ACTION LIST (scrollable, on top screen) ----
+                    let n = acts_cache.len();
+                    let line_h = unsafe { _3ds_bot_line_height() } as usize;
+                    let max_lines = if line_h > 0 { 210 / line_h } else { 8 };
+                    let max_vis = max_lines.saturating_sub(2);
+                    let half = max_vis / 2;
+                    let start_idx = if n > max_vis {
+                        (cur as isize - half as isize)
+                            .max(0)
+                            .min((n - max_vis) as isize) as usize
+                    } else {
+                        0
+                    };
+                    let end_idx = (start_idx + max_vis).min(n);
+                    if start_idx > 0 {
+                        unsafe {
+                            _3ds_text_add_top(format!("\u{25b2} +{}\n\0", start_idx).as_ptr());
+                        }
+                    }
+                    for i in start_idx..end_idx {
+                        let arrow = if i == cur { ">" } else { " " };
+                        let desc_w = wrap_text(&acts_cache[i].description, 34);
+                        let cp = acts_cache[i]
+                            .parameters
+                            .as_ref()
+                            .and_then(|p| p.card_id)
+                            .and_then(|cid| gs.card_database.get_card(cid))
+                            .map(|c| format!("[{}] ", c.card_no))
+                            .unwrap_or_default();
+                        unsafe {
+                            _3ds_text_add_top(
+                                format!("{}[{:02}] {}{}\n\0", arrow, i, cp, desc_w).as_ptr(),
+                            );
+                        }
+                    }
+                    if end_idx < n {
+                        unsafe {
+                            _3ds_text_add_top(format!("\u{25bc} +{}\n\0", n - end_idx).as_ptr());
+                        }
                     }
 
                     dirty = false;
                     redraw = false;
                 }
-                Step::Play(gs, cur, acts_cache, dirty, redraw, atlas.clone())
+                Step::Play(
+                    gs,
+                    cur,
+                    acts_cache,
+                    dirty,
+                    redraw,
+                    atlas.clone(),
+                    *vs_ai,
+                    detail_mode,
+                )
             }
             Step::Done(ref r) => {
                 unsafe {
@@ -731,8 +1057,8 @@ fn step_name(s: &Step) -> &'static str {
     match s {
         Step::ReadCardsBin => "ReadCards",
         Step::ParseCards(_) => "ParseCards",
-        Step::LoadDecks(_) => "LoadDecks",
-        Step::Play(_, _, _, _, _, _) => "Play",
+        Step::Setup(_, _, _, _) => "Setup",
+        Step::Play(_, _, _, _, _, _, _, _) => "Play",
         Step::Done(_) => "Done",
     }
 }
@@ -752,13 +1078,16 @@ extern "C" {
     fn _3ds_clear_top();
     fn _3ds_text_add_top(msg: *const u8);
     fn _3ds_text_add_bot(msg: *const u8);
+    fn _3ds_text_set_scroll_y(y: i32);
+    fn _3ds_text_get_scroll_y() -> i32;
     fn _3ds_bot_line_height() -> f32;
 
     // Board API
     fn _3ds_board_enable(on: bool);
-    fn _3ds_board_toggle_side();
-    fn _3ds_board_is_opponent() -> bool;
+    fn _3ds_board_cycle_view();
+    fn _3ds_board_current_view() -> i32;
     fn _3ds_board_clear_cache();
+    // Player slots
     fn _3ds_board_set_stage(
         slot: i32,
         active: bool,
@@ -794,6 +1123,42 @@ extern "C" {
     );
     fn _3ds_board_set_hand_count(count: i32);
     fn _3ds_board_set_utility(deck: i32, edeck: i32, discard: i32, success: i32);
+    // Opponent slots
+    fn _3ds_board_set_opp_stage(
+        slot: i32,
+        active: bool,
+        atlas: *const u8,
+        index: i32,
+        landscape: bool,
+        tapped: bool,
+    );
+    fn _3ds_board_set_opp_live(
+        slot: i32,
+        active: bool,
+        atlas: *const u8,
+        index: i32,
+        landscape: bool,
+        tapped: bool,
+    );
+    fn _3ds_board_set_opp_energy(
+        slot: i32,
+        active: bool,
+        atlas: *const u8,
+        index: i32,
+        landscape: bool,
+        tapped: bool,
+    );
+    fn _3ds_board_set_opp_energy_count(count: i32);
+    fn _3ds_board_set_opp_hand(
+        slot: i32,
+        active: bool,
+        atlas: *const u8,
+        index: i32,
+        landscape: bool,
+        tapped: bool,
+    );
+    fn _3ds_board_set_opp_hand_count(count: i32);
+    fn _3ds_board_set_opp_utility(deck: i32, edeck: i32, discard: i32, success: i32);
     fn _3ds_board_set_selection(slot: i32, slot_type: i32);
 }
 
