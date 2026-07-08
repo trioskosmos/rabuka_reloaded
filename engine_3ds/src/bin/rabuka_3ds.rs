@@ -194,7 +194,7 @@ enum SetupPhase {
 enum Step {
     ReadCardsBin,
     ParseCards(Vec<u8>),
-    Setup(Vec<Card>, Vec<DeckList>, SetupPhase, bool), // +dirty flag
+    Setup(Arc<Vec<Card>>, Vec<DeckList>, SetupPhase, bool),
     Play(
         GameState,
         usize, // cursor
@@ -262,8 +262,6 @@ fn main() {
     let mut step = Step::ReadCardsBin;
 
     while unsafe { _3ds_main_loop() != 0 } {
-        let tick_start = unsafe { _3ds_system_tick() };
-
         unsafe {
             _3ds_scan_input();
         }
@@ -310,7 +308,13 @@ fn main() {
                         let decks = match DeckParser::parse_all_decks_from_directory(Path::new(
                             "romfs:/decks/",
                         )) {
-                            Ok(d) => d,
+                            Ok(d) => {
+                                let mut decks = d;
+                                decks.sort_by(|a, b| {
+                                    a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                                });
+                                decks
+                            }
                             Err(e) => {
                                 step = Step::Done(Err(format!("No decks: {}", e)));
                                 continue;
@@ -320,7 +324,7 @@ fn main() {
                             step = Step::Done(Err("No decks found!".into()));
                             continue;
                         }
-                        Step::Setup(cards, decks, SetupPhase::PickMode(0), true)
+                        Step::Setup(Arc::new(cards), decks, SetupPhase::PickMode(0), true)
                     }
                     Err(e) => Step::Done(Err(format!("Parse: {}", e))),
                 }
@@ -365,7 +369,12 @@ fn main() {
                                 )
                             }
                         } else {
-                            step.clone()
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::PickMode(cur),
+                                false,
+                            )
                         }
                     },
                     SetupPhase::PickDeck(cur, vs_ai) => {
@@ -422,7 +431,12 @@ fn main() {
                                 )
                             }
                         } else {
-                            step.clone()
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::PickDeck(cur, vs_ai),
+                                false,
+                            )
                         }
                     }
                     SetupPhase::PickDeck2(cur, p1_idx, vs_ai) => {
@@ -474,12 +488,17 @@ fn main() {
                                 true,
                             )
                         } else {
-                            step.clone()
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::PickDeck2(cur, p1_idx, vs_ai),
+                                false,
+                            )
                         }
                     }
                     SetupPhase::Loading(p1_idx, p2_idx, vs_ai) => {
                         let r = (|| -> Result<(GameState, CardAtlas), String> {
-                            let mut db = Arc::new(CardDatabase::load_or_create(cards.clone()));
+                            let mut db = Arc::new(CardDatabase::load_or_create((**cards).clone()));
                             let nums1 = DeckParser::deck_list_to_card_numbers(&decks[p1_idx]);
                             let nums2 = if p1_idx == p2_idx {
                                 nums1.clone()
@@ -1002,16 +1021,6 @@ fn main() {
                 })
             }
         };
-        let tick_end = unsafe { _3ds_system_tick() };
-        let frame_ms = ticks_to_ms(tick_end - tick_start);
-        if frame_ms > 33.0 {
-            tprintln!(
-                "[WARN] frame {}: {} ms (step: {})",
-                frame,
-                frame_ms,
-                current_step
-            );
-        }
         unsafe {
             _3ds_swap_buffers();
         }

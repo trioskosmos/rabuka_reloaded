@@ -423,7 +423,7 @@ void _3ds_swap_buffers() {
     C2D_SceneBegin(top_target);
     if (top_parsed) {
         C2D_DrawText(&top_obj,
-            C2D_WithColor | C2D_WordWrap,
+            C2D_WithColor,
             2.0f, 2.0f - (float)top_scroll_y, 0.5f,
             0.85f, 0.85f,
             C2D_Color32(0, 255, 0, 255),
