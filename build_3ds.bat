@@ -50,8 +50,9 @@ copy /Y "%~dp0web_ui\decks\*.txt" "%~dp0engine_3ds\romfs\decks\" >nul
 
 echo [4/6] cards.json with baked abilities ready
 
-:: Step 4.5 - Card image conversion (skip if manifest exists)
-if not exist "%~dp0engine_3ds\romfs\cards_manifest.json" (
+:: Step 4.5 - Card image conversion (skip if t3x atlases already exist)
+dir /b "%~dp0engine_3ds\romfs\cards\*.t3x" >nul 2>nul
+if errorlevel 1 (
     echo [4.5/6] Converting card images...
     if exist "%~dp0web_ui\img\cards_webp\*.webp" (
         cd /d "%~dp0engine_3ds"
@@ -67,7 +68,7 @@ if not exist "%~dp0engine_3ds\romfs\cards_manifest.json" (
         echo [WARN] No card images found at web_ui\img\cards_webp
     )
 ) else (
-    echo [4.5/6] Card images already converted (manifest exists)
+    echo [4.5/6] Card images already converted (t3x atlases found)
 )
 
 :: Step 5 - Build 3DS binary

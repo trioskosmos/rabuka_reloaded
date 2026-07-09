@@ -2,8 +2,10 @@
 
 Pipeline: web_ui/img/cards_webp/*.webp
   -> engine_3ds/romfs/cards/*.png        (resized, orientation-detected)
-  -> engine_3ds/romfs/cards/*.t3x        (per-set tex3ds atlases)
-  -> engine_3ds/romfs/cards_manifest.json (card->atlas+index map)
+   -> engine_3ds/romfs/cards/*.t3x        (per-set tex3ds atlases)
+   -> engine_3ds/romfs/cards_manifest.json (card->atlas+index map)
+
+Intermediate PNGs are deleted after atlas generation to keep romfs lean.
 
 Orientation: detected per-image. If width > height, card is landscape
 and resized to 90xN. Portrait becomes Nx90.
@@ -106,6 +108,17 @@ def generate_atlases(png_dir: str, by_set: dict[str, list[str]]) -> dict:
     return manifest
 
 
+def cleanup_pngs(png_dir: str):
+    """Delete intermediate PNGs after successful atlas generation."""
+    deleted = 0
+    for fname in os.listdir(png_dir):
+        if fname.endswith(".png"):
+            os.remove(os.path.join(png_dir, fname))
+            deleted += 1
+    if deleted:
+        print(f"Cleaned up {deleted} intermediate PNG files ({png_dir})")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Convert card images for 3DS")
     parser.add_argument(
@@ -128,6 +141,7 @@ def main():
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest, f, ensure_ascii=False, indent=2)
         print(f"Wrote manifest: {manifest_path} ({len(manifest)} entries)")
+        cleanup_pngs(dst_dir)
 
     if by_set:
         total = sum(len(v) for v in by_set.values())

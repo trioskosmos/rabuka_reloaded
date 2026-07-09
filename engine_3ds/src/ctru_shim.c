@@ -53,7 +53,8 @@ typedef struct {
 } PlayerBoard;
 
 static bool board_mode = false;
-static int board_view = 0;
+static int board_view = 2;  // default to both players
+static float section_y0 = 0, section_h = 240;
 static int top_scroll_y = 0;          // 0=player, 1=opponent, 2=both
 static int board_sel_slot = -1;
 static int board_sel_type = 0;
@@ -76,6 +77,7 @@ static u32 COL_TAPPED    = 0xAA000000; // tapped overlay
 
 // ---- Forward declarations ----
 C2D_Image _3ds_get_card_image(const char* atlas_name, int index);
+static void zone_heights(float h, float* live, float* stage, float* energy, float* hand);
 
 // ---- init / exit ----
 void _3ds_init() {
@@ -233,11 +235,8 @@ void _3ds_board_set_section_rect(float y0, float h, bool opponent) {
 }
 
 int _3ds_board_get_zone_y(int zone_type) {
-    const float M = 2.0f;
-    float live_h = section_h * 0.18f;
-    float stage_h = section_h * 0.42f;
-    float energy_h = section_h * 0.08f;
-    float hand_h = section_h * 0.32f;
+    float live_h, stage_h, energy_h, hand_h;
+    zone_heights(section_h, &live_h, &stage_h, &energy_h, &hand_h);
     float live_y = section_y0;
     float stage_y = live_y + live_h + 1;
     float energy_y = stage_y + stage_h + 1;
@@ -252,10 +251,8 @@ int _3ds_board_get_zone_y(int zone_type) {
 }
 
 int _3ds_board_get_zone_h(int zone_type) {
-    float live_h = section_h * 0.18f;
-    float stage_h = section_h * 0.42f;
-    float energy_h = section_h * 0.08f;
-    float hand_h = section_h * 0.32f;
+    float live_h, stage_h, energy_h, hand_h;
+    zone_heights(section_h, &live_h, &stage_h, &energy_h, &hand_h);
     switch (zone_type) {
         case 0: return (int)live_h;
         case 1: return (int)stage_h;
@@ -314,6 +311,32 @@ void _3ds_draw_border(float x, float y, float w, float h, u32 color, float thick
     C2D_DrawRectSolid(x + w - thickness, y, 0.1f, thickness, h, color);
 }
 
+void _3ds_draw_dotted_rect(float x, float y, float w, float h, u32 color) {
+    // Draw a 4-dash dotted rectangle outline showing wait-state card boundary
+    float seg = 4.0f, gap = 4.0f;
+    float step = seg + gap;
+    // Top edge
+    for (float px = x; px < x + w - seg; px += step) {
+        float s = (px + seg > x + w) ? (x + w - px) : seg;
+        C2D_DrawRectSolid(px, y, 0.1f, s, 2.0f, color);
+    }
+    // Bottom edge
+    for (float px = x; px < x + w - seg; px += step) {
+        float s = (px + seg > x + w) ? (x + w - px) : seg;
+        C2D_DrawRectSolid(px, y + h - 2.0f, 0.1f, s, 2.0f, color);
+    }
+    // Left edge
+    for (float py = y; py < y + h - seg; py += step) {
+        float s = (py + seg > y + h) ? (y + h - py) : seg;
+        C2D_DrawRectSolid(x, py, 0.1f, 2.0f, s, color);
+    }
+    // Right edge
+    for (float py = y; py < y + h - seg; py += step) {
+        float s = (py + seg > y + h) ? (y + h - py) : seg;
+        C2D_DrawRectSolid(x + w - 2.0f, py, 0.1f, 2.0f, s, color);
+    }
+}
+
 void _3ds_draw_label(const char* label, float x, float y, u32 color, float scale) {
     if (!label || label[0] == '\0') return;
     C2D_Font f = custom_font ? custom_font : NULL;
@@ -334,39 +357,49 @@ void _3ds_draw_card_at(CardSlot* slot, float x, float y, float w, float h) {
         return;
     }
 
-    float scale = (w / (float)img.subtex->width) < (h / (float)img.subtex->height)
-        ? (w / (float)img.subtex->width)
-        : (h / (float)img.subtex->height);
-    float dw = (float)img.subtex->width * scale;
-    float dh = (float)img.subtex->height * scale;
+    float iw = (float)img.subtex->width;
+    float ih = (float)img.subtex->height;
+
+    if (slot->tapped) {
+        // Waited: 90° CCW rotation, image dimensions swap
+        float scale = (w / ih) < (h / iw) ? (w / ih) : (h / iw);
+        float cx = x + w * 0.5f;
+        float cy = y + h * 0.5f;
+        C2D_DrawImageAtRotated(img, cx, cy, 0.5f, 1.57079633f, NULL, scale, scale);
+        return;
+    }
+
+    float scale = (w / iw) < (h / ih) ? (w / iw) : (h / ih);
+    float dw = iw * scale;
+    float dh = ih * scale;
     float cx = x + (w - dw) * 0.5f;
     float cy = y + (h - dh) * 0.5f;
 
     if (slot->flipped) {
-        // Render upside-down: position at the bottom-right of the bounding box
         C2D_DrawImageAt(img, cx + dw, cy + dh, 0.5f, NULL, -scale, -scale);
     } else {
         C2D_DrawImageAt(img, cx, cy, 0.5f, NULL, scale, scale);
     }
-
-    if (slot->tapped) {
-        _3ds_draw_rect(x, y, w, h, COL_TAPPED);
-    }
 }
 
-static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent) {
+static void zone_heights(float h, float* live, float* stage, float* energy, float* hand) {
+    float u = h - 3.0f;
+    *live   = u * 0.22f;
+    *stage  = u * 0.27f;
+    *energy = u * 0.10f;
+    *hand   = u * 0.41f;
+}
+
+static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool flip_cards) {
     const float W = 320.0f, M = 2.0f;
     const float PORTRAIT = 0.711f;
     const float LANDSCAPE = 1.41f;
 
-    // Set flip flag on all slots when opponent (dual view: cards face each other)
-    for (int i = 0; i < 3; i++) { pb->stage[i].flipped = opponent; pb->live[i].flipped = opponent; }
-    for (int i = 0; i < MAX_SLOTS; i++) { pb->energy[i].flipped = opponent; pb->hand[i].flipped = opponent; }
+    for (int i = 0; i < 3; i++) { pb->stage[i].flipped = flip_cards; pb->live[i].flipped = flip_cards; }
+    for (int i = 0; i < MAX_SLOTS; i++) { pb->energy[i].flipped = flip_cards; pb->hand[i].flipped = flip_cards; }
 
-    float live_h = h * 0.18f;
-    float stage_h = h * 0.42f;
-    float energy_h = h * 0.08f;
-    float hand_h = h * 0.32f;
+    float live_h, stage_h, energy_h, hand_h;
+    zone_heights(h, &live_h, &stage_h, &energy_h, &hand_h);
 
     float live_y, stage_y, energy_y, hand_y;
     if (opponent) {
@@ -383,7 +416,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent) {
     }
 
     float st_slot_h = stage_h - 4;
-    float st_slot_w = st_slot_h * PORTRAIT;
+    float st_slot_w = st_slot_h * LANDSCAPE;   // 3 slots fit at 27%: 61px → 86px each ✓
     float util_x = M + 3 * (st_slot_w + 2) + 5;
     float util_w = W - util_x - M;
 
@@ -399,15 +432,27 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent) {
         lx += live_slot_w + 2;
     }
 
-    // === STAGE + UTILITY ===
+// === STAGE + UTILITY ===
     float st_x = M;
+    float st_card_w = st_slot_h * PORTRAIT;   // portrait card width within landscape slot
+    float st_pad_x = (st_slot_w - st_card_w) * 0.5f;  // horizontal padding to center portrait
+    float st_pad_y = 1.0f;
+    float st_inner_w = st_card_w - 2.0f;
+    float st_inner_h = st_slot_h - 4.0f;
     // Stage slots: opponent displayed in reverse (R C L)
     for (int i = 0; i < 3; i++) {
         int si = opponent ? (2 - i) : i;
         float sy = stage_y + 1;
         _3ds_draw_rect(st_x, sy, st_slot_w, st_slot_h, COL_ZONE_BG);
         _3ds_draw_border(st_x, sy, st_slot_w, st_slot_h, COL_BLUE, 1);
-        if (pb->stage[si].active) _3ds_draw_card_at(&pb->stage[si], st_x + 1, sy + 1, st_slot_w - 2, st_slot_h - 2);
+        // Portrait card slot (solid border, centered)
+        float psx = st_x + st_pad_x;
+        _3ds_draw_border(psx, sy + st_pad_y, st_card_w, st_slot_h - 2, COL_BLUE, 1);
+        if (pb->stage[si].active) {
+            _3ds_draw_card_at(&pb->stage[si], psx + 1, sy + 2, st_inner_w, st_inner_h);
+        }
+        // Dotted landscape outline showing wait-state card boundary (visible as left/right arms outside portrait rect)
+        _3ds_draw_dotted_rect(st_x + 1, sy + 2, st_slot_w - 2, st_slot_h - 4, 0xFFFF8800);
         st_x += st_slot_w + 2;
     }
 
@@ -456,7 +501,8 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent) {
     float range_y = hand_y + 2;
     char rbuf[48];
     int show = hand_range_off + 1;
-    int show_end = (hand_range_off + hand_range_vis).min(hand_range_total);
+    int show_end = (hand_range_off + hand_range_vis) < hand_range_total
+                    ? (hand_range_off + hand_range_vis) : hand_range_total;
     snprintf(rbuf, sizeof(rbuf), "%s%d-%d/%d%s",
         hand_range_off > 0 ? "<" : " ",
         show, show_end, hand_range_total,
@@ -473,28 +519,28 @@ void _3ds_render_board() {
         float half = 114.0f;
         float div_y = half + 2;
         _3ds_board_set_section_rect(2, half, true);
-        draw_section(&o_board, 2, half, true);
+        draw_section(&o_board, 2, half, true, true);  // opponent zone order, flipped
         _3ds_draw_rect(0, div_y, 320, 4, COL_ZONE_BDR);
         _3ds_board_set_section_rect(div_y + 4, 240 - div_y - 4, false);
-        draw_section(&p_board, div_y + 4, 240 - div_y - 4, false);
+        draw_section(&p_board, div_y + 4, 240 - div_y - 4, false, false);
     } else if (board_view == 1) {
         // === OPPONENT ONLY ===
-        _3ds_board_set_section_rect(0, 240, true);
-        draw_section(&o_board, 0, 240, true);
+        _3ds_board_set_section_rect(0, 240, false);
+        // Opponent-only: normal zone order (like player view), cards flipped
+        draw_section(&o_board, 0, 240, false, true);
     } else {
         // === PLAYER ONLY ===
         _3ds_board_set_section_rect(0, 240, false);
-        draw_section(&p_board, 0, 240, false);
+        draw_section(&p_board, 0, 240, false, false);
     }
 
     // View indicator + hand range (3 lines in bottom-right corner)
     const char* view_label = board_view == 0 ? "YOU" : (board_view == 1 ? "OPP" : "BOTH");
     _3ds_draw_label(view_label, 280, 220, COL_GOLD, 0.5f);
     char hbuf[20];
-    snprintf(hbuf, sizeof(hbuf), "%d-%d/%d",
-        hand_range_off + 1,
-        (hand_range_off + hand_range_vis).min(hand_range_total),
-        hand_range_total);
+    int e = (hand_range_off + hand_range_vis) < hand_range_total
+              ? (hand_range_off + hand_range_vis) : hand_range_total;
+    snprintf(hbuf, sizeof(hbuf), "%d-%d/%d", hand_range_off + 1, e, hand_range_total);
     _3ds_draw_label(hbuf, 280, 210, COL_TEXT, 0.4f);
     // Arrow line
     if (hand_range_off > 0 && (hand_range_off + hand_range_vis) < hand_range_total) {
@@ -502,9 +548,8 @@ void _3ds_render_board() {
     } else if (hand_range_off > 0) {
         _3ds_draw_label("<", 280, 202, COL_GOLD, 0.4f);
     } else if ((hand_range_off + hand_range_vis) < hand_range_total) {
-        _3ds_draw_label(">", 280, 202, COL_GOLD, 0.4f);
+_3ds_draw_label(">", 280, 202, COL_GOLD, 0.4f);
     }
-}
 }
 
 // ---- Main render ----

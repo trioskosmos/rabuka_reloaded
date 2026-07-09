@@ -774,7 +774,7 @@ fn main() {
                             } else {
                                 stage_h as f32
                             };
-                            let st_slot_w = (st_card_h * 0.711_f32) as u32;
+                            let st_slot_w = (st_card_h * 1.41_f32) as u32;
                             let live_card_h = if live_h > 4 {
                                 live_h as f32 - 4.0
                             } else {
@@ -1231,9 +1231,9 @@ fn settle_3ds(gs: &mut GameState) {
 fn visible_hand_slots() -> usize {
     let hand_h = 240.0 * 0.32;
     let card_h = hand_h - 4.0;
-    let slot_w = card_h * 0.711 + 2.0;
-    let limit = 320.0 - 2.0 - slot_w;
-    let count = ((limit - 4.0) / slot_w) as usize;
+    let hsw = card_h * 0.711;
+    let stride = hsw + 2.0;
+    let count = ((314.0 - hsw) / stride) as usize + 1;
     count.max(1).min(15)
 }
 
