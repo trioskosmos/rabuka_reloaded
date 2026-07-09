@@ -58,6 +58,7 @@ static float section_y0 = 0, section_h = 240;
 static int top_scroll_y = 0;          // 0=player, 1=opponent, 2=both
 static int board_sel_slot = -1;
 static int board_sel_type = 0;
+static bool section_opponent = false;
 
 static PlayerBoard p_board;  // player (self)
 static PlayerBoard o_board;  // opponent
@@ -230,17 +231,38 @@ void _3ds_board_set_hand_scroll_info(int visible, int offset, int total) {
     hand_range_total = total;
 }
 
+float _3ds_board_get_slot_w(int zone_type) {
+    const float PORTRAIT = 0.711f;
+    const float LANDSCAPE = 1.41f;
+    float live_h, stage_h, energy_h, hand_h;
+    zone_heights(section_h, &live_h, &stage_h, &energy_h, &hand_h);
+    switch (zone_type) {
+        case 0: { float h = live_h - 4.0f; return h < 0 ? 0 : h * LANDSCAPE; } // live
+        case 1: { float h = stage_h - 4.0f; return h < 0 ? 0 : h; }           // stage (square)
+        case 3: { float h = hand_h - 4.0f; return h < 0 ? 0 : h * PORTRAIT; } // hand
+        default: return 0;
+    }
+}
+
 void _3ds_board_set_section_rect(float y0, float h, bool opponent) {
-    section_y0 = y0; section_h = h; (void)opponent;
+    section_y0 = y0; section_h = h; section_opponent = opponent;
 }
 
 int _3ds_board_get_zone_y(int zone_type) {
     float live_h, stage_h, energy_h, hand_h;
     zone_heights(section_h, &live_h, &stage_h, &energy_h, &hand_h);
-    float live_y = section_y0;
-    float stage_y = live_y + live_h + 1;
-    float energy_y = stage_y + stage_h + 1;
-    float hand_y = energy_y + energy_h + 1;
+    float live_y, stage_y, energy_y, hand_y;
+    if (section_opponent) {
+        hand_y = section_y0;
+        energy_y = hand_y + hand_h + 1;
+        stage_y = energy_y + energy_h + 1;
+        live_y = stage_y + stage_h + 1;
+    } else {
+        live_y = section_y0;
+        stage_y = live_y + live_h + 1;
+        energy_y = stage_y + stage_h + 1;
+        hand_y = energy_y + energy_h + 1;
+    }
     switch (zone_type) {
         case 0: return (int)live_y;
         case 1: return (int)stage_y;
@@ -376,7 +398,7 @@ void _3ds_draw_card_at(CardSlot* slot, float x, float y, float w, float h) {
     float cy = y + (h - dh) * 0.5f;
 
     if (slot->flipped) {
-        C2D_DrawImageAt(img, cx + dw, cy + dh, 0.5f, NULL, -scale, -scale);
+        C2D_DrawImageAt(img, cx, cy, 0.5f, NULL, -scale, -scale);
     } else {
         C2D_DrawImageAt(img, cx, cy, 0.5f, NULL, scale, scale);
     }
@@ -386,8 +408,8 @@ static void zone_heights(float h, float* live, float* stage, float* energy, floa
     float u = h - 3.0f;
     *live   = u * 0.22f;
     *stage  = u * 0.27f;
-    *energy = u * 0.10f;
-    *hand   = u * 0.41f;
+    *energy = u * 0.09f;
+    *hand   = u * 0.42f;
 }
 
 static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool flip_cards) {
@@ -416,7 +438,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     }
 
     float st_slot_h = stage_h - 4;
-    float st_slot_w = st_slot_h * LANDSCAPE;   // 3 slots fit at 27%: 61px → 86px each ✓
+    float st_slot_w = st_slot_h;
     float util_x = M + 3 * (st_slot_w + 2) + 5;
     float util_w = W - util_x - M;
 
@@ -437,22 +459,23 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float st_card_w = st_slot_h * PORTRAIT;   // portrait card width within landscape slot
     float st_pad_x = (st_slot_w - st_card_w) * 0.5f;  // horizontal padding to center portrait
     float st_pad_y = 1.0f;
-    float st_inner_w = st_card_w - 2.0f;
-    float st_inner_h = st_slot_h - 4.0f;
     // Stage slots: opponent displayed in reverse (R C L)
     for (int i = 0; i < 3; i++) {
         int si = opponent ? (2 - i) : i;
         float sy = stage_y + 1;
         _3ds_draw_rect(st_x, sy, st_slot_w, st_slot_h, COL_ZONE_BG);
-        _3ds_draw_border(st_x, sy, st_slot_w, st_slot_h, COL_BLUE, 1);
         // Portrait card slot (solid border, centered)
         float psx = st_x + st_pad_x;
         _3ds_draw_border(psx, sy + st_pad_y, st_card_w, st_slot_h - 2, COL_BLUE, 1);
         if (pb->stage[si].active) {
-            _3ds_draw_card_at(&pb->stage[si], psx + 1, sy + 2, st_inner_w, st_inner_h);
+            _3ds_draw_card_at(&pb->stage[si], st_x + 1, sy + 2, st_slot_w - 2, st_slot_h - 4);
         }
-        // Dotted landscape outline showing wait-state card boundary (visible as left/right arms outside portrait rect)
-        _3ds_draw_dotted_rect(st_x + 1, sy + 2, st_slot_w - 2, st_slot_h - 4, 0xFFFF8800);
+        // Dotted rotated portrait rect showing wait-state preview (cross shape with solid rect)
+        float ddw = st_slot_h - 2;
+        float ddh = st_card_w;
+        float ddx = st_x + (st_slot_w - ddw) * 0.5f;
+        float ddy = sy + (st_slot_h - ddh) * 0.5f;
+        _3ds_draw_dotted_rect(ddx, ddy, ddw, ddh, 0xFFFF8800);
         st_x += st_slot_w + 2;
     }
 
@@ -477,7 +500,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float ex = M + 2;
     float e_sz = energy_h - 4;
     for (int i = 0; i < pb->energy_count && i < MAX_SLOTS; i++) {
-        float e_w = e_sz * PORTRAIT;
+        float e_w = e_sz * LANDSCAPE;
         if (pb->energy[i].active) _3ds_draw_card_at(&pb->energy[i], ex, energy_y + 2, e_w, e_sz);
         else _3ds_draw_rect(ex, energy_y + 2, e_w, e_sz, 0x33000000);
         ex += e_w + 1;

@@ -204,7 +204,9 @@ enum Step {
         CardAtlas,
         bool,        // vs_ai
         bool,        // detail_mode
-        usize,       // hand_offset
+        usize,       // hand_offset (P1)
+        usize,       // hand_offset_p2
+        u32,         // touch_tap_count
         Option<i16>, // viewing_card_id
     ),
     Done(Result<(), String>),
@@ -574,6 +576,8 @@ fn main() {
                                     vs_ai,
                                     false,
                                     0,
+                                    0,
+                                    0,
                                     None,
                                 )
                             }
@@ -593,6 +597,8 @@ fn main() {
                 ref vs_ai,
                 mut detail_mode,
                 mut hand_offset,
+                mut hand_offset_p2,
+                mut touch_tap_count,
                 mut viewing_card,
             ) => {
                 // Input handling
@@ -631,12 +637,28 @@ fn main() {
                 // DPAD LEFT/RIGHT: scroll hand view (0x10 = RIGHT, 0x20 = LEFT)
                 if !detail_mode {
                     let vis = visible_hand_slots();
-                    let max_off = gs.player1.hand.cards.len().saturating_sub(vis);
-                    if keys & 0x00000020 != 0 && hand_offset > 0 {
-                        hand_offset -= 1;
+                    let is_p1 = gs.active_player().id == gs.player1.id;
+                    let (off, max) = if is_p1 {
+                        (hand_offset, gs.player1.hand.cards.len().saturating_sub(vis))
+                    } else {
+                        (
+                            hand_offset_p2,
+                            gs.player2.hand.cards.len().saturating_sub(vis),
+                        )
+                    };
+                    if keys & 0x00000020 != 0 && off > 0 {
+                        if is_p1 {
+                            hand_offset -= 1;
+                        } else {
+                            hand_offset_p2 -= 1;
+                        }
                         redraw = true;
-                    } else if keys & 0x00000010 != 0 && hand_offset < max_off {
-                        hand_offset += 1;
+                    } else if keys & 0x00000010 != 0 && off < max {
+                        if is_p1 {
+                            hand_offset += 1;
+                        } else {
+                            hand_offset_p2 += 1;
+                        }
                         redraw = true;
                     }
                 }
@@ -718,6 +740,7 @@ fn main() {
 
                 // Touch: tap board zones to view card details
                 if unsafe { _3ds_touch_down() } {
+                    touch_tap_count += 1;
                     let mut tx: u32 = 0;
                     let mut ty: u32 = 0;
                     unsafe {
@@ -728,8 +751,8 @@ fn main() {
                         let (p1y0, p1h): (i32, i32);
                         let (p2y0, p2h): (i32, i32);
                         if view == 2 {
-                            p1y0 = 118;
-                            p1h = 122;
+                            p1y0 = 120;
+                            p1h = 120;
                             p2y0 = 2;
                             p2h = 114;
                         } else if view == 1 {
@@ -756,42 +779,28 @@ fn main() {
                             unsafe {
                                 _3ds_board_set_section_rect(y0 as f32, h as f32, is_opp);
                             }
-                            let hand_y = y0 + unsafe { _3ds_board_get_zone_y(3) };
+                            let hand_y = unsafe { _3ds_board_get_zone_y(3) };
                             let hand_h = unsafe { _3ds_board_get_zone_h(3) };
-                            let stage_y = y0 + unsafe { _3ds_board_get_zone_y(1) };
+                            let stage_y = unsafe { _3ds_board_get_zone_y(1) };
                             let stage_h = unsafe { _3ds_board_get_zone_h(1) };
-                            let live_y = y0 + unsafe { _3ds_board_get_zone_y(0) };
+                            let live_y = unsafe { _3ds_board_get_zone_y(0) };
                             let live_h = unsafe { _3ds_board_get_zone_h(0) };
                             let vis = visible_hand_slots();
-                            let hand_card_h = if hand_h > 4 {
-                                hand_h as f32 - 4.0
-                            } else {
-                                hand_h as f32
-                            };
-                            let hand_slot_w = (hand_card_h * 0.711_f32) as u32;
-                            let st_card_h = if stage_h > 4 {
-                                stage_h as f32 - 4.0
-                            } else {
-                                stage_h as f32
-                            };
-                            let st_slot_w = (st_card_h * 1.41_f32) as u32;
-                            let live_card_h = if live_h > 4 {
-                                live_h as f32 - 4.0
-                            } else {
-                                live_h as f32
-                            };
-                            let live_slot_w = (live_card_h * 1.41_f32) as u32;
+                            let hand_slot_w = unsafe { _3ds_board_get_slot_w(3) };
+                            let st_slot_w = unsafe { _3ds_board_get_slot_w(1) };
+                            let live_slot_w = unsafe { _3ds_board_get_slot_w(0) };
                             let tapped = if (ty as i32) >= hand_y && (ty as i32) < (hand_y + hand_h)
                             {
-                                let idx = ((tx - 4) / (hand_slot_w + 2)) as usize;
-                                let hand_idx = hand_offset + idx;
+                                let idx = ((tx as f32 - 4.0) / (hand_slot_w + 2.0)) as usize;
+                                let hoff = if is_opp { hand_offset_p2 } else { hand_offset };
+                                let hand_idx = hoff + idx;
                                 if idx < vis && hand_idx < pb.hand.cards.len() {
                                     Some(pb.hand.cards[hand_idx])
                                 } else {
                                     None
                                 }
                             } else if (ty as i32) >= stage_y && (ty as i32) < (stage_y + stage_h) {
-                                let raw_idx = ((tx - 2) / (st_slot_w + 2)) as usize;
+                                let raw_idx = ((tx as f32 - 2.0) / (st_slot_w + 2.0)) as usize;
                                 let idx = if is_opp { 2 - raw_idx } else { raw_idx };
                                 if idx < 3 && pb.stage.stage[idx] != -1 {
                                     Some(pb.stage.stage[idx])
@@ -799,7 +808,7 @@ fn main() {
                                     None
                                 }
                             } else if (ty as i32) >= live_y && (ty as i32) < (live_y + live_h) {
-                                let idx = ((tx - 5) / (live_slot_w + 2)) as usize;
+                                let idx = ((tx as f32 - 5.0) / (live_slot_w + 2.0)) as usize;
                                 if idx < 3 && idx < pb.live_card_zone.cards.len() {
                                     Some(pb.live_card_zone.cards[idx])
                                 } else {
@@ -880,7 +889,8 @@ fn main() {
                          $stage_fn:ident, $live_fn:ident,
                          $energy_fn:ident, $ecount_fn:ident,
                          $hand_fn:ident, $hcount_fn:ident,
-                         $util_fn:ident) => {{
+                         $util_fn:ident,
+                         $hoff:expr) => {{
                             let pb = $pb;
                             // Stage
                             let st = &pb.stage.stage;
@@ -917,12 +927,12 @@ fn main() {
                                 $hcount_fn(vis as i32);
                                 _3ds_board_set_hand_scroll_info(
                                     vis as i32,
-                                    hand_offset as i32,
+                                    $hoff as i32,
                                     hc.len() as i32,
                                 );
                             }
                             for i in 0..vis {
-                                let idx = hand_offset + i;
+                                let idx = $hoff + i;
                                 if idx < hc.len() {
                                     set_slot($hand_fn, i as i32, hc[idx], false, false);
                                 } else {
@@ -957,7 +967,8 @@ fn main() {
                         _3ds_board_set_energy_count,
                         _3ds_board_set_hand,
                         _3ds_board_set_hand_count,
-                        _3ds_board_set_utility
+                        _3ds_board_set_utility,
+                        hand_offset
                     );
                     fill_player_board!(
                         p2,
@@ -967,7 +978,8 @@ fn main() {
                         _3ds_board_set_opp_energy_count,
                         _3ds_board_set_opp_hand,
                         _3ds_board_set_opp_hand_count,
-                        _3ds_board_set_opp_utility
+                        _3ds_board_set_opp_utility,
+                        hand_offset_p2
                     );
 
                     if detail_mode {
@@ -1005,8 +1017,12 @@ fn main() {
                         unsafe {
                             _3ds_text_add_top(
                                 format!(
-                                    "Turn {} | {:?} | {}{}\n\0",
-                                    gs.turn_number, gs.current_phase, ap_label, touch_indicator
+                                    "Turn {} | {:?} | {}{} | taps:{}\n\0",
+                                    gs.turn_number,
+                                    gs.current_phase,
+                                    ap_label,
+                                    touch_indicator,
+                                    touch_tap_count
                                 )
                                 .as_ptr(),
                             );
@@ -1087,7 +1103,7 @@ fn main() {
                                     }
                                 }
                                 for i in start..end {
-                                    let arrow = if i == cur { ">" } else { " " };
+                                    let prefix = if i == cur { ">" } else { " " };
                                     let cp = acts_cache[i]
                                         .parameters
                                         .as_ref()
@@ -1095,22 +1111,19 @@ fn main() {
                                         .and_then(|cid| gs.card_database.get_card(cid))
                                         .map(|c| format!("[{}] ", c.card_no))
                                         .unwrap_or_default();
-                                    let desc_full = wrap_text(&acts_cache[i].description, 34);
+                                    let desc_full = wrap_text(&acts_cache[i].description, 36);
                                     for (li, line) in desc_full.lines().enumerate() {
                                         if li == 0 {
                                             unsafe {
                                                 _3ds_text_add_top(
-                                                    format!(
-                                                        "{}[{:02}] {} {}\n\0",
-                                                        arrow, i, cp, line
-                                                    )
-                                                    .as_ptr(),
+                                                    format!("{}{}{}\n\0", prefix, cp, line)
+                                                        .as_ptr(),
                                                 );
                                             }
                                         } else {
                                             unsafe {
                                                 _3ds_text_add_top(
-                                                    format!("   {:02}    {}\n\0", i, line).as_ptr(),
+                                                    format!("   {}\n\0", line).as_ptr(),
                                                 );
                                             }
                                         }
@@ -1162,6 +1175,8 @@ fn main() {
                     *vs_ai,
                     detail_mode,
                     hand_offset,
+                    hand_offset_p2,
+                    touch_tap_count,
                     viewing_card,
                 )
             }
@@ -1229,7 +1244,7 @@ fn settle_3ds(gs: &mut GameState) {
 
 #[cfg(feature = "3ds")]
 fn visible_hand_slots() -> usize {
-    let hand_h = 240.0 * 0.32;
+    let hand_h = 240.0 * 0.42;
     let card_h = hand_h - 4.0;
     let hsw = card_h * 0.711;
     let stride = hsw + 2.0;
@@ -1242,7 +1257,7 @@ fn step_name(s: &Step) -> &'static str {
         Step::ReadCardsBin => "ReadCards",
         Step::ParseCards(_) => "ParseCards",
         Step::Setup(_, _, _, _) => "Setup",
-        Step::Play(_, _, _, _, _, _, _, _, _, _) => "Play",
+        Step::Play(_, _, _, _, _, _, _, _, _, _, _, _) => "Play",
         Step::Done(_) => "Done",
     }
 }
@@ -1351,6 +1366,7 @@ extern "C" {
     fn _3ds_board_set_section_rect(y0: f32, h: f32, opponent: bool);
     fn _3ds_board_get_zone_y(zone_type: i32) -> i32;
     fn _3ds_board_get_zone_h(zone_type: i32) -> i32;
+    fn _3ds_board_get_slot_w(zone_type: i32) -> f32;
 }
 
 #[cfg(not(feature = "3ds"))]

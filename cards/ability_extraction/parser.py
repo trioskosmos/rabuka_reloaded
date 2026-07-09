@@ -84,6 +84,7 @@ from parser_utils import (
     LOCATION_PATTERNS,
     CARD_TYPE_PATTERNS,
     OPERATOR_PATTERNS,
+    PriorityRegistry,
 )
 
 # ============== CONFIGURATION CONSTANTS ==============
@@ -1112,8 +1113,7 @@ def parse_effect(text: str) -> Dict[str, Any]:
                 extra_activation_pos = "right_side"
 
     # Try all handlers in priority order
-    for handler in _EFFECT_HANDLERS:
-        hn = handler.__name__ if hasattr(handler, "__name__") else "?"
+    for _priority, hn, handler in _effect_registry.sorted_handlers():
         result = handler(text)
         if result is not None:
             _DEBUG_LOG.append(
@@ -1314,13 +1314,12 @@ def parse_condition(text: str) -> Dict[str, Any]:
     """
     text = strip_parenthetical(text)
     # Try early-return handlers (most specific first).
-    # See CONDITION_PATTERNS for the priority-ordered registry.
-    for name, tier, handler in CONDITION_PATTERNS:
+    for _priority, name, handler in _condition_registry.sorted_handlers():
         result = handler(text)
         if result is not None:
             _DEBUG_LOG.append(
                 f"parse_condition({text!r})\n"
-                f"  [T{tier}] {name}: MATCH → type={result['type']}\n"
+                f"  [{name}]: MATCH → type={result['type']}\n"
                 f"  output: {json.dumps(result, ensure_ascii=False)}"
             )
             # Extract cost_limit and card_property from text for handlers
@@ -4343,6 +4342,11 @@ CONDITION_PATTERNS = [
         _try_live_mid,
     ),  # "ライブ中" → {type: "card_count_condition"|"temporal_condition", temporal: "during_live"}
 ]
+
+# PriorityRegistry wrapping CONDITION_PATTERNS for named, sorted dispatch.
+_condition_registry = PriorityRegistry("condition_patterns")
+for _ci, (_cn, _ct, _ch) in enumerate(CONDITION_PATTERNS):
+    _condition_registry.register(_ct * 100 + _ci, _cn, _ch)
 
 
 def _extract_generic_fields(condition, text):
@@ -8471,6 +8475,13 @@ _EFFECT_HANDLERS = [
     _try_lose_resource,  # Lose resource
     _try_restriction_effect,  # Restriction effects
 ]
+
+# PriorityRegistry wrapping _EFFECT_HANDLERS for named, sorted dispatch.
+# Priority = index in the list preserves existing ordering.
+_effect_registry = PriorityRegistry("effect_handlers")
+for _i, _h in enumerate(_EFFECT_HANDLERS):
+    _hn = getattr(_h, "__name__", f"handler_{_i}")
+    _effect_registry.register(_i, _hn, _h)
 
 # ======================================================================
 # POST-PROCESSING NORMALIZERS & CHAINING
