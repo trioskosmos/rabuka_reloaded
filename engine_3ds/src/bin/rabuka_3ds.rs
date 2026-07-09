@@ -202,8 +202,10 @@ enum Step {
         bool, // dirty
         bool, // redraw
         CardAtlas,
-        bool, // vs_ai
-        bool, // detail_mode (top screen shows card detail)
+        bool,        // vs_ai
+        bool,        // detail_mode
+        usize,       // hand_offset
+        Option<i16>, // viewing_card_id
     ),
     Done(Result<(), String>),
 }
@@ -266,6 +268,7 @@ fn main() {
             _3ds_scan_input();
         }
         let keys = unsafe { _3ds_keys_down() };
+        let held = unsafe { _3ds_keys_held() };
         if keys & 0x00000008 != 0 {
             break;
         }
@@ -561,7 +564,18 @@ fn main() {
                                 unsafe {
                                     _3ds_board_enable(true);
                                 }
-                                Step::Play(gs, 0, Vec::new(), true, true, atlas, vs_ai, false)
+                                Step::Play(
+                                    gs,
+                                    0,
+                                    Vec::new(),
+                                    true,
+                                    true,
+                                    atlas,
+                                    vs_ai,
+                                    false,
+                                    0,
+                                    None,
+                                )
                             }
                             Err(e) => Step::Done(Err(e)),
                         }
@@ -578,6 +592,8 @@ fn main() {
                 ref atlas,
                 ref vs_ai,
                 mut detail_mode,
+                mut hand_offset,
+                mut viewing_card,
             ) => {
                 // Input handling
                 if detail_mode {
@@ -610,6 +626,19 @@ fn main() {
                         _3ds_board_cycle_view();
                     }
                     redraw = true;
+                }
+
+                // DPAD LEFT/RIGHT: scroll hand view (0x10 = RIGHT, 0x20 = LEFT)
+                if !detail_mode {
+                    let vis = visible_hand_slots();
+                    let max_off = gs.player1.hand.cards.len().saturating_sub(vis);
+                    if keys & 0x00000020 != 0 && hand_offset > 0 {
+                        hand_offset -= 1;
+                        redraw = true;
+                    } else if keys & 0x00000010 != 0 && hand_offset < max_off {
+                        hand_offset += 1;
+                        redraw = true;
+                    }
                 }
 
                 // X toggles card detail mode on top screen
@@ -653,11 +682,10 @@ fn main() {
                     cur = n2 - 1;
                 }
 
-                // AI: auto-pick randomly when it's the AI player's turn with choices
-                if *vs_ai && gs.has_pending_choice() {
-                    let ap = gs.active_player();
-                    let is_human = ap.id == gs.player1.id; // P1 is human
-                    if !is_human && acts_cache.len() > 0 {
+                // AI: auto-pick when it's the AI's turn (before human input, covers all phases)
+                let is_ai_turn = *vs_ai && gs.active_player().id != gs.player1.id;
+                if is_ai_turn {
+                    if acts_cache.len() > 0 {
                         let ai_idx = (unsafe { _3ds_system_tick() } as usize) % acts_cache.len();
                         let action = acts_cache[ai_idx].clone();
                         let p = action.parameters.clone();
@@ -672,10 +700,11 @@ fn main() {
                         );
                         gs.reset_loop_detection();
                         gs.reset_loop_detection();
-                        cur = 0;
-                        dirty = true;
-                        redraw = true;
                     }
+                    acts_cache.clear();
+                    cur = 0;
+                    dirty = true;
+                    redraw = true;
                 }
 
                 let auto = !gs.has_pending_choice()
@@ -685,6 +714,111 @@ fn main() {
                     settle_3ds(&mut gs);
                     cur = 0;
                     dirty = true;
+                }
+
+                // Touch: tap board zones to view card details
+                if unsafe { _3ds_touch_down() } {
+                    let mut tx: u32 = 0;
+                    let mut ty: u32 = 0;
+                    unsafe {
+                        _3ds_touch_read(&mut tx, &mut ty);
+                    }
+                    if ty < 240 {
+                        let view = unsafe { _3ds_board_current_view() };
+                        let (p1y0, p1h): (i32, i32);
+                        let (p2y0, p2h): (i32, i32);
+                        if view == 2 {
+                            p1y0 = 118;
+                            p1h = 122;
+                            p2y0 = 2;
+                            p2h = 114;
+                        } else if view == 1 {
+                            p1y0 = 0;
+                            p1h = 0;
+                            p2y0 = 0;
+                            p2h = 240;
+                        } else {
+                            p1y0 = 0;
+                            p1h = 240;
+                            p2y0 = 0;
+                            p2h = 0;
+                        }
+                        let (y0, h) = if (ty as i32) >= p1y0 && (ty as i32) < (p1y0 + p1h) {
+                            (p1y0, p1h)
+                        } else if (ty as i32) >= p2y0 && (ty as i32) < (p2y0 + p2h) {
+                            (p2y0, p2h)
+                        } else {
+                            (0, 0)
+                        };
+                        if h > 0 {
+                            let pb = if y0 == p1y0 { &gs.player1 } else { &gs.player2 };
+                            let is_opp = y0 != p1y0;
+                            unsafe {
+                                _3ds_board_set_section_rect(y0 as f32, h as f32, is_opp);
+                            }
+                            let hand_y = y0 + unsafe { _3ds_board_get_zone_y(3) };
+                            let hand_h = unsafe { _3ds_board_get_zone_h(3) };
+                            let stage_y = y0 + unsafe { _3ds_board_get_zone_y(1) };
+                            let stage_h = unsafe { _3ds_board_get_zone_h(1) };
+                            let live_y = y0 + unsafe { _3ds_board_get_zone_y(0) };
+                            let live_h = unsafe { _3ds_board_get_zone_h(0) };
+                            let vis = visible_hand_slots();
+                            let hand_card_h = if hand_h > 4 {
+                                hand_h as f32 - 4.0
+                            } else {
+                                hand_h as f32
+                            };
+                            let hand_slot_w = (hand_card_h * 0.711_f32) as u32;
+                            let st_card_h = if stage_h > 4 {
+                                stage_h as f32 - 4.0
+                            } else {
+                                stage_h as f32
+                            };
+                            let st_slot_w = (st_card_h * 0.711_f32) as u32;
+                            let live_card_h = if live_h > 4 {
+                                live_h as f32 - 4.0
+                            } else {
+                                live_h as f32
+                            };
+                            let live_slot_w = (live_card_h * 1.41_f32) as u32;
+                            let tapped = if (ty as i32) >= hand_y && (ty as i32) < (hand_y + hand_h)
+                            {
+                                let idx = ((tx - 4) / (hand_slot_w + 2)) as usize;
+                                let hand_idx = hand_offset + idx;
+                                if idx < vis && hand_idx < pb.hand.cards.len() {
+                                    Some(pb.hand.cards[hand_idx])
+                                } else {
+                                    None
+                                }
+                            } else if (ty as i32) >= stage_y && (ty as i32) < (stage_y + stage_h) {
+                                let raw_idx = ((tx - 2) / (st_slot_w + 2)) as usize;
+                                let idx = if is_opp { 2 - raw_idx } else { raw_idx };
+                                if idx < 3 && pb.stage.stage[idx] != -1 {
+                                    Some(pb.stage.stage[idx])
+                                } else {
+                                    None
+                                }
+                            } else if (ty as i32) >= live_y && (ty as i32) < (live_y + live_h) {
+                                let idx = ((tx - 5) / (live_slot_w + 2)) as usize;
+                                if idx < 3 && idx < pb.live_card_zone.cards.len() {
+                                    Some(pb.live_card_zone.cards[idx])
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            };
+                            if let Some(cid) = tapped {
+                                if Some(cid) == viewing_card {
+                                    viewing_card = None;
+                                } else {
+                                    viewing_card = Some(cid);
+                                }
+                            } else {
+                                viewing_card = None;
+                            }
+                        } // end h > 0 guard
+                    }
                 }
 
                 if dirty || redraw {
@@ -776,14 +910,33 @@ fn main() {
                             for (i, cid) in ec.iter().enumerate().take(30) {
                                 set_slot($energy_fn, i as i32, *cid, false, is_tapped(*cid));
                             }
-                            // Hand
+                            // Hand (scrollable with DPAD LEFT/RIGHT)
                             let hc = &pb.hand.cards;
-                            let hcount = hc.len().min(15);
+                            let vis = visible_hand_slots();
                             unsafe {
-                                $hcount_fn(hcount as i32);
+                                $hcount_fn(vis as i32);
+                                _3ds_board_set_hand_scroll_info(
+                                    vis as i32,
+                                    hand_offset as i32,
+                                    hc.len() as i32,
+                                );
                             }
-                            for (i, cid) in hc.iter().enumerate().take(15) {
-                                set_slot($hand_fn, i as i32, *cid, false, false);
+                            for i in 0..vis {
+                                let idx = hand_offset + i;
+                                if idx < hc.len() {
+                                    set_slot($hand_fn, i as i32, hc[idx], false, false);
+                                } else {
+                                    unsafe {
+                                        $hand_fn(
+                                            i as i32,
+                                            false,
+                                            std::ptr::null(),
+                                            0,
+                                            false,
+                                            false,
+                                        );
+                                    }
+                                }
                             }
                             // Utility
                             unsafe {
@@ -817,25 +970,19 @@ fn main() {
                         _3ds_board_set_opp_utility
                     );
 
-                    // ---- TOP SCREEN (detail mode vs normal mode) ----
                     if detail_mode {
                         unsafe {
                             _3ds_text_set_scroll_y(0);
                         }
-                        // Show just the selected card's full info
                         if cur < acts_cache.len() {
                             let act = &acts_cache[cur];
                             if let Some(ref p) = act.parameters {
                                 if let Some(cid) = p.card_id {
                                     if let Some(card) = gs.card_database.get_card(cid) {
-                                        let desc_w = wrap_text(&act.description, 38);
                                         unsafe {
                                             _3ds_text_add_top(
-                                                format!(
-                                                    "[{}] {} | {}\n\0",
-                                                    card.card_no, card.name, desc_w
-                                                )
-                                                .as_ptr(),
+                                                format!("[{}] {}\n\0", card.card_no, card.name)
+                                                    .as_ptr(),
                                             );
                                         }
                                         for ab in &card.abilities {
@@ -849,16 +996,17 @@ fn main() {
                             }
                         }
                         unsafe {
-                            _3ds_text_add_top("\n[X]=back\0".as_ptr());
+                            _3ds_text_add_top("[X]=back\0".as_ptr());
                         }
                     } else {
                         // Normal mode: compact stats + action list
                         let ap_label = if ap.id == p1.id { "P1" } else { "P2" };
+                        let touch_indicator = if viewing_card.is_some() { "[T]" } else { "   " };
                         unsafe {
                             _3ds_text_add_top(
                                 format!(
-                                    "Turn {} | {:?} | {}\n\0",
-                                    gs.turn_number, gs.current_phase, ap_label
+                                    "Turn {} | {:?} | {}{}\n\0",
+                                    gs.turn_number, gs.current_phase, ap_label, touch_indicator
                                 )
                                 .as_ptr(),
                             );
@@ -870,118 +1018,134 @@ fn main() {
                                 p2.main_deck.cards.len(), p2.waitroom.cards.len(), p2.success_live_card_zone.cards.len(),
                             ).as_ptr());
                         }
-                        if cur < acts_cache.len() {
-                            let desc_w = wrap_text(&acts_cache[cur].description, 36);
-                            unsafe {
-                                _3ds_text_add_top(format!("> {}\n\0", desc_w).as_ptr());
+                        // Show tapped/viewed card detail or ability text
+                        if let Some(vcid) = viewing_card {
+                            if let Some(card) = gs.card_database.get_card(vcid) {
+                                unsafe {
+                                    _3ds_text_add_top(
+                                        format!(
+                                            "[{}] {}\n\0",
+                                            card.card_no,
+                                            wrap_text(&card.name, 30)
+                                        )
+                                        .as_ptr(),
+                                    );
+                                }
+                                for ab in &card.abilities {
+                                    let w = wrap_text(&ab.full_text, 34);
+                                    unsafe {
+                                        _3ds_text_add_top(format!("{}\n\0", w).as_ptr());
+                                    }
+                                }
+                                unsafe {
+                                    _3ds_text_add_top("(tap slot to dismiss)\n\0".as_ptr());
+                                }
                             }
-                        }
-                        // Action list (centered around cursor)
-                        let n = acts_cache.len();
-                        let max_vis = 7usize;
-                        let start = if cur + max_vis >= n {
-                            n.saturating_sub(max_vis)
-                        } else {
-                            cur
-                        };
-                        let end = (start + max_vis).min(n);
-                        if n > max_vis && start > 0 {
-                            unsafe {
-                                _3ds_text_add_top(format!("\u{25b2} +{}\n\0", start).as_ptr());
-                            }
-                        }
-                        for i in start..end {
-                            let arrow = if i == cur { ">" } else { " " };
-                            let cp = acts_cache[i]
-                                .parameters
-                                .as_ref()
-                                .and_then(|p| p.card_id)
-                                .and_then(|cid| gs.card_database.get_card(cid))
-                                .map(|c| format!("[{}] ", c.card_no))
-                                .unwrap_or_default();
-                            let desc_w = wrap_text(&acts_cache[i].description, 30);
+                        } else if let Some(entry) = gs.ability_queue.current_entry() {
+                            let ab_text = wrap_text(&entry.ability.full_text, 36);
                             unsafe {
                                 _3ds_text_add_top(
-                                    format!("{}[{:02}] {}{}\n\0", arrow, i, cp, desc_w).as_ptr(),
+                                    format!(
+                                        "[{}] {}\n\0",
+                                        entry.card_no,
+                                        ab_text.lines().next().unwrap_or("")
+                                    )
+                                    .as_ptr(),
                                 );
                             }
-                        }
-                        if n > max_vis && end < n {
-                            unsafe {
-                                _3ds_text_add_top(format!("\u{25bc} +{}\n\0", n - end).as_ptr());
-                            }
-                        }
-                        unsafe {
-                            _3ds_text_add_top("[X]=detail\0".as_ptr());
-                        }
-                    }
-
-                    // ---- CARD DETAILS (from action cursor) ----
-                    if cur < acts_cache.len() {
-                        let act = &acts_cache[cur];
-                        if let Some(ref p) = act.parameters {
-                            if let Some(cid) = p.card_id {
-                                if let Some(card) = gs.card_database.get_card(cid) {
-                                    let desc_w = wrap_text(&act.description, 38);
-                                    unsafe {
-                                        _3ds_text_add_top(
-                                            format!(
-                                                "[{}] {} | {}\n\0",
-                                                card.card_no, card.name, desc_w
-                                            )
-                                            .as_ptr(),
-                                        );
-                                    }
-                                    // Show abilities (word-wrapped)
-                                    for ab in &card.abilities {
-                                        let wrapped = wrap_text(&ab.full_text, 42);
-                                        unsafe {
-                                            _3ds_text_add_top(format!("{}\n\0", wrapped).as_ptr());
-                                        }
-                                    }
+                            for line in ab_text.lines().skip(1) {
+                                unsafe {
+                                    _3ds_text_add_top(format!("   {}\n\0", line).as_ptr());
                                 }
                             }
                         }
-                    }
-
-                    // ---- ACTION LIST (scrollable, on top screen) ----
-                    let n = acts_cache.len();
-                    let line_h = unsafe { _3ds_bot_line_height() } as usize;
-                    let max_lines = if line_h > 0 { 210 / line_h } else { 8 };
-                    let max_vis = max_lines.saturating_sub(2);
-                    let half = max_vis / 2;
-                    let start_idx = if n > max_vis {
-                        (cur as isize - half as isize)
-                            .max(0)
-                            .min((n - max_vis) as isize) as usize
-                    } else {
-                        0
-                    };
-                    let end_idx = (start_idx + max_vis).min(n);
-                    if start_idx > 0 {
+                        // Action list (scrollable, multi-line descriptions)
+                        let is_ai_turn = *vs_ai && gs.active_player().id != gs.player1.id;
+                        if is_ai_turn {
+                            unsafe {
+                                _3ds_text_add_top("AI is thinking...\n\0".as_ptr());
+                            }
+                        } else {
+                            let n = acts_cache.len();
+                            if n > 0 {
+                                let max_vis = 6usize;
+                                let half = max_vis / 2;
+                                let start = if n > max_vis {
+                                    (cur as isize - half as isize)
+                                        .max(0)
+                                        .min((n - max_vis) as isize)
+                                        as usize
+                                } else {
+                                    0
+                                };
+                                let end = (start + max_vis).min(n);
+                                if start > 0 {
+                                    unsafe {
+                                        _3ds_text_add_top(
+                                            format!("\u{25b2} +{}\n\0", start).as_ptr(),
+                                        );
+                                    }
+                                }
+                                for i in start..end {
+                                    let arrow = if i == cur { ">" } else { " " };
+                                    let cp = acts_cache[i]
+                                        .parameters
+                                        .as_ref()
+                                        .and_then(|p| p.card_id)
+                                        .and_then(|cid| gs.card_database.get_card(cid))
+                                        .map(|c| format!("[{}] ", c.card_no))
+                                        .unwrap_or_default();
+                                    let desc_full = wrap_text(&acts_cache[i].description, 34);
+                                    for (li, line) in desc_full.lines().enumerate() {
+                                        if li == 0 {
+                                            unsafe {
+                                                _3ds_text_add_top(
+                                                    format!(
+                                                        "{}[{:02}] {} {}\n\0",
+                                                        arrow, i, cp, line
+                                                    )
+                                                    .as_ptr(),
+                                                );
+                                            }
+                                        } else {
+                                            unsafe {
+                                                _3ds_text_add_top(
+                                                    format!("   {:02}    {}\n\0", i, line).as_ptr(),
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                                if end < n {
+                                    unsafe {
+                                        _3ds_text_add_top(
+                                            format!("\u{25bc} +{}\n\0", n - end).as_ptr(),
+                                        );
+                                    }
+                                }
+                            } // end if n > 0
+                        } // end else (is_ai_turn)
+                          // Bottom prompt with first ability line of cursor card
+                        let detail_hint = if cur < acts_cache.len() {
+                            let act = &acts_cache[cur];
+                            act.parameters
+                                .as_ref()
+                                .and_then(|p| p.card_id)
+                                .and_then(|cid| gs.card_database.get_card(cid))
+                                .and_then(|card| card.abilities.first())
+                                .map(|ab| {
+                                    wrap_text(&ab.full_text, 34)
+                                        .lines()
+                                        .next()
+                                        .unwrap_or("")
+                                        .to_string()
+                                })
+                                .unwrap_or_default()
+                        } else {
+                            String::new()
+                        };
                         unsafe {
-                            _3ds_text_add_top(format!("\u{25b2} +{}\n\0", start_idx).as_ptr());
-                        }
-                    }
-                    for i in start_idx..end_idx {
-                        let arrow = if i == cur { ">" } else { " " };
-                        let desc_w = wrap_text(&acts_cache[i].description, 34);
-                        let cp = acts_cache[i]
-                            .parameters
-                            .as_ref()
-                            .and_then(|p| p.card_id)
-                            .and_then(|cid| gs.card_database.get_card(cid))
-                            .map(|c| format!("[{}] ", c.card_no))
-                            .unwrap_or_default();
-                        unsafe {
-                            _3ds_text_add_top(
-                                format!("{}[{:02}] {}{}\n\0", arrow, i, cp, desc_w).as_ptr(),
-                            );
-                        }
-                    }
-                    if end_idx < n {
-                        unsafe {
-                            _3ds_text_add_top(format!("\u{25bc} +{}\n\0", n - end_idx).as_ptr());
+                            _3ds_text_add_top(format!("[X]=detail {}\0", detail_hint).as_ptr());
                         }
                     }
 
@@ -997,6 +1161,8 @@ fn main() {
                     atlas.clone(),
                     *vs_ai,
                     detail_mode,
+                    hand_offset,
+                    viewing_card,
                 )
             }
             Step::Done(ref r) => {
@@ -1062,12 +1228,21 @@ fn settle_3ds(gs: &mut GameState) {
 }
 
 #[cfg(feature = "3ds")]
+fn visible_hand_slots() -> usize {
+    let hand_h = 240.0 * 0.32;
+    let card_h = hand_h - 4.0;
+    let slot_w = card_h * 0.711 + 2.0;
+    let limit = 320.0 - 2.0 - slot_w;
+    let count = ((limit - 4.0) / slot_w) as usize;
+    count.max(1).min(15)
+}
+
 fn step_name(s: &Step) -> &'static str {
     match s {
         Step::ReadCardsBin => "ReadCards",
         Step::ParseCards(_) => "ParseCards",
         Step::Setup(_, _, _, _) => "Setup",
-        Step::Play(_, _, _, _, _, _, _, _) => "Play",
+        Step::Play(_, _, _, _, _, _, _, _, _, _) => "Play",
         Step::Done(_) => "Done",
     }
 }
@@ -1079,6 +1254,9 @@ extern "C" {
     fn _3ds_swap_buffers();
     fn _3ds_scan_input();
     fn _3ds_keys_down() -> u32;
+    fn _3ds_keys_held() -> u32;
+    fn _3ds_touch_read(px: *mut u32, py: *mut u32);
+    fn _3ds_touch_down() -> bool;
     fn _3ds_system_tick() -> u64;
     fn _3ds_debug_print(msg: *const u8);
     fn _3ds_tdbg(msg: *const u8);
@@ -1131,6 +1309,7 @@ extern "C" {
         tapped: bool,
     );
     fn _3ds_board_set_hand_count(count: i32);
+    fn _3ds_board_set_hand_scroll_info(visible: i32, offset: i32, total: i32);
     fn _3ds_board_set_utility(deck: i32, edeck: i32, discard: i32, success: i32);
     // Opponent slots
     fn _3ds_board_set_opp_stage(
@@ -1169,6 +1348,9 @@ extern "C" {
     fn _3ds_board_set_opp_hand_count(count: i32);
     fn _3ds_board_set_opp_utility(deck: i32, edeck: i32, discard: i32, success: i32);
     fn _3ds_board_set_selection(slot: i32, slot_type: i32);
+    fn _3ds_board_set_section_rect(y0: f32, h: f32, opponent: bool);
+    fn _3ds_board_get_zone_y(zone_type: i32) -> i32;
+    fn _3ds_board_get_zone_h(zone_type: i32) -> i32;
 }
 
 #[cfg(not(feature = "3ds"))]

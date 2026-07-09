@@ -98,6 +98,12 @@ impl super::TurnEngine {
                 }
             }
             crate::game_setup::ActionType::ChooseFirstAttacker => {
+                if game_state.current_phase != Phase::ChooseFirstAttacker {
+                    return Err(
+                        "ChooseFirstAttacker is only valid during ChooseFirstAttacker phase"
+                            .to_string(),
+                    );
+                }
                 let p1_first = game_state.rps_winner != Some(2);
                 game_state.player1.is_first_attacker = p1_first;
                 game_state.player2.is_first_attacker = !p1_first;
@@ -110,6 +116,12 @@ impl super::TurnEngine {
                 Ok(())
             }
             crate::game_setup::ActionType::ChooseSecondAttacker => {
+                if game_state.current_phase != Phase::ChooseFirstAttacker {
+                    return Err(
+                        "ChooseSecondAttacker is only valid during ChooseFirstAttacker phase"
+                            .to_string(),
+                    );
+                }
                 let p1_first = game_state.rps_winner == Some(2);
                 game_state.player1.is_first_attacker = p1_first;
                 game_state.player2.is_first_attacker = !p1_first;

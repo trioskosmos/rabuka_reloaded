@@ -39,6 +39,7 @@ typedef struct {
     int index;
     bool landscape;
     bool tapped;
+    bool flipped;
 } CardSlot;
 
 typedef struct {
@@ -216,6 +217,54 @@ void _3ds_board_set_selection(int slot_idx, int slot_type) {
     board_sel_type = slot_type;
 }
 
+// Hand scroll range + arrow tracking
+static int hand_range_vis = 0;
+static int hand_range_off = 0;
+static int hand_range_total = 0;
+
+void _3ds_board_set_hand_scroll_info(int visible, int offset, int total) {
+    hand_range_vis = visible;
+    hand_range_off = offset;
+    hand_range_total = total;
+}
+
+void _3ds_board_set_section_rect(float y0, float h, bool opponent) {
+    section_y0 = y0; section_h = h; (void)opponent;
+}
+
+int _3ds_board_get_zone_y(int zone_type) {
+    const float M = 2.0f;
+    float live_h = section_h * 0.18f;
+    float stage_h = section_h * 0.42f;
+    float energy_h = section_h * 0.08f;
+    float hand_h = section_h * 0.32f;
+    float live_y = section_y0;
+    float stage_y = live_y + live_h + 1;
+    float energy_y = stage_y + stage_h + 1;
+    float hand_y = energy_y + energy_h + 1;
+    switch (zone_type) {
+        case 0: return (int)live_y;
+        case 1: return (int)stage_y;
+        case 2: return (int)energy_y;
+        case 3: return (int)hand_y;
+        default: return 0;
+    }
+}
+
+int _3ds_board_get_zone_h(int zone_type) {
+    float live_h = section_h * 0.18f;
+    float stage_h = section_h * 0.42f;
+    float energy_h = section_h * 0.08f;
+    float hand_h = section_h * 0.32f;
+    switch (zone_type) {
+        case 0: return (int)live_h;
+        case 1: return (int)stage_h;
+        case 2: return (int)energy_h;
+        case 3: return (int)hand_h;
+        default: return 0;
+    }
+}
+
 // ---- Atlas cache ----
 C2D_Image _3ds_get_card_image(const char* atlas_name, int index) {
     C2D_Image empty = {0};
@@ -285,9 +334,20 @@ void _3ds_draw_card_at(CardSlot* slot, float x, float y, float w, float h) {
         return;
     }
 
-    float sx = w / (float)img.subtex->width;
-    float sy = h / (float)img.subtex->height;
-    C2D_DrawImageAt(img, x, y, 0.5f, NULL, sx, sy);
+    float scale = (w / (float)img.subtex->width) < (h / (float)img.subtex->height)
+        ? (w / (float)img.subtex->width)
+        : (h / (float)img.subtex->height);
+    float dw = (float)img.subtex->width * scale;
+    float dh = (float)img.subtex->height * scale;
+    float cx = x + (w - dw) * 0.5f;
+    float cy = y + (h - dh) * 0.5f;
+
+    if (slot->flipped) {
+        // Render upside-down: position at the bottom-right of the bounding box
+        C2D_DrawImageAt(img, cx + dw, cy + dh, 0.5f, NULL, -scale, -scale);
+    } else {
+        C2D_DrawImageAt(img, cx, cy, 0.5f, NULL, scale, scale);
+    }
 
     if (slot->tapped) {
         _3ds_draw_rect(x, y, w, h, COL_TAPPED);
@@ -296,19 +356,34 @@ void _3ds_draw_card_at(CardSlot* slot, float x, float y, float w, float h) {
 
 static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent) {
     const float W = 320.0f, M = 2.0f;
+    const float PORTRAIT = 0.711f;
+    const float LANDSCAPE = 1.41f;
+
+    // Set flip flag on all slots when opponent (dual view: cards face each other)
+    for (int i = 0; i < 3; i++) { pb->stage[i].flipped = opponent; pb->live[i].flipped = opponent; }
+    for (int i = 0; i < MAX_SLOTS; i++) { pb->energy[i].flipped = opponent; pb->hand[i].flipped = opponent; }
+
     float live_h = h * 0.18f;
     float stage_h = h * 0.42f;
     float energy_h = h * 0.08f;
     float hand_h = h * 0.32f;
 
-    float live_y = y0;
-    float stage_y = live_y + live_h + 1;
-    float energy_y = stage_y + stage_h + 1;
-    float hand_y = energy_y + energy_h + 1;
+    float live_y, stage_y, energy_y, hand_y;
+    if (opponent) {
+        // Physical board: opponent zones reversed, drawn from bottom up
+        hand_y = y0;
+        energy_y = hand_y + hand_h + 1;
+        stage_y = energy_y + energy_h + 1;
+        live_y = stage_y + stage_h + 1;
+    } else {
+        live_y = y0;
+        stage_y = live_y + live_h + 1;
+        energy_y = stage_y + stage_h + 1;
+        hand_y = energy_y + energy_h + 1;
+    }
 
-    float st_slot_w = stage_h * 0.8f;
-    float st_slot_h = stage_h - 3;
-
+    float st_slot_h = stage_h - 4;
+    float st_slot_w = st_slot_h * PORTRAIT;
     float util_x = M + 3 * (st_slot_w + 2) + 5;
     float util_w = W - util_x - M;
 
@@ -316,11 +391,11 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent) {
     _3ds_draw_rect(M, live_y, W - 2 * M, live_h, COL_ZONE_BG);
     _3ds_draw_border(M, live_y, W - 2 * M, live_h, COL_PINK, 1);
     float lx = M + 3;
-    float live_slot_w = live_h > 20 ? 40 : 32;
-    float live_slot_h = live_h - 3;
+    float live_card_h = live_h - 4;
+    float live_slot_w = live_card_h * LANDSCAPE;
     for (int i = 0; i < 3; i++) {
-        _3ds_draw_rect(lx, live_y + 1, live_slot_w, live_slot_h, 0x33000000);
-        if (pb->live[i].active) _3ds_draw_card_at(&pb->live[i], lx, live_y + 1, live_slot_w, live_slot_h);
+        _3ds_draw_rect(lx, live_y + 1, live_slot_w, live_card_h, 0x33000000);
+        if (pb->live[i].active) _3ds_draw_card_at(&pb->live[i], lx, live_y + 1, live_slot_w, live_card_h);
         lx += live_slot_w + 2;
     }
 
@@ -357,23 +432,36 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent) {
     float ex = M + 2;
     float e_sz = energy_h - 4;
     for (int i = 0; i < pb->energy_count && i < MAX_SLOTS; i++) {
-        if (pb->energy[i].active) _3ds_draw_card_at(&pb->energy[i], ex, energy_y + 2, e_sz * 0.7f, e_sz);
-        else _3ds_draw_rect(ex, energy_y + 2, e_sz * 0.7f, e_sz, 0x33000000);
-        ex += e_sz * 0.7f + 1;
-        if (ex > W - M - e_sz) break;
+        float e_w = e_sz * PORTRAIT;
+        if (pb->energy[i].active) _3ds_draw_card_at(&pb->energy[i], ex, energy_y + 2, e_w, e_sz);
+        else _3ds_draw_rect(ex, energy_y + 2, e_w, e_sz, 0x33000000);
+        ex += e_w + 1;
+        if (ex > W - M - e_w) break;
     }
 
     // === HAND ===
     _3ds_draw_rect(M, hand_y, W - 2 * M, hand_h, COL_ZONE_BG);
     _3ds_draw_border(M, hand_y, W - 2 * M, hand_h, COL_TEXT, 1);
     float hx = M + 2;
-    float h_slot_w = hand_h * 0.65f;
-    float h_slot_h = hand_h - 3;
+    float hand_card_h = hand_h - 4;
+    float h_slot_w = hand_card_h * PORTRAIT;
     for (int i = 0; i < pb->hand_count && i < MAX_SLOTS; i++) {
-        if (pb->hand[i].active) _3ds_draw_card_at(&pb->hand[i], hx, hand_y + 1, h_slot_w, h_slot_h);
-        hx += h_slot_w + 1;
+        if (pb->hand[i].active) _3ds_draw_card_at(&pb->hand[i], hx, hand_y + 2, h_slot_w, hand_card_h);
+        hx += h_slot_w + 2;
         if (hx > W - M - h_slot_w) break;
     }
+    // Hand scroll indicator: ◀/▶ arrows + range "off+1-off+vis/total"
+    // Shown at the right side of the hand zone, above any overflow
+    float range_x = W - M - 60;
+    float range_y = hand_y + 2;
+    char rbuf[48];
+    int show = hand_range_off + 1;
+    int show_end = (hand_range_off + hand_range_vis).min(hand_range_total);
+    snprintf(rbuf, sizeof(rbuf), "%s%d-%d/%d%s",
+        hand_range_off > 0 ? "<" : " ",
+        show, show_end, hand_range_total,
+        show_end < hand_range_total ? ">" : " ");
+    _3ds_draw_label(rbuf, range_x, range_y, COL_GOLD, 0.45f);
 }
 
 void _3ds_render_board() {
@@ -384,20 +472,39 @@ void _3ds_render_board() {
         // === DUAL MODE: opponent top, player bottom ===
         float half = 114.0f;
         float div_y = half + 2;
+        _3ds_board_set_section_rect(2, half, true);
         draw_section(&o_board, 2, half, true);
         _3ds_draw_rect(0, div_y, 320, 4, COL_ZONE_BDR);
+        _3ds_board_set_section_rect(div_y + 4, 240 - div_y - 4, false);
         draw_section(&p_board, div_y + 4, 240 - div_y - 4, false);
     } else if (board_view == 1) {
         // === OPPONENT ONLY ===
+        _3ds_board_set_section_rect(0, 240, true);
         draw_section(&o_board, 0, 240, true);
     } else {
         // === PLAYER ONLY ===
+        _3ds_board_set_section_rect(0, 240, false);
         draw_section(&p_board, 0, 240, false);
     }
 
-    // View indicator
+    // View indicator + hand range (3 lines in bottom-right corner)
     const char* view_label = board_view == 0 ? "YOU" : (board_view == 1 ? "OPP" : "BOTH");
-    _3ds_draw_label(view_label, 280, 230, COL_GOLD, 0.5f);
+    _3ds_draw_label(view_label, 280, 220, COL_GOLD, 0.5f);
+    char hbuf[20];
+    snprintf(hbuf, sizeof(hbuf), "%d-%d/%d",
+        hand_range_off + 1,
+        (hand_range_off + hand_range_vis).min(hand_range_total),
+        hand_range_total);
+    _3ds_draw_label(hbuf, 280, 210, COL_TEXT, 0.4f);
+    // Arrow line
+    if (hand_range_off > 0 && (hand_range_off + hand_range_vis) < hand_range_total) {
+        _3ds_draw_label("< >", 280, 202, COL_GOLD, 0.4f);
+    } else if (hand_range_off > 0) {
+        _3ds_draw_label("<", 280, 202, COL_GOLD, 0.4f);
+    } else if ((hand_range_off + hand_range_vis) < hand_range_total) {
+        _3ds_draw_label(">", 280, 202, COL_GOLD, 0.4f);
+    }
+}
 }
 
 // ---- Main render ----
@@ -462,6 +569,23 @@ void _3ds_scan_input() {
 
 u32 _3ds_keys_down() {
     return hidKeysDown();
+}
+
+u32 _3ds_keys_held() {
+    return hidKeysHeld();
+}
+
+void _3ds_touch_read(u32* px, u32* py) {
+    touchPosition t;
+    hidTouchRead(&t);
+    *px = t.px;
+    *py = t.py;
+}
+
+bool _3ds_touch_down() {
+    touchPosition t;
+    hidTouchRead(&t);
+    return t.px != 0 || t.py != 0;
 }
 
 u64 _3ds_system_tick() {
