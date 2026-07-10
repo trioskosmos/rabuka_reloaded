@@ -76,6 +76,7 @@ impl AbilityResolver {
                 if let Some(ref trig) = trigger {
                     let matching: Vec<&crate::card::Ability> = abilities
                         .iter()
+                        .map(|a| &**a)
                         .filter(|a| {
                             let at = a
                                 .triggers

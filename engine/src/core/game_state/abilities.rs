@@ -55,7 +55,7 @@ impl GameState {
         &self,
         card_no: String,
         ability_index: usize,
-        ability: crate::card::Ability,
+        ability: std::sync::Arc<crate::card::Ability>,
         card_id: Option<i16>,
         player_id: String,
         trigger_type: AbilityTrigger,
@@ -727,7 +727,7 @@ impl GameState {
                                             let entry = self.build_ability_queue_entry(
                                                 card_no.clone(),
                                                 10000 + gidx,
-                                                gained_ability.clone(),
+                                                std::sync::Arc::new(gained_ability.clone()),
                                                 Some(card_id_val),
                                                 player_id.clone(),
                                                 trigger_type,
@@ -2231,6 +2231,7 @@ impl GameState {
     ) -> Vec<&'a crate::card::Ability> {
         card.abilities
             .iter()
+            .map(|a| &**a)
             .filter(|ability| {
                 // Skip abilities with null triggers - they should not auto-trigger during any phase
                 if ability.triggers.is_none() {

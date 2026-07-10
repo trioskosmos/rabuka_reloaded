@@ -195,7 +195,7 @@ impl super::TurnEngine {
 
         struct AbilityActivation {
             idx: usize,
-            ability: crate::card::Ability,
+            ability: std::sync::Arc<crate::card::Ability>,
             loc: Zone,
         }
 
@@ -293,7 +293,7 @@ impl super::TurnEngine {
                                 .as_ref()
                                 .is_some_and(|t| t == crate::triggers::ACTIVATION)
                         })
-                        .map(|(i, a)| (i, a.clone()))
+                        .map(|(i, a)| (i, std::sync::Arc::new(a.clone())))
                 })
             {
                 if player.stage.stage.iter().any(|&id| id == card_id) {

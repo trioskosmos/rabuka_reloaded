@@ -1,6 +1,7 @@
 use crate::ability::enums::{ActionType, Zone};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum CardType {
@@ -167,7 +168,7 @@ pub struct Card {
     pub special_heart: Option<SpecialHeart>,
     // Parsed abilities from abilities.json
     #[serde(skip)]
-    pub abilities: Vec<Ability>,
+    pub abilities: Vec<Arc<Ability>>,
 }
 
 #[derive(Debug, Clone)]

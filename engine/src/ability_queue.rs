@@ -1,9 +1,49 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::ability::resolver::AbilityResolver;
 use crate::ability::types::Choice;
 use crate::card::{Ability, AbilityEffect};
 use crate::game_state::AbilityTrigger;
+
+/// Singleton empty ability shared by all dummy/padding queue entries.
+fn empty_ability() -> Arc<Ability> {
+    use std::sync::OnceLock;
+    static EMPTY: OnceLock<Arc<Ability>> = OnceLock::new();
+    EMPTY
+        .get_or_init(|| {
+            Arc::new(Ability {
+                full_text: String::new(),
+                triggerless_text: String::new(),
+                triggers: None,
+                use_limit: None,
+                is_null: false,
+                cost: None,
+                effect: None,
+                keywords: None,
+            })
+        })
+        .clone()
+}
+
+/// Singleton null ability (is_null=true) for padding/constant-context entries.
+fn null_ability() -> Arc<Ability> {
+    use std::sync::OnceLock;
+    static NULL: OnceLock<Arc<Ability>> = OnceLock::new();
+    NULL.get_or_init(|| {
+        Arc::new(Ability {
+            full_text: String::new(),
+            triggerless_text: String::new(),
+            triggers: None,
+            use_limit: None,
+            is_null: true,
+            cost: None,
+            effect: None,
+            keywords: None,
+        })
+    })
+    .clone()
+}
 
 /// Unique identifier for an ability instance in the queue
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,7 +78,7 @@ pub struct AbilityQueueEntry {
     pub id: AbilityId,
     pub card_no: String,
     pub player_id: String,
-    pub ability: Ability,
+    pub ability: Arc<Ability>,
     pub ability_index: usize,
     pub card_id: Option<i16>,
     pub trigger_type: AbilityTrigger,
@@ -254,16 +294,7 @@ impl AbilityQueue {
                     id: AbilityId::new("", 0, "choice"),
                     card_no: String::new(),
                     player_id: String::new(),
-                    ability: Ability {
-                        full_text: String::new(),
-                        triggerless_text: String::new(),
-                        triggers: None,
-                        use_limit: None,
-                        is_null: false,
-                        cost: None,
-                        effect: None,
-                        keywords: None,
-                    },
+                    ability: empty_ability(),
                     ability_index: 0,
                     card_id: None,
                     trigger_type: AbilityTrigger::Auto,
@@ -356,16 +387,7 @@ impl AbilityQueue {
             id: AbilityId::new("", 0, "const_eval"),
             card_no: String::new(),
             player_id,
-            ability: Ability {
-                full_text: String::new(),
-                triggerless_text: String::new(),
-                triggers: None,
-                use_limit: None,
-                is_null: true,
-                cost: None,
-                effect: None,
-                keywords: None,
-            },
+            ability: null_ability(),
             ability_index: 0,
             card_id: None,
             trigger_type: AbilityTrigger::Auto,
