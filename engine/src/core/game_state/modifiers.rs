@@ -986,6 +986,10 @@ impl GameState {
         // Track in the current batch + sync old fields (append, don't rebuild
         // from batch_movements — it accumulates across ability batches).
         self.batch_movements.push(event.clone());
+        // Card left the stage → its gained abilities no longer apply
+        if source_zone == "stage" && dest_zone != "stage" {
+            self.clear_gained_abilities_for_card(moved_card_id);
+        }
         let cards = self.recently_moved_cards.get_or_insert_with(Vec::new);
         cards.push(moved_card_id);
         self.recently_moved_from_zone = Some(source_zone.to_string());

@@ -431,6 +431,10 @@ impl AbilityResolver {
             for &card_id in &cards {
                 remove_card_from_any_zone(player, &mut gs.last_vacated_stage_area, card_id);
             }
+            // Card left any zone → clean up its gained abilities
+            for &card_id in &cards {
+                gs.clear_gained_abilities_for_card(card_id);
+            }
             return Ok(cards);
         }
         if source_str == "looked_at_remaining" {
@@ -1091,6 +1095,10 @@ impl AbilityResolver {
                                 &mut gs.last_vacated_stage_area,
                                 card_id,
                             );
+                        }
+                        // Card left any zone → clean up its gained abilities
+                        for &card_id in &taken {
+                            gs.clear_gained_abilities_for_card(card_id);
                         }
                         Ok(taken)
                     }

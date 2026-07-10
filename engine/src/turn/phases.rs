@@ -73,9 +73,8 @@ impl super::TurnEngine {
                     tdbg!("PHASE_ACTIVE:0");
                     game_state.reset_keyword_tracking();
                     tdbg!("PHASE_ACTIVE:1 reset_keyword_tracking OK");
-                    tdbg!("PHASE_ACTIVE:1b calling recalc_full...");
-                    game_state.recalculate_constants();
-                    tdbg!("PHASE_ACTIVE:2 recalculate_constants OK");
+                    // recalculate_constants skipped — check_timing at the end of
+                    // this block calls it internally.
                     // Q135: Weighed members become active during the active phase (7.4.1).
                     // Rule 7.4.1: Only the turn player activates their wait cards.
                     // Q180: "cannot_activate_by_effect" restrictions (e.g. PL!-pb1-009-R 矢澤にこ
@@ -129,9 +128,7 @@ impl super::TurnEngine {
                     tdbg!("PHASE_ACTIVE:DONE");
                 }
                 Phase::Energy => {
-                    tdbg!("PHASE_ENERGY:0 recalc");
-                    game_state.recalculate_constants();
-                    tdbg!("PHASE_ENERGY:1 OK");
+                    tdbg!("PHASE_ENERGY:0");
                     let _drawn_card = game_state.active_player_mut().draw_energy();
                     Self::check_timing(game_state);
                     Self::log_phase(game_state, "phase_draw");
@@ -140,17 +137,13 @@ impl super::TurnEngine {
                 Phase::Draw => {
                     Self::check_timing(game_state);
                     let _drawn = game_state.active_player_mut().draw_card();
-                    tdbg!("PHASE_DRAW:0 recalc");
-                    game_state.recalculate_constants();
-                    tdbg!("PHASE_DRAW:1 OK");
+                    // recalculate_constants skipped — check_timing below calls it
                     Self::check_timing(game_state);
                     Self::log_phase(game_state, "phase_main");
                     game_state.current_phase = Phase::Main;
                 }
                 Phase::Main => {
-                    tdbg!("PHASE_MAIN:0 recalc");
-                    game_state.recalculate_constants();
-                    tdbg!("PHASE_MAIN:1 OK");
+                    tdbg!("PHASE_MAIN:0");
                     Self::check_timing(game_state);
                     if game_state.current_turn_phase
                         == crate::game_state::TurnPhase::FirstAttackerNormal
@@ -178,9 +171,7 @@ impl super::TurnEngine {
                 Phase::LiveCardSetSecondAttacker => {
                     game_state.player1.live_card_set_limit_reduction = 0;
                     game_state.player2.live_card_set_limit_reduction = 0;
-                    tdbg!("PHASE_LIVE:0 recalc");
-                    game_state.recalculate_constants();
-                    tdbg!("PHASE_LIVE:1 recalc OK");
+                    tdbg!("PHASE_LIVE:0");
                     Self::check_timing(game_state);
                     Self::log_phase(game_state, "phase_performance_first");
                     game_state.current_phase = Phase::FirstAttackerPerformance;
@@ -816,13 +807,13 @@ impl super::TurnEngine {
         game_state.clear_baton_touch_tracking();
 
         let card_db = game_state.card_database.clone();
-        let mods = game_state.mods.clone();
 
         // Recalculate constant cost modifiers (hand-based cost reductions, etc.)
         // BEFORE paying cost, so the modifiers are in effect.
         tdbg!("PHASE_EXEC:0 recalc");
         game_state.recalculate_constants();
         tdbg!("PHASE_EXEC:1 recalc OK");
+        let mods = game_state.mods.clone();
 
         let player = game_state.active_player_mut();
         let idx = if let Some(cid) = card_id {

@@ -22,9 +22,10 @@ fn run_game_to_completion(gs: &mut GameState) -> u64 {
     let mut actions = 0u64;
     let mut last_turn = 0u32;
     let mut stuck = 0u32;
-    let mut stuck_phase = String::new();
+    let mut iterations = 0u32;
 
     for _ in 0..2000 {
+        iterations += 1;
         TurnEngine::check_victory_condition(gs);
         if gs.game_result != GameResult::Ongoing {
             break;
@@ -32,7 +33,6 @@ fn run_game_to_completion(gs: &mut GameState) -> u64 {
         if gs.turn_number == last_turn {
             stuck += 1;
             if stuck > 300 {
-                stuck_phase = format!("{:?}", gs.current_phase);
                 break;
             }
         } else {
@@ -83,27 +83,32 @@ fn run_game_to_completion(gs: &mut GameState) -> u64 {
         );
         actions += 1;
     }
-    if stuck > 300 {
-        eprintln!(
-            "  [stuck] turn={} phase={:?} p1_live={} p2_live={} p1_stage={:?} p2_stage={:?}",
-            gs.turn_number,
-            gs.current_phase,
-            gs.player1.success_live_card_zone.cards.len(),
-            gs.player2.success_live_card_zone.cards.len(),
-            gs.player1.stage.stage,
-            gs.player2.stage.stage,
-        );
-    }
-    if gs.game_result == GameResult::Draw {
-        eprintln!(
-            "  [loop] turn={} phase={:?} p1_live={} p2_live={} p1_stage={:?} p2_stage={:?}",
-            gs.turn_number,
-            gs.current_phase,
-            gs.player1.success_live_card_zone.cards.len(),
-            gs.player2.success_live_card_zone.cards.len(),
-            gs.player1.stage.stage,
-            gs.player2.stage.stage,
-        );
+    if gs.game_result != GameResult::Ongoing || stuck > 300 || iterations >= 2000 {
+        let tag = if gs.game_result == GameResult::Draw {
+            "loop"
+        } else if stuck > 300 {
+            "stuck"
+        } else if iterations >= 2000 {
+            "timeout"
+        } else {
+            "finished"
+        };
+        if tag != "finished" {
+            eprintln!(
+                "  [{}] turn={} phase={:?} p1_live={} p2_live={} p1_stage={:?} p2_stage={:?} p1_hand={} p2_hand={} iter={} act={}",
+                tag,
+                gs.turn_number,
+                gs.current_phase,
+                gs.player1.success_live_card_zone.cards.len(),
+                gs.player2.success_live_card_zone.cards.len(),
+                gs.player1.stage.stage,
+                gs.player2.stage.stage,
+                gs.player1.hand.cards.len(),
+                gs.player2.hand.cards.len(),
+                iterations,
+                actions,
+            );
+        }
     }
     actions
 }
