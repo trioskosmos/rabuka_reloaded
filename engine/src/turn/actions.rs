@@ -30,6 +30,7 @@ impl super::TurnEngine {
         stage_area: Option<crate::zones::MemberArea>,
         use_baton_touch: Option<bool>,
     ) -> Result<(), String> {
+        let _timer = crate::timer::Timer::start("execute_main_phase_action");
         // UseAbility must check activation legality independently — never
         // route through resume_with_choice, even when another ability's choice
         // is pending (e.g. a debut look-and-select from play_to_stage).
@@ -1008,6 +1009,7 @@ impl super::TurnEngine {
     }
 
     pub fn check_timing(game_state: &mut GameState) {
+        let _timer = crate::timer::Timer::start("check_timing");
         tdbg!("CHECK_TIMING:0");
         game_state.player1.refresh();
         tdbg!("CHECK_TIMING:1 p1.refresh OK");
@@ -1113,15 +1115,13 @@ impl super::TurnEngine {
     /// captures which cards moved where, enabling "from live_card_zone to
     /// discard" conditions.
     fn check_invalid_live_cards(game_state: &mut GameState, player_id: &str) {
-        let p1_id = game_state.player1.id.clone();
-        let p2_id = game_state.player2.id.clone();
-        if player_id != p1_id && player_id != p2_id {
+        if player_id != game_state.player1.id && player_id != game_state.player2.id {
             return;
         }
         // Two-pass: collect invalid IDs via immutable borrow, then mutate.
         // Avoids cloning the entire CardDatabase each call.
         let invalids: Vec<(usize, i16, bool)> = {
-            let player = if player_id == p1_id {
+            let player = if player_id == game_state.player1.id {
                 &game_state.player1
             } else {
                 &game_state.player2
@@ -1146,7 +1146,7 @@ impl super::TurnEngine {
         }
         let mut moved = Vec::new();
         for &(i, card_id, is_energy) in invalids.iter().rev() {
-            let player = if player_id == p1_id {
+            let player = if player_id == game_state.player1.id {
                 &mut game_state.player1
             } else {
                 &mut game_state.player2

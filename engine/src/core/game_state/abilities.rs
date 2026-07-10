@@ -1107,6 +1107,7 @@ impl GameState {
     }
 
     pub fn process_pending_auto_abilities(&mut self, raw_player_id: &str) {
+        let _timer = crate::timer::Timer::start("process_pending_auto_abilities");
         let active_player_id = match raw_player_id {
             "player1" => "p1",
             "player2" => "p2",

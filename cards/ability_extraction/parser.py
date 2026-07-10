@@ -85,6 +85,8 @@ from parser_utils import (
     CARD_TYPE_PATTERNS,
     OPERATOR_PATTERNS,
     PriorityRegistry,
+    ActionRule,
+    EffectPattern,
 )
 
 # ============== CONFIGURATION CONSTANTS ==============
@@ -1955,8 +1957,11 @@ def parse_action(text: str) -> Dict[str, Any]:
 
     _R = []
 
-    def R(cond, act, setter=None):
-        _R.append((cond, act, setter))
+    def R(cond, act=None, setter=None):
+        if isinstance(cond, ActionRule):
+            _R.append(cond)
+        else:
+            _R.append((cond, act, setter))
 
     R(
         lambda t: "シャッフルする" in t
@@ -2094,112 +2099,133 @@ def parse_action(text: str) -> Dict[str, Any]:
         lambda t, a: a.update({"activation_type": "pay_to_activate"}),
     )
     R(
-        "ライブできない",
-        "restriction",
-        lambda t, a: a.update(
-            {
-                "restriction_type": "cannot_live",
-                "target": "self"
-                if "自分" in t
-                else "both"
-                if "自分と相手" in t or "お互い" in t
-                else "opponent"
-                if "相手" in t
+        ActionRule(
+            match="ライブできない",
+            action="restriction",
+            setter=lambda t, a: a.update(
+                {
+                    "restriction_type": "cannot_live",
+                    "target": "self"
+                    if "自分" in t
+                    else "both"
+                    if "自分と相手" in t or "お互い" in t
+                    else "opponent"
+                    if "相手" in t
+                    else None,
+                }
+            ),
+        )
+    )
+    R(
+        ActionRule(
+            match="アクティブにしない",
+            action="restriction",
+            setter=lambda t, a: a.update(
+                {
+                    "restriction_type": "cannot_activate",
+                    "target": "opponent"
+                    if "相手" in t
+                    else "both"
+                    if "自分と相手" in t or "お互い" in t
+                    else "self"
+                    if "自分" in t
+                    else None,
+                    "phase": "active_phase" if "アクティブフェイズ" in t else None,
+                }
+            ),
+        )
+    )
+    R(
+        ActionRule(
+            condition=lambda t: "アクティブしない" in t
+            and "アクティブにしない" not in t,
+            action="restriction",
+            defaults={"restriction_type": "cannot_active", "delayed": True},
+        )
+    )
+    R(
+        ActionRule(
+            match="バトンタッチで控え室に置けない",
+            action="restriction",
+            defaults={"restriction_type": "cannot_baton_touch"},
+        )
+    )
+    R(
+        ActionRule(
+            match="置くことができない",
+            action="restriction",
+            setter=lambda t, a: a.update(
+                {
+                    "restriction_type": "cannot_place",
+                    "destination": _extract_place_restriction_destination(t),
+                }
+            ),
+        )
+    )
+    R(
+        ActionRule(
+            match="置けない",
+            action="restriction",
+            setter=lambda t, a: a.update(
+                {
+                    "restriction_type": "cannot_place",
+                    "destination": _extract_place_restriction_destination(t),
+                }
+            ),
+        )
+    )
+    R(
+        ActionRule(
+            match="登場できない",
+            action="restriction",
+            defaults={"restriction_type": "cannot_appear"},
+        )
+    )
+    R(
+        ActionRule(
+            match="移動できない",
+            action="restriction",
+            defaults={"restriction_type": "cannot_move"},
+        )
+    )
+    R(
+        ActionRule(
+            match_any=["加える", "加え"],
+            exclude_any=["選ぶ", "選び"],
+            action="move_cards",
+            defaults={"destination": "hand"},
+        )
+    )
+    R(
+        ActionRule(
+            match="ポジションチェンジ",
+            action="position_change",
+            setter=lambda t, a: (
+                a.update({"target": extract_target(t)}),
+                _handle_position_change_fields(t, a),
+                a.update({"destination": "front"}) if "正面" in t else None,
+                a.update({"target_member": "select"})
+                if "メンバー" in t and ("1人" in t or "N人" in t)
                 else None,
-            }
-        ),
+            )[-1],
+        )
     )
+    R(ActionRule(match_all=["移動させ", "エリア"], action="position_change"))
+    R(ActionRule(match="移動させ", exclude="エリア", action="move_cards"))
     R(
-        "アクティブにしない",
-        "restriction",
-        lambda t, a: a.update(
-            {
-                "restriction_type": "cannot_activate",
-                "target": "opponent"
-                if "相手" in t
-                else "both"
-                if "自分と相手" in t or "お互い" in t
-                else "self"
-                if "自分" in t
-                else None,
-                "phase": "active_phase" if "アクティブフェイズ" in t else None,
-            }
-        ),
+        ActionRule(
+            match_all=["エリアを移動", "ブレード"],
+            action="gain_resource",
+            setter=lambda t, a: a.update(
+                {
+                    "resource": "blade",
+                    "count": t.count("{{icon_blade.png|ブレード}}") or 1,
+                    "timing_condition": "moved_this_turn",
+                }
+            ),
+        )
     )
-    R(
-        lambda t: "アクティブしない" in t and "アクティブにしない" not in t,
-        "restriction",
-        lambda t, a: a.update({"restriction_type": "cannot_active", "delayed": True}),
-    )
-    R(
-        "バトンタッチで控え室に置けない",
-        "restriction",
-        lambda t, a: a.update({"restriction_type": "cannot_baton_touch"}),
-    )
-    R(
-        "置くことができない",
-        "restriction",
-        lambda t, a: a.update(
-            {
-                "restriction_type": "cannot_place",
-                "destination": _extract_place_restriction_destination(t),
-            }
-        ),
-    )
-    R(
-        "置けない",
-        "restriction",
-        lambda t, a: a.update(
-            {
-                "restriction_type": "cannot_place",
-                "destination": _extract_place_restriction_destination(t),
-            }
-        ),
-    )
-    R(
-        "登場できない",
-        "restriction",
-        lambda t, a: a.update({"restriction_type": "cannot_appear"}),
-    )
-    R(
-        "移動できない",
-        "restriction",
-        lambda t, a: a.update({"restriction_type": "cannot_move"}),
-    )
-    R(
-        lambda t: ("加える" in t or "加え" in t)
-        and "選ぶ" not in t
-        and "選び" not in t,
-        "move_cards",
-        lambda t, a: a.update({"destination": "hand"}),
-    )
-    R(
-        "ポジションチェンジ",
-        "position_change",
-        lambda t, a: (
-            a.update({"target": extract_target(t)}),
-            _handle_position_change_fields(t, a),
-            a.update({"destination": "front"}) if "正面" in t else None,
-            a.update({"target_member": "select"})
-            if "メンバー" in t and ("1人" in t or "N人" in t)
-            else None,
-        )[-1],
-    )
-    R(lambda t: "移動させ" in t and "エリア" in t, "position_change", None)
-    R(lambda t: "移動させ" in t and "エリア" not in t, "move_cards", None)
-    R(
-        lambda t: "エリアを移動" in t
-        and ("{{icon_blade.png|ブレード}}" in t or "ブレードを得る" in t),
-        "gain_resource",
-        lambda t, a: a.update(
-            {
-                "resource": "blade",
-                "count": t.count("{{icon_blade.png|ブレード}}") or 1,
-                "timing_condition": "moved_this_turn",
-            }
-        ),
-    )
-    R(lambda t: "移動する" in t or "移動し" in t, "position_change", None)
+    R(ActionRule(match_any=["移動する", "移動し"], action="position_change"))
     R(
         lambda t: (
             ("置く" in t or "置いて" in t) or ("置き" in t and "置き場" not in t)
@@ -2231,6 +2257,18 @@ def parse_action(text: str) -> Dict[str, Any]:
             }
         ),
     )
+    # {{icon_all.png}} must come BEFORE {{heart}}+得る to correctly set heart_type:all
+    R(
+        ActionRule(
+            match="得る",
+            condition=lambda t: "{{icon_all.png" in t,
+            action="gain_resource",
+            defaults={"resource": "heart", "heart_type": "all"},
+            setter=lambda t, a: a.update(
+                {"count": t.count("{{icon_all.png|ハート}}") or None}
+            ),
+        )
+    )
     R(
         lambda t: ("{{heart" in t and "得る" in t)
         or bool(re.search(r"ハート.*得る", t))
@@ -2239,17 +2277,6 @@ def parse_action(text: str) -> Dict[str, Any]:
         lambda t, a: a.update(
             {
                 "resource": "heart",
-            }
-        ),
-    )
-    R(
-        lambda t: "{{icon_all.png" in t and "得る" in t,
-        "gain_resource",
-        lambda t, a: a.update(
-            {
-                "resource": "heart",
-                "heart_type": "all",
-                "count": t.count("{{icon_all.png|ハート}}") or None,
             }
         ),
     )
@@ -2349,70 +2376,88 @@ def parse_action(text: str) -> Dict[str, Any]:
             else (a.update({"lose_blade_hearts": True}),),
         ),
     )
-    R("以下から1つを選ぶ", "choice", None)
+    R(ActionRule(match="以下から1つを選ぶ", action="choice"))
     R(
-        lambda t: bool(re.search(r"数\d*つを選ぶ", t)),
-        "select_number",
-        None,
-    )
-    R(
-        lambda t: "選ぶ" in t or "選び" in t or bool(re.search(r"選ん(?!だ)", t)),
-        "select",
-        lambda t, a: a.update(
-            {"heart_colors": [m.group(1) for m in re.finditer(r"\|(heart\d{2})}", t)]}
+        ActionRule(
+            condition=lambda t: bool(re.search(r"数\d*つを選ぶ", t)),
+            action="select_number",
         )
-        if not a.get("source") and not a.get("card_type") and "{{heart_" in t
-        else None,
     )
     R(
-        lambda t: bool(re.search(r"ハート.*得る", t))
-        or ("選んだハート" in t and "になる" not in t),
-        "gain_resource",
-        None,
-    )
-    (
-        R(
-            lambda t: "登場させ" in t,
-            "move_cards",
-            lambda t, a: a.update({"destination": "stage"}),
-        ),
-    )
-    R(lambda t: "起動でき" in t or "起動して" in t, "activate_ability", None)
-    R(lambda t: "無効に" in t, "invalidate_ability", None)
-    R(
-        lambda t: "能力は発動しない" in t,
-        "suppress_ability_trigger",
-        lambda t, a: a.update(
-            {
-                "suppressed_trigger": (
-                    m.group(1)
-                    if (m := re.search(r"\{\{(\w+)\.png\|", t[: t.find("能力")]))
-                    else None
-                ),
-            }
-        ),
+        ActionRule(
+            condition=lambda t: "選ぶ" in t
+            or "選び" in t
+            or bool(re.search(r"選ん(?!だ)", t)),
+            action="select",
+            setter=lambda t, a: a.update(
+                {
+                    "heart_colors": [
+                        m.group(1) for m in re.finditer(r"\|(heart\d{2})}", t)
+                    ]
+                }
+            )
+            if not a.get("source") and not a.get("card_type") and "{{heart_" in t
+            else None,
+        )
     )
     R(
-        lambda t: "必要ハート" in t or "ハートを増やす" in t or "ハートを減らす" in t,
-        "modify_required_hearts",
-        None,
+        ActionRule(
+            condition=lambda t: bool(re.search(r"ハート.*得る", t))
+            or ("選んだハート" in t and "になる" not in t),
+            action="gain_resource",
+        )
     )
     R(
-        lambda t: "追加" in t and "エール" not in t,
-        "modify_score",
-        lambda t, a: a.update({"operation": "add"}),
+        ActionRule(
+            match="登場させ", action="move_cards", defaults={"destination": "stage"}
+        )
+    )
+    R(ActionRule(match_any=["起動でき", "起動して"], action="activate_ability"))
+    R(ActionRule(match="無効に", exclude="無効にできない", action="invalidate_ability"))
+    R(
+        ActionRule(
+            match="能力は発動しない",
+            action="suppress_ability_trigger",
+            setter=lambda t, a: a.update(
+                {
+                    "suppressed_trigger": (
+                        m.group(1)
+                        if (m := re.search(r"\{\{(\w+)\.png\|", t[: t.find("能力")]))
+                        else None
+                    ),
+                }
+            ),
+        )
     )
     R(
-        lambda t: "スコアを1プラス" in t or "スコアをプラス" in t,
-        "modify_score",
-        lambda t, a: a.update({"operation": "add", "value": 1}),
+        ActionRule(
+            match_any=["必要ハート", "ハートを増やす", "ハートを減らす"],
+            action="modify_required_hearts",
+        )
     )
     R(
-        "スコアを1マイナス",
-        "modify_score",
-        lambda t, a: a.update({"operation": "remove", "value": 1}),
+        ActionRule(
+            match="追加",
+            exclude="エール",
+            action="modify_score",
+            defaults={"operation": "add"},
+        )
     )
-    R("ブレードの色を", "set_blade_type", None)
+    R(
+        ActionRule(
+            match_any=["スコアを1プラス", "スコアをプラス"],
+            action="modify_score",
+            defaults={"operation": "add", "value": 1},
+        )
+    )
+    R(
+        ActionRule(
+            match="スコアを1マイナス",
+            action="modify_score",
+            defaults={"operation": "remove", "value": 1},
+        )
+    )
+    R(ActionRule(match="ブレードの色を", action="set_blade_type"))
     # "ハートをすべてheartXXにする" → set all hearts to specific color (not player choice)
     R(
         lambda t: (
@@ -2485,57 +2530,66 @@ def parse_action(text: str) -> Dict[str, Any]:
         lambda t, a: _handle_cost_modification(t, a),
     )
     R(
-        lambda t: "繰り返してもよい" in t,
-        "repeat_procedure",
-        lambda t, a: (
-            a.update({"max_repeats": int(re.search(r"(\d+)回", t).group(1))})  # type: ignore
-            if re.search(r"(\d+)回", t)
-            else None
-        ),
-    )
-    R("何もしない", "do_nothing", None)
-    R(lambda t: t.strip() == "", "do_nothing", None)
-    R(lambda t: "{{icon_energy.png|E}}" in t and "エネルギー" in t, "pay_energy", None)
-    R(
-        lambda t: "バトンタッチ" in t or "baton touch" in t.lower(),
-        "play_baton_touch",
-        None,
-    )
-    R("無効にできない", "invalidate_ability", lambda t, a: a.update({"optional": True}))
-
-    R(
-        lambda t: ("スコアは" in t or "スコアが" in t)
-        and ("になる" in t or "なった" in t or "なっている" in t),
-        "modify_score",
-        lambda t, a: (
-            a.update({"operation": "set"}),
-            a.update(
-                {
-                    "value": int(m.group(1)),
-                }
+        ActionRule(
+            match="繰り返してもよい",
+            action="repeat_procedure",
+            setter=lambda t, a: a.update(
+                {"max_repeats": int(re.search(r"(\d+)回", t).group(1))}
             )
-            if (m := re.search(r"(\d+).*(になる|なった|なっている)", t))
+            if re.search(r"(\d+)回", t)
             else None,
-        )[-1],
+        )
+    )
+    R(ActionRule(match="何もしない", action="do_nothing"))
+    R(ActionRule(condition=lambda t: t.strip() == "", action="do_nothing"))
+    R(
+        ActionRule(
+            match_all=["{{icon_energy.png|E}}", "エネルギー"], action="pay_energy"
+        )
+    )
+    R(ActionRule(match_any=["バトンタッチ", "baton touch"], action="play_baton_touch"))
+    R(
+        ActionRule(
+            match="無効にできない",
+            action="invalidate_ability",
+            defaults={"optional": True},
+        )
     )
     R(
-        lambda t: "スコアを" in t,
-        "modify_score",
-        lambda t, a: (_set_score_op(t, a), a)[-1],
+        ActionRule(
+            condition=lambda t: ("スコアは" in t or "スコアが" in t)
+            and ("になる" in t or "なった" in t or "なっている" in t),
+            action="modify_score",
+            setter=lambda t, a: (
+                a.update({"operation": "set"}),
+                a.update({"value": int(m.group(1))})
+                if (m := re.search(r"(\d+).*(になる|なった|なっている)", t))
+                else None,
+            )[-1],
+        )
     )
     R(
-        lambda t: "デッキの上に置き" in t or "デッキの上に置く" in t,
-        "move_cards",
-        lambda t, a: a.update(
-            {"destination": "deck_top", "placement_order": "any_order"}
-            if "好きな順番で" in t
-            else {"destination": "deck_top"}
-        ),
+        ActionRule(
+            match="スコアを",
+            action="modify_score",
+            setter=lambda t, a: (_set_score_op(t, a), a)[-1],
+        )
     )
     R(
-        lambda t: ("エール" in t and ("枚数" in t or "数" in t)),
-        "modify_yell_count",
-        None,
+        ActionRule(
+            match_any=["デッキの上に置き", "デッキの上に置く"],
+            action="move_cards",
+            setter=lambda t, a: a.update(
+                {"destination": "deck_top", "placement_order": "any_order"}
+                if "好きな順番で" in t
+                else {"destination": "deck_top"}
+            ),
+        )
+    )
+    R(
+        ActionRule(
+            match_all=["エール"], match_any=["枚数", "数"], action="modify_yell_count"
+        )
     )
     R(
         lambda t: "持つ" in t and "能力" in t and "得る" in t and "すべて" in t,
@@ -2578,70 +2632,85 @@ def parse_action(text: str) -> Dict[str, Any]:
         else None,
     )
     R(
-        lambda t: "ライブカードセットフェイズ" in t
-        and ("上限" in t or "枚数" in t)
-        and ("減る" in t or "減らす" in t),
-        "reduce_live_card_set_limit",
-        None,
+        ActionRule(
+            match_all=["ライブカードセットフェイズ", "減る"],
+            match_any=["上限", "枚数"],
+            action="reduce_live_card_set_limit",
+        )
     )
     R(
-        lambda t: ("セット" in t or "設定" in t) and "コスト" not in t,
-        "set_card_identity",
-        None,
+        ActionRule(
+            match_any=["セット", "設定"], exclude="コスト", action="set_card_identity"
+        )
     )
-    R("必要ハートを選ぶ", "choose_required_hearts", None)
+    R(ActionRule(match="必要ハートを選ぶ", action="choose_required_hearts"))
     R(
-        "好きな順番で",
-        "move_cards",
-        lambda t, a: a.update({"placement_order": "any_order"}),
-    )
-    R(
-        lambda t: "必要ハートを確認する時" in t
-        and "ALLブレード" in t
-        and "任意の色のハートとして扱う" in t,
-        "all_blade_timing",
-        lambda t, a: a.update(
-            {"timing": "check_required_hearts", "treat_as": "any_heart_color"}
-        ),
+        ActionRule(
+            match="好きな順番で",
+            action="move_cards",
+            defaults={"placement_order": "any_order"},
+        )
     )
     R(
-        lambda t: "すべての領域にあるこのカードは" in t and "として扱う" in t,
-        "set_card_identity",
-        lambda t, a: a.update(
-            {"identities": re.findall(r"『([^』]+)』", t) or None, "all_regions": True}
-        ),
+        ActionRule(
+            match_all=[
+                "必要ハートを確認する時",
+                "ALLブレード",
+                "任意の色のハートとして扱う",
+            ],
+            action="all_blade_timing",
+            defaults={"timing": "check_required_hearts", "treat_as": "any_heart_color"},
+        )
     )
     R(
-        lambda t: bool(re.search(r"追加で.*エール.*行", t)),
-        "perform_yell",
-        lambda t, a: a.update({"count": extract_count(t) or 1}),
+        ActionRule(
+            match_all=["すべての領域にあるこのカードは", "として扱う"],
+            action="set_card_identity",
+            setter=lambda t, a: a.update(
+                {
+                    "identities": re.findall(r"『([^』]+)』", t) or None,
+                    "all_regions": True,
+                }
+            ),
+        )
     )
     R(
-        lambda t: "代わりに" in t and "置く" in t and "場合" in t,
-        "conditional_alternative",
-        lambda t, a: a.update({"condition_text": t}),
+        ActionRule(
+            condition=lambda t: bool(re.search(r"追加で.*エール.*行", t)),
+            action="perform_yell",
+            setter=lambda t, a: a.update({"count": extract_count(t) or 1}),
+        )
     )
     R(
-        lambda t: bool(re.search(r"［[^］]+ハート］", t)),
-        "gain_resource",
-        lambda t, a: a.update(
-            {
-                "resource": "heart",
-                "heart_selection": True,
-                "heart_colors": [
-                    {
-                        "緑": "heart01",
-                        "赤": "heart02",
-                        "青": "heart03",
-                        "黄": "heart04",
-                        "紫": "heart05",
-                        "白": "heart06",
-                    }.get(re.search(r"［([^］]+)ハート］", t).group(1), "heart00")  # type: ignore
-                ]
-                if re.search(r"［([^］]+)ハート］", t)
-                else ["heart00"],
-            }
-        ),
+        ActionRule(
+            match_all=["代わりに", "置く", "場合"],
+            action="conditional_alternative",
+            setter=lambda t, a: a.update({"condition_text": t}),
+        )
+    )
+    R(
+        ActionRule(
+            condition=lambda t: bool(re.search(r"［[^］]+ハート］", t)),
+            action="gain_resource",
+            setter=lambda t, a: a.update(
+                {
+                    "resource": "heart",
+                    "heart_selection": True,
+                    "heart_colors": [
+                        {
+                            "緑": "heart01",
+                            "赤": "heart02",
+                            "青": "heart03",
+                            "黄": "heart04",
+                            "紫": "heart05",
+                            "白": "heart06",
+                        }.get(re.search(r"［([^］]+)ハート］", t).group(1), "heart00")
+                    ]
+                    if re.search(r"［([^］]+)ハート］", t)
+                    else ["heart00"],
+                }
+            ),
+        )
     )
 
     # Run dispatch
@@ -2681,25 +2750,31 @@ def parse_action(text: str) -> Dict[str, Any]:
             _fill_defaults(result, text)
             return result
     action["action"] = "custom"
-    for cond, act, setter in _R:
-        try:
-            if callable(cond):
-                try:
-                    match = cond(text, action)
-                except TypeError:
-                    match = cond(text)
-            else:
-                match = cond in text
-        except Exception:
-            match = False
-        if match:
-            action["action"] = act
-            if setter:
-                try:
-                    setter(text, action)
-                except Exception:
-                    pass
-            break
+    for entry in _R:
+        if isinstance(entry, ActionRule):
+            if entry.matches(text, action):
+                entry.apply(text, action)
+                break
+        else:
+            cond, act, setter = entry
+            try:
+                if callable(cond):
+                    try:
+                        match = cond(text, action)
+                    except TypeError:
+                        match = cond(text)
+                else:
+                    match = cond in text
+            except Exception:
+                match = False
+            if match:
+                action["action"] = act
+                if setter:
+                    try:
+                        setter(text, action)
+                    except Exception:
+                        pass
+                break
 
     _fill_defaults(action, text, _cached_source=source, _cached_dest=destination)
     return action
@@ -8044,31 +8119,12 @@ def _try_global_modifier(text):
     return None
 
 
-def _try_play_baton_touch(text):
-    """プレイに際し、バトンタッチしてもよい — play baton touch."""
-    if "プレイに際し" not in text or "バトンタッチ" not in text:
-        return None
-    result = {"text": text, "action": "play_baton_touch"}
-    m = re.search(r"(\d+)人のメンバーとバトンタッチ", text)
-    if m:
-        result["count"] = int(m.group(1))
-    return result
-
-
-def _try_lose_resource(text):
-    """を失う — lose/gain-negative resource effects (e.g. ブレードを失う)."""
-    if "を失う" not in text:
-        return None
-    # Defer to _try_re_yell when the text also contains a re-yell instruction
-    if "もう一度エールを行う" in text or "もう1度エールを行う" in text:
-        return None
-    result = {"text": text, "action": "gain_resource", "sign": "negative"}
-    # Detect what's being lost
+def _set_lose_resource_fields(text, result):
+    """Setter for lose_resource EffectPattern: detect resource, count, duration."""
     if "ブレード" in text:
         result["resource"] = "blade"
     elif "ハート" in text:
         result["resource"] = "heart"
-    # Count icons in the lost resource
     blade_count = len(re.findall(r"\{\{icon_blade\.png\|ブレード\}\}", text))
     if blade_count > 0:
         result["count"] = blade_count
@@ -8076,10 +8132,23 @@ def _try_lose_resource(text):
     if heart_count > 0:
         result["count"] = heart_count
         result["heart_colors"] = extract_heart_types(text)
-    # Duration
     if "ライブ終了時まで" in text:
         result["duration"] = "live_end"
-    return result
+
+
+_try_lose_resource = EffectPattern(
+    match="を失う",
+    exclude_any=["もう一度エールを行う", "もう1度エールを行う"],
+    action="gain_resource",
+    defaults={"sign": "negative"},
+    setter=_set_lose_resource_fields,
+)
+
+_try_play_baton_touch = EffectPattern(
+    match_all=["プレイに際し", "バトンタッチ"],
+    action="play_baton_touch",
+    extract={"count": r"(\d+)人のメンバーとバトンタッチ"},
+)
 
 
 def _try_duration_effect(text):
@@ -8284,18 +8353,16 @@ def _try_re_yell(text):
     return result
 
 
-def _try_energy_under_member(text):
-    """under_member source — energy placement."""
-    if "下に置かれているエネルギーカード" not in text:
-        return None
-    return {
-        "text": text,
-        "action": "place_energy_under_member",
+_try_energy_under_member = EffectPattern(
+    match="下に置かれているエネルギーカード",
+    action="place_energy_under_member",
+    defaults={
         "source": "under_member",
         "card_type": "energy_card",
         "energy_count": 1,
         "target_member": "this_member",
-    }
+    },
+)
 
 
 def _try_heart_choice(text):
@@ -9234,6 +9301,9 @@ def _normalize_effect_tree(effect, original_text=None):
 
     _enrich_characters(effect)
 
+    # Clean gain_resource nodes (remove inappropriate fields)
+    _clean_gain_resource(effect)
+
     return effect
 
 
@@ -9658,7 +9728,6 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
 
     fix_stats = {
         "movement": 0,
-        "heart_type": 0,
         "each_time": 0,
         "card_property": 0,
         "ability_filter": 0,
@@ -9806,14 +9875,6 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
         # --- 2. Targeted fixes logic ---
         t = ability.get("triggerless_text", "")
 
-        # FIX 1: heart_type:all — when gain_resource heart + icon_all in text
-        if eff.get("action") == "gain_resource" and eff.get("resource") == "heart":
-            if "{{icon_all.png|ハート}}" in (eff.get("text", "") or t or ""):
-                if not eff.get("heart_type"):
-                    eff["heart_type"] = "all"
-                    eff.pop("heart_colors", None)
-                    fix_stats["heart_type"] += 1
-
         # FIX 2: each_time sequential → conditional_on_optional
         if eff.get("trigger_type") == "each_time" and eff.get("action") == "sequential":
             acts = eff.get("actions", [])
@@ -9841,12 +9902,6 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 sub = eff.get(sub_key)
                 if isinstance(sub, dict):
                     sub.pop("optional", None)
-
-        # FIX 4: Clean gain_resource — remove inappropriate fields
-        _clean_gain_resource(eff)
-        cost = ability.get("cost")
-        if isinstance(cost, dict):
-            _clean_gain_resource(cost)
 
         # FIX 6: Flatten opponent_action wrappers
         if eff.get("opponent_action") and isinstance(eff["opponent_action"], dict):

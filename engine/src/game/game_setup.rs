@@ -277,6 +277,7 @@ fn make_params() -> ActionParameters {
 }
 
 pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
+    let _timer = crate::timer::Timer::start("generate_possible_actions");
     if let Some(choice) = game_state.get_pending_choice() {
         return generate_pending_choice_actions(game_state, choice);
     }
@@ -970,6 +971,7 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
 }
 
 fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
+    let _timer = crate::timer::Timer::start("generate_main_phase_actions");
     let active_player = game_state.active_player();
     let mut actions = vec![make_action(ActionType::Pass, "Pass - End Main Phase")];
 
@@ -1025,10 +1027,10 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                 .contains(&existing_member_id)
                             {
                                 // Check if existing member has cannot_baton_touch restriction
-                                let has_baton_touch_protection = game_state
-                                    .card_database
-                                    .get_card(existing_member_id)
-                                    .is_some_and(|existing_card| {
+                                let existing_member_card =
+                                    game_state.card_database.get_card(existing_member_id);
+                                let has_baton_touch_protection =
+                                    existing_member_card.as_ref().is_some_and(|existing_card| {
                                         existing_card.abilities.iter().any(|a| {
                                             a.effect.as_ref().is_some_and(|ef| {
                                                 if ef.restriction_type.as_deref()
@@ -1053,21 +1055,20 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                     });
 
                                 if !has_baton_touch_protection {
-                                    let member_cost = game_state
-                                        .card_database
-                                        .get_card(existing_member_id)
-                                        .and_then(|c| c.cost)
-                                        .unwrap_or(0);
-                                    let cost_to_pay = effective_cost.saturating_sub(member_cost);
-                                    if (active_energy_count as u32) >= cost_to_pay {
-                                        area_info.available = true;
-                                        area_info.cost = cost_to_pay;
-                                        area_info.is_baton_touch = true;
-                                        area_info.existing_member_name = game_state
-                                            .card_database
-                                            .get_card(existing_member_id)
-                                            .map(|c| c.name.clone());
-                                        has_any_available = true;
+                                    if let Some(existing_member_card) =
+                                        existing_member_card.as_ref()
+                                    {
+                                        let member_cost = existing_member_card.cost.unwrap_or(0);
+                                        let cost_to_pay =
+                                            effective_cost.saturating_sub(member_cost);
+                                        if (active_energy_count as u32) >= cost_to_pay {
+                                            area_info.available = true;
+                                            area_info.cost = cost_to_pay;
+                                            area_info.is_baton_touch = true;
+                                            area_info.existing_member_name =
+                                                Some(existing_member_card.name.clone());
+                                            has_any_available = true;
+                                        }
                                     }
                                 }
                             }
@@ -1088,38 +1089,39 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 
                     let (double_baton_pairs, any_double_baton_available) = if has_double_baton {
                         // Pre-compute which occupied areas have cannot_baton_touch protection
+                        let member_cards: [Option<&crate::card::Card>; 3] = [
+                            game_state.card_database.get_card(stage_card_ids[0]),
+                            game_state.card_database.get_card(stage_card_ids[1]),
+                            game_state.card_database.get_card(stage_card_ids[2]),
+                        ];
                         let cannot_baton_touch_protected: Vec<bool> = (0..3)
                             .map(|idx| {
                                 let member_id = stage_card_ids[idx];
                                 if member_id == -1 {
                                     return false;
                                 }
-                                game_state
-                                    .card_database
-                                    .get_card(member_id)
-                                    .is_some_and(|card| {
-                                        card.abilities.iter().any(|a| {
-                                            a.effect.as_ref().is_some_and(|ef| {
-                                                if ef.restriction_type.as_deref()
-                                                    != Some("cannot_baton_touch")
-                                                {
+                                member_cards[idx].as_ref().is_some_and(|card| {
+                                    card.abilities.iter().any(|a| {
+                                        a.effect.as_ref().is_some_and(|ef| {
+                                            if ef.restriction_type.as_deref()
+                                                != Some("cannot_baton_touch")
+                                            {
+                                                return false;
+                                            }
+                                            if let Some(ref exclude_groups) = ef.exclude_group_names
+                                            {
+                                                if crate::ability::util::card_matches_any_group(
+                                                    &game_state.card_database,
+                                                    *card_id,
+                                                    exclude_groups,
+                                                ) {
                                                     return false;
                                                 }
-                                                if let Some(ref exclude_groups) =
-                                                    ef.exclude_group_names
-                                                {
-                                                    if crate::ability::util::card_matches_any_group(
-                                                        &game_state.card_database,
-                                                        *card_id,
-                                                        exclude_groups,
-                                                    ) {
-                                                        return false;
-                                                    }
-                                                }
-                                                true
-                                            })
+                                            }
+                                            true
                                         })
                                     })
+                                })
                             })
                             .collect();
                         let occupied: Vec<(usize, &str, i16)> = [0, 1, 2]

@@ -25,5 +25,6 @@ pub mod ability;
 pub mod ability_queue;
 pub mod qa_test_suite;
 pub mod rng;
+pub mod timer;
 pub mod triggers;
 pub mod turn;

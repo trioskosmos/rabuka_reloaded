@@ -5,7 +5,8 @@ pattern lists, and normalization used across the parsing pipeline.
 """
 
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple, Callable
 
 # Precompiled regex patterns for performance
 DIGIT_PATTERN = re.compile(r"(\d+)")
@@ -928,3 +929,126 @@ def action_rule(registry: PriorityRegistry, priority: int, name: str = ""):
         return func
 
     return decorator
+
+
+@dataclass
+class ActionRule:
+    """Declarative action parsing rule: text pattern → action type + field defaults.
+
+    Usage:
+        ActionRule(match_any=["シャッフルする", "シャッフルして"], action="shuffle",
+                   defaults={"target": "deck"})
+        ActionRule(match="カードを1枚引いてもよい", action="draw_card",
+                   defaults={"count": 1, "optional": True})
+    """
+
+    action: str
+    match: str = ""  # simple substring check
+    match_any: List[str] = field(default_factory=list)  # any of these substrings
+    match_all: List[str] = field(default_factory=list)  # all of these substrings
+    exclude: str = ""  # exclude if this substring found
+    exclude_any: List[str] = field(
+        default_factory=list
+    )  # exclude if any of these found
+    defaults: Dict[str, Any] = field(default_factory=dict)  # fields to merge
+    extract: Dict[str, str] = field(default_factory=dict)  # field → regex
+    condition: Optional[Callable] = None  # complex predicate (text, action) → bool
+    setter: Optional[Callable] = None  # complex setter (text, action) → None
+    extract_optional: bool = False  # auto-detect optional from "もよい"
+
+    def matches(self, text: str, action: Dict = None) -> bool:
+        if self.match and self.match not in text:
+            return False
+        if self.match_any and not any(m in text for m in self.match_any):
+            return False
+        if self.match_all and not all(m in text for m in self.match_all):
+            return False
+        if self.exclude and self.exclude in text:
+            return False
+        if self.exclude_any and any(e in text for e in self.exclude_any):
+            return False
+        if self.condition and action is not None:
+            try:
+                if not self.condition(text, action):
+                    return False
+            except TypeError:
+                if not self.condition(text):
+                    return False
+            except Exception:
+                return False
+        return True
+
+    def apply(self, text: str, action: Dict) -> None:
+        action["action"] = self.action
+        action.update(self.defaults)
+        for field, pattern in self.extract.items():
+            m = re.search(pattern, text)
+            if m:
+                val = m.group(1)
+                action[field] = int(val) if val.isdigit() else val
+        if self.setter:
+            try:
+                self.setter(text, action)
+            except Exception:
+                pass
+        if self.extract_optional and ("もよい" in text or "してもよい" in text):
+            action["optional"] = True
+
+
+@dataclass
+class EffectPattern:
+    """Declarative effect parsing pattern: text pattern → effect dict.
+
+    An EffectPattern is callable with (text, ctx) → dict | None, making it
+    directly registerable in PriorityRegistry as a handler.
+
+    Usage:
+        EffectPattern(match="を失う", action="gain_resource",
+                      defaults={"sign": "negative"})
+    """
+
+    action: str
+    match: str = ""
+    match_any: List[str] = field(default_factory=list)
+    match_all: List[str] = field(default_factory=list)
+    exclude: str = ""
+    exclude_any: List[str] = field(default_factory=list)
+    defaults: Dict[str, Any] = field(default_factory=dict)
+    extract: Dict[str, str] = field(default_factory=dict)
+    condition: Optional[Callable] = None
+    setter: Optional[Callable] = None
+
+    def matches(self, text: str) -> bool:
+        if self.match and self.match not in text:
+            return False
+        if self.match_any and not any(m in text for m in self.match_any):
+            return False
+        if self.match_all and not all(m in text for m in self.match_all):
+            return False
+        if self.exclude and self.exclude in text:
+            return False
+        if self.exclude_any and any(e in text for e in self.exclude_any):
+            return False
+        if self.condition:
+            try:
+                return bool(self.condition(text))
+            except Exception:
+                return False
+        return True
+
+    def __call__(self, text: str, ctx: dict = None) -> Optional[Dict]:
+        if not self.matches(text):
+            return None
+        result: Dict = {"text": text, "action": self.action}
+        result.update(self.defaults)
+        for field, pattern in self.extract.items():
+            m = re.search(pattern, text)
+            if m:
+                val = m.group(1)
+                result[field] = int(val) if val.isdigit() else val
+        if self.setter:
+            try:
+                self.setter(text, result)
+            except Exception:
+                pass
+        return result

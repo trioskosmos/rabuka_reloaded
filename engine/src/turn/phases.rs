@@ -53,6 +53,7 @@ impl super::TurnEngine {
     }
 
     pub fn advance_phase(game_state: &mut GameState) {
+        let _timer = crate::timer::Timer::start("advance_phase");
         debug_assert!(
             game_state.phase_invariant(),
             "Phase invariant violated before advance_phase"
@@ -129,9 +130,6 @@ impl super::TurnEngine {
                     tdbg!("PHASE_ACTIVE:DONE");
                 }
                 Phase::Energy => {
-                    tdbg!("PHASE_ENERGY:0 recalc");
-                    game_state.recalculate_constants();
-                    tdbg!("PHASE_ENERGY:1 OK");
                     let _drawn_card = game_state.active_player_mut().draw_energy();
                     Self::check_timing(game_state);
                     Self::log_phase(game_state, "phase_draw");

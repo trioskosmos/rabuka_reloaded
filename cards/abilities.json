@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-10T01:40:50.080786",
+  "generated_at": "2026-07-10T12:07:35.622624",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -2205,7 +2205,10 @@
         "target_count": 1,
         "action": "gain_resource",
         "resource": "blade",
-        "same_name": true
+        "same_name": true,
+        "heart_colors": [
+          "heart04"
+        ]
       }
     },
     {
@@ -2948,9 +2951,9 @@
             },
             "action": "gain_resource",
             "resource": "heart",
+            "heart_type": "all",
             "count": 1,
-            "duration": "live_end",
-            "heart_type": "all"
+            "duration": "live_end"
           },
           {
             "text": "合計が25の場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する",
@@ -4049,9 +4052,9 @@
         },
         "action": "gain_resource",
         "resource": "heart",
+        "heart_type": "all",
         "count": 1,
         "duration": "live_end",
-        "heart_type": "all",
         "target": "self"
       }
     },
@@ -5757,9 +5760,14 @@
         },
         "action": "gain_resource",
         "resource": "heart",
+        "heart_type": "all",
         "count": 2,
         "duration": "live_end",
-        "heart_type": "all",
+        "heart_colors": [
+          "heart02",
+          "heart04",
+          "heart05"
+        ],
         "target": "self"
       }
     },
@@ -7137,7 +7145,10 @@
         "action": "gain_resource",
         "resource": "blade",
         "count": 2,
-        "position": "left_side"
+        "position": "left_side",
+        "heart_colors": [
+          "heart02"
+        ]
       }
     },
     {
@@ -15217,8 +15228,16 @@
         "conditional": true,
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1,
         "heart_type": "all",
+        "count": 1,
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06"
+        ],
         "target": "self"
       }
     },
@@ -26418,7 +26437,15 @@
         "action": "gain_resource",
         "resource": "blade",
         "count": 2,
-        "duration": "live_end"
+        "duration": "live_end",
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06"
+        ]
       }
     },
     {
@@ -26752,10 +26779,10 @@
         "card_type": "member_card",
         "action": "gain_resource",
         "resource": "heart",
+        "heart_type": "all",
         "count": 1,
         "duration": "live_end",
-        "trigger_type": "each_time",
-        "heart_type": "all"
+        "trigger_type": "each_time"
       }
     },
     {
@@ -27813,10 +27840,10 @@
         "position": "center",
         "action": "gain_resource",
         "resource": "heart",
+        "heart_type": "all",
         "count": 1,
         "duration": "live_end",
-        "group_reference": "different_group_names",
-        "heart_type": "all"
+        "group_reference": "different_group_names"
       }
     },
     {
@@ -28163,7 +28190,10 @@
         ],
         "target_count": 1,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "heart_colors": [
+          "heart01"
+        ]
       }
     },
     {

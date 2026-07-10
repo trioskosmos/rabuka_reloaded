@@ -80,7 +80,7 @@ fn run_game_to_completion(gs: &mut GameState) -> u64 {
 }
 
 fn main() {
-    let cards_path = std::path::Path::new("cards/cards.json");
+    let cards_path = std::path::Path::new("../cards/cards.json");
     let cards =
         card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
     let card_database = Arc::new(CardDatabase::load_or_create(cards));
@@ -131,4 +131,5 @@ fn main() {
     }
 
     eprintln!("Ran {} games, total actions: {}", num_games, total_actions);
+    rabuka_engine::timer::print_results();
 }

@@ -23,6 +23,7 @@ impl GameState {
     /// Clears old constant-derived values and re-applies those whose conditions pass.
     #[inline(never)]
     pub fn recalculate_constants(&mut self) {
+        let _timer = crate::timer::Timer::start("recalculate_constants");
         tdbg!("RC:0 ENTERED");
         // HANG WORKAROUND (3DS ARMv6K): AtomicBool::load uses 8-bit atomics
         // that may deadlock via Mutex fallback. Use a plain bool on GameState

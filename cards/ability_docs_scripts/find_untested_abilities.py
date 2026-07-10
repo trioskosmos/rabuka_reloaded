@@ -22,6 +22,18 @@ def safe_write(text, file_obj):
         file_obj.write(safe_text)
 
 
+def normalize_card_id(cid):
+    """Normalize a card ID to ASCII-only form for matching.
+
+    Handles:
+    - Full-width ＋ (U+FF0B) -> ASCII + (U+002B)
+    - Rust unicode escape sequences like \\u{ff0b}
+    """
+    cid = cid.replace("\uff0b", "+")
+    cid = re.sub(r"\\u\{([0-9a-fA-F]+)\}", lambda m: chr(int(m.group(1), 16)), cid)
+    return cid
+
+
 def load_abilities():
     abilities_file = Path(__file__).parent.parent / "abilities.json"
     with open(abilities_file, encoding="utf-8") as f:
@@ -30,7 +42,7 @@ def load_abilities():
 
 
 def scan_test_files():
-    """Scan all test files and collect every card ID referenced."""
+    """Scan all test files and collect every card ID referenced (normalized)."""
     test_dir = Path(__file__).parent.parent.parent / "engine" / "tests" / "test_modules"
     test_files = sorted(test_dir.glob("*.rs"))
 
@@ -47,20 +59,22 @@ def scan_test_files():
         test_funcs = re.findall(r"pub fn (\w+)\s*\(", content)
 
         for cid in all_ids:
-            card_to_tests[cid].append(
+            ncid = normalize_card_id(cid)
+            card_to_tests[ncid].append(
                 {
                     "file": tf.name,
                     "functions": test_funcs,
                 }
             )
-            all_tested_cards.add(cid)
+            all_tested_cards.add(ncid)
 
     return card_to_tests, all_tested_cards, test_files
 
 
 def extract_card_id(card_ref):
-    """Extract the card ID portion from a card reference string."""
-    return card_ref.split("|")[0].strip() if "|" in card_ref else card_ref.strip()
+    """Extract the card ID portion from a card reference string and normalize."""
+    cid = card_ref.split("|")[0].strip() if "|" in card_ref else card_ref.strip()
+    return normalize_card_id(cid)
 
 
 def main():
