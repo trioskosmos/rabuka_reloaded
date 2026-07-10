@@ -24,3 +24,4 @@ source_images/
 # 3DS card conversion intermediates (PNGs only — .t3x atlases are tracked)
 engine_3ds/romfs/cards/*.png
 
+output_3ds/
