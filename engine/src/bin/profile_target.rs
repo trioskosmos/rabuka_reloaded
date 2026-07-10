@@ -7,7 +7,6 @@ use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
-use std::io::Write;
 use std::sync::Arc;
 
 fn parse_stage_area(s: &str) -> Option<MemberArea> {
@@ -23,6 +22,7 @@ fn run_game_to_completion(gs: &mut GameState) -> u64 {
     let mut actions = 0u64;
     let mut last_turn = 0u32;
     let mut stuck = 0u32;
+    let mut stuck_phase = String::new();
 
     for _ in 0..2000 {
         TurnEngine::check_victory_condition(gs);
@@ -32,6 +32,7 @@ fn run_game_to_completion(gs: &mut GameState) -> u64 {
         if gs.turn_number == last_turn {
             stuck += 1;
             if stuck > 300 {
+                stuck_phase = format!("{:?}", gs.current_phase);
                 break;
             }
         } else {
@@ -39,17 +40,22 @@ fn run_game_to_completion(gs: &mut GameState) -> u64 {
             last_turn = gs.turn_number;
         }
 
-        match gs.current_phase {
-            Phase::Active
-            | Phase::Energy
-            | Phase::Draw
-            | Phase::FirstAttackerPerformance
-            | Phase::SecondAttackerPerformance
-            | Phase::LiveVictoryDetermination => {
-                TurnEngine::advance_phase(gs);
-                continue;
+        // If there's a pending choice, let the bot resolve it before auto-advancing.
+        // (Otherwise a LiveSuccess ability that creates a choice during
+        // LiveVictoryDetermination leaves it orphaned forever.)
+        if !gs.has_pending_choice() {
+            match gs.current_phase {
+                Phase::Active
+                | Phase::Energy
+                | Phase::Draw
+                | Phase::FirstAttackerPerformance
+                | Phase::SecondAttackerPerformance
+                | Phase::LiveVictoryDetermination => {
+                    TurnEngine::advance_phase(gs);
+                    continue;
+                }
+                _ => {}
             }
-            _ => {}
         }
 
         let action_list = game_setup::generate_possible_actions(gs);
@@ -76,6 +82,28 @@ fn run_game_to_completion(gs: &mut GameState) -> u64 {
             action.parameters.as_ref().and_then(|p| p.use_baton_touch),
         );
         actions += 1;
+    }
+    if stuck > 300 {
+        eprintln!(
+            "  [stuck] turn={} phase={:?} p1_live={} p2_live={} p1_stage={:?} p2_stage={:?}",
+            gs.turn_number,
+            gs.current_phase,
+            gs.player1.success_live_card_zone.cards.len(),
+            gs.player2.success_live_card_zone.cards.len(),
+            gs.player1.stage.stage,
+            gs.player2.stage.stage,
+        );
+    }
+    if gs.game_result == GameResult::Draw {
+        eprintln!(
+            "  [loop] turn={} phase={:?} p1_live={} p2_live={} p1_stage={:?} p2_stage={:?}",
+            gs.turn_number,
+            gs.current_phase,
+            gs.player1.success_live_card_zone.cards.len(),
+            gs.player2.success_live_card_zone.cards.len(),
+            gs.player1.stage.stage,
+            gs.player2.stage.stage,
+        );
     }
     actions
 }
@@ -110,7 +138,8 @@ fn main() {
     );
 
     let mut total_actions = 0u64;
-    let num_games = 50;
+    let mut outcomes: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    let num_games = 500;
     for _ in 0..num_games {
         let mut p1_deck = p1_template.clone();
         let mut p2_deck = p2_template.clone();
@@ -129,33 +158,28 @@ fn main() {
         let mut gs = GameState::new(player1, player2, Arc::clone(&card_database));
         game_setup::setup_game(&mut gs);
         total_actions += run_game_to_completion(&mut gs);
+        let label = match gs.game_result {
+            GameResult::FirstAttackerWins => "P1 wins".to_string(),
+            GameResult::SecondAttackerWins => "P2 wins".to_string(),
+            GameResult::Draw => "Draw (permanent loop)".to_string(),
+            GameResult::Ongoing => "Draw (stuck)".to_string(),
+        };
+        *outcomes.entry(label).or_insert(0) += 1;
     }
 
-    eprintln!("Ran {} games, total actions: {}", num_games, total_actions);
-    rabuka_engine::timer::print_results();
-
-    // Generate flamegraph SVG from timing data
-    let data = rabuka_engine::timer::get_data();
-    if !data.is_empty() {
-        // Convert to folded stack format: path;separated;functions <count>
-        let mut folded = Vec::new();
-        for (path, _calls, total_ns) in &data {
-            let count = (*total_ns / 1000).max(1); // use µs as count
-            writeln!(folded, "{} {}", path.join(";"), count).unwrap();
-        }
-        let folded_str = String::from_utf8(folded).unwrap();
-        let mut svg = Vec::new();
-        let mut opt = inferno::flamegraph::Options::default();
-        inferno::flamegraph::from_reader(&mut opt, folded_str.as_bytes(), &mut svg)
-            .expect("Failed to generate flamegraph");
-        let svg_path = std::path::Path::new("flamegraph.svg");
-        std::fs::write(svg_path, &svg).expect("Failed to write flamegraph.svg");
-        eprintln!();
-        eprintln!("Flamegraph saved to: {}", svg_path.display());
+    eprintln!(
+        "\nRan {} games, total actions: {}",
+        num_games, total_actions
+    );
+    eprintln!("\n=== Game Outcomes ===");
+    let mut sorted: Vec<_> = outcomes.into_iter().collect();
+    sorted.sort_by(|a, b| b.1.cmp(&a.1));
+    for (label, count) in &sorted {
         eprintln!(
-            "Open in a browser to view: file://{}/{}",
-            std::env::current_dir().unwrap_or_default().display(),
-            svg_path.display()
+            "  {:30} {:>5} ({:>4.1}%)",
+            label,
+            count,
+            *count as f64 / num_games as f64 * 100.0
         );
     }
 }

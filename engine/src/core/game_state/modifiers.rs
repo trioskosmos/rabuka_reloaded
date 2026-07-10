@@ -14,7 +14,7 @@ macro_rules! tdbg {
 }
 #[cfg(not(feature = "3ds"))]
 macro_rules! tdbg {
-    ($($arg:tt)*) => {};
+    ($($arg:tt)*) => {{ let _ = format!($($arg)*); }};
 }
 
 impl GameState {
@@ -23,7 +23,6 @@ impl GameState {
     /// Clears old constant-derived values and re-applies those whose conditions pass.
     #[inline(never)]
     pub fn recalculate_constants(&mut self) {
-        let _timer = crate::timer::Timer::start("recalculate_constants");
         tdbg!("RC:0 ENTERED");
         // HANG WORKAROUND (3DS ARMv6K): AtomicBool::load uses 8-bit atomics
         // that may deadlock via Mutex fallback. Use a plain bool on GameState
@@ -295,13 +294,24 @@ impl GameState {
                                         if tgt == "self" {
                                             // Per-card: only block this specific member
                                             let card_id_str = card_id.to_string();
-                                            self.constant_cannot_activate_members
-                                                .insert(card_id_str);
+                                            if !self
+                                                .constant_cannot_activate_members
+                                                .contains(&card_id_str)
+                                            {
+                                                self.constant_cannot_activate_members
+                                                    .push(card_id_str);
+                                            }
                                         } else {
                                             // Player-level: block all members of the target player
                                             let resolved =
                                                 self.resolve_target_player(tgt).id.clone();
-                                            self.constant_cannot_activate_members.insert(resolved);
+                                            if !self
+                                                .constant_cannot_activate_members
+                                                .contains(&resolved)
+                                            {
+                                                self.constant_cannot_activate_members
+                                                    .push(resolved);
+                                            }
                                         }
                                     }
                                     if rt == "cannot_live" {
@@ -488,9 +498,9 @@ impl GameState {
             // Restore the previous activating_card
             self.activating_card = prev_activating;
         }
-        let _jyouji_len = jyouji_statuses.len();
+        let jyouji_len = jyouji_statuses.len();
         self.constant_ability_statuses = jyouji_statuses;
-        tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
+        tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", jyouji_len);
 
         // Blade
         tdbg!("RC:7 BLADE");
