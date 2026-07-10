@@ -2,9 +2,10 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::Instant;
 
-static TIMERS: Mutex<Option<HashMap<&'static str, (u64, u128)>>> = Mutex::new(None);
+static TIMERS: Mutex<Option<HashMap<Vec<&'static str>, (u64, u128)>>> = Mutex::new(None);
+static CALL_STACK: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
 
-fn get_timers() -> std::sync::MutexGuard<'static, Option<HashMap<&'static str, (u64, u128)>>> {
+fn get_timers() -> std::sync::MutexGuard<'static, Option<HashMap<Vec<&'static str>, (u64, u128)>>> {
     let mut guard = TIMERS.lock().unwrap();
     if guard.is_none() {
         *guard = Some(HashMap::new());
@@ -19,6 +20,9 @@ pub struct Timer {
 
 impl Timer {
     pub fn start(label: &'static str) -> Self {
+        if let Ok(mut stack) = CALL_STACK.lock() {
+            stack.push(label);
+        }
         Timer {
             label,
             start: Instant::now(),
@@ -29,12 +33,46 @@ impl Timer {
 impl Drop for Timer {
     fn drop(&mut self) {
         let elapsed = self.start.elapsed().as_nanos();
-        let mut guard = get_timers();
-        if let Some(ref mut map) = *guard {
-            let entry = map.entry(self.label).or_insert((0, 0));
-            entry.0 += 1;
-            entry.1 += elapsed;
+
+        // Reconstruct the full call path (entire stack at this moment)
+        let call_path: Vec<&'static str> = if let Ok(stack) = CALL_STACK.lock() {
+            // Check that we're at the top of the stack
+            if stack.last() == Some(&self.label) {
+                stack.clone()
+            } else {
+                vec![self.label]
+            }
+        } else {
+            vec![self.label]
+        };
+
+        // Remove ourselves from the call stack
+        if let Ok(mut stack) = CALL_STACK.lock() {
+            if stack.last() == Some(&self.label) {
+                stack.pop();
+            }
         }
+
+        // Record the time against the full call path
+        if !call_path.is_empty() {
+            let mut guard = get_timers();
+            if let Some(ref mut map) = *guard {
+                let entry = map.entry(call_path).or_insert((0, 0));
+                entry.0 += 1;
+                entry.1 += elapsed;
+            }
+        }
+    }
+}
+
+pub fn get_data() -> Vec<(Vec<&'static str>, u64, u128)> {
+    let guard = get_timers();
+    if let Some(ref map) = *guard {
+        let mut results: Vec<_> = map.iter().map(|(k, &v)| (k.clone(), v.0, v.1)).collect();
+        results.sort_by(|a, b| b.2.cmp(&a.2));
+        results
+    } else {
+        Vec::new()
     }
 }
 
@@ -45,12 +83,13 @@ pub fn print_results() {
         results.sort_by(|a, b| b.1 .1.cmp(&a.1 .1));
         eprintln!("\n=== Timing Results (sorted by total time) ===");
         eprintln!(
-            "{:<70} {:>10} {:>15} {:>15} {:>15}",
-            "Function", "Calls", "Total (ms)", "Avg (µs)", "% of total"
+            "{:<90} {:>10} {:>15} {:>15} {:>15}",
+            "Call Path", "Calls", "Total (ms)", "Avg (µs)", "% of total"
         );
-        eprintln!("{}", "-".repeat(130));
+        eprintln!("{}", "-".repeat(150));
         let grand_total: u128 = results.iter().map(|(_, (_, ns))| ns).sum();
-        for (label, (count, total_ns)) in &results {
+        for (path, (count, total_ns)) in &results {
+            let path_str = path.join(" → ");
             let total_ms = *total_ns as f64 / 1_000_000.0;
             let avg_us = if *count > 0 {
                 *total_ns as f64 / *count as f64 / 1_000.0
@@ -63,8 +102,8 @@ pub fn print_results() {
                 0.0
             };
             eprintln!(
-                "{:<70} {:>10} {:>15.2} {:>15.2} {:>14.1}%",
-                label, count, total_ms, avg_us, pct
+                "{:<90} {:>10} {:>15.2} {:>15.2} {:>14.1}%",
+                path_str, count, total_ms, avg_us, pct
             );
         }
         eprintln!("\n");
@@ -75,6 +114,9 @@ pub fn reset() {
     let mut guard = get_timers();
     if let Some(ref mut map) = *guard {
         map.clear();
+    }
+    if let Ok(mut stack) = CALL_STACK.lock() {
+        stack.clear();
     }
 }
 

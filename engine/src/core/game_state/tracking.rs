@@ -72,13 +72,13 @@ impl GameState {
         self.prohibition_effects.iter().any(|e| e.contains(action))
     }
 
-    pub fn record_turn_limited_ability_use(&mut self, card_id: String) {
-        *self.turn_limited_abilities_used.entry(card_id).or_insert(0) += 1;
+    pub fn record_turn_limited_ability_use(&mut self, key: (i16, usize, u32)) {
+        *self.turn_limited_abilities_used.entry(key).or_insert(0) += 1;
     }
 
-    pub fn has_turn_limited_ability_been_used(&self, card_id: &str) -> bool {
+    pub fn has_turn_limited_ability_been_used(&self, key: &(i16, usize, u32)) -> bool {
         self.turn_limited_abilities_used
-            .get(card_id)
+            .get(key)
             .copied()
             .unwrap_or(0)
             > 0

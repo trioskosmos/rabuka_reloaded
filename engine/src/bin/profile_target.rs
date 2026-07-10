@@ -7,6 +7,7 @@ use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
+use std::io::Write;
 use std::sync::Arc;
 
 fn parse_stage_area(s: &str) -> Option<MemberArea> {
@@ -132,4 +133,29 @@ fn main() {
 
     eprintln!("Ran {} games, total actions: {}", num_games, total_actions);
     rabuka_engine::timer::print_results();
+
+    // Generate flamegraph SVG from timing data
+    let data = rabuka_engine::timer::get_data();
+    if !data.is_empty() {
+        // Convert to folded stack format: path;separated;functions <count>
+        let mut folded = Vec::new();
+        for (path, _calls, total_ns) in &data {
+            let count = (*total_ns / 1000).max(1); // use µs as count
+            writeln!(folded, "{} {}", path.join(";"), count).unwrap();
+        }
+        let folded_str = String::from_utf8(folded).unwrap();
+        let mut svg = Vec::new();
+        let mut opt = inferno::flamegraph::Options::default();
+        inferno::flamegraph::from_reader(&mut opt, folded_str.as_bytes(), &mut svg)
+            .expect("Failed to generate flamegraph");
+        let svg_path = std::path::Path::new("flamegraph.svg");
+        std::fs::write(svg_path, &svg).expect("Failed to write flamegraph.svg");
+        eprintln!();
+        eprintln!("Flamegraph saved to: {}", svg_path.display());
+        eprintln!(
+            "Open in a browser to view: file://{}/{}",
+            std::env::current_dir().unwrap_or_default().display(),
+            svg_path.display()
+        );
+    }
 }

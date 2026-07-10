@@ -980,6 +980,18 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
         let estimated = active_player.hand.cards.len() * 3 + 1;
         actions.reserve(estimated);
 
+        // Cache stage card data: read once, not once per hand card
+        let stage_card_ids = [
+            active_player.stage.stage[0],
+            active_player.stage.stage[1],
+            active_player.stage.stage[2],
+        ];
+        let stage_cards: [Option<&crate::card::Card>; 3] = [
+            game_state.card_database.get_card(stage_card_ids[0]),
+            game_state.card_database.get_card(stage_card_ids[1]),
+            game_state.card_database.get_card(stage_card_ids[2]),
+        ];
+
         for (hand_index, card_id) in active_player.hand.cards.iter().enumerate() {
             if let Some(card) = game_state.card_database.get_card(*card_id) {
                 if card.is_member() && !card.is_live() {
@@ -1003,11 +1015,6 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 
                     let mut available_areas = Vec::with_capacity(3);
                     let mut has_any_available = false;
-                    let stage_card_ids = [
-                        active_player.stage.stage[0],
-                        active_player.stage.stage[1],
-                        active_player.stage.stage[2],
-                    ];
 
                     for (area_idx, (_area, area_name)) in areas.iter().enumerate() {
                         let mut area_info = AreaInfo {
@@ -1027,10 +1034,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                 .contains(&existing_member_id)
                             {
                                 // Check if existing member has cannot_baton_touch restriction
-                                let existing_member_card =
-                                    game_state.card_database.get_card(existing_member_id);
                                 let has_baton_touch_protection =
-                                    existing_member_card.as_ref().is_some_and(|existing_card| {
+                                    stage_cards[area_idx].is_some_and(|existing_card| {
                                         existing_card.abilities.iter().any(|a| {
                                             a.effect.as_ref().is_some_and(|ef| {
                                                 if ef.restriction_type.as_deref()
@@ -1055,9 +1060,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                     });
 
                                 if !has_baton_touch_protection {
-                                    if let Some(existing_member_card) =
-                                        existing_member_card.as_ref()
-                                    {
+                                    if let Some(existing_member_card) = stage_cards[area_idx] {
                                         let member_cost = existing_member_card.cost.unwrap_or(0);
                                         let cost_to_pay =
                                             effective_cost.saturating_sub(member_cost);
@@ -1089,18 +1092,13 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 
                     let (double_baton_pairs, any_double_baton_available) = if has_double_baton {
                         // Pre-compute which occupied areas have cannot_baton_touch protection
-                        let member_cards: [Option<&crate::card::Card>; 3] = [
-                            game_state.card_database.get_card(stage_card_ids[0]),
-                            game_state.card_database.get_card(stage_card_ids[1]),
-                            game_state.card_database.get_card(stage_card_ids[2]),
-                        ];
                         let cannot_baton_touch_protected: Vec<bool> = (0..3)
                             .map(|idx| {
                                 let member_id = stage_card_ids[idx];
                                 if member_id == -1 {
                                     return false;
                                 }
-                                member_cards[idx].as_ref().is_some_and(|card| {
+                                stage_cards[idx].is_some_and(|card| {
                                     card.abilities.iter().any(|a| {
                                         a.effect.as_ref().is_some_and(|ef| {
                                             if ef.restriction_type.as_deref()
@@ -1291,8 +1289,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     continue;
                 }
 
-                let ability_key =
-                    format!("{}_{}_{}", card_id, ability_index, game_state.turn_number);
+                let ability_key = (card_id, ability_index, game_state.turn_number);
                 if let Some(use_limit) = ability.use_limit {
                     let used = game_state
                         .turn_limited_abilities_used
@@ -1363,8 +1360,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     continue;
                 }
 
-                let ability_key =
-                    format!("{}_{}_{}", card_id, ability_index, game_state.turn_number);
+                let ability_key = (card_id, ability_index, game_state.turn_number);
                 if let Some(use_limit) = ability.use_limit {
                     let used = game_state
                         .turn_limited_abilities_used

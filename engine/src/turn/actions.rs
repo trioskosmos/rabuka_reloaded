@@ -18,7 +18,7 @@ macro_rules! tdbg {
 }
 #[cfg(not(feature = "3ds"))]
 macro_rules! tdbg {
-    ($($arg:tt)*) => {{ let _ = format!($($arg)*); }};
+    ($($arg:tt)*) => {};
 }
 
 impl super::TurnEngine {
@@ -261,7 +261,7 @@ impl super::TurnEngine {
                 if can_activate {
                     // Check use limit
                     if let Some(use_limit) = ability.use_limit {
-                        let key = format!("{}_{}_{}", card_id, idx, game_state.turn_number);
+                        let key = (card_id, idx, game_state.turn_number);
                         let used = game_state
                             .turn_limited_abilities_used
                             .get(&key)
@@ -906,7 +906,7 @@ impl super::TurnEngine {
                     if let Some(entry) = game_state.ability_queue.current_entry() {
                         if let Some(cid) = entry.card_id {
                             let turn = game_state.turn_number;
-                            let key = format!("{}_{}_{}", cid, entry.ability_index, turn);
+                            let key = (cid, entry.ability_index, turn);
                             *game_state
                                 .turn_limited_abilities_used
                                 .entry(key)

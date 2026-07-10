@@ -14,7 +14,7 @@ macro_rules! tdbg {
 }
 #[cfg(not(feature = "3ds"))]
 macro_rules! tdbg {
-    ($($arg:tt)*) => {{ let _ = format!($($arg)*); }};
+    ($($arg:tt)*) => {};
 }
 
 impl GameState {
@@ -295,24 +295,13 @@ impl GameState {
                                         if tgt == "self" {
                                             // Per-card: only block this specific member
                                             let card_id_str = card_id.to_string();
-                                            if !self
-                                                .constant_cannot_activate_members
-                                                .contains(&card_id_str)
-                                            {
-                                                self.constant_cannot_activate_members
-                                                    .push(card_id_str);
-                                            }
+                                            self.constant_cannot_activate_members
+                                                .insert(card_id_str);
                                         } else {
                                             // Player-level: block all members of the target player
                                             let resolved =
                                                 self.resolve_target_player(tgt).id.clone();
-                                            if !self
-                                                .constant_cannot_activate_members
-                                                .contains(&resolved)
-                                            {
-                                                self.constant_cannot_activate_members
-                                                    .push(resolved);
-                                            }
+                                            self.constant_cannot_activate_members.insert(resolved);
                                         }
                                     }
                                     if rt == "cannot_live" {
@@ -499,9 +488,9 @@ impl GameState {
             // Restore the previous activating_card
             self.activating_card = prev_activating;
         }
-        let jyouji_len = jyouji_statuses.len();
+        let _jyouji_len = jyouji_statuses.len();
         self.constant_ability_statuses = jyouji_statuses;
-        tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", jyouji_len);
+        tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
 
         // Blade
         tdbg!("RC:7 BLADE");

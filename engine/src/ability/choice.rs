@@ -2613,7 +2613,7 @@ impl super::resolver::AbilityResolver {
             } => {
                 // Consume use_limit for optional effects BEFORE the mutable
                 // player borrow, to avoid borrow conflicts with gs.
-                let mut use_limit_key: Option<String> = None;
+                let mut use_limit_key: Option<(i16, usize, u32)> = None;
                 if selected != "skip" {
                     if let Some(entry) = gs.ability_queue.current_entry() {
                         let is_optional = entry
@@ -2623,10 +2623,7 @@ impl super::resolver::AbilityResolver {
                             .is_some_and(|e| e.optional.unwrap_or(false));
                         if is_optional && entry.ability.use_limit.is_some() {
                             if let Some(cid) = entry.card_id.or(gs.activating_card) {
-                                use_limit_key = Some(format!(
-                                    "{}_{}_{}",
-                                    cid, entry.ability_index, gs.turn_number
-                                ));
+                                use_limit_key = Some((cid, entry.ability_index, gs.turn_number));
                             }
                         }
                     }
@@ -2828,7 +2825,7 @@ impl super::resolver::AbilityResolver {
                             .enumerate()
                         {
                             if ab.use_limit.is_some() {
-                                let key = format!("{}_{}_{}", cid, idx, turn);
+                                let key = (cid, idx, turn);
                                 *gs.turn_limited_abilities_used.entry(key).or_insert(0) += 1;
                                 break;
                             }

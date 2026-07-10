@@ -1801,7 +1801,9 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         turn_limited_abilities_used: game_state
             .turn_limited_abilities_used
             .iter()
-            .map(|(k, _v)| k.clone())
+            .map(|((card_id, ability_index, turn), _v)| {
+                format!("{}_{}_{}", card_id, ability_index, turn)
+            })
             .collect(),
         auto_ability_trigger_counts: game_state.auto_ability_trigger_counts.clone(),
         turn_limit_usage: game_state.turn_limit_usage.clone(),
@@ -1810,7 +1812,11 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         delayed_prohibition_effects: game_state.delayed_prohibition_effects.clone(),
         cannot_live_players: game_state.cannot_live_players.clone(),
         cannot_activate_members: game_state.cannot_activate_members.clone(),
-        constant_cannot_activate_members: game_state.constant_cannot_activate_members.clone(),
+        constant_cannot_activate_members: game_state
+            .constant_cannot_activate_members
+            .iter()
+            .cloned()
+            .collect(),
         constant_ability_statuses: game_state.constant_ability_statuses.clone(),
         negated_abilities: game_state.negated_abilities.iter().copied().collect(),
         temporary_effects: temp_effects,

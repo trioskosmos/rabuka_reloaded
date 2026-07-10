@@ -647,8 +647,7 @@ impl AbilityResolver {
         dbg.ability(&card_name, &card_no, &card_id_str, ability);
 
         // Check use_limit before cost, but don't insert until after effect runs
-        let ability_key = activating_card
-            .map(|card_id| format!("{}_{}_{}", card_id, ability_index, gs.turn_number));
+        let ability_key = activating_card.map(|card_id| (card_id, ability_index, gs.turn_number));
 
         // Set these early so push_ability_result can access them on early exits
         self.current_ability = Some(ability.clone());
@@ -753,9 +752,7 @@ impl AbilityResolver {
                         .as_ref()
                         .is_none_or(|e| self.can_activate_effect(gs, e));
                     if can_activate {
-                        *gs.turn_limited_abilities_used
-                            .entry(key.clone())
-                            .or_insert(0) += 1;
+                        *gs.turn_limited_abilities_used.entry(*key).or_insert(0) += 1;
                     }
                 }
             }
@@ -854,9 +851,7 @@ impl AbilityResolver {
                         && ability.triggers.as_deref() == Some(crate::triggers::ACTIVATION)
                     {
                         if let Some(ref key) = ability_key {
-                            *gs.turn_limited_abilities_used
-                                .entry(key.clone())
-                                .or_insert(0) += 1;
+                            *gs.turn_limited_abilities_used.entry(*key).or_insert(0) += 1;
                         }
                     }
                     dbg.p("RESULT", "effect condition not met — skipped");
@@ -900,9 +895,7 @@ impl AbilityResolver {
                     ) || is_optional_pos;
                     if let Some(ref key) = ability_key {
                         if ability.use_limit.is_some() && !skip_use_limit {
-                            *gs.turn_limited_abilities_used
-                                .entry(key.clone())
-                                .or_insert(0) += 1;
+                            *gs.turn_limited_abilities_used.entry(*key).or_insert(0) += 1;
                         }
                     }
                 }
@@ -935,9 +928,7 @@ impl AbilityResolver {
                         .as_ref()
                         .is_none_or(|e| self.can_activate_effect(gs, e));
                     if can_activate {
-                        *gs.turn_limited_abilities_used
-                            .entry(key.clone())
-                            .or_insert(0) += 1;
+                        *gs.turn_limited_abilities_used.entry(*key).or_insert(0) += 1;
                     }
                 }
             }
