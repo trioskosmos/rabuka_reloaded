@@ -16,7 +16,7 @@ macro_rules! tdbg {
 }
 #[cfg(not(feature = "3ds"))]
 macro_rules! tdbg {
-    ($($arg:tt)*) => {{ let _ = format!($($arg)*); }};
+    ($($arg:tt)*) => {};
 }
 
 impl super::TurnEngine {
@@ -53,6 +53,7 @@ impl super::TurnEngine {
     }
 
     pub fn advance_phase(game_state: &mut GameState) {
+        let _t = crate::timer::Timer::start("advance_phase");
         debug_assert!(
             game_state.phase_invariant(),
             "Phase invariant violated before advance_phase"

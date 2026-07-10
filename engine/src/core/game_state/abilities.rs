@@ -2650,29 +2650,37 @@ impl GameState {
         false
     }
 
-    fn generate_state_hash(&self) -> String {
-        format!(
-            "t{}_p{}_tp{}_p1h{}_p1e{}_p1w{}_p1l{}_p1su{}_p1st{:?}_p2h{}_p2e{}_p2w{}_p2l{}_p2su{}_p2st{:?}_oe{}_pro{}_tmp{}_rps{:?}",
-            self.turn_number,
-            self.current_phase,
-            self.current_turn_phase,
-            self.player1.hand.cards.len(),
-            self.player1.energy_zone.cards.len(),
-            self.player1.waitroom.cards.len(),
-            self.player1.live_card_zone.cards.len(),
-            self.player1.success_live_card_zone.cards.len(),
-            self.player1.stage.stage,
-            self.player2.hand.cards.len(),
-            self.player2.energy_zone.cards.len(),
-            self.player2.waitroom.cards.len(),
-            self.player2.live_card_zone.cards.len(),
-            self.player2.success_live_card_zone.cards.len(),
-            self.player2.stage.stage,
-            self.mods.orientation_modifiers.len(),
-            self.prohibition_effects.len(),
-            self.temporary_effects.len(),
-            self.rps_winner
-        )
+    fn generate_state_hash(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        self.turn_number.hash(&mut hasher);
+        self.current_phase.hash(&mut hasher);
+        self.current_turn_phase.hash(&mut hasher);
+        self.player1.hand.cards.len().hash(&mut hasher);
+        self.player1.energy_zone.cards.len().hash(&mut hasher);
+        self.player1.waitroom.cards.len().hash(&mut hasher);
+        self.player1.live_card_zone.cards.len().hash(&mut hasher);
+        self.player1
+            .success_live_card_zone
+            .cards
+            .len()
+            .hash(&mut hasher);
+        self.player1.stage.stage.hash(&mut hasher);
+        self.player2.hand.cards.len().hash(&mut hasher);
+        self.player2.energy_zone.cards.len().hash(&mut hasher);
+        self.player2.waitroom.cards.len().hash(&mut hasher);
+        self.player2.live_card_zone.cards.len().hash(&mut hasher);
+        self.player2
+            .success_live_card_zone
+            .cards
+            .len()
+            .hash(&mut hasher);
+        self.player2.stage.stage.hash(&mut hasher);
+        self.mods.orientation_modifiers.len().hash(&mut hasher);
+        self.prohibition_effects.len().hash(&mut hasher);
+        self.temporary_effects.len().hash(&mut hasher);
+        self.rps_winner.hash(&mut hasher);
+        hasher.finish()
     }
 
     pub fn reset_loop_detection(&mut self) {

@@ -444,40 +444,50 @@ fn main() {
                                     _3ds_text_add_top("\nA=select\0".as_ptr());
                                 }
                             } else {
-                                _3ds_top_clear();
-                                _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, 0xFF0A0E1A);
-                                _3ds_top_queue_text(
-                                    80.0,
-                                    10.0,
-                                    0xFFF59E0B,
-                                    0.45f32,
-                                    format!("SELECT {}\0", label).as_ptr(),
-                                );
+                                unsafe {
+                                    _3ds_top_clear();
+                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, 0xFF0A0E1A);
+                                    _3ds_top_queue_text(
+                                        80.0,
+                                        10.0,
+                                        0xFFF59E0B,
+                                        0.45f32,
+                                        format!("SELECT {}\0", label).as_ptr(),
+                                    );
+                                }
                                 let start = cur.saturating_sub(6).min(n.saturating_sub(12));
                                 let end = (start + 12).min(n);
                                 for i in start..end {
                                     let y = 30.0 + (i - start) as f32 * 16.0;
                                     let bg = if i == cur { 0xFF2A3A5C } else { 0x661A2333 };
-                                    _3ds_top_queue_rect(20.0, y, 360.0, 14.0, bg);
+                                    unsafe {
+                                        _3ds_top_queue_rect(20.0, y, 360.0, 14.0, bg);
+                                    }
                                     if i == cur {
-                                        _3ds_top_queue_rect(20.0, y, 360.0, 14.0, 0x33F59E0B);
+                                        unsafe {
+                                            _3ds_top_queue_rect(20.0, y, 360.0, 14.0, 0x33F59E0B);
+                                        }
                                     }
                                     let color = if i == cur { 0xFFF59E0B } else { 0xFFD1D5DB };
+                                    unsafe {
+                                        _3ds_top_queue_text(
+                                            24.0,
+                                            y + 1.0,
+                                            color,
+                                            0.32f32,
+                                            format!("{}\0", decks[i].name).as_ptr(),
+                                        );
+                                    }
+                                }
+                                unsafe {
                                     _3ds_top_queue_text(
-                                        24.0,
-                                        y + 1.0,
-                                        color,
-                                        0.32f32,
-                                        format!("{}\0", decks[i].name).as_ptr(),
+                                        20.0,
+                                        225.0,
+                                        0xFF6B7280,
+                                        0.30f32,
+                                        "UP/DOWN=select  A=confirm\0".as_ptr(),
                                     );
                                 }
-                                _3ds_top_queue_text(
-                                    20.0,
-                                    225.0,
-                                    0xFF6B7280,
-                                    0.30f32,
-                                    "UP/DOWN=select  A=confirm\0".as_ptr(),
-                                );
                             }
                         }
                         if keys & 0x00000040 != 0 && cur > 0 {
@@ -542,40 +552,50 @@ fn main() {
                                     _3ds_text_add_top("\nA=select B=same\0".as_ptr());
                                 }
                             } else {
-                                _3ds_top_clear();
-                                _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, 0xFF0A0E1A);
-                                _3ds_top_queue_text(
-                                    80.0,
-                                    10.0,
-                                    0xFFF59E0B,
-                                    0.45f32,
-                                    "SELECT P2 DECK\0".as_ptr(),
-                                );
+                                unsafe {
+                                    _3ds_top_clear();
+                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, 0xFF0A0E1A);
+                                    _3ds_top_queue_text(
+                                        80.0,
+                                        10.0,
+                                        0xFFF59E0B,
+                                        0.45f32,
+                                        "SELECT P2 DECK\0".as_ptr(),
+                                    );
+                                }
                                 let start = cur.saturating_sub(6).min(n.saturating_sub(12));
                                 let end = (start + 12).min(n);
                                 for i in start..end {
                                     let y = 30.0 + (i - start) as f32 * 16.0;
                                     let bg = if i == cur { 0xFF2A3A5C } else { 0x661A2333 };
-                                    _3ds_top_queue_rect(20.0, y, 360.0, 14.0, bg);
+                                    unsafe {
+                                        _3ds_top_queue_rect(20.0, y, 360.0, 14.0, bg);
+                                    }
                                     if i == cur {
-                                        _3ds_top_queue_rect(20.0, y, 360.0, 14.0, 0x33F59E0B);
+                                        unsafe {
+                                            _3ds_top_queue_rect(20.0, y, 360.0, 14.0, 0x33F59E0B);
+                                        }
                                     }
                                     let color = if i == cur { 0xFFF59E0B } else { 0xFFD1D5DB };
+                                    unsafe {
+                                        _3ds_top_queue_text(
+                                            24.0,
+                                            y + 1.0,
+                                            color,
+                                            0.32f32,
+                                            format!("{}\0", decks[i].name).as_ptr(),
+                                        );
+                                    }
+                                }
+                                unsafe {
                                     _3ds_top_queue_text(
-                                        24.0,
-                                        y + 1.0,
-                                        color,
-                                        0.32f32,
-                                        format!("{}\0", decks[i].name).as_ptr(),
+                                        20.0,
+                                        225.0,
+                                        0xFF6B7280,
+                                        0.30f32,
+                                        "A=select  B=use same\0".as_ptr(),
                                     );
                                 }
-                                _3ds_top_queue_text(
-                                    20.0,
-                                    225.0,
-                                    0xFF6B7280,
-                                    0.30f32,
-                                    "A=select  B=use same\0".as_ptr(),
-                                );
                             }
                         }
                         if keys & 0x00000040 != 0 && cur > 0 {
@@ -655,7 +675,10 @@ fn main() {
                                     for (_, card) in Arc::make_mut(&mut db).cards.iter_mut() {
                                         if deck_nos.contains(&card.card_no) {
                                             if let Some(ab) = am.get(&card.card_no) {
-                                                card.abilities = ab.clone();
+                                                card.abilities = ab
+                                                    .iter()
+                                                    .map(|a| Arc::new(a.clone()))
+                                                    .collect();
                                             }
                                         }
                                     }
@@ -1625,6 +1648,7 @@ fn visible_hand_slots() -> usize {
     count.max(1).min(15)
 }
 
+#[cfg(feature = "3ds")]
 fn step_name(s: &Step) -> &'static str {
     match s {
         Step::ReadCardsBin => "ReadCards",

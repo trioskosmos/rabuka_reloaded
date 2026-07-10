@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-10T12:44:53.649031",
+  "generated_at": "2026-07-10T12:07:35.622624",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -8317,7 +8317,8 @@
               "state_change": "wait",
               "card_type": "member_card",
               "action": "change_state",
-              "count": 1
+              "count": 1,
+              "self_cost": true
             },
             "text": "自分のデッキの一番上のカードを控え室に置いてもよい。そうした場合、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。これにより控え室に置いたカードがライブカードの場合、このメンバーをウェイトにする。自分はこの手順をさらに4回まで繰り返してもよい"
           },
@@ -10203,8 +10204,7 @@
               {
                 "text": "このメンバーをそのエリアに移動する",
                 "card_type": "member_card",
-                "action": "position_change",
-                "exclude_self": true
+                "action": "position_change"
               },
               {
                 "text": "選んだエリアにメンバーがいる場合、そのメンバーは、このメンバーがいたエリアに移動させる",
@@ -10217,8 +10217,7 @@
                 },
                 "destination": "same_area",
                 "card_type": "member_card",
-                "action": "position_change",
-                "exclude_self": true
+                "action": "position_change"
               }
             ]
           }
@@ -10903,8 +10902,7 @@
           {
             "text": "このメンバーをそのエリアに移動する",
             "card_type": "member_card",
-            "action": "position_change",
-            "exclude_self": true
+            "action": "position_change"
           },
           {
             "text": "選んだエリアにメンバーがいる場合、そのメンバーは、このメンバーがいたエリアに移動させる",
@@ -10917,8 +10915,7 @@
             },
             "destination": "same_area",
             "card_type": "member_card",
-            "action": "position_change",
-            "exclude_self": true
+            "action": "position_change"
           }
         ]
       }
@@ -14786,10 +14783,10 @@
         "optional": true,
         "action": "position_change",
         "multiple_targets": true,
-        "exclude_self": true,
         "parenthetical": [
           "メンバーをそれぞれ好きなエリアに移動させる。この効果で1つのエリアに2人以上のメンバーを移動させることはできない。"
-        ]
+        ],
+        "exclude_self": true
       }
     },
     {
@@ -19364,10 +19361,10 @@
         "optional": true,
         "action": "position_change",
         "multiple_targets": true,
-        "exclude_self": true,
         "parenthetical": [
           "メンバーをそれぞれ好きなエリアに移動させてもよい。"
-        ]
+        ],
+        "exclude_self": true
       }
     },
     {
@@ -30391,13 +30388,11 @@
           },
           {
             "text": "これにより控え室に置いたカードのコスト5につき、追加で1枚エールを行う。この能力では4枚までしか追加でエールできない",
-            "count": 4,
             "max": true,
             "action": "perform_yell",
             "max_repeats": 4,
             "per_unit": true,
             "per_unit_count": 5,
-            "per_unit_type": "discard",
             "per_unit_source": "previous_moved_cards",
             "group_names": [
               "Aqours"
@@ -31830,8 +31825,7 @@
             "target": "self",
             "optional": true,
             "action": "position_change",
-            "multiple_targets": true,
-            "exclude_self": true
+            "multiple_targets": true
           }
         ],
         "parenthetical": [
@@ -32904,10 +32898,10 @@
         "optional": true,
         "action": "position_change",
         "multiple_targets": true,
-        "exclude_self": true,
         "parenthetical": [
           "メンバーをそれぞれ好きなエリアに移動させてもよい。"
-        ]
+        ],
+        "exclude_self": true
       }
     },
     {

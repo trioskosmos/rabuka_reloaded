@@ -18,7 +18,7 @@ macro_rules! tdbg {
 }
 #[cfg(not(feature = "3ds"))]
 macro_rules! tdbg {
-    ($($arg:tt)*) => {{ let _ = format!($($arg)*); }};
+    ($($arg:tt)*) => {};
 }
 
 impl super::TurnEngine {
@@ -30,6 +30,7 @@ impl super::TurnEngine {
         stage_area: Option<crate::zones::MemberArea>,
         use_baton_touch: Option<bool>,
     ) -> Result<(), String> {
+        let _t = crate::timer::Timer::start("execute_main_phase_action");
         // UseAbility must check activation legality independently — never
         // route through resume_with_choice, even when another ability's choice
         // is pending (e.g. a debut look-and-select from play_to_stage).
@@ -996,6 +997,7 @@ impl super::TurnEngine {
     }
 
     pub fn check_timing(game_state: &mut GameState) {
+        let _t = crate::timer::Timer::start("check_timing");
         tdbg!("CHECK_TIMING:0");
         game_state.player1.refresh();
         tdbg!("CHECK_TIMING:1 p1.refresh OK");

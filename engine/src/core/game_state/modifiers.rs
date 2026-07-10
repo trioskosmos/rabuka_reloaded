@@ -14,7 +14,7 @@ macro_rules! tdbg {
 }
 #[cfg(not(feature = "3ds"))]
 macro_rules! tdbg {
-    ($($arg:tt)*) => {{ let _ = format!($($arg)*); }};
+    ($($arg:tt)*) => {};
 }
 
 impl GameState {
@@ -293,25 +293,13 @@ impl GameState {
                                     } else if rt == "cannot_activate" {
                                         if tgt == "self" {
                                             // Per-card: only block this specific member
-                                            let card_id_str = card_id.to_string();
-                                            if !self
-                                                .constant_cannot_activate_members
-                                                .contains(&card_id_str)
-                                            {
-                                                self.constant_cannot_activate_members
-                                                    .push(card_id_str);
-                                            }
+                                            self.constant_cannot_activate_members
+                                                .insert(card_id.to_string());
                                         } else {
                                             // Player-level: block all members of the target player
                                             let resolved =
                                                 self.resolve_target_player(tgt).id.clone();
-                                            if !self
-                                                .constant_cannot_activate_members
-                                                .contains(&resolved)
-                                            {
-                                                self.constant_cannot_activate_members
-                                                    .push(resolved);
-                                            }
+                                            self.constant_cannot_activate_members.insert(resolved);
                                         }
                                     }
                                     if rt == "cannot_live" {
@@ -983,9 +971,12 @@ impl GameState {
             effect_only,
             timestamp: self.movement_event_counter,
         };
-        // Track in the current batch + sync old fields (append, don't rebuild
-        // from batch_movements — it accumulates across ability batches).
-        self.batch_movements.push(event.clone());
+        // Display-only tracking (skipped in profiling/bot mode):
+        if cfg!(not(feature = "profiling")) {
+            self.batch_movements.push(event.clone());
+        }
+        // Track turn-level ALL-zone movement for ability triggers
+        self.turn_movements.push(event.clone());
         // Card left the stage → its gained abilities no longer apply
         if source_zone == "stage" && dest_zone != "stage" {
             self.clear_gained_abilities_for_card(moved_card_id);
@@ -993,12 +984,10 @@ impl GameState {
         let cards = self.recently_moved_cards.get_or_insert_with(Vec::new);
         cards.push(moved_card_id);
         self.recently_moved_from_zone = Some(source_zone.to_string());
-        // Track turn-level ALL-zone movement (persists across ability batches)
-        self.turn_movements.push(event.clone());
         // Track turn-level area movement (stage-area-to-stage-area)
         let is_area_move = source_zone == "stage" && dest_zone == "stage";
         if is_area_move {
-            self.turn_area_movements.push(event);
+            self.turn_area_movements.push(event.clone());
             self.position_change_occurred_this_turn = true;
         }
         // Track in cards_moved_this_turn for fast O(1) lookups

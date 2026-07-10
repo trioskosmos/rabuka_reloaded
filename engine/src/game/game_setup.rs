@@ -105,6 +105,16 @@ impl std::str::FromStr for ActionType {
     }
 }
 
+macro_rules! action_desc {
+    ($($arg:tt)*) => {
+        if cfg!(not(feature = "profiling")) {
+            format!($($arg)*)
+        } else {
+            String::new()
+        }
+    };
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Action {
     pub description: String,
@@ -237,9 +247,9 @@ pub fn settle_single_player_state(game_state: &mut GameState) {
     }
 }
 
-fn make_action(action_type: ActionType, description: &str) -> Action {
+fn make_action(action_type: ActionType, description: impl Into<String>) -> Action {
     Action {
-        description: description.to_string(),
+        description: description.into(),
         action_type,
         parameters: None,
     }
@@ -247,11 +257,11 @@ fn make_action(action_type: ActionType, description: &str) -> Action {
 
 fn make_action_params(
     action_type: ActionType,
-    description: &str,
+    description: impl Into<String>,
     params: ActionParameters,
 ) -> Action {
     Action {
-        description: description.to_string(),
+        description: description.into(),
         action_type,
         parameters: Some(params),
     }
@@ -389,11 +399,11 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             }
                         };
                         let label = if is_source {
-                            format!("Select {}", capitalize(&stage_area))
+                            action_desc!("Select {}", capitalize(&stage_area))
                         } else if let Some(ref src) = from_pos {
-                            format!("{} → {}", capitalize(src), capitalize(&stage_area))
+                            action_desc!("{} → {}", capitalize(src), capitalize(&stage_area))
                         } else {
-                            format!("Move to {}", capitalize(&stage_area))
+                            action_desc!("Move to {}", capitalize(&stage_area))
                         };
                         make_action_params(
                             ActionType::ChoicePosition,
@@ -431,7 +441,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         let label = if n == 0 {
                             "Draw 0 (skip)".to_string()
                         } else {
-                            format!("Draw {}", n)
+                            action_desc!("Draw {}", n)
                         };
                         make_action_params(
                             ActionType::ChoiceDecision,
@@ -453,7 +463,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     .unwrap_or(3);
                 return (0..count)
                     .map(|n| {
-                        let label = format!("Move card {} to top", n + 1);
+                        let label = action_desc!("Move card {} to top", n + 1);
                         make_action_params(
                             ActionType::ChoiceDecision,
                             &label,
@@ -498,7 +508,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 return vec![
                     make_action_params(
                         ActionType::ChoiceOption,
-                        &format!("Primary: {}", description),
+                        action_desc!("Primary: {}", description),
                         ActionParameters {
                             card_id: Some(0),
                             card_no: Some("primary".to_string()),
@@ -507,7 +517,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     ),
                     make_action_params(
                         ActionType::ChoiceOption,
-                        &format!("Alternative: {}", description),
+                        action_desc!("Alternative: {}", description),
                         ActionParameters {
                             card_id: Some(1),
                             card_no: Some("alternative".to_string()),
@@ -781,7 +791,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             if actions.is_empty() {
                 actions.push(make_action_params(
                     ActionType::ChoiceSelect,
-                    &format!("Select card(s): {}", description),
+                    action_desc!("Select card(s): {}", description),
                     ActionParameters {
                         card_indices: Some(Vec::new()),
                         card_no: Some("select".to_string()),
@@ -821,8 +831,8 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 };
                 let label = stage_area_str
                     .as_deref()
-                    .map(|s| format!("Place at {}", s))
-                    .unwrap_or_else(|| format!("Place at {}", area));
+                    .map(|s| action_desc!("Place at {}", s))
+                    .unwrap_or_else(|| action_desc!("Place at {}", area));
                 make_action_params(
                     ActionType::ChoicePosition,
                     &label,
@@ -852,7 +862,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             .map(|(i, color)| {
                 make_action_params(
                     ActionType::ChoiceOption,
-                    &format!("{}  E{}", color, description),
+                    action_desc!("{}  E{}", color, description),
                     ActionParameters {
                         card_id: Some(i as i16),
                         card_no: Some(color.clone()),
@@ -871,7 +881,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             .map(|(i, opt)| {
                 make_action_params(
                     ActionType::ChoiceOption,
-                    &format!("{}: {}", opt.card_name, description),
+                    action_desc!("{}: {}", opt.card_name, description),
                     ActionParameters {
                         card_id: Some(i as i16),
                         card_no: Some(opt.card_name.clone()),
@@ -890,7 +900,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             .map(|(i, opt)| {
                 make_action_params(
                     ActionType::ChoiceOption,
-                    &format!("{}: {}", opt.card_name, description),
+                    action_desc!("{}: {}", opt.card_name, description),
                     ActionParameters {
                         card_id: Some(i as i16),
                         card_no: Some(opt.card_name.clone()),
@@ -941,7 +951,7 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
 
     let mut actions = vec![make_action_params(
         ActionType::ConfirmMulligan,
-        &format!("Confirm {}'s mulligan", player_name),
+        action_desc!("Confirm {}'s mulligan", player_name),
         ActionParameters { ..make_params() },
     )];
 
@@ -954,7 +964,7 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
             .unwrap_or("Unknown");
         actions.push(make_action_params(
             ActionType::SelectMulligan,
-            &format!(
+            action_desc!(
                 "{} {} for mulligan",
                 if is_selected { "Deselect" } else { "Select" },
                 card_name
@@ -1184,7 +1194,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                 o => o,
                             };
                             let bt = if area.is_baton_touch {
-                                format!(
+                                action_desc!(
                                     " bt from {}",
                                     area.existing_member_name.as_deref().unwrap_or("?")
                                 )
@@ -1193,15 +1203,30 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                             };
                             actions.push(make_action_params(
                                 ActionType::PlayMemberToStage,
-                                &format!(
+                                action_desc!(
                                     "{} → {} (cost:{}){}",
-                                    card.name, area_label, area.cost, bt
+                                    card.name,
+                                    area_label,
+                                    area.cost,
+                                    bt
                                 ),
                                 ActionParameters {
                                     card_id: Some(*card_id),
                                     card_index: Some(hand_index),
-                                    card_name: Some(card.name.clone()),
-                                    card_no: Some(card.card_no.clone()),
+                                    card_name: {
+                                        if cfg!(not(feature = "profiling")) {
+                                            Some(card.name.clone())
+                                        } else {
+                                            None
+                                        }
+                                    },
+                                    card_no: {
+                                        if cfg!(not(feature = "profiling")) {
+                                            Some(card.card_no.clone())
+                                        } else {
+                                            None
+                                        }
+                                    },
                                     base_cost: Some(card_cost),
                                     stage_area: Some(area.area.clone()),
                                     available_areas: Some(available_areas.clone()),
@@ -1223,7 +1248,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                     .collect();
                                 actions.push(make_action_params(
                                     ActionType::PlayMemberToStage,
-                                    &format!(
+                                    action_desc!(
                                         "{} → {} (double {}&{} cost:{})",
                                         card.name,
                                         pair.placement,
@@ -1309,14 +1334,18 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 let trigger_info = ability
                     .triggers
                     .as_ref()
-                    .map(|t| format!(" ({})", t))
+                    .map(|t| action_desc!(" ({})", t))
                     .unwrap_or_default();
 
                 actions.push(make_action_params(
                     ActionType::UseAbility,
-                    &format!(
+                    action_desc!(
                         "Use ability on {} ({}): {}{} - Cost: {}",
-                        card.name, area_name, ability.full_text, trigger_info, ability_cost
+                        card.name,
+                        area_name,
+                        ability.full_text,
+                        trigger_info,
+                        ability_cost
                     ),
                     ActionParameters {
                         card_id: Some(card_id),
@@ -1380,9 +1409,11 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 
                 actions.push(make_action_params(
                     ActionType::UseAbility,
-                    &format!(
+                    action_desc!(
                         "Use ability on {} (discard): {} (起動) - Cost: {}",
-                        card.name, ability.full_text, ability_cost
+                        card.name,
+                        ability.full_text,
+                        ability_cost
                     ),
                     ActionParameters {
                         card_id: Some(card_id),
@@ -1423,7 +1454,7 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
 
     let mut actions = vec![make_action_params(
         ActionType::ConfirmLiveCardSet,
-        &format!("Confirm {}'s live card set", player_name),
+        action_desc!("Confirm {}'s live card set", player_name),
         ActionParameters { ..make_params() },
     )];
 
@@ -1444,7 +1475,7 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
             .unwrap_or("Unknown");
         actions.push(make_action_params(
             ActionType::SelectLiveCard,
-            &format!(
+            action_desc!(
                 "{} {} for live set",
                 if is_selected { "Deselect" } else { "Select" },
                 card_name

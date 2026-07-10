@@ -144,7 +144,8 @@ fn main() {
 
     let mut total_actions = 0u64;
     let mut outcomes: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
-    let num_games = 500;
+    let mut p1_first_count = 0u32;
+    let num_games = 5000;
     for _ in 0..num_games {
         let mut p1_deck = p1_template.clone();
         let mut p2_deck = p2_template.clone();
@@ -163,11 +164,22 @@ fn main() {
         let mut gs = GameState::new(player1, player2, Arc::clone(&card_database));
         game_setup::setup_game(&mut gs);
         total_actions += run_game_to_completion(&mut gs);
-        let label = match gs.game_result {
-            GameResult::FirstAttackerWins => "P1 wins".to_string(),
-            GameResult::SecondAttackerWins => "P2 wins".to_string(),
-            GameResult::Draw => "Draw (permanent loop)".to_string(),
-            GameResult::Ongoing => "Draw (stuck)".to_string(),
+        // Record who is first attacker at game end
+        if gs.player1.is_first_attacker {
+            p1_first_count += 1;
+        }
+        let p1_success = gs.player1.success_live_card_zone.cards.len();
+        let p2_success = gs.player2.success_live_card_zone.cards.len();
+        let label = if p1_success >= 3 && p2_success <= 2 {
+            "P1 wins".to_string()
+        } else if p2_success >= 3 && p1_success <= 2 {
+            "P2 wins".to_string()
+        } else if p1_success >= 3 && p2_success >= 3 {
+            "Draw (permanent loop)".to_string()
+        } else if gs.game_result == GameResult::Draw {
+            "Draw (permanent loop)".to_string()
+        } else {
+            "Draw (stuck)".to_string()
         };
         *outcomes.entry(label).or_insert(0) += 1;
     }
@@ -175,6 +187,12 @@ fn main() {
     eprintln!(
         "\nRan {} games, total actions: {}",
         num_games, total_actions
+    );
+    eprintln!(
+        "P1 first attacker at end: {} / {} ({:.1}%)",
+        p1_first_count,
+        num_games,
+        p1_first_count as f64 / num_games as f64 * 100.0
     );
     eprintln!("\n=== Game Outcomes ===");
     let mut sorted: Vec<_> = outcomes.into_iter().collect();
@@ -186,5 +204,8 @@ fn main() {
             count,
             *count as f64 / num_games as f64 * 100.0
         );
+    }
+    if cfg!(feature = "profiling") {
+        rabuka_engine::timer::print_results();
     }
 }
