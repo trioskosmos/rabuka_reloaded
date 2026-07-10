@@ -18,7 +18,7 @@ macro_rules! tdbg {
 }
 #[cfg(not(feature = "3ds"))]
 macro_rules! tdbg {
-    ($($arg:tt)*) => {};
+    ($($arg:tt)*) => {{ let _ = format!($($arg)*); }};
 }
 
 impl super::TurnEngine {
@@ -30,7 +30,6 @@ impl super::TurnEngine {
         stage_area: Option<crate::zones::MemberArea>,
         use_baton_touch: Option<bool>,
     ) -> Result<(), String> {
-        let _timer = crate::timer::Timer::start("execute_main_phase_action");
         // UseAbility must check activation legality independently — never
         // route through resume_with_choice, even when another ability's choice
         // is pending (e.g. a debut look-and-select from play_to_stage).
@@ -99,12 +98,6 @@ impl super::TurnEngine {
                 }
             }
             crate::game_setup::ActionType::ChooseFirstAttacker => {
-                if game_state.current_phase != Phase::ChooseFirstAttacker {
-                    return Err(
-                        "ChooseFirstAttacker is only valid during ChooseFirstAttacker phase"
-                            .to_string(),
-                    );
-                }
                 let p1_first = game_state.rps_winner != Some(2);
                 game_state.player1.is_first_attacker = p1_first;
                 game_state.player2.is_first_attacker = !p1_first;
@@ -117,12 +110,6 @@ impl super::TurnEngine {
                 Ok(())
             }
             crate::game_setup::ActionType::ChooseSecondAttacker => {
-                if game_state.current_phase != Phase::ChooseFirstAttacker {
-                    return Err(
-                        "ChooseSecondAttacker is only valid during ChooseFirstAttacker phase"
-                            .to_string(),
-                    );
-                }
                 let p1_first = game_state.rps_winner == Some(2);
                 game_state.player1.is_first_attacker = p1_first;
                 game_state.player2.is_first_attacker = !p1_first;
@@ -293,13 +280,13 @@ impl super::TurnEngine {
                                 .as_ref()
                                 .is_some_and(|t| t == crate::triggers::ACTIVATION)
                         })
-                        .map(|(i, a)| (i, std::sync::Arc::new(a.clone())))
+                        .map(|(i, a)| (i, a.clone()))
                 })
             {
                 if player.stage.stage.iter().any(|&id| id == card_id) {
                     ability_to_activate = Some(AbilityActivation {
                         idx: 10000 + gained.0,
-                        ability: gained.1,
+                        ability: std::sync::Arc::new(gained.1),
                         loc: Zone::Stage,
                     });
                 }
@@ -1009,7 +996,6 @@ impl super::TurnEngine {
     }
 
     pub fn check_timing(game_state: &mut GameState) {
-        let _timer = crate::timer::Timer::start("check_timing");
         tdbg!("CHECK_TIMING:0");
         game_state.player1.refresh();
         tdbg!("CHECK_TIMING:1 p1.refresh OK");
@@ -1115,13 +1101,15 @@ impl super::TurnEngine {
     /// captures which cards moved where, enabling "from live_card_zone to
     /// discard" conditions.
     fn check_invalid_live_cards(game_state: &mut GameState, player_id: &str) {
-        if player_id != game_state.player1.id && player_id != game_state.player2.id {
+        let p1_id = game_state.player1.id.clone();
+        let p2_id = game_state.player2.id.clone();
+        if player_id != p1_id && player_id != p2_id {
             return;
         }
         // Two-pass: collect invalid IDs via immutable borrow, then mutate.
         // Avoids cloning the entire CardDatabase each call.
         let invalids: Vec<(usize, i16, bool)> = {
-            let player = if player_id == game_state.player1.id {
+            let player = if player_id == p1_id {
                 &game_state.player1
             } else {
                 &game_state.player2
@@ -1146,7 +1134,7 @@ impl super::TurnEngine {
         }
         let mut moved = Vec::new();
         for &(i, card_id, is_energy) in invalids.iter().rev() {
-            let player = if player_id == game_state.player1.id {
+            let player = if player_id == p1_id {
                 &mut game_state.player1
             } else {
                 &mut game_state.player2

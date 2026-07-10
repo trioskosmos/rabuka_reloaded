@@ -57,7 +57,7 @@ fn serasu_played_to_stage_triggers_self() {
 
     // use_limit IS consumed (the ability actually fired)
     let turn = game.state.turn_number;
-    let key = (serasu, 0usize, turn);
+    let key = (serasu, 0, turn);
     assert!(
         game.state.turn_limited_abilities_used.contains_key(&key),
         "use_limit must be consumed after successful trigger"
@@ -73,7 +73,7 @@ fn serasu_played_to_stage_triggers_self() {
 
     // use_limit IS consumed (the ability actually fired)
     let turn = game.state.turn_number;
-    let key = (serasu, 0usize, turn);
+    let key = (serasu, 0, turn);
     assert!(
         game.state.turn_limited_abilities_used.contains_key(&key),
         "use_limit must be consumed after successful trigger"
@@ -247,7 +247,7 @@ fn hanaho_played_to_stage_no_baton_touch_does_not_trigger() {
     );
 
     let turn = game.state.turn_number;
-    let key = (hanaho, 0usize, turn);
+    let key = (hanaho, 0, turn);
     assert!(
         !game.state.turn_limited_abilities_used.contains_key(&key),
         "use_limit must not be recorded for a condition-failed trigger"

@@ -218,7 +218,7 @@ fn maki_ab1_use_limit_once_per_turn() {
     );
 
     // Verify use_limit was consumed for this copy's ab#1 (ability index 1)
-    let key = (maki, 1usize, game.state.turn_number);
+    let key = (maki, 1, game.state.turn_number);
     assert!(
         game.state.turn_limited_abilities_used.contains_key(&key),
         "ab#1 use_limit must be consumed for this copy"
