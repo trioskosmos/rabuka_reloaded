@@ -2777,7 +2777,6 @@ impl AbilityResolver {
             if source_id2 != -1 {
                 gs.record_card_movement(source_id2);
             }
-            gs.recalculate_constants();
             let mover_pid = gs
                 .ability_queue
                 .current_entry()
@@ -2824,6 +2823,15 @@ impl AbilityResolver {
                     true,
                 );
             }
+            gs.trigger_auto_abilities_for_player_with_event(
+                &mover_pid,
+                &crate::ability::types::TriggerEvent {
+                    moved_cards: gs.recently_moved_cards.clone().unwrap_or_default(),
+                    position_change_occurred: gs.position_change_occurred_this_turn,
+                    ..Default::default()
+                },
+            );
+            gs.recalculate_constants();
             return Ok(());
         }
         // Handle specific card_no (for "multiple_targets" each-member pattern)
@@ -2866,7 +2874,6 @@ impl AbilityResolver {
                     if source_id != -1 {
                         gs.record_card_movement(source_id);
                     }
-                    gs.recalculate_constants();
                     let mover_pid = gs
                         .ability_queue
                         .current_entry()
@@ -2913,6 +2920,15 @@ impl AbilityResolver {
                             true,
                         );
                     }
+                    gs.trigger_auto_abilities_for_player_with_event(
+                        &mover_pid,
+                        &crate::ability::types::TriggerEvent {
+                            moved_cards: gs.recently_moved_cards.clone().unwrap_or_default(),
+                            position_change_occurred: gs.position_change_occurred_this_turn,
+                            ..Default::default()
+                        },
+                    );
+                    gs.recalculate_constants();
                     return Ok(());
                 }
             }
