@@ -3395,7 +3395,7 @@ fn hanamaru_score_icon_filter() {
         let has_ability = card_data.abilities.iter().any(|a| {
             a.effect
                 .as_ref()
-                .is_some_and(|e| e.card_property.as_deref() == Some("has_score_icon"))
+                .is_some_and(|e| e.card_property_any() == Some("has_score_icon"))
         });
         assert!(
             has_ability,

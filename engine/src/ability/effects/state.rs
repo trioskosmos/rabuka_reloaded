@@ -38,124 +38,131 @@ impl AbilityResolver {
         };
 
         if optional {
-            // Only offer the optional choice if there's at least one valid target.
-            // For state_change="active", the member must be in "wait" state.
-            // For state_change="wait", any member works.
-            // If no valid targets exist, return early without creating the choice.
-            let can_target = if state_change == "active" {
-                let p = gs.resolve_target_player(&target);
-                let ct = card_type_filter.as_deref();
-                let gf = group_filter.as_deref();
-                p.stage.stage.iter().any(|&cid| {
-                    if cid == -1 {
-                        return false;
-                    }
-                    let is_wait = gs
-                        .mods
-                        .get_orientation_modifier(cid)
-                        .is_some_and(|o| o == "wait");
-                    if !is_wait {
-                        return false;
-                    }
-                    if let Some(t) = ct {
-                        if !util::card_matches_type(&gs.card_database, cid, Some(t)) {
+            let decided = gs
+                .ability_queue
+                .current_entry()
+                .and_then(|e| e.optional_cost_result);
+            if decided.is_none() {
+                // Only offer the optional choice if there's at least one valid target.
+                // For state_change="active", the member must be in "wait" state.
+                // For state_change="wait", any member works.
+                // If no valid targets exist, return early without creating the choice.
+                let can_target = if state_change == "active" {
+                    let p = gs.resolve_target_player(&target);
+                    let ct = card_type_filter.as_deref();
+                    let gf = group_filter.as_deref();
+                    p.stage.stage.iter().any(|&cid| {
+                        if cid == -1 {
                             return false;
                         }
-                    }
-                    if let Some(g) = gf {
-                        if !util::card_matches_group_str(&gs.card_database, cid, Some(g)) {
+                        let is_wait = gs
+                            .mods
+                            .get_orientation_modifier(cid)
+                            .is_some_and(|o| o == "wait");
+                        if !is_wait {
                             return false;
                         }
-                    }
-                    true
-                })
-            } else if state_change == "wait" && effect.state.as_deref() == Some("active") {
-                // wait effect targeting only active members:
-                // check if there is at least one active (non-wait) member
-                let p = gs.resolve_target_player(&target);
-                let ct = card_type_filter.as_deref();
-                let gf = group_filter.as_deref();
-                p.stage.stage.iter().any(|&cid| {
-                    if cid == -1 {
-                        return false;
-                    }
-                    // member is active when there is no "wait" orientation modifier
-                    let is_active = gs
-                        .mods
-                        .get_orientation_modifier(cid)
-                        .is_none_or(|o| o != "wait");
-                    if !is_active {
-                        return false;
-                    }
-                    if let Some(t) = ct {
-                        if !util::card_matches_type(&gs.card_database, cid, Some(t)) {
+                        if let Some(t) = ct {
+                            if !util::card_matches_type(&gs.card_database, cid, Some(t)) {
+                                return false;
+                            }
+                        }
+                        if let Some(g) = gf {
+                            if !util::card_matches_group_str(&gs.card_database, cid, Some(g)) {
+                                return false;
+                            }
+                        }
+                        true
+                    })
+                } else if state_change == "wait" && effect.state_any().as_deref() == Some("active")
+                {
+                    // wait effect targeting only active members:
+                    // check if there is at least one active (non-wait) member
+                    let p = gs.resolve_target_player(&target);
+                    let ct = card_type_filter.as_deref();
+                    let gf = group_filter.as_deref();
+                    p.stage.stage.iter().any(|&cid| {
+                        if cid == -1 {
                             return false;
                         }
-                    }
-                    if let Some(g) = gf {
-                        if !util::card_matches_group_str(&gs.card_database, cid, Some(g)) {
+                        // member is active when there is no "wait" orientation modifier
+                        let is_active = gs
+                            .mods
+                            .get_orientation_modifier(cid)
+                            .is_none_or(|o| o != "wait");
+                        if !is_active {
                             return false;
                         }
-                    }
-                    true
-                })
-            } else if state_change == "wait" {
-                // Q137: 「ウェイトにする」とは、アクティブ状態のメンバーをウェイト状態に
-                // することを意味します。既にウェイト状態のメンバーは対象外です。
-                let p = gs.resolve_target_player(&target);
-                let ct = card_type_filter.as_deref();
-                let gf = group_filter.as_deref();
-                p.stage.stage.iter().any(|&cid| {
-                    if cid == -1 {
-                        return false;
-                    }
-                    let is_active = gs
-                        .mods
-                        .get_orientation_modifier(cid)
-                        .is_none_or(|o| o != "wait");
-                    if !is_active {
-                        return false;
-                    }
-                    if let Some(t) = ct {
-                        if !util::card_matches_type(&gs.card_database, cid, Some(t)) {
+                        if let Some(t) = ct {
+                            if !util::card_matches_type(&gs.card_database, cid, Some(t)) {
+                                return false;
+                            }
+                        }
+                        if let Some(g) = gf {
+                            if !util::card_matches_group_str(&gs.card_database, cid, Some(g)) {
+                                return false;
+                            }
+                        }
+                        true
+                    })
+                } else if state_change == "wait" {
+                    // Q137: 「ウェイトにする」とは、アクティブ状態のメンバーをウェイト状態に
+                    // することを意味します。既にウェイト状態のメンバーは対象外です。
+                    let p = gs.resolve_target_player(&target);
+                    let ct = card_type_filter.as_deref();
+                    let gf = group_filter.as_deref();
+                    p.stage.stage.iter().any(|&cid| {
+                        if cid == -1 {
                             return false;
                         }
-                    }
-                    if let Some(g) = gf {
-                        if !util::card_matches_group_str(&gs.card_database, cid, Some(g)) {
+                        let is_active = gs
+                            .mods
+                            .get_orientation_modifier(cid)
+                            .is_none_or(|o| o != "wait");
+                        if !is_active {
                             return false;
                         }
-                    }
-                    true
-                })
-            } else {
-                true // no state filter for non-wait: any member is a valid target
-            };
-            if !can_target {
-                log::debug!(
-                    "[EXEC_CHANGE_STATE] optional {} but no valid targets — skipping",
-                    state_change
-                );
+                        if let Some(t) = ct {
+                            if !util::card_matches_type(&gs.card_database, cid, Some(t)) {
+                                return false;
+                            }
+                        }
+                        if let Some(g) = gf {
+                            if !util::card_matches_group_str(&gs.card_database, cid, Some(g)) {
+                                return false;
+                            }
+                        }
+                        true
+                    })
+                } else {
+                    true // no state filter for non-wait: any member is a valid target
+                };
+                if !can_target {
+                    log::debug!(
+                        "[EXEC_CHANGE_STATE] optional {} but no valid targets — skipping",
+                        state_change
+                    );
+                    return Ok(());
+                }
+                self.pending_choice = Some(Choice::SelectTarget {
+                    target: "pay_optional_cost:skip_optional_cost".to_string(),
+                    description: format!("Change state to {} (pay optional cost)?", state_change),
+                    description_en: Some(format!(
+                        "Change state to {} (pay optional cost)?",
+                        state_change
+                    )),
+                    description_ja: Some(format!(
+                        "状態を{}に変更（オプションコスト）？",
+                        state_change
+                    )),
+                    allow_skip: optional,
+                    options: None,
+                });
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.choice_card_no = Some(ChoiceRoute::ChangeState);
+                }
                 return Ok(());
-            }
-            self.pending_choice = Some(Choice::SelectTarget {
-                target: "pay_optional_cost:skip_optional_cost".to_string(),
-                description: format!("Change state to {} (pay optional cost)?", state_change),
-                description_en: Some(format!(
-                    "Change state to {} (pay optional cost)?",
-                    state_change
-                )),
-                description_ja: Some(format!(
-                    "状態を{}に変更（オプションコスト）？",
-                    state_change
-                )),
-                allow_skip: optional,
-                options: None,
-            });
-            if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.choice_card_no = Some(ChoiceRoute::ChangeState);
-            }
-            return Ok(());
+            } // end if decided.is_none
         }
 
         // Draw from energy deck and place in energy zone with state (e.g. wait)
@@ -186,7 +193,7 @@ impl AbilityResolver {
                 false
             };
 
-            let exclude_self_id = if effect.exclude_self.unwrap_or(false) {
+            let exclude_self_id = if effect.exclude_self_any().unwrap_or(false) {
                 gs.activating_card
             } else {
                 None
@@ -234,7 +241,7 @@ impl AbilityResolver {
                     let matches_state = if state_change == "active" {
                         let ori = gs.mods.get_orientation_modifier(*card_id);
                         ori.is_some_and(|o| o == "wait")
-                    } else if effect.state.as_deref() == Some("active") {
+                    } else if effect.state_any().as_deref() == Some("active") {
                         // e.g. "アクティブ状態のメンバーをウェイトにする"
                         // Only members currently in active state (no wait modifier).
                         let ori = gs.mods.get_orientation_modifier(*card_id);
@@ -256,7 +263,8 @@ impl AbilityResolver {
             // When self_cost or self_target explicitly restricts to "this member"
             // (e.g. "このメンバーをウェイトにする"), filter candidates to only the
             // activating card. If the card is already in the target state, skip.
-            if (self_cost || effect.self_target.unwrap_or(false)) && self.selected_cards.is_empty()
+            if (self_cost || effect.self_target_any().unwrap_or(false))
+                && self.selected_cards.is_empty()
             {
                 if let Some(act_id) = gs.activating_card {
                     if candidates.iter().any(|(_, cid)| *cid == act_id) {
@@ -364,19 +372,9 @@ impl AbilityResolver {
                 gs.ability_queue
                     .set_pending_actions(vec![crate::card::AbilityEffect {
                         action: "change_state".to_string(),
-                        state_change: Some(state_change.clone()),
-                        // Preserve the state filter (e.g. "active" for
-                        // "アクティブ状態のメンバーをウェイトにする") so the
-                        // re-run after the player's choice keeps the same
-                        // candidate filter and doesn't accept already-waited members.
-                        state: effect.state.clone(),
                         target: Some(target.clone()),
                         count: Some(count),
-                        card_type: card_type_filter.clone(),
-                        cost_limit,
-                        group_names: group_filter.clone().map(|g| vec![g]),
-                        self_cost: Some(self_cost),
-                        cost_limit_operator,
+                        kind: effect.kind.clone(),
                         ..Default::default()
                     }]);
                 return Ok(());
@@ -596,7 +594,7 @@ impl AbilityResolver {
         group_filter: Option<&str>,
     ) -> Result<(), String> {
         let card_db = self.card_db();
-        let exclude_self_id = if effect.exclude_self.unwrap_or(false) {
+        let exclude_self_id = if effect.exclude_self_any().unwrap_or(false) {
             gs.activating_card
         } else {
             None
@@ -760,7 +758,8 @@ impl AbilityResolver {
         value: u32,
     ) {
         let target = effect.target_name();
-        let card_type = effect.card_type.as_deref();
+        let ct_binding = effect.card_type_any();
+        let card_type = ct_binding.as_deref();
         let player = gs.resolve_target_player_mut(target);
         let mut card_ids: Vec<i16> = if let Some("live_card") = card_type {
             player.live_card_zone.cards.iter().copied().collect()
@@ -775,10 +774,10 @@ impl AbilityResolver {
         } else {
             player.hand.cards.iter().copied().collect()
         };
-        if effect.group_names.is_some()
-            || effect.exclude_group_names.is_some()
-            || effect.characters.is_some()
-            || effect.exclude_characters.is_some()
+        if effect.group_names_any().is_some()
+            || effect.exclude_group_names_any().is_some()
+            || effect.characters_any().is_some()
+            || effect.exclude_characters_any().is_some()
         {
             let filter = effect.filter_subset();
             card_ids = util::matching_ids_filtered(
@@ -804,9 +803,11 @@ impl AbilityResolver {
     }
 
     pub(crate) fn execute_set_blade_type(&mut self, gs: &mut GameState, effect: &AbilityEffect) {
-        let blade_type = effect.blade_type.as_deref();
+        let bt_binding = effect.blade_type_any();
+        let blade_type = bt_binding.as_deref();
         let target = effect.target_name();
-        let duration = effect.duration.as_deref();
+        let dur_binding = effect.duration_any();
+        let duration = dur_binding.as_deref();
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -842,10 +843,10 @@ impl AbilityResolver {
                 })
                 .collect()
         };
-        if effect.group_names.is_some()
-            || effect.exclude_group_names.is_some()
-            || effect.characters.is_some()
-            || effect.exclude_characters.is_some()
+        if effect.group_names_any().is_some()
+            || effect.exclude_group_names_any().is_some()
+            || effect.characters_any().is_some()
+            || effect.exclude_characters_any().is_some()
         {
             let filter = effect.filter_subset();
             let ids: Vec<i16> = stage_card_ids.iter().map(|(id, _)| *id).collect();
@@ -1026,10 +1027,10 @@ impl AbilityResolver {
             player.stage.stage.to_vec()
         };
         stage_cards.retain(|&id| id != -1);
-        if effect.group_names.is_some()
-            || effect.exclude_group_names.is_some()
-            || effect.characters.is_some()
-            || effect.exclude_characters.is_some()
+        if effect.group_names_any().is_some()
+            || effect.exclude_group_names_any().is_some()
+            || effect.characters_any().is_some()
+            || effect.exclude_characters_any().is_some()
         {
             let filter = effect.filter_subset();
             stage_cards = util::matching_ids_filtered(
@@ -1042,7 +1043,7 @@ impl AbilityResolver {
                 None,
             );
         }
-        if let Some(ref pos) = effect.position {
+        if let Some(ref pos) = effect.position_any() {
             if let Some(p) = pos.get_position() {
                 if let Some(stage_idx) = util::stage_position_index(p) {
                     let player = gs.resolve_target_player(target);
@@ -1058,7 +1059,7 @@ impl AbilityResolver {
         for &card_id in &stage_cards {
             gs.mods.set_blade_modifier(card_id, value as i32);
             // Register for cleanup at live end / duration expiry
-            if effect.duration.is_some() {
+            if effect.duration_any().is_some() {
                 let mut data = serde_json::Map::new();
                 data.insert(
                     "card_id".to_string(),
@@ -1067,7 +1068,7 @@ impl AbilityResolver {
                 util::push_temporary_effect(
                     gs,
                     "set_blade_count",
-                    effect.duration.as_deref(),
+                    effect.duration_any().as_deref(),
                     target,
                     &format!("set blade count to {} for card {}", value, card_id),
                     Some(serde_json::Value::Object(data)),
@@ -1182,10 +1183,13 @@ impl AbilityResolver {
         effect: &AbilityEffect,
         value: u32,
     ) {
-        let operation = effect.operation.as_deref().unwrap_or("add");
+        let op_binding = effect.operation_any();
+        let operation = op_binding.unwrap_or("add");
         let target = effect.target_name();
-        let card_type = effect.card_type.as_deref();
-        let duration = effect.duration.as_deref();
+        let ct_binding = effect.card_type_any();
+        let card_type = ct_binding.as_deref();
+        let dur_binding = effect.duration_any();
+        let duration = dur_binding.as_deref();
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -1212,10 +1216,10 @@ impl AbilityResolver {
             player.hand.cards.iter().copied().collect()
         };
         // Filter by group_names etc. using the effect's CardFilter
-        if effect.group_names.is_some()
-            || effect.exclude_group_names.is_some()
-            || effect.characters.is_some()
-            || effect.exclude_characters.is_some()
+        if effect.group_names_any().is_some()
+            || effect.exclude_group_names_any().is_some()
+            || effect.characters_any().is_some()
+            || effect.exclude_characters_any().is_some()
         {
             let filter = effect.filter_subset();
             card_ids = util::matching_ids_filtered(
@@ -1230,7 +1234,7 @@ impl AbilityResolver {
         }
         // When self_target is set, only the activating card receives the modifier
         // (e.g. "このメンバーのコストを+Nする" — only this member, not all matching).
-        if effect.self_target.unwrap_or(false) {
+        if effect.self_target_any().unwrap_or(false) {
             if let Some(cid) = gs.activating_card {
                 card_ids.retain(|&id| id == cid);
             }

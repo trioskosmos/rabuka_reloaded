@@ -27,7 +27,9 @@ fn love_wing_bell_debug_card_abilities() {
         if let Some(ref eff) = ab.effect {
             eprintln!(
                 "[TEST_DEBUG]     effect action={} resource={:?} count={:?}",
-                eff.action, eff.resource, eff.count
+                eff.action,
+                eff.resource_any(),
+                eff.count
             );
             eprintln!(
                 "[TEST_DEBUG]     effect condition={:?}",

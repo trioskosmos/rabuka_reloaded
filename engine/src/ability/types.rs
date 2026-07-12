@@ -936,9 +936,9 @@ impl StepState {
     /// Record a step's output under its id. No-op if the effect has no id.
     /// If the id already has an output, the new output is merged in.
     pub fn record(&mut self, effect: &AbilityEffect, output: StepOutput) {
-        if let Some(ref id) = effect.id {
+        if let Some(ref id) = effect.id_any() {
             self.step_results
-                .entry(id.clone())
+                .entry(id.to_string())
                 .or_insert_with(StepOutput::default)
                 .merge(&output);
         }
@@ -973,11 +973,11 @@ impl StepState {
     /// referenced step produced, plus an optional offset. Returns `fallback`
     /// when the reference is not present (or `ref_value` is None).
     pub fn resolve_ref_value(&self, effect: &AbilityEffect, fallback: i32) -> i32 {
-        match &effect.ref_value {
+        match &effect.ref_value_any() {
             Some(id) => self
                 .get(id)
                 .value
-                .map(|v| v + effect.ref_offset.unwrap_or(0))
+                .map(|v| v + effect.ref_offset_any().unwrap_or(0))
                 .unwrap_or(fallback),
             None => fallback,
         }

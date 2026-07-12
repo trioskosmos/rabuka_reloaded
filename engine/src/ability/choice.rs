@@ -6,7 +6,7 @@ use super::types::{
 };
 use super::util;
 use crate::ability::debug::ABILITY_DEBUG;
-use crate::card::AbilityEffect;
+use crate::card::{AbilityEffect, EffectKind};
 use crate::game_state::GameState;
 use std::sync::atomic::Ordering;
 
@@ -114,6 +114,11 @@ impl super::resolver::AbilityResolver {
             }
         }
         // Feed the next repeat action + "Repeat?" prompt, one at a time.
+        eprintln!(
+            "[RPA_REPEAT] pending_repeat={} pending_choice={:?}",
+            self.pending_repeat_actions.len(),
+            self.pending_choice.is_some()
+        );
         if !self.pending_repeat_actions.is_empty() && self.pending_choice.is_none() {
             let next = self.pending_repeat_actions.remove(0);
             gs.ability_queue.set_pending_actions(vec![next]);
@@ -393,6 +398,9 @@ impl super::resolver::AbilityResolver {
         is_reveal: bool,
         discard_remaining: Option<bool>,
     ) -> Result<(), String> {
+        eprintln!("[KANAN_DEBUG] handle_select_card entered: zone={} indices={:?} count={} allow_skip={} effect_started={}",
+            zone, indices, count, allow_skip,
+            gs.ability_queue.current_entry().is_some_and(|e| e.effect_started));
         if ABILITY_DEBUG.load(Ordering::Relaxed) {
             log::debug!(
                 "[SEL_CARD] zone='{}' indices={:?} count={} allow_skip={} context={:?} is_reveal={}",
@@ -470,6 +478,13 @@ impl super::resolver::AbilityResolver {
                 .target_player_id(tpid)
         };
 
+        eprintln!(
+            "[KANAN_DEBUG] check hand-cost block: zone={} is_hand={} has_cost={} effect_started={}",
+            zone,
+            Zone::from_str(zone) == Some(Zone::Hand),
+            gs.entry_cost().is_some(),
+            effect_started
+        );
         if Zone::from_str(zone) == Some(Zone::Hand) && gs.entry_cost().is_some() && !effect_started
         {
             if !indices.is_empty() {
@@ -497,6 +512,10 @@ impl super::resolver::AbilityResolver {
                 .filter(|&cid| validate_card(cid))
                 .collect();
             if !new_card_ids.is_empty() {
+                eprintln!(
+                    "[KANAN_DEBUG] moving cards: count={} new_card_ids={:?}",
+                    count, new_card_ids
+                );
                 let player = gs.resolve_target_player_mut(&target);
                 let _ = util::move_cards(
                     player,
@@ -522,6 +541,7 @@ impl super::resolver::AbilityResolver {
             }
             if new_card_ids.is_empty() {
                 if !self.moved_cards.is_empty() {
+                    eprintln!("[KANAN_DEBUG] cost finalize: moved_cards={:?}, setting optional_cost_result=true", self.moved_cards);
                     gs.mods.last_cost_discard_count = self.moved_cards.len() as u32;
                     gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
                     gs.recently_moved_cards = Some(self.moved_cards.clone());
@@ -531,6 +551,7 @@ impl super::resolver::AbilityResolver {
                         entry.optional_cost_result = Some(true);
                     }
                 } else if allow_skip {
+                    eprintln!("[KANAN_DEBUG] cost finalize: NO moved cards, setting optional_cost_result=false");
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
                         entry.cost_paid = true;
                         entry.optional_cost_result = Some(false);
@@ -549,7 +570,7 @@ impl super::resolver::AbilityResolver {
                 };
                 let same_unit_name = gs
                     .entry_cost()
-                    .and_then(|c| c.same_unit_name)
+                    .and_then(|c| c.same_unit_name_any())
                     .unwrap_or(false);
                 let same_unit_filter = if same_unit_name {
                     self.moved_cards
@@ -594,7 +615,7 @@ impl super::resolver::AbilityResolver {
             // for remaining cards filtered to only the chosen unit.
             if count > 0 && !new_card_ids.is_empty() && new_card_ids.len() == count {
                 if let Some(cost) = gs.entry_cost() {
-                    if cost.same_unit_name.unwrap_or(false) {
+                    if cost.same_unit_name_any().unwrap_or(false) {
                         let total_needed = cost.count.unwrap_or(1) as usize;
                         let total_moved = self.moved_cards.len();
                         if total_moved < total_needed {
@@ -649,7 +670,13 @@ impl super::resolver::AbilityResolver {
             }
             // Re-prompt for any_number costs: after each selection, ask
             // if the player wants to select more cards or skip to finish.
-            if count == 0 && allow_skip {
+            let cost_max_cap = gs
+                .entry_cost()
+                .and_then(|c| c.count)
+                .map(|c| c as usize)
+                .unwrap_or(usize::MAX);
+            if count == 0 && allow_skip && self.moved_cards.len() < cost_max_cap {
+                eprintln!("[KANAN_DEBUG] any_number re-prompt: count={} allow_skip={} new_card_ids.len={} moved_cards={:?}", count, allow_skip, new_card_ids.len(), self.moved_cards);
                 let hand_now: Vec<i16> = {
                     let p = gs.resolve_target_player_mut(&target);
                     p.hand.cards.to_vec()
@@ -1364,19 +1391,17 @@ impl super::resolver::AbilityResolver {
         self.moved_cards.extend(&moved);
         // Apply resource_on_select if present — grants resource (e.g. blade)
         // automatically when a card is selected from revealed_cards.
-        if let Some(ref res) = self
+        let res = self
             .current_effect
             .as_ref()
-            .and_then(|e| e.resource_on_select.clone())
-        {
-            // Don't cache this execution — the resource is granted at selection
-            // time, not through the condition-evaluation path.
-            self.execute_effect(gs, &res)?;
+            .and_then(|e| e.resource_on_select_any().cloned());
+        if let Some(ref res) = res {
+            self.execute_effect(gs, res)?;
         }
         if self
             .current_effect
             .as_ref()
-            .is_some_and(|e| e.discard_remaining.unwrap_or(false))
+            .is_some_and(|e| e.discard_remaining_any().unwrap_or(false))
         {
             let remaining: Vec<i16> = gs
                 .revealed_cards
@@ -1468,15 +1493,16 @@ impl super::resolver::AbilityResolver {
             .filter_map(|&idx| {
                 if idx < player.hand.cards.len() {
                     let cid = player.hand.cards[idx];
-                    let passes = util::card_matches_type(&card_db, cid, cost.card_type.as_deref())
-                        && util::card_matches_characters(&card_db, cid, cost.characters.as_ref())
-                        && match cost.group_names.as_ref() {
-                            Some(groups) => groups.iter().any(|g| {
-                                util::card_matches_group_str(&card_db, cid, Some(g.as_str()))
-                            }),
-                            None => true,
-                        }
-                        && util::card_matches_cost_limit(&card_db, cid, cost.cost_limit);
+                    let passes =
+                        util::card_matches_type(&card_db, cid, cost.card_type_any().as_deref())
+                            && util::card_matches_characters(&card_db, cid, cost.characters_any())
+                            && match cost.group_names_any().as_ref() {
+                                Some(groups) => groups.iter().any(|g| {
+                                    util::card_matches_group_str(&card_db, cid, Some(g.as_str()))
+                                }),
+                                None => true,
+                            }
+                            && util::card_matches_cost_limit(&card_db, cid, cost.cost_limit_any());
                     if passes {
                         Some(cid)
                     } else {
@@ -1570,7 +1596,7 @@ impl super::resolver::AbilityResolver {
 
         if select_action_entry
             .as_ref()
-            .and_then(|sa| sa.reveal)
+            .and_then(|sa| sa.reveal_any())
             .unwrap_or(false)
         {
             self.reveal_selected_looked_at(gs, &valid);
@@ -1586,7 +1612,7 @@ impl super::resolver::AbilityResolver {
 
             if is_select_cards && !valid.is_empty() {
                 let sa = select_action_entry.as_ref();
-                let any_number = sa.and_then(|s| s.any_number).unwrap_or(false);
+                let any_number = sa.and_then(|s| s.any_number_any()).unwrap_or(false);
                 let is_max = sa.and_then(|s| s.max).unwrap_or(false);
                 let is_optional = sa.and_then(|s| s.optional).unwrap_or(false);
                 let json_count = sa.and_then(|s| s.count).unwrap_or(1) as usize;
@@ -1627,11 +1653,11 @@ impl super::resolver::AbilityResolver {
                         )))
                         .card_type(ct)
                         .cost_limit(
-                            sa.and_then(|s| s.cost_limit),
-                            sa.and_then(|s| s.cost_limit_operator.clone()),
+                            sa.and_then(|s| s.cost_limit_any()),
+                            sa.and_then(|s| s.cost_limit_operator_any()).map(|s| s.to_string()),
                         )
-                        .group(sa.and_then(|s| s.group_names.as_ref()).and_then(|v| v.first().cloned()))
-                        .characters(sa.and_then(|s| s.characters.clone()))
+                        .group(sa.as_ref().and_then(|s| s.group_names_any()).and_then(|v| v.first().cloned()))
+                        .characters(sa.and_then(|s| s.characters_any().cloned()))
                         .filtered_indices(Some(remaining_indices))
                         .build(),
                     );
@@ -2090,7 +2116,7 @@ impl super::resolver::AbilityResolver {
                             let commands = vec![selected_effect];
                             let wants_re_prompt = !remaining.is_empty()
                                 && gs.entry_effect().map_or(false, |eff| {
-                                    if eff.any_number.unwrap_or(false) {
+                                    if eff.any_number_any().unwrap_or(false) {
                                         return true;
                                     }
                                     if let Some(ref alt_cond) = eff.compound.alternative_condition {
@@ -2099,7 +2125,7 @@ impl super::resolver::AbilityResolver {
                                             &self.moved_cards,
                                         );
                                         ctx.evaluate_condition(alt_cond)
-                                            && eff.alternative_count_type.as_deref()
+                                            && eff.alternative_count_type_any().as_deref()
                                                 == Some("any_number")
                                     } else {
                                         false
@@ -2113,7 +2139,7 @@ impl super::resolver::AbilityResolver {
                                 let desc: Vec<String> = remaining
                                     .iter()
                                     .map(|o| {
-                                        o.answers
+                                        o.answers_any()
                                             .as_ref()
                                             .map(|a| a.join(", "))
                                             .unwrap_or_else(|| o.text.clone())
@@ -2268,7 +2294,8 @@ impl super::resolver::AbilityResolver {
         if let Some(effect) = gs.entry_effect().cloned() {
             let source = effect.source.as_deref().unwrap_or(Zone::Deck.to_str());
             let destination = effect.destination.as_deref().unwrap_or(Zone::Hand.to_str());
-            let card_type = effect.card_type.as_deref();
+            let ct_binding = effect.card_type_any();
+            let card_type = ct_binding.as_deref();
             let card_db = gs.card_database.clone();
             let target = effect.target.as_deref().unwrap_or("self");
             let player = gs.resolve_target_player_mut(target);
@@ -2345,12 +2372,29 @@ impl super::resolver::AbilityResolver {
                 "0" | "left" | "left_side" => "left",
                 "1" | "center" => "center",
                 "2" | "right" | "right_side" => "right",
-                _ => selected,
+                _ => selected
+                    .split_once(':')
+                    .map(|(_, pos)| pos)
+                    .unwrap_or(selected),
             };
+            let mut explicit_source_pos: Option<String> = None;
             if let Some(ChoiceRoute::Raw(ref raw)) = choice_card_no {
                 if let Some(tgt) = raw.strip_prefix("position_change:") {
                     if tgt == "opponent:front" {
-                        modified.source_position = Some(selected.to_string());
+                        if let Some(EffectKind::MoveCards {
+                            ref mut source_position,
+                            ..
+                        }) = modified.kind
+                        {
+                            *source_position = Some(selected.to_string());
+                        }
+                        if let Some(EffectKind::PositionOp {
+                            ref mut source_position,
+                            ..
+                        }) = modified.kind
+                        {
+                            *source_position = Some(selected.to_string());
+                        }
                         let pc_ok =
                             self.execute_position_change_with_destination(gs, &modified, "front");
                         if let Err(ref e) = pc_ok {
@@ -2384,14 +2428,14 @@ impl super::resolver::AbilityResolver {
                             // "opponent:center") — used when effect.target was null (any member).
                             if let Some((player_prefix, position)) = selected.split_once(':') {
                                 modified.target = Some(player_prefix.to_string());
-                                modified.source_position = Some(position.to_string());
+                                explicit_source_pos = Some(position.to_string());
                             } else {
-                                modified.source_position = Some(dest.to_string());
+                                explicit_source_pos = Some(dest.to_string());
                             }
                         } else if super::util::stage_position_index(parts[1]).is_some() {
-                            modified.source_position = Some(parts[1].to_string());
+                            explicit_source_pos = Some(parts[1].to_string());
                         } else {
-                            modified.target_member = Some(parts[1].to_string());
+                            modified.set_target_member(Some(parts[1].to_string()));
                         }
                     } else {
                         modified.target = Some(tgt.to_string());
@@ -2410,22 +2454,46 @@ impl super::resolver::AbilityResolver {
                     .clone()
                     .unwrap_or_else(|| "self".to_string());
                 self.clear_choice_meta(gs);
-                modified.target_member = Some("this_member".to_string());
-                modified.group_names = None;
-                modified.exclude_self = None;
-                if let Err(e) =
-                    self.execute_position_change(gs, &modified, None, &target_str, "this_member")
-                {
-                    log::debug!(
-                        "Failed to create destination choice for position change: {}",
-                        e
-                    );
-                }
-                if self.pending_choice.is_some() {
-                    self.store_pending_choice(gs);
+                self.pending_choice = None;
+                // Compute destinations directly — all positions except source
+                // are valid (no group_names/exclude_self filtering for dest).
+                let all_positions = ["left", "center", "right"];
+                let valid_destinations: Vec<String> = all_positions
+                    .iter()
+                    .filter(|pos| **pos != dest)
+                    .map(|pos| pos.to_string())
+                    .collect();
+                if valid_destinations.is_empty() {
+                    self.clear_choice_state_and_resume(gs)?;
                     return Ok(());
                 }
-                self.clear_choice_state_and_resume(gs)?;
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.choice_card_no = Some(ChoiceRoute::Raw(format!(
+                        "position_change:{}:{}",
+                        target_str, dest
+                    )));
+                }
+                let from_label = match dest {
+                    "left" | "left_side" => "Left",
+                    "center" => "Center",
+                    "right" | "right_side" => "Right",
+                    _ => "?",
+                };
+                self.pending_choice = Some(Choice::SelectTarget {
+                    target: "position|destination".to_string(),
+                    description: format!(
+                        "Choose destination for position change (currently at {})",
+                        from_label
+                    ),
+                    description_en: Some(format!(
+                        "Choose destination for position change (currently at {})",
+                        from_label
+                    )),
+                    description_ja: Some(format!("移動先を選択（現在: {}）", from_label)),
+                    allow_skip: false,
+                    options: Some(valid_destinations),
+                });
+                self.store_pending_choice(gs);
                 return Ok(());
             }
 
@@ -2533,10 +2601,43 @@ impl super::resolver::AbilityResolver {
             }
 
             modified.destination = Some(dest.to_string());
-            if let Err(e) = self.execute_position_change_with_destination(gs, &modified, dest) {
-                log::debug!("Failed to execute position change: {}", e);
-            } else {
-                // Scan immediately for auto-abilities triggered by this swap.
+            // Use explicit_source_pos if available (handles Choice/compound
+            // effects where source_position_any() returns None).
+            if let Some(ref src_pos) = explicit_source_pos {
+                let target = modified.target.as_deref().unwrap_or("self");
+                let player = gs.resolve_target_player_mut(target);
+                let src_idx = crate::ability::util::stage_position_index(src_pos).unwrap_or(999);
+                let dst_idx = crate::ability::util::stage_position_index(dest).unwrap_or(999);
+                if src_idx != dst_idx
+                    && src_idx < 3
+                    && dst_idx < 3
+                    && player.stage.stage[src_idx] != -1
+                {
+                    use crate::zones::MemberArea;
+                    let from = match src_idx {
+                        0 => MemberArea::LeftSide,
+                        1 => MemberArea::Center,
+                        _ => MemberArea::RightSide,
+                    };
+                    let to = match dst_idx {
+                        0 => MemberArea::LeftSide,
+                        1 => MemberArea::Center,
+                        _ => MemberArea::RightSide,
+                    };
+                    let tgt_id = player.stage.stage[dst_idx];
+                    let src_id = player.stage.stage[src_idx];
+                    if let Err(e) = player.stage.position_change(from, to) {
+                        log::debug!("Direct position change failed: {}", e);
+                    } else {
+                        gs.position_change_occurred_this_turn = true;
+                        if src_id != -1 {
+                            gs.record_card_movement(src_id);
+                        }
+                        if tgt_id != -1 {
+                            gs.record_card_movement(tgt_id);
+                        }
+                    }
+                }
                 let pid = gs
                     .ability_queue
                     .current_entry()
@@ -2550,6 +2651,24 @@ impl super::resolver::AbilityResolver {
                         ..Default::default()
                     },
                 );
+            } else {
+                if let Err(e) = self.execute_position_change_with_destination(gs, &modified, dest) {
+                    log::debug!("Failed to execute position change: {}", e);
+                } else {
+                    let pid = gs
+                        .ability_queue
+                        .current_entry()
+                        .map(|e| e.player_id.clone())
+                        .unwrap_or_default();
+                    gs.trigger_auto_abilities_for_player_with_event(
+                        &pid,
+                        &TriggerEvent {
+                            moved_cards: gs.recently_moved_cards.clone().unwrap_or_default(),
+                            position_change_occurred: gs.position_change_occurred_this_turn,
+                            ..Default::default()
+                        },
+                    );
+                }
             }
             self.selected_area = None;
         }
@@ -2583,14 +2702,14 @@ impl super::resolver::AbilityResolver {
             let chosen = if selected == "1" || selected == "alternative" || selected == "secondary"
             {
                 effect
-                    .alternative_effect
+                    .alternative_effect_any()
                     .clone()
-                    .or(effect.compound.primary_effect.clone())
+                    .or(effect.compound.primary_effect.as_ref())
             } else {
-                effect.compound.primary_effect.clone()
+                effect.compound.primary_effect.as_ref()
             };
             if let Some(sub_effect) = chosen {
-                *effect = (*sub_effect).clone();
+                *effect = *(*sub_effect).clone();
             }
         })
     }
@@ -2990,7 +3109,7 @@ impl super::resolver::AbilityResolver {
                 Self::set_chosen_target(s, target);
             }
         }
-        if let Some(ref mut oa) = effect.opponent_action {
+        if let Some(ref mut oa) = effect.compound.optional_action.as_mut() {
             Self::set_chosen_target(oa, target);
         }
         if let Some(ref mut pri) = effect.compound.primary_effect {

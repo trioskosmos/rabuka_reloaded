@@ -76,7 +76,7 @@ impl super::TurnEngine {
                                         ability
                                             .effect
                                             .as_ref()
-                                            .and_then(|e| e.activation_position.as_deref()),
+                                            .and_then(|e| e.activation_position_any()),
                                         area,
                                     ) {
                                         continue;
@@ -190,7 +190,7 @@ impl super::TurnEngine {
                 for ability in &card.abilities {
                     if let Some(ref effect) = ability.effect {
                         if effect.action == "suppress_ability_trigger" {
-                            if effect.suppressed_trigger.as_deref() == Some(trigger_name) {
+                            if effect.suppressed_trigger_any().as_deref() == Some(trigger_name) {
                                 return true;
                             }
                         }
@@ -326,7 +326,7 @@ impl super::TurnEngine {
                                 ability
                                     .effect
                                     .as_ref()
-                                    .and_then(|e| e.activation_position.as_deref()),
+                                    .and_then(|e| e.activation_position_any()),
                                 card_position,
                             ) {
                                 continue;
@@ -477,7 +477,7 @@ impl super::TurnEngine {
                                 ability
                                     .effect
                                     .as_ref()
-                                    .and_then(|e| e.activation_position.as_deref()),
+                                    .and_then(|e| e.activation_position_any()),
                                 area,
                             ) {
                                 continue;
@@ -524,7 +524,7 @@ impl super::TurnEngine {
                                     gained_ability
                                         .effect
                                         .as_ref()
-                                        .and_then(|e| e.activation_position.as_deref()),
+                                        .and_then(|e| e.activation_position_any()),
                                     area,
                                 ) {
                                     continue;

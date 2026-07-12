@@ -176,14 +176,14 @@ impl AbilityResolver {
             .is_some_and(|e| e.cost_paid);
 
         if !cost_already_paid {
-            if let Some(ref activation_condition) = effect.activation_condition_parsed {
-                let mut merged_cond = activation_condition.clone();
+            if let Some(ref activation_condition) = effect.activation_condition_parsed_any() {
+                let mut merged_cond = Box::clone(activation_condition);
                 // Merge the effect's position info into the condition so it's checked.
                 if merged_cond.position.is_none() && merged_cond.positions_characters.is_none() {
-                    if let Some(ref pos) = effect.position {
-                        merged_cond.position = Some(pos.clone());
-                    } else if let Some(ref act_pos) = effect.activation_position {
-                        merged_cond.activation_position = Some(act_pos.clone());
+                    if let Some(ref pos) = effect.position_any() {
+                        merged_cond.position = Some(pos.clone().clone());
+                    } else if let Some(ref act_pos) = effect.activation_position_any() {
+                        merged_cond.activation_position = Some(act_pos.to_string());
                     }
                 }
                 let snapshot = crate::ability::log::buffer_len();
@@ -217,10 +217,10 @@ impl AbilityResolver {
                 }
                 let mut cond = condition.clone();
                 if cond.position.is_none() && cond.positions_characters.is_none() {
-                    if let Some(ref pos) = effect.position {
-                        cond.position = Some(pos.clone());
-                    } else if let Some(ref act_pos) = effect.activation_position {
-                        cond.activation_position = Some(act_pos.clone());
+                    if let Some(ref pos) = effect.position_any() {
+                        cond.position = Some(pos.clone().clone());
+                    } else if let Some(ref act_pos) = effect.activation_position_any() {
+                        cond.activation_position = Some(act_pos.to_string());
                     }
                 }
                 // Merge effect-level group_names into conditions that need
@@ -247,8 +247,9 @@ impl AbilityResolver {
                         }
                     }
                 }
-                let gns = effect.group_names.as_ref();
-                merge_group_names(&mut cond, gns);
+                let gns_binding = effect.group_names_any();
+                let gns = gns_binding.as_ref();
+                merge_group_names(&mut cond, gns.map(|v| &**v));
                 let cond_snapshot = crate::ability::log::buffer_len();
                 let passed = ctx.evaluate_condition(&cond);
                 // On success: drain (will be re-evaluated during execution).
@@ -274,7 +275,7 @@ impl AbilityResolver {
         // When an effect has activation_position but no condition field, the merge
         // paths above never fire. Check the position directly here.
         if effect.condition.is_none() {
-            if let Some(ref act_pos) = effect.activation_position {
+            if let Some(ref act_pos) = effect.activation_position_any() {
                 let card_id = gs.activating_card;
                 let player = gs.resolve_target_player("self");
                 let passes = act_pos.split(',').any(|p| {
@@ -454,11 +455,11 @@ impl AbilityResolver {
             if let Some(ref mut j) = json {
                 if let Some(entry) = gs.ability_queue.current_entry() {
                     if let Some(ref effect) = entry.ability.effect {
-                        if let Some(ref maker) = effect.choice_maker {
+                        if let Some(ref maker) = effect.choice_maker_any() {
                             if let Some(obj) = j.as_object_mut() {
                                 obj.insert(
                                     "choice_maker".to_string(),
-                                    serde_json::Value::String(maker.clone()),
+                                    serde_json::Value::String(maker.to_string()),
                                 );
                             }
                         }
@@ -712,7 +713,7 @@ impl AbilityResolver {
                     cost.action,
                     cost.source.as_deref().unwrap_or("?"),
                     cost.destination.as_deref().unwrap_or("?"),
-                    cost.count.unwrap_or(cost.energy_count.unwrap_or(1))
+                    cost.count.unwrap_or(cost.energy_count_any().unwrap_or(1))
                 );
                 push_verdict(AbilityLogItem::Cost {
                     text: cost.text.clone(),
@@ -825,6 +826,13 @@ impl AbilityResolver {
             .ability_queue
             .current_entry()
             .is_some_and(|e| e.optional_cost_result == Some(false));
+        eprintln!(
+            "[KANAN_DEBUG] cost_was_skipped={} optional_cost_result={:?}",
+            cost_was_skipped,
+            gs.ability_queue
+                .current_entry()
+                .and_then(|e| e.optional_cost_result)
+        );
         if cost_was_skipped {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.effect_started = true;
@@ -839,7 +847,7 @@ impl AbilityResolver {
             // Check the effect's condition BEFORE executing. The condition must
             // be met in the current game state (after cost payment). This prevents
             // effects like "choice" from being shown when the condition fails.
-            if effect.condition.is_some() || effect.activation_condition_parsed.is_some() {
+            if effect.condition.is_some() || effect.activation_condition_parsed_any().is_some() {
                 let passed = self.can_activate_effect(gs, effect);
                 if !passed {
                     // For 起動 (activation) abilities, the player deliberately paid the
@@ -1039,9 +1047,9 @@ impl AbilityResolver {
         let mut cost = cost.clone();
         if let Some(ref effect) = ability.effect {
             if let Some(mod_cost) = util::find_modify_cost(effect, None, None) {
-                if mod_cost.operation.as_deref() == Some("subtract")
-                    && mod_cost.per_unit.unwrap_or(false)
-                    && mod_cost.per_unit_type.as_deref() == Some("group_name")
+                if mod_cost.operation_any().as_deref() == Some("subtract")
+                    && mod_cost.per_unit_any().unwrap_or(false)
+                    && mod_cost.per_unit_type_any().as_deref() == Some("group_name")
                 {
                     // Count distinct group names on self's stage
                     let player = gs.resolve_target_player("self");
@@ -1057,12 +1065,15 @@ impl AbilityResolver {
                             }
                         }
                     }
-                    let per_unit_count = mod_cost.per_unit_count.unwrap_or(1);
+                    let per_unit_count = mod_cost.per_unit_count_any().unwrap_or(1);
                     let reduction =
                         (groups.len() as u32 / per_unit_count) * mod_cost.count.unwrap_or(1);
                     if cost.action == "pay_energy" {
-                        let new_energy = cost.energy_count.unwrap_or(0).saturating_sub(reduction);
-                        cost.energy_count = Some(new_energy);
+                        let new_energy = cost
+                            .energy_count_any()
+                            .unwrap_or(0)
+                            .saturating_sub(reduction);
+                        cost.set_energy_count(Some(new_energy));
                     }
                 }
             }

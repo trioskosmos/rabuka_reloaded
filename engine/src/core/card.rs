@@ -465,8 +465,8 @@ pub struct Ability {
     pub use_limit: Option<u32>,
     #[serde(default)]
     pub is_null: bool,
-    pub cost: Option<AbilityCost>,
-    pub effect: Option<AbilityEffect>,
+    pub cost: Option<Box<AbilityCost>>,
+    pub effect: Option<Box<AbilityEffect>>,
     pub keywords: Option<Vec<Keyword>>,
 }
 
@@ -538,58 +538,58 @@ impl serde::Serialize for AbilityCost {
         if let Some(ref v) = inner.count {
             map.serialize_entry("count", v)?;
         }
-        if let Some(ref v) = inner.card_type {
+        if let Some(v) = inner.card_type_any() {
             map.serialize_entry("card_type", v)?;
         }
         if let Some(ref v) = inner.target {
             map.serialize_entry("target", v)?;
         }
-        if let Some(v) = inner.optional {
+        if let Some(v) = inner.optional_any() {
             map.serialize_entry("optional", &v)?;
         }
-        if let Some(ref v) = inner.energy_count {
-            map.serialize_entry("energy", v)?;
+        if let Some(v) = inner.energy_count_any() {
+            map.serialize_entry("energy", &v)?;
         }
-        if let Some(ref v) = inner.state_change {
+        if let Some(v) = inner.state_change_any() {
             map.serialize_entry("state_change", v)?;
         }
-        if let Some(ref v) = inner.position {
+        if let Some(v) = inner.position_any() {
             map.serialize_entry("position", v)?;
         }
-        if let Some(ref v) = inner.self_cost {
-            map.serialize_entry("self_cost", v)?;
+        if let Some(v) = inner.self_cost_any() {
+            map.serialize_entry("self_cost", &v)?;
         }
-        if let Some(v) = inner.exclude_self {
+        if let Some(v) = inner.exclude_self_any() {
             map.serialize_entry("exclude_self", &v)?;
         }
-        if let Some(ref v) = inner.same_unit_name {
-            map.serialize_entry("same_unit_name", v)?;
+        if let Some(v) = inner.same_unit_name_any() {
+            map.serialize_entry("same_unit_name", &v)?;
         }
-        if let Some(ref v) = inner.shuffle {
-            map.serialize_entry("shuffle", v)?;
+        if let Some(v) = inner.shuffle_any() {
+            map.serialize_entry("shuffle", &v)?;
         }
-        if let Some(ref v) = inner.any_number {
-            map.serialize_entry("any_number", v)?;
+        if let Some(v) = inner.any_number_any() {
+            map.serialize_entry("any_number", &v)?;
         }
-        if let Some(ref v) = inner.cost_limit {
-            map.serialize_entry("cost_limit", v)?;
+        if let Some(v) = inner.cost_limit_any() {
+            map.serialize_entry("cost_limit", &v)?;
         }
-        if let Some(ref v) = inner.cost_limit_operator {
+        if let Some(v) = inner.cost_limit_operator_any() {
             map.serialize_entry("cost_limit_operator", v)?;
         }
-        if let Some(ref v) = inner.characters {
+        if let Some(v) = inner.characters_any() {
             map.serialize_entry("characters", v)?;
         }
-        if let Some(ref v) = inner.exclude_characters {
+        if let Some(v) = inner.exclude_characters_any() {
             map.serialize_entry("exclude_characters", v)?;
         }
-        if let Some(ref v) = inner.group_names {
+        if let Some(v) = inner.group_names_any() {
             map.serialize_entry("group_names", v)?;
         }
-        if let Some(ref v) = inner.placement_order {
+        if let Some(v) = inner.placement_order_any() {
             map.serialize_entry("placement_order", v)?;
         }
-        if let Some(ref v) = inner.alternative_effect {
+        if let Some(v) = inner.alternative_effect_any() {
             map.serialize_entry("alternative_effect", v)?;
         }
         if !inner.action.is_empty() {
@@ -617,6 +617,7 @@ impl<'de> serde::Deserialize<'de> for AbilityCost {
             }
             fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> Result<AbilityCost, M::Error> {
                 let mut effect = AbilityEffect::default();
+                let mut extra = serde_json::Map::new();
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
                         "text" => effect.text = map.next_value()?,
@@ -628,52 +629,27 @@ impl<'de> serde::Deserialize<'de> for AbilityCost {
                         }
                         "destination" => effect.destination = map.next_value()?,
                         "count" => effect.count = map.next_value()?,
-                        "card_type" => effect.card_type = map.next_value()?,
                         "target" => effect.target = map.next_value()?,
                         "optional" => effect.optional = map.next_value()?,
-                        "energy" | "energy_count" => {
-                            effect.energy_count = map.next_value()?;
-                        }
-                        "state_change" => effect.state_change = map.next_value()?,
-                        "position" => effect.position = map.next_value()?,
-                        "self_cost" => effect.self_cost = map.next_value()?,
-                        "exclude_self" => effect.exclude_self = map.next_value()?,
-                        "same_unit_name" => effect.same_unit_name = map.next_value()?,
-                        "shuffle" => effect.shuffle = map.next_value()?,
-                        "any_number" => effect.any_number = map.next_value()?,
                         "max" => effect.max = map.next_value()?,
-                        "cost_limit" => effect.cost_limit = map.next_value()?,
-                        "cost_limit_operator" => effect.cost_limit_operator = map.next_value()?,
-                        "characters" => effect.characters = map.next_value()?,
-                        "exclude_characters" => effect.exclude_characters = map.next_value()?,
-                        "group_names" => effect.group_names = map.next_value()?,
-                        "placement_order" => effect.placement_order = map.next_value()?,
-                        "alternative_effect" => {
-                            effect.alternative_effect = map.next_value()?;
-                        }
                         "options" | "costs" => {
-                            // Sub-costs become sub-effects in compound.actions.
-                            // Deserialize as AbilityCost so the rename mappings
-                            // (type→action, energy→energy_count) are applied.
-                            // Use Option because AbilityEffect's derive Serialize
-                            // writes null for empty Option<Vec> fields.
                             let sub: Option<Vec<AbilityCost>> = map.next_value()?;
                             if let Some(sub) = sub {
                                 effect.compound.actions =
                                     Some(sub.into_iter().map(AbilityCost::into_effect).collect());
                             }
                         }
-                        "group_reference" => effect.group_reference = map.next_value()?,
-                        "exclude_group_names" => effect.exclude_group_names = map.next_value()?,
-                        "cost_total" => effect.cost_total = map.next_value()?,
-                        "cost_total_operator" => effect.cost_total_operator = map.next_value()?,
-                        "cost_reference" => effect.cost_reference = map.next_value()?,
-                        "cost_offset" => effect.cost_offset = map.next_value()?,
-                        // Ignore unknown legacy cost fields rather than failing
-                        // — the parser has been adding fields over time.
                         _ => {
-                            let _: serde::de::IgnoredAny = map.next_value()?;
+                            let value: serde_json::Value = map.next_value()?;
+                            extra.insert(key.to_string(), value);
                         }
+                    }
+                }
+                if !extra.is_empty() {
+                    if let Some(kind) =
+                        build_kind_from_action(&effect.action, &serde_json::Value::Object(extra))
+                    {
+                        effect.kind = Some(kind);
                     }
                 }
 
@@ -690,22 +666,22 @@ impl AbilityCost {
     /// handlers can use the same consolidation pattern as effect handlers.
     pub fn filter_subset(&self) -> crate::ability::util::CardFilter<'_> {
         crate::ability::util::CardFilter {
-            card_type: self.card_type.as_deref(),
+            card_type: self.card_type_any(),
             group: self
-                .group_names
+                .group_names_any()
                 .as_ref()
                 .and_then(|v| v.first())
                 .map(|s| s.as_str()),
-            cost_limit: self.cost_limit,
-            cost_operator: self.cost_limit_operator.as_deref(),
-            characters: self.characters.as_ref(),
-            exclude_characters: self.exclude_characters.as_ref(),
-            exclude_self: if self.exclude_self.unwrap_or(false) {
+            cost_limit: self.cost_limit_any(),
+            cost_operator: self.cost_limit_operator_any(),
+            characters: self.characters_any(),
+            exclude_characters: self.exclude_characters_any(),
+            exclude_self: if self.exclude_self_any().unwrap_or(false) {
                 Some(-1)
             } else {
                 None
             },
-            exclude_group_names: self.exclude_group_names.as_ref(),
+            exclude_group_names: self.exclude_group_names_any(),
             ..Default::default()
         }
     }
@@ -753,366 +729,5145 @@ pub struct AbilityFilterBranch {
     pub ability_filter_triggers: Option<Vec<String>>,
 }
 
+/// Macro to generate accessor methods on AbilityEffect that delegate to EffectKind.
+/// Usage: ekf!(field_name: return_type => VariantName)
+/// This expands to a method `pub fn field_name(&self) -> &return_type`
+/// that checks self.kind for the given variant and returns a reference
+/// or default.
+#[macro_export]
+macro_rules! ekf {
+    ($effect:expr, $variant:path, $field:ident) => {{
+        match &$effect.kind {
+            Some($variant { $field, .. }) => $field,
+            _ => &None,
+        }
+    }};
+}
+
+/// Tagged union of effect-specific fields, indexed by effect action type.
+/// Each variant holds only the fields relevant to its group of actions,
+/// replacing the 142-field flat AbilityEffect struct.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EffectKind {
+    #[default]
+    None,
+    /// MoveCards effect fields
+    MoveCards {
+        #[serde(default)]
+        card_type: Option<String>,
+        #[serde(default)]
+        target_count: Option<u32>,
+        #[serde(default)]
+        characters: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_characters: Option<Vec<String>>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_group_names: Option<Vec<String>>,
+        #[serde(default)]
+        cost_limit: Option<u32>,
+        #[serde(default)]
+        cost_limit_operator: Option<String>,
+        #[serde(default)]
+        cost_limit_min: Option<u32>,
+        #[serde(default)]
+        cost_limit_max: Option<u32>,
+        #[serde(default)]
+        card_names: Vec<String>,
+        #[serde(default)]
+        placement_order: Option<String>,
+        #[serde(default)]
+        shuffle: Option<bool>,
+        #[serde(default)]
+        any_number: Option<bool>,
+        #[serde(default)]
+        discard_remaining: Option<bool>,
+        #[serde(default)]
+        multiple_targets: Option<bool>,
+        #[serde(default)]
+        exclude_self: Option<bool>,
+        #[serde(default)]
+        exclude_selected: Option<bool>,
+        #[serde(default)]
+        exclude_by_name_source: Option<String>,
+        #[serde(default)]
+        name_constraint: Option<String>,
+        #[serde(default)]
+        name_constraint_source: Option<String>,
+        #[serde(default)]
+        ability_filter: Option<String>,
+        #[serde(default)]
+        ability_filter_triggers: Option<Vec<String>>,
+        #[serde(default)]
+        or_ability_filters: Option<Vec<AbilityFilterBranch>>,
+        #[serde(default)]
+        card_property: Option<String>,
+        #[serde(default)]
+        original_value: Option<bool>,
+        #[serde(default)]
+        source_position: Option<String>,
+        #[serde(default)]
+        exclude_position: Option<String>,
+        #[serde(default)]
+        allow_occupied_stage: Option<bool>,
+        #[serde(default)]
+        target_from_selection: Option<bool>,
+        #[serde(default)]
+        group_reference: Option<String>,
+        #[serde(default)]
+        cost_from_revealed: Option<bool>,
+        #[serde(default)]
+        self_target: Option<bool>,
+        #[serde(default)]
+        per_group: Option<bool>,
+        #[serde(default)]
+        per_group_count: Option<u32>,
+        #[serde(default)]
+        state: Option<String>,
+        #[serde(default)]
+        negation: Option<bool>,
+        #[serde(default)]
+        location: Option<String>,
+        #[serde(default)]
+        activation_position: Option<String>,
+        #[serde(default)]
+        exclude_heart_colors: Option<Vec<String>>,
+        #[serde(default)]
+        filter_targets_by_heart_colors: Option<bool>,
+        #[serde(default)]
+        cost_total: Option<u32>,
+        #[serde(default)]
+        cost_total_operator: Option<String>,
+        #[serde(default)]
+        need_heart_total: Option<u32>,
+        #[serde(default)]
+        need_heart_operator: Option<String>,
+        #[serde(default)]
+        need_heart_color: Option<String>,
+        #[serde(default)]
+        distinct: Option<String>,
+        #[serde(default)]
+        state_change: Option<String>,
+        #[serde(default)]
+        self_cost: Option<bool>,
+        #[serde(default)]
+        dynamic_count: Option<DynamicCount>,
+        #[serde(default)]
+        or_card_types: Option<Vec<String>>,
+        #[serde(default)]
+        position: Option<PositionInfo>,
+        #[serde(default)]
+        cost_reference: Option<String>,
+        #[serde(default)]
+        cost_offset: Option<i32>,
+        #[serde(default)]
+        all: Option<bool>,
+        #[serde(default)]
+        energy_count: Option<u32>,
+        #[serde(default)]
+        heart_colors: Vec<String>,
+        #[serde(default)]
+        baton_touch_trigger: Option<bool>,
+        #[serde(default)]
+        target_member: Option<String>,
+        #[serde(default)]
+        same_unit_name: Option<bool>,
+        #[serde(default)]
+        action_by: Option<String>,
+        #[serde(default)]
+        activation_condition_parsed: Option<Box<Condition>>,
+        #[serde(default)]
+        quoted_text: Option<QuotedText>,
+    },
+    /// DrawCards effect fields
+    DrawCards {
+        #[serde(default)]
+        target_count: Option<u32>,
+        #[serde(default)]
+        card_type: Option<String>,
+        #[serde(default)]
+        dynamic_count: Option<DynamicCount>,
+        #[serde(default)]
+        card_names: Vec<String>,
+        #[serde(default)]
+        location: Option<String>,
+        #[serde(default)]
+        exclude_self: Option<bool>,
+        #[serde(default)]
+        per_unit: Option<bool>,
+        #[serde(default)]
+        per_unit_count: Option<u32>,
+        #[serde(default)]
+        per_unit_type: Option<String>,
+        #[serde(default)]
+        per_unit_heart_colors: Vec<String>,
+        #[serde(default)]
+        per_unit_location: Option<String>,
+        #[serde(default)]
+        position: Option<PositionInfo>,
+        #[serde(default)]
+        state: Option<String>,
+        #[serde(default)]
+        heart_colors: Vec<String>,
+        #[serde(default)]
+        trigger_type: Option<String>,
+        #[serde(default)]
+        original_value: Option<bool>,
+        #[serde(default)]
+        action_by: Option<String>,
+    },
+    /// SelectTarget effect fields
+    SelectTarget {
+        #[serde(default)]
+        target_count: Option<u32>,
+        #[serde(default)]
+        card_type: Option<String>,
+        #[serde(default)]
+        characters: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_characters: Option<Vec<String>>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_group_names: Option<Vec<String>>,
+        #[serde(default)]
+        cost_limit: Option<u32>,
+        #[serde(default)]
+        cost_limit_operator: Option<String>,
+        #[serde(default)]
+        cost_limit_min: Option<u32>,
+        #[serde(default)]
+        cost_limit_max: Option<u32>,
+        #[serde(default)]
+        card_names: Vec<String>,
+        #[serde(default)]
+        exclude_self: Option<bool>,
+        #[serde(default)]
+        exclude_selected: Option<bool>,
+        #[serde(default)]
+        placement_order: Option<String>,
+        #[serde(default)]
+        distinct: Option<String>,
+        #[serde(default)]
+        name_constraint: Option<String>,
+        #[serde(default)]
+        name_constraint_source: Option<String>,
+        #[serde(default)]
+        ability_filter: Option<String>,
+        #[serde(default)]
+        ability_filter_triggers: Option<Vec<String>>,
+        #[serde(default)]
+        or_ability_filters: Option<Vec<AbilityFilterBranch>>,
+        #[serde(default)]
+        card_property: Option<String>,
+        #[serde(default)]
+        original_value: Option<bool>,
+        #[serde(default)]
+        negation: Option<bool>,
+        #[serde(default)]
+        self_target: Option<bool>,
+        #[serde(default)]
+        per_unit: Option<bool>,
+        #[serde(default)]
+        per_unit_count: Option<u32>,
+        #[serde(default)]
+        per_unit_type: Option<String>,
+        #[serde(default)]
+        per_unit_heart_colors: Vec<String>,
+        #[serde(default)]
+        per_unit_location: Option<String>,
+        #[serde(default)]
+        optional: Option<bool>,
+        #[serde(default)]
+        location: Option<String>,
+        #[serde(default)]
+        state: Option<String>,
+        #[serde(default)]
+        activation_position: Option<String>,
+        #[serde(default)]
+        group_reference: Option<String>,
+        #[serde(default)]
+        multiple_targets: Option<bool>,
+        #[serde(default)]
+        question: Option<String>,
+        #[serde(default)]
+        answers: Option<Vec<String>>,
+        #[serde(default)]
+        choice_maker: Option<String>,
+        #[serde(default)]
+        choice_type: Option<String>,
+        #[serde(default)]
+        choice_options: Option<Vec<String>>,
+        #[serde(default)]
+        filter_targets_by_heart_colors: Option<bool>,
+        #[serde(default)]
+        heart_colors: Vec<String>,
+        #[serde(default)]
+        cost_total: Option<u32>,
+        #[serde(default)]
+        cost_total_operator: Option<String>,
+        #[serde(default)]
+        or_card_types: Option<Vec<String>>,
+        #[serde(default)]
+        action_by: Option<String>,
+        #[serde(default)]
+        require_all_heart_colors: Option<bool>,
+        #[serde(default)]
+        heart_color_count: Option<u32>,
+        #[serde(default)]
+        options: Option<Vec<AbilityEffect>>,
+        #[serde(default)]
+        per_group: Option<bool>,
+        #[serde(default)]
+        per_group_count: Option<u32>,
+        #[serde(default)]
+        reveal: Option<bool>,
+        #[serde(default)]
+        any_number: Option<bool>,
+        #[serde(default)]
+        discard_remaining: Option<bool>,
+    },
+    /// LookReveal effect fields
+    LookReveal {
+        #[serde(default)]
+        card_type: Option<String>,
+        #[serde(default)]
+        characters: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_characters: Option<Vec<String>>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_group_names: Option<Vec<String>>,
+        #[serde(default)]
+        cost_limit: Option<u32>,
+        #[serde(default)]
+        cost_limit_operator: Option<String>,
+        #[serde(default)]
+        cost_limit_min: Option<u32>,
+        #[serde(default)]
+        cost_limit_max: Option<u32>,
+        #[serde(default)]
+        card_names: Vec<String>,
+        #[serde(default)]
+        exclude_self: Option<bool>,
+        #[serde(default)]
+        distinct: Option<String>,
+        #[serde(default)]
+        name_constraint: Option<String>,
+        #[serde(default)]
+        name_constraint_source: Option<String>,
+        #[serde(default)]
+        ability_filter: Option<String>,
+        #[serde(default)]
+        ability_filter_triggers: Option<Vec<String>>,
+        #[serde(default)]
+        or_ability_filters: Option<Vec<AbilityFilterBranch>>,
+        #[serde(default)]
+        card_property: Option<String>,
+        #[serde(default)]
+        original_value: Option<bool>,
+        #[serde(default)]
+        negation: Option<bool>,
+        #[serde(default)]
+        self_target: Option<bool>,
+        #[serde(default)]
+        per_unit: Option<bool>,
+        #[serde(default)]
+        per_unit_count: Option<u32>,
+        #[serde(default)]
+        per_unit_type: Option<String>,
+        #[serde(default)]
+        per_unit_heart_colors: Vec<String>,
+        #[serde(default)]
+        per_unit_location: Option<String>,
+        #[serde(default)]
+        location: Option<String>,
+        #[serde(default)]
+        group_reference: Option<String>,
+        #[serde(default)]
+        dynamic_count: Option<DynamicCount>,
+        #[serde(default)]
+        heart_colors: Vec<String>,
+        #[serde(default)]
+        reveal: Option<bool>,
+        #[serde(default)]
+        filter_targets_by_heart_colors: Option<bool>,
+        #[serde(default)]
+        activation_position: Option<String>,
+        #[serde(default)]
+        state: Option<String>,
+        #[serde(default)]
+        optional: Option<bool>,
+        #[serde(default)]
+        blind: Option<bool>,
+        #[serde(default)]
+        is_reveal: Option<bool>,
+        #[serde(default)]
+        picker: Option<String>,
+        #[serde(default)]
+        multiple_targets: Option<bool>,
+        #[serde(default)]
+        options: Option<Vec<AbilityEffect>>,
+        #[serde(default)]
+        resource_on_select: Option<Box<AbilityEffect>>,
+        #[serde(default)]
+        require_all_heart_colors: Option<bool>,
+        #[serde(default)]
+        heart_color_count: Option<u32>,
+    },
+    /// ModifyScore effect fields
+    ModifyScore {
+        #[serde(default)]
+        operation: Option<String>,
+        #[serde(default)]
+        value: Option<u32>,
+        #[serde(default)]
+        duration: Option<String>,
+        #[serde(default)]
+        card_type: Option<String>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        #[serde(default)]
+        per_unit: Option<bool>,
+        #[serde(default)]
+        per_unit_count: Option<u32>,
+        #[serde(default)]
+        per_unit_type: Option<String>,
+        #[serde(default)]
+        per_unit_location: Option<String>,
+        #[serde(default)]
+        per_unit_heart_colors: Vec<String>,
+        #[serde(default)]
+        location: Option<String>,
+        #[serde(default)]
+        effect_constraint: Option<String>,
+        #[serde(default)]
+        self_target: Option<bool>,
+        #[serde(default)]
+        heart_colors: Vec<String>,
+        #[serde(default)]
+        exclude_self: Option<bool>,
+        #[serde(default)]
+        target_count: Option<u32>,
+        #[serde(default)]
+        repeat_limit: Option<u32>,
+        #[serde(default)]
+        filter_targets_by_heart_colors: Option<bool>,
+        #[serde(default)]
+        cost_total: Option<u32>,
+        #[serde(default)]
+        cost_total_operator: Option<String>,
+        #[serde(default)]
+        distinct: Option<String>,
+        #[serde(default)]
+        position: Option<PositionInfo>,
+        #[serde(default)]
+        activation_position: Option<String>,
+        #[serde(default)]
+        card_names: Vec<String>,
+        #[serde(default)]
+        card_property: Option<String>,
+        #[serde(default)]
+        state: Option<String>,
+        #[serde(default)]
+        negation: Option<bool>,
+        #[serde(default)]
+        max_repeats: Option<u32>,
+        #[serde(default)]
+        need_heart_operator: Option<String>,
+        #[serde(default)]
+        need_heart_total: Option<u32>,
+    },
+    /// ModifyHearts effect fields
+    ModifyHearts {
+        #[serde(default)]
+        operation: Option<String>,
+        #[serde(default)]
+        value: Option<u32>,
+        #[serde(default)]
+        duration: Option<String>,
+        #[serde(default)]
+        heart_colors: Vec<String>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        #[serde(default)]
+        per_unit: Option<bool>,
+        #[serde(default)]
+        per_unit_count: Option<u32>,
+        #[serde(default)]
+        per_unit_heart_colors: Vec<String>,
+        #[serde(default)]
+        location: Option<String>,
+        #[serde(default)]
+        timing_condition: Option<String>,
+        #[serde(default)]
+        original_value: Option<bool>,
+        #[serde(default)]
+        original_count: Option<u32>,
+        #[serde(default)]
+        original_operator: Option<String>,
+        #[serde(default)]
+        exclude_self: Option<bool>,
+        #[serde(default)]
+        self_target: Option<bool>,
+        #[serde(default)]
+        exclude_heart_colors: Option<Vec<String>>,
+        #[serde(default)]
+        repeat_limit: Option<u32>,
+        #[serde(default)]
+        card_type: Option<String>,
+        #[serde(default)]
+        target_count: Option<u32>,
+        #[serde(default)]
+        filter_targets_by_heart_colors: Option<bool>,
+        #[serde(default)]
+        cost_total: Option<u32>,
+        #[serde(default)]
+        cost_total_operator: Option<String>,
+        #[serde(default)]
+        group_reference: Option<String>,
+        #[serde(default)]
+        negation: Option<bool>,
+        #[serde(default)]
+        replace_all: Option<bool>,
+        #[serde(default)]
+        position: Option<PositionInfo>,
+        #[serde(default)]
+        all: Option<bool>,
+        #[serde(default)]
+        per_unit_type: Option<String>,
+        #[serde(default)]
+        distinct: Option<String>,
+    },
+    /// GainResource effect fields
+    GainResource {
+        #[serde(default)]
+        resource: Option<String>,
+        #[serde(default)]
+        heart_colors: Vec<String>,
+        #[serde(default)]
+        heart_colors_from_selected_card: Option<bool>,
+        #[serde(default)]
+        sign: Option<String>,
+        #[serde(default)]
+        operation: Option<String>,
+        #[serde(default)]
+        value: Option<u32>,
+        #[serde(default, alias = "energy")]
+        energy_count: Option<u32>,
+        #[serde(default)]
+        dynamic_count: Option<DynamicCount>,
+        #[serde(default)]
+        optional: Option<bool>,
+        #[serde(default)]
+        duration: Option<String>,
+        #[serde(default)]
+        position: Option<PositionInfo>,
+        #[serde(default)]
+        any_number: Option<bool>,
+        #[serde(default)]
+        per_unit: Option<bool>,
+        #[serde(default)]
+        per_unit_count: Option<u32>,
+        #[serde(default)]
+        per_unit_type: Option<String>,
+        #[serde(default)]
+        per_unit_heart_colors: Vec<String>,
+        #[serde(default)]
+        per_unit_location: Option<String>,
+        #[serde(default)]
+        location: Option<String>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        #[serde(default)]
+        card_type: Option<String>,
+        #[serde(default)]
+        cost_limit: Option<u32>,
+        #[serde(default)]
+        cost_limit_operator: Option<String>,
+        #[serde(default)]
+        characters: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_characters: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_group_names: Option<Vec<String>>,
+        #[serde(default)]
+        self_target: Option<bool>,
+        #[serde(default)]
+        target_from_selection: Option<bool>,
+        #[serde(default)]
+        card_property: Option<String>,
+        #[serde(default)]
+        original_value: Option<bool>,
+        #[serde(default)]
+        negation: Option<bool>,
+        #[serde(default)]
+        filter_targets_by_heart_colors: Option<bool>,
+        #[serde(default)]
+        activation_position: Option<String>,
+        #[serde(default)]
+        state: Option<String>,
+        #[serde(default)]
+        heart_type: Option<String>,
+        #[serde(default)]
+        target_count: Option<u32>,
+        #[serde(default)]
+        all: Option<bool>,
+        #[serde(default)]
+        same_name: Option<bool>,
+        #[serde(default)]
+        exclude_self: Option<bool>,
+        #[serde(default)]
+        group_reference: Option<String>,
+        #[serde(default)]
+        trigger_type: Option<String>,
+        #[serde(default)]
+        distinct: Option<String>,
+        #[serde(default)]
+        heart_color: Option<String>,
+        #[serde(default)]
+        action_by: Option<String>,
+        #[serde(default)]
+        activation_condition_parsed: Option<Box<Condition>>,
+        #[serde(default)]
+        multiple_targets: Option<bool>,
+        #[serde(default, alias = "max_repeats")]
+        repeat_limit: Option<u32>,
+        #[serde(default)]
+        timing_condition: Option<String>,
+        #[serde(default)]
+        require_all_heart_colors: Option<bool>,
+        #[serde(default)]
+        heart_color_count: Option<u32>,
+    },
+    /// ChangeState effect fields
+    ChangeState {
+        #[serde(default)]
+        state_change: Option<String>,
+        #[serde(default)]
+        card_type: Option<String>,
+        #[serde(default)]
+        cost_limit: Option<u32>,
+        #[serde(default)]
+        cost_limit_operator: Option<String>,
+        #[serde(default)]
+        cost_from_revealed: Option<bool>,
+        #[serde(default)]
+        optional: Option<bool>,
+        #[serde(default)]
+        self_cost: Option<bool>,
+        #[serde(default)]
+        characters: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_characters: Option<Vec<String>>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_group_names: Option<Vec<String>>,
+        #[serde(default)]
+        blade_limit: Option<u32>,
+        #[serde(default)]
+        blade_limit_operator: Option<String>,
+        #[serde(default)]
+        per_unit: Option<bool>,
+        #[serde(default)]
+        per_unit_count: Option<u32>,
+        #[serde(default)]
+        per_unit_type: Option<String>,
+        #[serde(default)]
+        per_unit_heart_colors: Vec<String>,
+        #[serde(default)]
+        per_unit_location: Option<String>,
+        #[serde(default)]
+        location: Option<String>,
+        #[serde(default)]
+        distinct: Option<String>,
+        #[serde(default)]
+        exclude_self: Option<bool>,
+        #[serde(default)]
+        self_target: Option<bool>,
+        #[serde(default)]
+        identities: Option<Vec<String>>,
+        #[serde(default)]
+        all_regions: Option<bool>,
+        #[serde(default)]
+        card_names: Vec<String>,
+        #[serde(default)]
+        negation: Option<bool>,
+        #[serde(default)]
+        cost_total: Option<u32>,
+        #[serde(default)]
+        cost_total_operator: Option<String>,
+        #[serde(default)]
+        card_property: Option<String>,
+        #[serde(default)]
+        original_value: Option<bool>,
+        #[serde(default)]
+        name_constraint: Option<String>,
+        #[serde(default)]
+        name_constraint_source: Option<String>,
+        #[serde(default)]
+        filter_targets_by_heart_colors: Option<bool>,
+        #[serde(default)]
+        group_reference: Option<String>,
+        #[serde(default)]
+        activation_position: Option<String>,
+        #[serde(default)]
+        ability_filter: Option<String>,
+        #[serde(default)]
+        ability_filter_triggers: Option<Vec<String>>,
+        #[serde(default)]
+        or_ability_filters: Option<Vec<AbilityFilterBranch>>,
+        #[serde(default)]
+        exclude_heart_colors: Option<Vec<String>>,
+        #[serde(default)]
+        heart_colors: Vec<String>,
+        #[serde(default)]
+        all: Option<bool>,
+        #[serde(default)]
+        position: Option<PositionInfo>,
+        #[serde(default)]
+        state: Option<String>,
+        #[serde(default)]
+        action_by: Option<String>,
+        #[serde(default)]
+        activation_condition_parsed: Option<Box<Condition>>,
+    },
+    /// AbilityOp effect fields
+    AbilityOp {
+        #[serde(default)]
+        ability_gain: Option<String>,
+        #[serde(default)]
+        ability_gain_trigger: Option<String>,
+        #[serde(default)]
+        gained_effect: Option<Box<AbilityEffect>>,
+        #[serde(default)]
+        ability_text: Option<String>,
+        #[serde(default)]
+        target_trigger: Option<String>,
+        #[serde(default)]
+        source_card: Option<String>,
+        #[serde(default)]
+        suppressed_trigger: Option<String>,
+        #[serde(default)]
+        card_type: Option<String>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_group_names: Option<Vec<String>>,
+        #[serde(default)]
+        characters: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_characters: Option<Vec<String>>,
+        #[serde(default)]
+        cost_limit: Option<u32>,
+        #[serde(default)]
+        cost_limit_operator: Option<String>,
+        #[serde(default)]
+        location: Option<String>,
+        #[serde(default)]
+        trigger_filter: Option<Vec<String>>,
+        #[serde(default)]
+        trigger_type: Option<String>,
+        #[serde(default)]
+        duration: Option<String>,
+        #[serde(default)]
+        self_target: Option<bool>,
+        #[serde(default)]
+        exclude_self: Option<bool>,
+        #[serde(default)]
+        effect_type: Option<String>,
+        #[serde(default)]
+        use_limit: Option<u32>,
+        #[serde(default)]
+        triggers: Option<String>,
+        #[serde(default)]
+        activation_condition_parsed: Option<Box<Condition>>,
+        #[serde(default)]
+        option: Option<String>,
+        #[serde(default)]
+        all: Option<bool>,
+        #[serde(default)]
+        activation_position: Option<String>,
+        #[serde(default)]
+        heart_colors: Vec<String>,
+        #[serde(default)]
+        dynamic_count: Option<DynamicCount>,
+    },
+    /// CompoundEffect effect fields
+    CompoundEffect {
+        #[serde(default, alias = "max_repeats")]
+        repeat_limit: Option<u32>,
+        #[serde(default)]
+        options: Option<Vec<AbilityEffect>>,
+        #[serde(default)]
+        choice_type: Option<String>,
+        #[serde(default)]
+        choice_options: Option<Vec<String>>,
+        #[serde(default)]
+        question: Option<String>,
+        #[serde(default)]
+        answers: Option<Vec<String>>,
+        #[serde(default)]
+        choice_maker: Option<String>,
+        #[serde(default)]
+        alternative_effect: Option<Box<AbilityEffect>>,
+        #[serde(default)]
+        optional: Option<bool>,
+        #[serde(default)]
+        target_count: Option<u32>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        #[serde(default)]
+        heart_colors: Vec<String>,
+        #[serde(default)]
+        exclude_self: Option<bool>,
+        #[serde(default)]
+        duration: Option<String>,
+        #[serde(default)]
+        position: Option<PositionInfo>,
+        #[serde(default)]
+        all: Option<bool>,
+        #[serde(default)]
+        activation_position: Option<String>,
+        #[serde(default)]
+        card_type: Option<String>,
+        #[serde(default)]
+        trigger_type: Option<String>,
+        #[serde(default)]
+        activation_condition_parsed: Option<Box<Condition>>,
+        #[serde(default)]
+        original_value: Option<bool>,
+        #[serde(default)]
+        shuffle: Option<bool>,
+        #[serde(default)]
+        distinct: Option<String>,
+        #[serde(default)]
+        group_reference: Option<String>,
+        #[serde(default)]
+        per_unit: Option<bool>,
+        #[serde(default)]
+        per_unit_count: Option<u32>,
+        #[serde(default)]
+        per_unit_type: Option<String>,
+        #[serde(default)]
+        alternative_count_type: Option<String>,
+    },
+    /// RestrictionOp effect fields
+    RestrictionOp {
+        #[serde(default)]
+        restriction_type: Option<String>,
+        #[serde(default)]
+        restricted_destination: Option<String>,
+        #[serde(default)]
+        delayed: Option<bool>,
+        #[serde(default)]
+        timing: Option<String>,
+        #[serde(default)]
+        treat_as: Option<String>,
+        #[serde(default)]
+        timing_condition: Option<String>,
+        #[serde(default)]
+        phase: Option<String>,
+        #[serde(default)]
+        non_stackable: Option<bool>,
+        #[serde(default)]
+        operation: Option<String>,
+        #[serde(default)]
+        card_type: Option<String>,
+        #[serde(default)]
+        location: Option<String>,
+        #[serde(default)]
+        effect_type: Option<String>,
+        #[serde(default)]
+        replaces_event: Option<String>,
+        #[serde(default)]
+        choice_based: Option<bool>,
+        #[serde(default)]
+        trigger_type: Option<String>,
+        #[serde(default)]
+        trigger_filter: Option<Vec<String>>,
+        #[serde(default)]
+        duration: Option<String>,
+        #[serde(default)]
+        self_target: Option<bool>,
+        #[serde(default)]
+        exclude_self: Option<bool>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_group_names: Option<Vec<String>>,
+        #[serde(default)]
+        characters: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_characters: Option<Vec<String>>,
+    },
+    /// PositionOp effect fields
+    PositionOp {
+        #[serde(default)]
+        position: Option<PositionInfo>,
+        #[serde(default)]
+        target_member: Option<String>,
+        #[serde(default)]
+        source_position: Option<String>,
+        #[serde(default)]
+        exclude_position: Option<String>,
+        #[serde(default)]
+        allow_occupied_stage: Option<bool>,
+        #[serde(default)]
+        optional: Option<bool>,
+        #[serde(default)]
+        card_type: Option<String>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_group_names: Option<Vec<String>>,
+        #[serde(default)]
+        characters: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_characters: Option<Vec<String>>,
+        #[serde(default)]
+        cost_limit: Option<u32>,
+        #[serde(default)]
+        cost_limit_operator: Option<String>,
+        #[serde(default)]
+        energy_count: Option<u32>,
+        #[serde(default)]
+        dynamic_count: Option<DynamicCount>,
+        #[serde(default)]
+        any_number: Option<bool>,
+        #[serde(default)]
+        cost_from_revealed: Option<bool>,
+        #[serde(default)]
+        exclude_self: Option<bool>,
+        #[serde(default)]
+        multiple_targets: Option<bool>,
+        #[serde(default)]
+        self_target: Option<bool>,
+        #[serde(default)]
+        state: Option<String>,
+        #[serde(default)]
+        activation_position: Option<String>,
+        #[serde(default)]
+        group_reference: Option<String>,
+    },
+    /// MiscOp effect fields
+    MiscOp {
+        #[serde(default)]
+        operation: Option<String>,
+        #[serde(default)]
+        value: Option<u32>,
+        #[serde(default)]
+        card_type: Option<String>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_group_names: Option<Vec<String>>,
+        #[serde(default)]
+        characters: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_characters: Option<Vec<String>>,
+        #[serde(default)]
+        cost_limit: Option<u32>,
+        #[serde(default)]
+        cost_limit_operator: Option<String>,
+        #[serde(default)]
+        location: Option<String>,
+        #[serde(default)]
+        duration: Option<String>,
+        #[serde(default)]
+        heart_colors: Vec<String>,
+        #[serde(default)]
+        heart_type: Option<String>,
+        #[serde(default)]
+        heart_selection: Option<bool>,
+        #[serde(default)]
+        blade_type: Option<String>,
+        #[serde(default)]
+        self_target: Option<bool>,
+        #[serde(default)]
+        exclude_self: Option<bool>,
+        #[serde(default)]
+        choice: Option<bool>,
+        #[serde(default)]
+        lose_blade_hearts: Option<bool>,
+        #[serde(default)]
+        dynamic_count: Option<DynamicCount>,
+        #[serde(default)]
+        per_unit: Option<bool>,
+        #[serde(default)]
+        per_unit_count: Option<u32>,
+        #[serde(default)]
+        per_unit_type: Option<String>,
+        #[serde(default)]
+        per_unit_heart_colors: Vec<String>,
+        #[serde(default)]
+        per_unit_location: Option<String>,
+        #[serde(default)]
+        repeat_limit: Option<u32>,
+        #[serde(default)]
+        identities: Option<Vec<String>>,
+        #[serde(default)]
+        all_regions: Option<bool>,
+        #[serde(default)]
+        timing: Option<String>,
+        #[serde(default)]
+        treat_as: Option<String>,
+        #[serde(default)]
+        effect_constraint: Option<String>,
+        #[serde(default)]
+        original_value: Option<bool>,
+        #[serde(default)]
+        original_count: Option<u32>,
+        #[serde(default)]
+        original_operator: Option<String>,
+        #[serde(default)]
+        original_cost: Option<u32>,
+        #[serde(default)]
+        blade_limit: Option<u32>,
+        #[serde(default)]
+        blade_limit_operator: Option<String>,
+        #[serde(default)]
+        negation: Option<bool>,
+        #[serde(default)]
+        activation_position: Option<String>,
+        #[serde(default)]
+        target_count: Option<u32>,
+        #[serde(default)]
+        group_reference: Option<String>,
+        #[serde(default)]
+        parenthetical: Option<Vec<String>>,
+        #[serde(default)]
+        quoted_text: Option<QuotedText>,
+        #[serde(default)]
+        same_unit_name: Option<bool>,
+        #[serde(default)]
+        alternative_count_type: Option<String>,
+        #[serde(default)]
+        per_group: Option<bool>,
+        #[serde(default)]
+        per_group_count: Option<u32>,
+        #[serde(default)]
+        resource_icon_count: Option<u32>,
+        #[serde(default)]
+        cost_total: Option<u32>,
+        #[serde(default)]
+        cost_total_operator: Option<String>,
+        #[serde(default)]
+        cost_reference: Option<String>,
+        #[serde(default)]
+        cost_offset: Option<i32>,
+        #[serde(default)]
+        blind: Option<bool>,
+        #[serde(default)]
+        picker: Option<String>,
+        #[serde(default)]
+        all: Option<bool>,
+        #[serde(default)]
+        sign: Option<String>,
+        #[serde(default)]
+        heart_color_count: Option<u32>,
+        #[serde(default)]
+        require_all_heart_colors: Option<bool>,
+        #[serde(default)]
+        energy_count: Option<u32>,
+        #[serde(default)]
+        placement_order: Option<String>,
+        #[serde(default)]
+        ref_value: Option<String>,
+        #[serde(default)]
+        ref_offset: Option<i32>,
+        #[serde(default)]
+        id: Option<String>,
+        #[serde(default)]
+        card_names: Vec<String>,
+        #[serde(default)]
+        character_effects: Option<Vec<serde_json::Value>>,
+        #[serde(default)]
+        or_card_types: Option<Vec<String>>,
+        #[serde(default)]
+        options: Option<Vec<AbilityEffect>>,
+        #[serde(default)]
+        position: Option<PositionInfo>,
+        #[serde(default)]
+        ability_filter: Option<String>,
+    },
+    /// CustomOp effect fields
+    CustomOp {
+        #[serde(default)]
+        action_by: Option<String>,
+        #[serde(default)]
+        opponent_action: Option<Box<AbilityEffect>>,
+        #[serde(default)]
+        effect_type: Option<String>,
+        #[serde(default)]
+        replaces_event: Option<String>,
+        #[serde(default)]
+        choice_based: Option<bool>,
+        #[serde(default)]
+        card_type: Option<String>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_group_names: Option<Vec<String>>,
+        #[serde(default)]
+        characters: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_characters: Option<Vec<String>>,
+        #[serde(default)]
+        identities: Option<Vec<String>>,
+        #[serde(default)]
+        all_regions: Option<bool>,
+        #[serde(default)]
+        question: Option<String>,
+        #[serde(default)]
+        answers: Option<Vec<String>>,
+        #[serde(default)]
+        choice_maker: Option<String>,
+        #[serde(default)]
+        options: Option<Vec<AbilityEffect>>,
+        #[serde(default)]
+        location: Option<String>,
+        #[serde(default)]
+        duration: Option<String>,
+        #[serde(default)]
+        self_target: Option<bool>,
+        #[serde(default)]
+        exclude_self: Option<bool>,
+        #[serde(default)]
+        original_value: Option<bool>,
+        #[serde(default)]
+        timing: Option<String>,
+        #[serde(default)]
+        treat_as: Option<String>,
+        #[serde(default)]
+        trigger_type: Option<String>,
+        #[serde(default)]
+        trigger_filter: Option<Vec<String>>,
+        #[serde(default)]
+        activation_condition_parsed: Option<Box<Condition>>,
+        #[serde(default)]
+        use_limit: Option<u32>,
+        #[serde(default)]
+        triggers: Option<String>,
+    },
+}
+
+pub fn build_kind_from_action(action: &str, effect_json: &serde_json::Value) -> Option<EffectKind> {
+    let a = action.to_lowercase();
+    let tag = match a.as_str() {
+        "move_cards"
+        | "discard_card"
+        | "discard_until_count"
+        | "place_energy_under_member"
+        | "re_yell"
+        | "shuffle"
+        | "play_baton_touch"
+        | "double_baton_touch" => "MoveCards",
+        "draw" | "draw_card" | "draw_until_count" => "DrawCards",
+        "select" | "select_cards" | "select_number" | "choose_target_player" => "SelectTarget",
+        "look"
+        | "look_at"
+        | "reveal"
+        | "reveal_effect"
+        | "reveal_per_group"
+        | "reveal_until_live_card"
+        | "reveal_until_chosen_card"
+        | "look_and_select" => "LookReveal",
+        "modify_score" => "ModifyScore",
+        "modify_required_hearts"
+        | "modify_required_hearts_global"
+        | "modify_required_hearts_success" => "ModifyHearts",
+        "gain_resource" | "pay_energy" => "GainResource",
+        "change_state" | "set_card_identity" | "set_card_identity_all_regions" => "ChangeState",
+        "gain_ability"
+        | "gain_ability_from_source"
+        | "invalidate_ability"
+        | "suppress_ability_trigger"
+        | "activate_ability" => "AbilityOp",
+        "sequential"
+        | "choice"
+        | "repeat_procedure"
+        | "conditional_alternative"
+        | "conditional_on_optional"
+        | "conditional_on_result" => "CompoundEffect",
+        "restriction"
+        | "activation_restriction"
+        | "modify_limit"
+        | "all_blade_timing"
+        | "reduce_live_card_set_limit" => "RestrictionOp",
+        "position_change" | "rotation" => "PositionOp",
+        "set_cost"
+        | "set_cost_to_use"
+        | "modify_cost"
+        | "activation_cost"
+        | "set_blade_type"
+        | "set_blade_count"
+        | "set_heart_type"
+        | "specify_heart_color"
+        | "choose_required_hearts"
+        | "perform_yell"
+        | "modify_yell_count" => "MiscOp",
+        "custom" | "do_nothing" | "action_by" | "opponent_action" => "CustomOp",
+        "" => "SelectTarget", // filter-only options inside select_action.options
+        _ => return None,
+    };
+    let tagged = serde_json::json!({tag: effect_json});
+    serde_json::from_value(tagged).ok()
+}
+
+/// Recursively re-populate EffectKind for a serialization-deserialized
+/// AbilityEffect that lost its `kind` (because kind is #[serde(skip)]).
+pub fn rekindle_effect(effect: &mut AbilityEffect, json_val: &serde_json::Value) {
+    let action = json_val
+        .get("action")
+        .or_else(|| json_val.get("type"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if let Some(kind) = build_kind_from_action(action, json_val) {
+        effect.kind = Some(kind);
+    }
+    if let Some(ref mut actions) = effect.compound.actions {
+        if let Some(json_actions) = json_val.get("actions").and_then(|a| a.as_array()) {
+            for (i, action) in actions.iter_mut().enumerate() {
+                if i < json_actions.len() {
+                    rekindle_effect(action, &json_actions[i]);
+                }
+            }
+        }
+    }
+    for (field, key) in [
+        (&mut effect.compound.look_action, "look_action"),
+        (&mut effect.compound.select_action, "select_action"),
+        (&mut effect.compound.followup_action, "followup_action"),
+        (&mut effect.compound.optional_action, "optional_action"),
+        (
+            &mut effect.compound.conditional_action,
+            "conditional_action",
+        ),
+        (&mut effect.compound.primary_effect, "primary_effect"),
+    ] {
+        if let Some(ref mut sub) = field {
+            if let Some(sub_json) = json_val.get(key) {
+                rekindle_effect(sub, sub_json);
+            }
+        }
+    }
+    if let Some(EffectKind::SelectTarget {
+        ref mut options, ..
+    }) = effect.kind
+    {
+        if let Some(ref mut opts) = options {
+            if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
+                for (i, opt) in opts.iter_mut().enumerate() {
+                    if i < json_opts.len() {
+                        rekindle_effect(opt, &json_opts[i]);
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct AbilityEffect {
     #[serde(default = "default_empty_string")]
     pub text: String,
     #[serde(default = "default_empty_string")]
     pub action: String,
+    #[serde(default)]
     pub source: Option<String>,
+    #[serde(default)]
     pub destination: Option<String>,
+    #[serde(default)]
     pub count: Option<u32>,
-    pub target_count: Option<u32>,
-    pub card_type: Option<String>,
+    #[serde(default)]
     pub target: Option<String>,
-    pub duration: Option<String>,
-    pub resource: Option<String>,
-    /// Resource (e.g. blade) to grant when a select_cards choice resolves.
-    /// Collapses the common "select → gain_resource" pattern into one action,
-    /// avoiding stale-state re-evaluation of a separate gain_resource step.
     #[serde(default)]
-    pub resource_on_select: Option<Box<AbilityEffect>>,
-    pub position: Option<PositionInfo>,
-    pub state_change: Option<String>,
-    pub optional: Option<bool>,
-    #[serde(default)]
-    pub negation: Option<bool>,
-    #[serde(default)]
-    pub suppressed_trigger: Option<String>,
-    pub max: Option<bool>,
-    pub effect_constraint: Option<String>,
-    pub resource_icon_count: Option<u32>,
-    pub ability_gain: Option<String>,
-    #[serde(default)]
-    pub ability_gain_trigger: Option<String>,
-    #[serde(default)]
-    pub gained_effect: Option<Box<AbilityEffect>>,
-    pub quoted_text: Option<QuotedText>,
-    pub per_unit: Option<bool>,
-    pub condition: Option<Condition>,
-    /// Compound sub-effects (sequential, conditional, look_and_select branches).
-    /// Flat fields in JSON are collected here via `#[serde(flatten)]`.
+    pub condition: Option<Box<Condition>>,
     #[serde(flatten)]
     pub compound: CompoundBranch,
-    /// Cost-only: "this is a same-unit cost" (used by pay_cost handlers).
-    /// Carried on AbilityEffect because AbilityCost is now a newtype around
-    /// AbilityEffect — there is no separate type to put it on.
     #[serde(default)]
-    pub same_unit_name: Option<bool>,
-    /// Cost-only: shuffle the zone after paying.
+    pub kind: Option<EffectKind>,
     #[serde(default)]
-    pub shuffle: Option<bool>,
-    /// Effect that fires instead when this optional cost is skipped
-    /// ("unless you pay"). Lives on AbilityEffect so both cost-as-effect
-    /// and effect-as-effect contexts can carry it. The `alias` accepts
-    /// the old `compound.alternative_effect` key from pre-unification JSON.
-    #[serde(default, alias = "alternative_effect_legacy")]
-    pub alternative_effect: Option<Box<AbilityEffect>>,
-    pub operation: Option<String>,
-    pub value: Option<u32>,
-    /// Heart colors specification.
-    /// Semantics depend on action:
-    /// - gain_resource: choice options (len>1) or fixed single color (len==1)
-    /// - modify_required_hearts: which color's requirement to modify (uses first)
-    /// - set_required_hearts: each color's requirement is set individually
-    /// - select/reveal/look_and_select: filter — card must match ANY listed color
-    /// - modify_score (per_unit): count cards matching ANY listed color
-    /// - Empty: use default (heart00 for single-value ops, no filter for filter ops)
-    #[serde(default)]
-    pub heart_colors: Vec<String>,
-    /// When true, card must have ALL listed heart_colors (AND semantics).
-    /// When false/absent, card must have ANY listed heart_colors (OR semantics, default).
-    #[serde(default)]
-    pub require_all_heart_colors: Option<bool>,
-    /// Minimum count per heart color (e.g. 2 for "heart05を2個以上").
-    /// When set, the card must have at least this many hearts of the specified color(s).
-    #[serde(default)]
-    pub heart_color_count: Option<u32>,
-    /// Card names to filter by (e.g. `["EMOTION"]`).  When set, per-unit
-    /// counting and effect targeting only consider cards whose name
-    /// contains one of these strings (case-insensitive substring match).
-    #[serde(default)]
-    pub card_names: Vec<String>,
-    pub blade_type: Option<String>,
-    #[serde(alias = "energy")]
-    pub energy_count: Option<u32>,
-    pub target_member: Option<String>,
-    // Fields from parser improvements
-    pub choice_options: Option<Vec<String>>,
-    pub options: Option<Vec<AbilityEffect>>,
-    pub per_unit_count: Option<u32>,
-    pub per_unit_type: Option<String>,
-    /// Heart colors to count for per-unit calculations (e.g. count heart03 on a card).
-    /// Used when per_unit_type is "つ" and the effect counts heart icons, not cards.
-    #[serde(default)]
-    pub per_unit_heart_colors: Vec<String>,
-    /// Zone to count cards in for per_unit calculations. When absent, falls back
-    /// to the effect's `location` field (or "hand" as default).
-    pub per_unit_location: Option<String>,
-    #[serde(alias = "max_repeats")]
-    pub repeat_limit: Option<u32>,
-    pub is_further: Option<bool>,
-    pub restriction_type: Option<String>,
-    pub restricted_destination: Option<String>,
-    pub dynamic_count: Option<DynamicCount>,
-    pub placement_order: Option<String>,
-    pub cost_limit: Option<u32>,
-    #[serde(default)]
-    pub cost_limit_operator: Option<String>,
-    /// Minimum cost bound for range filters (e.g. "コスト4以上9以下" → min=4)
-    #[serde(default)]
-    pub cost_limit_min: Option<u32>,
-    /// Maximum cost bound for range filters (e.g. "コスト4以上9以下" → max=9)
-    #[serde(default)]
-    pub cost_limit_max: Option<u32>,
-    /// Sum-total cost constraint (e.g. "total cost ≤ 4")
-    #[serde(default)]
-    pub cost_total: Option<u32>,
-    #[serde(default)]
-    pub cost_total_operator: Option<String>,
-    #[serde(default)]
-    pub any_number: Option<bool>,
-    #[serde(default)]
-    pub alternative_count_type: Option<String>,
-    #[serde(default)]
-    pub discard_remaining: Option<bool>,
-    /// Required hearts sum filter (e.g. "total need_heart ≥ 8")
-    #[serde(default)]
-    pub need_heart_total: Option<u32>,
-    #[serde(default)]
-    pub need_heart_operator: Option<String>,
-    /// Per-color need_heart filter (e.g. "heart06 >= 3")
-    #[serde(default)]
-    pub need_heart_color: Option<String>,
-    #[serde(default)]
-    pub reveal: Option<bool>,
-    #[serde(default)]
-    pub per_group: Option<bool>,
-    #[serde(default)]
-    pub per_group_count: Option<u32>,
-    pub distinct: Option<String>,
-    // Card name matching constraints
-    #[serde(default)]
-    pub name_constraint: Option<String>,
-    #[serde(default)]
-    pub name_constraint_source: Option<String>,
-    pub activation_condition_parsed: Option<Condition>,
-    pub ability_text: Option<String>,
-    pub use_limit: Option<u32>,
-    pub triggers: Option<String>,
-    #[serde(default)]
-    pub self_cost: Option<bool>,
-    #[serde(default)]
-    pub exclude_self: Option<bool>,
-    #[serde(default)]
-    pub exclude_selected: Option<bool>,
-    #[serde(default)]
-    pub exclude_by_name_source: Option<String>,
-    // Effect type for replacement/continuous effects
-    #[serde(default)]
-    pub effect_type: Option<String>,
-    // Heart color specification
-    #[serde(default)]
-    pub choice: Option<bool>,
-    // ALL blade timing
-    #[serde(default)]
-    pub timing: Option<String>,
-    #[serde(default)]
-    pub treat_as: Option<String>,
-    // Replacement effect metadata
-    #[serde(default)]
-    pub replaces_event: Option<String>,
-    #[serde(default)]
-    pub choice_based: Option<bool>,
-    // Card identity
-    #[serde(default)]
-    pub identities: Option<Vec<String>>,
-    // Opponent action handling
-    #[serde(default)]
-    pub action_by: Option<String>,
-    #[serde(default)]
-    pub opponent_action: Option<Box<AbilityEffect>>,
-    // Missing fields from parser
-    #[serde(default)]
-    pub lose_blade_hearts: Option<bool>,
+    pub non_stackable: Option<bool>,
     #[serde(default)]
     pub conditional: Option<bool>,
     #[serde(default)]
-    pub choice_type: Option<String>,
-    #[serde(default)]
-    #[serde(alias = "heart_color")]
-    pub heart_type: Option<String>,
-    /// Cost lookup reference for relative cost filters (e.g. previous moved card + 2).
-    #[serde(default)]
-    pub cost_reference: Option<String>,
-    #[serde(default)]
-    pub cost_offset: Option<i32>,
-    /// parenthetical annotations (e.g. rule clarifications in parentheses)
-    #[serde(default)]
-    pub parenthetical: Option<Vec<String>>,
-    /// characters filter for card selection
-    #[serde(default)]
-    pub characters: Option<Vec<String>>,
-    pub exclude_characters: Option<Vec<String>>,
-    /// source_card reference (e.g. "cost_card" for activate_ability)
-    #[serde(default)]
-    pub source_card: Option<String>,
-    // Parser-only fields that were missing struct fields
-    #[serde(default)]
-    pub or_card_types: Option<Vec<String>>,
-    #[serde(default)]
-    pub activation_position: Option<String>,
-    /// Source position: member AT this position gets moved (e.g. "センターにいる")
-    #[serde(default)]
-    pub source_position: Option<String>,
-    /// Excluded destination position (e.g. "センターエリア以外" → don't allow center)
-    #[serde(default)]
-    pub exclude_position: Option<String>,
-    #[serde(default)]
-    pub all_regions: Option<bool>,
-    #[serde(default)]
-    pub character_effects: Option<Vec<serde_json::Value>>,
-    #[serde(default)]
-    pub group_names: Option<Vec<String>>,
-    /// Card property filter (e.g. "has_blade_heart")
-    #[serde(default)]
-    pub card_property: Option<String>,
-    #[serde(default)]
-    pub exclude_group_names: Option<Vec<String>>,
-    /// Heart colors to exclude from per-unit counting.
-    /// e.g. "{{heart_01.png|heart01}}と{{heart_06.png|heart06}}以外の色のハートを持つ"
-    /// → exclude members whose base_heart contains ONLY these colors.
-    #[serde(default)]
-    pub exclude_heart_colors: Option<Vec<String>>,
-    #[serde(default)]
-    pub heart_selection: Option<bool>,
-    #[serde(default)]
-    pub filter_targets_by_heart_colors: Option<bool>,
-    #[serde(default)]
-    pub location: Option<String>,
-    #[serde(default)]
-    pub trigger_filter: Option<Vec<String>>,
-    #[serde(default)]
-    pub multiple_targets: Option<bool>,
-    #[serde(default)]
-    pub question: Option<String>,
-    #[serde(default)]
-    pub answers: Option<Vec<String>>,
-    #[serde(default)]
-    pub choice_maker: Option<String>,
-    #[serde(default)]
-    pub state: Option<String>,
-    #[serde(default)]
-    pub target_trigger: Option<String>,
-    #[serde(default)]
-    pub timing_condition: Option<String>,
-    #[serde(default)]
-    pub self_target: Option<bool>,
-    /// When true, gain_resource with resource="heart" copies the heart colors
-    /// from the card selected by the preceding action in the sequential chain
-    /// (e.g. "選んだカードが持つ色のハートを1つずつ得る").
-    #[serde(default)]
-    pub heart_colors_from_selected_card: Option<bool>,
-    /// When true, the resource (blade/heart) goes to the card(s) selected by
-    /// the preceding action in the same sequential chain, not to all matching
-    /// members on stage.  Used for patterns like "activated member + this card
-    /// each gain heart04" where two gain_resource actions split the targets.
-    #[serde(default)]
-    pub target_from_selection: Option<bool>,
-    /// When true, this effect can place cards on occupied stage slots
-    /// (replacing existing cards). Used for Q76-style rulings.
-    #[serde(default)]
-    pub allow_occupied_stage: Option<bool>,
-    #[serde(default)]
-    pub trigger_type: Option<String>,
-    /// "+" or "-" sign for resource operations (gain_resource with sign: "negative" = lose)
-    #[serde(default)]
-    pub sign: Option<String>,
-    /// Phase restriction for restriction actions (e.g., "active_phase")
-    #[serde(default)]
-    pub phase: Option<String>,
-    /// "すべての" — apply to ALL cards in zone, not just matching count
-    #[serde(default)]
-    pub all: Option<bool>,
-    /// "元々持つ" — refers to original/natural value, not current modified value
-    #[serde(default)]
-    pub original_value: Option<bool>,
-    /// "この効果は重複しない" — this effect does not stack with copies of itself
-    #[serde(default)]
-    pub non_stackable: Option<bool>,
-    /// Delayed restriction — applied at a later timing (e.g. アクティブしない)
-    #[serde(default)]
-    pub delayed: Option<bool>,
-    /// Blind selection: "見ないで" — the selecting player should not see card identities
-    #[serde(default)]
-    pub blind: Option<bool>,
-    /// Who performs the blind pick: "opponent" (opponent picks from your hand)
-    /// or "self" (you pick from opponent's hand). Absent when blind is false.
-    #[serde(default)]
-    pub picker: Option<String>,
-    /// Dynamic group reference (same_group_name, different_group_names)
-    #[serde(default)]
-    pub group_reference: Option<String>,
-    /// Original blade limit filter (元々持つブレードの数)
-    #[serde(default)]
-    pub blade_limit: Option<u32>,
-    #[serde(default)]
-    pub blade_limit_operator: Option<String>,
-    /// Original cost threshold (e.g. "元々のコストが17以上" → original_count: 17)
-    #[serde(default)]
-    pub original_count: Option<u32>,
-    /// Operator for original cost threshold (e.g. ">=", "<=", "==")
-    #[serde(default)]
-    pub original_operator: Option<String>,
-    /// Resolve cost_limit from the first revealed card at runtime.
-    /// Used by followup actions that reference "これにより公開したカードのコスト以下".
-    #[serde(default)]
-    pub cost_from_revealed: Option<bool>,
-    /// Step identifier. When this effect runs inside a `sequential` and has
-    /// an `id`, its outputs (selected card ids, revealed card ids, etc.) are
-    /// stored under this key in the resolver's `step_results` map, and later
-    /// steps in the same sequential can reference them via `ref: "<id>"`.
-    #[serde(default)]
-    pub id: Option<String>,
-    /// Cross-step card reference. When set on a field like `source`,
-    /// `destination`, or a filter, the engine resolves it against
-    /// `step_results[<ref>].cards` and substitutes the referenced card ids
-    /// (e.g. as the `source` zone of a `move_cards`, or as the card names
-    /// to filter by). This replaces the implicit global-state handoffs
-    /// (`gs.revealed_cards`, `gs.recently_moved_cards`) with explicit links.
+    pub is_further: Option<bool>,
     #[serde(default)]
     pub r#ref: Option<String>,
-    /// Cross-step value reference. When set on a field like `value` or
-    /// `count`, the engine resolves it against `step_results[<ref>].value`.
-    /// Optional offset for patterns like "selected card's score - 1".
     #[serde(default)]
-    pub ref_value: Option<String>,
-    /// Offset to add to `ref_value` after resolution. Defaults to 0.
+    pub optional: Option<bool>,
     #[serde(default)]
-    pub ref_offset: Option<i32>,
-    /// Unified sub-effect steps. When this is `Some`, the 4 specialized
-    /// compound shapes (look_and_select, conditional_alternative,
-    /// conditional_on_result, conditional_on_optional) all reduce to a
-    /// single `actions` list of `AbilityEffect`s, each with an optional
-    /// per-step `condition` and an `id` for cross-step references. This is
-    /// the consolidation target; new parsers should emit only this field
-    /// for compound effects. The legacy `look_action`/`select_action`/
-    /// `primary_effect`/`alternative_effect`/... fields are still parsed
-    /// for backward compat but should not be emitted alongside.
+    pub max: Option<bool>,
     #[serde(default)]
     pub effect_steps: Option<Vec<AbilityEffect>>,
-    /// ability_filter: "no_ability" / "has_ability" / "no_ability_type"
-    /// Filters cards by presence or absence of abilities / trigger types.
-    #[serde(default)]
-    pub ability_filter: Option<String>,
-    /// Trigger types excluded when ability_filter is "no_ability_type"
-    #[serde(default)]
-    pub ability_filter_triggers: Option<Vec<String>>,
-    /// OR'd ability filter branches. When present, a card passes if ANY
-    /// branch matches (replaces the single ability_filter check).
-    /// Used for patterns like "no ability OR has 常時 ability".
-    #[serde(default)]
-    pub or_ability_filters: Option<Vec<AbilityFilterBranch>>,
+}
+
+impl AbilityEffect {
+    pub fn ability_filter_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { ability_filter, .. }) => ability_filter.as_deref(),
+            Some(EffectKind::SelectTarget { ability_filter, .. }) => ability_filter.as_deref(),
+            Some(EffectKind::LookReveal { ability_filter, .. }) => ability_filter.as_deref(),
+            Some(EffectKind::ChangeState { ability_filter, .. }) => ability_filter.as_deref(),
+            Some(EffectKind::MiscOp { ability_filter, .. }) => ability_filter.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn ability_filter_triggers_any(&self) -> Option<&Vec<String>> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                ability_filter_triggers,
+                ..
+            }) => ability_filter_triggers.as_ref(),
+            Some(EffectKind::SelectTarget {
+                ability_filter_triggers,
+                ..
+            }) => ability_filter_triggers.as_ref(),
+            Some(EffectKind::LookReveal {
+                ability_filter_triggers,
+                ..
+            }) => ability_filter_triggers.as_ref(),
+            Some(EffectKind::ChangeState {
+                ability_filter_triggers,
+                ..
+            }) => ability_filter_triggers.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn ability_gain_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::AbilityOp { ability_gain, .. }) => ability_gain.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn ability_gain_trigger_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::AbilityOp {
+                ability_gain_trigger,
+                ..
+            }) => ability_gain_trigger.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn ability_text_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::AbilityOp { ability_text, .. }) => ability_text.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn action_by_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::CustomOp { action_by, .. }) => action_by.as_deref(),
+            Some(EffectKind::SelectTarget { action_by, .. }) => action_by.as_deref(),
+            Some(EffectKind::MoveCards { action_by, .. }) => action_by.as_deref(),
+            Some(EffectKind::DrawCards { action_by, .. }) => action_by.as_deref(),
+            Some(EffectKind::ChangeState { action_by, .. }) => action_by.as_deref(),
+            Some(EffectKind::GainResource { action_by, .. }) => action_by.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn activation_condition_parsed_any(&self) -> Option<&Box<Condition>> {
+        match &self.kind {
+            Some(EffectKind::AbilityOp {
+                activation_condition_parsed,
+                ..
+            }) => activation_condition_parsed.as_ref(),
+            Some(EffectKind::CompoundEffect {
+                activation_condition_parsed,
+                ..
+            }) => activation_condition_parsed.as_ref(),
+            Some(EffectKind::CustomOp {
+                activation_condition_parsed,
+                ..
+            }) => activation_condition_parsed.as_ref(),
+            Some(EffectKind::MoveCards {
+                activation_condition_parsed,
+                ..
+            }) => activation_condition_parsed.as_ref(),
+            Some(EffectKind::ChangeState {
+                activation_condition_parsed,
+                ..
+            }) => activation_condition_parsed.as_ref(),
+            Some(EffectKind::GainResource {
+                activation_condition_parsed,
+                ..
+            }) => activation_condition_parsed.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn activation_position_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                activation_position,
+                ..
+            }) => activation_position.as_deref(),
+            Some(EffectKind::SelectTarget {
+                activation_position,
+                ..
+            }) => activation_position.as_deref(),
+            Some(EffectKind::LookReveal {
+                activation_position,
+                ..
+            }) => activation_position.as_deref(),
+            Some(EffectKind::GainResource {
+                activation_position,
+                ..
+            }) => activation_position.as_deref(),
+            Some(EffectKind::CompoundEffect {
+                activation_position,
+                ..
+            }) => activation_position.as_deref(),
+            Some(EffectKind::ChangeState {
+                activation_position,
+                ..
+            }) => activation_position.as_deref(),
+            Some(EffectKind::AbilityOp {
+                activation_position,
+                ..
+            }) => activation_position.as_deref(),
+            Some(EffectKind::PositionOp {
+                activation_position,
+                ..
+            }) => activation_position.as_deref(),
+            Some(EffectKind::MiscOp {
+                activation_position,
+                ..
+            }) => activation_position.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn all_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { all, .. }) => *all,
+            Some(EffectKind::GainResource { all, .. }) => *all,
+            Some(EffectKind::ChangeState { all, .. }) => *all,
+            Some(EffectKind::CompoundEffect { all, .. }) => *all,
+            Some(EffectKind::MiscOp { all, .. }) => *all,
+            Some(EffectKind::AbilityOp { all, .. }) => *all,
+            Some(EffectKind::ModifyHearts { all, .. }) => *all,
+            _ => None,
+        }
+    }
+
+    pub fn all_regions_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::ChangeState { all_regions, .. }) => *all_regions,
+            Some(EffectKind::MiscOp { all_regions, .. }) => *all_regions,
+            Some(EffectKind::CustomOp { all_regions, .. }) => *all_regions,
+            _ => None,
+        }
+    }
+
+    pub fn allow_occupied_stage_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                allow_occupied_stage,
+                ..
+            }) => *allow_occupied_stage,
+            Some(EffectKind::PositionOp {
+                allow_occupied_stage,
+                ..
+            }) => *allow_occupied_stage,
+            _ => None,
+        }
+    }
+
+    pub fn alternative_count_type_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MiscOp {
+                alternative_count_type,
+                ..
+            }) => alternative_count_type.as_deref(),
+            Some(EffectKind::CompoundEffect {
+                alternative_count_type,
+                ..
+            }) => alternative_count_type.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn alternative_effect_any(&self) -> Option<&Box<AbilityEffect>> {
+        match &self.kind {
+            Some(EffectKind::CompoundEffect {
+                alternative_effect, ..
+            }) => alternative_effect.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn answers_any(&self) -> Option<&Vec<String>> {
+        match &self.kind {
+            Some(EffectKind::SelectTarget { answers, .. }) => answers.as_ref(),
+            Some(EffectKind::CompoundEffect { answers, .. }) => answers.as_ref(),
+            Some(EffectKind::CustomOp { answers, .. }) => answers.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn any_number_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { any_number, .. }) => *any_number,
+            Some(EffectKind::GainResource { any_number, .. }) => *any_number,
+            Some(EffectKind::PositionOp { any_number, .. }) => *any_number,
+            Some(EffectKind::SelectTarget { any_number, .. }) => *any_number,
+            _ => None,
+        }
+    }
+
+    pub fn blade_limit_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::ChangeState { blade_limit, .. }) => *blade_limit,
+            Some(EffectKind::MiscOp { blade_limit, .. }) => *blade_limit,
+            _ => None,
+        }
+    }
+
+    pub fn blade_limit_operator_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::ChangeState {
+                blade_limit_operator,
+                ..
+            }) => blade_limit_operator.as_deref(),
+            Some(EffectKind::MiscOp {
+                blade_limit_operator,
+                ..
+            }) => blade_limit_operator.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn blade_type_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MiscOp { blade_type, .. }) => blade_type.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn blind_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MiscOp { blind, .. }) => *blind,
+            Some(EffectKind::LookReveal { blind, .. }) => *blind,
+            _ => None,
+        }
+    }
+
+    pub fn is_reveal_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::LookReveal { is_reveal, .. }) => *is_reveal,
+            _ => None,
+        }
+    }
+
+    pub fn card_names_any(&self) -> Option<&Vec<String>> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { card_names, .. }) => Some(card_names),
+            Some(EffectKind::DrawCards { card_names, .. }) => Some(card_names),
+            Some(EffectKind::SelectTarget { card_names, .. }) => Some(card_names),
+            Some(EffectKind::LookReveal { card_names, .. }) => Some(card_names),
+            Some(EffectKind::ChangeState { card_names, .. }) => Some(card_names),
+            Some(EffectKind::MiscOp { card_names, .. }) => Some(card_names),
+            Some(EffectKind::ModifyScore { card_names, .. }) => Some(card_names),
+            _ => None,
+        }
+    }
+
+    pub fn card_property_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { card_property, .. }) => card_property.as_deref(),
+            Some(EffectKind::SelectTarget { card_property, .. }) => card_property.as_deref(),
+            Some(EffectKind::LookReveal { card_property, .. }) => card_property.as_deref(),
+            Some(EffectKind::GainResource { card_property, .. }) => card_property.as_deref(),
+            Some(EffectKind::ChangeState { card_property, .. }) => card_property.as_deref(),
+            Some(EffectKind::ModifyScore { card_property, .. }) => card_property.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn card_type_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { card_type, .. }) => card_type.as_deref(),
+            Some(EffectKind::DrawCards { card_type, .. }) => card_type.as_deref(),
+            Some(EffectKind::SelectTarget { card_type, .. }) => card_type.as_deref(),
+            Some(EffectKind::LookReveal { card_type, .. }) => card_type.as_deref(),
+            Some(EffectKind::ModifyScore { card_type, .. }) => card_type.as_deref(),
+            Some(EffectKind::ModifyHearts { card_type, .. }) => card_type.as_deref(),
+            Some(EffectKind::GainResource { card_type, .. }) => card_type.as_deref(),
+            Some(EffectKind::ChangeState { card_type, .. }) => card_type.as_deref(),
+            Some(EffectKind::AbilityOp { card_type, .. }) => card_type.as_deref(),
+            Some(EffectKind::CompoundEffect { card_type, .. }) => card_type.as_deref(),
+            Some(EffectKind::RestrictionOp { card_type, .. }) => card_type.as_deref(),
+            Some(EffectKind::PositionOp { card_type, .. }) => card_type.as_deref(),
+            Some(EffectKind::MiscOp { card_type, .. }) => card_type.as_deref(),
+            Some(EffectKind::CustomOp { card_type, .. }) => card_type.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn character_effects_any(&self) -> Option<&Vec<serde_json::Value>> {
+        match &self.kind {
+            Some(EffectKind::MiscOp {
+                character_effects, ..
+            }) => character_effects.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn characters_any(&self) -> Option<&Vec<String>> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { characters, .. }) => characters.as_ref(),
+            Some(EffectKind::SelectTarget { characters, .. }) => characters.as_ref(),
+            Some(EffectKind::LookReveal { characters, .. }) => characters.as_ref(),
+            Some(EffectKind::GainResource { characters, .. }) => characters.as_ref(),
+            Some(EffectKind::ChangeState { characters, .. }) => characters.as_ref(),
+            Some(EffectKind::AbilityOp { characters, .. }) => characters.as_ref(),
+            Some(EffectKind::RestrictionOp { characters, .. }) => characters.as_ref(),
+            Some(EffectKind::PositionOp { characters, .. }) => characters.as_ref(),
+            Some(EffectKind::MiscOp { characters, .. }) => characters.as_ref(),
+            Some(EffectKind::CustomOp { characters, .. }) => characters.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn choice_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MiscOp { choice, .. }) => *choice,
+            _ => None,
+        }
+    }
+
+    pub fn choice_based_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::RestrictionOp { choice_based, .. }) => *choice_based,
+            Some(EffectKind::CustomOp { choice_based, .. }) => *choice_based,
+            _ => None,
+        }
+    }
+
+    pub fn choice_maker_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::SelectTarget { choice_maker, .. }) => choice_maker.as_deref(),
+            Some(EffectKind::CompoundEffect { choice_maker, .. }) => choice_maker.as_deref(),
+            Some(EffectKind::CustomOp { choice_maker, .. }) => choice_maker.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn choice_options_any(&self) -> Option<&Vec<String>> {
+        match &self.kind {
+            Some(EffectKind::SelectTarget { choice_options, .. }) => choice_options.as_ref(),
+            Some(EffectKind::CompoundEffect { choice_options, .. }) => choice_options.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn choice_type_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::SelectTarget { choice_type, .. }) => choice_type.as_deref(),
+            Some(EffectKind::CompoundEffect { choice_type, .. }) => choice_type.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn cost_from_revealed_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                cost_from_revealed, ..
+            }) => *cost_from_revealed,
+            Some(EffectKind::ChangeState {
+                cost_from_revealed, ..
+            }) => *cost_from_revealed,
+            Some(EffectKind::PositionOp {
+                cost_from_revealed, ..
+            }) => *cost_from_revealed,
+            _ => None,
+        }
+    }
+
+    pub fn cost_limit_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { cost_limit, .. }) => *cost_limit,
+            Some(EffectKind::SelectTarget { cost_limit, .. }) => *cost_limit,
+            Some(EffectKind::LookReveal { cost_limit, .. }) => *cost_limit,
+            Some(EffectKind::GainResource { cost_limit, .. }) => *cost_limit,
+            Some(EffectKind::ChangeState { cost_limit, .. }) => *cost_limit,
+            Some(EffectKind::AbilityOp { cost_limit, .. }) => *cost_limit,
+            Some(EffectKind::PositionOp { cost_limit, .. }) => *cost_limit,
+            Some(EffectKind::MiscOp { cost_limit, .. }) => *cost_limit,
+            _ => None,
+        }
+    }
+
+    pub fn cost_limit_max_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { cost_limit_max, .. }) => *cost_limit_max,
+            Some(EffectKind::SelectTarget { cost_limit_max, .. }) => *cost_limit_max,
+            Some(EffectKind::LookReveal { cost_limit_max, .. }) => *cost_limit_max,
+            _ => None,
+        }
+    }
+
+    pub fn cost_limit_min_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { cost_limit_min, .. }) => *cost_limit_min,
+            Some(EffectKind::SelectTarget { cost_limit_min, .. }) => *cost_limit_min,
+            Some(EffectKind::LookReveal { cost_limit_min, .. }) => *cost_limit_min,
+            _ => None,
+        }
+    }
+
+    pub fn cost_limit_operator_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                cost_limit_operator,
+                ..
+            }) => cost_limit_operator.as_deref(),
+            Some(EffectKind::SelectTarget {
+                cost_limit_operator,
+                ..
+            }) => cost_limit_operator.as_deref(),
+            Some(EffectKind::LookReveal {
+                cost_limit_operator,
+                ..
+            }) => cost_limit_operator.as_deref(),
+            Some(EffectKind::GainResource {
+                cost_limit_operator,
+                ..
+            }) => cost_limit_operator.as_deref(),
+            Some(EffectKind::ChangeState {
+                cost_limit_operator,
+                ..
+            }) => cost_limit_operator.as_deref(),
+            Some(EffectKind::AbilityOp {
+                cost_limit_operator,
+                ..
+            }) => cost_limit_operator.as_deref(),
+            Some(EffectKind::PositionOp {
+                cost_limit_operator,
+                ..
+            }) => cost_limit_operator.as_deref(),
+            Some(EffectKind::MiscOp {
+                cost_limit_operator,
+                ..
+            }) => cost_limit_operator.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn cost_offset_any(&self) -> Option<i32> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { cost_offset, .. }) => *cost_offset,
+            Some(EffectKind::MiscOp { cost_offset, .. }) => *cost_offset,
+            _ => None,
+        }
+    }
+
+    pub fn cost_reference_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { cost_reference, .. }) => cost_reference.as_deref(),
+            Some(EffectKind::MiscOp { cost_reference, .. }) => cost_reference.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn cost_total_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { cost_total, .. }) => *cost_total,
+            Some(EffectKind::SelectTarget { cost_total, .. }) => *cost_total,
+            Some(EffectKind::ModifyScore { cost_total, .. }) => *cost_total,
+            Some(EffectKind::ModifyHearts { cost_total, .. }) => *cost_total,
+            Some(EffectKind::ChangeState { cost_total, .. }) => *cost_total,
+            Some(EffectKind::MiscOp { cost_total, .. }) => *cost_total,
+            _ => None,
+        }
+    }
+
+    pub fn cost_total_operator_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                cost_total_operator,
+                ..
+            }) => cost_total_operator.as_deref(),
+            Some(EffectKind::SelectTarget {
+                cost_total_operator,
+                ..
+            }) => cost_total_operator.as_deref(),
+            Some(EffectKind::ModifyScore {
+                cost_total_operator,
+                ..
+            }) => cost_total_operator.as_deref(),
+            Some(EffectKind::ModifyHearts {
+                cost_total_operator,
+                ..
+            }) => cost_total_operator.as_deref(),
+            Some(EffectKind::ChangeState {
+                cost_total_operator,
+                ..
+            }) => cost_total_operator.as_deref(),
+            Some(EffectKind::MiscOp {
+                cost_total_operator,
+                ..
+            }) => cost_total_operator.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn delayed_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::RestrictionOp { delayed, .. }) => *delayed,
+            _ => None,
+        }
+    }
+
+    pub fn discard_remaining_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                discard_remaining, ..
+            }) => *discard_remaining,
+            Some(EffectKind::SelectTarget {
+                discard_remaining, ..
+            }) => *discard_remaining,
+            _ => None,
+        }
+    }
+
+    pub fn distinct_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { distinct, .. }) => distinct.as_deref(),
+            Some(EffectKind::SelectTarget { distinct, .. }) => distinct.as_deref(),
+            Some(EffectKind::LookReveal { distinct, .. }) => distinct.as_deref(),
+            Some(EffectKind::ModifyScore { distinct, .. }) => distinct.as_deref(),
+            Some(EffectKind::GainResource { distinct, .. }) => distinct.as_deref(),
+            Some(EffectKind::ChangeState { distinct, .. }) => distinct.as_deref(),
+            Some(EffectKind::CompoundEffect { distinct, .. }) => distinct.as_deref(),
+            Some(EffectKind::ModifyHearts { distinct, .. }) => distinct.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn duration_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::ModifyScore { duration, .. }) => duration.as_deref(),
+            Some(EffectKind::ModifyHearts { duration, .. }) => duration.as_deref(),
+            Some(EffectKind::GainResource { duration, .. }) => duration.as_deref(),
+            Some(EffectKind::AbilityOp { duration, .. }) => duration.as_deref(),
+            Some(EffectKind::RestrictionOp { duration, .. }) => duration.as_deref(),
+            Some(EffectKind::CompoundEffect { duration, .. }) => duration.as_deref(),
+            Some(EffectKind::MiscOp { duration, .. }) => duration.as_deref(),
+            Some(EffectKind::CustomOp { duration, .. }) => duration.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn dynamic_count_any(&self) -> Option<&DynamicCount> {
+        match &self.kind {
+            Some(EffectKind::DrawCards { dynamic_count, .. }) => dynamic_count.as_ref(),
+            Some(EffectKind::LookReveal { dynamic_count, .. }) => dynamic_count.as_ref(),
+            Some(EffectKind::GainResource { dynamic_count, .. }) => dynamic_count.as_ref(),
+            Some(EffectKind::MoveCards { dynamic_count, .. }) => dynamic_count.as_ref(),
+            Some(EffectKind::PositionOp { dynamic_count, .. }) => dynamic_count.as_ref(),
+            Some(EffectKind::MiscOp { dynamic_count, .. }) => dynamic_count.as_ref(),
+            Some(EffectKind::AbilityOp { dynamic_count, .. }) => dynamic_count.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn effect_constraint_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::ModifyScore {
+                effect_constraint, ..
+            }) => effect_constraint.as_deref(),
+            Some(EffectKind::MiscOp {
+                effect_constraint, ..
+            }) => effect_constraint.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn effect_type_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::AbilityOp { effect_type, .. }) => effect_type.as_deref(),
+            Some(EffectKind::RestrictionOp { effect_type, .. }) => effect_type.as_deref(),
+            Some(EffectKind::CustomOp { effect_type, .. }) => effect_type.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn energy_count_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::GainResource { energy_count, .. }) => *energy_count,
+            Some(EffectKind::PositionOp { energy_count, .. }) => *energy_count,
+            Some(EffectKind::MiscOp { energy_count, .. }) => *energy_count,
+            Some(EffectKind::MoveCards { energy_count, .. }) => *energy_count,
+            _ => None,
+        }
+    }
+
+    pub fn exclude_by_name_source_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                exclude_by_name_source,
+                ..
+            }) => exclude_by_name_source.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn exclude_characters_any(&self) -> Option<&Vec<String>> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                exclude_characters, ..
+            }) => exclude_characters.as_ref(),
+            Some(EffectKind::SelectTarget {
+                exclude_characters, ..
+            }) => exclude_characters.as_ref(),
+            Some(EffectKind::LookReveal {
+                exclude_characters, ..
+            }) => exclude_characters.as_ref(),
+            Some(EffectKind::GainResource {
+                exclude_characters, ..
+            }) => exclude_characters.as_ref(),
+            Some(EffectKind::ChangeState {
+                exclude_characters, ..
+            }) => exclude_characters.as_ref(),
+            Some(EffectKind::AbilityOp {
+                exclude_characters, ..
+            }) => exclude_characters.as_ref(),
+            Some(EffectKind::RestrictionOp {
+                exclude_characters, ..
+            }) => exclude_characters.as_ref(),
+            Some(EffectKind::PositionOp {
+                exclude_characters, ..
+            }) => exclude_characters.as_ref(),
+            Some(EffectKind::MiscOp {
+                exclude_characters, ..
+            }) => exclude_characters.as_ref(),
+            Some(EffectKind::CustomOp {
+                exclude_characters, ..
+            }) => exclude_characters.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn exclude_group_names_any(&self) -> Option<&Vec<String>> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                exclude_group_names,
+                ..
+            }) => exclude_group_names.as_ref(),
+            Some(EffectKind::SelectTarget {
+                exclude_group_names,
+                ..
+            }) => exclude_group_names.as_ref(),
+            Some(EffectKind::LookReveal {
+                exclude_group_names,
+                ..
+            }) => exclude_group_names.as_ref(),
+            Some(EffectKind::GainResource {
+                exclude_group_names,
+                ..
+            }) => exclude_group_names.as_ref(),
+            Some(EffectKind::ChangeState {
+                exclude_group_names,
+                ..
+            }) => exclude_group_names.as_ref(),
+            Some(EffectKind::AbilityOp {
+                exclude_group_names,
+                ..
+            }) => exclude_group_names.as_ref(),
+            Some(EffectKind::RestrictionOp {
+                exclude_group_names,
+                ..
+            }) => exclude_group_names.as_ref(),
+            Some(EffectKind::PositionOp {
+                exclude_group_names,
+                ..
+            }) => exclude_group_names.as_ref(),
+            Some(EffectKind::MiscOp {
+                exclude_group_names,
+                ..
+            }) => exclude_group_names.as_ref(),
+            Some(EffectKind::CustomOp {
+                exclude_group_names,
+                ..
+            }) => exclude_group_names.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn exclude_heart_colors_any(&self) -> &[String] {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                exclude_heart_colors,
+                ..
+            }) => exclude_heart_colors.as_deref().unwrap_or(&[]),
+            Some(EffectKind::ModifyHearts {
+                exclude_heart_colors,
+                ..
+            }) => exclude_heart_colors.as_deref().unwrap_or(&[]),
+            Some(EffectKind::ChangeState {
+                exclude_heart_colors,
+                ..
+            }) => exclude_heart_colors.as_deref().unwrap_or(&[]),
+            _ => &[],
+        }
+    }
+
+    pub fn exclude_position_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                exclude_position, ..
+            }) => exclude_position.as_deref(),
+            Some(EffectKind::PositionOp {
+                exclude_position, ..
+            }) => exclude_position.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn exclude_selected_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                exclude_selected, ..
+            }) => *exclude_selected,
+            Some(EffectKind::SelectTarget {
+                exclude_selected, ..
+            }) => *exclude_selected,
+            _ => None,
+        }
+    }
+
+    pub fn exclude_self_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { exclude_self, .. }) => *exclude_self,
+            Some(EffectKind::DrawCards { exclude_self, .. }) => *exclude_self,
+            Some(EffectKind::SelectTarget { exclude_self, .. }) => *exclude_self,
+            Some(EffectKind::LookReveal { exclude_self, .. }) => *exclude_self,
+            Some(EffectKind::ModifyScore { exclude_self, .. }) => *exclude_self,
+            Some(EffectKind::ModifyHearts { exclude_self, .. }) => *exclude_self,
+            Some(EffectKind::GainResource { exclude_self, .. }) => *exclude_self,
+            Some(EffectKind::ChangeState { exclude_self, .. }) => *exclude_self,
+            Some(EffectKind::AbilityOp { exclude_self, .. }) => *exclude_self,
+            Some(EffectKind::RestrictionOp { exclude_self, .. }) => *exclude_self,
+            Some(EffectKind::PositionOp { exclude_self, .. }) => *exclude_self,
+            Some(EffectKind::CompoundEffect { exclude_self, .. }) => *exclude_self,
+            Some(EffectKind::MiscOp { exclude_self, .. }) => *exclude_self,
+            Some(EffectKind::CustomOp { exclude_self, .. }) => *exclude_self,
+            _ => None,
+        }
+    }
+
+    pub fn filter_targets_by_heart_colors_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                filter_targets_by_heart_colors,
+                ..
+            }) => *filter_targets_by_heart_colors,
+            Some(EffectKind::SelectTarget {
+                filter_targets_by_heart_colors,
+                ..
+            }) => *filter_targets_by_heart_colors,
+            Some(EffectKind::LookReveal {
+                filter_targets_by_heart_colors,
+                ..
+            }) => *filter_targets_by_heart_colors,
+            Some(EffectKind::ModifyScore {
+                filter_targets_by_heart_colors,
+                ..
+            }) => *filter_targets_by_heart_colors,
+            Some(EffectKind::ModifyHearts {
+                filter_targets_by_heart_colors,
+                ..
+            }) => *filter_targets_by_heart_colors,
+            Some(EffectKind::GainResource {
+                filter_targets_by_heart_colors,
+                ..
+            }) => *filter_targets_by_heart_colors,
+            Some(EffectKind::ChangeState {
+                filter_targets_by_heart_colors,
+                ..
+            }) => *filter_targets_by_heart_colors,
+            _ => None,
+        }
+    }
+
+    pub fn gained_effect_any(&self) -> Option<&Box<AbilityEffect>> {
+        match &self.kind {
+            Some(EffectKind::AbilityOp { gained_effect, .. }) => gained_effect.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn group_names_any(&self) -> Option<&Vec<String>> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { group_names, .. }) => group_names.as_ref(),
+            Some(EffectKind::SelectTarget { group_names, .. }) => group_names.as_ref(),
+            Some(EffectKind::LookReveal { group_names, .. }) => group_names.as_ref(),
+            Some(EffectKind::ModifyScore { group_names, .. }) => group_names.as_ref(),
+            Some(EffectKind::ModifyHearts { group_names, .. }) => group_names.as_ref(),
+            Some(EffectKind::GainResource { group_names, .. }) => group_names.as_ref(),
+            Some(EffectKind::ChangeState { group_names, .. }) => group_names.as_ref(),
+            Some(EffectKind::AbilityOp { group_names, .. }) => group_names.as_ref(),
+            Some(EffectKind::CompoundEffect { group_names, .. }) => group_names.as_ref(),
+            Some(EffectKind::RestrictionOp { group_names, .. }) => group_names.as_ref(),
+            Some(EffectKind::PositionOp { group_names, .. }) => group_names.as_ref(),
+            Some(EffectKind::MiscOp { group_names, .. }) => group_names.as_ref(),
+            Some(EffectKind::CustomOp { group_names, .. }) => group_names.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn group_reference_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                group_reference, ..
+            }) => group_reference.as_deref(),
+            Some(EffectKind::SelectTarget {
+                group_reference, ..
+            }) => group_reference.as_deref(),
+            Some(EffectKind::LookReveal {
+                group_reference, ..
+            }) => group_reference.as_deref(),
+            Some(EffectKind::ModifyHearts {
+                group_reference, ..
+            }) => group_reference.as_deref(),
+            Some(EffectKind::GainResource {
+                group_reference, ..
+            }) => group_reference.as_deref(),
+            Some(EffectKind::ChangeState {
+                group_reference, ..
+            }) => group_reference.as_deref(),
+            Some(EffectKind::MiscOp {
+                group_reference, ..
+            }) => group_reference.as_deref(),
+            Some(EffectKind::CompoundEffect {
+                group_reference, ..
+            }) => group_reference.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn heart_color_count_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::MiscOp {
+                heart_color_count, ..
+            }) => *heart_color_count,
+            Some(EffectKind::SelectTarget {
+                heart_color_count, ..
+            }) => *heart_color_count,
+            Some(EffectKind::LookReveal {
+                heart_color_count, ..
+            }) => *heart_color_count,
+            Some(EffectKind::GainResource {
+                heart_color_count, ..
+            }) => *heart_color_count,
+            _ => None,
+        }
+    }
+
+    pub fn heart_colors_any(&self) -> &[String] {
+        match &self.kind {
+            Some(EffectKind::DrawCards { heart_colors, .. }) => heart_colors.as_slice(),
+            Some(EffectKind::SelectTarget { heart_colors, .. }) => heart_colors.as_slice(),
+            Some(EffectKind::LookReveal { heart_colors, .. }) => heart_colors.as_slice(),
+            Some(EffectKind::ModifyScore { heart_colors, .. }) => heart_colors.as_slice(),
+            Some(EffectKind::ModifyHearts { heart_colors, .. }) => heart_colors.as_slice(),
+            Some(EffectKind::GainResource { heart_colors, .. }) => heart_colors.as_slice(),
+            Some(EffectKind::ChangeState { heart_colors, .. }) => heart_colors.as_slice(),
+            Some(EffectKind::CompoundEffect { heart_colors, .. }) => heart_colors.as_slice(),
+            Some(EffectKind::MiscOp { heart_colors, .. }) => heart_colors.as_slice(),
+            Some(EffectKind::MoveCards { heart_colors, .. }) => heart_colors.as_slice(),
+            Some(EffectKind::AbilityOp { heart_colors, .. }) => heart_colors.as_slice(),
+            _ => &[],
+        }
+    }
+
+    pub fn heart_colors_from_selected_card_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::GainResource {
+                heart_colors_from_selected_card,
+                ..
+            }) => *heart_colors_from_selected_card,
+            _ => None,
+        }
+    }
+
+    pub fn heart_color_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::GainResource { heart_color, .. }) => heart_color.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn heart_selection_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MiscOp {
+                heart_selection, ..
+            }) => *heart_selection,
+            _ => None,
+        }
+    }
+
+    pub fn heart_type_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::GainResource { heart_type, .. }) => heart_type.as_deref(),
+            Some(EffectKind::MiscOp { heart_type, .. }) => heart_type.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn id_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MiscOp { id, .. }) => id.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn identities_any(&self) -> Option<&Vec<String>> {
+        match &self.kind {
+            Some(EffectKind::ChangeState { identities, .. }) => identities.as_ref(),
+            Some(EffectKind::MiscOp { identities, .. }) => identities.as_ref(),
+            Some(EffectKind::CustomOp { identities, .. }) => identities.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn location_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { location, .. }) => location.as_deref(),
+            Some(EffectKind::DrawCards { location, .. }) => location.as_deref(),
+            Some(EffectKind::SelectTarget { location, .. }) => location.as_deref(),
+            Some(EffectKind::LookReveal { location, .. }) => location.as_deref(),
+            Some(EffectKind::ModifyScore { location, .. }) => location.as_deref(),
+            Some(EffectKind::ModifyHearts { location, .. }) => location.as_deref(),
+            Some(EffectKind::GainResource { location, .. }) => location.as_deref(),
+            Some(EffectKind::ChangeState { location, .. }) => location.as_deref(),
+            Some(EffectKind::AbilityOp { location, .. }) => location.as_deref(),
+            Some(EffectKind::RestrictionOp { location, .. }) => location.as_deref(),
+            Some(EffectKind::MiscOp { location, .. }) => location.as_deref(),
+            Some(EffectKind::CustomOp { location, .. }) => location.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn lose_blade_hearts_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MiscOp {
+                lose_blade_hearts, ..
+            }) => *lose_blade_hearts,
+            _ => None,
+        }
+    }
+
+    pub fn multiple_targets_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                multiple_targets, ..
+            }) => *multiple_targets,
+            Some(EffectKind::SelectTarget {
+                multiple_targets, ..
+            }) => *multiple_targets,
+            Some(EffectKind::PositionOp {
+                multiple_targets, ..
+            }) => *multiple_targets,
+            Some(EffectKind::LookReveal {
+                multiple_targets, ..
+            }) => *multiple_targets,
+            Some(EffectKind::GainResource {
+                multiple_targets, ..
+            }) => *multiple_targets,
+            _ => None,
+        }
+    }
+
+    pub fn name_constraint_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                name_constraint, ..
+            }) => name_constraint.as_deref(),
+            Some(EffectKind::SelectTarget {
+                name_constraint, ..
+            }) => name_constraint.as_deref(),
+            Some(EffectKind::LookReveal {
+                name_constraint, ..
+            }) => name_constraint.as_deref(),
+            Some(EffectKind::ChangeState {
+                name_constraint, ..
+            }) => name_constraint.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn name_constraint_source_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                name_constraint_source,
+                ..
+            }) => name_constraint_source.as_deref(),
+            Some(EffectKind::SelectTarget {
+                name_constraint_source,
+                ..
+            }) => name_constraint_source.as_deref(),
+            Some(EffectKind::LookReveal {
+                name_constraint_source,
+                ..
+            }) => name_constraint_source.as_deref(),
+            Some(EffectKind::ChangeState {
+                name_constraint_source,
+                ..
+            }) => name_constraint_source.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn need_heart_color_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                need_heart_color, ..
+            }) => need_heart_color.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn need_heart_operator_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                need_heart_operator,
+                ..
+            }) => need_heart_operator.as_deref(),
+            Some(EffectKind::ModifyScore {
+                need_heart_operator,
+                ..
+            }) => need_heart_operator.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn need_heart_total_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                need_heart_total, ..
+            }) => *need_heart_total,
+            Some(EffectKind::ModifyScore {
+                need_heart_total, ..
+            }) => *need_heart_total,
+            _ => None,
+        }
+    }
+
+    pub fn negation_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { negation, .. }) => *negation,
+            Some(EffectKind::SelectTarget { negation, .. }) => *negation,
+            Some(EffectKind::LookReveal { negation, .. }) => *negation,
+            Some(EffectKind::ModifyHearts { negation, .. }) => *negation,
+            Some(EffectKind::GainResource { negation, .. }) => *negation,
+            Some(EffectKind::ChangeState { negation, .. }) => *negation,
+            Some(EffectKind::MiscOp { negation, .. }) => *negation,
+            Some(EffectKind::ModifyScore { negation, .. }) => *negation,
+            _ => None,
+        }
+    }
+
+    pub fn non_stackable_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::RestrictionOp { non_stackable, .. }) => *non_stackable,
+            _ => None,
+        }
+    }
+
+    pub fn operation_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::ModifyScore { operation, .. }) => operation.as_deref(),
+            Some(EffectKind::ModifyHearts { operation, .. }) => operation.as_deref(),
+            Some(EffectKind::GainResource { operation, .. }) => operation.as_deref(),
+            Some(EffectKind::RestrictionOp { operation, .. }) => operation.as_deref(),
+            Some(EffectKind::MiscOp { operation, .. }) => operation.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn opponent_action_any(&self) -> Option<&Box<AbilityEffect>> {
+        match &self.kind {
+            Some(EffectKind::CustomOp {
+                opponent_action, ..
+            }) => opponent_action.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn option_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::AbilityOp { option, .. }) => option.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn optional_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::SelectTarget { optional, .. }) => *optional,
+            Some(EffectKind::LookReveal { optional, .. }) => *optional,
+            Some(EffectKind::GainResource { optional, .. }) => *optional,
+            Some(EffectKind::ChangeState { optional, .. }) => *optional,
+            Some(EffectKind::CompoundEffect { optional, .. }) => *optional,
+            Some(EffectKind::PositionOp { optional, .. }) => *optional,
+            _ => None,
+        }
+    }
+
+    pub fn options_any(&self) -> Option<&Vec<AbilityEffect>> {
+        match &self.kind {
+            Some(EffectKind::LookReveal { options, .. }) => options.as_ref(),
+            Some(EffectKind::CompoundEffect { options, .. }) => options.as_ref(),
+            Some(EffectKind::MiscOp { options, .. }) => options.as_ref(),
+            Some(EffectKind::CustomOp { options, .. }) => options.as_ref(),
+            Some(EffectKind::SelectTarget { options, .. }) => options.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn or_ability_filters_any(&self) -> Option<&Vec<AbilityFilterBranch>> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                or_ability_filters, ..
+            }) => or_ability_filters.as_ref(),
+            Some(EffectKind::SelectTarget {
+                or_ability_filters, ..
+            }) => or_ability_filters.as_ref(),
+            Some(EffectKind::LookReveal {
+                or_ability_filters, ..
+            }) => or_ability_filters.as_ref(),
+            Some(EffectKind::ChangeState {
+                or_ability_filters, ..
+            }) => or_ability_filters.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn or_card_types_any(&self) -> Option<&Vec<String>> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { or_card_types, .. }) => or_card_types.as_ref(),
+            Some(EffectKind::SelectTarget { or_card_types, .. }) => or_card_types.as_ref(),
+            Some(EffectKind::MiscOp { or_card_types, .. }) => or_card_types.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn original_cost_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::MiscOp { original_cost, .. }) => *original_cost,
+            _ => None,
+        }
+    }
+
+    pub fn original_count_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::ModifyHearts { original_count, .. }) => *original_count,
+            Some(EffectKind::MiscOp { original_count, .. }) => *original_count,
+            _ => None,
+        }
+    }
+
+    pub fn original_operator_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::ModifyHearts {
+                original_operator, ..
+            }) => original_operator.as_deref(),
+            Some(EffectKind::MiscOp {
+                original_operator, ..
+            }) => original_operator.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn original_value_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { original_value, .. }) => *original_value,
+            Some(EffectKind::SelectTarget { original_value, .. }) => *original_value,
+            Some(EffectKind::LookReveal { original_value, .. }) => *original_value,
+            Some(EffectKind::ModifyHearts { original_value, .. }) => *original_value,
+            Some(EffectKind::GainResource { original_value, .. }) => *original_value,
+            Some(EffectKind::ChangeState { original_value, .. }) => *original_value,
+            Some(EffectKind::MiscOp { original_value, .. }) => *original_value,
+            Some(EffectKind::CustomOp { original_value, .. }) => *original_value,
+            Some(EffectKind::DrawCards { original_value, .. }) => *original_value,
+            Some(EffectKind::CompoundEffect { original_value, .. }) => *original_value,
+            _ => None,
+        }
+    }
+
+    pub fn replace_all_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::ModifyHearts { replace_all, .. }) => *replace_all,
+            _ => None,
+        }
+    }
+
+    pub fn parenthetical_any(&self) -> Option<&Vec<String>> {
+        match &self.kind {
+            Some(EffectKind::MiscOp { parenthetical, .. }) => parenthetical.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn per_group_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { per_group, .. }) => *per_group,
+            Some(EffectKind::MiscOp { per_group, .. }) => *per_group,
+            Some(EffectKind::SelectTarget { per_group, .. }) => *per_group,
+            _ => None,
+        }
+    }
+
+    pub fn per_group_count_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                per_group_count, ..
+            }) => *per_group_count,
+            Some(EffectKind::MiscOp {
+                per_group_count, ..
+            }) => *per_group_count,
+            Some(EffectKind::SelectTarget {
+                per_group_count, ..
+            }) => *per_group_count,
+            _ => None,
+        }
+    }
+
+    pub fn per_unit_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::SelectTarget { per_unit, .. }) => *per_unit,
+            Some(EffectKind::LookReveal { per_unit, .. }) => *per_unit,
+            Some(EffectKind::ModifyScore { per_unit, .. }) => *per_unit,
+            Some(EffectKind::ModifyHearts { per_unit, .. }) => *per_unit,
+            Some(EffectKind::GainResource { per_unit, .. }) => *per_unit,
+            Some(EffectKind::ChangeState { per_unit, .. }) => *per_unit,
+            Some(EffectKind::DrawCards { per_unit, .. }) => *per_unit,
+            Some(EffectKind::MiscOp { per_unit, .. }) => *per_unit,
+            Some(EffectKind::CompoundEffect { per_unit, .. }) => *per_unit,
+            _ => None,
+        }
+    }
+
+    pub fn per_unit_count_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::SelectTarget { per_unit_count, .. }) => *per_unit_count,
+            Some(EffectKind::DrawCards { per_unit_count, .. }) => *per_unit_count,
+            Some(EffectKind::LookReveal { per_unit_count, .. }) => *per_unit_count,
+            Some(EffectKind::ModifyScore { per_unit_count, .. }) => *per_unit_count,
+            Some(EffectKind::ModifyHearts { per_unit_count, .. }) => *per_unit_count,
+            Some(EffectKind::GainResource { per_unit_count, .. }) => *per_unit_count,
+            Some(EffectKind::ChangeState { per_unit_count, .. }) => *per_unit_count,
+            Some(EffectKind::MiscOp { per_unit_count, .. }) => *per_unit_count,
+            Some(EffectKind::CompoundEffect { per_unit_count, .. }) => *per_unit_count,
+            _ => None,
+        }
+    }
+
+    pub fn per_unit_heart_colors_any(&self) -> &[String] {
+        match &self.kind {
+            Some(EffectKind::SelectTarget {
+                per_unit_heart_colors,
+                ..
+            }) => per_unit_heart_colors.as_slice(),
+            Some(EffectKind::LookReveal {
+                per_unit_heart_colors,
+                ..
+            }) => per_unit_heart_colors.as_slice(),
+            Some(EffectKind::ModifyScore {
+                per_unit_heart_colors,
+                ..
+            }) => per_unit_heart_colors.as_slice(),
+            Some(EffectKind::ModifyHearts {
+                per_unit_heart_colors,
+                ..
+            }) => per_unit_heart_colors.as_slice(),
+            Some(EffectKind::GainResource {
+                per_unit_heart_colors,
+                ..
+            }) => per_unit_heart_colors.as_slice(),
+            Some(EffectKind::DrawCards {
+                per_unit_heart_colors,
+                ..
+            }) => per_unit_heart_colors.as_slice(),
+            Some(EffectKind::ChangeState {
+                per_unit_heart_colors,
+                ..
+            }) => per_unit_heart_colors.as_slice(),
+            Some(EffectKind::MiscOp {
+                per_unit_heart_colors,
+                ..
+            }) => per_unit_heart_colors.as_slice(),
+            _ => &[],
+        }
+    }
+
+    pub fn per_unit_location_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::SelectTarget {
+                per_unit_location, ..
+            }) => per_unit_location.as_deref(),
+            Some(EffectKind::LookReveal {
+                per_unit_location, ..
+            }) => per_unit_location.as_deref(),
+            Some(EffectKind::ModifyScore {
+                per_unit_location, ..
+            }) => per_unit_location.as_deref(),
+            Some(EffectKind::GainResource {
+                per_unit_location, ..
+            }) => per_unit_location.as_deref(),
+            Some(EffectKind::DrawCards {
+                per_unit_location, ..
+            }) => per_unit_location.as_deref(),
+            Some(EffectKind::ChangeState {
+                per_unit_location, ..
+            }) => per_unit_location.as_deref(),
+            Some(EffectKind::MiscOp {
+                per_unit_location, ..
+            }) => per_unit_location.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn per_unit_type_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::SelectTarget { per_unit_type, .. }) => per_unit_type.as_deref(),
+            Some(EffectKind::LookReveal { per_unit_type, .. }) => per_unit_type.as_deref(),
+            Some(EffectKind::ModifyScore { per_unit_type, .. }) => per_unit_type.as_deref(),
+            Some(EffectKind::GainResource { per_unit_type, .. }) => per_unit_type.as_deref(),
+            Some(EffectKind::DrawCards { per_unit_type, .. }) => per_unit_type.as_deref(),
+            Some(EffectKind::ChangeState { per_unit_type, .. }) => per_unit_type.as_deref(),
+            Some(EffectKind::MiscOp { per_unit_type, .. }) => per_unit_type.as_deref(),
+            Some(EffectKind::CompoundEffect { per_unit_type, .. }) => per_unit_type.as_deref(),
+            Some(EffectKind::ModifyHearts { per_unit_type, .. }) => per_unit_type.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn phase_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::RestrictionOp { phase, .. }) => phase.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn picker_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MiscOp { picker, .. }) => picker.as_deref(),
+            Some(EffectKind::LookReveal { picker, .. }) => picker.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn placement_order_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                placement_order, ..
+            }) => placement_order.as_deref(),
+            Some(EffectKind::SelectTarget {
+                placement_order, ..
+            }) => placement_order.as_deref(),
+            Some(EffectKind::MiscOp {
+                placement_order, ..
+            }) => placement_order.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn position_any(&self) -> Option<&PositionInfo> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { position, .. }) => position.as_ref(),
+            Some(EffectKind::DrawCards { position, .. }) => position.as_ref(),
+            Some(EffectKind::GainResource { position, .. }) => position.as_ref(),
+            Some(EffectKind::ModifyScore { position, .. }) => position.as_ref(),
+            Some(EffectKind::ChangeState { position, .. }) => position.as_ref(),
+            Some(EffectKind::CompoundEffect { position, .. }) => position.as_ref(),
+            Some(EffectKind::PositionOp { position, .. }) => position.as_ref(),
+            Some(EffectKind::ModifyHearts { position, .. }) => position.as_ref(),
+            Some(EffectKind::MiscOp { position, .. }) => position.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn question_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::SelectTarget { question, .. }) => question.as_deref(),
+            Some(EffectKind::CompoundEffect { question, .. }) => question.as_deref(),
+            Some(EffectKind::CustomOp { question, .. }) => question.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn quoted_text_any(&self) -> Option<&QuotedText> {
+        match &self.kind {
+            Some(EffectKind::MiscOp { quoted_text, .. }) => quoted_text.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn ref_offset_any(&self) -> Option<i32> {
+        match &self.kind {
+            Some(EffectKind::MiscOp { ref_offset, .. }) => *ref_offset,
+            _ => None,
+        }
+    }
+
+    pub fn ref_value_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MiscOp { ref_value, .. }) => ref_value.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn repeat_limit_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::ModifyScore {
+                repeat_limit,
+                max_repeats,
+                ..
+            }) => repeat_limit.or(*max_repeats),
+            Some(EffectKind::ModifyHearts { repeat_limit, .. }) => *repeat_limit,
+            Some(EffectKind::CompoundEffect { repeat_limit, .. }) => *repeat_limit,
+            Some(EffectKind::MiscOp { repeat_limit, .. }) => *repeat_limit,
+            Some(EffectKind::GainResource { repeat_limit, .. }) => *repeat_limit,
+            _ => None,
+        }
+    }
+
+    pub fn replaces_event_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::RestrictionOp { replaces_event, .. }) => replaces_event.as_deref(),
+            Some(EffectKind::CustomOp { replaces_event, .. }) => replaces_event.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn require_all_heart_colors_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MiscOp {
+                require_all_heart_colors,
+                ..
+            }) => *require_all_heart_colors,
+            Some(EffectKind::SelectTarget {
+                require_all_heart_colors,
+                ..
+            }) => *require_all_heart_colors,
+            Some(EffectKind::LookReveal {
+                require_all_heart_colors,
+                ..
+            }) => *require_all_heart_colors,
+            Some(EffectKind::GainResource {
+                require_all_heart_colors,
+                ..
+            }) => *require_all_heart_colors,
+            _ => None,
+        }
+    }
+
+    pub fn resource_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::GainResource { resource, .. }) => resource.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn resource_icon_count_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::MiscOp {
+                resource_icon_count,
+                ..
+            }) => *resource_icon_count,
+            _ => None,
+        }
+    }
+
+    pub fn resource_on_select_any(&self) -> Option<&Box<AbilityEffect>> {
+        match &self.kind {
+            Some(EffectKind::LookReveal {
+                resource_on_select, ..
+            }) => resource_on_select.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn restricted_destination_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::RestrictionOp {
+                restricted_destination,
+                ..
+            }) => restricted_destination.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn restriction_type_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::RestrictionOp {
+                restriction_type, ..
+            }) => restriction_type.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn reveal_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::LookReveal { reveal, .. }) => *reveal,
+            Some(EffectKind::SelectTarget { reveal, .. }) => *reveal,
+            _ => None,
+        }
+    }
+
+    pub fn same_unit_name_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MiscOp { same_unit_name, .. }) => *same_unit_name,
+            Some(EffectKind::MoveCards { same_unit_name, .. }) => *same_unit_name,
+            _ => None,
+        }
+    }
+
+    pub fn self_cost_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::ChangeState { self_cost, .. }) => *self_cost,
+            Some(EffectKind::MoveCards { self_cost, .. }) => *self_cost,
+            _ => None,
+        }
+    }
+
+    pub fn self_target_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { self_target, .. }) => *self_target,
+            Some(EffectKind::SelectTarget { self_target, .. }) => *self_target,
+            Some(EffectKind::LookReveal { self_target, .. }) => *self_target,
+            Some(EffectKind::ModifyScore { self_target, .. }) => *self_target,
+            Some(EffectKind::ModifyHearts { self_target, .. }) => *self_target,
+            Some(EffectKind::GainResource { self_target, .. }) => *self_target,
+            Some(EffectKind::ChangeState { self_target, .. }) => *self_target,
+            Some(EffectKind::AbilityOp { self_target, .. }) => *self_target,
+            Some(EffectKind::RestrictionOp { self_target, .. }) => *self_target,
+            Some(EffectKind::PositionOp { self_target, .. }) => *self_target,
+            Some(EffectKind::MiscOp { self_target, .. }) => *self_target,
+            Some(EffectKind::CustomOp { self_target, .. }) => *self_target,
+            _ => None,
+        }
+    }
+
+    pub fn shuffle_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { shuffle, .. }) => *shuffle,
+            Some(EffectKind::CompoundEffect { shuffle, .. }) => *shuffle,
+            _ => None,
+        }
+    }
+
+    pub fn sign_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::GainResource { sign, .. }) => sign.as_deref(),
+            Some(EffectKind::MiscOp { sign, .. }) => sign.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn source_card_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::AbilityOp { source_card, .. }) => source_card.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn source_position_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                source_position, ..
+            }) => source_position.as_deref(),
+            Some(EffectKind::PositionOp {
+                source_position, ..
+            }) => source_position.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn state_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { state, .. }) => state.as_deref(),
+            Some(EffectKind::DrawCards { state, .. }) => state.as_deref(),
+            Some(EffectKind::LookReveal { state, .. }) => state.as_deref(),
+            Some(EffectKind::GainResource { state, .. }) => state.as_deref(),
+            Some(EffectKind::PositionOp { state, .. }) => state.as_deref(),
+            Some(EffectKind::ChangeState { state, .. }) => state.as_deref(),
+            Some(EffectKind::ModifyScore { state, .. }) => state.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn state_change_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::ChangeState { state_change, .. }) => state_change.as_deref(),
+            Some(EffectKind::MoveCards { state_change, .. }) => state_change.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn suppressed_trigger_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::AbilityOp {
+                suppressed_trigger, ..
+            }) => suppressed_trigger.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn target_count_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::MoveCards { target_count, .. }) => *target_count,
+            Some(EffectKind::DrawCards { target_count, .. }) => *target_count,
+            Some(EffectKind::SelectTarget { target_count, .. }) => *target_count,
+            Some(EffectKind::ModifyScore { target_count, .. }) => *target_count,
+            Some(EffectKind::ModifyHearts { target_count, .. }) => *target_count,
+            Some(EffectKind::GainResource { target_count, .. }) => *target_count,
+            Some(EffectKind::CompoundEffect { target_count, .. }) => *target_count,
+            Some(EffectKind::MiscOp { target_count, .. }) => *target_count,
+            _ => None,
+        }
+    }
+
+    pub fn target_from_selection_any(&self) -> Option<bool> {
+        match &self.kind {
+            Some(EffectKind::MoveCards {
+                target_from_selection,
+                ..
+            }) => *target_from_selection,
+            Some(EffectKind::GainResource {
+                target_from_selection,
+                ..
+            }) => *target_from_selection,
+            _ => None,
+        }
+    }
+
+    pub fn target_member_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::PositionOp { target_member, .. }) => target_member.as_deref(),
+            Some(EffectKind::MoveCards { target_member, .. }) => target_member.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn target_trigger_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::AbilityOp { target_trigger, .. }) => target_trigger.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn timing_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::RestrictionOp { timing, .. }) => timing.as_deref(),
+            Some(EffectKind::MiscOp { timing, .. }) => timing.as_deref(),
+            Some(EffectKind::CustomOp { timing, .. }) => timing.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn timing_condition_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::ModifyHearts {
+                timing_condition, ..
+            }) => timing_condition.as_deref(),
+            Some(EffectKind::RestrictionOp {
+                timing_condition, ..
+            }) => timing_condition.as_deref(),
+            Some(EffectKind::GainResource {
+                timing_condition, ..
+            }) => timing_condition.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn treat_as_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::RestrictionOp { treat_as, .. }) => treat_as.as_deref(),
+            Some(EffectKind::MiscOp { treat_as, .. }) => treat_as.as_deref(),
+            Some(EffectKind::CustomOp { treat_as, .. }) => treat_as.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn trigger_filter_any(&self) -> Option<&Vec<String>> {
+        match &self.kind {
+            Some(EffectKind::AbilityOp { trigger_filter, .. }) => trigger_filter.as_ref(),
+            Some(EffectKind::RestrictionOp { trigger_filter, .. }) => trigger_filter.as_ref(),
+            Some(EffectKind::CustomOp { trigger_filter, .. }) => trigger_filter.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn trigger_type_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::DrawCards { trigger_type, .. }) => trigger_type.as_deref(),
+            Some(EffectKind::GainResource { trigger_type, .. }) => trigger_type.as_deref(),
+            Some(EffectKind::AbilityOp { trigger_type, .. }) => trigger_type.as_deref(),
+            Some(EffectKind::CompoundEffect { trigger_type, .. }) => trigger_type.as_deref(),
+            Some(EffectKind::RestrictionOp { trigger_type, .. }) => trigger_type.as_deref(),
+            Some(EffectKind::CustomOp { trigger_type, .. }) => trigger_type.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn triggers_any(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::AbilityOp { triggers, .. }) => triggers.as_deref(),
+            Some(EffectKind::CustomOp { triggers, .. }) => triggers.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn use_limit_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::AbilityOp { use_limit, .. }) => *use_limit,
+            Some(EffectKind::CustomOp { use_limit, .. }) => *use_limit,
+            _ => None,
+        }
+    }
+
+    pub fn value_any(&self) -> Option<u32> {
+        match &self.kind {
+            Some(EffectKind::ModifyScore { value, .. }) => *value,
+            Some(EffectKind::ModifyHearts { value, .. }) => *value,
+            Some(EffectKind::GainResource { value, .. }) => *value,
+            Some(EffectKind::MiscOp { value, .. }) => *value,
+            _ => None,
+        }
+    }
+}
+
+impl AbilityEffect {
+    pub fn set_ability_filter(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut ability_filter,
+                ..
+            }) => *ability_filter = val,
+            Some(EffectKind::SelectTarget {
+                ref mut ability_filter,
+                ..
+            }) => *ability_filter = val,
+            Some(EffectKind::LookReveal {
+                ref mut ability_filter,
+                ..
+            }) => *ability_filter = val,
+            Some(EffectKind::ChangeState {
+                ref mut ability_filter,
+                ..
+            }) => *ability_filter = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_ability_filter_triggers(&mut self, val: Option<Vec<String>>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut ability_filter_triggers,
+                ..
+            }) => *ability_filter_triggers = val,
+            Some(EffectKind::SelectTarget {
+                ref mut ability_filter_triggers,
+                ..
+            }) => *ability_filter_triggers = val,
+            Some(EffectKind::LookReveal {
+                ref mut ability_filter_triggers,
+                ..
+            }) => *ability_filter_triggers = val,
+            Some(EffectKind::ChangeState {
+                ref mut ability_filter_triggers,
+                ..
+            }) => *ability_filter_triggers = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_ability_gain(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::AbilityOp {
+                ref mut ability_gain,
+                ..
+            }) => *ability_gain = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_ability_gain_trigger(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::AbilityOp {
+                ref mut ability_gain_trigger,
+                ..
+            }) => *ability_gain_trigger = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_ability_text(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::AbilityOp {
+                ref mut ability_text,
+                ..
+            }) => *ability_text = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_action_by(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::CustomOp {
+                ref mut action_by, ..
+            }) => *action_by = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_activation_position(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut activation_position,
+                ..
+            }) => *activation_position = val,
+            Some(EffectKind::SelectTarget {
+                ref mut activation_position,
+                ..
+            }) => *activation_position = val,
+            Some(EffectKind::LookReveal {
+                ref mut activation_position,
+                ..
+            }) => *activation_position = val,
+            Some(EffectKind::GainResource {
+                ref mut activation_position,
+                ..
+            }) => *activation_position = val,
+            Some(EffectKind::ChangeState {
+                ref mut activation_position,
+                ..
+            }) => *activation_position = val,
+            Some(EffectKind::PositionOp {
+                ref mut activation_position,
+                ..
+            }) => *activation_position = val,
+            Some(EffectKind::MiscOp {
+                ref mut activation_position,
+                ..
+            }) => *activation_position = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_all(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp { ref mut all, .. }) => *all = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_all_regions(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::ChangeState {
+                ref mut all_regions,
+                ..
+            }) => *all_regions = val,
+            Some(EffectKind::MiscOp {
+                ref mut all_regions,
+                ..
+            }) => *all_regions = val,
+            Some(EffectKind::CustomOp {
+                ref mut all_regions,
+                ..
+            }) => *all_regions = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_allow_occupied_stage(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut allow_occupied_stage,
+                ..
+            }) => *allow_occupied_stage = val,
+            Some(EffectKind::PositionOp {
+                ref mut allow_occupied_stage,
+                ..
+            }) => *allow_occupied_stage = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_alternative_count_type(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp {
+                ref mut alternative_count_type,
+                ..
+            }) => *alternative_count_type = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_answers(&mut self, val: Option<Vec<String>>) {
+        match &mut self.kind {
+            Some(EffectKind::SelectTarget {
+                ref mut answers, ..
+            }) => *answers = val,
+            Some(EffectKind::CompoundEffect {
+                ref mut answers, ..
+            }) => *answers = val,
+            Some(EffectKind::CustomOp {
+                ref mut answers, ..
+            }) => *answers = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_any_number(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut any_number, ..
+            }) => *any_number = val,
+            Some(EffectKind::GainResource {
+                ref mut any_number, ..
+            }) => *any_number = val,
+            Some(EffectKind::PositionOp {
+                ref mut any_number, ..
+            }) => *any_number = val,
+            Some(EffectKind::SelectTarget {
+                ref mut any_number, ..
+            }) => *any_number = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_blade_limit(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::ChangeState {
+                ref mut blade_limit,
+                ..
+            }) => *blade_limit = val,
+            Some(EffectKind::MiscOp {
+                ref mut blade_limit,
+                ..
+            }) => *blade_limit = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_blade_limit_operator(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::ChangeState {
+                ref mut blade_limit_operator,
+                ..
+            }) => *blade_limit_operator = val,
+            Some(EffectKind::MiscOp {
+                ref mut blade_limit_operator,
+                ..
+            }) => *blade_limit_operator = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_blade_type(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp {
+                ref mut blade_type, ..
+            }) => *blade_type = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_blind(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp { ref mut blind, .. }) => *blind = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_card_names(&mut self, val: Vec<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut card_names, ..
+            }) => *card_names = val.clone(),
+            Some(EffectKind::DrawCards {
+                ref mut card_names, ..
+            }) => *card_names = val.clone(),
+            Some(EffectKind::SelectTarget {
+                ref mut card_names, ..
+            }) => *card_names = val.clone(),
+            Some(EffectKind::LookReveal {
+                ref mut card_names, ..
+            }) => *card_names = val.clone(),
+            Some(EffectKind::ChangeState {
+                ref mut card_names, ..
+            }) => *card_names = val.clone(),
+            Some(EffectKind::MiscOp {
+                ref mut card_names, ..
+            }) => *card_names = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_card_property(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut card_property,
+                ..
+            }) => *card_property = val,
+            Some(EffectKind::SelectTarget {
+                ref mut card_property,
+                ..
+            }) => *card_property = val,
+            Some(EffectKind::LookReveal {
+                ref mut card_property,
+                ..
+            }) => *card_property = val,
+            Some(EffectKind::GainResource {
+                ref mut card_property,
+                ..
+            }) => *card_property = val,
+            Some(EffectKind::ChangeState {
+                ref mut card_property,
+                ..
+            }) => *card_property = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_card_type(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut card_type, ..
+            }) => *card_type = val,
+            Some(EffectKind::DrawCards {
+                ref mut card_type, ..
+            }) => *card_type = val,
+            Some(EffectKind::SelectTarget {
+                ref mut card_type, ..
+            }) => *card_type = val,
+            Some(EffectKind::LookReveal {
+                ref mut card_type, ..
+            }) => *card_type = val,
+            Some(EffectKind::ModifyScore {
+                ref mut card_type, ..
+            }) => *card_type = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut card_type, ..
+            }) => *card_type = val,
+            Some(EffectKind::GainResource {
+                ref mut card_type, ..
+            }) => *card_type = val,
+            Some(EffectKind::ChangeState {
+                ref mut card_type, ..
+            }) => *card_type = val,
+            Some(EffectKind::AbilityOp {
+                ref mut card_type, ..
+            }) => *card_type = val,
+            Some(EffectKind::RestrictionOp {
+                ref mut card_type, ..
+            }) => *card_type = val,
+            Some(EffectKind::PositionOp {
+                ref mut card_type, ..
+            }) => *card_type = val,
+            Some(EffectKind::MiscOp {
+                ref mut card_type, ..
+            }) => *card_type = val,
+            Some(EffectKind::CustomOp {
+                ref mut card_type, ..
+            }) => *card_type = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_characters(&mut self, val: Option<Vec<String>>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut characters, ..
+            }) => *characters = val,
+            Some(EffectKind::SelectTarget {
+                ref mut characters, ..
+            }) => *characters = val,
+            Some(EffectKind::LookReveal {
+                ref mut characters, ..
+            }) => *characters = val,
+            Some(EffectKind::GainResource {
+                ref mut characters, ..
+            }) => *characters = val,
+            Some(EffectKind::ChangeState {
+                ref mut characters, ..
+            }) => *characters = val,
+            Some(EffectKind::AbilityOp {
+                ref mut characters, ..
+            }) => *characters = val,
+            Some(EffectKind::RestrictionOp {
+                ref mut characters, ..
+            }) => *characters = val,
+            Some(EffectKind::PositionOp {
+                ref mut characters, ..
+            }) => *characters = val,
+            Some(EffectKind::MiscOp {
+                ref mut characters, ..
+            }) => *characters = val,
+            Some(EffectKind::CustomOp {
+                ref mut characters, ..
+            }) => *characters = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_choice(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp { ref mut choice, .. }) => *choice = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_choice_based(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::RestrictionOp {
+                ref mut choice_based,
+                ..
+            }) => *choice_based = val,
+            Some(EffectKind::CustomOp {
+                ref mut choice_based,
+                ..
+            }) => *choice_based = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_choice_maker(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::SelectTarget {
+                ref mut choice_maker,
+                ..
+            }) => *choice_maker = val,
+            Some(EffectKind::CompoundEffect {
+                ref mut choice_maker,
+                ..
+            }) => *choice_maker = val,
+            Some(EffectKind::CustomOp {
+                ref mut choice_maker,
+                ..
+            }) => *choice_maker = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_choice_options(&mut self, val: Option<Vec<String>>) {
+        match &mut self.kind {
+            Some(EffectKind::SelectTarget {
+                ref mut choice_options,
+                ..
+            }) => *choice_options = val,
+            Some(EffectKind::CompoundEffect {
+                ref mut choice_options,
+                ..
+            }) => *choice_options = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_choice_type(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::SelectTarget {
+                ref mut choice_type,
+                ..
+            }) => *choice_type = val,
+            Some(EffectKind::CompoundEffect {
+                ref mut choice_type,
+                ..
+            }) => *choice_type = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_cost_from_revealed(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut cost_from_revealed,
+                ..
+            }) => *cost_from_revealed = val,
+            Some(EffectKind::ChangeState {
+                ref mut cost_from_revealed,
+                ..
+            }) => *cost_from_revealed = val,
+            Some(EffectKind::PositionOp {
+                ref mut cost_from_revealed,
+                ..
+            }) => *cost_from_revealed = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_cost_limit(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut cost_limit, ..
+            }) => *cost_limit = val,
+            Some(EffectKind::SelectTarget {
+                ref mut cost_limit, ..
+            }) => *cost_limit = val,
+            Some(EffectKind::LookReveal {
+                ref mut cost_limit, ..
+            }) => *cost_limit = val,
+            Some(EffectKind::GainResource {
+                ref mut cost_limit, ..
+            }) => *cost_limit = val,
+            Some(EffectKind::ChangeState {
+                ref mut cost_limit, ..
+            }) => *cost_limit = val,
+            Some(EffectKind::AbilityOp {
+                ref mut cost_limit, ..
+            }) => *cost_limit = val,
+            Some(EffectKind::PositionOp {
+                ref mut cost_limit, ..
+            }) => *cost_limit = val,
+            Some(EffectKind::MiscOp {
+                ref mut cost_limit, ..
+            }) => *cost_limit = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_cost_limit_max(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut cost_limit_max,
+                ..
+            }) => *cost_limit_max = val,
+            Some(EffectKind::SelectTarget {
+                ref mut cost_limit_max,
+                ..
+            }) => *cost_limit_max = val,
+            Some(EffectKind::LookReveal {
+                ref mut cost_limit_max,
+                ..
+            }) => *cost_limit_max = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_cost_limit_min(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut cost_limit_min,
+                ..
+            }) => *cost_limit_min = val,
+            Some(EffectKind::SelectTarget {
+                ref mut cost_limit_min,
+                ..
+            }) => *cost_limit_min = val,
+            Some(EffectKind::LookReveal {
+                ref mut cost_limit_min,
+                ..
+            }) => *cost_limit_min = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_cost_limit_operator(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut cost_limit_operator,
+                ..
+            }) => *cost_limit_operator = val,
+            Some(EffectKind::SelectTarget {
+                ref mut cost_limit_operator,
+                ..
+            }) => *cost_limit_operator = val,
+            Some(EffectKind::LookReveal {
+                ref mut cost_limit_operator,
+                ..
+            }) => *cost_limit_operator = val,
+            Some(EffectKind::GainResource {
+                ref mut cost_limit_operator,
+                ..
+            }) => *cost_limit_operator = val,
+            Some(EffectKind::ChangeState {
+                ref mut cost_limit_operator,
+                ..
+            }) => *cost_limit_operator = val,
+            Some(EffectKind::AbilityOp {
+                ref mut cost_limit_operator,
+                ..
+            }) => *cost_limit_operator = val,
+            Some(EffectKind::PositionOp {
+                ref mut cost_limit_operator,
+                ..
+            }) => *cost_limit_operator = val,
+            Some(EffectKind::MiscOp {
+                ref mut cost_limit_operator,
+                ..
+            }) => *cost_limit_operator = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_cost_offset(&mut self, val: Option<i32>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp {
+                ref mut cost_offset,
+                ..
+            }) => *cost_offset = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_cost_reference(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp {
+                ref mut cost_reference,
+                ..
+            }) => *cost_reference = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_cost_total(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut cost_total, ..
+            }) => *cost_total = val,
+            Some(EffectKind::SelectTarget {
+                ref mut cost_total, ..
+            }) => *cost_total = val,
+            Some(EffectKind::ModifyScore {
+                ref mut cost_total, ..
+            }) => *cost_total = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut cost_total, ..
+            }) => *cost_total = val,
+            Some(EffectKind::ChangeState {
+                ref mut cost_total, ..
+            }) => *cost_total = val,
+            Some(EffectKind::MiscOp {
+                ref mut cost_total, ..
+            }) => *cost_total = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_cost_total_operator(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut cost_total_operator,
+                ..
+            }) => *cost_total_operator = val,
+            Some(EffectKind::SelectTarget {
+                ref mut cost_total_operator,
+                ..
+            }) => *cost_total_operator = val,
+            Some(EffectKind::ModifyScore {
+                ref mut cost_total_operator,
+                ..
+            }) => *cost_total_operator = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut cost_total_operator,
+                ..
+            }) => *cost_total_operator = val,
+            Some(EffectKind::ChangeState {
+                ref mut cost_total_operator,
+                ..
+            }) => *cost_total_operator = val,
+            Some(EffectKind::MiscOp {
+                ref mut cost_total_operator,
+                ..
+            }) => *cost_total_operator = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_delayed(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::RestrictionOp {
+                ref mut delayed, ..
+            }) => *delayed = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_discard_remaining(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut discard_remaining,
+                ..
+            }) => *discard_remaining = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_distinct(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut distinct, ..
+            }) => *distinct = val,
+            Some(EffectKind::SelectTarget {
+                ref mut distinct, ..
+            }) => *distinct = val,
+            Some(EffectKind::LookReveal {
+                ref mut distinct, ..
+            }) => *distinct = val,
+            Some(EffectKind::ModifyScore {
+                ref mut distinct, ..
+            }) => *distinct = val,
+            Some(EffectKind::ChangeState {
+                ref mut distinct, ..
+            }) => *distinct = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_duration(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::ModifyScore {
+                ref mut duration, ..
+            }) => *duration = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut duration, ..
+            }) => *duration = val,
+            Some(EffectKind::GainResource {
+                ref mut duration, ..
+            }) => *duration = val,
+            Some(EffectKind::AbilityOp {
+                ref mut duration, ..
+            }) => *duration = val,
+            Some(EffectKind::RestrictionOp {
+                ref mut duration, ..
+            }) => *duration = val,
+            Some(EffectKind::MiscOp {
+                ref mut duration, ..
+            }) => *duration = val,
+            Some(EffectKind::CustomOp {
+                ref mut duration, ..
+            }) => *duration = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_effect_constraint(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::ModifyScore {
+                ref mut effect_constraint,
+                ..
+            }) => *effect_constraint = val,
+            Some(EffectKind::MiscOp {
+                ref mut effect_constraint,
+                ..
+            }) => *effect_constraint = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_effect_type(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::AbilityOp {
+                ref mut effect_type,
+                ..
+            }) => *effect_type = val,
+            Some(EffectKind::RestrictionOp {
+                ref mut effect_type,
+                ..
+            }) => *effect_type = val,
+            Some(EffectKind::CustomOp {
+                ref mut effect_type,
+                ..
+            }) => *effect_type = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_energy_count(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::GainResource {
+                ref mut energy_count,
+                ..
+            }) => *energy_count = val,
+            Some(EffectKind::PositionOp {
+                ref mut energy_count,
+                ..
+            }) => *energy_count = val,
+            Some(EffectKind::MiscOp {
+                ref mut energy_count,
+                ..
+            }) => *energy_count = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_exclude_by_name_source(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut exclude_by_name_source,
+                ..
+            }) => *exclude_by_name_source = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_exclude_characters(&mut self, val: Option<Vec<String>>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut exclude_characters,
+                ..
+            }) => *exclude_characters = val,
+            Some(EffectKind::SelectTarget {
+                ref mut exclude_characters,
+                ..
+            }) => *exclude_characters = val,
+            Some(EffectKind::LookReveal {
+                ref mut exclude_characters,
+                ..
+            }) => *exclude_characters = val,
+            Some(EffectKind::GainResource {
+                ref mut exclude_characters,
+                ..
+            }) => *exclude_characters = val,
+            Some(EffectKind::ChangeState {
+                ref mut exclude_characters,
+                ..
+            }) => *exclude_characters = val,
+            Some(EffectKind::AbilityOp {
+                ref mut exclude_characters,
+                ..
+            }) => *exclude_characters = val,
+            Some(EffectKind::RestrictionOp {
+                ref mut exclude_characters,
+                ..
+            }) => *exclude_characters = val,
+            Some(EffectKind::PositionOp {
+                ref mut exclude_characters,
+                ..
+            }) => *exclude_characters = val,
+            Some(EffectKind::MiscOp {
+                ref mut exclude_characters,
+                ..
+            }) => *exclude_characters = val,
+            Some(EffectKind::CustomOp {
+                ref mut exclude_characters,
+                ..
+            }) => *exclude_characters = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_exclude_group_names(&mut self, val: Option<Vec<String>>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut exclude_group_names,
+                ..
+            }) => *exclude_group_names = val,
+            Some(EffectKind::SelectTarget {
+                ref mut exclude_group_names,
+                ..
+            }) => *exclude_group_names = val,
+            Some(EffectKind::LookReveal {
+                ref mut exclude_group_names,
+                ..
+            }) => *exclude_group_names = val,
+            Some(EffectKind::GainResource {
+                ref mut exclude_group_names,
+                ..
+            }) => *exclude_group_names = val,
+            Some(EffectKind::ChangeState {
+                ref mut exclude_group_names,
+                ..
+            }) => *exclude_group_names = val,
+            Some(EffectKind::AbilityOp {
+                ref mut exclude_group_names,
+                ..
+            }) => *exclude_group_names = val,
+            Some(EffectKind::RestrictionOp {
+                ref mut exclude_group_names,
+                ..
+            }) => *exclude_group_names = val,
+            Some(EffectKind::PositionOp {
+                ref mut exclude_group_names,
+                ..
+            }) => *exclude_group_names = val,
+            Some(EffectKind::MiscOp {
+                ref mut exclude_group_names,
+                ..
+            }) => *exclude_group_names = val,
+            Some(EffectKind::CustomOp {
+                ref mut exclude_group_names,
+                ..
+            }) => *exclude_group_names = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_exclude_heart_colors(&mut self, val: Option<Vec<String>>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut exclude_heart_colors,
+                ..
+            }) => *exclude_heart_colors = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut exclude_heart_colors,
+                ..
+            }) => *exclude_heart_colors = val,
+            Some(EffectKind::ChangeState {
+                ref mut exclude_heart_colors,
+                ..
+            }) => *exclude_heart_colors = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_exclude_position(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut exclude_position,
+                ..
+            }) => *exclude_position = val,
+            Some(EffectKind::PositionOp {
+                ref mut exclude_position,
+                ..
+            }) => *exclude_position = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_exclude_selected(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut exclude_selected,
+                ..
+            }) => *exclude_selected = val,
+            Some(EffectKind::SelectTarget {
+                ref mut exclude_selected,
+                ..
+            }) => *exclude_selected = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_exclude_self(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut exclude_self,
+                ..
+            }) => *exclude_self = val,
+            Some(EffectKind::SelectTarget {
+                ref mut exclude_self,
+                ..
+            }) => *exclude_self = val,
+            Some(EffectKind::LookReveal {
+                ref mut exclude_self,
+                ..
+            }) => *exclude_self = val,
+            Some(EffectKind::ModifyScore {
+                ref mut exclude_self,
+                ..
+            }) => *exclude_self = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut exclude_self,
+                ..
+            }) => *exclude_self = val,
+            Some(EffectKind::ChangeState {
+                ref mut exclude_self,
+                ..
+            }) => *exclude_self = val,
+            Some(EffectKind::AbilityOp {
+                ref mut exclude_self,
+                ..
+            }) => *exclude_self = val,
+            Some(EffectKind::RestrictionOp {
+                ref mut exclude_self,
+                ..
+            }) => *exclude_self = val,
+            Some(EffectKind::PositionOp {
+                ref mut exclude_self,
+                ..
+            }) => *exclude_self = val,
+            Some(EffectKind::MiscOp {
+                ref mut exclude_self,
+                ..
+            }) => *exclude_self = val,
+            Some(EffectKind::CustomOp {
+                ref mut exclude_self,
+                ..
+            }) => *exclude_self = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_filter_targets_by_heart_colors(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut filter_targets_by_heart_colors,
+                ..
+            }) => *filter_targets_by_heart_colors = val,
+            Some(EffectKind::SelectTarget {
+                ref mut filter_targets_by_heart_colors,
+                ..
+            }) => *filter_targets_by_heart_colors = val,
+            Some(EffectKind::LookReveal {
+                ref mut filter_targets_by_heart_colors,
+                ..
+            }) => *filter_targets_by_heart_colors = val,
+            Some(EffectKind::ModifyScore {
+                ref mut filter_targets_by_heart_colors,
+                ..
+            }) => *filter_targets_by_heart_colors = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut filter_targets_by_heart_colors,
+                ..
+            }) => *filter_targets_by_heart_colors = val,
+            Some(EffectKind::GainResource {
+                ref mut filter_targets_by_heart_colors,
+                ..
+            }) => *filter_targets_by_heart_colors = val,
+            Some(EffectKind::ChangeState {
+                ref mut filter_targets_by_heart_colors,
+                ..
+            }) => *filter_targets_by_heart_colors = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_group_names(&mut self, val: Option<Vec<String>>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut group_names,
+                ..
+            }) => *group_names = val,
+            Some(EffectKind::SelectTarget {
+                ref mut group_names,
+                ..
+            }) => *group_names = val,
+            Some(EffectKind::LookReveal {
+                ref mut group_names,
+                ..
+            }) => *group_names = val,
+            Some(EffectKind::ModifyScore {
+                ref mut group_names,
+                ..
+            }) => *group_names = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut group_names,
+                ..
+            }) => *group_names = val,
+            Some(EffectKind::GainResource {
+                ref mut group_names,
+                ..
+            }) => *group_names = val,
+            Some(EffectKind::ChangeState {
+                ref mut group_names,
+                ..
+            }) => *group_names = val,
+            Some(EffectKind::AbilityOp {
+                ref mut group_names,
+                ..
+            }) => *group_names = val,
+            Some(EffectKind::RestrictionOp {
+                ref mut group_names,
+                ..
+            }) => *group_names = val,
+            Some(EffectKind::PositionOp {
+                ref mut group_names,
+                ..
+            }) => *group_names = val,
+            Some(EffectKind::MiscOp {
+                ref mut group_names,
+                ..
+            }) => *group_names = val,
+            Some(EffectKind::CustomOp {
+                ref mut group_names,
+                ..
+            }) => *group_names = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_group_reference(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut group_reference,
+                ..
+            }) => *group_reference = val,
+            Some(EffectKind::SelectTarget {
+                ref mut group_reference,
+                ..
+            }) => *group_reference = val,
+            Some(EffectKind::LookReveal {
+                ref mut group_reference,
+                ..
+            }) => *group_reference = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut group_reference,
+                ..
+            }) => *group_reference = val,
+            Some(EffectKind::ChangeState {
+                ref mut group_reference,
+                ..
+            }) => *group_reference = val,
+            Some(EffectKind::PositionOp {
+                ref mut group_reference,
+                ..
+            }) => *group_reference = val,
+            Some(EffectKind::MiscOp {
+                ref mut group_reference,
+                ..
+            }) => *group_reference = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_heart_color_count(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp {
+                ref mut heart_color_count,
+                ..
+            }) => *heart_color_count = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_heart_color(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::GainResource {
+                ref mut heart_color,
+                ..
+            }) => *heart_color = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_heart_colors_from_selected_card(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::GainResource {
+                ref mut heart_colors_from_selected_card,
+                ..
+            }) => *heart_colors_from_selected_card = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_heart_selection(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp {
+                ref mut heart_selection,
+                ..
+            }) => *heart_selection = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_heart_type(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp {
+                ref mut heart_type, ..
+            }) => *heart_type = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_id(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp { ref mut id, .. }) => *id = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_identities(&mut self, val: Option<Vec<String>>) {
+        match &mut self.kind {
+            Some(EffectKind::ChangeState {
+                ref mut identities, ..
+            }) => *identities = val,
+            Some(EffectKind::MiscOp {
+                ref mut identities, ..
+            }) => *identities = val,
+            Some(EffectKind::CustomOp {
+                ref mut identities, ..
+            }) => *identities = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_location(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut location, ..
+            }) => *location = val,
+            Some(EffectKind::DrawCards {
+                ref mut location, ..
+            }) => *location = val,
+            Some(EffectKind::SelectTarget {
+                ref mut location, ..
+            }) => *location = val,
+            Some(EffectKind::LookReveal {
+                ref mut location, ..
+            }) => *location = val,
+            Some(EffectKind::ModifyScore {
+                ref mut location, ..
+            }) => *location = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut location, ..
+            }) => *location = val,
+            Some(EffectKind::GainResource {
+                ref mut location, ..
+            }) => *location = val,
+            Some(EffectKind::ChangeState {
+                ref mut location, ..
+            }) => *location = val,
+            Some(EffectKind::AbilityOp {
+                ref mut location, ..
+            }) => *location = val,
+            Some(EffectKind::RestrictionOp {
+                ref mut location, ..
+            }) => *location = val,
+            Some(EffectKind::MiscOp {
+                ref mut location, ..
+            }) => *location = val,
+            Some(EffectKind::CustomOp {
+                ref mut location, ..
+            }) => *location = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_lose_blade_hearts(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp {
+                ref mut lose_blade_hearts,
+                ..
+            }) => *lose_blade_hearts = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_multiple_targets(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut multiple_targets,
+                ..
+            }) => *multiple_targets = val,
+            Some(EffectKind::SelectTarget {
+                ref mut multiple_targets,
+                ..
+            }) => *multiple_targets = val,
+            Some(EffectKind::PositionOp {
+                ref mut multiple_targets,
+                ..
+            }) => *multiple_targets = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_name_constraint(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut name_constraint,
+                ..
+            }) => *name_constraint = val,
+            Some(EffectKind::SelectTarget {
+                ref mut name_constraint,
+                ..
+            }) => *name_constraint = val,
+            Some(EffectKind::LookReveal {
+                ref mut name_constraint,
+                ..
+            }) => *name_constraint = val,
+            Some(EffectKind::ChangeState {
+                ref mut name_constraint,
+                ..
+            }) => *name_constraint = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_name_constraint_source(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut name_constraint_source,
+                ..
+            }) => *name_constraint_source = val,
+            Some(EffectKind::SelectTarget {
+                ref mut name_constraint_source,
+                ..
+            }) => *name_constraint_source = val,
+            Some(EffectKind::LookReveal {
+                ref mut name_constraint_source,
+                ..
+            }) => *name_constraint_source = val,
+            Some(EffectKind::ChangeState {
+                ref mut name_constraint_source,
+                ..
+            }) => *name_constraint_source = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_need_heart_color(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut need_heart_color,
+                ..
+            }) => *need_heart_color = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_need_heart_operator(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut need_heart_operator,
+                ..
+            }) => *need_heart_operator = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_need_heart_total(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut need_heart_total,
+                ..
+            }) => *need_heart_total = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_negation(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut negation, ..
+            }) => *negation = val,
+            Some(EffectKind::SelectTarget {
+                ref mut negation, ..
+            }) => *negation = val,
+            Some(EffectKind::LookReveal {
+                ref mut negation, ..
+            }) => *negation = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut negation, ..
+            }) => *negation = val,
+            Some(EffectKind::GainResource {
+                ref mut negation, ..
+            }) => *negation = val,
+            Some(EffectKind::ChangeState {
+                ref mut negation, ..
+            }) => *negation = val,
+            Some(EffectKind::MiscOp {
+                ref mut negation, ..
+            }) => *negation = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_non_stackable(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::RestrictionOp {
+                ref mut non_stackable,
+                ..
+            }) => *non_stackable = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_operation(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::ModifyScore {
+                ref mut operation, ..
+            }) => *operation = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut operation, ..
+            }) => *operation = val,
+            Some(EffectKind::GainResource {
+                ref mut operation, ..
+            }) => *operation = val,
+            Some(EffectKind::RestrictionOp {
+                ref mut operation, ..
+            }) => *operation = val,
+            Some(EffectKind::MiscOp {
+                ref mut operation, ..
+            }) => *operation = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_option(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::AbilityOp { ref mut option, .. }) => *option = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_optional(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::SelectTarget {
+                ref mut optional, ..
+            }) => *optional = val,
+            Some(EffectKind::LookReveal {
+                ref mut optional, ..
+            }) => *optional = val,
+            Some(EffectKind::GainResource {
+                ref mut optional, ..
+            }) => *optional = val,
+            Some(EffectKind::ChangeState {
+                ref mut optional, ..
+            }) => *optional = val,
+            Some(EffectKind::CompoundEffect {
+                ref mut optional, ..
+            }) => *optional = val,
+            Some(EffectKind::PositionOp {
+                ref mut optional, ..
+            }) => *optional = val,
+            _ => {}
+        }
+    }
+    pub fn set_or_card_types(&mut self, val: Option<Vec<String>>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut or_card_types,
+                ..
+            }) => *or_card_types = val,
+            Some(EffectKind::SelectTarget {
+                ref mut or_card_types,
+                ..
+            }) => *or_card_types = val,
+            Some(EffectKind::MiscOp {
+                ref mut or_card_types,
+                ..
+            }) => *or_card_types = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_original_cost(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp {
+                ref mut original_cost,
+                ..
+            }) => *original_cost = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_original_count(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::ModifyHearts {
+                ref mut original_count,
+                ..
+            }) => *original_count = val,
+            Some(EffectKind::MiscOp {
+                ref mut original_count,
+                ..
+            }) => *original_count = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_original_operator(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::ModifyHearts {
+                ref mut original_operator,
+                ..
+            }) => *original_operator = val,
+            Some(EffectKind::MiscOp {
+                ref mut original_operator,
+                ..
+            }) => *original_operator = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_original_value(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut original_value,
+                ..
+            }) => *original_value = val,
+            Some(EffectKind::SelectTarget {
+                ref mut original_value,
+                ..
+            }) => *original_value = val,
+            Some(EffectKind::LookReveal {
+                ref mut original_value,
+                ..
+            }) => *original_value = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut original_value,
+                ..
+            }) => *original_value = val,
+            Some(EffectKind::GainResource {
+                ref mut original_value,
+                ..
+            }) => *original_value = val,
+            Some(EffectKind::ChangeState {
+                ref mut original_value,
+                ..
+            }) => *original_value = val,
+            Some(EffectKind::MiscOp {
+                ref mut original_value,
+                ..
+            }) => *original_value = val,
+            Some(EffectKind::CustomOp {
+                ref mut original_value,
+                ..
+            }) => *original_value = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_parenthetical(&mut self, val: Option<Vec<String>>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp {
+                ref mut parenthetical,
+                ..
+            }) => *parenthetical = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_per_group(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut per_group, ..
+            }) => *per_group = val,
+            Some(EffectKind::MiscOp {
+                ref mut per_group, ..
+            }) => *per_group = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_per_group_count(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut per_group_count,
+                ..
+            }) => *per_group_count = val,
+            Some(EffectKind::MiscOp {
+                ref mut per_group_count,
+                ..
+            }) => *per_group_count = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_per_unit(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::SelectTarget {
+                ref mut per_unit, ..
+            }) => *per_unit = val,
+            Some(EffectKind::LookReveal {
+                ref mut per_unit, ..
+            }) => *per_unit = val,
+            Some(EffectKind::ModifyScore {
+                ref mut per_unit, ..
+            }) => *per_unit = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut per_unit, ..
+            }) => *per_unit = val,
+            Some(EffectKind::GainResource {
+                ref mut per_unit, ..
+            }) => *per_unit = val,
+            Some(EffectKind::ChangeState {
+                ref mut per_unit, ..
+            }) => *per_unit = val,
+            Some(EffectKind::MiscOp {
+                ref mut per_unit, ..
+            }) => *per_unit = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_per_unit_count(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::SelectTarget {
+                ref mut per_unit_count,
+                ..
+            }) => *per_unit_count = val,
+            Some(EffectKind::LookReveal {
+                ref mut per_unit_count,
+                ..
+            }) => *per_unit_count = val,
+            Some(EffectKind::ModifyScore {
+                ref mut per_unit_count,
+                ..
+            }) => *per_unit_count = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut per_unit_count,
+                ..
+            }) => *per_unit_count = val,
+            Some(EffectKind::GainResource {
+                ref mut per_unit_count,
+                ..
+            }) => *per_unit_count = val,
+            Some(EffectKind::ChangeState {
+                ref mut per_unit_count,
+                ..
+            }) => *per_unit_count = val,
+            Some(EffectKind::MiscOp {
+                ref mut per_unit_count,
+                ..
+            }) => *per_unit_count = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_per_unit_location(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::SelectTarget {
+                ref mut per_unit_location,
+                ..
+            }) => *per_unit_location = val,
+            Some(EffectKind::LookReveal {
+                ref mut per_unit_location,
+                ..
+            }) => *per_unit_location = val,
+            Some(EffectKind::ModifyScore {
+                ref mut per_unit_location,
+                ..
+            }) => *per_unit_location = val,
+            Some(EffectKind::GainResource {
+                ref mut per_unit_location,
+                ..
+            }) => *per_unit_location = val,
+            Some(EffectKind::ChangeState {
+                ref mut per_unit_location,
+                ..
+            }) => *per_unit_location = val,
+            Some(EffectKind::MiscOp {
+                ref mut per_unit_location,
+                ..
+            }) => *per_unit_location = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_per_unit_type(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::SelectTarget {
+                ref mut per_unit_type,
+                ..
+            }) => *per_unit_type = val,
+            Some(EffectKind::LookReveal {
+                ref mut per_unit_type,
+                ..
+            }) => *per_unit_type = val,
+            Some(EffectKind::ModifyScore {
+                ref mut per_unit_type,
+                ..
+            }) => *per_unit_type = val,
+            Some(EffectKind::GainResource {
+                ref mut per_unit_type,
+                ..
+            }) => *per_unit_type = val,
+            Some(EffectKind::ChangeState {
+                ref mut per_unit_type,
+                ..
+            }) => *per_unit_type = val,
+            Some(EffectKind::MiscOp {
+                ref mut per_unit_type,
+                ..
+            }) => *per_unit_type = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_phase(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::RestrictionOp { ref mut phase, .. }) => *phase = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_picker(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp { ref mut picker, .. }) => *picker = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_placement_order(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut placement_order,
+                ..
+            }) => *placement_order = val,
+            Some(EffectKind::SelectTarget {
+                ref mut placement_order,
+                ..
+            }) => *placement_order = val,
+            Some(EffectKind::MiscOp {
+                ref mut placement_order,
+                ..
+            }) => *placement_order = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_question(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::SelectTarget {
+                ref mut question, ..
+            }) => *question = val,
+            Some(EffectKind::CompoundEffect {
+                ref mut question, ..
+            }) => *question = val,
+            Some(EffectKind::CustomOp {
+                ref mut question, ..
+            }) => *question = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_ref_offset(&mut self, val: Option<i32>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp {
+                ref mut ref_offset, ..
+            }) => *ref_offset = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_ref_value(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp {
+                ref mut ref_value, ..
+            }) => *ref_value = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_repeat_limit(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::ModifyScore {
+                ref mut repeat_limit,
+                ..
+            }) => *repeat_limit = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut repeat_limit,
+                ..
+            }) => *repeat_limit = val,
+            Some(EffectKind::CompoundEffect {
+                ref mut repeat_limit,
+                ..
+            }) => *repeat_limit = val,
+            Some(EffectKind::MiscOp {
+                ref mut repeat_limit,
+                ..
+            }) => *repeat_limit = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_replaces_event(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::RestrictionOp {
+                ref mut replaces_event,
+                ..
+            }) => *replaces_event = val,
+            Some(EffectKind::CustomOp {
+                ref mut replaces_event,
+                ..
+            }) => *replaces_event = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_replace_all(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::ModifyHearts {
+                ref mut replace_all,
+                ..
+            }) => *replace_all = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_require_all_heart_colors(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp {
+                ref mut require_all_heart_colors,
+                ..
+            }) => *require_all_heart_colors = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_resource(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::GainResource {
+                ref mut resource, ..
+            }) => *resource = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_resource_icon_count(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp {
+                ref mut resource_icon_count,
+                ..
+            }) => *resource_icon_count = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_restricted_destination(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::RestrictionOp {
+                ref mut restricted_destination,
+                ..
+            }) => *restricted_destination = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_restriction_type(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::RestrictionOp {
+                ref mut restriction_type,
+                ..
+            }) => *restriction_type = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_reveal(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::LookReveal { ref mut reveal, .. }) => *reveal = val,
+            Some(EffectKind::SelectTarget { ref mut reveal, .. }) => *reveal = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_same_unit_name(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MiscOp {
+                ref mut same_unit_name,
+                ..
+            }) => *same_unit_name = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_self_cost(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::ChangeState {
+                ref mut self_cost, ..
+            }) => *self_cost = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_self_target(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut self_target,
+                ..
+            }) => *self_target = val,
+            Some(EffectKind::SelectTarget {
+                ref mut self_target,
+                ..
+            }) => *self_target = val,
+            Some(EffectKind::LookReveal {
+                ref mut self_target,
+                ..
+            }) => *self_target = val,
+            Some(EffectKind::ModifyScore {
+                ref mut self_target,
+                ..
+            }) => *self_target = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut self_target,
+                ..
+            }) => *self_target = val,
+            Some(EffectKind::GainResource {
+                ref mut self_target,
+                ..
+            }) => *self_target = val,
+            Some(EffectKind::ChangeState {
+                ref mut self_target,
+                ..
+            }) => *self_target = val,
+            Some(EffectKind::AbilityOp {
+                ref mut self_target,
+                ..
+            }) => *self_target = val,
+            Some(EffectKind::RestrictionOp {
+                ref mut self_target,
+                ..
+            }) => *self_target = val,
+            Some(EffectKind::PositionOp {
+                ref mut self_target,
+                ..
+            }) => *self_target = val,
+            Some(EffectKind::MiscOp {
+                ref mut self_target,
+                ..
+            }) => *self_target = val,
+            Some(EffectKind::CustomOp {
+                ref mut self_target,
+                ..
+            }) => *self_target = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_shuffle(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut shuffle, ..
+            }) => *shuffle = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_sign(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::GainResource { ref mut sign, .. }) => *sign = val,
+            Some(EffectKind::MiscOp { ref mut sign, .. }) => *sign = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_source_card(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::AbilityOp {
+                ref mut source_card,
+                ..
+            }) => *source_card = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_source_position(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut source_position,
+                ..
+            }) => *source_position = val,
+            Some(EffectKind::PositionOp {
+                ref mut source_position,
+                ..
+            }) => *source_position = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_state(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards { ref mut state, .. }) => *state = val,
+            Some(EffectKind::LookReveal { ref mut state, .. }) => *state = val,
+            Some(EffectKind::GainResource { ref mut state, .. }) => *state = val,
+            Some(EffectKind::PositionOp { ref mut state, .. }) => *state = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_state_change(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::ChangeState {
+                ref mut state_change,
+                ..
+            }) => *state_change = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_suppressed_trigger(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::AbilityOp {
+                ref mut suppressed_trigger,
+                ..
+            }) => *suppressed_trigger = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_target_count(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut target_count,
+                ..
+            }) => *target_count = val,
+            Some(EffectKind::DrawCards {
+                ref mut target_count,
+                ..
+            }) => *target_count = val,
+            Some(EffectKind::SelectTarget {
+                ref mut target_count,
+                ..
+            }) => *target_count = val,
+            Some(EffectKind::ModifyScore {
+                ref mut target_count,
+                ..
+            }) => *target_count = val,
+            Some(EffectKind::ModifyHearts {
+                ref mut target_count,
+                ..
+            }) => *target_count = val,
+            Some(EffectKind::CompoundEffect {
+                ref mut target_count,
+                ..
+            }) => *target_count = val,
+            Some(EffectKind::MiscOp {
+                ref mut target_count,
+                ..
+            }) => *target_count = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_target_from_selection(&mut self, val: Option<bool>) {
+        match &mut self.kind {
+            Some(EffectKind::MoveCards {
+                ref mut target_from_selection,
+                ..
+            }) => *target_from_selection = val,
+            Some(EffectKind::GainResource {
+                ref mut target_from_selection,
+                ..
+            }) => *target_from_selection = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_target_member(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::PositionOp {
+                ref mut target_member,
+                ..
+            }) => *target_member = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_target_trigger(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::AbilityOp {
+                ref mut target_trigger,
+                ..
+            }) => *target_trigger = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_timing(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::RestrictionOp { ref mut timing, .. }) => *timing = val,
+            Some(EffectKind::MiscOp { ref mut timing, .. }) => *timing = val,
+            Some(EffectKind::CustomOp { ref mut timing, .. }) => *timing = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_timing_condition(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::ModifyHearts {
+                ref mut timing_condition,
+                ..
+            }) => *timing_condition = val,
+            Some(EffectKind::RestrictionOp {
+                ref mut timing_condition,
+                ..
+            }) => *timing_condition = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_treat_as(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::RestrictionOp {
+                ref mut treat_as, ..
+            }) => *treat_as = val,
+            Some(EffectKind::MiscOp {
+                ref mut treat_as, ..
+            }) => *treat_as = val,
+            Some(EffectKind::CustomOp {
+                ref mut treat_as, ..
+            }) => *treat_as = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_trigger_filter(&mut self, val: Option<Vec<String>>) {
+        match &mut self.kind {
+            Some(EffectKind::AbilityOp {
+                ref mut trigger_filter,
+                ..
+            }) => *trigger_filter = val,
+            Some(EffectKind::RestrictionOp {
+                ref mut trigger_filter,
+                ..
+            }) => *trigger_filter = val,
+            Some(EffectKind::CustomOp {
+                ref mut trigger_filter,
+                ..
+            }) => *trigger_filter = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_trigger_type(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::AbilityOp {
+                ref mut trigger_type,
+                ..
+            }) => *trigger_type = val,
+            Some(EffectKind::RestrictionOp {
+                ref mut trigger_type,
+                ..
+            }) => *trigger_type = val,
+            Some(EffectKind::CustomOp {
+                ref mut trigger_type,
+                ..
+            }) => *trigger_type = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_triggers(&mut self, val: Option<String>) {
+        match &mut self.kind {
+            Some(EffectKind::AbilityOp {
+                ref mut triggers, ..
+            }) => *triggers = val,
+            Some(EffectKind::CustomOp {
+                ref mut triggers, ..
+            }) => *triggers = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_use_limit(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::AbilityOp {
+                ref mut use_limit, ..
+            }) => *use_limit = val,
+            Some(EffectKind::CustomOp {
+                ref mut use_limit, ..
+            }) => *use_limit = val,
+            _ => {}
+        }
+    }
+
+    pub fn set_value(&mut self, val: Option<u32>) {
+        match &mut self.kind {
+            Some(EffectKind::ModifyScore { ref mut value, .. }) => *value = val,
+            Some(EffectKind::ModifyHearts { ref mut value, .. }) => *value = val,
+            Some(EffectKind::GainResource { ref mut value, .. }) => *value = val,
+            Some(EffectKind::MiscOp { ref mut value, .. }) => *value = val,
+            _ => {}
+        }
+    }
 }
 
 impl AbilityEffect {
@@ -1128,48 +5883,31 @@ impl AbilityEffect {
 
     /// Build a `CardFilter` containing the 7 base filter fields (card_type,
     /// group, cost_limit, cost_operator, characters, exclude_characters,
-    /// exclude_self) that effect handlers most commonly need. This is the
-    /// subset of `CardFilter::from_effect` that matches the field set
-    /// Returns a minimal CardFilter suitable for zone lookups and simple
-    /// conditions.  Handlers that need the full filter (heart thresholds,
-    /// blade limits, cost totals, distinct, ability filters, card properties,
-    /// etc.) should call `CardFilter::from_effect` instead.
-    ///
-    /// Missing fields compared to `from_effect`:
-    ///   need_heart_total, need_heart_operator, need_heart_color (Q149/Q172)
-    ///   original_blade_limit, original_blade_operator (Q195, Rules 9.9.1)
-    ///   cost_total, cost_total_operator (Q129 — cost uses modified values)
-    ///   distinct, heart_colors, exclude_cards
-    ///   ability_filter, ability_filter_triggers, or_ability_filters
-    ///   card_property, original_value, negation
-    ///
-    /// Handlers that need to override individual fields can mutate the
-    /// returned `CardFilter` directly or use the builder methods.
+    /// exclude_self) that effect handlers most commonly need.
     pub fn filter_subset(&self) -> crate::ability::util::CardFilter<'_> {
         crate::ability::util::CardFilter {
-            card_type: self.card_type.as_deref(),
+            card_type: self.card_type_any(),
             group: self.group_name(),
-            cost_limit: self.cost_limit,
-            cost_operator: self.cost_limit_operator.as_deref(),
-            characters: self.characters.as_ref(),
-            exclude_characters: self.exclude_characters.as_ref(),
-            exclude_self: if self.exclude_self.unwrap_or(false) {
+            cost_limit: self.cost_limit_any(),
+            cost_operator: self.cost_limit_operator_any(),
+            characters: self.characters_any(),
+            exclude_characters: self.exclude_characters_any(),
+            exclude_self: if self.exclude_self_any().unwrap_or(false) {
                 Some(-1)
             } else {
                 None
             },
-            exclude_group_names: self.exclude_group_names.as_ref(),
-            name_fragments: if self.card_names.is_empty() {
-                None
-            } else {
-                Some(&self.card_names)
+            exclude_group_names: self.exclude_group_names_any(),
+            name_fragments: match self.card_names_any() {
+                Some(names) if !names.is_empty() => Some(names),
+                _ => None,
             },
-            card_property: self.card_property.as_deref(),
-            negation: self.negation.unwrap_or(false),
-            heart_colors: if self.filter_targets_by_heart_colors.unwrap_or(false)
-                && !self.heart_colors.is_empty()
+            card_property: self.card_property_any(),
+            negation: self.negation_any().unwrap_or(false),
+            heart_colors: if self.filter_targets_by_heart_colors_any().unwrap_or(false)
+                && !self.heart_colors_any().is_empty()
             {
-                &self.heart_colors
+                self.heart_colors_any()
             } else {
                 &[]
             },
@@ -1184,27 +5922,23 @@ impl AbilityEffect {
 
     /// Returns the first group name, if any.
     pub fn group_name(&self) -> Option<&str> {
-        self.group_names
-            .as_ref()
+        self.group_names_any()
             .and_then(|gn| gn.first().map(|s| s.as_str()))
     }
 
     /// Returns the group_names slice, or `&[]` if absent.
-    /// Avoids repeated `.as_ref().map(|v| v.as_slice()).unwrap_or_default()`.
     pub fn group_names_slice(&self) -> &[String] {
-        self.group_names.as_deref().unwrap_or(&[])
+        self.group_names_any().map_or(&[], |v| v.as_slice())
     }
 
     /// Returns true if `card_id` matches this effect's group filter.
-    /// When `group_names` is absent or empty, every card passes (no filter).
     pub fn matches_group_filter(&self, card_db: &CardDatabase, card_id: i16) -> bool {
         crate::ability::util::card_matches_any_group(card_db, card_id, self.group_names_slice())
     }
 
     /// Returns the first heart color as a string reference, or a static default.
-    /// For single-color operations like modify_required_hearts.
     pub fn heart_color_or(&self, default: &'static str) -> &str {
-        self.heart_colors
+        self.heart_colors_any()
             .first()
             .map(|s| s.as_str())
             .unwrap_or(default)
@@ -1221,51 +5955,28 @@ impl AbilityEffect {
     }
 
     /// Returns the numeric value from `value` or `count`, in that priority.
-    /// Consolidates the many `effect.value.or(effect.count)` patterns in dispatch.
     pub fn value_or_count(&self, default: u32) -> u32 {
-        self.value.or(self.count).unwrap_or(default)
+        self.value_any().or(self.count).unwrap_or(default)
     }
 
     /// Like `value_or_count`, but if a `ref_value` is set, resolves against
-    /// the supplied step_results to a value the referenced step produced
-    /// (plus any `ref_offset`). Falls back to `value_or_count(default)` when
-    /// the reference is absent or unresolvable. This is the type-safe
-    /// replacement for the implicit dynamic_count / cost_reference lookups
-    /// that currently live in handlers like `execute_modify_cost` and
-    /// `execute_draw_wrapper`.
+    /// the supplied step_results to a value the referenced step produced.
     pub fn value_or_count_resolved(
         &self,
         step_results: &std::collections::HashMap<String, crate::ability::types::StepOutput>,
         default: u32,
     ) -> i32 {
-        if let Some(ref id) = self.ref_value {
+        if let Some(id) = self.ref_value_any() {
             if let Some(out) = step_results.get(id) {
                 if let Some(v) = out.value {
-                    return v + self.ref_offset.unwrap_or(0);
+                    return v + self.ref_offset_any().unwrap_or(0);
                 }
             }
         }
-        self.value.or(self.count).unwrap_or(default) as i32
+        self.value_any().or(self.count).unwrap_or(default) as i32
     }
 
-    // Rule 9.2.1 / Q85 / Q86 / Q122: Normalized sub-effect steps
-    //
-    // Flattens compound effect shapes into a linear Vec<AbilityEffect> for
-    // sequential execution. The engine's sequential pipeline (compound.rs)
-    // iterates these steps, evaluating conditions/gating between them.
-    //
-    // Compound shapes:
-    //   1. sequential → compound.actions (direct passthrough)
-    //   2. look_and_select → [look_action, select_action, followup_action]
-    //      Q85: look_action may trigger mid-look refresh
-    //      Q86: if deck >= count, no refresh during look
-    //   3. conditional_alternative → [alternative_effect, primary_effect]
-    //      The alternative_effect carries the condition; if it fails,
-    //      the sequential pipeline falls through to primary_effect.
-    //   4. conditional_on_result → [primary_effect, followup_action]
-    //      followup_action's condition gates on result of primary.
-    //   5. conditional_on_optional → [single conditional_optional step]
-    //      Dispatches to execute_conditional_on_optional for yes/no routing.
+    /// Normalized sub-effect steps
     pub fn normalized_steps(&self) -> Vec<AbilityEffect> {
         if let Some(ref steps) = self.effect_steps {
             return steps.clone();
@@ -1280,10 +5991,6 @@ impl AbilityEffect {
                 if let Some(ref sa) = self.compound.select_action {
                     out.push((**sa).clone());
                 }
-                // Followup action must be a step in the sequential pipeline
-                // so it runs after the selection completes — the legacy
-                // handler saved it as a pending_command manually, but the
-                // sequential pipeline expects it as an effect_steps entry.
                 if let Some(ref fu) = self.compound.followup_action {
                     out.push((**fu).clone());
                 }
@@ -1292,13 +5999,11 @@ impl AbilityEffect {
             "conditional_alternative" => {
                 let mut out = Vec::new();
                 let mut primary = self.compound.primary_effect.clone().map(|b| *b);
-                let mut alternative = self.alternative_effect.clone().map(|b| *b);
+                let mut alternative = self.alternative_effect_any().cloned().map(|b| *b);
                 let condition = self.compound.alternative_condition.clone();
                 if let Some(mut alt) = alternative.take() {
                     if let Some(cond) = condition {
-                        // Per-step condition: run alternative if cond met,
-                        // else fall through to primary.
-                        alt.condition = Some(cond);
+                        alt.condition = Some(Box::new(cond));
                     }
                     out.push(alt);
                 }
@@ -1315,28 +6020,18 @@ impl AbilityEffect {
                 if let Some(ref follow) = self.compound.followup_action {
                     let mut f = (**follow).clone();
                     if let Some(rc) = self.compound.result_condition.clone() {
-                        f.condition = Some(rc);
+                        f.condition = Some(Box::new(rc));
                     }
                     out.push(f);
                 }
                 out
             }
             "conditional_on_optional" => {
-                // Optional yes/no choice between optional_action and
-                // conditional_action. The legacy handler creates a
-                // SelectTarget("conditional_optional") choice and dispatches
-                // based on the answer. We model that as a single step with
-                // a special action name that the engine still routes to the
-                // existing execute_conditional_on_optional handler, but
-                // accessed through the unified sequential pipeline.
                 let mut step = AbilityEffect::default();
                 step.action = "conditional_optional".to_string();
                 if let Some(ref oa) = self.compound.optional_action {
                     step.text = oa.text.clone();
                 }
-                // Reuse the existing compound fields via direct dispatch
-                // in the engine. We embed the legacy handler's needed
-                // inputs into a single step that the engine recognizes.
                 step.compound.optional_action = self.compound.optional_action.clone();
                 step.compound.conditional_action = self.compound.conditional_action.clone();
                 step.compound.conditional_negation = self.compound.conditional_negation;
@@ -1344,6 +6039,36 @@ impl AbilityEffect {
                 vec![step]
             }
             _ => Vec::new(),
+        }
+    }
+
+    pub fn action_by(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::CustomOp { action_by, .. }) => action_by.as_deref(),
+            Some(EffectKind::SelectTarget { action_by, .. }) => action_by.as_deref(),
+            Some(EffectKind::MoveCards { action_by, .. }) => action_by.as_deref(),
+            Some(EffectKind::DrawCards { action_by, .. }) => action_by.as_deref(),
+            Some(EffectKind::ChangeState { action_by, .. }) => action_by.as_deref(),
+            Some(EffectKind::GainResource { action_by, .. }) => action_by.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn opponent_action(&self) -> Option<&AbilityEffect> {
+        match &self.kind {
+            Some(EffectKind::CustomOp {
+                opponent_action, ..
+            }) => opponent_action.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn effect_type(&self) -> Option<&str> {
+        match &self.kind {
+            Some(EffectKind::AbilityOp { effect_type, .. }) => effect_type.as_deref(),
+            Some(EffectKind::RestrictionOp { effect_type, .. }) => effect_type.as_deref(),
+            Some(EffectKind::CustomOp { effect_type, .. }) => effect_type.as_deref(),
+            _ => None,
         }
     }
 }
@@ -2026,11 +6751,11 @@ impl Card {
             if let Some(ref effect) = ability.effect {
                 if crate::ability::enums::ActionType::from_str(&effect.action)
                     == Some(crate::ability::enums::ActionType::ModifyCost)
-                    && effect.operation.as_deref() == Some("subtract")
-                    && Zone::from_str(effect.location.as_deref().unwrap_or("")) == Some(Zone::Hand)
-                    && effect.cost_limit.is_none()
+                    && effect.operation_any() == Some("subtract")
+                    && Zone::from_str(effect.location_any().unwrap_or("")) == Some(Zone::Hand)
+                    && effect.cost_limit_any().is_none()
                 {
-                    let per_unit = effect.per_unit_count.unwrap_or(1) as usize;
+                    let per_unit = effect.per_unit_count_any().unwrap_or(1) as usize;
                     return (hand_size.saturating_sub(1) * per_unit) as u32;
                 }
             }

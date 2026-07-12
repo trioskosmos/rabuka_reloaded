@@ -1228,12 +1228,12 @@ fn riko_bp6_has_heart_type_all() {
         "Action should be gain_resource"
     );
     assert_eq!(
-        effect.resource.as_deref(),
+        effect.resource_any(),
         Some("heart"),
         "Resource should be heart"
     );
     assert_eq!(
-        effect.heart_type.as_deref(),
+        effect.heart_type_any(),
         Some("all"),
         "heart_type should be all"
     );

@@ -219,7 +219,7 @@ impl AbilityResolver {
             });
             return Ok(());
         }
-        let draw_count = if let Some(ref dc) = effect.dynamic_count {
+        let draw_count = if let Some(ref dc) = effect.dynamic_count_any() {
             self.resolve_dynamic_count(gs, dc)
         } else if effect.count == Some(0) {
             log::debug!("[DRAW_ZERO] self.moved_cards={:?}", self.moved_cards);
@@ -248,10 +248,10 @@ impl AbilityResolver {
             effect.target_name(),
             effect.source_or(Zone::Deck.to_str()),
             effect.destination.as_deref().unwrap_or(Zone::Hand.to_str()),
-            effect.card_type.as_deref(),
-            effect.per_unit.unwrap_or(false),
-            effect.per_unit_count.unwrap_or(1),
-            effect.per_unit_type.as_deref(),
+            effect.card_type_any().as_deref(),
+            effect.per_unit_any().unwrap_or(false),
+            effect.per_unit_count_any().unwrap_or(1),
+            effect.per_unit_type_any().as_deref(),
         )
     }
 
@@ -260,30 +260,30 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        let has_heart_colors = !effect.heart_colors.is_empty();
+        let has_heart_colors = !effect.heart_colors_any().is_empty();
         let has_heart_icons = effect.text.contains("heart_");
         log::debug!(
             "[SELECT_EFFECT] heart_colors={:?} has_icons={} source={:?} card_type={:?}",
-            effect.heart_colors,
+            effect.heart_colors_any(),
             has_heart_icons,
             effect.source,
-            effect.card_type
+            effect.card_type_any()
         );
         if effect.source.is_none()
-            && effect.heart_colors.is_empty()
+            && effect.heart_colors_any().is_empty()
             && !has_heart_icons
-            && effect.or_card_types.is_none()
-            && effect.characters.as_ref().is_none_or(|v| v.is_empty())
-            && effect.group_names.is_none()
+            && effect.or_card_types_any().is_none()
+            && effect.characters_any().is_none_or(|v| v.is_empty())
+            && effect.group_names_any().is_none()
         {
             return self.execute_area_select(gs, effect);
         }
         if effect.source.is_none()
-            && effect.card_type.is_none()
+            && effect.card_type_any().is_none()
             && (has_heart_colors || has_heart_icons)
         {
-            let heart_colors = if !effect.heart_colors.is_empty() {
-                effect.heart_colors.clone()
+            let heart_colors = if !effect.heart_colors_any().is_empty() {
+                effect.heart_colors_any().to_vec()
             } else {
                 crate::ability::util::extract_heart_colors_from_text(&effect.text)
             };
@@ -305,12 +305,13 @@ impl AbilityResolver {
                 return Ok(());
             }
         }
-        let source =
-            if effect.card_type.as_deref() == Some("member_card") && effect.source.is_none() {
-                Zone::Stage.to_str()
-            } else {
-                effect.source_or(Zone::Hand.to_str())
-            };
+        let source = if effect.card_type_any().as_deref() == Some("member_card")
+            && effect.source.is_none()
+        {
+            Zone::Stage.to_str()
+        } else {
+            effect.source_or(Zone::Hand.to_str())
+        };
         self.execute_select(gs, source, effect)
     }
 
@@ -333,9 +334,10 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         let card_db = self.card_db();
-        let is_any_number = effect.any_number.unwrap_or(false);
-        let is_distinct = effect.distinct.as_deref();
-        let is_self_target = effect.self_target.unwrap_or(false);
+        let is_any_number = effect.any_number_any().unwrap_or(false);
+        let is_distinct_binding = effect.distinct_any();
+        let is_distinct = is_distinct_binding.as_deref();
+        let is_self_target = effect.self_target_any().unwrap_or(false);
 
         if target == "both" {
             for player in [&mut gs.player1, &mut gs.player2] {
@@ -383,7 +385,7 @@ impl AbilityResolver {
                     per_unit_type,
                     player,
                     &orientation_modifiers,
-                    effect.state.as_deref(),
+                    effect.state_any().as_deref(),
                 );
                 multiplier * per_unit_count
             };
@@ -678,11 +680,11 @@ impl AbilityResolver {
         if resource != "heart" && resource != "ハート" {
             return Ok(None);
         }
-        if heart_colors.is_empty() && !heart_selection && effect.heart_type.is_none() {
+        if heart_colors.is_empty() && !heart_selection && effect.heart_type_any().is_none() {
             return Ok(None);
         }
-        let colors: Vec<String> = if let Some(ref ht) = effect.heart_type {
-            vec![ht.clone()]
+        let colors: Vec<String> = if let Some(ref ht) = effect.heart_type_any() {
+            vec![ht.to_string()]
         } else if !heart_colors.is_empty() {
             heart_colors.to_vec()
         } else {

@@ -99,9 +99,9 @@ fn mia_constant_blade_per_energy_under() {
             "  trigger={:?} effect.action={:?} per_unit={:?} location={:?} card_type={:?}",
             a.triggers,
             a.effect.as_ref().map(|e| &e.action),
-            a.effect.as_ref().and_then(|e| e.per_unit),
-            a.effect.as_ref().and_then(|e| e.location.as_deref()),
-            a.effect.as_ref().and_then(|e| e.card_type.as_deref())
+            a.effect.as_ref().and_then(|e| e.per_unit_any()),
+            a.effect.as_ref().and_then(|e| e.location_any()),
+            a.effect.as_ref().and_then(|e| e.card_type_any())
         );
     }
 

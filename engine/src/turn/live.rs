@@ -531,11 +531,9 @@ impl super::TurnEngine {
                     let alt_met = alt_cond.is_some_and(|c| ctx.evaluate_condition(c));
                     let base_met = base_cond.is_some_and(|c| ctx.evaluate_condition(c));
                     if alt_met || base_met {
-                        let effect_to_apply = if alt_met {
-                            gained.alternative_effect.as_ref()
-                        } else {
-                            gained.compound.primary_effect.as_ref()
-                        };
+                        let alt_eff = gained.alternative_effect_any();
+                        let prim_eff = gained.compound.primary_effect.as_ref();
+                        let effect_to_apply = if alt_met { alt_eff.as_ref() } else { prim_eff.as_ref() };
                         if let Some(apply) = effect_to_apply {
                             let mut resolver = AbilityResolver::new(
                                 game_state.card_database.clone(),
@@ -699,13 +697,12 @@ impl super::TurnEngine {
             if let Some(card) = card_db.get_card(*card_id) {
                 let has_restriction = card.abilities.iter().any(|ability| {
                     if let Some(ref effect) = ability.effect {
-                        let restricted_dest = effect
-                            .restricted_destination
-                            .as_deref()
-                            .or(effect.destination.as_deref());
+                        let rd_binding = effect.restricted_destination_any();
+                            let dest_binding = effect.destination.as_deref();
+                            let restricted_dest = rd_binding.or(dest_binding);
                         crate::ability::enums::ActionType::from_str(&effect.action)
                             == Some(crate::ability::enums::ActionType::Restriction)
-                            && effect.restriction_type.as_deref() == Some("cannot_place")
+                            && effect.restriction_type_any().as_deref() == Some("cannot_place")
                             && matches!(
                                 restricted_dest.and_then(Zone::from_str),
                                 Some(Zone::SuccessLiveZone | Zone::LiveCardZone)
@@ -925,7 +922,8 @@ impl super::TurnEngine {
             if !cond_matches {
                 continue;
             }
-            let alt = match &effect.alternative_effect {
+            let alt_binding = effect.alternative_effect_any();
+            let alt = match alt_binding.as_ref() {
                 Some(a) => a,
                 None => continue,
             };
@@ -936,9 +934,9 @@ impl super::TurnEngine {
             if Zone::from_str(alt_source) != Some(Zone::Discard) && alt_source != "discard" {
                 continue;
             }
-            let group_names = effect.group_names.clone().unwrap_or_default();
+            let group_names = effect.group_names_any().cloned().unwrap_or_default();
             if group_names.is_empty() {
-                let alt_groups = alt.group_names.clone().unwrap_or_default();
+                let alt_groups = alt.group_names_any().cloned().unwrap_or_default();
                 if !alt_groups.is_empty() {
                     return Some(alt_groups);
                 }

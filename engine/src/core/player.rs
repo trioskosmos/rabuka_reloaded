@@ -238,11 +238,11 @@ impl Player {
                 if let Some(ref effect) = ability.effect {
                     if crate::ability::enums::ActionType::from_str(&effect.action)
                         == Some(crate::ability::enums::ActionType::ModifyCost)
-                        && matches!(effect.operation.as_deref(), Some("increase") | Some("add"))
-                        && Zone::from_str(effect.location.as_deref().unwrap_or(""))
+                        && matches!(effect.operation_any().as_deref(), Some("increase") | Some("add"))
+                        && Zone::from_str(effect.location_any().as_deref().unwrap_or(""))
                             == Some(Zone::SuccessLiveZone)
                     {
-                        let per_unit_count = effect.per_unit_count.unwrap_or(1) as usize;
+                        let per_unit_count = effect.per_unit_count_any().unwrap_or(1) as usize;
                         let success_count = self.success_live_card_zone.cards.len();
                         let multiplier = effect.count.unwrap_or(1);
                         cost_increase = ((success_count / per_unit_count) as u32) * multiplier;
@@ -315,10 +315,10 @@ impl Player {
                     let has_protection = card_db.get_card(member_id).is_some_and(|existing_card| {
                         existing_card.abilities.iter().any(|a| {
                             a.effect.as_ref().is_some_and(|ef| {
-                                if ef.restriction_type.as_deref() != Some("cannot_baton_touch") {
+                                if ef.restriction_type_any().as_deref() != Some("cannot_baton_touch") {
                                     return false;
                                 }
-                                if let Some(ref exclude_groups) = ef.exclude_group_names {
+                                if let Some(ref exclude_groups) = ef.exclude_group_names_any() {
                                     if crate::ability::util::card_matches_any_group(
                                         &card_db,
                                         card_id,

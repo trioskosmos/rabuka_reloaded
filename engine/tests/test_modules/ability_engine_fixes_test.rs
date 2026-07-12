@@ -834,9 +834,8 @@ fn keke_look_select_liella_no_blade_heart_excluded() {
     game.state.player1.stage.stage = [-1, -1, -1];
     game.play_to_stage(keke, MemberArea::Center);
 
-    // Drain all choices: optional cost (pay), then look+filter, then any remaining prompts
+    // Drain all choices
     while game.has_pending_choice() {
-        // Pay optional cost: first prompt is Yes/No, second is select card to discard
         game.select_indices(&[0]);
     }
 

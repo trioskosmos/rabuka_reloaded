@@ -11,8 +11,8 @@ pub fn find_modify_cost<'a>(
     loc: Option<&str>,
 ) -> Option<&'a crate::card::AbilityEffect> {
     if effect.action == "modify_cost"
-        && op.is_none_or(|o| effect.operation.as_deref() == Some(o))
-        && loc.is_none_or(|l| effect.location.as_deref() == Some(l))
+        && op.is_none_or(|o| effect.operation_any().as_deref() == Some(o))
+        && loc.is_none_or(|l| effect.location_any().as_deref() == Some(l))
     {
         return Some(effect);
     }
@@ -35,7 +35,7 @@ fn play_cost_reduction_matches(
     card_db: &CardDatabase,
 ) -> bool {
     let group_matches = effect
-        .group_names
+        .group_names_any()
         .as_ref()
         .and_then(|gn| {
             gn.first()
@@ -45,7 +45,7 @@ fn play_cost_reduction_matches(
     if !group_matches {
         return false;
     }
-    if let Some(limit) = effect.cost_limit {
+    if let Some(limit) = effect.cost_limit_any() {
         if card.cost != Some(limit) {
             return false;
         }
@@ -53,14 +53,14 @@ fn play_cost_reduction_matches(
     if !cost_threshold_met(card, effect) {
         return false;
     }
-    if let Some(ref ct) = effect.card_type {
-        if ct != "member_card" && ct != "card" && ct != "member" {
+    if let Some(ref ct) = effect.card_type_any() {
+        if *ct != "member_card" && *ct != "card" && *ct != "member" {
             return false;
         }
     }
     // ability_filter: e.g. "no_ability" means only reduce cost for members
     // whose abilities list is empty.
-    if effect.ability_filter.as_deref() == Some("no_ability") {
+    if effect.ability_filter_any().as_deref() == Some("no_ability") {
         if !card.abilities.is_empty() {
             return false;
         }
@@ -74,13 +74,11 @@ fn per_unit_cost_reduction(
     hand_count: usize,
     card_db: &CardDatabase,
 ) -> u32 {
-    let count_zone = effect
-        .per_unit_location
-        .as_deref()
-        .or(effect.location.as_deref())
-        .unwrap_or("hand");
+    let pul_binding = effect.per_unit_location_any();
+    let loc_binding = effect.location_any();
+    let count_zone = pul_binding.or(loc_binding).unwrap_or("hand");
 
-    let raw_count = if count_zone == "stage" && effect.group_names.is_some() {
+    let raw_count = if count_zone == "stage" && effect.group_names_any().is_some() {
         let group_name = effect.group_name();
         stage
             .stage
@@ -92,14 +90,14 @@ fn per_unit_cost_reduction(
         hand_count
     };
 
-    let per_unit_count = effect.per_unit_count.unwrap_or(1).max(1) as usize;
-    let exclude_self = effect.exclude_self.unwrap_or(false);
+    let per_unit_count = effect.per_unit_count_any().unwrap_or(1).max(1) as usize;
+    let exclude_self = effect.exclude_self_any().unwrap_or(false);
     let effective = if exclude_self {
         raw_count.saturating_sub(1)
     } else {
         raw_count
     };
-    let value = effect.value.unwrap_or(1) as u32;
+    let value = effect.value_any().unwrap_or(1) as u32;
     ((effective / per_unit_count) as u32) * value
 }
 
@@ -123,10 +121,10 @@ pub fn calculate_play_cost_reduction(
                 if !play_cost_reduction_matches(mod_cost, card_id, card, card_db) {
                     continue;
                 }
-                if mod_cost.per_unit.unwrap_or(false) {
+                if mod_cost.per_unit_any().unwrap_or(false) {
                     cost_reduction = per_unit_cost_reduction(mod_cost, stage, hand_count, card_db);
                 } else {
-                    let reduction = mod_cost.value.unwrap_or(1);
+                    let reduction = mod_cost.value_any().unwrap_or(1);
                     cost_reduction = cost_reduction.max(reduction);
                 }
                 break;
@@ -200,8 +198,8 @@ fn scan_abilities_for_cost_reduction(
     for ability in abilities {
         if let Some(ref effect) = ability.effect {
             if ActionType::from_str(&effect.action) != Some(ActionType::ModifyCost)
-                || effect.operation.as_deref() != Some("subtract")
-                || effect.location.as_deref().and_then(Zone::from_str) != Some(Zone::Hand)
+                || effect.operation_any().as_deref() != Some("subtract")
+                || effect.location_any().as_deref().and_then(Zone::from_str) != Some(Zone::Hand)
             {
                 continue;
             }
@@ -216,7 +214,7 @@ fn scan_abilities_for_cost_reduction(
             }
             // Group filter: the played card must belong to the aura's group.
             let group_matches = effect
-                .group_names
+                .group_names_any()
                 .as_deref()
                 .map(|gns| card_matches_any_group(card_db, target_id, gns))
                 .unwrap_or(true);
@@ -224,7 +222,7 @@ fn scan_abilities_for_cost_reduction(
                 continue;
             }
             // Exact cost-limit guard (e.g. "only for cost-N cards")
-            if let Some(limit) = effect.cost_limit {
+            if let Some(limit) = effect.cost_limit_any() {
                 if target_card.cost != Some(limit) {
                     continue;
                 }
@@ -233,23 +231,23 @@ fn scan_abilities_for_cost_reduction(
                 continue;
             }
             // Card-type guard: only applies to member/card types
-            if let Some(ref ct) = effect.card_type {
-                if ct != "member_card" && ct != "card" && ct != "member" {
+            if let Some(ref ct) = effect.card_type_any() {
+                if *ct != "member_card" && *ct != "card" && *ct != "member" {
                     continue;
                 }
             }
             // ability_filter: e.g. "no_ability" means only reduce cost for
             // members whose abilities list is empty (the TARGET card, not
             // the stage card providing the aura).
-            if effect.ability_filter.as_deref() == Some("no_ability") {
+            if effect.ability_filter_any().as_deref() == Some("no_ability") {
                 if !target_card.abilities.is_empty() {
                     continue;
                 }
             }
-            let reduction = if effect.per_unit.unwrap_or(false) {
+            let reduction = if effect.per_unit_any().unwrap_or(false) {
                 per_unit_cost_reduction(effect, stage, hand_count, card_db)
             } else {
-                effect.value.unwrap_or(1)
+                effect.value_any().unwrap_or(1)
             };
             return Some(reduction);
         }
@@ -258,7 +256,10 @@ fn scan_abilities_for_cost_reduction(
 }
 
 fn cost_threshold_met(card: &crate::card::Card, effect: &crate::card::AbilityEffect) -> bool {
-    match (effect.original_count, effect.original_operator.as_deref()) {
+    match (
+        effect.original_count_any(),
+        effect.original_operator_any().as_deref(),
+    ) {
         (Some(threshold), Some(op)) => {
             let cost = card.cost.unwrap_or(0);
             let met = match op {
@@ -435,7 +436,7 @@ pub fn card_matches_group_str(
                 || c.abilities.iter().any(|ab| {
                     ab.effect.as_ref().is_some_and(|eff| {
                         eff.action == "set_card_identity"
-                            && eff.identities.as_ref().is_some_and(|ids| {
+                            && eff.identities_any().as_ref().is_some_and(|ids| {
                                 ids.iter().any(|id| id == &gn || ((id.contains('\u{FF01}') || id.contains('\u{00B5}')) && norm(id) == gn))
                             })
                     })
@@ -1175,47 +1176,57 @@ impl<'a> CardFilter<'a> {
     /// ability filters, card properties, distinct, etc.
     /// Use filter_subset() only for minimal zone lookups.
     pub fn from_effect(effect: &'a crate::card::AbilityEffect) -> Self {
+        let card_type = effect.card_type_any();
+        let group_names = effect.group_names_any();
+
+        let cost_operator = effect.cost_limit_operator_any();
+        let cost_total_operator = effect.cost_total_operator_any();
+        let need_heart_operator = effect.need_heart_operator_any();
+        let need_heart_color = effect.need_heart_color_any();
+        let distinct = effect.distinct_any();
+        let original_blade_operator = effect.blade_limit_operator_any();
+        let ability_filter = effect.ability_filter_any();
+        let card_property = effect.card_property_any();
         CardFilter {
-            card_type: effect.card_type.as_deref(),
-            group: effect
-                .group_names
+            card_type,
+            group: group_names
                 .as_ref()
                 .and_then(|v| v.first())
                 .map(|s| s.as_str()),
-            groups: effect.group_names.as_ref().map(|v| v),
-            cost_limit: effect.cost_limit,
-            cost_operator: effect.cost_limit_operator.as_deref(),
-            cost_limit_min: effect.cost_limit_min,
-            cost_total: effect.cost_total,
-            cost_total_operator: effect.cost_total_operator.as_deref(),
-            characters: effect.characters.as_ref(),
-            exclude_characters: effect.exclude_characters.as_ref(),
-            exclude_group_names: effect.exclude_group_names.as_ref(),
-            heart_colors: &effect.heart_colors,
-            require_all_heart_colors: effect.require_all_heart_colors.unwrap_or(false),
-            heart_color_count: effect.heart_color_count,
-            need_heart_total: effect.need_heart_total,
-            need_heart_operator: effect.need_heart_operator.as_deref(),
-            need_heart_color: effect.need_heart_color.as_deref(),
-            name_fragments: if effect.card_names.is_empty() {
+            groups: group_names.as_ref().map(|v| &**v),
+            cost_limit: effect.cost_limit_any(),
+            cost_operator,
+            cost_limit_min: effect.cost_limit_min_any(),
+            cost_total: effect.cost_total_any(),
+            cost_total_operator,
+            characters: effect.characters_any(),
+            exclude_characters: effect.exclude_characters_any(),
+            exclude_group_names: effect.exclude_group_names_any(),
+            heart_colors: &effect.heart_colors_any(),
+            require_all_heart_colors: effect.require_all_heart_colors_any().unwrap_or(false),
+            heart_color_count: effect.heart_color_count_any(),
+            need_heart_total: effect.need_heart_total_any(),
+            need_heart_operator,
+            need_heart_color,
+            name_fragments: if effect.card_names_any().map_or(true, |v| v.is_empty()) {
                 None
             } else {
-                Some(&effect.card_names)
+                effect.card_names_any()
             },
-            distinct: effect.distinct.as_deref(),
-            exclude_self: if effect.exclude_self.unwrap_or(false) {
+            distinct,
+            exclude_self: if effect.exclude_self_any().unwrap_or(false) {
                 Some(-1)
             } else {
                 None
             },
-            original_blade_limit: effect.blade_limit,
-            original_blade_operator: effect.blade_limit_operator.as_deref(),
+            original_blade_limit: effect.blade_limit_any(),
+            original_blade_operator,
             exclude_cards: None,
             exclude_names: None,
-            ability_filter: effect.ability_filter.as_deref(),
-            ability_filter_triggers: effect.ability_filter_triggers.as_ref().map(|v| &**v),
-            or_ability_filters: effect.or_ability_filters.as_ref().map(|v| &**v),
-            card_property: effect.card_property.as_deref(),
+            ability_filter,
+            ability_filter_triggers: effect.ability_filter_triggers_any().map(|v| &**v),
+            or_ability_filters: effect.or_ability_filters_any().map(|v| &**v),
+            card_property,
             negation: false,
         }
     }

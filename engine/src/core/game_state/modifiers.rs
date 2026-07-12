@@ -105,7 +105,7 @@ impl GameState {
                 ctx.skip_phase_gate = true;
 
                 // Check effect-level position requirement
-                let pos_ok = if let Some(ref pos) = effect.position {
+                let pos_ok = if let Some(ref pos) = effect.position_any() {
                     let pos_str = pos.get_position();
                     let card_pos = entry_positions.get(card_id).copied().flatten();
                     matches!(
@@ -141,20 +141,19 @@ impl GameState {
                         });
                         match crate::ability::enums::ActionType::from_str(&effect.action) {
                             Some(crate::ability::enums::ActionType::GainResource) => {
-                                match effect.resource.as_deref().unwrap_or("") {
+                                match effect.resource_any().as_deref().unwrap_or("") {
                                     "blade" | "ブレード" => {
-                                        let n = if effect.per_unit.unwrap_or(false) {
+                                        let n = if effect.per_unit_any().unwrap_or(false) {
                                             let player =
                                                 if self.player1.stage.stage.contains(card_id) {
                                                     &self.player1
                                                 } else {
                                                     &self.player2
                                                 };
-                                            let zone = effect
-                                                .location
-                                                .as_deref()
-                                                .or(effect.per_unit_type.as_deref())
-                                                .unwrap_or(Zone::Hand.to_str());
+                                            let loc_b = effect.location_any();
+                                            let per_b = effect.per_unit_type_any();
+                                            let zone =
+                                                loc_b.or(per_b).unwrap_or(Zone::Hand.to_str());
                                             let mut filter = effect.filter_subset();
                                             if filter.exclude_self == Some(-1) {
                                                 filter.exclude_self = Some(*card_id);
@@ -167,18 +166,19 @@ impl GameState {
                                                     &self.card_database,
                                                     &filter,
                                                     &[],
-                                                    effect.state.as_deref(),
+                                                    effect.state_any().as_deref(),
                                                     &self.mods.orientation_modifiers,
                                                 );
                                             let base = if effect.max.unwrap_or(false) {
                                                 1
                                             } else {
                                                 effect
-                                                    .resource_icon_count
+                                                    .resource_icon_count_any()
                                                     .unwrap_or(effect.count.unwrap_or(1))
                                             };
                                             let mut units = per_count as i32
-                                                / effect.per_unit_count.unwrap_or(1).max(1) as i32;
+                                                / effect.per_unit_count_any().unwrap_or(1).max(1)
+                                                    as i32;
                                             if effect.max.unwrap_or(false) {
                                                 if let Some(cap) = effect.count {
                                                     units = units.min(cap as i32);
@@ -187,25 +187,24 @@ impl GameState {
                                             units * base as i32
                                         } else {
                                             effect
-                                                .resource_icon_count
+                                                .resource_icon_count_any()
                                                 .unwrap_or(effect.count.unwrap_or(1))
                                                 as i32
                                         };
                                         *exp_blade.entry(*card_id).or_insert(0) += n;
                                     }
                                     "heart" | "ハート" => {
-                                        let n = if effect.per_unit.unwrap_or(false) {
+                                        let n = if effect.per_unit_any().unwrap_or(false) {
                                             let player =
                                                 if self.player1.stage.stage.contains(card_id) {
                                                     &self.player1
                                                 } else {
                                                     &self.player2
                                                 };
-                                            let zone = effect
-                                                .location
-                                                .as_deref()
-                                                .or(effect.per_unit_type.as_deref())
-                                                .unwrap_or(Zone::Hand.to_str());
+                                            let loc_b = effect.location_any();
+                                            let per_b = effect.per_unit_type_any();
+                                            let zone =
+                                                loc_b.or(per_b).unwrap_or(Zone::Hand.to_str());
                                             let mut filter = effect.filter_subset();
                                             if filter.exclude_self == Some(-1) {
                                                 filter.exclude_self = Some(*card_id);
@@ -217,12 +216,13 @@ impl GameState {
                                                     player,
                                                     &self.card_database,
                                                     &filter,
-                                                    &effect.heart_colors,
-                                                    effect.state.as_deref(),
+                                                    effect.heart_colors_any(),
+                                                    effect.state_any().as_deref(),
                                                     &self.mods.orientation_modifiers,
                                                 );
                                             let mut units = per_count as i32
-                                                / effect.per_unit_count.unwrap_or(1).max(1) as i32;
+                                                / effect.per_unit_count_any().unwrap_or(1).max(1)
+                                                    as i32;
                                             if effect.max.unwrap_or(false) {
                                                 if let Some(cap) = effect.count {
                                                     units = units.min(cap as i32);
@@ -232,14 +232,14 @@ impl GameState {
                                         } else {
                                             effect.count.unwrap_or(1) as i32
                                         };
-                                        if effect.heart_type.as_deref() == Some("all") {
+                                        if effect.heart_type_any().as_deref() == Some("all") {
                                             *exp_heart
                                                 .entry(*card_id)
                                                 .or_default()
                                                 .entry("heart00".to_string())
                                                 .or_insert(0) += n;
                                         } else {
-                                            for hc in &effect.heart_colors {
+                                            for hc in effect.heart_colors_any() {
                                                 *exp_heart
                                                     .entry(*card_id)
                                                     .or_default()
@@ -252,7 +252,7 @@ impl GameState {
                                 }
                             }
                             Some(crate::ability::enums::ActionType::ModifyScore) => {
-                                let sv = effect.value.unwrap_or(0) as i32;
+                                let sv = effect.value_any().unwrap_or(0) as i32;
                                 *exp_score.entry(*card_id).or_insert(0) += sv;
                                 if sv != 0 {
                                     self.mods.constant_score_sources.push((
@@ -264,10 +264,10 @@ impl GameState {
                             }
                             Some(crate::ability::enums::ActionType::ModifyCost) => {
                                 *exp_cost.entry(*card_id).or_insert(0) +=
-                                    effect.value.unwrap_or(0) as i32;
+                                    effect.value_any().unwrap_or(0) as i32;
                             }
                             Some(crate::ability::enums::ActionType::Restriction) => {
-                                if let Some(ref rt) = effect.restriction_type {
+                                if let Some(rt) = effect.restriction_type_any() {
                                     let card_name = self
                                         .card_database
                                         .get_card(*card_id)
@@ -324,13 +324,14 @@ impl GameState {
                             //   - Legacy text parse: bonus_score → icon_score.png badge
                             //     PLUS bonus_triggers → trigger texticon
                             Some(crate::ability::enums::ActionType::GainAbility) => {
-                                if effect.ability_gain.as_deref() == Some("{{icon_all.png|ハート}}")
+                                if effect.ability_gain_any().as_deref()
+                                    == Some("{{icon_all.png|ハート}}")
                                     || effect
-                                        .ability_gain
+                                        .ability_gain_any()
                                         .as_deref()
                                         .is_some_and(|t| t.contains("ALL"))
                                     || effect
-                                        .ability_gain
+                                        .ability_gain_any()
                                         .as_deref()
                                         .is_some_and(|t| t.contains("【ハート】"))
                                 {
@@ -340,7 +341,8 @@ impl GameState {
                                         .or_default()
                                         .entry("all".to_string())
                                         .or_insert(0) += 1i32;
-                                } else if let Some(gain_text) = effect.ability_gain.as_deref() {
+                                } else if let Some(gain_text) = effect.ability_gain_any().as_deref()
+                                {
                                     // Determine which player this card belongs to
                                     let belongs_to_p1 = self.player1.stage.stage.contains(card_id);
                                     let bonus_target = if belongs_to_p1 {
@@ -353,14 +355,14 @@ impl GameState {
                                     self.add_gained_ability(*card_id, gain_text.to_string());
 
                                     // Use gained_effect if available (structured data from parser)
-                                    if let Some(ref gained) = effect.gained_effect {
+                                    if let Some(ref gained) = effect.gained_effect_any() {
                                         let action = crate::ability::enums::ActionType::from_str(
                                             &gained.action,
                                         );
                                         if action
                                             == Some(crate::ability::enums::ActionType::ModifyScore)
                                         {
-                                            let val = gained.value.unwrap_or(0) as i32;
+                                            let val = gained.value_any().unwrap_or(0) as i32;
                                             *bonus_target += val;
                                             if val != 0 {
                                                 self.mods.constant_score_sources.push((
@@ -379,7 +381,7 @@ impl GameState {
                                             // constant evaluation time.  Store them for later
                                             // evaluation during execute_live_victory_determination.
                                             self.delayed_gained_effects
-                                                .push((*card_id, (**gained).clone()));
+                                                .push((*card_id, *(*gained).clone()));
                                         }
                                     } else {
                                         // Fallback: parse value from text (legacy path)
@@ -417,16 +419,17 @@ impl GameState {
                                 let target_cards: Vec<i16> =
                                     target_player.live_card_zone.cards.to_vec();
                                 let value = effect.value_or_count(1) as i32;
-                                let op = effect.operation.as_deref().unwrap_or("increase");
+                                let op_str = effect.operation_any().unwrap_or("increase");
+                                let op = op_str;
                                 let delta = match op {
                                     "increase" => value,
                                     "decrease" => -value,
                                     _ => value,
                                 };
-                                let colors: Vec<String> = if effect.heart_colors.is_empty() {
+                                let colors: Vec<String> = if effect.heart_colors_any().is_empty() {
                                     vec!["heart00".to_string()]
                                 } else {
-                                    effect.heart_colors.clone()
+                                    effect.heart_colors_any().to_vec()
                                 };
                                 for card_id in &target_cards {
                                     for color in &colors {
@@ -453,17 +456,17 @@ impl GameState {
                                         ) =
                                             crate::ability::enums::ActionType::from_str(&sub.action)
                                         {
-                                            match sub.resource.as_deref().unwrap_or("") {
+                                            match sub.resource_any().as_deref().unwrap_or("") {
                                                 "blade" | "ブレード" => {
                                                     let n = sub
-                                                        .resource_icon_count
+                                                        .resource_icon_count_any()
                                                         .unwrap_or(sub.count.unwrap_or(1))
                                                         as i32;
                                                     *exp_blade.entry(*card_id).or_insert(0) += n;
                                                 }
                                                 "heart" | "ハート" => {
                                                     let n = sub.count.unwrap_or(1) as i32;
-                                                    for hc in &sub.heart_colors {
+                                                    for hc in sub.heart_colors_any() {
                                                         *exp_heart
                                                             .entry(*card_id)
                                                             .or_default()
@@ -588,7 +591,10 @@ impl GameState {
             .filter(|(_, effect)| {
                 crate::ability::enums::ActionType::from_str(&effect.action)
                     == Some(crate::ability::enums::ActionType::GainResource)
-                    && matches!(effect.resource.as_deref(), Some("blade") | Some("ブレード"))
+                    && matches!(
+                        effect.resource_any().as_deref(),
+                        Some("blade") | Some("ブレード")
+                    )
             })
             .collect();
 
@@ -601,16 +607,16 @@ impl GameState {
                     .as_ref()
                     .is_none_or(|c| ctx.evaluate_condition(c));
                 if cond_met {
-                    let count = if effect.per_unit.unwrap_or(false) {
+                    let count = if effect.per_unit_any().unwrap_or(false) {
                         let player = if self.player1.stage.stage.contains(&cid) {
                             &self.player1
                         } else {
                             &self.player2
                         };
-                        let zone = effect
-                            .location
-                            .as_deref()
-                            .or(effect.per_unit_type.as_deref())
+                        let loc = effect.location_any();
+                        let per_type = effect.per_unit_type_any();
+                        let zone = loc
+                            .or(per_type)
                             .unwrap_or(crate::ability::enums::Zone::Hand.to_str());
                         let mut filter = effect.filter_subset();
                         if filter.exclude_self == Some(-1) {
@@ -623,18 +629,18 @@ impl GameState {
                             &self.card_database,
                             &filter,
                             &[],
-                            effect.state.as_deref(),
+                            effect.state_any().as_deref(),
                             &self.mods.orientation_modifiers,
                         );
                         let base = if effect.max.unwrap_or(false) {
                             1
                         } else {
                             effect
-                                .resource_icon_count
+                                .resource_icon_count_any()
                                 .unwrap_or(effect.count.unwrap_or(1))
                         };
-                        let mut units =
-                            per_count as i32 / effect.per_unit_count.unwrap_or(1).max(1) as i32;
+                        let mut units = per_count as i32
+                            / effect.per_unit_count_any().unwrap_or(1).max(1) as i32;
                         if effect.max.unwrap_or(false) {
                             if let Some(cap) = effect.count {
                                 units = units.min(cap as i32);
@@ -643,7 +649,7 @@ impl GameState {
                         units * base as i32
                     } else {
                         effect
-                            .resource_icon_count
+                            .resource_icon_count_any()
                             .unwrap_or(effect.count.unwrap_or(1)) as i32
                     };
                     *expected.entry(cid).or_insert(0) += count;
@@ -701,21 +707,19 @@ impl GameState {
                     .as_ref()
                     .is_none_or(|c| ctx.evaluate_condition(c));
                 if cond_met {
-                    let mut value = effect.value.unwrap_or(0) as i32;
+                    let mut value = effect.value_any().unwrap_or(0) as i32;
 
                     // Handle per_unit cost reduction (e.g. "1 per other card in hand")
-                    if effect.per_unit.unwrap_or(false) {
+                    if effect.per_unit_any().unwrap_or(false) {
                         let player = self.resolve_target_player(effect.target_name());
                         // per_unit_location overrides the counting zone when the
                         // parser determines the per-unit count targets a different
                         // zone than the effect's location (e.g. count stage members
                         // while the cost modifier itself applies to hand cards).
-                        let count_zone = effect
-                            .per_unit_location
-                            .as_deref()
-                            .or(effect.location.as_deref())
-                            .unwrap_or(Zone::Hand.to_str());
-                        let count = if count_zone == "stage" && effect.group_names.is_some() {
+                        let per_unit_loc = effect.per_unit_location_any();
+                        let loc2 = effect.location_any();
+                        let count_zone = per_unit_loc.or(loc2).unwrap_or(Zone::Hand.to_str());
+                        let count = if count_zone == "stage" && effect.group_names_any().is_some() {
                             let group_name = effect.group_name();
                             let card_db = &self.card_database;
                             let stage_ids: Vec<i16> = player
@@ -751,8 +755,8 @@ impl GameState {
                             count_zone,
                             count
                         );
-                        let per_unit_count = effect.per_unit_count.unwrap_or(1);
-                        let exclude_self = effect.exclude_self.unwrap_or(false);
+                        let per_unit_count = effect.per_unit_count_any().unwrap_or(1);
+                        let exclude_self = effect.exclude_self_any().unwrap_or(false);
                         let effective = if exclude_self {
                             count.saturating_sub(1)
                         } else {
@@ -765,11 +769,12 @@ impl GameState {
                     log::debug!(
                         "[COST_MOD] cid={} op={:?} val={}",
                         cid,
-                        effect.operation.as_deref(),
+                        effect.operation_any().as_deref(),
                         value
                     );
 
-                    let op = effect.operation.as_deref().unwrap_or("add");
+                    let op_str = effect.operation_any().unwrap_or("add");
+                    let op = op_str;
                     match op {
                         "add" => *expected.entry(cid).or_insert(0) += value,
                         "subtract" => *expected.entry(cid).or_insert(0) -= value,
@@ -1261,7 +1266,7 @@ impl GameState {
                         continue;
                     }
                     if let Some(effect) = ability.effect.as_ref() {
-                        entries.push((*cid, player_idx, effect.clone()));
+                        entries.push((*cid, player_idx, (**effect).clone()));
                     }
                 }
             }
@@ -1338,31 +1343,34 @@ impl GameState {
                 let mut resolver = AbilityResolver::new(self.card_database.clone(), Some(cid));
                 let _ = resolver.execute_modify_required_hearts(
                     self,
-                    effect.operation.as_deref().unwrap_or("decrease"),
+                    effect.operation_any().as_deref().unwrap_or("decrease"),
                     effect.value_or_count(0),
-                    &effect.heart_colors,
+                    effect.heart_colors_any(),
                     effect.target_name(),
-                    effect.per_unit.unwrap_or(false),
-                    effect.per_unit_count.unwrap_or(1),
+                    effect.per_unit_any().unwrap_or(false),
+                    effect.per_unit_count_any().unwrap_or(1),
                     effect.group_name(),
-                    effect.timing_condition.as_deref(),
-                    effect.location.as_deref(),
-                    effect.original_value,
-                    effect.original_count,
-                    effect.original_operator.as_deref(),
-                    effect.exclude_self.unwrap_or(false),
-                    effect.self_target.unwrap_or(false),
-                    effect.exclude_heart_colors.as_deref().unwrap_or(&[]),
+                    effect.timing_condition_any().as_deref(),
+                    effect.location_any().as_deref(),
+                    effect.original_value_any(),
+                    effect.original_count_any(),
+                    effect.original_operator_any().as_deref(),
+                    effect.exclude_self_any().unwrap_or(false),
+                    effect.self_target_any().unwrap_or(false),
+                    effect.exclude_heart_colors_any(),
                     effect.max.unwrap_or(false),
-                    effect.repeat_limit,
-                    &effect.per_unit_heart_colors,
+                    effect.repeat_limit_any(),
+                    &effect.per_unit_heart_colors_any(),
                 );
                 self.ability_queue.pop_constant_context();
                 self.activating_card = prev;
             }
             Some(ActionType::GainResource) => {
-                let resource = effect.resource.as_deref().unwrap_or("");
-                let amount = effect.resource_icon_count.unwrap_or(effect.count_or(1)) as i32;
+                let resource_binding = effect.resource_any();
+                let resource = resource_binding.unwrap_or("");
+                let amount = effect
+                    .resource_icon_count_any()
+                    .unwrap_or(effect.count_or(1)) as i32;
                 let card_db = self.card_database.clone();
                 let player = match effect.target_name() {
                     "self" | "自分" => owner_player,
@@ -1379,7 +1387,7 @@ impl GameState {
                         resource,
                         amount,
                         effect.target_name(),
-                        effect.position
+                        effect.position_any()
                     );
                     log::debug!("[SZ_DEBUG] stage={:?}", player.stage.stage);
                 }
@@ -1391,7 +1399,7 @@ impl GameState {
                     .enumerate()
                     .filter(|&(_, &idx)| idx != -1)
                     .filter(|&(pos, _)| {
-                        if let Some(ref pos_req) = effect.position {
+                        if let Some(ref pos_req) = effect.position_any() {
                             let pos_str = pos_req.get_position();
                             match pos_str {
                                 Some("center") => pos == 1,
@@ -1404,7 +1412,7 @@ impl GameState {
                         }
                     })
                     .filter(|&(_, &id)| {
-                        if let Some(ref groups) = effect.group_names {
+                        if let Some(ref groups) = effect.group_names_any() {
                             groups.iter().any(|g| {
                                 crate::ability::util::card_matches_group_str(
                                     &card_db,
@@ -1452,10 +1460,10 @@ impl GameState {
                         }
                     }
                     "heart" | "ハート" => {
-                        let heart_colors = if effect.heart_colors.is_empty() {
+                        let heart_colors = if effect.heart_colors_any().is_empty() {
                             vec!["heart01".to_string()]
                         } else {
-                            effect.heart_colors.clone()
+                            effect.heart_colors_any().to_vec()
                         };
                         for &target_id in &candidates {
                             for color_str in &heart_colors {
@@ -1485,11 +1493,12 @@ impl GameState {
                     _ => owner_player,
                 };
                 let value = effect.value_or_count(1) as i32;
-                let op = effect.operation.as_deref().unwrap_or("add");
+                let op_binding = effect.operation_any();
+                let op = op_binding.unwrap_or("add");
                 // When self_target is true, apply the score modifier to the
                 // success zone card itself (e.g. Angelic Angel's +5 self buff).
                 // Otherwise, target cards in the live set zone.
-                let targets: Vec<i16> = if effect.self_target.unwrap_or(false) {
+                let targets: Vec<i16> = if effect.self_target_any().unwrap_or(false) {
                     vec![cid]
                 } else {
                     player.live_card_zone.cards.to_vec()

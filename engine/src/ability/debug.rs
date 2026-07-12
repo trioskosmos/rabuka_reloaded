@@ -213,7 +213,7 @@ impl AbDebug {
         let msg = match ct {
             "pay_energy" => format!(
                 "pay {} E{}",
-                cost.energy_count.unwrap_or(1),
+                cost.energy_count_any().unwrap_or(1),
                 if cost.optional.unwrap_or(false) {
                     " (optional)"
                 } else {
@@ -230,7 +230,7 @@ impl AbDebug {
             "change_state" => format!(
                 "set {} → {}",
                 cost.source.as_deref().unwrap_or("self"),
-                cost.state_change.as_deref().unwrap_or("?")
+                cost.state_change_any().as_deref().unwrap_or("?")
             ),
             "sequential_cost" => format!(
                 "compound ({} sub-costs)",
@@ -273,31 +273,31 @@ impl AbDebug {
                 effect.count.unwrap_or(1),
                 effect.source.as_deref().unwrap_or("?"),
                 effect.destination.as_deref().unwrap_or("?"),
-                effect.card_type.as_deref().unwrap_or("card")
+                effect.card_type_any().as_deref().unwrap_or("card")
             ),
             "gain_resource" => format!(
                 "gain {} {}{}",
                 effect.count.unwrap_or(1),
-                effect.resource.as_deref().unwrap_or("?"),
+                effect.resource_any().as_deref().unwrap_or("?"),
                 effect
-                    .duration
+                    .duration_any()
                     .as_deref()
                     .map(|d| format!(" for {}", d))
                     .unwrap_or_default()
             ),
             "modify_score" => format!(
                 "score {}{}",
-                effect.operation.as_deref().unwrap_or("add"),
-                effect.value.map(|v| format!(" {}", v)).unwrap_or_default()
+                effect.operation_any().as_deref().unwrap_or("add"),
+                effect.value_any().map(|v| format!(" {}", v)).unwrap_or_default()
             ),
             "change_state" => format!(
                 "change state → {}",
-                effect.state_change.as_deref().unwrap_or("?")
+                effect.state_change_any().as_deref().unwrap_or("?")
             ),
             "select" => format!(
                 "select {} {} from {}{}",
                 effect.count.unwrap_or(1),
-                effect.card_type.as_deref().unwrap_or("card"),
+                effect.card_type_any().as_deref().unwrap_or("card"),
                 effect.source.as_deref().unwrap_or("?"),
                 if effect.optional.unwrap_or(false) {
                     " (optional)"
@@ -341,7 +341,7 @@ impl AbDebug {
         let msg = match ct {
             "pay_energy" => format!(
                 "pay {} E{}",
-                cost.energy_count.unwrap_or(1),
+                cost.energy_count_any().unwrap_or(1),
                 if cost.optional.unwrap_or(false) {
                     " (optional)"
                 } else {
@@ -353,13 +353,13 @@ impl AbDebug {
                 cost.source.as_deref().unwrap_or("?"),
                 cost.destination.as_deref().unwrap_or("?"),
                 cost.count.unwrap_or(1),
-                cost.card_type.as_deref().unwrap_or("card")
+                cost.card_type_any().as_deref().unwrap_or("card")
             ),
-            "change_state" => format!("set self → {}", cost.state_change.as_deref().unwrap_or("?")),
+            "change_state" => format!("set self → {}", cost.state_change_any().as_deref().unwrap_or("?")),
             "reveal" => format!(
                 "reveal {} {}",
                 cost.count.unwrap_or(1),
-                cost.card_type.as_deref().unwrap_or("card")
+                cost.card_type_any().as_deref().unwrap_or("card")
             ),
             "sequential_cost" => format!(
                 "compound ({} sub-costs)",

@@ -36,7 +36,7 @@ fn issue2_kanan_discard_1_gain_1() {
     let mut game = TestGame::new(db);
     let kanan = game.id("PL!S-bp5-003-R");
     let aqours_live = game.id("PL!S-bp3-019-L");
-    let no_blade = game.id("PL!-bp3-012-N"); // no blade heart, cost 2
+    let no_blade = game.id("PL!-sd1-011-SD"); // no blade heart, cost 4
 
     // Kanan in hand, no-blade card in hand, Aqours live in discard
     game.add_to_hand(kanan);
@@ -48,13 +48,21 @@ fn issue2_kanan_discard_1_gain_1() {
     // Play Kanan to stage → debut triggers → cost choice → effect resolves
     game.play_to_stage(kanan, MemberArea::Center);
 
+    let mut iter = 0;
     while game.has_pending_choice() {
+        let ct = game.pending_choice_type();
+        eprintln!("[TEST_DEBUG] iter={} pending_choice_type={:?}", iter, ct);
         if game.pending_choice_type().as_deref() == Some("SelectAutoAbility") {
             game.select_indices(&[]);
         } else {
             game.select_indices(&[0]);
         }
+        iter += 1;
+        if iter > 20 {
+            panic!("infinite loop");
+        }
     }
+    eprintln!("[TEST_DEBUG] loop ended, iter={}", iter);
 
     // Verify we gained the Aqours live card in hand
     let has_live = game

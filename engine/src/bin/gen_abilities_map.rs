@@ -73,7 +73,7 @@ fn main() {
                             let mut fa = a.clone();
                             if (fa.action == "draw" || fa.action == "draw_card")
                                 && fa.count.is_none()
-                                && fa.dynamic_count.is_none()
+                                && fa.dynamic_count_any().is_none()
                             {
                                 fa.count = Some(1);
                             }

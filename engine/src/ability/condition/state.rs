@@ -1021,8 +1021,9 @@ impl<'a> ConditionContext<'a> {
             // The effect stores a condition-like AbilityEffect. Evaluate it
             // via evaluate_effect_condition which checks negated card presence.
             if effect.compound.conditional_negation.unwrap_or(false) {
-                if let Some(card_type) = &effect.card_type {
-                    let loc = effect.location.as_deref().unwrap_or("hand");
+                if let Some(card_type) = &effect.card_type_any() {
+                    let loc_binding = effect.location_any();
+                    let loc = loc_binding.unwrap_or("hand");
                     let zone = crate::ability::enums::Zone::from_str(loc);
                     let target = effect.target_name();
                     let player = self.resolve_condition_player(&target);
@@ -1040,9 +1041,9 @@ impl<'a> ConditionContext<'a> {
                                 .card_database
                                 .get_card(cid)
                                 .is_some_and(|c| {
-                                    if card_type == "live_card" {
+                                    if *card_type == "live_card" {
                                         c.is_live()
-                                    } else if card_type == "member_card" {
+                                    } else if *card_type == "member_card" {
                                         c.is_member()
                                     } else {
                                         true

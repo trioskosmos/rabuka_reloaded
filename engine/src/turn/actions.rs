@@ -198,7 +198,7 @@ impl super::TurnEngine {
                 let loc = ability
                     .effect
                     .as_ref()
-                    .and_then(|e| e.activation_condition_parsed.as_ref())
+                    .and_then(|e| e.activation_condition_parsed_any())
                     .and_then(|c| {
                         if c.condition_type == Some(ConditionType::LocationCondition)
                             || matches!(c.location.as_deref(), Some("hand") | Some("discard"))
@@ -236,7 +236,7 @@ impl super::TurnEngine {
                                 ability
                                     .effect
                                     .as_ref()
-                                    .and_then(|e| e.activation_position.as_deref()),
+                                    .and_then(|e| e.activation_position_any()),
                                 stage_area,
                             )
                         } else {
@@ -728,6 +728,19 @@ impl super::TurnEngine {
             return Ok(());
         }
 
+        eprintln!(
+            "[RWC_DEBUG] after provide: pending_choice={:?} choice_type={}",
+            resolver.pending_choice.is_some(),
+            resolver
+                .pending_choice
+                .as_ref()
+                .map(|c| match c {
+                    crate::ability::types::Choice::SelectCard { .. } => "SelectCard",
+                    crate::ability::types::Choice::SelectTarget { .. } => "SelectTarget",
+                    _ => "Other",
+                })
+                .unwrap_or("None")
+        );
         log::debug!(
             "[RWC] after provide: pending_choice={:?} moved_cards={:?} selected={:?}",
             resolver.pending_choice.is_some(),
@@ -839,6 +852,14 @@ impl super::TurnEngine {
                 && had_pending_sequential
                 && !game_state.ability_queue.has_pending_actions();
             let effect_ready = cost_was_paid && !had_pending_sequential && !effect_started;
+            // When an optional choice inside a sequential is resolved with "pay",
+            // re-process so remaining pending actions can execute.
+            let chose_to_pay = game_state
+                .ability_queue
+                .current_entry()
+                .is_some_and(|e| e.optional_cost_result == Some(true));
+            let needs_reprocess = effect_ready
+                || (cost_was_paid && !effect_started && had_pending_sequential && chose_to_pay);
             log::debug!("[RWC_BRANCH] cost_was_paid={} effect_started={} had_pending={} optional_skipped={} pending_cleared={} effect_ready={}",
                 cost_was_paid, effect_started, had_pending_sequential,
                 game_state.ability_queue.current_entry().is_some_and(|e| {
@@ -862,11 +883,8 @@ impl super::TurnEngine {
                 game_state.recently_moved_cards = None;
                 game_state.recently_appeared_cards.clear();
                 game_state.recently_state_changed.clear();
-            } else if effect_ready {
-                log::debug!("RWC: calling process_current_ability");
-                log::debug!("[RWC_EFFECT_READY] storing resolver and calling PCA");
-                // Store resolver back on entry so process_current_ability can reuse it
-                // (the resolver carries cost-phase state like revealed_cost_cards).
+            } else if needs_reprocess {
+                log::debug!("[RWC] needs_reprocess=true: storing resolver and calling PCA");
                 game_state.ability_queue.set_resolver(resolver);
                 game_state.process_current_ability();
                 if game_state.has_pending_choice() {

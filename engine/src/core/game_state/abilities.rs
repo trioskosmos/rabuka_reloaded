@@ -116,7 +116,7 @@ impl GameState {
                     &crate::game_state::AbilityTrigger::Constant,
                 ) {
                     if let Some(ref effect) = ability.effect {
-                        effects.push((*cid, effect.clone()));
+                        effects.push((*cid, (**effect).clone()));
                     }
                 }
             }
@@ -137,7 +137,7 @@ impl GameState {
                     &crate::game_state::AbilityTrigger::Constant,
                 ) {
                     if let Some(ref effect) = ability.effect {
-                        effects.push((cid, effect.clone()));
+                        effects.push((cid, (**effect).clone()));
                     }
                 }
             }
@@ -263,7 +263,7 @@ impl GameState {
                             ability
                                 .effect
                                 .as_ref()
-                                .and_then(|e| e.activation_position.as_deref()),
+                                .and_then(|e| e.activation_position_any()),
                             card_position,
                         ) {
                             continue;
@@ -356,7 +356,7 @@ impl GameState {
                                     // prevent re-triggering on stale comparisons
                                     // like "energy_zone >= 0" during phase-based
                                     // energy placement).
-                                    if effect.trigger_type.as_deref() == Some("each_time") {
+                                    if effect.trigger_type_any().as_deref() == Some("each_time") {
                                         if condition.condition_type
                                             == Some(crate::ability::enums::ConditionType::ComparisonCondition)
                                             && condition.location.as_deref() == Some("energy_zone")
@@ -857,7 +857,7 @@ impl GameState {
                         Some(e) => e,
                         None => continue,
                     };
-                    if effect.trigger_type.as_deref() != Some("each_time") {
+                    if effect.trigger_type_any().as_deref() != Some("each_time") {
                         continue;
                     }
                     let watch_text = match &effect.condition {
@@ -1292,6 +1292,9 @@ impl GameState {
             r.spawn_context.target = saved_target;
             r.pending_stage_cards = Vec::new();
             r.execution_context = crate::ability::types::ExecutionContext::None;
+            // Clear pending_choice: the previous call stored it in the queue,
+            // and it must not block re-execution of the effect on the next pass.
+            r.pending_choice = None;
             r
         } else {
             crate::ability::resolver::AbilityResolver::new(self.card_database.clone(), card_id)
@@ -1532,13 +1535,13 @@ impl GameState {
     pub fn entry_effect(&self) -> Option<&crate::card::AbilityEffect> {
         self.ability_queue
             .current_entry()
-            .and_then(|e| e.ability.effect.as_ref())
+            .and_then(|e| e.ability.effect.as_deref())
     }
 
     pub fn entry_cost(&self) -> Option<&crate::card::AbilityCost> {
         self.ability_queue
             .current_entry()
-            .and_then(|e| e.ability.cost.as_ref())
+            .and_then(|e| e.ability.cost.as_deref())
     }
 
     pub fn entry_destination(&self) -> Option<&str> {
@@ -2127,12 +2130,11 @@ impl GameState {
                     &crate::game_state::AbilityTrigger::Constant,
                 ) {
                     if let Some(ref effect) = ability.effect {
-                        let restricted_to = effect
-                            .restricted_destination
-                            .as_deref()
-                            .or(effect.destination.as_deref());
+                        let res_dest = effect.restricted_destination_any();
+                        let dest = effect.destination.as_deref();
+                        let restricted_to = res_dest.or(dest);
                         if effect.action == "restriction"
-                            && effect.restriction_type.as_deref() == Some("cannot_place")
+                            && effect.restriction_type_any().as_deref() == Some("cannot_place")
                             && {
                                 let rz = restricted_to.and_then(Zone::from_str);
                                 let cz = Zone::from_str(zone);

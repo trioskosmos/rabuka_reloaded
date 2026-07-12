@@ -223,6 +223,33 @@ pub unsafe extern "C" fn pthread_atfork(
     0
 }
 
+// Helper to build C2D color values.
+// C2D stores colors as 0xAABBGGRR in the u32 literal:
+//   bits 31-24 = Alpha
+//   bits 23-16 = Blue
+//   bits 15-8  = Green
+//   bits 7-0   = Red
+// The GPU on 3DS reads little-endian memory bytes as RGBA,
+// so the u32 literal must be AABBGGRR (A in MSB, R in LSB).
+const fn c2d(r: u8, g: u8, b: u8, a: u8) -> u32 {
+    (a as u32) << 24 | (b as u32) << 16 | (g as u32) << 8 | r as u32
+}
+
+// Precomputed color constants for game-mode rendering.
+// Each uses c2d(R,G,B,A) so the hex matches how GPU reads it.
+const COL_TOP_BG: u32 = 0xFF1A0E0A; // c2d(10,14,26,255)   dark navy background
+const COL_PANEL: u32 = 0xFF3C2A1A; // c2d(26,42,60,255)   dark blue-gray panel
+const COL_GOLD: u32 = 0xFF0B9EF5; // c2d(245,158,11,255) gold text
+const COL_LIGHT: u32 = 0xFFDBD5D1; // c2d(209,213,219,255) light gray text
+const COL_MED: u32 = 0xFF80726B; // c2d(107,114,128,255) medium gray text
+const COL_SEL: u32 = 0xFF5C3A2A; // c2d(42,58,92,255)   selected-item background
+const COL_DIM: u32 = 0x66231A33; // c2d(26,35,51,102)   semi-transparent dark
+const COL_HIGHLIGHT: u32 = 0x330B9EF5; // c2d(245,158,11,51)  semi-transparent gold
+const COL_CARD: u32 = 0x22231A22; // c2d(34,26,35,34)    card detail semi-transparent
+const COL_ABILITY: u32 = 0x33231A2A; // c2d(42,26,51,51)    ability queue semi-transparent
+const COL_BLUE: u32 = 0xFFFF9E4A; // c2d(74,158,255,255) blue accent text
+const COL_PINK: u32 = 0xFFAA55FF; // c2d(255,85,170,255) pink accent text
+
 #[cfg(feature = "3ds")]
 fn main() {
     std::panic::set_hook(Box::new(|info| {
@@ -352,38 +379,54 @@ fn main() {
                                 }
                                 _3ds_text_add_top("\nUP/DOWN=select A=confirm\0".as_ptr());
                             } else {
+                                // Game-mode: graphical mode selection screen on top LCD.
+                                // Colors use c2d() byte order: 0xAABBGGRR.
                                 _3ds_top_clear();
-                                _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, 0xFF0A0E1A);
+                                _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
                                 _3ds_top_queue_text(
                                     100.0,
                                     20.0,
-                                    0xFFF59E0B,
+                                    COL_GOLD,
                                     0.50f32,
                                     "SELECT MODE\0".as_ptr(),
                                 );
                                 for (i, m) in ["Sandbox (2 players)", "VS AI"].iter().enumerate() {
                                     let y = 60.0 + i as f32 * 70.0;
-                                    let bg = if i == cur { 0xFF2A3A5C } else { 0x661A2333 };
-                                    _3ds_top_queue_rect(40.0, y, 320.0, 50.0, bg);
-                                    if i == cur {
-                                        _3ds_top_queue_rect(40.0, y, 320.0, 50.0, 0x33F59E0B);
+                                    let bg = if i == cur { COL_SEL } else { COL_DIM };
+                                    unsafe {
+                                        _3ds_top_queue_rect(40.0, y, 320.0, 50.0, bg);
                                     }
-                                    let color = if i == cur { 0xFFF59E0B } else { 0xFFD1D5DB };
+                                    if i == cur {
+                                        unsafe {
+                                            _3ds_top_queue_rect(
+                                                40.0,
+                                                y,
+                                                320.0,
+                                                50.0,
+                                                COL_HIGHLIGHT,
+                                            );
+                                        }
+                                    }
+                                    let color = if i == cur { COL_GOLD } else { COL_LIGHT };
+                                    unsafe {
+                                        _3ds_top_queue_text(
+                                            60.0,
+                                            y + 10.0,
+                                            color,
+                                            0.40f32,
+                                            format!("{}\0", m).as_ptr(),
+                                        );
+                                    }
+                                }
+                                unsafe {
                                     _3ds_top_queue_text(
                                         60.0,
-                                        y + 10.0,
-                                        color,
-                                        0.40f32,
-                                        format!("{}\0", m).as_ptr(),
+                                        210.0,
+                                        COL_MED,
+                                        0.30f32,
+                                        "UP/DOWN=select  A=confirm\0".as_ptr(),
                                     );
                                 }
-                                _3ds_top_queue_text(
-                                    60.0,
-                                    210.0,
-                                    0xFF6B7280,
-                                    0.30f32,
-                                    "UP/DOWN=select  A=confirm\0".as_ptr(),
-                                );
                             }
                         }
                         if keys & 0x00000040 != 0 && cur > 0 {
@@ -446,11 +489,11 @@ fn main() {
                             } else {
                                 unsafe {
                                     _3ds_top_clear();
-                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, 0xFF0A0E1A);
+                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
                                     _3ds_top_queue_text(
                                         80.0,
                                         10.0,
-                                        0xFFF59E0B,
+                                        COL_GOLD,
                                         0.45f32,
                                         format!("SELECT {}\0", label).as_ptr(),
                                     );
@@ -459,16 +502,22 @@ fn main() {
                                 let end = (start + 12).min(n);
                                 for i in start..end {
                                     let y = 30.0 + (i - start) as f32 * 16.0;
-                                    let bg = if i == cur { 0xFF2A3A5C } else { 0x661A2333 };
+                                    let bg = if i == cur { COL_SEL } else { COL_DIM };
                                     unsafe {
                                         _3ds_top_queue_rect(20.0, y, 360.0, 14.0, bg);
                                     }
                                     if i == cur {
                                         unsafe {
-                                            _3ds_top_queue_rect(20.0, y, 360.0, 14.0, 0x33F59E0B);
+                                            _3ds_top_queue_rect(
+                                                20.0,
+                                                y,
+                                                360.0,
+                                                14.0,
+                                                COL_HIGHLIGHT,
+                                            );
                                         }
                                     }
-                                    let color = if i == cur { 0xFFF59E0B } else { 0xFFD1D5DB };
+                                    let color = if i == cur { COL_GOLD } else { COL_LIGHT };
                                     unsafe {
                                         _3ds_top_queue_text(
                                             24.0,
@@ -483,7 +532,7 @@ fn main() {
                                     _3ds_top_queue_text(
                                         20.0,
                                         225.0,
-                                        0xFF6B7280,
+                                        COL_MED,
                                         0.30f32,
                                         "UP/DOWN=select  A=confirm\0".as_ptr(),
                                     );
@@ -554,11 +603,11 @@ fn main() {
                             } else {
                                 unsafe {
                                     _3ds_top_clear();
-                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, 0xFF0A0E1A);
+                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
                                     _3ds_top_queue_text(
                                         80.0,
                                         10.0,
-                                        0xFFF59E0B,
+                                        COL_GOLD,
                                         0.45f32,
                                         "SELECT P2 DECK\0".as_ptr(),
                                     );
@@ -567,16 +616,22 @@ fn main() {
                                 let end = (start + 12).min(n);
                                 for i in start..end {
                                     let y = 30.0 + (i - start) as f32 * 16.0;
-                                    let bg = if i == cur { 0xFF2A3A5C } else { 0x661A2333 };
+                                    let bg = if i == cur { COL_SEL } else { COL_DIM };
                                     unsafe {
                                         _3ds_top_queue_rect(20.0, y, 360.0, 14.0, bg);
                                     }
                                     if i == cur {
                                         unsafe {
-                                            _3ds_top_queue_rect(20.0, y, 360.0, 14.0, 0x33F59E0B);
+                                            _3ds_top_queue_rect(
+                                                20.0,
+                                                y,
+                                                360.0,
+                                                14.0,
+                                                COL_HIGHLIGHT,
+                                            );
                                         }
                                     }
-                                    let color = if i == cur { 0xFFF59E0B } else { 0xFFD1D5DB };
+                                    let color = if i == cur { COL_GOLD } else { COL_LIGHT };
                                     unsafe {
                                         _3ds_top_queue_text(
                                             24.0,
@@ -591,7 +646,7 @@ fn main() {
                                     _3ds_top_queue_text(
                                         20.0,
                                         225.0,
-                                        0xFF6B7280,
+                                        COL_MED,
                                         0.30f32,
                                         "A=select  B=use same\0".as_ptr(),
                                     );
@@ -1008,6 +1063,9 @@ fn main() {
                                 } else {
                                     viewing_card = Some(cid);
                                 }
+                                // Force redraw so the top-screen card-detail panel
+                                // appears (game mode) or text updates (CLI mode).
+                                redraw = true;
                             } else {
                                 viewing_card = None;
                             }
@@ -1361,17 +1419,17 @@ fn main() {
                         unsafe {
                             _3ds_top_clear();
                         }
-                        // Top screen: stats panel + card detail/ability + prompt
-                        // Stats panel
+                        // Top screen in game mode: color-coordinated panels with proper \0 terminators
+                        // Stats panel bar at top showing turn/phase/active-player/HP/deck counts
                         unsafe {
-                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 26.0, 0xFF1A2A3C);
+                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 26.0, COL_PANEL);
                             _3ds_top_queue_text(
                                 4.0,
                                 2.0,
-                                0xFFF59E0B,
+                                COL_GOLD,
                                 0.32f32,
                                 format!(
-                                    "T{} {:?} [{}]  P1 H:{} E:{}/{} D:{}  P2 H:{} E:{}/{} D:{}",
+                                    "T{} {:?} [{}]  P1 H:{} E:{}/{} D:{}  P2 H:{} E:{}/{} D:{}\0",
                                     gs.turn_number,
                                     gs.current_phase,
                                     if ap.id == p1.id { "P1" } else { "P2" },
@@ -1389,10 +1447,10 @@ fn main() {
                             _3ds_top_queue_text(
                                 4.0,
                                 14.0,
-                                0xFFD1D5DB,
+                                COL_LIGHT,
                                 0.28f32,
                                 format!(
-                                    "W:{} L:{}  taps:{}  Y=CLI  X=detail",
+                                    "W:{} L:{}  taps:{}  Y=CLI  X=detail\0",
                                     p1.waitroom.cards.len(),
                                     p1.success_live_card_zone.cards.len(),
                                     touch_tap_count,
@@ -1401,18 +1459,22 @@ fn main() {
                             );
                         }
 
-                        // Card detail / ability text
+                        // Card detail panel when a board card is tapped
                         if let Some(vcid) = viewing_card {
                             if let Some(card) = gs.card_database.get_card(vcid) {
                                 unsafe {
-                                    _3ds_top_queue_rect(0.0, 28.0, 400.0, 212.0, 0x221A2333);
+                                    _3ds_top_queue_rect(0.0, 28.0, 400.0, 212.0, COL_CARD);
                                     _3ds_top_queue_text(
                                         4.0,
                                         30.0,
-                                        0xFF4A9EFF,
+                                        COL_BLUE,
                                         0.40f32,
-                                        format!("[{}] {}", card.card_no, wrap_text(&card.name, 25))
-                                            .as_ptr(),
+                                        format!(
+                                            "[{}] {}\0",
+                                            card.card_no,
+                                            wrap_text(&card.name, 25)
+                                        )
+                                        .as_ptr(),
                                     );
                                     let mut ty = 46.0;
                                     for ab in &card.abilities {
@@ -1422,7 +1484,7 @@ fn main() {
                                                 _3ds_top_queue_text(
                                                     4.0,
                                                     ty,
-                                                    0xFFD1D5DB,
+                                                    COL_LIGHT,
                                                     0.30f32,
                                                     format!("{}\0", line).as_ptr(),
                                                 );
@@ -1433,17 +1495,18 @@ fn main() {
                                     }
                                 }
                             }
+                        // Ability queue entry when an ability is resolving
                         } else if let Some(entry) = gs.ability_queue.current_entry() {
                             unsafe {
                                 let ab_text = wrap_text(&entry.ability.full_text, 40);
-                                _3ds_top_queue_rect(0.0, 28.0, 400.0, 212.0, 0x332A1A33);
+                                _3ds_top_queue_rect(0.0, 28.0, 400.0, 212.0, COL_ABILITY);
                                 _3ds_top_queue_text(
                                     4.0,
                                     30.0,
-                                    0xFFFF55AA,
+                                    COL_PINK,
                                     0.35f32,
                                     format!(
-                                        "[{}] {}",
+                                        "[{}] {}\0",
                                         entry.card_no,
                                         ab_text.lines().next().unwrap_or("")
                                     )
@@ -1455,7 +1518,7 @@ fn main() {
                                         _3ds_top_queue_text(
                                             4.0,
                                             ty,
-                                            0xFFD1D5DB,
+                                            COL_LIGHT,
                                             0.30f32,
                                             format!("{}\0", line).as_ptr(),
                                         );

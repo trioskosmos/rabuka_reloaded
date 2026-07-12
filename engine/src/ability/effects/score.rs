@@ -41,7 +41,7 @@ impl AbilityResolver {
         let per_unit_type_str = per_unit_type.map(|s| s.to_string());
         let effect_constraint = effect_constraint.map(|s| s.to_string());
         let card_db = self.card_db();
-        let exclude_self_id = if effect.exclude_self.unwrap_or(false) {
+        let exclude_self_id = if effect.exclude_self_any().unwrap_or(false) {
             gs.activating_card
         } else {
             None
@@ -92,13 +92,13 @@ impl AbilityResolver {
                         &card_db,
                         &filter,
                         heart_colors,
-                        effect.state.as_deref(),
+                        effect.state_any().as_deref(),
                         &orientation_modifiers,
                     )
                 };
                 // per_unit_count: apply value once per N units (e.g. 4 energy = +1)
                 let effective_units = matching_count / per_unit_count_val.max(1);
-                let effective_units = if let Some(cap) = effect.repeat_limit {
+                let effective_units = if let Some(cap) = effect.repeat_limit_any() {
                     effective_units.min(cap)
                 } else {
                     effective_units

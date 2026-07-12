@@ -12,7 +12,7 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        if effect.multiple_targets.unwrap_or(false)
+        if effect.multiple_targets_any().unwrap_or(false)
             && Zone::from_str(effect.source.as_deref().unwrap_or("")) == Some(Zone::DeckTop)
         {
             if effect.optional.unwrap_or(false) {
@@ -33,11 +33,12 @@ impl AbilityResolver {
                 .ability_queue
                 .current_entry()
                 .and_then(|e| e.conditional_choice.clone())
-                .or_else(|| effect.card_type.clone());
+                .or_else(|| effect.card_type_any().map(|s| s.to_string()));
             // cost_limit and operator come from the reveal effect itself if set,
             // or from the conditional_choice JSON if stored there by select.
-            let cl = effect.cost_limit;
-            let co = effect.cost_limit_operator.as_deref();
+            let cl = effect.cost_limit_any();
+            let co_binding = effect.cost_limit_operator_any();
+            let co = co_binding.as_deref();
             return self.execute_reveal_until_target(
                 gs,
                 effect.target_name(),
@@ -51,16 +52,16 @@ impl AbilityResolver {
             effect.source_or(Zone::Hand.to_str()),
             effect.count_or(1),
             effect.target_name(),
-            effect.card_type.as_deref(),
-            &effect.heart_colors,
-            effect.blind.unwrap_or(false),
+            effect.card_type_any().as_deref(),
+            effect.heart_colors_any(),
+            effect.blind_any().unwrap_or(false),
         )?;
 
-        if effect.self_target.unwrap_or(false) {
-            if let Some(ref ct) = effect.card_type {
+        if effect.self_target_any().unwrap_or(false) {
+            if let Some(ref ct) = effect.card_type_any() {
                 let card_db = &gs.card_database;
                 let has_matching = gs.revealed_cards.iter().any(|&cid| {
-                    crate::ability::util::card_matches_type(card_db, cid, Some(ct.as_str()))
+                    crate::ability::util::card_matches_type(card_db, cid, Some(ct.as_ref()))
                 });
                 if has_matching {
                     if let Some(cid) = gs.activating_card {
@@ -83,7 +84,7 @@ impl AbilityResolver {
         // Some custom actions have enough info to re-route to a known handler.
 
         // 1) Deck reordering: placement_order=any_order → route as move_cards looked_at→deck_top
-        if effect.placement_order.as_deref() == Some("any_order") {
+        if effect.placement_order_any().as_deref() == Some("any_order") {
             let mut routed = effect.clone();
             routed.action = "move_cards".into();
             if routed.source.is_none() {
@@ -96,7 +97,7 @@ impl AbilityResolver {
         }
 
         // 2) Complex conditional scoring / gain_ability: has duration
-        if effect.duration.is_some() {
+        if effect.duration_any().is_some() {
             let text = if effect.text.is_empty() {
                 action_str
             } else {
@@ -106,9 +107,9 @@ impl AbilityResolver {
                 gs,
                 text,
                 effect.target.as_deref().unwrap_or("self"),
-                effect.duration.as_deref(),
-                effect.gained_effect.clone(),
-                effect.ability_gain_trigger.as_deref(),
+                effect.duration_any().as_deref(),
+                effect.gained_effect_any().cloned(),
+                effect.ability_gain_trigger_any().as_deref(),
             );
         }
 
@@ -133,7 +134,7 @@ impl AbilityResolver {
             .ability_queue
             .current_entry()
             .and_then(|e| e.conditional_choice.clone())
-            .or_else(|| effect.card_type.clone());
+            .or_else(|| effect.card_type_any().map(|s| s.to_string()));
 
         if let Some(card_type) = chosen_card_type {
             // Use the existing reveal_until_target functionality
@@ -161,7 +162,7 @@ impl AbilityResolver {
                 // Clear looked_at_cards
                 gs.looked_at_cards.clear();
             }
-        } else if let Some(ref or_types) = effect.or_card_types {
+        } else if let Some(ref or_types) = effect.or_card_types_any() {
             // No card type chosen yet — create the type choice prompt.
             let desc = format!("Choose: {}", or_types.join(", or "));
             self.pending_choice = Some(Choice::SelectTarget {
@@ -176,11 +177,14 @@ impl AbilityResolver {
                         .map(|t| {
                             let label = match t.as_str() {
                                 "live_card" => {
-                                    if effect.cost_limit.is_some() {
+                                    if effect.cost_limit_any().is_some() {
                                         format!(
                                             "Live card (cost {}{})",
-                                            effect.cost_limit_operator.as_deref().unwrap_or(">="),
-                                            effect.cost_limit.unwrap()
+                                            effect
+                                                .cost_limit_operator_any()
+                                                .as_deref()
+                                                .unwrap_or(">="),
+                                            effect.cost_limit_any().unwrap()
                                         )
                                     } else {
                                         "Live card".to_string()
@@ -189,8 +193,8 @@ impl AbilityResolver {
                                 "member_card" => {
                                     format!(
                                         "Member card (cost {} {})",
-                                        effect.cost_limit_operator.as_deref().unwrap_or(">="),
-                                        effect.cost_limit.unwrap_or(0)
+                                        effect.cost_limit_operator_any().as_deref().unwrap_or(">="),
+                                        effect.cost_limit_any().unwrap_or(0)
                                     )
                                 }
                                 _ => t.clone(),
@@ -313,13 +317,14 @@ impl AbilityResolver {
         // bp6 pattern: "gain 1 heart per distinct color among discarded cards"
         // Detected by: resource=heart, per_unit=true, per_unit_type="discard", multiple_targets=true
         // For each distinct heart color present among recently_moved_cards, grant 1 heart of that color.
-        if effect.resource.as_deref() == Some("heart")
-            && effect.per_unit.unwrap_or(false)
-            && Zone::from_str(effect.per_unit_type.as_deref().unwrap_or("")) == Some(Zone::Discard)
-            && effect.multiple_targets.unwrap_or(false)
+        if effect.resource_any().as_deref() == Some("heart")
+            && effect.per_unit_any().unwrap_or(false)
+            && Zone::from_str(effect.per_unit_type_any().as_deref().unwrap_or(""))
+                == Some(Zone::Discard)
+            && effect.multiple_targets_any().unwrap_or(false)
         {
             let card_db = self.card_db();
-            let duration = effect.duration.clone();
+            let duration = effect.duration_any().clone();
             let is_temporary = duration.is_some() && duration.as_deref() != Some("permanent");
             let target = effect.target_name().to_string();
             let activating_card_id = gs.activating_card;
@@ -471,7 +476,8 @@ impl AbilityResolver {
 
         // If the effect has an explicit location, use that as the count zone
         // instead of the generic per_unit_type → zone mapping.
-        let effective_per_unit_type = effect.location.as_deref().or(per_unit_type_str);
+        let loc_binding = effect.location_any();
+        let effective_per_unit_type = loc_binding.as_deref().or(per_unit_type_str);
         let mut matching_count = if effective_per_unit_type == Some("つ") {
             last_energy
         } else {
@@ -482,7 +488,7 @@ impl AbilityResolver {
                 &card_db,
                 filter,
                 &[],
-                effect.state.as_deref(),
+                effect.state_any().as_deref(),
                 orientation_modifiers,
             )
         };
@@ -526,7 +532,7 @@ impl AbilityResolver {
                 matching_count = 0;
             }
         }
-        let per_unit_count_val = effect.per_unit_count.unwrap_or(1);
+        let per_unit_count_val = effect.per_unit_count_any().unwrap_or(1);
         let mut units = matching_count / per_unit_count_val;
         if effect.max.unwrap_or(false) {
             if let Some(cap) = effect.count {
@@ -536,13 +542,15 @@ impl AbilityResolver {
         // Also cap by max_repeats (aliased as repeat_limit), used
         // when the parser sets it as the sole cap on per_unit effects
         // (e.g. "N枚までしか数えない" text constraints).
-        if let Some(cap) = effect.repeat_limit {
+        if let Some(cap) = effect.repeat_limit_any() {
             units = units.min(cap);
         }
         let per_unit_base = if effect.max.unwrap_or(false) {
             1
         } else {
-            effect.resource_icon_count.unwrap_or(effect.count_or(1))
+            effect
+                .resource_icon_count_any()
+                .unwrap_or(effect.count_or(1))
         };
         units * per_unit_base
     }
@@ -553,12 +561,14 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
             log::debug!("[GR_ENTER] resource={:?} count={:?} target_count={:?} source={:?} card_type={:?} target={:?} exclude_self={:?} target_from_sel={:?}",
-                effect.resource, effect.count, effect.target_count, effect.source, effect.card_type, effect.target, effect.exclude_self, effect.target_from_selection);
+                effect.resource_any(), effect.count, effect.target_count_any(), effect.source, effect.card_type_any(), effect.target, effect.exclude_self_any(), effect.target_from_selection_any());
         }
         // heart_colors_from_selected_card: gain 1 heart of each color
         // that the previously-selected card in the sequential has (base_heart).
-        if effect.resource.as_deref() == Some("heart")
-            && effect.heart_colors_from_selected_card.unwrap_or(false)
+        if effect.resource_any().as_deref() == Some("heart")
+            && effect
+                .heart_colors_from_selected_card_any()
+                .unwrap_or(false)
         {
             let target_str = effect.target_name().to_string();
             let player = gs.resolve_target_player_mut(&target_str);
@@ -573,7 +583,7 @@ impl AbilityResolver {
                         && crate::ability::util::card_matches_characters(
                             &card_db,
                             tid,
-                            effect.characters.as_ref(),
+                            effect.characters_any(),
                         )
                 })
                 .collect();
@@ -629,7 +639,7 @@ impl AbilityResolver {
                                         gs.mods.get_heart_modifier(target_id, color)
                                     );
                                 }
-                                if effect.duration.as_deref() == Some("live_end") {
+                                if effect.duration_any().as_deref() == Some("live_end") {
                                     let effect_data = serde_json::json!({
                                         "card_id": target_id,
                                         "amount": 1,
@@ -652,8 +662,8 @@ impl AbilityResolver {
             return Ok(());
         }
 
-        if effect.resource.as_deref() == Some("heart")
-            && effect.heart_type.as_deref() == Some("all")
+        if effect.resource_any().as_deref() == Some("heart")
+            && effect.heart_type_any().as_deref() == Some("all")
         {
             let target_str = effect.target_name().to_string();
             // Capture values before mutable borrow of gs
@@ -665,7 +675,7 @@ impl AbilityResolver {
             let has_explicit_target = effect.target.is_some();
             let player = gs.resolve_target_player_mut(&target_str);
             let card_id = triggering_member.or_else(|| {
-                if let Some(ref pos) = effect.position {
+                if let Some(ref pos) = effect.position_any() {
                     let pos_str = pos.get_position()?;
                     let idx = crate::ability::util::stage_position_index(pos_str)?;
                     if idx < player.stage.stage.len() && player.stage.stage[idx] != -1 {
@@ -689,7 +699,7 @@ impl AbilityResolver {
                     card_id,
                     &effect.text,
                 );
-                if effect.duration.as_deref() == Some("live_end") {
+                if effect.duration_any().as_deref() == Some("live_end") {
                     let effect_data = serde_json::json!({
                         "card_id": card_id,
                         "amount": amount,
@@ -711,33 +721,37 @@ impl AbilityResolver {
         if self.handle_bp6_pattern(gs, effect)? {
             return Ok(());
         }
-        let resource = effect.resource.as_deref().unwrap_or("").to_string();
-        let count = effect.resource_icon_count.unwrap_or(effect.count_or(1));
+        let resource = effect.resource_any().as_deref().unwrap_or("").to_string();
+        let count = effect
+            .resource_icon_count_any()
+            .unwrap_or(effect.count_or(1));
         let target = effect.target_name().to_string();
-        let duration = effect.duration.clone();
+        let duration = effect.duration_any().clone();
         let is_temporary = duration.is_some() && duration.as_deref() != Some("permanent");
-        let card_type_filter = effect.card_type.clone();
+        let card_type_filter = effect.card_type_any().map(|s| s.to_string());
         let group_filter = effect.group_name().map(|s| s.to_string());
-        let per_unit_type_str = effect.per_unit_type.clone();
-        let heart_selection = effect.heart_selection.unwrap_or(false);
-        let per_unit = effect.per_unit.unwrap_or(false);
-        let sign = effect.sign.as_deref();
+        let per_unit_type_str = effect.per_unit_type_any().clone();
+        let heart_selection = effect.heart_selection_any().unwrap_or(false);
+        let per_unit = effect.per_unit_any().unwrap_or(false);
+        let sign_binding = effect.sign_any();
+        let sign = sign_binding.as_deref();
         let activating_card_id = gs.activating_card;
         let card_db = self.card_db();
-        let is_self_target = effect.self_target.unwrap_or(false);
+        let is_self_target = effect.self_target_any().unwrap_or(false);
         let last_discard_count = gs.mods.last_cost_discard_count;
-        let is_all = effect.all.unwrap_or(false)
+        let is_all = effect.all_any().unwrap_or(false)
             || (effect.source.is_none()
-                && effect.card_type.as_deref() == Some("member_card")
+                && effect.card_type_any().as_deref() == Some("member_card")
                 && (target == "self" || target == "opponent")
                 && !is_self_target
-                && effect.exclude_self.is_none())
+                && effect.exclude_self_any().is_none()
+                && effect.target_count_any().is_none())
             // Also detect "all members" when the effect has no target_count limit
             // and targets "self"/"opponent" members (e.g. "自分のステージにいるメンバーは")
-            || (effect.card_type.as_deref() == Some("member_card")
+            || (effect.card_type_any().as_deref() == Some("member_card")
                 && (target == "self" || target == "opponent")
-                && effect.target_count.is_none()
-                && effect.distinct.is_none());
+                && effect.target_count_any().is_none()
+                && effect.distinct_any().is_none());
 
         if resource == "surplus_heart" {
             return self.execute_gain_surplus_heart(
@@ -766,12 +780,16 @@ impl AbilityResolver {
                 .current_entry()
                 .and_then(|e| e.conditional_choice.clone())
         } else {
+            let effective_heart_colors: Vec<String> = effect
+                .heart_color_any()
+                .map(|hc| vec![hc.to_string()])
+                .unwrap_or_else(|| effect.heart_colors_any().to_vec());
             let result = self.resolve_gain_heart_color(
                 gs,
                 effect,
                 resource.as_str(),
                 count,
-                &effect.heart_colors,
+                &effective_heart_colors,
                 heart_selection,
             )?;
             if self.pending_choice.is_some() {
@@ -804,7 +822,7 @@ impl AbilityResolver {
         // cross-character leakage in sequential (e.g. blade for char A leaks
         // into blade for char B).
         let selected_for_current: Vec<i16> = if !all_selected.is_empty() {
-            if let Some(ref chars) = effect.characters {
+            if let Some(ref chars) = effect.characters_any() {
                 all_selected
                     .iter()
                     .filter(|&&cid| {
@@ -840,15 +858,15 @@ impl AbilityResolver {
                 }
             });
 
-        let exclude_self_id = if effect.exclude_self.unwrap_or(false) {
+        let exclude_self_id = if effect.exclude_self_any().unwrap_or(false) {
             gs.activating_card
         } else {
             None
         };
 
-        if effect.target_count.is_some()
+        if effect.target_count_any().is_some()
             && !is_self_target
-            && (selected_for_current.is_empty() || effect.distinct.is_some())
+            && (selected_for_current.is_empty() || effect.distinct_any().is_some())
             && !per_unit
             && (resource == "blade"
                 || resource == "ブレード"
@@ -867,7 +885,7 @@ impl AbilityResolver {
             let mut prelim_filter = effect.filter_subset();
             prelim_filter.exclude_self = exclude_self_id;
             let exclude_names: Vec<String> = effect
-                .exclude_by_name_source
+                .exclude_by_name_source_any()
                 .as_deref()
                 .filter(|&s| s == "preceding_moved")
                 .and_then(|_| preceding_moved.as_ref())
@@ -881,7 +899,8 @@ impl AbilityResolver {
             if !exclude_names.is_empty() {
                 prelim_filter.exclude_names = Some(&exclude_names);
             }
-            let choice_exclude = if (effect.target_count.is_some() || effect.distinct.is_some())
+            let choice_exclude = if (effect.target_count_any().is_some()
+                || effect.distinct_any().is_some())
                 && !all_selected.is_empty()
             {
                 Some(all_selected.as_slice())
@@ -899,14 +918,14 @@ impl AbilityResolver {
                     || resource == "heart"
                     || resource == "ハート"
                 {
-                    effect.distinct.as_deref()
+                    effect.distinct_any()
                 } else {
                     None
                 },
                 choice_exclude,
             );
             // Filter target_count candidates by position if specified.
-            if let Some(ref pos) = effect.position {
+            if let Some(ref pos) = effect.position_any() {
                 if let Some(p) = pos.get_position() {
                     if let Some(stage_idx) = util::stage_position_index(p) {
                         let p = gs.resolve_target_player(&target);
@@ -918,7 +937,7 @@ impl AbilityResolver {
             // Filter candidates by group_reference: "same_group_name" — use the
             // cost-discarded card's group (c.group, card position ②) so the target
             // prompt shows only members matching that group name.
-            if effect.group_reference.as_deref() == Some("same_group_name") {
+            if effect.group_reference_any().as_deref() == Some("same_group_name") {
                 let ref_group: Option<String> = self
                     .moved_cards
                     .first()
@@ -930,7 +949,7 @@ impl AbilityResolver {
                     });
                 }
             }
-            let tc = effect.target_count.unwrap_or(1) as usize;
+            let tc = effect.target_count_any().unwrap_or(1) as usize;
             if candidates.len() > tc {
                 let stage_snapshot: Vec<i16> = {
                     let p = gs.resolve_target_player(&target);
@@ -941,7 +960,7 @@ impl AbilityResolver {
                     .filter_map(|&cid| stage_snapshot.iter().position(|&s| s == cid))
                     .collect();
                 let mut saved = effect.clone();
-                saved.target_count = None;
+                saved.set_target_count(None);
                 self.selected_count_at_save = Some(self.selected_cards.len());
                 let mut pending = gs.ability_queue.take_pending_actions();
                 pending.insert(0, saved);
@@ -954,9 +973,9 @@ impl AbilityResolver {
                 self.pending_choice = Some(
                     Choice::select_cards(Zone::Stage.to_str().to_string(), tc, desc_en, false)
                         .description_ja(Some(desc_ja))
-                        .card_type(effect.card_type.clone())
+                        .card_type(effect.card_type_any().map(|s| s.to_string()))
                         .group(effect.group_name().map(|s| s.to_string()))
-                        .characters(effect.characters.clone())
+                        .characters(effect.characters_any().cloned())
                         .filtered_indices(Some(filtered_indices))
                         .target_player_id(Some(target.clone()))
                         .is_select_action(true)
@@ -974,7 +993,7 @@ impl AbilityResolver {
         let last_energy = gs.mods.last_cost_energy_count;
         // Issue 6: Pre-compute appeared/moved-this-turn sets before mutable borrow
         let appeared_ids: std::collections::HashSet<i16> =
-            if effect.timing_condition.as_deref() == Some("appeared_this_turn") {
+            if effect.timing_condition_any().as_deref() == Some("appeared_this_turn") {
                 let p = gs.resolve_target_player(&target);
                 p.stage
                     .stage
@@ -982,7 +1001,7 @@ impl AbilityResolver {
                     .filter(|&&cid| cid != -1 && gs.has_card_appeared_this_turn(cid))
                     .copied()
                     .collect()
-            } else if effect.timing_condition.as_deref() == Some("moved_this_turn") {
+            } else if effect.timing_condition_any().as_deref() == Some("moved_this_turn") {
                 let area_moved_ids: std::collections::HashSet<i16> = gs
                     .turn_area_movements
                     .iter()
@@ -1013,7 +1032,7 @@ impl AbilityResolver {
             let mut filter = effect.filter_subset();
             filter.exclude_self = exclude_self_id;
             let exclude_names: Vec<String> = effect
-                .exclude_by_name_source
+                .exclude_by_name_source_any()
                 .as_deref()
                 .filter(|&s| s == "preceding_moved")
                 .and_then(|_| preceding_moved.as_ref())
@@ -1045,11 +1064,12 @@ impl AbilityResolver {
 
             let player = gs.resolve_target_player_mut(&target);
 
-            let has_selection_filter = effect.target_count.is_some() || effect.distinct.is_some();
+            let has_selection_filter =
+                effect.target_count_any().is_some() || effect.distinct_any().is_some();
             // When a distinct choice was saved (target_count cleared), exclude
             // only cards selected BEFORE the choice, not the card selected BY it.
-            let saved_exclude: Option<Vec<i16>> = if effect.target_count.is_none()
-                && effect.distinct.is_some()
+            let saved_exclude: Option<Vec<i16>> = if effect.target_count_any().is_none()
+                && effect.distinct_any().is_some()
                 && !all_selected.is_empty()
             {
                 if let Some(save_len) = self.selected_count_at_save {
@@ -1076,10 +1096,10 @@ impl AbilityResolver {
             } else {
                 None
             };
-            let tc = effect.target_count;
-            let dn = effect.distinct.as_deref();
+            let tc = effect.target_count_any();
+            let dn = effect.distinct_any();
 
-            let has_characters = effect.characters.as_ref().is_some_and(|c| !c.is_empty());
+            let has_characters = effect.characters_any().is_some_and(|c| !c.is_empty());
             let has_blade_filter =
                 card_type_filter.is_some() || group_filter.is_some() || has_characters;
             // When has_selection_filter is set (target_count/distinct), don't blindly
@@ -1087,8 +1107,9 @@ impl AbilityResolver {
             // Only use all_selected directly for pure sequential select→gain_resource.
             // When distinct is set, the saved action must filter by exclude to
             // prevent cards selected in previous steps from also getting the resource.
-            let use_raw =
-                !all_selected.is_empty() && !has_selection_filter && effect.distinct.is_none();
+            let use_raw = !all_selected.is_empty()
+                && !has_selection_filter
+                && effect.distinct_any().is_none();
             let mut all_candidates: Vec<i16> = if use_raw {
                 all_selected.clone()
             } else if has_blade_filter || is_all {
@@ -1110,7 +1131,7 @@ impl AbilityResolver {
             };
 
             // Filter by position if the effect specifies one (e.g. "center").
-            if let Some(ref pos) = effect.position {
+            if let Some(ref pos) = effect.position_any() {
                 if let Some(p) = pos.get_position() {
                     if let Some(stage_idx) = util::stage_position_index(p) {
                         let expected = player.stage.stage[stage_idx];
@@ -1124,7 +1145,7 @@ impl AbilityResolver {
                 appeared_ids,
                 all_candidates
             );
-            if effect.timing_condition.is_some() {
+            if effect.timing_condition_any().is_some() {
                 all_candidates.retain(|&cid| appeared_ids.contains(&cid));
                 log::debug!("[APP_IDS] all_candidates after={:?}", all_candidates);
             }
@@ -1137,7 +1158,7 @@ impl AbilityResolver {
                 "[GAIN_RESOURCE] blade_targets computation starts ({} candidates)",
                 all_candidates.len()
             );
-            let blade_targets: Vec<i16> = if effect.target_from_selection.unwrap_or(false) {
+            let blade_targets: Vec<i16> = if effect.target_from_selection_any().unwrap_or(false) {
                 selected_for_current.clone()
             } else if let Some(tgt_count) = tc {
                 if !selected_for_current.is_empty() {
@@ -1155,7 +1176,7 @@ impl AbilityResolver {
                     all_candidates.truncate(tgt_count as usize);
                     all_candidates
                 }
-            } else if !selected_for_current.is_empty() && effect.distinct.is_none() {
+            } else if !selected_for_current.is_empty() && effect.distinct_any().is_none() {
                 selected_for_current.clone()
             } else {
                 all_candidates
@@ -1163,8 +1184,10 @@ impl AbilityResolver {
 
             let heart_color_inner = single_fixed_heart
                 .clone()
-                .or_else(|| effect.heart_colors.first().map(|s| s.to_string()));
-            let mut heart_targets: Vec<i16> = if effect.target_from_selection.unwrap_or(false) {
+                .or_else(|| effect.heart_color_any().map(|s| s.to_string()))
+                .or_else(|| effect.heart_colors_any().first().map(|s| s.to_string()));
+            let mut heart_targets: Vec<i16> = if effect.target_from_selection_any().unwrap_or(false)
+            {
                 // Explicitly target only the cards selected by the preceding
                 // sequential action (e.g. a change_state that activated a member).
                 log::debug!(
@@ -1172,16 +1195,17 @@ impl AbilityResolver {
                     self.selected_cards, selected_for_current, all_selected
                 );
                 selected_for_current
-            } else if use_raw && !selected_for_current.is_empty() && effect.distinct.is_none() {
+            } else if use_raw && !selected_for_current.is_empty() && effect.distinct_any().is_none()
+            {
                 selected_for_current
             } else if use_raw {
                 all_selected.clone()
             } else if resource == "heart" || resource == "ハート" {
-                let mut h = if !selected_for_current.is_empty() && effect.distinct.is_none() {
+                let mut h = if !selected_for_current.is_empty() && effect.distinct_any().is_none() {
                     selected_for_current
                 } else if !selected_for_current.is_empty()
-                    && effect.target_count.is_none()
-                    && effect.distinct.is_some()
+                    && effect.target_count_any().is_none()
+                    && effect.distinct_any().is_some()
                 {
                     // Saved action from distinct choice: target only the
                     // NEWLY selected cards (after the pre-choice save point).
@@ -1194,11 +1218,11 @@ impl AbilityResolver {
                     } else {
                         selected_for_current
                     }
-                } else if effect.card_type.is_none()
-                    && effect.group_names.is_none()
-                    && effect.characters.is_none()
-                    && effect.target_count.is_none()
-                    && effect.distinct.is_none()
+                } else if effect.card_type_any().is_none()
+                    && effect.group_names_any().is_none()
+                    && effect.characters_any().is_none()
+                    && effect.target_count_any().is_none()
+                    && effect.distinct_any().is_none()
                     && !is_all
                 {
                     // No targeting info: default to activating card only.
@@ -1216,14 +1240,14 @@ impl AbilityResolver {
                         exclude,
                     )
                 };
-                if effect.timing_condition.is_some() {
+                if effect.timing_condition_any().is_some() {
                     h.retain(|&cid| appeared_ids.contains(&cid));
                 }
                 h
             } else {
                 vec![]
             };
-            if let Some(ref pos) = effect.position {
+            if let Some(ref pos) = effect.position_any() {
                 if let Some(p) = pos.get_position() {
                     if let Some(stage_idx) = util::stage_position_index(p) {
                         let expected = player.stage.stage[stage_idx];
@@ -1234,14 +1258,14 @@ impl AbilityResolver {
 
             // Apply heart_colors as a target filter when the effect
             // specifies that targets must already possess the heart color.
-            if effect.filter_targets_by_heart_colors.unwrap_or(false)
-                && !effect.heart_colors.is_empty()
+            if effect.filter_targets_by_heart_colors_any().unwrap_or(false)
+                && !effect.heart_colors_any().is_empty()
             {
                 heart_targets.retain(|&id| {
-                    if effect.require_all_heart_colors.unwrap_or(false) {
-                        util::card_matches_all_heart_colors(&card_db, id, &effect.heart_colors)
+                    if effect.require_all_heart_colors_any().unwrap_or(false) {
+                        util::card_matches_all_heart_colors(&card_db, id, effect.heart_colors_any())
                     } else {
-                        util::card_matches_heart_colors(&card_db, id, &effect.heart_colors)
+                        util::card_matches_heart_colors(&card_db, id, effect.heart_colors_any())
                     }
                 });
             }
@@ -1253,14 +1277,16 @@ impl AbilityResolver {
         // so the next sequential action can exclude these cards.
         // Only store when we have explicit selection limits to avoid
         // polluting all_selected for blanket effects like "both players gain blade".
-        if effect.target_count.is_some() || effect.distinct.is_some() {
+        if effect.target_count_any().is_some() || effect.distinct_any().is_some() {
             let selected_targets: Vec<i16> = if resource == "blade" || resource == "ブレード" {
                 blade_targets.clone()
             } else {
                 heart_targets.clone()
             };
-            if !selected_targets.is_empty() {
-                self.selected_cards.extend(&selected_targets);
+            for &cid in &selected_targets {
+                if !self.selected_cards.contains(&cid) {
+                    self.selected_cards.push(cid);
+                }
             }
         }
 
@@ -1283,12 +1309,12 @@ impl AbilityResolver {
         // across all specified colors instead of using a single color.
         let heart_distribution: Vec<(crate::card::HeartColor, u32)> = if resource == "heart"
             && !heart_selection
-            && effect.heart_colors.len() > 1
-            && final_count >= effect.heart_colors.len() as u32
+            && effect.heart_colors_any().len() > 1
+            && final_count >= effect.heart_colors_any().len() as u32
         {
-            let per_color = final_count / effect.heart_colors.len() as u32;
+            let per_color = final_count / effect.heart_colors_any().len() as u32;
             effect
-                .heart_colors
+                .heart_colors_any()
                 .iter()
                 .map(|c| (crate::zones::parse_heart_color(c), per_color))
                 .collect()
@@ -1369,11 +1395,11 @@ impl AbilityResolver {
         if resource == "blade" || resource == "ブレード" {
             if blade_targets.is_empty() {
                 if is_all
-                    && effect.group_names.is_none()
-                    && effect.card_type.is_none()
-                    && effect.characters.is_none()
-                    && effect.timing_condition.is_none()
-                    && effect.position.is_none()
+                    && effect.group_names_any().is_none()
+                    && effect.card_type_any().is_none()
+                    && effect.characters_any().is_none()
+                    && effect.timing_condition_any().is_none()
+                    && effect.position_any().is_none()
                 {
                     let stage_ids: Vec<i16> = {
                         let player = gs.resolve_target_player(&target);
@@ -1403,10 +1429,10 @@ impl AbilityResolver {
                         );
                         effect_data = Some(serde_json::Value::Object(data));
                     }
-                } else if effect.position.is_some() {
+                } else if effect.position_any().is_some() {
                     // Position-based target: apply to the stage member at that position
                     if resource == "blade" || resource == "ブレード" {
-                        if let Some(pos_info) = effect.position.as_ref() {
+                        if let Some(pos_info) = effect.position_any().as_ref() {
                             if let Some(p) = pos_info.get_position() {
                                 if let Some(stage_idx) = util::stage_position_index(p) {
                                     let player = gs.resolve_target_player_mut(&target);
@@ -1431,8 +1457,9 @@ impl AbilityResolver {
                             }
                         }
                     }
-                } else if effect.target_count.is_none()
-                    && (effect.exclude_self.is_none() || effect.target.as_deref() == Some("self"))
+                } else if effect.target_count_any().is_none()
+                    && (effect.exclude_self_any().is_none()
+                        || effect.target.as_deref() == Some("self"))
                 {
                     if let Some(card_id) = activating_card_id {
                         gs.mods.add_blade_modifier_with_trace(
@@ -1492,7 +1519,7 @@ impl AbilityResolver {
         // group_reference: "same_group_name" — filter heart targets to only
         // include cards whose group name (c.group, card position ②) matches the
         // group of the card that was discarded as cost (tracked in self.moved_cards).
-        if effect.group_reference.as_deref() == Some("same_group_name") {
+        if effect.group_reference_any().as_deref() == Some("same_group_name") {
             log::debug!("[SAME_GROUP] moved_cards={:?}", self.moved_cards);
             let ref_group: Option<String> = self
                 .moved_cards
@@ -1531,8 +1558,8 @@ impl AbilityResolver {
 
         if resource == "heart" || resource == "ハート" {
             if heart_targets.is_empty() {
-                if effect.position.is_some() {
-                    if let Some(pos_info) = effect.position.as_ref() {
+                if effect.position_any().is_some() {
+                    if let Some(pos_info) = effect.position_any().as_ref() {
                         if let Some(p) = pos_info.get_position() {
                             if let Some(stage_idx) = util::stage_position_index(p) {
                                 let player = gs.resolve_target_player_mut(&target);
@@ -1553,8 +1580,9 @@ impl AbilityResolver {
                             }
                         }
                     }
-                } else if effect.target_count.is_none()
-                    && (effect.exclude_self.is_none() || effect.target.as_deref() == Some("self"))
+                } else if effect.target_count_any().is_none()
+                    && (effect.exclude_self_any().is_none()
+                        || effect.target.as_deref() == Some("self"))
                 {
                     if let Some(card_id) = activating_card_id {
                         self.apply_heart_to_card(
@@ -1574,8 +1602,8 @@ impl AbilityResolver {
                 || (target == "self"
                     && activating_card_id.is_some()
                     && effect.source.is_none()
-                    && effect.card_type.is_none()
-                    && !effect.target_from_selection.unwrap_or(false))
+                    && effect.card_type_any().is_none()
+                    && !effect.target_from_selection_any().unwrap_or(false))
             {
                 if let Some(card_id) = activating_card_id {
                     self.apply_heart_to_card(
@@ -1692,7 +1720,7 @@ impl AbilityResolver {
             pp,
             act_name,
             effect.count.unwrap_or(1),
-            effect.resource.as_deref().unwrap_or("?")
+            effect.resource_any().as_deref().unwrap_or("?")
         ));
         Ok(())
     }
@@ -1748,7 +1776,7 @@ impl AbilityResolver {
                 description_en: Some("Choose 2 occupied areas for double baton touch".to_string()),
                 description_ja: Some("ダブルバトンのエリア2つを選択".to_string()),
                 allow_skip: true,
-                options: Some(options),
+                options: Some(options.to_vec()),
             });
             return Ok(());
         }
@@ -1952,8 +1980,8 @@ impl AbilityResolver {
         gs.rule_log
             .push(format!("{} {}: [[log_position_change]]", pp, act_name));
         // Check source_position from effect (new parser field), fall back to position param
-        let source_pos = effect
-            .source_position
+        let source_pos_binding = effect.source_position_any();
+        let source_pos = source_pos_binding
             .as_deref()
             .or_else(|| position.as_ref().and_then(|p| p.get_position()));
         let position_str = source_pos.unwrap_or("");
@@ -2005,8 +2033,9 @@ impl AbilityResolver {
         if target_member == "select" {
             let valid_sources: Vec<String> = {
                 let card_db = self.card_db();
-                let group_names = effect.group_names.as_ref();
-                let exclude_self = effect.exclude_self.unwrap_or(false);
+                let gns_binding = effect.group_names_any();
+                let group_names = gns_binding.as_ref();
+                let exclude_self = effect.exclude_self_any().unwrap_or(false);
                 let activating_card_id = gs.activating_card;
                 let has_explicit_target = effect.target.is_some();
 
@@ -2102,10 +2131,10 @@ impl AbilityResolver {
 
         if target_member == "this_member" {
             // Handle "multiple_targets=true" (それぞれ) pattern: iterate all stage members.
-            if effect.multiple_targets.unwrap_or(false) {
+            if effect.multiple_targets_any().unwrap_or(false) {
                 // Check for predetermined rotation: multiple_targets + position specified.
                 // e.g. 003-R: center→left, left→right, right→center
-                if effect.position.is_some() || effect.source_position.is_some() {
+                if effect.position_any().is_some() || effect.source_position_any().is_some() {
                     return self.execute_rotation(gs, effect, target);
                 }
 
@@ -2291,9 +2320,13 @@ impl AbilityResolver {
 
         // Handle specific card_no target with no destination specified:
         // find the card's current position and create a destination choice.
-        if effect.target_member.is_some() && position_str.is_empty() {
+        if effect.target_member_any().is_some() && position_str.is_empty() {
             let target_m = target.to_string();
-            let card_no = effect.target_member.as_deref().unwrap_or("").to_string();
+            let card_no = effect
+                .target_member_any()
+                .as_deref()
+                .unwrap_or("")
+                .to_string();
             let optional = effect.optional.unwrap_or(false);
             let card_db = gs.card_database.clone();
             // Collect stage card info before mutable borrow
@@ -2466,8 +2499,9 @@ impl AbilityResolver {
         let card_db = self.card_db();
         let player = gs.resolve_target_player(target);
         let activating_card_id = gs.activating_card;
-        let group_names = effect.group_names.as_ref();
-        let exclude_self = effect.exclude_self.unwrap_or(false);
+        let gns_binding = effect.group_names_any();
+        let group_names = gns_binding.as_ref();
+        let exclude_self = effect.exclude_self_any().unwrap_or(false);
 
         let position_names = ["left", "center", "right"];
         let mut valid = Vec::new();
@@ -2489,7 +2523,7 @@ impl AbilityResolver {
             }
 
             // Exclude explicitly excluded positions (e.g. "センターエリア以外" → exclude center).
-            if let Some(ref exclude_pos) = effect.exclude_position {
+            if let Some(ref exclude_pos) = effect.exclude_position_any() {
                 if pos_name == exclude_pos {
                     continue;
                 }
@@ -2508,7 +2542,7 @@ impl AbilityResolver {
             // member's area"), empty slots are invalid.
             if let Some(gn) = group_names {
                 if card_id == -1 {
-                    if !effect.multiple_targets.unwrap_or(false) {
+                    if !effect.multiple_targets_any().unwrap_or(false) {
                         continue;
                     }
                 } else {
@@ -2672,11 +2706,15 @@ impl AbilityResolver {
         } else {
             raw_target
         };
-        let target_member = effect.target_member.as_deref().unwrap_or("this_member");
-        let source_position = effect
-            .source_position
-            .as_deref()
-            .or_else(|| effect.position.as_ref().and_then(|p| p.get_position()));
+        let target_member_binding = effect.target_member_any();
+        let target_member = target_member_binding.unwrap_or("this_member");
+        let sp_binding = effect.source_position_any();
+        let source_position = sp_binding.as_deref().or_else(|| {
+            effect
+                .position_any()
+                .as_ref()
+                .and_then(|p| p.get_position())
+        });
         log::debug!(
             "[EPCWD] entry: target={} target_member={} source_pos={:?} dest={} activating={:?}",
             target,
@@ -2691,12 +2729,16 @@ impl AbilityResolver {
         } else {
             raw_target
         };
-        let target_member = effect.target_member.as_deref().unwrap_or("this_member");
+        let target_member_binding = effect.target_member_any();
+        let target_member = target_member_binding.unwrap_or("this_member");
         // Check source_position first (new parser field), fall back to position
-        let source_position = effect
-            .source_position
-            .as_deref()
-            .or_else(|| effect.position.as_ref().and_then(|p| p.get_position()));
+        let sp_binding = effect.source_position_any();
+        let source_position = sp_binding.as_deref().or_else(|| {
+            effect
+                .position_any()
+                .as_ref()
+                .and_then(|p| p.get_position())
+        });
 
         // destination "same_area" means the area that was just vacated by the
         // previous position_change (the source area of the first move). Since
@@ -2731,7 +2773,7 @@ impl AbilityResolver {
         let destination = dest_owned.as_ref();
 
         // Reject destination if it matches exclude_position
-        if let Some(ref exclude) = effect.exclude_position {
+        if let Some(ref exclude) = effect.exclude_position_any() {
             let exclude_idx = util::stage_position_index(exclude).unwrap_or(999);
             let dest_idx = util::stage_position_index(destination).unwrap_or(999);
             if exclude_idx == dest_idx {
@@ -2835,8 +2877,8 @@ impl AbilityResolver {
             return Ok(());
         }
         // Handle specific card_no (for "multiple_targets" each-member pattern)
-        if let Some(ref card_no) = effect.target_member {
-            if card_no != "this_member" {
+        if let Some(ref card_no) = effect.target_member_any() {
+            if *card_no != "this_member" {
                 log::debug!("[EPCWD] card_no branch: card_no={}", card_no);
                 let card_db = self.card_db();
                 let player = gs.resolve_target_player_mut(target);
@@ -3133,10 +3175,14 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        let choice_options = effect.choice_options.as_ref();
-        let choice_type = effect.choice_type.as_deref();
-        let options = effect.options.as_ref();
-        let choice_maker = effect.choice_maker.as_deref();
+        let co_binding = effect.choice_options_any();
+        let choice_options = co_binding.as_ref();
+        let ct_binding = effect.choice_type_any();
+        let choice_type = ct_binding.as_deref();
+        let opt_binding = effect.options_any();
+        let options = opt_binding.as_ref();
+        let cm_binding = effect.choice_maker_any();
+        let choice_maker = cm_binding.as_deref();
         // If a selection was already made (from a prior choice resolution),
         // execute the selected option's effect instead of creating another choice.
         if let Some(effect_options) = options {
@@ -3167,16 +3213,16 @@ impl AbilityResolver {
         // used as a condition (e.g. "if X group is present, pick any number"), not
         // as a filter on the options themselves.  Fixes Kanon pb2-001-R's followup
         // choice where group_names=["Liella!"] was lost after option selection.
-        let should_propagate_group = effect.group_names.is_some()
-            && effect.alternative_count_type.is_none()
+        let should_propagate_group = effect.group_names_any().is_some()
+            && effect.alternative_count_type_any().is_none()
             && effect.compound.alternative_condition.is_none();
         let propagated_options: Option<Vec<AbilityEffect>> = if should_propagate_group {
             options.map(|opts| {
                 opts.iter()
                     .map(|opt| {
                         let mut p = opt.clone();
-                        if p.group_names.is_none() {
-                            p.group_names = effect.group_names.clone();
+                        if p.group_names_any().is_none() {
+                            p.set_group_names(effect.group_names_any().cloned());
                         }
                         p
                     })
@@ -3217,7 +3263,7 @@ impl AbilityResolver {
             let description = effect_options
                 .iter()
                 .map(|o| {
-                    o.answers
+                    o.answers_any()
                         .as_ref()
                         .map(|a| a.join(", "))
                         .unwrap_or_else(|| o.text.clone())
@@ -3440,8 +3486,8 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         self.current_effect = Some(effect.clone());
         let options = effect
-            .choice_options
-            .clone()
+            .choice_options_any()
+            .cloned()
             .unwrap_or_else(|| vec!["自分".to_string(), "相手".to_string()]);
         self.pending_choice = Some(Choice::SelectTarget {
             target: "self_or_opponent".to_string(),
@@ -3449,7 +3495,7 @@ impl AbilityResolver {
             description_en: Some("Choose self or opponent".to_string()),
             description_ja: Some("自分または相手を選択".to_string()),
             allow_skip: false,
-            options: Some(options),
+            options: Some(options.to_vec()),
         });
         let pp = self.player_prefix(gs);
         gs.rule_log

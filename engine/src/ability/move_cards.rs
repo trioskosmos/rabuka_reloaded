@@ -42,12 +42,13 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<Option<u32>, String> {
-        let reference = match effect.cost_reference.as_deref() {
+        let ref_binding = effect.cost_reference_any();
+        let reference = match ref_binding.as_deref() {
             Some(r) => r,
-            None => return Ok(effect.cost_limit),
+            None => return Ok(effect.cost_limit_any()),
         };
 
-        let offset = effect.cost_offset.unwrap_or(0);
+        let offset = effect.cost_offset_any().unwrap_or(0);
         let moved = self.moved_cards.last().copied();
         let recently = gs
             .recently_moved_cards
@@ -109,12 +110,12 @@ impl AbilityResolver {
     ) {
         let zone_display = crate::ability::describe::zone_label(Some(zone));
         let zone_display_ja = crate::ability::describe::zone_label_ja(Some(zone));
-        let description = if effect.any_number.unwrap_or(false) {
+        let description = if effect.any_number_any().unwrap_or(false) {
             format!("Select any number of card(s) from {}", zone_display)
         } else {
             format!("Select {} card(s) from {}", count, zone_display)
         };
-        let description_ja = if effect.any_number.unwrap_or(false) {
+        let description_ja = if effect.any_number_any().unwrap_or(false) {
             format!("{}から任意枚選択", zone_display_ja)
         } else {
             format!("{}から{}枚選択", zone_display_ja, count)
@@ -123,8 +124,14 @@ impl AbilityResolver {
             Choice::select_cards(zone, count, description, can_skip)
                 .description_ja(Some(description_ja))
                 .card_type(filter.card_type.map(|s| s.to_string()))
-                .cost_limit(filter.cost_limit, effect.cost_limit_operator.clone())
-                .cost_total(filter.cost_total, effect.cost_total_operator.clone())
+                .cost_limit(
+                    filter.cost_limit,
+                    effect.cost_limit_operator_any().map(|s| s.to_string()),
+                )
+                .cost_total(
+                    filter.cost_total,
+                    effect.cost_total_operator_any().map(|s| s.to_string()),
+                )
                 .group(filter.group.map(|s| s.to_string()))
                 .characters(filter.characters.cloned())
                 .target_player_id(Some(
@@ -132,7 +139,7 @@ impl AbilityResolver {
                 ))
                 .filtered_indices(filtered_indices)
                 .destination(effect.destination.clone())
-                .discard_remaining(effect.discard_remaining)
+                .discard_remaining(effect.discard_remaining_any())
                 .build(),
         );
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
@@ -299,7 +306,7 @@ impl AbilityResolver {
             count,
             is_all,
             filter,
-            effect.self_target.unwrap_or(false),
+            effect.self_target_any().unwrap_or(false),
             behavior,
             false,
         )? {
@@ -463,14 +470,14 @@ impl AbilityResolver {
                 cost_total,
                 cost_total_operator,
             );
-            let neg = effect.negation.unwrap_or(false);
+            let neg = effect.negation_any().unwrap_or(false);
             let matching: Vec<usize> = (0..gs.revealed_cards.len())
                 .filter(|&i| {
                     let id = gs.revealed_cards[i];
                     if !filter.matches(card_db, id, false) {
                         return false;
                     }
-                    if let Some(prop) = effect.card_property.as_deref() {
+                    if let Some(prop) = effect.card_property_any().as_deref() {
                         let has_prop = match prop {
                             "has_blade_heart" => {
                                 card_db.get_card(id).is_some_and(|c| c.has_blade_heart())
@@ -689,7 +696,17 @@ impl AbilityResolver {
                         .as_ref()
                         .and_then(|e| e.conditional_choice.as_ref())
                         .is_some();
+                    let opt_paid = entry
+                        .as_ref()
+                        .and_then(|e| e.optional_cost_result)
+                        .is_some();
                     if !decided {
+                        if let Some(entry_mut) = gs.ability_queue.current_entry_mut() {
+                            entry_mut.choice_card_no =
+                                Some(crate::ability::types::ChoiceRoute::Raw(
+                                    "pay_optional_cost".to_string(),
+                                ));
+                        }
                         self.pending_choice = Some(Choice::SelectTarget {
                             target: "pay_optional_cost:skip_optional_cost".to_string(),
                             description: "Place top card of deck to waiting room?".to_string(),
@@ -789,7 +806,7 @@ impl AbilityResolver {
                         count,
                         is_all,
                         &filter,
-                        effect.self_target.unwrap_or(false),
+                        effect.self_target_any().unwrap_or(false),
                         util::InsufficientBehavior::Silent,
                         true,
                     )? {
@@ -872,7 +889,7 @@ impl AbilityResolver {
                 let can_skip = match src_zone {
                     Some(Zone::Discard) => is_max || effect.optional.unwrap_or(false),
                     Some(Zone::Hand) => {
-                        effect.optional.unwrap_or(false) || effect.any_number.unwrap_or(false)
+                        effect.optional.unwrap_or(false) || effect.any_number_any().unwrap_or(false)
                     }
                     Some(Zone::SuccessLiveZone) => effect.optional.unwrap_or(false),
                     _ => false,
@@ -883,8 +900,10 @@ impl AbilityResolver {
                     _ => false,
                 };
 
-                let has_effect_groups =
-                    effect.group_names.as_ref().map_or(false, |g| !g.is_empty());
+                let has_effect_groups = effect
+                    .group_names_any()
+                    .as_ref()
+                    .map_or(false, |g| !g.is_empty());
                 let filter_group_name = if has_effect_groups { None } else { group_name };
                 let mut filter = util::filter_from_parts_full(
                     if src_zone == Some(Zone::LiveCardZone)
@@ -907,7 +926,7 @@ impl AbilityResolver {
                         cost_limit
                     },
                     if src_zone == Some(Zone::Discard) {
-                        effect.cost_limit_operator.as_deref()
+                        effect.cost_limit_operator_any()
                     } else {
                         None
                     },
@@ -930,14 +949,17 @@ impl AbilityResolver {
                         None
                     },
                 );
-                filter.need_heart_total = effect.need_heart_total;
-                filter.need_heart_operator = effect.need_heart_operator.as_deref();
-                filter.need_heart_color = effect.need_heart_color.as_deref();
-                filter.heart_colors = &effect.heart_colors;
+                filter.need_heart_total = effect.need_heart_total_any();
+                let nho_binding = effect.need_heart_operator_any();
+                filter.need_heart_operator = nho_binding.as_deref();
+                let nhc_binding = effect.need_heart_color_any();
+                filter.need_heart_color = nhc_binding.as_deref();
+                filter.heart_colors = effect.heart_colors_any();
                 if has_effect_groups {
-                    filter.groups = effect.group_names.as_ref();
+                    filter.groups = effect.group_names_any();
                 }
-                filter.card_property = effect.card_property.as_deref();
+                let cp_binding = effect.card_property_any();
+                filter.card_property = cp_binding.as_deref();
 
                 // ── group_reference: "different_group_names" ──────────────────
                 // Q89: Multi-name cards have the group name(s) from their series.
@@ -965,7 +987,7 @@ impl AbilityResolver {
                     })
                     .unwrap_or(false);
                 if !cond_has_grp
-                    && effect.group_reference.as_deref() == Some("different_group_names")
+                    && effect.group_reference_any().as_deref() == Some("different_group_names")
                     && source_str == "discard"
                 {
                     let mut stage_groups: std::collections::BTreeSet<String> =
@@ -1041,21 +1063,33 @@ impl AbilityResolver {
                     } else {
                         format!("見たカードを最大{}枚まで控え室に置きますか？", max_take)
                     });
-                    let filter = util::CardFilter::from_effect(effect);
+                    let mut filter = util::CardFilter::from_effect(effect);
+                    // Resolve dynamic cost limit reference (e.g. "previous_moved_card" + offset)
+                    if let Ok(resolved) = self.resolve_cost_limit_reference(gs, effect) {
+                        if let Some(cost) = resolved {
+                            filter.cost_limit = Some(cost);
+                        }
+                    }
                     self.pending_choice = Some(
                         Choice::select_cards(Zone::LookedAt.to_str(), max_take, description, true)
                             .description_en(description_en)
                             .description_ja(description_ja)
                             .card_type(filter.card_type.map(|s| s.to_string()))
-                            .cost_limit(filter.cost_limit, effect.cost_limit_operator.clone())
-                            .cost_total(filter.cost_total, effect.cost_total_operator.clone())
+                            .cost_limit(
+                                filter.cost_limit,
+                                effect.cost_limit_operator_any().map(|s| s.to_string()),
+                            )
+                            .cost_total(
+                                filter.cost_total,
+                                effect.cost_total_operator_any().map(|s| s.to_string()),
+                            )
                             .group(filter.group.map(|s| s.to_string()))
                             .characters(filter.characters.cloned())
                             .target_player_id(Some(
                                 effect.target.clone().unwrap_or_else(|| "self".to_string()),
                             ))
                             .destination(effect.destination.clone())
-                            .discard_remaining(effect.discard_remaining)
+                            .discard_remaining(effect.discard_remaining_any())
                             .build(),
                     );
                     self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
@@ -1103,7 +1137,13 @@ impl AbilityResolver {
                         Ok(taken)
                     }
                     util::SelectionOutcome::Prompt => {
-                        let filter = util::CardFilter::from_effect(effect);
+                        let mut filter = util::CardFilter::from_effect(effect);
+                        // Resolve dynamic cost limit reference (e.g. "previous_moved_card" + offset)
+                        if let Ok(resolved) = self.resolve_cost_limit_reference(gs, effect) {
+                            if let Some(cost) = resolved {
+                                filter.cost_limit = Some(cost);
+                            }
+                        }
                         self.prompt_card_selection(
                             Zone::SelectedCards.to_str(),
                             count,
@@ -1198,10 +1238,10 @@ impl AbilityResolver {
                     gs,
                     count as u32,
                     effect.target_name(),
-                    effect.position.as_ref(),
+                    effect.position_any(),
                     effect.optional.unwrap_or(false),
                     Some(Zone::UnderMember.to_str()),
-                    effect.any_number.unwrap_or(false),
+                    effect.any_number_any().unwrap_or(false),
                 );
                 Ok(vec![])
             }
@@ -1217,20 +1257,21 @@ impl AbilityResolver {
         // Resolve dynamic_count if count is not explicitly set
         let count = if effect.count.is_some() {
             effect.count.unwrap() as usize
-        } else if let Some(ref dc) = effect.dynamic_count {
+        } else if let Some(ref dc) = effect.dynamic_count_any() {
             self.resolve_dynamic_count(gs, dc) as usize
         } else {
             0
         };
         let cost_limit = self.resolve_cost_limit_reference(gs, effect)?;
-        let cost_total = effect.cost_total;
-        let cost_total_operator = effect.cost_total_operator.as_deref();
+        let cost_total = effect.cost_total_any();
+        let cto_binding = effect.cost_total_operator_any();
+        let cost_total_operator = cto_binding.as_deref();
         let group_name = effect.group_name();
 
         // Handle or_card_types: let the player pick which type to search for
-        let card_type_owned: Option<String> = if let Some(or_types) = &effect.or_card_types {
+        let card_type_owned: Option<String> = if let Some(or_types) = &effect.or_card_types_any() {
             if or_types.is_empty() {
-                effect.card_type.clone()
+                effect.card_type_any().map(|s| s.to_string())
             } else {
                 let chosen = gs
                     .ability_queue
@@ -1266,26 +1307,26 @@ impl AbilityResolver {
                 }
             }
         } else {
-            effect.card_type.clone()
+            effect.card_type_any().map(|s| s.to_string())
         };
         let card_type_filter: Option<&str> = card_type_owned.as_deref();
         let tgt = effect.target.clone();
-        let is_self_cost = effect.self_cost.unwrap_or(false);
-        let exclude_self = effect.exclude_self.unwrap_or(false);
+        let is_self_cost = effect.self_cost_any().unwrap_or(false);
+        let exclude_self = effect.exclude_self_any().unwrap_or(false);
         let is_max = effect.max.unwrap_or(false);
-        let is_all = effect.all.unwrap_or(false);
+        let is_all = effect.all_any().unwrap_or(false);
         let card_db = gs.card_database.clone();
         let activating_card_id = gs.activating_card;
         let vacated_stage_area = gs.last_vacated_stage_area;
         gs.last_vacated_stage_area = None;
 
         // Character name filter from the effect
-        let character_filter: Option<Vec<String>> = effect.characters.clone();
+        let character_filter: Option<Vec<String>> = effect.characters_any().cloned();
 
         // Resolve name_constraint (e.g. "contains_all" from a revealed card)
-        let name_fragments: Option<Vec<String>> = if effect.name_constraint.as_deref()
+        let name_fragments: Option<Vec<String>> = if effect.name_constraint_any().as_deref()
             == Some("contains_all")
-            && effect.name_constraint_source.as_deref() == Some("revealed_card")
+            && effect.name_constraint_source_any().as_deref() == Some("revealed_card")
         {
             let fragments: Vec<String> = gs
                 .revealed_cost_cards
@@ -1335,7 +1376,7 @@ impl AbilityResolver {
         // is not accessible via entry_destination, e.g. for sequential sub-actions).
         self.spawn_context.destination = effect.destination.clone();
         self.spawn_context.source = effect.source.clone();
-        self.spawn_context.position = effect.position.as_ref().and_then(|p| match p {
+        self.spawn_context.position = effect.position_any().and_then(|p| match p {
             crate::card::PositionInfo::String(s) => s.parse::<usize>().ok(),
             crate::card::PositionInfo::Struct { position, .. } => {
                 position.as_ref().and_then(|s| s.parse::<usize>().ok())
@@ -1373,7 +1414,6 @@ impl AbilityResolver {
             &destination,
             &card_db,
         )?;
-
         // --- STEP 2: Any-order deck placement (before consuming taken) ---
         let is_deck_dest = Zone::from_str(&destination) == Some(Zone::Deck)
             || Zone::from_str(&destination) == Some(Zone::DeckTop);
@@ -1381,7 +1421,7 @@ impl AbilityResolver {
             || Zone::from_str(&source) == Some(Zone::SelectedCards);
         if is_eligible_source
             && is_deck_dest
-            && effect.placement_order.as_deref() == Some("any_order")
+            && effect.placement_order_any().as_deref() == Some("any_order")
             && taken.len() > 1
         {
             let taken_count = taken.len();
@@ -1408,7 +1448,8 @@ impl AbilityResolver {
         }
 
         // Apply distinct card name filter if specified
-        let distinct = effect.distinct.as_deref();
+        let distinct_binding = effect.distinct_any();
+        let distinct = distinct_binding.as_deref();
         if distinct == Some("card_name") || distinct == Some("true") || distinct == Some("distinct")
         {
             let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -1425,7 +1466,7 @@ impl AbilityResolver {
 
         // --- STEP 3: Place cards in destination ---
         let deck_pos = effect
-            .position
+            .position_any()
             .as_ref()
             .and_then(|p| match p {
                 crate::card::PositionInfo::String(s) => s.parse::<usize>().ok(),
@@ -1438,7 +1479,7 @@ impl AbilityResolver {
         let stage_full = {
             let player = if use_p2 { &gs.player2 } else { &gs.player1 };
             Zone::from_str(&destination) == Some(Zone::Stage)
-                && !effect.allow_occupied_stage.unwrap_or(false)
+                && !effect.allow_occupied_stage_any().unwrap_or(false)
                 && player.stage.stage.iter().all(|&id| id != -1)
         };
 
@@ -1528,7 +1569,7 @@ impl AbilityResolver {
                     });
                     self.execution_context = ExecutionContext::MoveCardsPosition {
                         card_id,
-                        state_change: effect.state_change.clone(),
+                        state_change: effect.state_change_any().map(|s| s.to_string()),
                         target: tgt.clone().unwrap_or_else(|| "self".to_string()),
                         source_zone: source.clone(),
                     };
@@ -1542,10 +1583,10 @@ impl AbilityResolver {
                         vacated_stage_area,
                         is_max,
                         count,
-                        effect.state_change.clone(),
+                        effect.state_change_any().map(|s| s.to_string()),
                         deck_pos,
                         &source,
-                        effect.allow_occupied_stage.unwrap_or(false),
+                        effect.allow_occupied_stage_any().unwrap_or(false),
                     ) {
                         Ok(true) => {
                             return Ok(());
@@ -1571,12 +1612,13 @@ impl AbilityResolver {
             }
         }
 
+        let state_change = effect.state_change_any().map(|s| s.to_string());
         self.finalize_card_movement(
             gs,
             &moved_cards,
             &destination,
             &source,
-            &effect.state_change,
+            &state_change,
             tgt.as_deref(),
         );
         Ok(())
@@ -1993,10 +2035,12 @@ impl AbilityResolver {
                 .ability_queue
                 .current_entry()
                 .and_then(|e| e.ability.effect.clone());
-            let state_change = entry_effect.as_ref().and_then(|ef| ef.state_change.clone());
+            let state_change = entry_effect
+                .as_ref()
+                .and_then(|ef| ef.state_change_any().map(|s| s.to_string()));
             let allow_occupied = entry_effect
                 .as_ref()
-                .and_then(|ef| ef.allow_occupied_stage)
+                .and_then(|ef| ef.allow_occupied_stage_any())
                 .unwrap_or(false);
             match self.place_card_with_stage_choice(
                 gs,
@@ -2189,7 +2233,7 @@ impl AbilityResolver {
                         let deck_pos = gs
                             .entry_effect()
                             .and_then(|ef| {
-                                ef.position.as_ref().and_then(|p| match p {
+                                ef.position_any().as_ref().and_then(|p| match p {
                                     crate::card::PositionInfo::String(s) => s.parse::<usize>().ok(),
                                     crate::card::PositionInfo::Struct { position, .. } => {
                                         position.as_ref().and_then(|s| s.parse::<usize>().ok())
@@ -2336,7 +2380,7 @@ impl AbilityResolver {
             .ability_queue
             .current_entry()
             .and_then(|e| e.ability.effect.as_ref())
-            .and_then(|ef| ef.state_change.clone());
+            .and_then(|ef| ef.state_change_any().map(|s| s.to_string()));
         if let Some(sc) = state_change {
             if sc == "wait" {
                 for &cid in &moved {
@@ -2423,14 +2467,14 @@ impl AbilityResolver {
                 .unwrap_or_else(|| Zone::Hand.to_str().to_string()),
             select_action
                 .as_ref()
-                .and_then(|sa| sa.discard_remaining)
-                .or_else(|| current.and_then(|c| c.discard_remaining))
+                .and_then(|sa| sa.discard_remaining_any())
+                .or_else(|| current.and_then(|c| c.discard_remaining_any()))
                 .or_else(|| ctx_discard_remaining)
                 .unwrap_or(true),
             select_action
                 .as_ref()
-                .and_then(|sa| sa.placement_order.clone())
-                .or_else(|| current.and_then(|c| c.placement_order.clone())),
+                .and_then(|sa| sa.placement_order_any().clone())
+                .or_else(|| current.and_then(|c| c.placement_order_any().clone())),
         );
 
         if gs.looked_at_cards.is_empty() && !self.selected_cards.is_empty() {
@@ -2490,10 +2534,10 @@ impl AbilityResolver {
 
         {
             let card_db = &gs.card_database;
-            let cost_limit = select_action.as_ref().and_then(|sa| sa.cost_limit);
+            let cost_limit = select_action.as_ref().and_then(|sa| sa.cost_limit_any());
             let cost_limit_operator = select_action
                 .as_ref()
-                .and_then(|sa| sa.cost_limit_operator.as_deref());
+                .and_then(|sa| sa.cost_limit_operator_any());
             selected_cards.retain(|&cid| {
                 util::card_matches_cost_limit_op(card_db, cid, cost_limit, cost_limit_operator)
             });
@@ -2547,7 +2591,7 @@ impl AbilityResolver {
 
         let any_number = select_action
             .as_ref()
-            .and_then(|sa| sa.any_number)
+            .and_then(|sa| sa.any_number_any())
             .unwrap_or(false);
         let json_count = select_action.as_ref().and_then(|sa| sa.count).unwrap_or(1) as usize;
         let total_available = selected_count + remaining_cards.len();
@@ -2602,20 +2646,28 @@ impl AbilityResolver {
                     description,
                     true,
                 )
-                .card_type(select_action.as_ref().and_then(|sa| sa.card_type.clone()))
-                .cost_limit(
-                    select_action.as_ref().and_then(|sa| sa.cost_limit),
+                .card_type(
                     select_action
                         .as_ref()
-                        .and_then(|sa| sa.cost_limit_operator.clone()),
+                        .and_then(|sa| sa.card_type_any().map(|s| s.to_string())),
+                )
+                .cost_limit(
+                    select_action.as_ref().and_then(|sa| sa.cost_limit_any()),
+                    select_action
+                        .as_ref()
+                        .and_then(|sa| sa.cost_limit_operator_any().map(|s| s.to_string())),
                 )
                 .group(
                     select_action
                         .as_ref()
-                        .and_then(|sa| sa.group_names.as_ref())
+                        .and_then(|sa| sa.group_names_any())
                         .and_then(|v| v.first().cloned()),
                 )
-                .characters(select_action.as_ref().and_then(|sa| sa.characters.clone()))
+                .characters(
+                    select_action
+                        .as_ref()
+                        .and_then(|sa| sa.characters_any().cloned()),
+                )
                 .filtered_indices(Some(remaining_indices))
                 .build(),
             );

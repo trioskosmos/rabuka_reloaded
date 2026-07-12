@@ -92,7 +92,11 @@ impl AbilityResolver {
             let repeat_max = if has_repeat {
                 // repeat_limit = max additional iterations (e.g. 4 = 4 more times)
                 // Total iterations = initial + max_repeats
-                actions.last().and_then(|a| a.repeat_limit).unwrap_or(1) + 1
+                actions
+                    .last()
+                    .and_then(|a| a.repeat_limit_any())
+                    .unwrap_or(1)
+                    + 1
             } else {
                 1
             };
@@ -102,6 +106,9 @@ impl AbilityResolver {
                 actions.as_slice()
             };
 
+            if has_repeat {
+                self.pending_repeat_actions.clear();
+            }
             log::debug!(
                 "[ABILITY] sequential: {} actions, repeat_max={} card_id={:?}",
                 repeat_actions.len(),
@@ -233,18 +240,22 @@ impl AbilityResolver {
                             | Some(crate::ability::enums::ActionType::LookAt)
                     );
                     if supports_per_unit {
-                        if action_to_execute.per_unit.is_none() && effect.per_unit.is_some() {
-                            action_to_execute.per_unit = effect.per_unit;
-                        }
-                        if action_to_execute.per_unit_count.is_none()
-                            && effect.per_unit_count.is_some()
+                        if action_to_execute.per_unit_any().is_none()
+                            && effect.per_unit_any().is_some()
                         {
-                            action_to_execute.per_unit_count = effect.per_unit_count;
+                            action_to_execute.set_per_unit(effect.per_unit_any());
                         }
-                        if action_to_execute.per_unit_type.is_none()
-                            && effect.per_unit_type.is_some()
+                        if action_to_execute.per_unit_count_any().is_none()
+                            && effect.per_unit_count_any().is_some()
                         {
-                            action_to_execute.per_unit_type = effect.per_unit_type.clone();
+                            action_to_execute.set_per_unit_count(effect.per_unit_count_any());
+                        }
+                        if action_to_execute.per_unit_type_any().is_none()
+                            && effect.per_unit_type_any().is_some()
+                        {
+                            action_to_execute.set_per_unit_type(
+                                effect.per_unit_type_any().map(|s| s.to_string()),
+                            );
                         }
                     }
                     // Inherit self_target from the parent effect or the first
@@ -257,10 +268,12 @@ impl AbilityResolver {
                     // explicit card_type that differs from the inherited target
                     // (e.g. modify_score self_target bleeds into gain_resource
                     // member_card — the live card is not a member on stage).
-                    if action_to_execute.self_target.is_none() {
+                    if action_to_execute.self_target_any().is_none() {
                         let inheritable = if i > 0 {
-                            let first_ct = repeat_actions[0].card_type.as_deref();
-                            let cur_ct = action.card_type.as_deref();
+                            let first_ct_binding = repeat_actions[0].card_type_any();
+                            let first_ct = first_ct_binding.as_deref();
+                            let cur_ct_binding = action.card_type_any();
+                            let cur_ct = cur_ct_binding.as_deref();
                             // If the first action targets a live card (no card_type
                             // or live_card) and the current targets a member, don't
                             // inherit — they're different cards entirely.
@@ -282,18 +295,25 @@ impl AbilityResolver {
                                     | Some(crate::ability::enums::ActionType::GainResource)
                                     | Some(crate::ability::enums::ActionType::ChangeState)
                             );
-                            if effect.self_target.is_some() && supports_self {
-                                action_to_execute.self_target = effect.self_target;
+                            if effect.self_target_any().is_some() && supports_self {
+                                action_to_execute.set_self_target(effect.self_target_any());
                             } else if i > 0 && supports_self {
-                                action_to_execute.self_target = repeat_actions[0].self_target;
+                                action_to_execute
+                                    .set_self_target(repeat_actions[0].self_target_any());
                             }
                         }
                     }
                     // Inherit card_names from the parent (set at the sequential
                     // level, e.g. EMOTION's "card_names": ["EMOTION"]) so that
                     // per-unit counting in sub-actions only counts matching cards.
-                    if action_to_execute.card_names.is_empty() && !effect.card_names.is_empty() {
-                        action_to_execute.card_names.clone_from(&effect.card_names);
+                    if action_to_execute
+                        .card_names_any()
+                        .map_or(true, |v| v.is_empty())
+                        && !effect.card_names_any().map_or(true, |v| v.is_empty())
+                    {
+                        if let Some(names) = effect.card_names_any() {
+                            action_to_execute.set_card_names(names.clone());
+                        }
                     }
 
                     log::debug!(
@@ -316,7 +336,7 @@ impl AbilityResolver {
                     // G3: before executing an opponent-action sub-action, tag the spawn
                     // context so that any choice created inside is routed to the opponent.
                     if action.action == "opponent_action"
-                        || action.action_by.as_deref() == Some("opponent")
+                        || action.action_by().as_deref() == Some("opponent")
                     {
                         self.spawn_context.target = Some("opponent".to_string());
                     }
@@ -338,7 +358,7 @@ impl AbilityResolver {
                             // Record this step's output under its id (if any)
                             // so downstream steps in the same sequential can
                             // reference it via `ref: "<id>"`.
-                            if let Some(ref step_id) = action.id {
+                            if let Some(ref step_id) = action.id_any() {
                                 let mut out = StepOutput::default();
                                 // Capture cards the step "produced": selected
                                 // cards, moved cards, or looked-at cards.
@@ -360,7 +380,7 @@ impl AbilityResolver {
                                 }
                                 self.step_state
                                     .step_results
-                                    .entry(step_id.clone())
+                                    .entry(step_id.to_string())
                                     .or_insert_with(StepOutput::default)
                                     .merge(&out);
                                 log::debug!(
@@ -373,7 +393,7 @@ impl AbilityResolver {
                             if self.pending_choice.is_some() {
                                 let current_was_optional = action.optional.unwrap_or(false);
                                 let is_opponent_action = action.action == "opponent_action"
-                                    || action.action_by.as_deref() == Some("opponent");
+                                    || action.action_by().as_deref() == Some("opponent");
                                 // When an optional action creates a SelectCard choice (card
                                 // selection from a zone), the effect was already fully
                                 // completed by the choice resolution — the card(s) were
@@ -516,6 +536,12 @@ impl AbilityResolver {
                                 allow_skip: true,
                                 options: Some(vec!["Stop".to_string(), "Continue".to_string()]),
                             });
+                            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                                entry.choice_card_no =
+                                    Some(crate::ability::types::ChoiceRoute::Raw(
+                                        "pay_optional_cost".to_string(),
+                                    ));
+                            }
                             return Ok(());
                         }
                     }
@@ -567,7 +593,7 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         let has_primary = effect.compound.primary_effect.is_some();
-        let has_alternative = effect.alternative_effect.is_some();
+        let has_alternative = effect.alternative_effect_any().is_some();
 
         if has_primary && has_alternative {
             let ctx = super::condition::ConditionContext::with_moved_cards(gs, &self.moved_cards);
@@ -579,7 +605,7 @@ impl AbilityResolver {
             if effect.compound.alternative_condition.is_some() && effect.condition.is_some() {
                 if let Some(ref alt_cond) = effect.compound.alternative_condition {
                     if ctx.evaluate_condition(alt_cond) {
-                        if let Some(ref alt_effect) = effect.alternative_effect {
+                        if let Some(ref alt_effect) = effect.alternative_effect_any() {
                             return self.execute_effect(gs, alt_effect);
                         }
                     }
@@ -601,10 +627,10 @@ impl AbilityResolver {
                 .compound
                 .alternative_condition
                 .as_ref()
-                .or(effect.condition.as_ref());
+                .or(effect.condition.as_deref());
             if let Some(cond) = single_cond {
                 if ctx.evaluate_condition(cond) {
-                    if let Some(ref alt_effect) = effect.alternative_effect {
+                    if let Some(ref alt_effect) = effect.alternative_effect_any() {
                         return self.execute_effect(gs, alt_effect);
                     }
                 } else if let Some(ref primary_effect) = effect.compound.primary_effect {
@@ -621,7 +647,7 @@ impl AbilityResolver {
                 .map(|e| e.text.as_str())
                 .unwrap_or("Primary effect");
             let alternative_text = effect
-                .alternative_effect
+                .alternative_effect_any()
                 .as_ref()
                 .map(|e| e.text.as_str())
                 .unwrap_or("Alternative effect");
@@ -650,7 +676,7 @@ impl AbilityResolver {
         if let Some(ref alt_condition) = effect.compound.alternative_condition {
             let ctx = super::condition::ConditionContext::with_moved_cards(gs, &self.moved_cards);
             if ctx.evaluate_condition(alt_condition) {
-                if let Some(ref alt_effect) = effect.alternative_effect {
+                if let Some(ref alt_effect) = effect.alternative_effect_any() {
                     return self.execute_effect(gs, alt_effect);
                 }
             }
@@ -659,7 +685,7 @@ impl AbilityResolver {
         // Handle the case where we have alternative_effect + top-level condition
         // but no primary_effect and no alternative_condition (e.g. replacement effects
         // like 錯覚CROSSROADS: "when this card would be placed in success zone, instead...")
-        if effect.alternative_effect.is_some()
+        if effect.alternative_effect_any().is_some()
             && effect.compound.primary_effect.is_none()
             && effect.compound.alternative_condition.is_none()
         {
@@ -667,7 +693,7 @@ impl AbilityResolver {
                 let ctx =
                     super::condition::ConditionContext::with_moved_cards(gs, &self.moved_cards);
                 if ctx.evaluate_condition(cond) {
-                    if let Some(ref alt_effect) = effect.alternative_effect {
+                    if let Some(ref alt_effect) = effect.alternative_effect_any() {
                         return self.execute_effect(gs, alt_effect);
                     }
                 }
@@ -785,7 +811,7 @@ impl AbilityResolver {
         // skip the choice and execute the conditional action directly
         if let (Some(opt), Some(cond)) = (optional_action, conditional_action) {
             if opt.action == "pay_energy" {
-                let need = opt.energy_count.unwrap_or(0) as usize;
+                let need = opt.energy_count_any().unwrap_or(0) as usize;
                 if need > 0 {
                     let pp = gs.player_prefix();
                     let active = gs

@@ -88,12 +88,13 @@ fn group_label(gn: Option<&Vec<String>>) -> String {
 
 pub fn describe_effect_en(effect: &AbilityEffect) -> String {
     let action = effect.action.as_str();
-    let ct = card_type_label(effect.card_type.as_deref());
+    let ct_binding = effect.card_type_any();
+    let ct = card_type_label(ct_binding.as_deref());
     let c = effect.count;
     let t = effect.target.as_deref();
     let s = effect.source.as_deref();
     let d = effect.destination.as_deref();
-    let gn = group_label(effect.group_names.as_ref());
+    let gn = group_label(effect.group_names_any());
 
     match action {
         "move_cards" => {
@@ -106,7 +107,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
                     let src = zone_label(s);
                     let mut result =
                         format!("Place {} from {} to {}", maybe_plural(c, ct), src, dest);
-                    if let Some("wait") = effect.state_change.as_deref() {
+                    if let Some("wait") = effect.state_change_any().as_deref() {
                         result += " (rest)";
                     }
                     result
@@ -126,8 +127,10 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         }
 
         "gain_resource" => {
-            let r = resource_label(effect.resource.as_deref());
-            let dur = effect.duration.as_deref().and_then(|d| {
+            let r_binding = effect.resource_any();
+            let r = resource_label(r_binding.as_deref());
+            let dur_binding = effect.duration_any();
+            let dur = dur_binding.as_deref().and_then(|d| {
                 let lbl = duration_label(Some(d));
                 if lbl.is_empty() {
                     None
@@ -144,7 +147,8 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         }
 
         "change_state" => {
-            let verb = state_verb(effect.state_change.as_deref());
+            let verb_binding = effect.state_change_any();
+            let verb = state_verb(verb_binding.as_deref());
             let cnt = c.unwrap_or(1);
             let who = match t {
                 Some("opponent") => "opponent ",
@@ -154,7 +158,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
                 .map(|src| format!(" on {}", zone_label(Some(src))))
                 .unwrap_or_default();
             let lim = effect
-                .cost_limit
+                .cost_limit_any()
                 .map(|cl| format!(" (cost ≤ {})", cl))
                 .unwrap_or_default();
             format!("{} {}{}{} {}{}", verb, cnt, gn, loc, who, lim)
@@ -163,8 +167,9 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         }
 
         "modify_score" => {
-            let val = effect.value.unwrap_or(1);
-            let op = effect.operation.as_deref().unwrap_or("add");
+            let val = effect.value_any().unwrap_or(1);
+            let op_binding = effect.operation_any();
+            let op = op_binding.unwrap_or("add");
             if op == "subtract" {
                 format!("Subtract {} from score", val)
             } else {
@@ -173,7 +178,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         }
 
         "position_change" => {
-            if let Some(ep) = effect.exclude_position.as_deref() {
+            if let Some(ep) = effect.exclude_position_any().as_deref() {
                 format!("Move a{} member away from {}", gn, ep)
             } else if c == Some(1) || c.is_none() {
                 format!("Change position of a{} member", gn)
@@ -235,12 +240,13 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         }
 
         "restriction" => {
-            let rt = effect.restriction_type.as_deref().unwrap_or("restriction");
+            let rt_binding = effect.restriction_type_any();
+            let rt = rt_binding.unwrap_or("restriction");
             format!("Apply {} restriction", rt)
         }
 
         "gain_ability" => {
-            if let Some(ref ga) = effect.ability_gain {
+            if let Some(ref ga) = effect.ability_gain_any() {
                 format!("Gain ability: {}", ga)
             } else {
                 "Gain ability".to_string()
@@ -275,7 +281,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         ),
 
         "modify_required_hearts" | "modify_required_hearts_global" => {
-            let val = effect.value.unwrap_or(1);
+            let val = effect.value_any().unwrap_or(1);
             if val == 0 {
                 "Clear required hearts".to_string()
             } else if val > 0 {
@@ -289,7 +295,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         }
 
         "activate_ability" => {
-            if let Some(ref at) = effect.target_trigger {
+            if let Some(ref at) = effect.target_trigger_any() {
                 format!("Activate {} ability", at)
             } else {
                 "Activate ability".to_string()
@@ -297,7 +303,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         }
 
         "set_card_identity" => {
-            if let Some(ref ids) = effect.identities {
+            if let Some(ref ids) = effect.identities_any() {
                 format!("Treat as: {}", ids.join(", "))
             } else {
                 "Set card identity".to_string()
@@ -307,7 +313,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         "set_blade_count" => format!("Set blade to {}", c.unwrap_or(0)),
 
         "set_heart_type" => {
-            if let Some(ref ht) = effect.heart_type {
+            if let Some(ref ht) = effect.heart_type_any() {
                 format!("Set heart type to {}", ht)
             } else {
                 "Set heart type".to_string()
@@ -315,7 +321,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         }
 
         "set_blade_type" => {
-            if let Some(ref bt) = effect.blade_type {
+            if let Some(ref bt) = effect.blade_type_any() {
                 format!("Set blade type to {}", bt)
             } else {
                 "Set blade type".to_string()
@@ -325,8 +331,8 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         "discard_until_count" => {
             format!(
                 "Discard down to {} card{} in hand",
-                effect.target_count.unwrap_or(1),
-                if effect.target_count == Some(1) {
+                effect.target_count_any().unwrap_or(1),
+                if effect.target_count_any() == Some(1) {
                     ""
                 } else {
                     "s"
@@ -340,8 +346,8 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
                 .unwrap_or_default();
             format!(
                 "Draw until {} card{} in hand{}",
-                effect.target_count.unwrap_or(1),
-                if effect.target_count == Some(1) {
+                effect.target_count_any().unwrap_or(1),
+                if effect.target_count_any() == Some(1) {
                     ""
                 } else {
                     "s"
@@ -351,7 +357,8 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         }
 
         "modify_cost" => {
-            let op = effect.operation.as_deref().unwrap_or("subtract");
+            let op_binding = effect.operation_any();
+            let op = op_binding.unwrap_or("subtract");
             let amt = c.unwrap_or(1);
             if op == "subtract" {
                 format!("Reduce cost by {}", amt)
@@ -361,7 +368,8 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         }
 
         "modify_yell_count" => {
-            let op = effect.operation.as_deref().unwrap_or("add");
+            let op_binding = effect.operation_any();
+            let op = op_binding.unwrap_or("add");
             let amt = c.unwrap_or(1);
             if op == "subtract" {
                 format!("Reduce yell count by {}", amt)
@@ -372,7 +380,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
 
         "perform_yell" => {
             let amt = c.unwrap_or(1);
-            let max = effect.repeat_limit.unwrap_or(amt);
+            let max = effect.repeat_limit_any().unwrap_or(amt);
             if amt == max {
                 format!("Perform {} yell{}", amt, if amt == 1 { "" } else { "s" })
             } else {
@@ -387,7 +395,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         "re_yell" => {
             format!(
                 "Re-yell{}",
-                if effect.lose_blade_hearts.unwrap_or(false) {
+                if effect.lose_blade_hearts_any().unwrap_or(false) {
                     " (lose blade/hearts)"
                 } else {
                     ""
@@ -398,7 +406,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         "specify_heart_color" => "Choose a heart color".to_string(),
 
         "place_energy_under_member" => {
-            let e = effect.energy_count.or(c).unwrap_or(1);
+            let e = effect.energy_count_any().or(c).unwrap_or(1);
             format!("Place {} energy under this member", e)
         }
 
@@ -407,7 +415,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
         "choose_target_player" => "Choose self or opponent".to_string(),
 
         "repeat_procedure" => {
-            let max = effect.repeat_limit.unwrap_or(c.unwrap_or(1));
+            let max = effect.repeat_limit_any().unwrap_or(c.unwrap_or(1));
             format!("Repeat up to {} times", max)
         }
 
@@ -475,7 +483,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
                 .as_ref()
                 .map(|a| describe_effect_en(a));
             let alt = effect
-                .alternative_effect
+                .alternative_effect_any()
                 .as_ref()
                 .map(|a| describe_effect_en(a));
             match (primary, alt) {
@@ -494,12 +502,13 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
 pub fn describe_cost_en(cost: &AbilityEffect) -> String {
     match cost.action.as_str() {
         "pay_energy" => {
-            let count = cost.energy_count.unwrap_or(1);
+            let count = cost.energy_count_any().unwrap_or(1);
             format!("Pay {} energy", count)
         }
         "change_state" => {
-            if cost.self_cost == Some(true) {
-                let state = cost.state_change.as_deref().unwrap_or("wait");
+            if cost.self_cost_any() == Some(true) {
+                let state_binding = cost.state_change_any();
+                let state = state_binding.unwrap_or("wait");
                 match state {
                     "wait" => "Rest this member".to_string(),
                     s => format!("Change this member to {}", s),
@@ -511,9 +520,10 @@ pub fn describe_cost_en(cost: &AbilityEffect) -> String {
         "move_cards" => {
             let src = zone_label(cost.source.as_deref());
             let dest = zone_label(cost.destination.as_deref());
-            let card_type = card_type_label(cost.card_type.as_deref());
+            let card_type_binding = cost.card_type_any();
+            let card_type = card_type_label(card_type_binding.as_deref());
             let count = cost.count.unwrap_or(1);
-            if cost.self_cost == Some(true) && cost.source.as_deref() == Some("those_cards") {
+            if cost.self_cost_any() == Some(true) && cost.source.as_deref() == Some("those_cards") {
                 format!("Move that card to {}", dest)
             } else {
                 format!("Place {} {} from {} to {}", count, card_type, src, dest)
@@ -532,12 +542,13 @@ pub fn describe_cost_en(cost: &AbilityEffect) -> String {
 pub fn describe_cost_ja(cost: &AbilityEffect) -> String {
     match cost.action.as_str() {
         "pay_energy" => {
-            let count = cost.energy_count.unwrap_or(1);
+            let count = cost.energy_count_any().unwrap_or(1);
             format!("{{{{icon_energy.png|E}}}}を{}払う", count)
         }
         "change_state" => {
-            if cost.self_cost == Some(true) {
-                let state = cost.state_change.as_deref().unwrap_or("wait");
+            if cost.self_cost_any() == Some(true) {
+                let state_binding = cost.state_change_any();
+                let state = state_binding.unwrap_or("wait");
                 match state {
                     "wait" => "このメンバーをウェイト".to_string(),
                     s => format!("このメンバーを{}にする", s),
@@ -549,9 +560,10 @@ pub fn describe_cost_ja(cost: &AbilityEffect) -> String {
         "move_cards" => {
             let src = zone_label_ja(cost.source.as_deref());
             let dest = zone_label_ja(cost.destination.as_deref());
-            let ct = card_type_label_ja(cost.card_type.as_deref());
+            let ct_binding = cost.card_type_any();
+            let ct = card_type_label_ja(ct_binding.as_deref());
             let count = cost.count.unwrap_or(1);
-            if cost.self_cost == Some(true) && cost.source.as_deref() == Some("those_cards") {
+            if cost.self_cost_any() == Some(true) && cost.source.as_deref() == Some("those_cards") {
                 format!("そのカードを{}に置く", dest)
             } else {
                 let count_str = if count == 1 {
@@ -670,12 +682,13 @@ fn duration_label_ja(d: Option<&str>) -> &str {
 
 pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
     let action = effect.action.as_str();
-    let ct = card_type_label_ja(effect.card_type.as_deref());
+    let ct_binding = effect.card_type_any();
+    let ct = card_type_label_ja(ct_binding.as_deref());
     let c = effect.count;
     let t = effect.target.as_deref();
     let s = effect.source.as_deref();
     let d = effect.destination.as_deref();
-    let gn = group_label(effect.group_names.as_ref());
+    let gn = group_label(effect.group_names_any());
 
     match action {
         "move_cards" => {
@@ -696,7 +709,7 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
                         src,
                         dest
                     );
-                    if let Some("wait") = effect.state_change.as_deref() {
+                    if let Some("wait") = effect.state_change_any().as_deref() {
                         result += "（レスト）";
                     }
                     result
@@ -716,8 +729,10 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
             }
         }
         "gain_resource" => {
-            let r = resource_label_ja(effect.resource.as_deref());
-            let dur = effect.duration.as_deref().and_then(|d| {
+            let r_binding = effect.resource_any();
+            let r = resource_label_ja(r_binding.as_deref());
+            let dur_binding = effect.duration_any();
+            let dur = dur_binding.as_deref().and_then(|d| {
                 let lbl = duration_label_ja(Some(d));
                 if lbl.is_empty() {
                     None
@@ -737,7 +752,8 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
             }
         }
         "change_state" => {
-            let verb = state_verb_ja(effect.state_change.as_deref());
+            let verb_binding = effect.state_change_any();
+            let verb = state_verb_ja(verb_binding.as_deref());
             let cnt = c.unwrap_or(1);
             let who = match t {
                 Some("opponent") => "相手の",
@@ -745,7 +761,7 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
             };
             let loc = s.map(|src| zone_label_ja(Some(src))).unwrap_or("");
             let lim = effect
-                .cost_limit
+                .cost_limit_any()
                 .map(|cl| format!("（コスト{}以下）", cl))
                 .unwrap_or_default();
             if loc.is_empty() {
@@ -755,8 +771,9 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
             }
         }
         "modify_score" => {
-            let val = effect.value.unwrap_or(1);
-            let op = effect.operation.as_deref().unwrap_or("add");
+            let val = effect.value_any().unwrap_or(1);
+            let op_binding = effect.operation_any();
+            let op = op_binding.unwrap_or("add");
             if op == "subtract" {
                 format!("スコアを{}減らす", val)
             } else {
@@ -764,7 +781,7 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
             }
         }
         "position_change" => {
-            if let Some(ep) = effect.exclude_position.as_deref() {
+            if let Some(ep) = effect.exclude_position_any().as_deref() {
                 format!("{}を避けてポジションチェンジ", ep)
             } else if c == Some(1) || c.is_none() {
                 format!("ポジションチェンジ{}", gn)
@@ -839,11 +856,12 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
             }
         }
         "restriction" => {
-            let rt = effect.restriction_type.as_deref().unwrap_or("制限");
+            let rt_binding = effect.restriction_type_any();
+            let rt = rt_binding.unwrap_or("制限");
             format!("{}制限を適用", rt)
         }
         "gain_ability" => {
-            if let Some(ref ga) = effect.ability_gain {
+            if let Some(ref ga) = effect.ability_gain_any() {
                 format!("アビリティを得る：{}", ga)
             } else {
                 "アビリティを得る".to_string()
@@ -876,7 +894,7 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
             format!("バトンタッチ{}", suffix)
         }
         "modify_required_hearts" | "modify_required_hearts_global" => {
-            let val = effect.value.unwrap_or(1);
+            let val = effect.value_any().unwrap_or(1);
             if val == 0 {
                 "必要ハートをクリア".to_string()
             } else if val > 0 {
@@ -886,14 +904,14 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
             }
         }
         "activate_ability" => {
-            if let Some(ref at) = effect.target_trigger {
+            if let Some(ref at) = effect.target_trigger_any() {
                 format!("{}アビリティを発動", at)
             } else {
                 "アビリティを発動".to_string()
             }
         }
         "set_card_identity" => {
-            if let Some(ref ids) = effect.identities {
+            if let Some(ref ids) = effect.identities_any() {
                 format!("扱い：{}", ids.join(", "))
             } else {
                 "カードの扱いを設定".to_string()
@@ -907,14 +925,14 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
         }
         "set_blade_count" => format!("ブレードを{}に設定", c.unwrap_or(0)),
         "set_heart_type" => {
-            if let Some(ref ht) = effect.heart_type {
+            if let Some(ref ht) = effect.heart_type_any() {
                 format!("ハートタイプを{}に設定", ht)
             } else {
                 "ハートタイプを設定".to_string()
             }
         }
         "set_blade_type" => {
-            if let Some(ref bt) = effect.blade_type {
+            if let Some(ref bt) = effect.blade_type_any() {
                 format!("ブレードタイプを{}に設定", bt)
             } else {
                 "ブレードタイプを設定".to_string()
@@ -923,7 +941,7 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
         "discard_until_count" => {
             format!(
                 "手札が{}枚になるまで捨てる",
-                effect.target_count.unwrap_or(1)
+                effect.target_count_any().unwrap_or(1)
             )
         }
         "draw_until_count" => {
@@ -932,12 +950,13 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
                 .unwrap_or_default();
             format!(
                 "手札が{}枚になるまで{}引く",
-                effect.target_count.unwrap_or(1),
+                effect.target_count_any().unwrap_or(1),
                 from
             )
         }
         "modify_cost" => {
-            let op = effect.operation.as_deref().unwrap_or("subtract");
+            let op_binding = effect.operation_any();
+            let op = op_binding.unwrap_or("subtract");
             let amt = c.unwrap_or(1);
             if op == "subtract" {
                 format!("{{{{icon_energy.png|E}}}}を{}減らす", amt)
@@ -946,7 +965,8 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
             }
         }
         "modify_yell_count" => {
-            let op = effect.operation.as_deref().unwrap_or("add");
+            let op_binding = effect.operation_any();
+            let op = op_binding.unwrap_or("add");
             let amt = c.unwrap_or(1);
             if op == "subtract" {
                 format!("エール回数を{}減らす", amt)
@@ -956,7 +976,7 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
         }
         "perform_yell" => {
             let amt = c.unwrap_or(1);
-            let max = effect.repeat_limit.unwrap_or(amt);
+            let max = effect.repeat_limit_any().unwrap_or(amt);
             if amt == max {
                 format!("エールを{}回行う", amt)
             } else {
@@ -964,7 +984,7 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
             }
         }
         "re_yell" => {
-            let suffix = if effect.lose_blade_hearts.unwrap_or(false) {
+            let suffix = if effect.lose_blade_hearts_any().unwrap_or(false) {
                 "（ブレード/ハートを失う）"
             } else {
                 ""
@@ -973,13 +993,13 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
         }
         "specify_heart_color" => "ハートの色を指定する".to_string(),
         "place_energy_under_member" => {
-            let e = effect.energy_count.or(c).unwrap_or(1);
+            let e = effect.energy_count_any().or(c).unwrap_or(1);
             format!("このメンバーの下にエネルギーを{}枚置く", e)
         }
         "invalidate_ability" => "アビリティを無効にする".to_string(),
         "choose_target_player" => "自分か相手を選ぶ".to_string(),
         "repeat_procedure" => {
-            let max = effect.repeat_limit.unwrap_or(c.unwrap_or(1));
+            let max = effect.repeat_limit_any().unwrap_or(c.unwrap_or(1));
             format!("最大{}回繰り返す", max)
         }
         "sequential_cost" => {
@@ -1042,7 +1062,7 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
                 .as_ref()
                 .map(|a| describe_effect_ja(a));
             let alt = effect
-                .alternative_effect
+                .alternative_effect_any()
                 .as_ref()
                 .map(|a| describe_effect_ja(a));
             match (primary, alt) {

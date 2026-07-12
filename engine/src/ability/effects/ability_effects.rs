@@ -9,9 +9,8 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        let text = effect
-            .ability_gain
-            .as_deref()
+        let text_binding = effect.ability_gain_any();
+        let text = text_binding
             .filter(|s| !s.is_empty())
             .or({
                 if effect.text.is_empty() {
@@ -25,9 +24,9 @@ impl AbilityResolver {
             gs,
             text,
             effect.target_name(),
-            effect.duration.as_deref(),
-            effect.gained_effect.clone(),
-            effect.ability_gain_trigger.as_deref(),
+            effect.duration_any().as_deref(),
+            effect.gained_effect_any().cloned(),
+            effect.ability_gain_trigger_any().as_deref(),
         )
     }
 
@@ -36,14 +35,17 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        if effect.all_regions.unwrap_or(false) {
+        if effect.all_regions_any().unwrap_or(false) {
             self.execute_set_card_identity_all_regions(
                 gs,
-                effect.identities.as_ref(),
+                effect.identities_any(),
                 effect.target_name(),
             );
         } else {
-            self.execute_set_card_identity(gs, &effect.identities.clone().unwrap_or_default());
+            self.execute_set_card_identity(
+                gs,
+                &effect.identities_any().cloned().unwrap_or_default(),
+            );
         }
         Ok(())
     }
@@ -138,7 +140,7 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         let db = &gs.card_database;
-        let is_self = effect.self_target.unwrap_or(false);
+        let is_self = effect.self_target_any().unwrap_or(false);
 
         if is_self {
             // Self-targeting: invalidate the activating card itself (works for any zone)
@@ -190,7 +192,8 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        let trigger = effect.suppressed_trigger.as_deref().unwrap_or("unknown");
+        let trigger_binding = effect.suppressed_trigger_any();
+        let trigger = trigger_binding.unwrap_or("unknown");
         if let Some(card_id) = gs.activating_card {
             let pp = self.player_prefix(gs);
             let cn = self.card_name(card_id);
@@ -250,7 +253,7 @@ impl AbilityResolver {
                     use_limit: None,
                     is_null: false,
                     cost: None,
-                    effect: Some(*gained),
+                    effect: Some(gained),
                     keywords: None,
                 };
                 gs.gained_card_abilities
@@ -351,8 +354,8 @@ impl AbilityResolver {
                     None => return false,
                 };
 
-                if let Some(ref ct) = effect.card_type {
-                    let type_ok = match ct.as_str() {
+                if let Some(ref ct) = effect.card_type_any() {
+                    let type_ok = match *ct {
                         "member_card" => c.card_type == crate::card::CardType::Member,
                         "live_card" => c.card_type == crate::card::CardType::Live,
                         "energy_card" => c.card_type == crate::card::CardType::Energy,
@@ -363,9 +366,9 @@ impl AbilityResolver {
                     }
                 }
 
-                if let Some(cl) = effect.cost_limit {
+                if let Some(cl) = effect.cost_limit_any() {
                     let card_cost = c.cost.unwrap_or(0);
-                    let passes = match effect.cost_limit_operator.as_deref() {
+                    let passes = match effect.cost_limit_operator_any().as_deref() {
                         Some("<=") | None => card_cost <= cl,
                         Some(">=") => card_cost >= cl,
                         Some("<") => card_cost < cl,
@@ -378,7 +381,7 @@ impl AbilityResolver {
                     }
                 }
 
-                if let Some(ref groups) = effect.group_names {
+                if let Some(ref groups) = effect.group_names_any() {
                     if !groups.iter().any(|g| {
                         crate::ability::util::card_matches_group_str(&card_db, id, Some(g))
                     }) {
@@ -394,7 +397,7 @@ impl AbilityResolver {
         for &src_id in &source_cards {
             if let Some(src_card) = card_db.get_card(src_id) {
                 for ability in &src_card.abilities {
-                    let should_copy = match effect.trigger_filter.as_ref() {
+                    let should_copy = match effect.trigger_filter_any().as_ref() {
                         Some(filters) => filters.iter().any(|f| {
                             ability
                                 .triggers

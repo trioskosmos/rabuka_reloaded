@@ -1048,13 +1048,13 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                     stage_cards[area_idx].is_some_and(|existing_card| {
                                         existing_card.abilities.iter().any(|a| {
                                             a.effect.as_ref().is_some_and(|ef| {
-                                                if ef.restriction_type.as_deref()
+                                                if ef.restriction_type_any().as_deref()
                                                     != Some("cannot_baton_touch")
                                                 {
                                                     return false;
                                                 }
                                                 if let Some(ref exclude_groups) =
-                                                    ef.exclude_group_names
+                                                    ef.exclude_group_names_any()
                                                 {
                                                     if crate::ability::util::card_matches_any_group(
                                                         &game_state.card_database,
@@ -1111,12 +1111,13 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                 stage_cards[idx].is_some_and(|card| {
                                     card.abilities.iter().any(|a| {
                                         a.effect.as_ref().is_some_and(|ef| {
-                                            if ef.restriction_type.as_deref()
+                                            if ef.restriction_type_any().as_deref()
                                                 != Some("cannot_baton_touch")
                                             {
                                                 return false;
                                             }
-                                            if let Some(ref exclude_groups) = ef.exclude_group_names
+                                            if let Some(ref exclude_groups) =
+                                                ef.exclude_group_names_any()
                                             {
                                                 if crate::ability::util::card_matches_any_group(
                                                     &game_state.card_database,
@@ -1308,7 +1309,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     ability
                         .effect
                         .as_ref()
-                        .and_then(|e| e.activation_position.as_deref()),
+                        .and_then(|e| e.activation_position_any()),
                     card_position,
                 ) {
                     continue;
@@ -1329,7 +1330,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 let ability_cost = ability
                     .cost
                     .as_ref()
-                    .and_then(|c| c.energy_count)
+                    .and_then(|c| c.energy_count_any())
                     .unwrap_or(0);
                 let trigger_info = ability
                     .triggers
@@ -1371,7 +1372,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 let is_discard_activation = ability
                     .effect
                     .as_ref()
-                    .and_then(|e| e.activation_condition_parsed.as_ref())
+                    .and_then(|e| e.activation_condition_parsed_any())
                     .is_some_and(|c| {
                         Zone::from_str(c.location.as_deref().unwrap_or("")) == Some(Zone::Discard)
                     });
@@ -1404,7 +1405,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 let ability_cost = ability
                     .cost
                     .as_ref()
-                    .and_then(|c| c.energy_count)
+                    .and_then(|c| c.energy_count_any())
                     .unwrap_or(0);
 
                 actions.push(make_action_params(
