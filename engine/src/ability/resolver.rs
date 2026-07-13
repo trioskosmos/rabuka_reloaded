@@ -46,10 +46,10 @@ pub struct AbilityResolver {
     /// Binary sub-costs (e.g. change_state self_cost) in a sequential_cost that
     /// were deferred until the choice sub-cost is confirmed by the player.
     /// Paid on confirm, cleared on skip.
-    pub pending_deferred_costs: Vec<AbilityEffect>,
+    pub pending_deferred_costs: Vec<Box<AbilityEffect>>,
     pub cancel_remaining_commands: bool,
     /// Repeat actions fed one-at-a-time after each iteration completes.
-    pub pending_repeat_actions: Vec<AbilityEffect>,
+    pub pending_repeat_actions: Vec<Box<AbilityEffect>>,
     /// Re-prompt choice (any_number / re-select) set after pending actions finish.
     pub pending_reprompt_choice: Option<Choice>,
     /// Buffer for structured ability resolution log items.
@@ -181,9 +181,9 @@ impl AbilityResolver {
                 // Merge the effect's position info into the condition so it's checked.
                 if merged_cond.position.is_none() && merged_cond.positions_characters.is_none() {
                     if let Some(ref pos) = effect.position_any() {
-                        merged_cond.position = Some(pos.clone().clone());
+                        merged_cond.position = Some((*pos).clone());
                     } else if let Some(ref act_pos) = effect.activation_position_any() {
-                        merged_cond.activation_position = Some(act_pos.to_string());
+                        merged_cond.activation_position = Some((*act_pos).into());
                     }
                 }
                 let snapshot = crate::ability::log::buffer_len();
@@ -218,9 +218,9 @@ impl AbilityResolver {
                 let mut cond = condition.clone();
                 if cond.position.is_none() && cond.positions_characters.is_none() {
                     if let Some(ref pos) = effect.position_any() {
-                        cond.position = Some(pos.clone().clone());
+                        cond.position = Some((*pos).clone());
                     } else if let Some(ref act_pos) = effect.activation_position_any() {
-                        cond.activation_position = Some(act_pos.to_string());
+                        cond.activation_position = Some((*act_pos).into());
                     }
                 }
                 // Merge effect-level group_names into conditions that need

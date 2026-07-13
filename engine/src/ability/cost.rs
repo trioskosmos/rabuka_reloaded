@@ -264,7 +264,7 @@ impl AbilityResolver {
                     .current_ability
                     .as_ref()
                     .and_then(|a| a.triggers.as_ref())
-                    .is_some_and(|t| t == crate::triggers::ACTIVATION);
+                    .is_some_and(|t| &**t == crate::triggers::ACTIVATION);
 
                 let same_unit = cost.same_unit_name_any().unwrap_or(false);
                 let is_from_hand = Zone::from_str(source) == Some(Zone::Hand) && !same_unit;
@@ -434,7 +434,7 @@ impl AbilityResolver {
                                 }))
                                 .characters(cost.characters_any().cloned())
                                 .target_player_id(Some(
-                                    cost.target.clone().unwrap_or_else(|| "self".to_string()),
+                                    cost.target.as_deref().unwrap_or("self").to_string(),
                                 ))
                                 .filtered_indices(filtered)
                                 .build(),
@@ -467,7 +467,7 @@ impl AbilityResolver {
                             if filter.matches(card_db, cid, false) {
                                 let unit = card_db
                                     .get_card(cid)
-                                    .and_then(|c| c.unit.clone())
+                                    .and_then(|c| c.unit.clone().map(|s| s.to_string()))
                                     .unwrap_or_default();
                                 unit_groups.entry(unit).or_default().push(cid);
                             }
@@ -503,7 +503,7 @@ impl AbilityResolver {
                                 .description_ja(Some(desc_ja))
                                 .card_type(cost.card_type_any().map(|s| s.to_string()))
                                 .target_player_id(Some(
-                                    cost.target.clone().unwrap_or_else(|| "self".to_string()),
+                                    cost.target.as_deref().unwrap_or("self").to_string(),
                                 ))
                                 .filtered_indices(Some(eligible_indices))
                                 .build(),
@@ -586,7 +586,7 @@ impl AbilityResolver {
                     .current_ability
                     .as_ref()
                     .and_then(|a| a.triggers.as_ref())
-                    .is_some_and(|t| t == crate::triggers::ACTIVATION);
+                    .is_some_and(|t| &**t == crate::triggers::ACTIVATION);
 
                 if optional && !is_activation {
                     // Q137: 「ウェイトにする」とは、アクティブ状態のメンバーをウェイト
@@ -683,7 +683,7 @@ impl AbilityResolver {
                             .card_type(cost.card_type_any().map(|s| s.to_string()))
                             .is_select_action(true)
                             .target_player_id(Some(
-                                cost.target.clone().unwrap_or_else(|| "self".to_string()),
+                                cost.target.as_deref().unwrap_or("self").to_string(),
                             ))
                             .build(),
                         );
@@ -713,7 +713,7 @@ impl AbilityResolver {
                     .current_ability
                     .as_ref()
                     .and_then(|a| a.triggers.as_ref())
-                    .is_some_and(|t| t == crate::triggers::ACTIVATION);
+                    .is_some_and(|t| &**t == crate::triggers::ACTIVATION);
 
                 if any_number && (optional || !is_activation) {
                     let player = gs.resolve_target_player_mut(target);
@@ -888,7 +888,7 @@ impl AbilityResolver {
                         .group(group)
                         .characters(cost.characters_any().cloned())
                         .target_player_id(Some(
-                            cost.target.clone().unwrap_or_else(|| "self".to_string()),
+                            cost.target.as_deref().unwrap_or("self").to_string(),
                         ))
                         .is_reveal(true)
                         .build(),
@@ -1097,8 +1097,9 @@ impl AbilityResolver {
                                     .card_type(cost.card_type_any().map(|s| s.to_string()))
                                     .group(cost.group_names_any().clone().map(|v| v.join(",")))
                                     .target_player_id(Some(
-                                        cost.target.clone().unwrap_or_else(|| "self".to_string()),
+                                        cost.target.as_deref().unwrap_or("self").to_string(),
                                     ))
+                                    .is_reveal(true)
                                     .build(),
                                 );
                             return Ok(());

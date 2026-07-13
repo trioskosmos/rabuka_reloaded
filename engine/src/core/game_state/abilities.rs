@@ -274,7 +274,7 @@ impl GameState {
                         if ability
                             .triggers
                             .as_ref()
-                            .is_some_and(|t| t == crate::triggers::AUTO)
+                            .is_some_and(|t| &**t == crate::triggers::AUTO)
                         {
                             let mut trigger_multiplicity: u32 = 1;
                             // Guard: skip discard-location abilities when the card
@@ -441,7 +441,7 @@ impl GameState {
                         if ability
                             .triggers
                             .as_ref()
-                            .is_some_and(|t| t == crate::triggers::AUTO)
+                            .is_some_and(|t| &**t == crate::triggers::AUTO)
                         {
                             if let Some(ref effect) = ability.effect {
                                 // Live card scan — uses the same event-based
@@ -530,7 +530,7 @@ impl GameState {
                         if ability
                             .triggers
                             .as_ref()
-                            .is_some_and(|t| t == crate::triggers::AUTO)
+                            .is_some_and(|t| &**t == crate::triggers::AUTO)
                         {
                             if let Some(ref effect) = ability.effect {
                                 if let Some(ref condition) = effect.condition {

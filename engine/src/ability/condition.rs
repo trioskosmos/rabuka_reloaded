@@ -4,7 +4,7 @@ use super::debug::AbDebug;
 use crate::ability::debug::ABILITY_DEBUG;
 use crate::ability::enums::ConditionType;
 use crate::ability::enums::Zone;
-use crate::card::Condition;
+use crate::card::{CardState, Condition};
 use crate::game_state::Phase;
 use serde_json::json;
 
@@ -226,7 +226,7 @@ pub fn push_cond_verdict(
             format!("資源{}{}", op, threshold)
         }
         Some(ConditionType::StateCondition) => {
-            let state = condition.state.as_deref().unwrap_or("状態");
+            let state = condition.state.map(CardState::as_str).unwrap_or("状態");
             let loc = condition.location.as_deref().unwrap_or("stage");
             format!("{}状態を{}で確認", state, loc)
         }
@@ -692,7 +692,7 @@ impl<'a> ConditionContext<'a> {
                 }
             }
             Some(ConditionType::StateCondition) => {
-                let state = condition.state.as_deref().unwrap_or("状態");
+                let state = condition.state.map(CardState::as_str).unwrap_or("状態");
                 let target = condition.target.as_deref().unwrap_or("self");
                 let player = self.resolve_condition_player(target);
                 let resource_type = condition.resource_type.as_deref();
@@ -767,7 +767,7 @@ impl<'a> ConditionContext<'a> {
             }
             Some(ConditionType::EnergyStateCondition) => condition
                 .state
-                .as_deref()
+                .map(CardState::as_str)
                 .map(|s| format!("エネルギー状態={}", s))
                 .unwrap_or_default(),
             Some(ConditionType::StateChangeCondition) => {

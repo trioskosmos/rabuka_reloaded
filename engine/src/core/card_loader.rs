@@ -114,7 +114,7 @@ impl CardLoader {
                         .and_then(|v| v.as_str())
                         .map(String::from)
                 });
-                let effect_actions = effect_entry
+                let _effect_actions = effect_entry
                     .as_ref()
                     .and_then(|ej| ej.get("actions"))
                     .and_then(|a| a.as_array())
@@ -143,7 +143,7 @@ impl CardLoader {
 
                     if let Some(ref mut effect) = ability.effect {
                         if let Some(ref actions) = effect.compound.actions.clone() {
-                            let fixed_actions: Vec<crate::card::AbilityEffect> = actions
+                            let fixed_actions: Vec<Box<AbilityEffect>> = actions
                                 .iter()
                                 .map(|action| {
                                     let mut fixed_action = action.clone();
@@ -458,7 +458,7 @@ impl CardLoader {
                         .and_then(|v| v.as_str())
                         .map(String::from)
                 });
-                let effect_actions = effect_entry
+                let _effect_actions = effect_entry
                     .as_ref()
                     .and_then(|ej| ej.get("actions"))
                     .and_then(|a| a.as_array())
@@ -479,7 +479,7 @@ impl CardLoader {
                     }
                     if let Some(ref mut effect) = ability.effect {
                         if let Some(ref actions) = effect.compound.actions.clone() {
-                            let fixed_actions: Vec<crate::card::AbilityEffect> = actions
+                            let fixed_actions: Vec<Box<AbilityEffect>> = actions
                                 .iter()
                                 .map(|action| {
                                     let mut fixed_action = action.clone();

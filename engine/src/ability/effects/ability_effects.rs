@@ -244,12 +244,12 @@ impl AbilityResolver {
         // would show only icon_score.png with no indication that it's
         // a constant (jyouji) ability.
         //
-        if trigger == Some(crate::triggers::LIVE_SUCCESS) {
+        if trigger.as_deref() == Some(crate::triggers::LIVE_SUCCESS) {
             if let (Some(gained), Some(card_id)) = (gained_effect, gs.activating_card) {
                 let gained_ability = Ability {
                     full_text: ability_text.to_string(),
                     triggerless_text: ability_text.to_string(),
-                    triggers: Some(crate::triggers::LIVE_SUCCESS.to_string()),
+                    triggers: Some(crate::triggers::LIVE_SUCCESS.into()),
                     use_limit: None,
                     is_null: false,
                     cost: None,
@@ -402,7 +402,7 @@ impl AbilityResolver {
                             ability
                                 .triggers
                                 .as_ref()
-                                .is_some_and(|t| t.contains(f) || f.contains(t.as_str()))
+                                .is_some_and(|t| t.contains(f) || f.contains(&**t))
                         }),
                         None => true,
                     };

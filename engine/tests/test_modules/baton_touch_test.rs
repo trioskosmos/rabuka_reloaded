@@ -1,4 +1,5 @@
 use crate::helpers::*;
+use rabuka_engine::card::{ConditionCardType, ConditionTarget, Location};
 use rabuka_engine::game_setup::{generate_possible_actions, ActionType};
 use rabuka_engine::zones::MemberArea;
 
@@ -299,14 +300,14 @@ fn card_count_condition_baton_touch_filter() {
     // with baton_touch_trigger and min_baton_touch_count=2
     let condition = Condition {
         condition_type: Some(ConditionType::CardCountCondition),
-        card_type: Some("member_card".to_string()),
-        location: Some("stage".to_string()),
-        target: Some("self".to_string()),
+        card_type: Some(ConditionCardType::MemberCard),
+        location: Some(Location::Stage),
+        target: Some(ConditionTarget::Self_),
         group_names: Some(vec!["蓮ノ空".to_string()]),
         baton_touch_trigger: Some(true),
         min_baton_touch_count: Some(2),
         count: Some(2),
-        operator: Some(">=".to_string()),
+        operator: Some(">=".into()),
         ..Default::default()
     };
 

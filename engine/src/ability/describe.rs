@@ -591,7 +591,7 @@ pub fn describe_cost_ja(cost: &AbilityEffect) -> String {
 /// Build a combined English description for a sequential_cost up to the choice sub-cost.
 /// Binary costs before the choice are included; the choice cost's "(or skip)" is appended
 /// at the end if the choice sub-cost is optional.
-pub fn describe_sequential_cost_en(costs: &[AbilityEffect], choice_index: usize) -> String {
+pub fn describe_sequential_cost_en(costs: &[Box<AbilityEffect>], choice_index: usize) -> String {
     let parts: Vec<String> = (0..=choice_index)
         .map(|i| describe_cost_en(&costs[i]))
         .collect();
@@ -604,7 +604,7 @@ pub fn describe_sequential_cost_en(costs: &[AbilityEffect], choice_index: usize)
 }
 
 /// Build a combined Japanese description for a sequential_cost up to the choice sub-cost.
-pub fn describe_sequential_cost_ja(costs: &[AbilityEffect], choice_index: usize) -> String {
+pub fn describe_sequential_cost_ja(costs: &[Box<AbilityEffect>], choice_index: usize) -> String {
     let parts: Vec<String> = (0..=choice_index)
         .map(|i| describe_cost_ja(&costs[i]))
         .collect();

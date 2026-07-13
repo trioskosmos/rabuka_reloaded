@@ -149,7 +149,7 @@ fn hazuki_activates_kidou_copied_from_under() {
     assert!(
         gained_list
             .iter()
-            .any(|a| a.triggers.as_ref().is_some_and(|t| t == "起動")),
+            .any(|a| a.triggers.as_ref().is_some_and(|t| &**t == "起動")),
         "Copied ability should have 起動 trigger"
     );
 

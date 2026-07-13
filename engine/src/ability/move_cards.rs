@@ -2,7 +2,7 @@ use super::enums::Zone;
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ExecutionContext, LookAndSelectStep};
 use super::util;
-use crate::card::{AbilityEffect, CardDatabase};
+use crate::card::{AbilityEffect, CardDatabase, DistinctType, Operator, PlacementOrder};
 use crate::game_state::GameState;
 use crate::player::Player;
 
@@ -134,11 +134,9 @@ impl AbilityResolver {
                 )
                 .group(filter.group.map(|s| s.to_string()))
                 .characters(filter.characters.cloned())
-                .target_player_id(Some(
-                    effect.target.clone().unwrap_or_else(|| "self".to_string()),
-                ))
+                .target_player_id(Some(effect.target.as_deref().unwrap_or("self").to_string()))
                 .filtered_indices(filtered_indices)
-                .destination(effect.destination.clone())
+                .destination(effect.destination.clone().map(|s| s.to_string()))
                 .discard_remaining(effect.discard_remaining_any())
                 .build(),
         );
@@ -597,7 +595,7 @@ impl AbilityResolver {
                             }
                         }
                         return Ok(found);
-                    } else if destination == "deck_top_or_bottom" {
+                    } else if &*destination == "deck_top_or_bottom" {
                         // Q252: more matching cards than count, player chooses which one.
                         // Directly create a SelectCard choice restricted to the
                         // trigger_moved_cards' positions in the waitroom.
@@ -926,7 +924,7 @@ impl AbilityResolver {
                         cost_limit
                     },
                     if src_zone == Some(Zone::Discard) {
-                        effect.cost_limit_operator_any()
+                        effect.cost_limit_operator_any().map(Operator::as_str)
                     } else {
                         None
                     },
@@ -1086,9 +1084,9 @@ impl AbilityResolver {
                             .group(filter.group.map(|s| s.to_string()))
                             .characters(filter.characters.cloned())
                             .target_player_id(Some(
-                                effect.target.clone().unwrap_or_else(|| "self".to_string()),
+                                effect.target.as_deref().unwrap_or("self").to_string(),
                             ))
-                            .destination(effect.destination.clone())
+                            .destination(effect.destination.clone().map(|s| s.to_string()))
                             .discard_remaining(effect.discard_remaining_any())
                             .build(),
                     );
@@ -1374,8 +1372,8 @@ impl AbilityResolver {
         // Store destination for execute_selected_cards_from_zone to read later
         // (needed when the resolve creates a card selection choice and the destination
         // is not accessible via entry_destination, e.g. for sequential sub-actions).
-        self.spawn_context.destination = effect.destination.clone();
-        self.spawn_context.source = effect.source.clone();
+        self.spawn_context.destination = effect.destination.clone().map(|s| s.to_string());
+        self.spawn_context.source = effect.source.clone().map(|s| s.to_string());
         self.spawn_context.position = effect.position_any().and_then(|p| match p {
             crate::card::PositionInfo::String(s) => s.parse::<usize>().ok(),
             crate::card::PositionInfo::Struct { position, .. } => {
@@ -1421,7 +1419,7 @@ impl AbilityResolver {
             || Zone::from_str(&source) == Some(Zone::SelectedCards);
         if is_eligible_source
             && is_deck_dest
-            && effect.placement_order_any().as_deref() == Some("any_order")
+            && effect.placement_order_any() == Some(PlacementOrder::AnyOrder)
             && taken.len() > 1
         {
             let taken_count = taken.len();
@@ -1448,9 +1446,10 @@ impl AbilityResolver {
         }
 
         // Apply distinct card name filter if specified
-        let distinct_binding = effect.distinct_any();
-        let distinct = distinct_binding.as_deref();
-        if distinct == Some("card_name") || distinct == Some("true") || distinct == Some("distinct")
+        let distinct = effect.distinct_any();
+        if distinct == Some(DistinctType::CardName)
+            || distinct == Some(DistinctType::True)
+            || distinct == Some(DistinctType::Distinct)
         {
             let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
             taken.retain(|&id| {
@@ -1549,7 +1548,7 @@ impl AbilityResolver {
                     };
                     let clamped = pos.min(player.main_deck.cards.len());
                     player.main_deck.cards.insert(clamped, card_id);
-                } else if destination == "deck_top_or_bottom" {
+                } else if &*destination == "deck_top_or_bottom" {
                     let can_skip = effect.optional.unwrap_or(false);
                     if can_skip && !taken.is_empty() {
                         // For optional deck placement, the card was left in
@@ -1570,8 +1569,8 @@ impl AbilityResolver {
                     self.execution_context = ExecutionContext::MoveCardsPosition {
                         card_id,
                         state_change: effect.state_change_any().map(|s| s.to_string()),
-                        target: tgt.clone().unwrap_or_else(|| "self".to_string()),
-                        source_zone: source.clone(),
+                        target: tgt.as_deref().unwrap_or("self").to_string(),
+                        source_zone: source.to_string(),
                     };
                     return Ok(());
                 } else {
@@ -1600,10 +1599,10 @@ impl AbilityResolver {
                             } else {
                                 &mut gs.player1
                             };
-                            let src_zone = if source.as_str() == "those_cards" {
+                            let src_zone = if &*source == "those_cards" {
                                 Zone::Discard.to_str()
                             } else {
-                                source.as_str()
+                                &*source
                             };
                             util::place_card_in_zone(player, card_id, src_zone, None, false, 1);
                         }
@@ -2101,7 +2100,10 @@ impl AbilityResolver {
         let target = target_player_id
             .map(|s| s.to_string())
             .or_else(|| self.spawn_context.target.clone())
-            .or_else(|| gs.entry_effect().and_then(|e| e.target.clone()))
+            .or_else(|| {
+                gs.entry_effect()
+                    .and_then(|e| e.target.clone().map(|s| s.to_string()))
+            })
             .unwrap_or_else(|| "self".to_string());
         let card_db = gs.card_database.clone();
         let vacated_area = gs.last_vacated_stage_area;
@@ -2436,7 +2438,10 @@ impl AbilityResolver {
             .spawn_context
             .target
             .clone()
-            .or_else(|| gs.entry_effect().and_then(|e| e.target.clone()))
+            .or_else(|| {
+                gs.entry_effect()
+                    .and_then(|e| e.target.clone().map(|s| s.to_string()))
+            })
             .unwrap_or_else(|| "self".to_string());
         let select_action = self
             .current_effect
@@ -2461,8 +2466,8 @@ impl AbilityResolver {
         let (destination, discard_remaining, placement_order) = (
             select_action
                 .as_ref()
-                .and_then(|sa| sa.destination.clone())
-                .or_else(|| current.and_then(|c| c.destination.clone()))
+                .and_then(|sa| sa.destination.clone().map(|s| s.to_string()))
+                .or_else(|| current.and_then(|c| c.destination.clone().map(|s| s.to_string())))
                 .or_else(|| ctx_destination)
                 .unwrap_or_else(|| Zone::Hand.to_str().to_string()),
             select_action
@@ -2537,7 +2542,7 @@ impl AbilityResolver {
             let cost_limit = select_action.as_ref().and_then(|sa| sa.cost_limit_any());
             let cost_limit_operator = select_action
                 .as_ref()
-                .and_then(|sa| sa.cost_limit_operator_any());
+                .and_then(|sa| sa.cost_limit_operator_any().map(Operator::as_str));
             selected_cards.retain(|&cid| {
                 util::card_matches_cost_limit_op(card_db, cid, cost_limit, cost_limit_operator)
             });
@@ -2548,7 +2553,7 @@ impl AbilityResolver {
         let is_deck_dest = Zone::from_str(&destination) == Some(Zone::DeckTop)
             || Zone::from_str(&destination) == Some(Zone::Deck);
         let needs_order = is_deck_dest
-            && placement_order.as_deref() == Some("any_order")
+            && placement_order == Some(PlacementOrder::AnyOrder)
             && selected_cards.len() > 1;
 
         if needs_order {
@@ -2777,23 +2782,19 @@ impl AbilityResolver {
         // "both" handler in effects.rs may have set it to "self".
         self.spawn_context.target = Some("opponent".to_string());
         let mut opp_eff = effect.clone();
-        opp_eff.target = Some("opponent".to_string());
+        opp_eff.target = Some("opponent".into());
         self.execute_move_cards(gs, &opp_eff)?;
-        log::debug!(
-            "[MOVE_BOTH] Opponent returned. pending_choice={}",
-            self.pending_choice.is_some()
-        );
 
         if self.pending_choice.is_some() {
             log::debug!("[MOVE_BOTH] Queueing self effect for later.");
             let mut self_eff = effect.clone();
-            self_eff.target = Some("self".to_string());
+            self_eff.target = Some("self".into());
             gs.ability_queue.set_pending_actions(vec![self_eff]);
             return Ok(());
         }
         log::debug!("[MOVE_BOTH] No choice created. Processing self now.");
         let mut self_eff = effect.clone();
-        self_eff.target = Some("self".to_string());
+        self_eff.target = Some("self".into());
         self.execute_move_cards(gs, &self_eff)
     }
 }

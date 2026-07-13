@@ -2,7 +2,7 @@ use super::ConditionContext;
 use crate::ability::enums::{ConditionType, Zone};
 use crate::ability::util;
 use crate::ability::util::compare_counts;
-use crate::card::Condition;
+use crate::card::{CardProperty, CardState, Condition};
 use crate::game_state::Phase;
 
 impl<'a> ConditionContext<'a> {
@@ -127,7 +127,7 @@ impl<'a> ConditionContext<'a> {
                             zones.push(z.as_str());
                         }
                     } else if let Some(ref loc) = condition.location {
-                        zones.push(loc.as_str());
+                        zones.push(&**loc);
                     } else if condition.heart_colors.is_some() {
                         // If checking heart colors but no zone specified, default to live_card_zone
                         zones.push("live_card_zone");
@@ -318,7 +318,7 @@ impl<'a> ConditionContext<'a> {
     }
 
     pub(crate) fn evaluate_state_condition(&self, condition: &Condition) -> bool {
-        let state = condition.state.as_deref().unwrap_or("");
+        let state = condition.state.map(CardState::as_str).unwrap_or("");
         let target = condition.target.as_deref().unwrap_or("self");
         let resource_type = condition.resource_type.as_deref();
         let all_cards = condition.all.unwrap_or(false);
@@ -359,10 +359,11 @@ impl<'a> ConditionContext<'a> {
                         || condition.card_type.is_some()
                         || condition.characters.as_ref().is_some_and(|c| !c.is_empty());
                     let check_orientation = |cid: i16| -> bool {
+                        use std::ops::Deref;
                         self.game_state
                             .mods
                             .get_orientation_modifier(cid)
-                            .map_or(state == "active", |o| o.as_str() == state)
+                            .map_or(state == "active", |o| &*o == state)
                     };
                     if has_filter {
                         stage_cards.iter().any(|&cid| {
@@ -639,7 +640,7 @@ impl<'a> ConditionContext<'a> {
                 if let Some(check_card) = check_id_for_group {
                     if let Some(card) = self.game_state.card_database.get_card(check_card) {
                         if let Some(ref af) = condition.ability_filter {
-                            match af.as_str() {
+                            match &**af {
                                 "no_ability" => {
                                     if !card.abilities.is_empty() {
                                         return false;
@@ -654,7 +655,7 @@ impl<'a> ConditionContext<'a> {
                             }
                         }
                         if let Some(ref ct) = condition.card_type {
-                            let card_type_ok = match ct.as_str() {
+                            let card_type_ok = match &**ct {
                                 "member_card" | "member" => card.is_member(),
                                 "live_card" => {
                                     matches!(card.card_type, crate::card::CardType::Live)
@@ -703,8 +704,8 @@ impl<'a> ConditionContext<'a> {
                 }
                 if let Some(ref prop) = condition.card_property {
                     if let Some(check_card) = check_id_for_group {
-                        let has_prop = match prop.as_str() {
-                            "has_blade_heart" => self
+                        let has_prop = match *prop {
+                            CardProperty::HasBladeHeart => self
                                 .game_state
                                 .card_database
                                 .get_card(check_card)

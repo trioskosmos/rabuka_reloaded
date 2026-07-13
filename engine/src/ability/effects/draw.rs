@@ -2,7 +2,7 @@ use super::super::enums::Zone;
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ExecutionContext};
 use super::super::util;
-use crate::card::AbilityEffect;
+use crate::card::{AbilityEffect, DistinctType};
 use crate::game_state::GameState;
 
 pub(crate) fn draw_cards_for_player(
@@ -12,7 +12,7 @@ pub(crate) fn draw_cards_for_player(
     destination: &str,
     card_type_filter: Option<&str>,
     is_any_number: bool,
-    _distinct: Option<&str>,
+    _distinct: Option<DistinctType>,
     card_db: &crate::card::CardDatabase,
     self_target_id: Option<i16>,
 ) -> Result<(), String> {
@@ -193,7 +193,7 @@ impl AbilityResolver {
             },
         };
         if let Some(ref calculation) = dc.calculation {
-            if calculation == "add" {
+            if &**calculation == "add" {
                 count += dc.calculation_value.unwrap_or(0);
             }
         }
@@ -335,8 +335,7 @@ impl AbilityResolver {
             .unwrap_or_default();
         let card_db = self.card_db();
         let is_any_number = effect.any_number_any().unwrap_or(false);
-        let is_distinct_binding = effect.distinct_any();
-        let is_distinct = is_distinct_binding.as_deref();
+        let is_distinct = effect.distinct_any();
         let is_self_target = effect.self_target_any().unwrap_or(false);
 
         if target == "both" {

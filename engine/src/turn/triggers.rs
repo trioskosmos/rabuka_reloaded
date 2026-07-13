@@ -485,7 +485,7 @@ impl super::TurnEngine {
                             if ability
                                 .triggers
                                 .as_ref()
-                                .is_some_and(|t| t == crate::triggers::LIVE_SUCCESS)
+                                .is_some_and(|t| &**t == crate::triggers::LIVE_SUCCESS)
                             {
                                 if !seen.insert((card_id, aidx)) {
                                     continue;
@@ -532,7 +532,7 @@ impl super::TurnEngine {
                                 if gained_ability
                                     .triggers
                                     .as_ref()
-                                    .is_some_and(|t| t == crate::triggers::LIVE_SUCCESS)
+                                    .is_some_and(|t| &**t == crate::triggers::LIVE_SUCCESS)
                                 {
                                     if !seen.insert((card_id, 10000 + gidx)) {
                                         continue;
@@ -572,7 +572,7 @@ impl super::TurnEngine {
                     let card_no = card.card_no.clone();
                     for (aidx, ability) in card.abilities.iter().enumerate() {
                         let trigger_match = ability.triggers.as_ref().is_some_and(|t| {
-                            t == crate::triggers::LIVE_SUCCESS
+                            &**t == crate::triggers::LIVE_SUCCESS
                                 || t.contains(crate::triggers::LIVE_SUCCESS_EN)
                         });
                         if !trigger_match {
@@ -613,7 +613,7 @@ impl super::TurnEngine {
                             if gained_ability
                                 .triggers
                                 .as_ref()
-                                .is_some_and(|t| t == crate::triggers::LIVE_SUCCESS)
+                                .is_some_and(|t| &**t == crate::triggers::LIVE_SUCCESS)
                             {
                                 if !seen.insert((*card_id, 10000 + gidx)) {
                                     continue;

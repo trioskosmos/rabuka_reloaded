@@ -221,7 +221,7 @@ pub struct BaseHeart {
 #[derive(Debug, Clone, Serialize)]
 pub struct Card {
     pub card_no: String,
-    pub img: Option<String>,
+    pub img: Option<Box<str>>,
     pub name: String,
     #[serde(default)]
     pub product: Box<str>,
@@ -231,7 +231,7 @@ pub struct Card {
     pub series: Box<str>,
     #[serde(default = "default_group_from_series")]
     pub group: Box<str>,
-    pub unit: Option<String>,
+    pub unit: Option<Box<str>>,
     pub cost: Option<u32>,
     pub base_heart: Option<BaseHeart>,
     pub blade_heart: Option<BladeHeart>,
@@ -244,7 +244,7 @@ pub struct Card {
     #[serde(default)]
     pub faq: Vec<FAQEntry>,
     #[serde(rename = "_img")]
-    pub _img: Option<String>,
+    pub _img: Option<Box<str>>,
     // Live card fields
     pub score: Option<u32>,
     pub need_heart: Option<BaseHeart>,
@@ -439,7 +439,7 @@ impl<'de> Deserialize<'de> for Card {
         #[derive(Debug, Clone, Deserialize)]
         struct CardHelper {
             pub card_no: String,
-            pub img: Option<String>,
+            pub img: Option<Box<str>>,
             pub name: String,
             #[serde(default)]
             pub product: String,
@@ -447,7 +447,7 @@ impl<'de> Deserialize<'de> for Card {
             pub card_type: CardType,
             #[serde(default)]
             pub series: String,
-            pub unit: Option<String>,
+            pub unit: Option<Box<str>>,
             pub cost: Option<u32>,
             pub base_heart: Option<BaseHeart>,
             pub blade_heart: Option<BladeHeart>,
@@ -460,7 +460,7 @@ impl<'de> Deserialize<'de> for Card {
             #[serde(default)]
             pub faq: Vec<FAQEntry>,
             #[serde(rename = "_img")]
-            pub _img: Option<String>,
+            pub _img: Option<Box<str>>,
             pub score: Option<u32>,
             pub need_heart: Option<BaseHeart>,
             pub special_heart: Option<SpecialHeart>,
@@ -521,7 +521,7 @@ pub struct Ability {
     pub full_text: String,
     #[serde(default = "default_empty_string")]
     pub triggerless_text: String,
-    pub triggers: Option<String>,
+    pub triggers: Option<Box<str>>,
     pub use_limit: Option<u32>,
     #[serde(default)]
     pub is_null: bool,
@@ -635,7 +635,7 @@ impl serde::Serialize for AbilityCost {
             map.serialize_entry("cost_limit", &v)?;
         }
         if let Some(v) = inner.cost_limit_operator_any() {
-            map.serialize_entry("cost_limit_operator", v)?;
+            map.serialize_entry("cost_limit_operator", v.as_str())?;
         }
         if let Some(v) = inner.characters_any() {
             map.serialize_entry("characters", v)?;
@@ -647,7 +647,7 @@ impl serde::Serialize for AbilityCost {
             map.serialize_entry("group_names", v)?;
         }
         if let Some(v) = inner.placement_order_any() {
-            map.serialize_entry("placement_order", v)?;
+            map.serialize_entry("placement_order", v.as_str())?;
         }
         if let Some(v) = inner.alternative_effect_any() {
             map.serialize_entry("alternative_effect", v)?;
@@ -695,8 +695,11 @@ impl<'de> serde::Deserialize<'de> for AbilityCost {
                         "options" | "costs" => {
                             let sub: Option<Vec<AbilityCost>> = map.next_value()?;
                             if let Some(sub) = sub {
-                                effect.compound.actions =
-                                    Some(sub.into_iter().map(AbilityCost::into_effect).collect());
+                                effect.compound.actions = Some(
+                                    sub.into_iter()
+                                        .map(|c| Box::new(AbilityCost::into_effect(c)))
+                                        .collect(),
+                                );
                             }
                         }
                         _ => {
@@ -733,7 +736,7 @@ impl AbilityCost {
                 .and_then(|v| v.first())
                 .map(|s| s.as_str()),
             cost_limit: self.cost_limit_any(),
-            cost_operator: self.cost_limit_operator_any(),
+            cost_operator: self.cost_limit_operator_any().map(Operator::as_str),
             characters: self.characters_any(),
             exclude_characters: self.exclude_characters_any(),
             exclude_self: if self.exclude_self_any().unwrap_or(false) {
@@ -764,7 +767,7 @@ pub struct CompoundBranch {
     #[serde(default)]
     pub select_action: Option<Box<AbilityEffect>>,
     #[serde(default)]
-    pub actions: Option<Vec<AbilityEffect>>,
+    pub actions: Option<Vec<Box<AbilityEffect>>>,
     #[serde(default)]
     pub primary_effect: Option<Box<AbilityEffect>>,
     #[serde(default)]
@@ -785,7 +788,7 @@ pub struct CompoundBranch {
 /// for the card to pass.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct AbilityFilterBranch {
-    pub ability_filter: Option<String>,
+    pub ability_filter: Option<AbilityFilter>,
     pub ability_filter_triggers: Option<Vec<String>>,
 }
 
@@ -814,7 +817,7 @@ pub enum EffectKind {
     /// MoveCards effect fields
     MoveCards {
         #[serde(default)]
-        card_type: Option<String>,
+        card_type: Option<Box<str>>,
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
@@ -828,7 +831,7 @@ pub enum EffectKind {
         #[serde(default)]
         cost_limit: Option<u32>,
         #[serde(default)]
-        cost_limit_operator: Option<String>,
+        cost_limit_operator: Option<Operator>,
         #[serde(default)]
         cost_limit_min: Option<u32>,
         #[serde(default)]
@@ -836,7 +839,7 @@ pub enum EffectKind {
         #[serde(default)]
         card_names: Vec<String>,
         #[serde(default)]
-        placement_order: Option<String>,
+        placement_order: Option<PlacementOrder>,
         #[serde(default)]
         shuffle: Option<bool>,
         #[serde(default)]
@@ -850,31 +853,31 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_selected: Option<bool>,
         #[serde(default)]
-        exclude_by_name_source: Option<String>,
+        exclude_by_name_source: Option<Box<str>>,
         #[serde(default)]
-        name_constraint: Option<String>,
+        name_constraint: Option<Box<str>>,
         #[serde(default)]
-        name_constraint_source: Option<String>,
+        name_constraint_source: Option<Box<str>>,
         #[serde(default)]
-        ability_filter: Option<String>,
+        ability_filter: Option<AbilityFilter>,
         #[serde(default)]
         ability_filter_triggers: Option<Vec<String>>,
         #[serde(default)]
         or_ability_filters: Option<Vec<AbilityFilterBranch>>,
         #[serde(default)]
-        card_property: Option<String>,
+        card_property: Option<Box<str>>,
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
-        source_position: Option<String>,
+        source_position: Option<Box<str>>,
         #[serde(default)]
-        exclude_position: Option<String>,
+        exclude_position: Option<Box<str>>,
         #[serde(default)]
         allow_occupied_stage: Option<bool>,
         #[serde(default)]
         target_from_selection: Option<bool>,
         #[serde(default)]
-        group_reference: Option<String>,
+        group_reference: Option<Box<str>>,
         #[serde(default)]
         cost_from_revealed: Option<bool>,
         #[serde(default)]
@@ -884,13 +887,13 @@ pub enum EffectKind {
         #[serde(default)]
         per_group_count: Option<u32>,
         #[serde(default)]
-        state: Option<String>,
+        state: Option<Box<str>>,
         #[serde(default)]
         negation: Option<bool>,
         #[serde(default)]
-        location: Option<String>,
+        location: Option<Box<str>>,
         #[serde(default)]
-        activation_position: Option<String>,
+        activation_position: Option<Box<str>>,
         #[serde(default)]
         exclude_heart_colors: Option<Vec<String>>,
         #[serde(default)]
@@ -898,17 +901,17 @@ pub enum EffectKind {
         #[serde(default)]
         cost_total: Option<u32>,
         #[serde(default)]
-        cost_total_operator: Option<String>,
+        cost_total_operator: Option<Operator>,
         #[serde(default)]
         need_heart_total: Option<u32>,
         #[serde(default)]
-        need_heart_operator: Option<String>,
+        need_heart_operator: Option<Operator>,
         #[serde(default)]
-        need_heart_color: Option<String>,
+        need_heart_color: Option<Box<str>>,
         #[serde(default)]
-        distinct: Option<String>,
+        distinct: Option<DistinctType>,
         #[serde(default)]
-        state_change: Option<String>,
+        state_change: Option<Box<str>>,
         #[serde(default)]
         self_cost: Option<bool>,
         #[serde(default)]
@@ -918,7 +921,7 @@ pub enum EffectKind {
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
-        cost_reference: Option<String>,
+        cost_reference: Option<Box<str>>,
         #[serde(default)]
         cost_offset: Option<i32>,
         #[serde(default)]
@@ -930,11 +933,11 @@ pub enum EffectKind {
         #[serde(default)]
         baton_touch_trigger: Option<bool>,
         #[serde(default)]
-        target_member: Option<String>,
+        target_member: Option<Box<str>>,
         #[serde(default)]
         same_unit_name: Option<bool>,
         #[serde(default)]
-        action_by: Option<String>,
+        action_by: Option<Box<str>>,
         #[serde(default)]
         activation_condition_parsed: Option<Box<Condition>>,
         #[serde(default)]
@@ -945,13 +948,13 @@ pub enum EffectKind {
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
-        card_type: Option<String>,
+        card_type: Option<Box<str>>,
         #[serde(default)]
         dynamic_count: Option<DynamicCount>,
         #[serde(default)]
         card_names: Vec<String>,
         #[serde(default)]
-        location: Option<String>,
+        location: Option<Box<str>>,
         #[serde(default)]
         exclude_self: Option<bool>,
         #[serde(default)]
@@ -959,30 +962,30 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_count: Option<u32>,
         #[serde(default)]
-        per_unit_type: Option<String>,
+        per_unit_type: Option<Box<str>>,
         #[serde(default)]
         per_unit_heart_colors: Vec<String>,
         #[serde(default)]
-        per_unit_location: Option<String>,
+        per_unit_location: Option<Box<str>>,
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
-        state: Option<String>,
+        state: Option<Box<str>>,
         #[serde(default)]
         heart_colors: Vec<String>,
         #[serde(default)]
-        trigger_type: Option<String>,
+        trigger_type: Option<Box<str>>,
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
-        action_by: Option<String>,
+        action_by: Option<Box<str>>,
     },
     /// SelectTarget effect fields
     SelectTarget {
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
-        card_type: Option<String>,
+        card_type: Option<Box<str>>,
         #[serde(default)]
         characters: Option<Vec<String>>,
         #[serde(default)]
@@ -994,7 +997,7 @@ pub enum EffectKind {
         #[serde(default)]
         cost_limit: Option<u32>,
         #[serde(default)]
-        cost_limit_operator: Option<String>,
+        cost_limit_operator: Option<Operator>,
         #[serde(default)]
         cost_limit_min: Option<u32>,
         #[serde(default)]
@@ -1006,21 +1009,21 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_selected: Option<bool>,
         #[serde(default)]
-        placement_order: Option<String>,
+        placement_order: Option<PlacementOrder>,
         #[serde(default)]
-        distinct: Option<String>,
+        distinct: Option<DistinctType>,
         #[serde(default)]
-        name_constraint: Option<String>,
+        name_constraint: Option<Box<str>>,
         #[serde(default)]
-        name_constraint_source: Option<String>,
+        name_constraint_source: Option<Box<str>>,
         #[serde(default)]
-        ability_filter: Option<String>,
+        ability_filter: Option<AbilityFilter>,
         #[serde(default)]
         ability_filter_triggers: Option<Vec<String>>,
         #[serde(default)]
         or_ability_filters: Option<Vec<AbilityFilterBranch>>,
         #[serde(default)]
-        card_property: Option<String>,
+        card_property: Option<Box<str>>,
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
@@ -1032,31 +1035,31 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_count: Option<u32>,
         #[serde(default)]
-        per_unit_type: Option<String>,
+        per_unit_type: Option<Box<str>>,
         #[serde(default)]
         per_unit_heart_colors: Vec<String>,
         #[serde(default)]
-        per_unit_location: Option<String>,
+        per_unit_location: Option<Box<str>>,
         #[serde(default)]
         optional: Option<bool>,
         #[serde(default)]
-        location: Option<String>,
+        location: Option<Box<str>>,
         #[serde(default)]
-        state: Option<String>,
+        state: Option<Box<str>>,
         #[serde(default)]
-        activation_position: Option<String>,
+        activation_position: Option<Box<str>>,
         #[serde(default)]
-        group_reference: Option<String>,
+        group_reference: Option<Box<str>>,
         #[serde(default)]
         multiple_targets: Option<bool>,
         #[serde(default)]
-        question: Option<String>,
+        question: Option<Box<str>>,
         #[serde(default)]
         answers: Option<Vec<String>>,
         #[serde(default)]
-        choice_maker: Option<String>,
+        choice_maker: Option<Box<str>>,
         #[serde(default)]
-        choice_type: Option<String>,
+        choice_type: Option<Box<str>>,
         #[serde(default)]
         choice_options: Option<Vec<String>>,
         #[serde(default)]
@@ -1066,17 +1069,17 @@ pub enum EffectKind {
         #[serde(default)]
         cost_total: Option<u32>,
         #[serde(default)]
-        cost_total_operator: Option<String>,
+        cost_total_operator: Option<Operator>,
         #[serde(default)]
         or_card_types: Option<Vec<String>>,
         #[serde(default)]
-        action_by: Option<String>,
+        action_by: Option<Box<str>>,
         #[serde(default)]
         require_all_heart_colors: Option<bool>,
         #[serde(default)]
         heart_color_count: Option<u32>,
         #[serde(default)]
-        options: Option<Vec<AbilityEffect>>,
+        options: Option<Vec<Box<AbilityEffect>>>,
         #[serde(default)]
         per_group: Option<bool>,
         #[serde(default)]
@@ -1091,7 +1094,7 @@ pub enum EffectKind {
     /// LookReveal effect fields
     LookReveal {
         #[serde(default)]
-        card_type: Option<String>,
+        card_type: Option<Box<str>>,
         #[serde(default)]
         characters: Option<Vec<String>>,
         #[serde(default)]
@@ -1103,7 +1106,7 @@ pub enum EffectKind {
         #[serde(default)]
         cost_limit: Option<u32>,
         #[serde(default)]
-        cost_limit_operator: Option<String>,
+        cost_limit_operator: Option<Operator>,
         #[serde(default)]
         cost_limit_min: Option<u32>,
         #[serde(default)]
@@ -1113,19 +1116,19 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_self: Option<bool>,
         #[serde(default)]
-        distinct: Option<String>,
+        distinct: Option<DistinctType>,
         #[serde(default)]
-        name_constraint: Option<String>,
+        name_constraint: Option<Box<str>>,
         #[serde(default)]
-        name_constraint_source: Option<String>,
+        name_constraint_source: Option<Box<str>>,
         #[serde(default)]
-        ability_filter: Option<String>,
+        ability_filter: Option<AbilityFilter>,
         #[serde(default)]
         ability_filter_triggers: Option<Vec<String>>,
         #[serde(default)]
         or_ability_filters: Option<Vec<AbilityFilterBranch>>,
         #[serde(default)]
-        card_property: Option<String>,
+        card_property: Option<Box<str>>,
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
@@ -1137,15 +1140,15 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_count: Option<u32>,
         #[serde(default)]
-        per_unit_type: Option<String>,
+        per_unit_type: Option<Box<str>>,
         #[serde(default)]
         per_unit_heart_colors: Vec<String>,
         #[serde(default)]
-        per_unit_location: Option<String>,
+        per_unit_location: Option<Box<str>>,
         #[serde(default)]
-        location: Option<String>,
+        location: Option<Box<str>>,
         #[serde(default)]
-        group_reference: Option<String>,
+        group_reference: Option<Box<str>>,
         #[serde(default)]
         dynamic_count: Option<DynamicCount>,
         #[serde(default)]
@@ -1155,9 +1158,9 @@ pub enum EffectKind {
         #[serde(default)]
         filter_targets_by_heart_colors: Option<bool>,
         #[serde(default)]
-        activation_position: Option<String>,
+        activation_position: Option<Box<str>>,
         #[serde(default)]
-        state: Option<String>,
+        state: Option<Box<str>>,
         #[serde(default)]
         optional: Option<bool>,
         #[serde(default)]
@@ -1165,11 +1168,11 @@ pub enum EffectKind {
         #[serde(default)]
         is_reveal: Option<bool>,
         #[serde(default)]
-        picker: Option<String>,
+        picker: Option<Box<str>>,
         #[serde(default)]
         multiple_targets: Option<bool>,
         #[serde(default)]
-        options: Option<Vec<AbilityEffect>>,
+        options: Option<Vec<Box<AbilityEffect>>>,
         #[serde(default)]
         resource_on_select: Option<Box<AbilityEffect>>,
         #[serde(default)]
@@ -1180,13 +1183,13 @@ pub enum EffectKind {
     /// ModifyScore effect fields
     ModifyScore {
         #[serde(default)]
-        operation: Option<String>,
+        operation: Option<Box<str>>,
         #[serde(default)]
         value: Option<u32>,
         #[serde(default)]
-        duration: Option<String>,
+        duration: Option<Box<str>>,
         #[serde(default)]
-        card_type: Option<String>,
+        card_type: Option<Box<str>>,
         #[serde(default)]
         group_names: Option<Vec<String>>,
         #[serde(default)]
@@ -1194,15 +1197,15 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_count: Option<u32>,
         #[serde(default)]
-        per_unit_type: Option<String>,
+        per_unit_type: Option<Box<str>>,
         #[serde(default)]
-        per_unit_location: Option<String>,
+        per_unit_location: Option<Box<str>>,
         #[serde(default)]
         per_unit_heart_colors: Vec<String>,
         #[serde(default)]
-        location: Option<String>,
+        location: Option<Box<str>>,
         #[serde(default)]
-        effect_constraint: Option<String>,
+        effect_constraint: Option<Box<str>>,
         #[serde(default)]
         self_target: Option<bool>,
         #[serde(default)]
@@ -1218,36 +1221,36 @@ pub enum EffectKind {
         #[serde(default)]
         cost_total: Option<u32>,
         #[serde(default)]
-        cost_total_operator: Option<String>,
+        cost_total_operator: Option<Operator>,
         #[serde(default)]
-        distinct: Option<String>,
+        distinct: Option<DistinctType>,
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
-        activation_position: Option<String>,
+        activation_position: Option<Box<str>>,
         #[serde(default)]
         card_names: Vec<String>,
         #[serde(default)]
-        card_property: Option<String>,
+        card_property: Option<Box<str>>,
         #[serde(default)]
-        state: Option<String>,
+        state: Option<Box<str>>,
         #[serde(default)]
         negation: Option<bool>,
         #[serde(default)]
         max_repeats: Option<u32>,
         #[serde(default)]
-        need_heart_operator: Option<String>,
+        need_heart_operator: Option<Operator>,
         #[serde(default)]
         need_heart_total: Option<u32>,
     },
     /// ModifyHearts effect fields
     ModifyHearts {
         #[serde(default)]
-        operation: Option<String>,
+        operation: Option<Box<str>>,
         #[serde(default)]
         value: Option<u32>,
         #[serde(default)]
-        duration: Option<String>,
+        duration: Option<Box<str>>,
         #[serde(default)]
         heart_colors: Vec<String>,
         #[serde(default)]
@@ -1259,15 +1262,15 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_heart_colors: Vec<String>,
         #[serde(default)]
-        location: Option<String>,
+        location: Option<Box<str>>,
         #[serde(default)]
-        timing_condition: Option<String>,
+        timing_condition: Option<Box<str>>,
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
         original_count: Option<u32>,
         #[serde(default)]
-        original_operator: Option<String>,
+        original_operator: Option<Operator>,
         #[serde(default)]
         exclude_self: Option<bool>,
         #[serde(default)]
@@ -1277,7 +1280,7 @@ pub enum EffectKind {
         #[serde(default)]
         repeat_limit: Option<u32>,
         #[serde(default)]
-        card_type: Option<String>,
+        card_type: Option<Box<str>>,
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
@@ -1285,9 +1288,9 @@ pub enum EffectKind {
         #[serde(default)]
         cost_total: Option<u32>,
         #[serde(default)]
-        cost_total_operator: Option<String>,
+        cost_total_operator: Option<Operator>,
         #[serde(default)]
-        group_reference: Option<String>,
+        group_reference: Option<Box<str>>,
         #[serde(default)]
         negation: Option<bool>,
         #[serde(default)]
@@ -1297,22 +1300,22 @@ pub enum EffectKind {
         #[serde(default)]
         all: Option<bool>,
         #[serde(default)]
-        per_unit_type: Option<String>,
+        per_unit_type: Option<Box<str>>,
         #[serde(default)]
-        distinct: Option<String>,
+        distinct: Option<DistinctType>,
     },
     /// GainResource effect fields
     GainResource {
         #[serde(default)]
-        resource: Option<String>,
+        resource: Option<Box<str>>,
         #[serde(default)]
         heart_colors: Vec<String>,
         #[serde(default)]
         heart_colors_from_selected_card: Option<bool>,
         #[serde(default)]
-        sign: Option<String>,
+        sign: Option<Box<str>>,
         #[serde(default)]
-        operation: Option<String>,
+        operation: Option<Box<str>>,
         #[serde(default)]
         value: Option<u32>,
         #[serde(default, alias = "energy")]
@@ -1322,7 +1325,7 @@ pub enum EffectKind {
         #[serde(default)]
         optional: Option<bool>,
         #[serde(default)]
-        duration: Option<String>,
+        duration: Option<Box<str>>,
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
@@ -1332,21 +1335,21 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_count: Option<u32>,
         #[serde(default)]
-        per_unit_type: Option<String>,
+        per_unit_type: Option<Box<str>>,
         #[serde(default)]
         per_unit_heart_colors: Vec<String>,
         #[serde(default)]
-        per_unit_location: Option<String>,
+        per_unit_location: Option<Box<str>>,
         #[serde(default)]
-        location: Option<String>,
+        location: Option<Box<str>>,
         #[serde(default)]
         group_names: Option<Vec<String>>,
         #[serde(default)]
-        card_type: Option<String>,
+        card_type: Option<Box<str>>,
         #[serde(default)]
         cost_limit: Option<u32>,
         #[serde(default)]
-        cost_limit_operator: Option<String>,
+        cost_limit_operator: Option<Operator>,
         #[serde(default)]
         characters: Option<Vec<String>>,
         #[serde(default)]
@@ -1358,7 +1361,7 @@ pub enum EffectKind {
         #[serde(default)]
         target_from_selection: Option<bool>,
         #[serde(default)]
-        card_property: Option<String>,
+        card_property: Option<Box<str>>,
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
@@ -1366,11 +1369,11 @@ pub enum EffectKind {
         #[serde(default)]
         filter_targets_by_heart_colors: Option<bool>,
         #[serde(default)]
-        activation_position: Option<String>,
+        activation_position: Option<Box<str>>,
         #[serde(default)]
-        state: Option<String>,
+        state: Option<Box<str>>,
         #[serde(default)]
-        heart_type: Option<String>,
+        heart_type: Option<Box<str>>,
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
@@ -1380,15 +1383,15 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_self: Option<bool>,
         #[serde(default)]
-        group_reference: Option<String>,
+        group_reference: Option<Box<str>>,
         #[serde(default)]
-        trigger_type: Option<String>,
+        trigger_type: Option<Box<str>>,
         #[serde(default)]
-        distinct: Option<String>,
+        distinct: Option<DistinctType>,
         #[serde(default)]
-        heart_color: Option<String>,
+        heart_color: Option<Box<str>>,
         #[serde(default)]
-        action_by: Option<String>,
+        action_by: Option<Box<str>>,
         #[serde(default)]
         activation_condition_parsed: Option<Box<Condition>>,
         #[serde(default)]
@@ -1396,7 +1399,7 @@ pub enum EffectKind {
         #[serde(default, alias = "max_repeats")]
         repeat_limit: Option<u32>,
         #[serde(default)]
-        timing_condition: Option<String>,
+        timing_condition: Option<Box<str>>,
         #[serde(default)]
         require_all_heart_colors: Option<bool>,
         #[serde(default)]
@@ -1405,13 +1408,13 @@ pub enum EffectKind {
     /// ChangeState effect fields
     ChangeState {
         #[serde(default)]
-        state_change: Option<String>,
+        state_change: Option<Box<str>>,
         #[serde(default)]
-        card_type: Option<String>,
+        card_type: Option<Box<str>>,
         #[serde(default)]
         cost_limit: Option<u32>,
         #[serde(default)]
-        cost_limit_operator: Option<String>,
+        cost_limit_operator: Option<Operator>,
         #[serde(default)]
         cost_from_revealed: Option<bool>,
         #[serde(default)]
@@ -1429,21 +1432,21 @@ pub enum EffectKind {
         #[serde(default)]
         blade_limit: Option<u32>,
         #[serde(default)]
-        blade_limit_operator: Option<String>,
+        blade_limit_operator: Option<Operator>,
         #[serde(default)]
         per_unit: Option<bool>,
         #[serde(default)]
         per_unit_count: Option<u32>,
         #[serde(default)]
-        per_unit_type: Option<String>,
+        per_unit_type: Option<Box<str>>,
         #[serde(default)]
         per_unit_heart_colors: Vec<String>,
         #[serde(default)]
-        per_unit_location: Option<String>,
+        per_unit_location: Option<Box<str>>,
         #[serde(default)]
-        location: Option<String>,
+        location: Option<Box<str>>,
         #[serde(default)]
-        distinct: Option<String>,
+        distinct: Option<DistinctType>,
         #[serde(default)]
         exclude_self: Option<bool>,
         #[serde(default)]
@@ -1459,23 +1462,23 @@ pub enum EffectKind {
         #[serde(default)]
         cost_total: Option<u32>,
         #[serde(default)]
-        cost_total_operator: Option<String>,
+        cost_total_operator: Option<Operator>,
         #[serde(default)]
-        card_property: Option<String>,
+        card_property: Option<Box<str>>,
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
-        name_constraint: Option<String>,
+        name_constraint: Option<Box<str>>,
         #[serde(default)]
-        name_constraint_source: Option<String>,
+        name_constraint_source: Option<Box<str>>,
         #[serde(default)]
         filter_targets_by_heart_colors: Option<bool>,
         #[serde(default)]
-        group_reference: Option<String>,
+        group_reference: Option<Box<str>>,
         #[serde(default)]
-        activation_position: Option<String>,
+        activation_position: Option<Box<str>>,
         #[serde(default)]
-        ability_filter: Option<String>,
+        ability_filter: Option<AbilityFilter>,
         #[serde(default)]
         ability_filter_triggers: Option<Vec<String>>,
         #[serde(default)]
@@ -1489,30 +1492,30 @@ pub enum EffectKind {
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
-        state: Option<String>,
+        state: Option<Box<str>>,
         #[serde(default)]
-        action_by: Option<String>,
+        action_by: Option<Box<str>>,
         #[serde(default)]
         activation_condition_parsed: Option<Box<Condition>>,
     },
     /// AbilityOp effect fields
     AbilityOp {
         #[serde(default)]
-        ability_gain: Option<String>,
+        ability_gain: Option<Box<str>>,
         #[serde(default)]
-        ability_gain_trigger: Option<String>,
+        ability_gain_trigger: Option<Box<str>>,
         #[serde(default)]
         gained_effect: Option<Box<AbilityEffect>>,
         #[serde(default)]
-        ability_text: Option<String>,
+        ability_text: Option<Box<str>>,
         #[serde(default)]
-        target_trigger: Option<String>,
+        target_trigger: Option<Box<str>>,
         #[serde(default)]
-        source_card: Option<String>,
+        source_card: Option<Box<str>>,
         #[serde(default)]
-        suppressed_trigger: Option<String>,
+        suppressed_trigger: Option<Box<str>>,
         #[serde(default)]
-        card_type: Option<String>,
+        card_type: Option<Box<str>>,
         #[serde(default)]
         group_names: Option<Vec<String>>,
         #[serde(default)]
@@ -1524,33 +1527,33 @@ pub enum EffectKind {
         #[serde(default)]
         cost_limit: Option<u32>,
         #[serde(default)]
-        cost_limit_operator: Option<String>,
+        cost_limit_operator: Option<Operator>,
         #[serde(default)]
-        location: Option<String>,
+        location: Option<Box<str>>,
         #[serde(default)]
         trigger_filter: Option<Vec<String>>,
         #[serde(default)]
-        trigger_type: Option<String>,
+        trigger_type: Option<Box<str>>,
         #[serde(default)]
-        duration: Option<String>,
+        duration: Option<Box<str>>,
         #[serde(default)]
         self_target: Option<bool>,
         #[serde(default)]
         exclude_self: Option<bool>,
         #[serde(default)]
-        effect_type: Option<String>,
+        effect_type: Option<Box<str>>,
         #[serde(default)]
         use_limit: Option<u32>,
         #[serde(default)]
-        triggers: Option<String>,
+        triggers: Option<Box<str>>,
         #[serde(default)]
         activation_condition_parsed: Option<Box<Condition>>,
         #[serde(default)]
-        option: Option<String>,
+        option: Option<Box<str>>,
         #[serde(default)]
         all: Option<bool>,
         #[serde(default)]
-        activation_position: Option<String>,
+        activation_position: Option<Box<str>>,
         #[serde(default)]
         heart_colors: Vec<String>,
         #[serde(default)]
@@ -1561,17 +1564,17 @@ pub enum EffectKind {
         #[serde(default, alias = "max_repeats")]
         repeat_limit: Option<u32>,
         #[serde(default)]
-        options: Option<Vec<AbilityEffect>>,
+        options: Option<Vec<Box<AbilityEffect>>>,
         #[serde(default)]
-        choice_type: Option<String>,
+        choice_type: Option<Box<str>>,
         #[serde(default)]
         choice_options: Option<Vec<String>>,
         #[serde(default)]
-        question: Option<String>,
+        question: Option<Box<str>>,
         #[serde(default)]
         answers: Option<Vec<String>>,
         #[serde(default)]
-        choice_maker: Option<String>,
+        choice_maker: Option<Box<str>>,
         #[serde(default)]
         alternative_effect: Option<Box<AbilityEffect>>,
         #[serde(default)]
@@ -1585,17 +1588,17 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_self: Option<bool>,
         #[serde(default)]
-        duration: Option<String>,
+        duration: Option<Box<str>>,
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
         all: Option<bool>,
         #[serde(default)]
-        activation_position: Option<String>,
+        activation_position: Option<Box<str>>,
         #[serde(default)]
-        card_type: Option<String>,
+        card_type: Option<Box<str>>,
         #[serde(default)]
-        trigger_type: Option<String>,
+        trigger_type: Option<Box<str>>,
         #[serde(default)]
         activation_condition_parsed: Option<Box<Condition>>,
         #[serde(default)]
@@ -1603,54 +1606,54 @@ pub enum EffectKind {
         #[serde(default)]
         shuffle: Option<bool>,
         #[serde(default)]
-        distinct: Option<String>,
+        distinct: Option<DistinctType>,
         #[serde(default)]
-        group_reference: Option<String>,
+        group_reference: Option<Box<str>>,
         #[serde(default)]
         per_unit: Option<bool>,
         #[serde(default)]
         per_unit_count: Option<u32>,
         #[serde(default)]
-        per_unit_type: Option<String>,
+        per_unit_type: Option<Box<str>>,
         #[serde(default)]
-        alternative_count_type: Option<String>,
+        alternative_count_type: Option<Box<str>>,
     },
     /// RestrictionOp effect fields
     RestrictionOp {
         #[serde(default)]
-        restriction_type: Option<String>,
+        restriction_type: Option<Box<str>>,
         #[serde(default)]
-        restricted_destination: Option<String>,
+        restricted_destination: Option<Box<str>>,
         #[serde(default)]
         delayed: Option<bool>,
         #[serde(default)]
-        timing: Option<String>,
+        timing: Option<Box<str>>,
         #[serde(default)]
-        treat_as: Option<String>,
+        treat_as: Option<Box<str>>,
         #[serde(default)]
-        timing_condition: Option<String>,
+        timing_condition: Option<Box<str>>,
         #[serde(default)]
-        phase: Option<String>,
+        phase: Option<Box<str>>,
         #[serde(default)]
         non_stackable: Option<bool>,
         #[serde(default)]
-        operation: Option<String>,
+        operation: Option<Box<str>>,
         #[serde(default)]
-        card_type: Option<String>,
+        card_type: Option<Box<str>>,
         #[serde(default)]
-        location: Option<String>,
+        location: Option<Box<str>>,
         #[serde(default)]
-        effect_type: Option<String>,
+        effect_type: Option<Box<str>>,
         #[serde(default)]
-        replaces_event: Option<String>,
+        replaces_event: Option<Box<str>>,
         #[serde(default)]
         choice_based: Option<bool>,
         #[serde(default)]
-        trigger_type: Option<String>,
+        trigger_type: Option<Box<str>>,
         #[serde(default)]
         trigger_filter: Option<Vec<String>>,
         #[serde(default)]
-        duration: Option<String>,
+        duration: Option<Box<str>>,
         #[serde(default)]
         self_target: Option<bool>,
         #[serde(default)]
@@ -1669,17 +1672,17 @@ pub enum EffectKind {
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
-        target_member: Option<String>,
+        target_member: Option<Box<str>>,
         #[serde(default)]
-        source_position: Option<String>,
+        source_position: Option<Box<str>>,
         #[serde(default)]
-        exclude_position: Option<String>,
+        exclude_position: Option<Box<str>>,
         #[serde(default)]
         allow_occupied_stage: Option<bool>,
         #[serde(default)]
         optional: Option<bool>,
         #[serde(default)]
-        card_type: Option<String>,
+        card_type: Option<Box<str>>,
         #[serde(default)]
         group_names: Option<Vec<String>>,
         #[serde(default)]
@@ -1691,7 +1694,7 @@ pub enum EffectKind {
         #[serde(default)]
         cost_limit: Option<u32>,
         #[serde(default)]
-        cost_limit_operator: Option<String>,
+        cost_limit_operator: Option<Operator>,
         #[serde(default)]
         energy_count: Option<u32>,
         #[serde(default)]
@@ -1707,20 +1710,20 @@ pub enum EffectKind {
         #[serde(default)]
         self_target: Option<bool>,
         #[serde(default)]
-        state: Option<String>,
+        state: Option<Box<str>>,
         #[serde(default)]
-        activation_position: Option<String>,
+        activation_position: Option<Box<str>>,
         #[serde(default)]
-        group_reference: Option<String>,
+        group_reference: Option<Box<str>>,
     },
     /// MiscOp effect fields
     MiscOp {
         #[serde(default)]
-        operation: Option<String>,
+        operation: Option<Box<str>>,
         #[serde(default)]
         value: Option<u32>,
         #[serde(default)]
-        card_type: Option<String>,
+        card_type: Option<Box<str>>,
         #[serde(default)]
         group_names: Option<Vec<String>>,
         #[serde(default)]
@@ -1732,19 +1735,19 @@ pub enum EffectKind {
         #[serde(default)]
         cost_limit: Option<u32>,
         #[serde(default)]
-        cost_limit_operator: Option<String>,
+        cost_limit_operator: Option<Operator>,
         #[serde(default)]
-        location: Option<String>,
+        location: Option<Box<str>>,
         #[serde(default)]
-        duration: Option<String>,
+        duration: Option<Box<str>>,
         #[serde(default)]
         heart_colors: Vec<String>,
         #[serde(default)]
-        heart_type: Option<String>,
+        heart_type: Option<Box<str>>,
         #[serde(default)]
         heart_selection: Option<bool>,
         #[serde(default)]
-        blade_type: Option<String>,
+        blade_type: Option<Box<str>>,
         #[serde(default)]
         self_target: Option<bool>,
         #[serde(default)]
@@ -1760,11 +1763,11 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_count: Option<u32>,
         #[serde(default)]
-        per_unit_type: Option<String>,
+        per_unit_type: Option<Box<str>>,
         #[serde(default)]
         per_unit_heart_colors: Vec<String>,
         #[serde(default)]
-        per_unit_location: Option<String>,
+        per_unit_location: Option<Box<str>>,
         #[serde(default)]
         repeat_limit: Option<u32>,
         #[serde(default)]
@@ -1772,31 +1775,31 @@ pub enum EffectKind {
         #[serde(default)]
         all_regions: Option<bool>,
         #[serde(default)]
-        timing: Option<String>,
+        timing: Option<Box<str>>,
         #[serde(default)]
-        treat_as: Option<String>,
+        treat_as: Option<Box<str>>,
         #[serde(default)]
-        effect_constraint: Option<String>,
+        effect_constraint: Option<Box<str>>,
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
         original_count: Option<u32>,
         #[serde(default)]
-        original_operator: Option<String>,
+        original_operator: Option<Operator>,
         #[serde(default)]
         original_cost: Option<u32>,
         #[serde(default)]
         blade_limit: Option<u32>,
         #[serde(default)]
-        blade_limit_operator: Option<String>,
+        blade_limit_operator: Option<Operator>,
         #[serde(default)]
         negation: Option<bool>,
         #[serde(default)]
-        activation_position: Option<String>,
+        activation_position: Option<Box<str>>,
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
-        group_reference: Option<String>,
+        group_reference: Option<Box<str>>,
         #[serde(default)]
         parenthetical: Option<Vec<String>>,
         #[serde(default)]
@@ -1804,7 +1807,7 @@ pub enum EffectKind {
         #[serde(default)]
         same_unit_name: Option<bool>,
         #[serde(default)]
-        alternative_count_type: Option<String>,
+        alternative_count_type: Option<Box<str>>,
         #[serde(default)]
         per_group: Option<bool>,
         #[serde(default)]
@@ -1814,19 +1817,19 @@ pub enum EffectKind {
         #[serde(default)]
         cost_total: Option<u32>,
         #[serde(default)]
-        cost_total_operator: Option<String>,
+        cost_total_operator: Option<Operator>,
         #[serde(default)]
-        cost_reference: Option<String>,
+        cost_reference: Option<Box<str>>,
         #[serde(default)]
         cost_offset: Option<i32>,
         #[serde(default)]
         blind: Option<bool>,
         #[serde(default)]
-        picker: Option<String>,
+        picker: Option<Box<str>>,
         #[serde(default)]
         all: Option<bool>,
         #[serde(default)]
-        sign: Option<String>,
+        sign: Option<Box<str>>,
         #[serde(default)]
         heart_color_count: Option<u32>,
         #[serde(default)]
@@ -1834,13 +1837,13 @@ pub enum EffectKind {
         #[serde(default)]
         energy_count: Option<u32>,
         #[serde(default)]
-        placement_order: Option<String>,
+        placement_order: Option<PlacementOrder>,
         #[serde(default)]
-        ref_value: Option<String>,
+        ref_value: Option<Box<str>>,
         #[serde(default)]
         ref_offset: Option<i32>,
         #[serde(default)]
-        id: Option<String>,
+        id: Option<Box<str>>,
         #[serde(default)]
         card_names: Vec<String>,
         #[serde(default)]
@@ -1848,26 +1851,26 @@ pub enum EffectKind {
         #[serde(default)]
         or_card_types: Option<Vec<String>>,
         #[serde(default)]
-        options: Option<Vec<AbilityEffect>>,
+        options: Option<Vec<Box<AbilityEffect>>>,
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
-        ability_filter: Option<String>,
+        ability_filter: Option<AbilityFilter>,
     },
     /// CustomOp effect fields
     CustomOp {
         #[serde(default)]
-        action_by: Option<String>,
+        action_by: Option<Box<str>>,
         #[serde(default)]
         opponent_action: Option<Box<AbilityEffect>>,
         #[serde(default)]
-        effect_type: Option<String>,
+        effect_type: Option<Box<str>>,
         #[serde(default)]
-        replaces_event: Option<String>,
+        replaces_event: Option<Box<str>>,
         #[serde(default)]
         choice_based: Option<bool>,
         #[serde(default)]
-        card_type: Option<String>,
+        card_type: Option<Box<str>>,
         #[serde(default)]
         group_names: Option<Vec<String>>,
         #[serde(default)]
@@ -1881,17 +1884,17 @@ pub enum EffectKind {
         #[serde(default)]
         all_regions: Option<bool>,
         #[serde(default)]
-        question: Option<String>,
+        question: Option<Box<str>>,
         #[serde(default)]
         answers: Option<Vec<String>>,
         #[serde(default)]
-        choice_maker: Option<String>,
+        choice_maker: Option<Box<str>>,
         #[serde(default)]
-        options: Option<Vec<AbilityEffect>>,
+        options: Option<Vec<Box<AbilityEffect>>>,
         #[serde(default)]
-        location: Option<String>,
+        location: Option<Box<str>>,
         #[serde(default)]
-        duration: Option<String>,
+        duration: Option<Box<str>>,
         #[serde(default)]
         self_target: Option<bool>,
         #[serde(default)]
@@ -1899,11 +1902,11 @@ pub enum EffectKind {
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
-        timing: Option<String>,
+        timing: Option<Box<str>>,
         #[serde(default)]
-        treat_as: Option<String>,
+        treat_as: Option<Box<str>>,
         #[serde(default)]
-        trigger_type: Option<String>,
+        trigger_type: Option<Box<str>>,
         #[serde(default)]
         trigger_filter: Option<Vec<String>>,
         #[serde(default)]
@@ -1911,7 +1914,7 @@ pub enum EffectKind {
         #[serde(default)]
         use_limit: Option<u32>,
         #[serde(default)]
-        triggers: Option<String>,
+        triggers: Option<Box<str>>,
     },
 }
 
@@ -2038,13 +2041,13 @@ pub struct AbilityEffect {
     #[serde(default = "default_empty_string")]
     pub action: String,
     #[serde(default)]
-    pub source: Option<String>,
+    pub source: Option<Box<str>>,
     #[serde(default)]
-    pub destination: Option<String>,
+    pub destination: Option<Box<str>>,
     #[serde(default)]
     pub count: Option<u32>,
     #[serde(default)]
-    pub target: Option<String>,
+    pub target: Option<Box<str>>,
     #[serde(default)]
     pub condition: Option<Box<Condition>>,
     #[serde(flatten)]
@@ -2058,23 +2061,23 @@ pub struct AbilityEffect {
     #[serde(default)]
     pub is_further: Option<bool>,
     #[serde(default)]
-    pub r#ref: Option<String>,
+    pub r#ref: Option<Box<str>>,
     #[serde(default)]
     pub optional: Option<bool>,
     #[serde(default)]
     pub max: Option<bool>,
     #[serde(default)]
-    pub effect_steps: Option<Vec<AbilityEffect>>,
+    pub effect_steps: Option<Vec<Box<AbilityEffect>>>,
 }
 
 impl AbilityEffect {
-    pub fn ability_filter_any(&self) -> Option<&str> {
+    pub fn ability_filter_any(&self) -> Option<AbilityFilter> {
         match &self.kind {
-            Some(EffectKind::MoveCards { ability_filter, .. }) => ability_filter.as_deref(),
-            Some(EffectKind::SelectTarget { ability_filter, .. }) => ability_filter.as_deref(),
-            Some(EffectKind::LookReveal { ability_filter, .. }) => ability_filter.as_deref(),
-            Some(EffectKind::ChangeState { ability_filter, .. }) => ability_filter.as_deref(),
-            Some(EffectKind::MiscOp { ability_filter, .. }) => ability_filter.as_deref(),
+            Some(EffectKind::MoveCards { ability_filter, .. }) => *ability_filter,
+            Some(EffectKind::SelectTarget { ability_filter, .. }) => *ability_filter,
+            Some(EffectKind::LookReveal { ability_filter, .. }) => *ability_filter,
+            Some(EffectKind::ChangeState { ability_filter, .. }) => *ability_filter,
+            Some(EffectKind::MiscOp { ability_filter, .. }) => *ability_filter,
             _ => None,
         }
     }
@@ -2295,16 +2298,16 @@ impl AbilityEffect {
         }
     }
 
-    pub fn blade_limit_operator_any(&self) -> Option<&str> {
+    pub fn blade_limit_operator_any(&self) -> Option<Operator> {
         match &self.kind {
             Some(EffectKind::ChangeState {
                 blade_limit_operator,
                 ..
-            }) => blade_limit_operator.as_deref(),
+            }) => *blade_limit_operator,
             Some(EffectKind::MiscOp {
                 blade_limit_operator,
                 ..
-            }) => blade_limit_operator.as_deref(),
+            }) => *blade_limit_operator,
             _ => None,
         }
     }
@@ -2488,40 +2491,40 @@ impl AbilityEffect {
         }
     }
 
-    pub fn cost_limit_operator_any(&self) -> Option<&str> {
+    pub fn cost_limit_operator_any(&self) -> Option<Operator> {
         match &self.kind {
             Some(EffectKind::MoveCards {
                 cost_limit_operator,
                 ..
-            }) => cost_limit_operator.as_deref(),
+            }) => *cost_limit_operator,
             Some(EffectKind::SelectTarget {
                 cost_limit_operator,
                 ..
-            }) => cost_limit_operator.as_deref(),
+            }) => *cost_limit_operator,
             Some(EffectKind::LookReveal {
                 cost_limit_operator,
                 ..
-            }) => cost_limit_operator.as_deref(),
+            }) => *cost_limit_operator,
             Some(EffectKind::GainResource {
                 cost_limit_operator,
                 ..
-            }) => cost_limit_operator.as_deref(),
+            }) => *cost_limit_operator,
             Some(EffectKind::ChangeState {
                 cost_limit_operator,
                 ..
-            }) => cost_limit_operator.as_deref(),
+            }) => *cost_limit_operator,
             Some(EffectKind::AbilityOp {
                 cost_limit_operator,
                 ..
-            }) => cost_limit_operator.as_deref(),
+            }) => *cost_limit_operator,
             Some(EffectKind::PositionOp {
                 cost_limit_operator,
                 ..
-            }) => cost_limit_operator.as_deref(),
+            }) => *cost_limit_operator,
             Some(EffectKind::MiscOp {
                 cost_limit_operator,
                 ..
-            }) => cost_limit_operator.as_deref(),
+            }) => *cost_limit_operator,
             _ => None,
         }
     }
@@ -2554,32 +2557,32 @@ impl AbilityEffect {
         }
     }
 
-    pub fn cost_total_operator_any(&self) -> Option<&str> {
+    pub fn cost_total_operator_any(&self) -> Option<Operator> {
         match &self.kind {
             Some(EffectKind::MoveCards {
                 cost_total_operator,
                 ..
-            }) => cost_total_operator.as_deref(),
+            }) => *cost_total_operator,
             Some(EffectKind::SelectTarget {
                 cost_total_operator,
                 ..
-            }) => cost_total_operator.as_deref(),
+            }) => *cost_total_operator,
             Some(EffectKind::ModifyScore {
                 cost_total_operator,
                 ..
-            }) => cost_total_operator.as_deref(),
+            }) => *cost_total_operator,
             Some(EffectKind::ModifyHearts {
                 cost_total_operator,
                 ..
-            }) => cost_total_operator.as_deref(),
+            }) => *cost_total_operator,
             Some(EffectKind::ChangeState {
                 cost_total_operator,
                 ..
-            }) => cost_total_operator.as_deref(),
+            }) => *cost_total_operator,
             Some(EffectKind::MiscOp {
                 cost_total_operator,
                 ..
-            }) => cost_total_operator.as_deref(),
+            }) => *cost_total_operator,
             _ => None,
         }
     }
@@ -2603,16 +2606,16 @@ impl AbilityEffect {
         }
     }
 
-    pub fn distinct_any(&self) -> Option<&str> {
+    pub fn distinct_any(&self) -> Option<DistinctType> {
         match &self.kind {
-            Some(EffectKind::MoveCards { distinct, .. }) => distinct.as_deref(),
-            Some(EffectKind::SelectTarget { distinct, .. }) => distinct.as_deref(),
-            Some(EffectKind::LookReveal { distinct, .. }) => distinct.as_deref(),
-            Some(EffectKind::ModifyScore { distinct, .. }) => distinct.as_deref(),
-            Some(EffectKind::GainResource { distinct, .. }) => distinct.as_deref(),
-            Some(EffectKind::ChangeState { distinct, .. }) => distinct.as_deref(),
-            Some(EffectKind::CompoundEffect { distinct, .. }) => distinct.as_deref(),
-            Some(EffectKind::ModifyHearts { distinct, .. }) => distinct.as_deref(),
+            Some(EffectKind::MoveCards { distinct, .. }) => *distinct,
+            Some(EffectKind::SelectTarget { distinct, .. }) => *distinct,
+            Some(EffectKind::LookReveal { distinct, .. }) => *distinct,
+            Some(EffectKind::ModifyScore { distinct, .. }) => *distinct,
+            Some(EffectKind::GainResource { distinct, .. }) => *distinct,
+            Some(EffectKind::ChangeState { distinct, .. }) => *distinct,
+            Some(EffectKind::CompoundEffect { distinct, .. }) => *distinct,
+            Some(EffectKind::ModifyHearts { distinct, .. }) => *distinct,
             _ => None,
         }
     }
@@ -3101,16 +3104,16 @@ impl AbilityEffect {
         }
     }
 
-    pub fn need_heart_operator_any(&self) -> Option<&str> {
+    pub fn need_heart_operator_any(&self) -> Option<Operator> {
         match &self.kind {
             Some(EffectKind::MoveCards {
                 need_heart_operator,
                 ..
-            }) => need_heart_operator.as_deref(),
+            }) => *need_heart_operator,
             Some(EffectKind::ModifyScore {
                 need_heart_operator,
                 ..
-            }) => need_heart_operator.as_deref(),
+            }) => *need_heart_operator,
             _ => None,
         }
     }
@@ -3187,7 +3190,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn options_any(&self) -> Option<&Vec<AbilityEffect>> {
+    pub fn options_any(&self) -> Option<&Vec<Box<AbilityEffect>>> {
         match &self.kind {
             Some(EffectKind::LookReveal { options, .. }) => options.as_ref(),
             Some(EffectKind::CompoundEffect { options, .. }) => options.as_ref(),
@@ -3240,14 +3243,14 @@ impl AbilityEffect {
         }
     }
 
-    pub fn original_operator_any(&self) -> Option<&str> {
+    pub fn original_operator_any(&self) -> Option<Operator> {
         match &self.kind {
             Some(EffectKind::ModifyHearts {
                 original_operator, ..
-            }) => original_operator.as_deref(),
+            }) => *original_operator,
             Some(EffectKind::MiscOp {
                 original_operator, ..
-            }) => original_operator.as_deref(),
+            }) => *original_operator,
             _ => None,
         }
     }
@@ -3431,17 +3434,17 @@ impl AbilityEffect {
         }
     }
 
-    pub fn placement_order_any(&self) -> Option<&str> {
+    pub fn placement_order_any(&self) -> Option<PlacementOrder> {
         match &self.kind {
             Some(EffectKind::MoveCards {
                 placement_order, ..
-            }) => placement_order.as_deref(),
+            }) => *placement_order,
             Some(EffectKind::SelectTarget {
                 placement_order, ..
-            }) => placement_order.as_deref(),
+            }) => *placement_order,
             Some(EffectKind::MiscOp {
                 placement_order, ..
-            }) => placement_order.as_deref(),
+            }) => *placement_order,
             _ => None,
         }
     }
@@ -3813,7 +3816,7 @@ impl AbilityEffect {
 }
 
 impl AbilityEffect {
-    pub fn set_ability_filter(&mut self, val: Option<String>) {
+    pub fn set_ability_filter(&mut self, val: Option<AbilityFilter>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut ability_filter,
@@ -3857,7 +3860,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_ability_gain(&mut self, val: Option<String>) {
+    pub fn set_ability_gain(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::AbilityOp {
                 ref mut ability_gain,
@@ -3867,7 +3870,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_ability_gain_trigger(&mut self, val: Option<String>) {
+    pub fn set_ability_gain_trigger(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::AbilityOp {
                 ref mut ability_gain_trigger,
@@ -3877,7 +3880,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_ability_text(&mut self, val: Option<String>) {
+    pub fn set_ability_text(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::AbilityOp {
                 ref mut ability_text,
@@ -3887,7 +3890,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_action_by(&mut self, val: Option<String>) {
+    pub fn set_action_by(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::CustomOp {
                 ref mut action_by, ..
@@ -3896,7 +3899,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_activation_position(&mut self, val: Option<String>) {
+    pub fn set_activation_position(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut activation_position,
@@ -3969,7 +3972,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_alternative_count_type(&mut self, val: Option<String>) {
+    pub fn set_alternative_count_type(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MiscOp {
                 ref mut alternative_count_type,
@@ -4026,7 +4029,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_blade_limit_operator(&mut self, val: Option<String>) {
+    pub fn set_blade_limit_operator(&mut self, val: Option<Operator>) {
         match &mut self.kind {
             Some(EffectKind::ChangeState {
                 ref mut blade_limit_operator,
@@ -4040,7 +4043,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_blade_type(&mut self, val: Option<String>) {
+    pub fn set_blade_type(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MiscOp {
                 ref mut blade_type, ..
@@ -4080,7 +4083,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_card_property(&mut self, val: Option<String>) {
+    pub fn set_card_property(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut card_property,
@@ -4106,7 +4109,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_card_type(&mut self, val: Option<String>) {
+    pub fn set_card_type(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut card_type, ..
@@ -4208,7 +4211,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_choice_maker(&mut self, val: Option<String>) {
+    pub fn set_choice_maker(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::SelectTarget {
                 ref mut choice_maker,
@@ -4240,7 +4243,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_choice_type(&mut self, val: Option<String>) {
+    pub fn set_choice_type(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::SelectTarget {
                 ref mut choice_type,
@@ -4338,7 +4341,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_cost_limit_operator(&mut self, val: Option<String>) {
+    pub fn set_cost_limit_operator(&mut self, val: Option<Operator>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut cost_limit_operator,
@@ -4386,7 +4389,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_cost_reference(&mut self, val: Option<String>) {
+    pub fn set_cost_reference(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MiscOp {
                 ref mut cost_reference,
@@ -4420,7 +4423,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_cost_total_operator(&mut self, val: Option<String>) {
+    pub fn set_cost_total_operator(&mut self, val: Option<Operator>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut cost_total_operator,
@@ -4469,7 +4472,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_distinct(&mut self, val: Option<String>) {
+    pub fn set_distinct(&mut self, val: Option<DistinctType>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut distinct, ..
@@ -4490,7 +4493,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_duration(&mut self, val: Option<String>) {
+    pub fn set_duration(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::ModifyScore {
                 ref mut duration, ..
@@ -4517,7 +4520,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_effect_constraint(&mut self, val: Option<String>) {
+    pub fn set_effect_constraint(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::ModifyScore {
                 ref mut effect_constraint,
@@ -4531,7 +4534,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_effect_type(&mut self, val: Option<String>) {
+    pub fn set_effect_type(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::AbilityOp {
                 ref mut effect_type,
@@ -4567,7 +4570,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_exclude_by_name_source(&mut self, val: Option<String>) {
+    pub fn set_exclude_by_name_source(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut exclude_by_name_source,
@@ -4687,7 +4690,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_exclude_position(&mut self, val: Option<String>) {
+    pub fn set_exclude_position(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut exclude_position,
@@ -4853,7 +4856,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_group_reference(&mut self, val: Option<String>) {
+    pub fn set_group_reference(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut group_reference,
@@ -4897,7 +4900,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_heart_color(&mut self, val: Option<String>) {
+    pub fn set_heart_color(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::GainResource {
                 ref mut heart_color,
@@ -4927,7 +4930,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_heart_type(&mut self, val: Option<String>) {
+    pub fn set_heart_type(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MiscOp {
                 ref mut heart_type, ..
@@ -4936,7 +4939,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_id(&mut self, val: Option<String>) {
+    pub fn set_id(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MiscOp { ref mut id, .. }) => *id = val,
             _ => {}
@@ -4958,7 +4961,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_location(&mut self, val: Option<String>) {
+    pub fn set_location(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut location, ..
@@ -5028,7 +5031,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_name_constraint(&mut self, val: Option<String>) {
+    pub fn set_name_constraint(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut name_constraint,
@@ -5050,7 +5053,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_name_constraint_source(&mut self, val: Option<String>) {
+    pub fn set_name_constraint_source(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut name_constraint_source,
@@ -5072,7 +5075,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_need_heart_color(&mut self, val: Option<String>) {
+    pub fn set_need_heart_color(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut need_heart_color,
@@ -5082,7 +5085,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_need_heart_operator(&mut self, val: Option<String>) {
+    pub fn set_need_heart_operator(&mut self, val: Option<Operator>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut need_heart_operator,
@@ -5139,7 +5142,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_operation(&mut self, val: Option<String>) {
+    pub fn set_operation(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::ModifyScore {
                 ref mut operation, ..
@@ -5160,7 +5163,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_option(&mut self, val: Option<String>) {
+    pub fn set_option(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::AbilityOp { ref mut option, .. }) => *option = val,
             _ => {}
@@ -5232,7 +5235,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_original_operator(&mut self, val: Option<String>) {
+    pub fn set_original_operator(&mut self, val: Option<Operator>) {
         match &mut self.kind {
             Some(EffectKind::ModifyHearts {
                 ref mut original_operator,
@@ -5381,7 +5384,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_per_unit_location(&mut self, val: Option<String>) {
+    pub fn set_per_unit_location(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::SelectTarget {
                 ref mut per_unit_location,
@@ -5411,7 +5414,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_per_unit_type(&mut self, val: Option<String>) {
+    pub fn set_per_unit_type(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::SelectTarget {
                 ref mut per_unit_type,
@@ -5441,21 +5444,21 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_phase(&mut self, val: Option<String>) {
+    pub fn set_phase(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::RestrictionOp { ref mut phase, .. }) => *phase = val,
             _ => {}
         }
     }
 
-    pub fn set_picker(&mut self, val: Option<String>) {
+    pub fn set_picker(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MiscOp { ref mut picker, .. }) => *picker = val,
             _ => {}
         }
     }
 
-    pub fn set_placement_order(&mut self, val: Option<String>) {
+    pub fn set_placement_order(&mut self, val: Option<PlacementOrder>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut placement_order,
@@ -5473,7 +5476,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_question(&mut self, val: Option<String>) {
+    pub fn set_question(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::SelectTarget {
                 ref mut question, ..
@@ -5497,7 +5500,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_ref_value(&mut self, val: Option<String>) {
+    pub fn set_ref_value(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MiscOp {
                 ref mut ref_value, ..
@@ -5528,7 +5531,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_replaces_event(&mut self, val: Option<String>) {
+    pub fn set_replaces_event(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::RestrictionOp {
                 ref mut replaces_event,
@@ -5562,7 +5565,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_resource(&mut self, val: Option<String>) {
+    pub fn set_resource(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::GainResource {
                 ref mut resource, ..
@@ -5581,7 +5584,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_restricted_destination(&mut self, val: Option<String>) {
+    pub fn set_restricted_destination(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::RestrictionOp {
                 ref mut restricted_destination,
@@ -5591,7 +5594,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_restriction_type(&mut self, val: Option<String>) {
+    pub fn set_restriction_type(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::RestrictionOp {
                 ref mut restriction_type,
@@ -5691,7 +5694,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_sign(&mut self, val: Option<String>) {
+    pub fn set_sign(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::GainResource { ref mut sign, .. }) => *sign = val,
             Some(EffectKind::MiscOp { ref mut sign, .. }) => *sign = val,
@@ -5699,7 +5702,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_source_card(&mut self, val: Option<String>) {
+    pub fn set_source_card(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::AbilityOp {
                 ref mut source_card,
@@ -5709,7 +5712,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_source_position(&mut self, val: Option<String>) {
+    pub fn set_source_position(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards {
                 ref mut source_position,
@@ -5723,7 +5726,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_state(&mut self, val: Option<String>) {
+    pub fn set_state(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::MoveCards { ref mut state, .. }) => *state = val,
             Some(EffectKind::LookReveal { ref mut state, .. }) => *state = val,
@@ -5733,7 +5736,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_state_change(&mut self, val: Option<String>) {
+    pub fn set_state_change(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::ChangeState {
                 ref mut state_change,
@@ -5743,7 +5746,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_suppressed_trigger(&mut self, val: Option<String>) {
+    pub fn set_suppressed_trigger(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::AbilityOp {
                 ref mut suppressed_trigger,
@@ -5801,7 +5804,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_target_member(&mut self, val: Option<String>) {
+    pub fn set_target_member(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::PositionOp {
                 ref mut target_member,
@@ -5811,7 +5814,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_target_trigger(&mut self, val: Option<String>) {
+    pub fn set_target_trigger(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::AbilityOp {
                 ref mut target_trigger,
@@ -5821,7 +5824,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_timing(&mut self, val: Option<String>) {
+    pub fn set_timing(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::RestrictionOp { ref mut timing, .. }) => *timing = val,
             Some(EffectKind::MiscOp { ref mut timing, .. }) => *timing = val,
@@ -5830,7 +5833,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_timing_condition(&mut self, val: Option<String>) {
+    pub fn set_timing_condition(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::ModifyHearts {
                 ref mut timing_condition,
@@ -5844,7 +5847,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_treat_as(&mut self, val: Option<String>) {
+    pub fn set_treat_as(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::RestrictionOp {
                 ref mut treat_as, ..
@@ -5877,7 +5880,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_trigger_type(&mut self, val: Option<String>) {
+    pub fn set_trigger_type(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::AbilityOp {
                 ref mut trigger_type,
@@ -5895,7 +5898,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_triggers(&mut self, val: Option<String>) {
+    pub fn set_triggers(&mut self, val: Option<Box<str>>) {
         match &mut self.kind {
             Some(EffectKind::AbilityOp {
                 ref mut triggers, ..
@@ -5949,7 +5952,7 @@ impl AbilityEffect {
             card_type: self.card_type_any(),
             group: self.group_name(),
             cost_limit: self.cost_limit_any(),
-            cost_operator: self.cost_limit_operator_any(),
+            cost_operator: self.cost_limit_operator_any().map(Operator::as_str),
             characters: self.characters_any(),
             exclude_characters: self.exclude_characters_any(),
             exclude_self: if self.exclude_self_any().unwrap_or(false) {
@@ -6037,29 +6040,29 @@ impl AbilityEffect {
     }
 
     /// Normalized sub-effect steps
-    pub fn normalized_steps(&self) -> Vec<AbilityEffect> {
+    pub fn normalized_steps(&self) -> Vec<Box<AbilityEffect>> {
         if let Some(ref steps) = self.effect_steps {
             return steps.clone();
         }
-        match self.action.as_str() {
+        match self.action.as_ref() {
             "sequential" => self.compound.actions.clone().unwrap_or_default(),
             "look_and_select" => {
-                let mut out = Vec::new();
+                let mut out: Vec<Box<AbilityEffect>> = Vec::new();
                 if let Some(ref la) = self.compound.look_action {
-                    out.push((**la).clone());
+                    out.push(la.clone());
                 }
                 if let Some(ref sa) = self.compound.select_action {
-                    out.push((**sa).clone());
+                    out.push(sa.clone());
                 }
                 if let Some(ref fu) = self.compound.followup_action {
-                    out.push((**fu).clone());
+                    out.push(fu.clone());
                 }
                 out
             }
             "conditional_alternative" => {
-                let mut out = Vec::new();
-                let mut primary = self.compound.primary_effect.clone().map(|b| *b);
-                let mut alternative = self.alternative_effect_any().cloned().map(|b| *b);
+                let mut out: Vec<Box<AbilityEffect>> = Vec::new();
+                let mut primary = self.compound.primary_effect.clone();
+                let mut alternative = self.alternative_effect_any().cloned();
                 let condition = self.compound.alternative_condition.clone();
                 if let Some(mut alt) = alternative.take() {
                     if let Some(cond) = condition {
@@ -6073,12 +6076,12 @@ impl AbilityEffect {
                 out
             }
             "conditional_on_result" => {
-                let mut out = Vec::new();
+                let mut out: Vec<Box<AbilityEffect>> = Vec::new();
                 if let Some(ref pri) = self.compound.primary_effect {
-                    out.push((**pri).clone());
+                    out.push(pri.clone());
                 }
                 if let Some(ref follow) = self.compound.followup_action {
-                    let mut f = (**follow).clone();
+                    let mut f = follow.clone();
                     if let Some(rc) = self.compound.result_condition.clone() {
                         f.condition = Some(rc);
                     }
@@ -6095,8 +6098,7 @@ impl AbilityEffect {
                 step.compound.optional_action = self.compound.optional_action.clone();
                 step.compound.conditional_action = self.compound.conditional_action.clone();
                 step.compound.conditional_negation = self.compound.conditional_negation;
-                step.compound.conditional_negation = self.compound.conditional_negation;
-                vec![step]
+                vec![Box::new(step)]
             }
             _ => Vec::new(),
         }
@@ -6138,8 +6140,8 @@ impl AbilityEffect {
 pub enum PositionInfo {
     String(String),
     Struct {
-        position: Option<String>,
-        target: Option<String>,
+        position: Option<Box<str>>,
+        target: Option<Box<str>>,
     },
 }
 
@@ -6156,10 +6158,10 @@ impl PositionInfo {
 pub struct DynamicCount {
     #[serde(rename = "type")]
     pub count_type: String,
-    pub reference: Option<String>,
-    pub mode: Option<String>,
-    pub base_reference: Option<String>,
-    pub calculation: Option<String>,
+    pub reference: Option<Box<str>>,
+    pub mode: Option<Box<str>>,
+    pub base_reference: Option<Box<str>>,
+    pub calculation: Option<Box<str>>,
     pub calculation_value: Option<u32>,
 }
 
@@ -6192,22 +6194,343 @@ pub struct PositionCharacter {
     pub character: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CardState {
+    #[serde(rename = "active")]
+    Active,
+    #[serde(rename = "wait")]
+    Wait,
+}
+
+impl CardState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CardState::Active => "active",
+            CardState::Wait => "wait",
+        }
+    }
+}
+
+impl std::ops::Deref for CardState {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ComparisonTarget {
+    #[serde(rename = "self")]
+    Self_,
+    #[serde(rename = "opponent")]
+    Opponent,
+}
+
+impl ComparisonTarget {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ComparisonTarget::Self_ => "self",
+            ComparisonTarget::Opponent => "opponent",
+        }
+    }
+}
+
+impl std::ops::Deref for ComparisonTarget {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CardProperty {
+    #[serde(rename = "has_blade_heart")]
+    HasBladeHeart,
+    #[serde(rename = "has_score_icon")]
+    HasScoreIcon,
+    #[serde(rename = "has_all_blade")]
+    HasAllBlade,
+}
+
+impl CardProperty {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CardProperty::HasBladeHeart => "has_blade_heart",
+            CardProperty::HasScoreIcon => "has_score_icon",
+            CardProperty::HasAllBlade => "has_all_blade",
+        }
+    }
+}
+
+impl std::ops::Deref for CardProperty {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PlacementOrder {
+    #[serde(rename = "any_order")]
+    AnyOrder,
+}
+
+impl PlacementOrder {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PlacementOrder::AnyOrder => "any_order",
+        }
+    }
+}
+
+impl std::ops::Deref for PlacementOrder {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DistinctType {
+    #[serde(rename = "card_name")]
+    CardName,
+    #[serde(rename = "true")]
+    True,
+    #[serde(rename = "distinct")]
+    Distinct,
+}
+
+impl DistinctType {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DistinctType::CardName => "card_name",
+            DistinctType::True => "true",
+            DistinctType::Distinct => "distinct",
+        }
+    }
+}
+
+impl std::ops::Deref for DistinctType {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Operator {
+    #[serde(rename = ">=")]
+    Gte,
+    #[serde(rename = "<=")]
+    Lte,
+    #[serde(rename = ">")]
+    Gt,
+    #[serde(rename = "<")]
+    Lt,
+    #[serde(rename = "=", alias = "==")]
+    Eq,
+}
+
+impl Operator {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Operator::Gte => ">=",
+            Operator::Lte => "<=",
+            Operator::Gt => ">",
+            Operator::Lt => "<",
+            Operator::Eq => "=",
+        }
+    }
+}
+
+impl std::ops::Deref for Operator {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ComparisonType {
+    #[serde(rename = "score")]
+    Score,
+    #[serde(rename = "cost")]
+    Cost,
+    #[serde(rename = "count")]
+    Count,
+    #[serde(rename = "equality")]
+    Equality,
+}
+
+impl ComparisonType {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ComparisonType::Score => "score",
+            ComparisonType::Cost => "cost",
+            ComparisonType::Count => "count",
+            ComparisonType::Equality => "equality",
+        }
+    }
+}
+
+impl std::ops::Deref for ComparisonType {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AbilityFilter {
+    #[serde(rename = "no_ability")]
+    NoAbility,
+    #[serde(rename = "has_ability")]
+    HasAbility,
+    #[serde(rename = "has_ability_type")]
+    HasAbilityType,
+    #[serde(rename = "no_ability_type")]
+    NoAbilityType,
+}
+
+impl AbilityFilter {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AbilityFilter::NoAbility => "no_ability",
+            AbilityFilter::HasAbility => "has_ability",
+            AbilityFilter::HasAbilityType => "has_ability_type",
+            AbilityFilter::NoAbilityType => "no_ability_type",
+        }
+    }
+}
+
+impl std::ops::Deref for AbilityFilter {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ConditionTarget {
+    #[serde(rename = "self")]
+    Self_,
+    #[serde(rename = "opponent")]
+    Opponent,
+    #[serde(rename = "both")]
+    Both,
+    #[serde(rename = "either")]
+    Either,
+}
+
+impl ConditionTarget {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ConditionTarget::Self_ => "self",
+            ConditionTarget::Opponent => "opponent",
+            ConditionTarget::Both => "both",
+            ConditionTarget::Either => "either",
+        }
+    }
+}
+
+impl std::ops::Deref for ConditionTarget {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ConditionCardType {
+    #[serde(rename = "member_card")]
+    MemberCard,
+    #[serde(rename = "live_card")]
+    LiveCard,
+    #[serde(rename = "energy_card")]
+    EnergyCard,
+}
+
+impl ConditionCardType {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ConditionCardType::MemberCard => "member_card",
+            ConditionCardType::LiveCard => "live_card",
+            ConditionCardType::EnergyCard => "energy_card",
+        }
+    }
+}
+
+impl std::ops::Deref for ConditionCardType {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Location {
+    #[serde(rename = "stage", alias = "ステージ")]
+    Stage,
+    #[serde(rename = "hand")]
+    Hand,
+    #[serde(rename = "deck")]
+    Deck,
+    #[serde(rename = "deck_top")]
+    DeckTop,
+    #[serde(rename = "discard")]
+    Discard,
+    #[serde(rename = "energy_zone")]
+    EnergyZone,
+    #[serde(rename = "live_card_zone")]
+    LiveCardZone,
+    #[serde(rename = "success_live_card_zone", alias = "success_live_zone")]
+    SuccessLiveZone,
+    #[serde(rename = "under_member")]
+    UnderMember,
+    #[serde(rename = "revealed_cards")]
+    RevealedCards,
+}
+
+impl Location {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Location::Stage => "stage",
+            Location::Hand => "hand",
+            Location::Deck => "deck",
+            Location::DeckTop => "deck_top",
+            Location::Discard => "discard",
+            Location::EnergyZone => "energy_zone",
+            Location::LiveCardZone => "live_card_zone",
+            Location::SuccessLiveZone => "success_live_card_zone",
+            Location::UnderMember => "under_member",
+            Location::RevealedCards => "revealed_cards",
+        }
+    }
+}
+
+impl std::ops::Deref for Location {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct Condition {
     #[serde(default = "default_empty_string")]
     pub text: String,
     #[serde(rename = "type")]
     pub condition_type: Option<crate::ability::enums::ConditionType>,
-    pub location: Option<String>,
+    pub location: Option<Location>,
     pub locations: Option<Vec<String>>,
     pub count: Option<u32>,
-    pub operator: Option<String>,
-    pub card_type: Option<String>,
-    pub target: Option<String>,
+    pub operator: Option<Box<str>>,
+    pub card_type: Option<ConditionCardType>,
+    pub target: Option<ConditionTarget>,
     pub group_names: Option<Vec<String>>,
     /// Dynamic group reference: "same_group_name" — resolve from activating card's unit
     #[serde(default)]
-    pub group_reference: Option<String>,
+    pub group_reference: Option<Box<str>>,
     #[serde(default)]
     pub exclude_group_names: Option<Vec<String>>,
     pub characters: Option<Vec<String>>,
@@ -6218,11 +6541,11 @@ pub struct Condition {
     ///           {"position": "center", "character": "藤島慈"}]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub positions_characters: Option<Vec<PositionCharacter>>,
-    pub state: Option<String>,
+    pub state: Option<CardState>,
     pub position: Option<PositionInfo>,
     /// Cross-position comparison target (e.g. "right_side" when position is "left_side")
     #[serde(default)]
-    pub position_compare: Option<String>,
+    pub position_compare: Option<Box<str>>,
     /// When true, cross-position equality checks require both positions to have
     /// cards.  Empty slots return false instead of treating cost as 0.
     /// Set by Python parser when "にいる" appears near position keywords
@@ -6232,45 +6555,45 @@ pub struct Condition {
     /// Direction for area move: "from" = position is source (was AT this pos),
     /// "to" or absent = position is destination (moved TO this pos).
     #[serde(default)]
-    pub area_direction: Option<String>,
-    pub temporal_scope: Option<String>,
+    pub area_direction: Option<Box<str>>,
+    pub temporal_scope: Option<Box<str>>,
     #[serde(default)]
     pub distinct: Option<DistinctInfo>,
     pub exclude_self: Option<bool>,
     pub any_of: Option<Vec<String>>,
     pub cost_limit: Option<u32>,
     #[serde(default)]
-    pub cost_limit_operator: Option<String>,
+    pub cost_limit_operator: Option<Operator>,
     pub negation: Option<bool>,
     pub baton_touch_trigger: Option<bool>,
-    pub baton_touch_source: Option<String>,
+    pub baton_touch_source: Option<Box<str>>,
     pub min_baton_touch_count: Option<u32>,
-    pub movement_state: Option<String>,
-    pub energy_state: Option<String>,
-    pub comparison_target: Option<String>,
+    pub movement_state: Option<Box<str>>,
+    pub energy_state: Option<Box<str>>,
+    pub comparison_target: Option<ComparisonTarget>,
     #[serde(default)]
-    pub comparison_source: Option<String>,
-    pub movement: Option<String>,
-    pub temporal: Option<String>,
-    pub phase: Option<String>,
-    pub phase_target: Option<String>,
-    pub comparison_type: Option<String>,
+    pub comparison_source: Option<Box<str>>,
+    pub movement: Option<Box<str>>,
+    pub temporal: Option<Box<str>>,
+    pub phase: Option<Box<str>>,
+    pub phase_target: Option<Box<str>>,
+    pub comparison_type: Option<ComparisonType>,
     pub appearance: Option<bool>,
     #[serde(default)]
-    pub appearance_source: Option<String>,
+    pub appearance_source: Option<Box<str>>,
     pub conditions: Option<Vec<Box<Condition>>>,
     pub options: Option<Vec<Box<AbilityEffect>>>,
     #[serde(default)]
     pub condition: Option<Box<Condition>>,
-    pub card_property: Option<String>,
+    pub card_property: Option<CardProperty>,
     // New fields from parser improvements
     pub all_areas: Option<bool>,
     pub no_excess_heart: Option<bool>,
-    pub resource_type: Option<String>,
+    pub resource_type: Option<Box<str>>,
     pub turn_number: Option<u32>,
-    pub activation_position: Option<String>,
+    pub activation_position: Option<Box<str>>,
     pub all: Option<bool>,
-    pub unit: Option<String>,
+    pub unit: Option<Box<str>>,
     pub values: Option<Vec<u32>>,
     // Complex condition fields
     #[serde(default)]
@@ -6282,25 +6605,25 @@ pub struct Condition {
     pub same_name: Option<bool>,
     // Parser-only fields that were missing struct fields
     #[serde(default)]
-    pub from_state: Option<String>,
+    pub from_state: Option<Box<str>>,
     #[serde(default)]
-    pub heart_type: Option<String>,
+    pub heart_type: Option<Box<str>>,
     #[serde(default)]
-    pub to_state: Option<String>,
+    pub to_state: Option<Box<str>>,
     #[serde(default)]
-    pub aggregate: Option<String>,
+    pub aggregate: Option<Box<str>>,
     /// Heart colors required collectively from stage members (e.g. all 6 colors)
     #[serde(default)]
     pub heart_colors: Option<Vec<String>>,
     /// Heart source for heart color checks: "blade" means check blade_heart (ブレードハート),
     /// absent or other value means check base_heart (printed/natural hearts).
     #[serde(default)]
-    pub heart_source: Option<String>,
+    pub heart_source: Option<Box<str>>,
     /// ability_filter: "no_ability" for "能力を持たない" (card does not have abilities)
     /// or "has_ability" for "能力を持つ" (card has abilities)
     /// or "no_ability_type" for "能力も...能力も持たない" (card has neither type)
     #[serde(default)]
-    pub ability_filter: Option<String>,
+    pub ability_filter: Option<AbilityFilter>,
     /// Trigger types excluded by ability_filter (e.g. ["live_start", "live_success"])
     /// Used when ability_filter is "no_ability_type"
     #[serde(default)]
@@ -6314,13 +6637,13 @@ pub struct Condition {
     #[serde(default)]
     pub cost_total: Option<u32>,
     #[serde(default)]
-    pub cost_total_operator: Option<String>,
+    pub cost_total_operator: Option<Operator>,
     /// "元々持つ" — compare against original/natural value, not current modified value
     #[serde(default)]
     pub original_value: Option<bool>,
     /// scope: "both" for conditions that check both players (e.g. energy total of both)
     #[serde(default)]
-    pub scope: Option<String>,
+    pub scope: Option<Box<str>>,
     /// "のみ" — ALL members on stage must match the group (not just any)
     #[serde(default)]
     pub all_members: Option<bool>,
@@ -6329,13 +6652,13 @@ pub struct Condition {
     /// Backward compat: "preceding_moved" / "previous_moved_cards" still signal
     /// the old movement-check pattern.
     #[serde(default)]
-    pub source: Option<String>,
+    pub source: Option<Box<str>>,
     /// Destination zone for movement-based conditions (e.g. "discard", "waitroom", "stage").
     /// When paired with `source` set to a zone name, expresses a zone-transition check
     /// (cards moved FROM source TO destination). Replaces the old pattern of
     /// `source: "preceding_moved"` + `location`/`locations` inference.
     #[serde(default)]
-    pub destination: Option<String>,
+    pub destination: Option<Box<str>>,
     /// "自分のカードの効果" — only trigger if the event was caused by the player's own card effect.
     #[serde(default)]
     pub self_effect_only: Option<bool>,
@@ -6346,11 +6669,11 @@ pub struct Condition {
     /// When set, the subject character (characters list) must have cost greater
     /// than cost_reference_character on the target's stage.
     #[serde(default)]
-    pub cost_reference_character: Option<String>,
+    pub cost_reference_character: Option<Box<str>>,
     #[serde(default)]
-    pub cost_reference_operator: Option<String>,
+    pub cost_reference_operator: Option<Operator>,
     #[serde(default)]
-    pub cost_reference_type: Option<String>,
+    pub cost_reference_type: Option<Box<str>>,
     /// delta: true — check the change (difference) caused by preceding action,
     /// not the absolute current value. Used for surplus heart loss tracking.
     #[serde(default)]
@@ -6359,7 +6682,7 @@ pub struct Condition {
     /// card selected by the preceding select action. Used for "同じカード名"
     /// (same card name) conditions.
     #[serde(default)]
-    pub reference_card: Option<String>,
+    pub reference_card: Option<Box<str>>,
     /// self_target: condition refers to this specific card ("このメンバーが" / "このカードが").
     #[serde(default)]
     pub self_target: Option<bool>,
@@ -6384,35 +6707,35 @@ pub struct Condition {
 #[serde(default)]
 pub struct TriggerEvent {
     #[serde(rename = "type")]
-    pub event_type: Option<String>,
-    pub tense: Option<String>,
-    pub location: Option<String>,
-    pub source_character: Option<String>,
-    pub source_group: Option<String>,
+    pub event_type: Option<Box<str>>,
+    pub tense: Option<Box<str>>,
+    pub location: Option<Box<str>>,
+    pub source_character: Option<Box<str>>,
+    pub source_group: Option<Box<str>>,
     pub cost_comparison: Option<CostComparison>,
     pub min_count: Option<u32>,
     pub exclude_characters: Option<Vec<String>>,
-    pub ability_filter: Option<String>,
+    pub ability_filter: Option<AbilityFilter>,
     pub self_effect_only: Option<bool>,
     pub energy_placed: Option<bool>,
-    pub phase: Option<String>,
-    pub phase_target: Option<String>,
-    pub recurrence: Option<String>,
+    pub phase: Option<Box<str>>,
+    pub phase_target: Option<Box<str>>,
+    pub recurrence: Option<Box<str>>,
     pub events: Option<Vec<TriggerEvent>>,
-    pub source: Option<String>,
-    pub destination: Option<String>,
-    pub from_state: Option<String>,
-    pub to_state: Option<String>,
+    pub source: Option<Box<str>>,
+    pub destination: Option<Box<str>>,
+    pub from_state: Option<Box<str>>,
+    pub to_state: Option<Box<str>>,
 }
 
 /// Cost comparison for baton touch: e.g. "このメンバーよりコストが低い" (cost < activating).
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct CostComparison {
-    pub operator: Option<String>,
-    pub relative_to: Option<String>,
+    pub operator: Option<Operator>,
+    pub relative_to: Option<Box<str>>,
     pub cost_limit: Option<u32>,
-    pub cost_limit_operator: Option<String>,
+    pub cost_limit_operator: Option<Operator>,
 }
 
 impl Condition {

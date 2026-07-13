@@ -12,11 +12,11 @@ WORKDIR /build/engine
 
 COPY engine/Cargo.toml engine/Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs && \
-    cargo build --release --bin rabuka_engine 2>/dev/null || true && \
+    cargo build --release --features server --bin rabuka_engine 2>/dev/null || true && \
     rm -rf src
 
 COPY engine/ ./
-RUN cargo build --release --bin rabuka_engine
+RUN cargo build --release --features server --bin rabuka_engine
 
 # ============================================================
 # Stage 2: Minimal runtime image
@@ -35,10 +35,10 @@ COPY cards/cards.json                                                 /app/cards
 COPY cards/abilities.json                                             /app/cards/abilities.json
 COPY web_ui/decks/                                                    /app/game/decks/
 
-ENV PORT=7860
+ENV PORT=8080
 ENV RUST_LOG=warn
 
-EXPOSE 7860
+EXPOSE 8080
 
 WORKDIR /app/engine
 CMD ["./rabuka_engine", "web-server"]

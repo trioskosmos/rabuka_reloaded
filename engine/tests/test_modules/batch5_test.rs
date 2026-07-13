@@ -70,6 +70,6 @@ fn hanamaru_s3_q155_constant_cost_increase() {
     let constant_ability = card_data
         .abilities
         .iter()
-        .any(|a| a.triggers.as_ref().map_or(false, |t| t == "常時"));
+        .any(|a| a.triggers.as_ref().map_or(false, |t| &**t == "常時"));
     assert!(constant_ability, "Should have at least one 常時 ability");
 }

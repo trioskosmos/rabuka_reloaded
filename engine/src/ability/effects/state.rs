@@ -372,7 +372,7 @@ impl AbilityResolver {
                 gs.ability_queue
                     .set_pending_actions(vec![crate::card::AbilityEffect {
                         action: "change_state".to_string(),
-                        target: Some(target.clone()),
+                        target: Some(target.clone().into()),
                         count: Some(count),
                         kind: effect.kind.clone(),
                         ..Default::default()

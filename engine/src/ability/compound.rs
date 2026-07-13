@@ -100,7 +100,7 @@ impl AbilityResolver {
             } else {
                 1
             };
-            let repeat_actions: &[AbilityEffect] = if has_repeat {
+            let repeat_actions = if has_repeat {
                 &actions[..actions.len() - 1]
             } else {
                 actions.as_slice()
@@ -253,9 +253,8 @@ impl AbilityResolver {
                         if action_to_execute.per_unit_type_any().is_none()
                             && effect.per_unit_type_any().is_some()
                         {
-                            action_to_execute.set_per_unit_type(
-                                effect.per_unit_type_any().map(|s| s.to_string()),
-                            );
+                            action_to_execute
+                                .set_per_unit_type(effect.per_unit_type_any().map(|s| s.into()));
                         }
                     }
                     // Inherit self_target from the parent effect or the first
@@ -324,11 +323,11 @@ impl AbilityResolver {
                     );
                     fn save_remaining(
                         gs: &mut crate::game_state::GameState,
-                        remaining: Vec<AbilityEffect>,
+                        remaining: Vec<Box<AbilityEffect>>,
                     ) {
                         if !remaining.is_empty() {
                             let mut existing = gs.ability_queue.take_pending_actions();
-                            existing.extend(remaining);
+                            existing.extend(remaining.into_iter().map(|b| *b));
                             gs.ability_queue.set_pending_actions(existing);
                         }
                     }
@@ -412,7 +411,7 @@ impl AbilityResolver {
                                     && !is_opponent_action
                                     && !is_card_selection
                                 {
-                                    let mut actions: Vec<AbilityEffect> =
+                                    let mut actions: Vec<Box<AbilityEffect>> =
                                         repeat_actions[i..].to_vec();
                                     if !actions.is_empty() {
                                         actions[0].optional = None;

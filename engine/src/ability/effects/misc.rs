@@ -2,8 +2,7 @@ use super::super::enums::Zone;
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
 use super::super::util;
-use crate::card::AbilityEffect;
-use crate::card::PositionInfo;
+use crate::card::{AbilityEffect, PlacementOrder, PositionInfo};
 use crate::game_state::GameState;
 
 impl AbilityResolver {
@@ -84,14 +83,14 @@ impl AbilityResolver {
         // Some custom actions have enough info to re-route to a known handler.
 
         // 1) Deck reordering: placement_order=any_order → route as move_cards looked_at→deck_top
-        if effect.placement_order_any().as_deref() == Some("any_order") {
+        if effect.placement_order_any() == Some(PlacementOrder::AnyOrder) {
             let mut routed = effect.clone();
             routed.action = "move_cards".into();
             if routed.source.is_none() {
-                routed.source = Some(Zone::LookedAt.to_str().to_string());
+                routed.source = Some(Zone::LookedAt.to_str().into());
             }
             if routed.destination.is_none() {
-                routed.destination = Some(Zone::DeckTop.to_str().to_string());
+                routed.destination = Some(Zone::DeckTop.to_str().into());
             }
             return self.execute_move_cards(gs, &routed);
         }
@@ -235,7 +234,7 @@ impl AbilityResolver {
 
         // Execute for self first
         let mut for_self = effect.clone();
-        for_self.target = Some("self".to_string());
+        for_self.target = Some("self".into());
         self.spawn_context.target = Some("self".to_string());
 
         let had_choice_before = self.pending_choice.is_some();
@@ -244,7 +243,7 @@ impl AbilityResolver {
         // If self created a NEW pending choice, save opponent for later
         if self.pending_choice.is_some() && !had_choice_before {
             let mut for_opponent = effect.clone();
-            for_opponent.target = Some("opponent".to_string());
+            for_opponent.target = Some("opponent".into());
             // Preserve any existing pending commands (e.g. remaining sequential actions)
             let mut existing = gs.ability_queue.take_pending_actions();
             existing.push(for_opponent);
@@ -254,7 +253,7 @@ impl AbilityResolver {
 
         // Execute for opponent
         let mut for_opponent = effect.clone();
-        for_opponent.target = Some("opponent".to_string());
+        for_opponent.target = Some("opponent".into());
         self.spawn_context.target = Some("opponent".to_string());
         self.execute_effect(gs, &for_opponent)?;
 
@@ -1860,7 +1859,7 @@ impl AbilityResolver {
                     .current_ability
                     .as_ref()
                     .and_then(|a| a.triggers.as_ref())
-                    .is_some_and(|t| t == crate::triggers::ACTIVATION);
+                    .is_some_and(|t| &**t == crate::triggers::ACTIVATION);
                 if !is_activation {
                     self.pending_choice = Some(Choice::SelectTarget {
                         target: "pay_optional_cost:skip_optional_cost".to_string(),
@@ -1990,7 +1989,7 @@ impl AbilityResolver {
         // route directly to execute_position_change_with_destination.
         // EXCEPTION: "front" destination for opponent needs source selection first.
         if let Some(ref dest) = effect.destination {
-            if dest == "front" && target == "opponent" {
+            if &**dest == "front" && target == "opponent" {
                 // "front" destination for opponent: the destination is fixed (front area of
                 // activating card). Create a choice to select which OPPONENT member to move.
                 let valid_sources: Vec<String> = {
@@ -2103,7 +2102,7 @@ impl AbilityResolver {
         // Handle "both" target: opponent first (choice), then self (choice via pending).
         if target == "both" {
             let mut opp_effect = effect.clone();
-            opp_effect.target = Some("opponent".to_string());
+            opp_effect.target = Some("opponent".into());
             self.execute_position_change(
                 gs,
                 &opp_effect,
@@ -2113,11 +2112,11 @@ impl AbilityResolver {
             )?;
             if self.pending_choice.is_some() {
                 let mut self_effect = effect.clone();
-                self_effect.target = Some("self".to_string());
+                self_effect.target = Some("self".into());
                 gs.ability_queue.set_pending_actions(vec![self_effect]);
             } else {
                 let mut self_effect = effect.clone();
-                self_effect.target = Some("self".to_string());
+                self_effect.target = Some("self".into());
                 self.execute_position_change(
                     gs,
                     &self_effect,
@@ -2271,7 +2270,7 @@ impl AbilityResolver {
             if let Some(ref area) = stored_area {
                 self.selected_area = None;
                 let mut copy = effect.clone();
-                copy.destination = Some(area.clone());
+                copy.destination = Some(Box::from(area.as_str()));
                 return self.execute_position_change_with_destination(gs, &copy, area);
             }
 
@@ -3216,7 +3215,7 @@ impl AbilityResolver {
         let should_propagate_group = effect.group_names_any().is_some()
             && effect.alternative_count_type_any().is_none()
             && effect.compound.alternative_condition.is_none();
-        let propagated_options: Option<Vec<AbilityEffect>> = if should_propagate_group {
+        let propagated_options: Option<Vec<Box<AbilityEffect>>> = if should_propagate_group {
             options.map(|opts| {
                 opts.iter()
                     .map(|opt| {

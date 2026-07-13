@@ -463,8 +463,6 @@ impl Player {
             std::collections::HashMap<crate::card::HeartColor, ModifierEntry>,
         >,
     ) -> crate::card::BaseHeart {
-        use crate::card::HeartColor;
-
         let mut total_hearts = crate::card::HeartMap::new();
 
         for &card_id in &self.stage.stage {

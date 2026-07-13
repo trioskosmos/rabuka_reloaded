@@ -4,7 +4,9 @@ use crate::ability::debug::AbDebug;
 use crate::ability::enums::Zone;
 use crate::ability::util;
 use crate::ability::util::compare_counts;
-use crate::card::{Condition, HeartColor};
+use crate::card::{
+    CardProperty, CardState, ComparisonTarget, Condition, ConditionCardType, HeartColor,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HeartTotal {
@@ -128,7 +130,7 @@ impl<'a> ConditionContext<'a> {
                             .and_then(|c| c.cost)
                             .unwrap_or(0);
                         // Handle comparison_target: compare self vs opponent at same position
-                        if condition.comparison_target.as_deref() == Some("opponent") {
+                        if condition.comparison_target == Some(ComparisonTarget::Opponent) {
                             let opponent = self.game_state.resolve_target_player("opponent");
                             let opp_card_id = util::card_at_position(opponent, position);
                             let opp_cost = opp_card_id
@@ -172,9 +174,9 @@ impl<'a> ConditionContext<'a> {
         }
 
         let target_count = if let Some(ref comparison_target) = condition.comparison_target {
-            if comparison_target == "opponent" {
+            if *comparison_target == ComparisonTarget::Opponent {
                 self.get_count_for_target(condition, "opponent")
-            } else if comparison_target == "self"
+            } else if *comparison_target == ComparisonTarget::Self_
                 && (condition.comparison_type.as_deref() == Some("cost")
                     || condition.comparison_type.as_deref() == Some("score"))
             {
@@ -219,7 +221,7 @@ impl<'a> ConditionContext<'a> {
                     self.get_count_for_target(condition, target)
                 }
             } else if condition.resource_type.is_some() {
-                self.get_count_for_target(condition, comparison_target)
+                self.get_count_for_target(condition, comparison_target.as_str())
             } else {
                 condition
                     .count
@@ -659,10 +661,10 @@ impl<'a> ConditionContext<'a> {
         player: &crate::player::Player,
         location: &str,
     ) -> bool {
-        let prop = match condition.card_property.as_deref() {
-            Some("has_blade_heart") => "has_blade_heart",
-            Some("has_score_icon") => "has_score_icon",
-            Some("has_all_blade") => "has_all_blade",
+        let prop = match condition.card_property {
+            Some(CardProperty::HasBladeHeart) => "has_blade_heart",
+            Some(CardProperty::HasScoreIcon) => "has_score_icon",
+            Some(CardProperty::HasAllBlade) => "has_all_blade",
             _ => return true,
         };
         let card_db = &self.game_state.card_database;
@@ -1898,7 +1900,7 @@ impl<'a> ConditionContext<'a> {
     ) -> bool {
         let card_db = &self.game_state.card_database;
         let negate = condition.negation.unwrap_or(false);
-        let wants_blade_heart_prop = condition.card_property.as_deref() == Some("has_blade_heart");
+        let wants_blade_heart_prop = condition.card_property == Some(CardProperty::HasBladeHeart);
         // Source of moved card IDs: for the new format (source=zone+dst),
         // query turn_movements for all matching zone-transition events
         // this turn. For the old format (preceding_moved), use the
@@ -2051,9 +2053,10 @@ impl<'a> ConditionContext<'a> {
                 .map(|s| s.to_string())
                 .or_else(|| {
                     condition.location.as_ref().and_then(|src| {
-                        condition.locations.as_ref().and_then(|locs| {
-                            locs.iter().find(|l| l.as_str() != src.as_str()).cloned()
-                        })
+                        condition
+                            .locations
+                            .as_ref()
+                            .and_then(|locs| locs.iter().find(|l| &**l != &**src).cloned())
                     })
                 });
         let moved_group_name = condition
@@ -2301,7 +2304,7 @@ impl<'a> ConditionContext<'a> {
                             self.game_state
                                 .mods
                                 .get_orientation_modifier(cid)
-                                .map_or(state == "active", |o| o.as_str() == state)
+                                .map_or(state == &CardState::Active, |o| &*o == state.as_str())
                         })
                         .collect()
                 } else {
@@ -2508,7 +2511,9 @@ impl<'a> ConditionContext<'a> {
                                         .game_state
                                         .mods
                                         .get_orientation_modifier(id)
-                                        .map_or(state == "active", |o| o.as_str() == state);
+                                        .map_or(state == &CardState::Active, |o| {
+                                            &*o == state.as_str()
+                                        });
                                     if !state_ok {
                                         return false;
                                     }
@@ -2624,7 +2629,7 @@ impl<'a> ConditionContext<'a> {
                         self.game_state
                             .mods
                             .get_orientation_modifier(cid)
-                            .map_or(state == "active", |o| o.as_str() == state)
+                            .map_or(state == &CardState::Active, |o| &*o == state.as_str())
                     })
                     .collect()
             } else {
@@ -2845,9 +2850,13 @@ impl<'a> ConditionContext<'a> {
                     // Check card_type if specified (e.g. メンバー → member_card)
                     if let Some(ref ct) = condition.card_type {
                         if !stage_ids.iter().any(|&cid| {
-                            util::card_matches_type(&self.game_state.card_database, cid, Some(ct))
+                            util::card_matches_type(
+                                &self.game_state.card_database,
+                                cid,
+                                Some(ct.as_str()),
+                            )
                         }) {
-                            push_rich(&format!("カード種別不一致(type={})", ct), false);
+                            push_rich(&format!("カード種別不一致(type={})", ct.as_str()), false);
                             return false;
                         }
                     }
@@ -3145,7 +3154,7 @@ impl<'a> ConditionContext<'a> {
                             let card_to_check = self.activating_card_id;
                             let ok = card_to_check.map_or(false, |cid| {
                                 self.game_state.get_card_appearance_source(cid)
-                                    == Some(expected_source.as_str())
+                                    == Some(&**expected_source)
                             });
                             if !ok {
                                 push_rich(
@@ -3172,16 +3181,18 @@ impl<'a> ConditionContext<'a> {
                                 if !self.moved_cards.is_empty() {
                                     let has_prop = self.moved_cards.iter().any(|&cid| {
                                         self.game_state.card_database.get_card(cid).is_some_and(
-                                            |c| match prop.as_str() {
-                                                "has_blade_heart" => c.has_blade_heart(),
-                                                "has_score_icon" => c.has_score_icon(),
-                                                "has_all_blade" => c.has_all_blade(),
-                                                _ => false,
+                                            |c| match *prop {
+                                                CardProperty::HasBladeHeart => c.has_blade_heart(),
+                                                CardProperty::HasScoreIcon => c.has_score_icon(),
+                                                CardProperty::HasAllBlade => c.has_all_blade(),
                                             },
                                         )
                                     });
                                     if condition.negation.unwrap_or(false) == has_prop {
-                                        push_rich(&format!("card_property={} unmet", prop), false);
+                                        push_rich(
+                                            &format!("card_property={} unmet", prop.as_str()),
+                                            false,
+                                        );
                                         return false;
                                     }
                                 }
@@ -3792,7 +3803,7 @@ impl<'a> ConditionContext<'a> {
             // can compare it against the self card's cost via compare_counts.
             // When comparison_target != "self", the condition uses total sum
             // (handled by count_for_player_target instead).
-            if condition.comparison_target.as_deref() == Some("self") {
+            if condition.comparison_target == Some(ComparisonTarget::Self_) {
                 let player = self.resolve_condition_player(target);
                 let card_db = &self.game_state.card_database;
                 let location = condition.location.as_deref().unwrap_or("stage");

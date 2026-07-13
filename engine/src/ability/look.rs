@@ -18,7 +18,7 @@ impl AbilityResolver {
         }
 
         if let Some(ref select_action) = effect.compound.select_action {
-            let _placement_order = select_action.placement_order_any().as_deref();
+            let _placement_order = select_action.placement_order_any();
             let any_number = select_action.any_number_any().unwrap_or(false);
             let count = select_action.count.unwrap_or(1);
             let optional = select_action.optional.unwrap_or(false);
@@ -466,7 +466,7 @@ impl AbilityResolver {
             .copied()
             .collect();
 
-        if let Some(distinct) = effect.distinct_any().as_deref() {
+        if let Some(distinct) = effect.distinct_any() {
             let distinct_filter = super::util::filter_from_parts_full(
                 None,
                 None,
@@ -590,7 +590,7 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         self.current_effect = Some(effect.clone());
 
-        let _placement_order = effect.placement_order_any().as_deref();
+        let _placement_order = effect.placement_order_any();
         let any_number = effect.any_number_any().unwrap_or(false);
         let count = effect.count.unwrap_or(1) as usize;
         let optional = effect.optional.unwrap_or(false);
@@ -630,7 +630,7 @@ impl AbilityResolver {
                     .and_then(|v| v.first().cloned()),
             )
             .characters(effect.characters_any().cloned())
-            .destination(effect.destination.clone())
+            .destination(effect.destination.clone().map(|s| s.to_string()))
             .build();
             self.pending_choice = Some(choice);
             return Ok(());

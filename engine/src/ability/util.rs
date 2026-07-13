@@ -1,6 +1,5 @@
 use super::enums::{ActionType, Zone};
-use crate::card::parse_heart_color;
-use crate::card::CardDatabase;
+use crate::card::{parse_heart_color, AbilityFilter, CardDatabase, DistinctType, Operator};
 use crate::game_state::Duration;
 
 // ============== MODIFY COST ==============
@@ -702,7 +701,7 @@ pub struct CardFilter<'a> {
     pub need_heart_operator: Option<&'a str>,
     pub need_heart_color: Option<&'a str>,
     pub name_fragments: Option<&'a Vec<String>>,
-    pub distinct: Option<&'a str>,
+    pub distinct: Option<DistinctType>,
     pub exclude_self: Option<i16>,
     /// Group names to exclude from matching (e.g. 「スリーズブーケ」以外)
     pub exclude_group_names: Option<&'a Vec<String>>,
@@ -750,7 +749,7 @@ impl<'a> CardFilter<'a> {
         self.heart_colors = hc;
         self
     }
-    pub fn distinct(mut self, d: &'a str) -> Self {
+    pub fn distinct(mut self, d: DistinctType) -> Self {
         self.distinct = Some(d);
         self
     }
@@ -1179,13 +1178,13 @@ impl<'a> CardFilter<'a> {
         let card_type = effect.card_type_any();
         let group_names = effect.group_names_any();
 
-        let cost_operator = effect.cost_limit_operator_any();
-        let cost_total_operator = effect.cost_total_operator_any();
-        let need_heart_operator = effect.need_heart_operator_any();
+        let cost_operator = effect.cost_limit_operator_any().map(Operator::as_str);
+        let cost_total_operator = effect.cost_total_operator_any().map(Operator::as_str);
+        let need_heart_operator = effect.need_heart_operator_any().map(Operator::as_str);
         let need_heart_color = effect.need_heart_color_any();
         let distinct = effect.distinct_any();
-        let original_blade_operator = effect.blade_limit_operator_any();
-        let ability_filter = effect.ability_filter_any();
+        let original_blade_operator = effect.blade_limit_operator_any().map(Operator::as_str);
+        let ability_filter = effect.ability_filter_any().map(AbilityFilter::as_str);
         let card_property = effect.card_property_any();
         CardFilter {
             card_type,
@@ -1319,7 +1318,7 @@ pub fn filter_from_parts_full<'a>(
     cost_operator: Option<&'a str>,
     characters: Option<&'a Vec<String>>,
     name_fragments: Option<&'a Vec<String>>,
-    distinct: Option<&'a str>,
+    distinct: Option<DistinctType>,
     exclude_self: Option<i16>,
     cost_total: Option<u32>,
     cost_total_operator: Option<&'a str>,
@@ -1376,7 +1375,7 @@ pub fn matching_ids_filtered(
     filter: &CardFilter,
     skip_empty: bool,
     target_count: Option<u32>,
-    distinct: Option<&str>,
+    distinct: Option<DistinctType>,
     exclude_ids: Option<&[i16]>,
 ) -> Vec<i16> {
     let mut filter = filter.clone();
@@ -1453,7 +1452,9 @@ pub fn filter_distinct(
 ) -> Vec<usize> {
     let ids: Vec<usize> = matching_indices(cards, db, filter, skip_empty);
     let distinct = match filter.distinct {
-        Some("card_name") | Some("true") | Some("distinct") => true,
+        Some(DistinctType::CardName) | Some(DistinctType::True) | Some(DistinctType::Distinct) => {
+            true
+        }
         _ => return ids,
     };
     if !distinct {
@@ -1992,12 +1993,12 @@ pub fn resolve_per_unit_count(
 
 pub fn apply_distinct_filter(
     cards: &[i16],
-    distinct: Option<&str>,
+    distinct: Option<DistinctType>,
     card_db: &CardDatabase,
 ) -> Vec<i16> {
     let should = matches!(
         distinct,
-        Some("card_name") | Some("true") | Some("distinct")
+        Some(DistinctType::CardName) | Some(DistinctType::True) | Some(DistinctType::Distinct)
     );
     if !should {
         return cards.to_vec();

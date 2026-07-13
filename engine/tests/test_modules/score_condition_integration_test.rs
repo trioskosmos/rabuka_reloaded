@@ -1,4 +1,7 @@
 use crate::helpers::*;
+use rabuka_engine::card::{
+    ComparisonTarget, ComparisonType, ConditionCardType, ConditionTarget, Location,
+};
 use rabuka_engine::zones::MemberArea;
 
 /// Helper to calculate total score in P1's success_live_card_zone
@@ -173,9 +176,9 @@ use rabuka_engine::card::Condition;
 fn score_gt_opponent_condition() -> Condition {
     Condition {
         condition_type: Some(ConditionType::ComparisonCondition),
-        comparison_type: Some("score".to_string()),
-        comparison_target: Some("opponent".to_string()),
-        operator: Some(">".to_string()),
+        comparison_type: Some(ComparisonType::Score),
+        comparison_target: Some(ComparisonTarget::Opponent),
+        operator: Some(">".into()),
         ..Default::default()
     }
 }
@@ -184,22 +187,22 @@ fn score_gt_opponent_condition() -> Condition {
 fn compound_dododo_condition() -> Condition {
     Condition {
         condition_type: Some(ConditionType::Compound),
-        operator: Some("and".to_string()),
+        operator: Some("and".into()),
         conditions: Some(vec![
             // Sub-condition 1: score > opponent
             Box::new(Condition {
                 condition_type: Some(ConditionType::ComparisonCondition),
-                comparison_type: Some("score".to_string()),
-                comparison_target: Some("opponent".to_string()),
-                operator: Some(">".to_string()),
+                comparison_type: Some(ComparisonType::Score),
+                comparison_target: Some(ComparisonTarget::Opponent),
+                operator: Some(">".into()),
                 ..Default::default()
             }),
             // Sub-condition 2: 蓮ノ空 member on self stage
             Box::new(Condition {
                 condition_type: Some(ConditionType::GroupCondition),
-                target: Some("self".to_string()),
-                location: Some("stage".to_string()),
-                card_type: Some("member_card".to_string()),
+                target: Some(ConditionTarget::Self_),
+                location: Some(Location::Stage),
+                card_type: Some(ConditionCardType::MemberCard),
                 group_names: Some(vec!["蓮ノ空".to_string()]),
                 ..Default::default()
             }),
@@ -346,9 +349,9 @@ fn compound_dododo_tied_score_with_hasunosora_fails() {
 fn hasunosora_group_condition() -> Condition {
     Condition {
         condition_type: Some(ConditionType::GroupCondition),
-        target: Some("self".to_string()),
-        location: Some("stage".to_string()),
-        card_type: Some("member_card".to_string()),
+        target: Some(ConditionTarget::Self_),
+        location: Some(Location::Stage),
+        card_type: Some(ConditionCardType::MemberCard),
         group_names: Some(vec!["蓮ノ空".to_string()]),
         ..Default::default()
     }
@@ -420,8 +423,8 @@ fn score_comparison_without_operator_always_passes() {
     // P1 score = 0 (no cards), P2 score = 0 (no cards) — equal
     let condition_no_op = Condition {
         condition_type: Some(ConditionType::ComparisonCondition),
-        comparison_type: Some("score".to_string()),
-        comparison_target: Some("opponent".to_string()),
+        comparison_type: Some(ComparisonType::Score),
+        comparison_target: Some(ComparisonTarget::Opponent),
         operator: None, // ← no operator → defaults to pass-through
         ..Default::default()
     };
@@ -434,7 +437,7 @@ fn score_comparison_without_operator_always_passes() {
 
     // Now verify that WITH operator=">" it correctly fails for equal scores
     let condition_with_op = Condition {
-        operator: Some(">".to_string()),
+        operator: Some(">".into()),
         ..condition_no_op.clone()
     };
     assert!(

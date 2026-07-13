@@ -1,7 +1,7 @@
 use crate::helpers::*;
 use rabuka_engine::ability::condition::ConditionContext;
 use rabuka_engine::ability::enums::ConditionType;
-use rabuka_engine::card::Condition;
+use rabuka_engine::card::{Condition, ConditionCardType, ConditionTarget};
 
 fn fill_decks(game: &mut TestGame, filler: i16) {
     game.state.player1.main_deck.cards.clear();
@@ -12,32 +12,27 @@ fn fill_decks(game: &mut TestGame, filler: i16) {
     }
 }
 
-fn source_dest_condition(source: &str, destination: &str, card_type: &str) -> Condition {
+fn source_dest_condition(source: &str, destination: &str) -> Condition {
     Condition {
         condition_type: Some(ConditionType::CardCountCondition),
         count: Some(1),
-        operator: Some(">=".to_string()),
-        source: Some(source.to_string()),
-        destination: Some(destination.to_string()),
-        card_type: Some(card_type.to_string()),
+        operator: Some(">=".into()),
+        source: Some(source.into()),
+        destination: Some(destination.into()),
+        card_type: Some(ConditionCardType::MemberCard),
         ..Default::default()
     }
 }
 
-fn source_dest_condition_targeted(
-    source: &str,
-    destination: &str,
-    card_type: &str,
-    target: &str,
-) -> Condition {
+fn source_dest_condition_targeted(source: &str, destination: &str) -> Condition {
     Condition {
         condition_type: Some(ConditionType::CardCountCondition),
         count: Some(1),
-        operator: Some(">=".to_string()),
-        source: Some(source.to_string()),
-        destination: Some(destination.to_string()),
-        card_type: Some(card_type.to_string()),
-        target: Some(target.to_string()),
+        operator: Some(">=".into()),
+        source: Some(source.into()),
+        destination: Some(destination.into()),
+        card_type: Some(ConditionCardType::MemberCard),
+        target: Some(ConditionTarget::Opponent),
         ..Default::default()
     }
 }
@@ -98,7 +93,7 @@ fn source_dest_condition_matches_turn_movements() {
     push_movement_p1(&mut game, member, "live_card_zone", "waitroom");
     game.state.player1.waitroom.cards.push(member);
 
-    let cond = source_dest_condition("live_card_zone", "discard", "member_card");
+    let cond = source_dest_condition("live_card_zone", "discard");
     let ctx = ConditionContext::new(&game.state);
     assert!(ctx.evaluate_condition(&cond));
 }
@@ -116,7 +111,7 @@ fn source_dest_condition_wrong_source_fails() {
     push_movement_p1(&mut game, member, "stage", "waitroom");
     game.state.player1.waitroom.cards.push(member);
 
-    let cond = source_dest_condition("live_card_zone", "discard", "member_card");
+    let cond = source_dest_condition("live_card_zone", "discard");
     let ctx = ConditionContext::new(&game.state);
     assert!(!ctx.evaluate_condition(&cond));
 }
@@ -133,7 +128,7 @@ fn source_dest_condition_card_not_in_dest_fails() {
 
     push_movement_p1(&mut game, member, "live_card_zone", "waitroom");
 
-    let cond = source_dest_condition("live_card_zone", "discard", "member_card");
+    let cond = source_dest_condition("live_card_zone", "discard");
     let ctx = ConditionContext::new(&game.state);
     assert!(!ctx.evaluate_condition(&cond));
 }
@@ -151,7 +146,7 @@ fn source_dest_condition_needs_multiple_fails() {
     push_movement_p1(&mut game, member, "live_card_zone", "waitroom");
     game.state.player1.waitroom.cards.push(member);
 
-    let mut cond = source_dest_condition("live_card_zone", "discard", "member_card");
+    let mut cond = source_dest_condition("live_card_zone", "discard");
     cond.count = Some(2);
     let ctx = ConditionContext::new(&game.state);
     assert!(!ctx.evaluate_condition(&cond));
@@ -208,7 +203,7 @@ fn source_dest_condition_excludes_other_player() {
     game.state.player2.waitroom.cards.push(member);
 
     // "self" resolves to P1 in plain ConditionContext → P2's movement should NOT count
-    let cond = source_dest_condition("live_card_zone", "discard", "member_card");
+    let cond = source_dest_condition("live_card_zone", "discard");
     let ctx = ConditionContext::new(&game.state);
     assert!(!ctx.evaluate_condition(&cond));
 }
@@ -228,8 +223,7 @@ fn source_dest_condition_opponent_target_includes_other_player() {
     game.state.player2.waitroom.cards.push(member);
 
     // target="opponent" → should count P2's movements
-    let cond =
-        source_dest_condition_targeted("live_card_zone", "discard", "member_card", "opponent");
+    let cond = source_dest_condition_targeted("live_card_zone", "discard");
     let ctx = ConditionContext::new(&game.state);
     assert!(ctx.evaluate_condition(&cond));
 }

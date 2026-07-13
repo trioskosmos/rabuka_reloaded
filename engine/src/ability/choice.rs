@@ -62,7 +62,7 @@ impl super::resolver::AbilityResolver {
     pub fn resume_pending_actions(&mut self, gs: &mut GameState) -> Result<(), String> {
         let pending = gs.ability_queue.take_pending_actions();
         for (idx, effect) in pending.iter().enumerate() {
-            self.spawn_context.target = effect.target.clone();
+            self.spawn_context.target = effect.target.clone().map(|s| s.to_string());
             self.execute_effect(gs, effect)?;
             if self.pending_choice.is_some() {
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
@@ -121,7 +121,7 @@ impl super::resolver::AbilityResolver {
         );
         if !self.pending_repeat_actions.is_empty() && self.pending_choice.is_none() {
             let next = self.pending_repeat_actions.remove(0);
-            gs.ability_queue.set_pending_actions(vec![next]);
+            gs.ability_queue.set_pending_actions(vec![*next]);
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "pay_optional_cost:skip_optional_cost".to_string(),
                 description: "Repeat effect?".to_string(),
@@ -2260,7 +2260,7 @@ impl super::resolver::AbilityResolver {
                                 modified.compound.select_action.is_some()
                             );
                             self.pending_choice = None;
-                            gs.ability_queue.set_pending_actions(vec![modified]);
+                            gs.ability_queue.set_pending_actions(vec![*modified]);
                             let res = self.resume_pending_actions(gs);
                             log::debug!(
                                 "[SELFOR] after resume: pending={:?} res={:?}",
@@ -2333,7 +2333,10 @@ impl super::resolver::AbilityResolver {
                         .spawn_context
                         .target
                         .clone()
-                        .or_else(|| gs.entry_effect().and_then(|e| e.target.clone()))
+                        .or_else(|| {
+                            gs.entry_effect()
+                                .and_then(|e| e.target.clone().map(|s| s.to_string()))
+                        })
                         .unwrap_or_else(|| "self".to_string());
                     let player = gs.resolve_target_player_mut(&target);
                     for card_id in card_ids {
@@ -2386,14 +2389,14 @@ impl super::resolver::AbilityResolver {
                             ..
                         }) = modified.kind
                         {
-                            *source_position = Some(selected.to_string());
+                            *source_position = Some(selected.into());
                         }
                         if let Some(EffectKind::PositionOp {
                             ref mut source_position,
                             ..
                         }) = modified.kind
                         {
-                            *source_position = Some(selected.to_string());
+                            *source_position = Some(selected.into());
                         }
                         let pc_ok =
                             self.execute_position_change_with_destination(gs, &modified, "front");
@@ -2422,12 +2425,12 @@ impl super::resolver::AbilityResolver {
                         return Ok(());
                     } else if tgt.contains(':') {
                         let parts: Vec<&str> = tgt.splitn(2, ':').collect();
-                        modified.target = Some(parts[0].to_string());
+                        modified.target = Some(parts[0].into());
                         if parts[1] == "select" {
                             // Check if the selected option encodes player info (e.g. "self:left",
                             // "opponent:center") — used when effect.target was null (any member).
                             if let Some((player_prefix, position)) = selected.split_once(':') {
-                                modified.target = Some(player_prefix.to_string());
+                                modified.target = Some(player_prefix.into());
                                 explicit_source_pos = Some(position.to_string());
                             } else {
                                 explicit_source_pos = Some(dest.to_string());
@@ -2435,10 +2438,10 @@ impl super::resolver::AbilityResolver {
                         } else if super::util::stage_position_index(parts[1]).is_some() {
                             explicit_source_pos = Some(parts[1].to_string());
                         } else {
-                            modified.set_target_member(Some(parts[1].to_string()));
+                            modified.set_target_member(Some(parts[1].into()));
                         }
                     } else {
-                        modified.target = Some(tgt.to_string());
+                        modified.target = Some(tgt.into());
                     }
                 }
             }
@@ -2452,6 +2455,7 @@ impl super::resolver::AbilityResolver {
                 let target_str = modified
                     .target
                     .clone()
+                    .map(|s| s.to_string())
                     .unwrap_or_else(|| "self".to_string());
                 self.clear_choice_meta(gs);
                 self.pending_choice = None;
@@ -2600,7 +2604,7 @@ impl super::resolver::AbilityResolver {
                 }
             }
 
-            modified.destination = Some(dest.to_string());
+            modified.destination = Some(dest.into());
             // Use explicit_source_pos if available (handles Choice/compound
             // effects where source_position_any() returns None).
             if let Some(ref src_pos) = explicit_source_pos {
@@ -2829,7 +2833,7 @@ impl super::resolver::AbilityResolver {
                 // Fall back to effect modification for non-card-specific position choices
                 // (e.g. stage position selection).
                 self.apply_effect_modification(gs, |effect| {
-                    effect.destination = Some(selected.to_string());
+                    effect.destination = Some(selected.into());
                 })
             }
         }
@@ -3091,7 +3095,7 @@ impl super::resolver::AbilityResolver {
             return;
         }
         if effect.target.is_none() || effect.target.as_deref() == Some("self") {
-            effect.target = Some(target.to_string());
+            effect.target = Some(target.into());
         }
         if let Some(ref mut la) = effect.compound.look_action {
             Self::set_chosen_target(la, target);

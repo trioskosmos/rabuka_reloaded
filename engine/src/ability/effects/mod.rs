@@ -81,7 +81,7 @@ impl AbilityResolver {
                 self.spawn_context.target = Some("opponent".to_string());
                 let mut modified = (*opponent_action).clone();
                 if modified.target.is_none() || modified.target.as_deref() == Some("self") {
-                    modified.target = Some("opponent".to_string());
+                    modified.target = Some("opponent".into());
                 }
                 self.execute_effect(gs, &modified)?;
                 return Ok(());
@@ -303,7 +303,7 @@ impl AbilityResolver {
                         .collect();
                     let count = util::apply_distinct_filter(
                         &matching,
-                        effect.distinct_any().as_deref(),
+                        effect.distinct_any(),
                         &gs.card_database,
                     )
                     .len() as u32;

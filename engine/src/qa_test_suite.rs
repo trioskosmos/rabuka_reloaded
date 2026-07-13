@@ -2068,7 +2068,7 @@ fn test_ability_live_success_draw_then_discard() {
     let live_success_ability = member_card
         .abilities
         .iter()
-        .find(|a| a.triggers.as_ref().is_some_and(|t| t == "ライブ成功時"))
+        .find(|a| a.triggers.as_ref().is_some_and(|t| &**t == "ライブ成功時"))
         .expect("Should have live_success ability");
     println!(
         "Live success ability: {:?}",
