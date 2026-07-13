@@ -77,9 +77,8 @@ fn q255_dancing_stars_live_success_after_position_change() {
     // Set up stage hearts so Live Success conditions pass.
     // Dancing stars on me! needs: heart01=2, heart03=2, heart06=2, heart0=6 (total 12)
     // Honoka provides heart03=1 at center, but was moved. Give enough hearts.
-    use rabuka_engine::card::HeartColor;
-    use std::collections::HashMap;
-    let mut heart_map = HashMap::new();
+    use rabuka_engine::card::{HeartColor, HeartMap};
+    let mut heart_map = HeartMap::new();
     heart_map.insert(HeartColor::Heart01, 2);
     heart_map.insert(HeartColor::Heart03, 2);
     heart_map.insert(HeartColor::Heart06, 2);

@@ -752,8 +752,8 @@ fn test_bp6_live_start_same_color_deduplicates() {
     let distinct_colors: Vec<HeartColor> = if let Some(ref bh) = kotori_card.base_heart {
         bh.hearts
             .iter()
-            .filter(|(_, &amt)| amt > 0)
-            .map(|(&c, _)| c)
+            .filter(|&&(_, amt)| amt > 0)
+            .map(|&(c, _)| c)
             .collect()
     } else {
         vec![]

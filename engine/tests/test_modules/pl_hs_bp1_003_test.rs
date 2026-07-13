@@ -1,5 +1,6 @@
 use crate::helpers::*;
 use rabuka_engine::ability::util;
+use rabuka_engine::card::{BaseHeart, HeartColor, HeartMap};
 use rabuka_engine::zones::MemberArea;
 
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
@@ -163,9 +164,9 @@ fn live_score_includes_global_bonus() {
     game.state.player1.live_card_zone.cards.push(live);
 
     // Provide stage hearts to satisfy need_heart
-    let hearts = rabuka_engine::card::BaseHeart {
-        hearts: std::collections::HashMap::from([(rabuka_engine::card::HeartColor::Heart00, 4)]),
-    };
+    let mut h = HeartMap::new();
+    h.insert(HeartColor::Heart00, 4);
+    let hearts = BaseHeart { hearts: h };
     game.state.player1.stage_hearts = Some(hearts.clone());
 
     game.state.recalculate_constants();
@@ -276,9 +277,9 @@ fn live_score_no_bonus_when_condition_fails() {
     let live = game.id("PL!HS-bp1-019-L");
     game.state.player1.live_card_zone.cards.push(live);
 
-    let hearts = rabuka_engine::card::BaseHeart {
-        hearts: std::collections::HashMap::from([(rabuka_engine::card::HeartColor::Heart00, 4)]),
-    };
+    let mut h = HeartMap::new();
+    h.insert(HeartColor::Heart00, 4);
+    let hearts = BaseHeart { hearts: h };
     game.state.player1.stage_hearts = Some(hearts.clone());
 
     game.state.recalculate_constants();

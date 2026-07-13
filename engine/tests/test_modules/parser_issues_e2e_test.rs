@@ -657,7 +657,7 @@ fn issue7_hajimari_set_modifier_replaces_not_adds() {
         .is_some_and(|m| m.values().any(|e| e.set != 0));
     assert!(has_set, "set modifier should exist");
     let effective = {
-        let mut hearts = std::collections::HashMap::new();
+        let mut hearts = rabuka_engine::card::HeartMap::new();
         if let Some(color_mods) = game.state.mods.need_heart_modifiers.get(&live_card) {
             for (color, me) in color_mods {
                 if me.set != 0 {

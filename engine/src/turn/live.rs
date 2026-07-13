@@ -1,5 +1,5 @@
 use crate::ability::enums::Zone;
-use crate::card::{BaseHeart, BladeColor, CardDatabase, HeartColor};
+use crate::card::{BaseHeart, BladeColor, CardDatabase, HeartColor, HeartMap};
 use crate::core::game_modifiers::ModifierEntry;
 use crate::game_state::GameState;
 use crate::types::{
@@ -87,7 +87,7 @@ impl super::TurnEngine {
                 for (i, &count) in yc.blade_hearts.iter().enumerate() {
                     if count > 0 {
                         let color = crate::card::HeartColor::from_index(i);
-                        *target.hearts.entry(color).or_insert(0) += count;
+                        *target.hearts.entry_or_default(color) += count;
                     }
                 }
             }
@@ -533,7 +533,11 @@ impl super::TurnEngine {
                     if alt_met || base_met {
                         let alt_eff = gained.alternative_effect_any();
                         let prim_eff = gained.compound.primary_effect.as_ref();
-                        let effect_to_apply = if alt_met { alt_eff.as_ref() } else { prim_eff.as_ref() };
+                        let effect_to_apply = if alt_met {
+                            alt_eff.as_ref()
+                        } else {
+                            prim_eff.as_ref()
+                        };
                         if let Some(apply) = effect_to_apply {
                             let mut resolver = AbilityResolver::new(
                                 game_state.card_database.clone(),
@@ -698,8 +702,8 @@ impl super::TurnEngine {
                 let has_restriction = card.abilities.iter().any(|ability| {
                     if let Some(ref effect) = ability.effect {
                         let rd_binding = effect.restricted_destination_any();
-                            let dest_binding = effect.destination.as_deref();
-                            let restricted_dest = rd_binding.or(dest_binding);
+                        let dest_binding = effect.destination.as_deref();
+                        let restricted_dest = rd_binding.or(dest_binding);
                         crate::ability::enums::ActionType::from_str(&effect.action)
                             == Some(crate::ability::enums::ActionType::Restriction)
                             && effect.restriction_type_any().as_deref() == Some("cannot_place")
@@ -1297,7 +1301,7 @@ impl super::TurnEngine {
                         // Mapped to HeartColor::All (icon_all, index 7) so the UI
                         // displays icon_all.png for BAll yell hearts.
                         if effective_color == HeartColor::BAll {
-                            *owned_hearts.hearts.entry(HeartColor::All).or_insert(0) += count;
+                            *owned_hearts.hearts.entry_or_default(HeartColor::All) += count;
                             bh_arr[7] += count;
                             total_hearts_arr[7] += count;
                         } else if effective_color == HeartColor::Draw {
@@ -1309,7 +1313,7 @@ impl super::TurnEngine {
                         } else {
                             let idx = effective_color.index();
                             if idx < 8 {
-                                *owned_hearts.hearts.entry(effective_color).or_insert(0) += count;
+                                *owned_hearts.hearts.entry_or_default(effective_color) += count;
                                 bh_arr[idx] += count;
                                 total_hearts_arr[idx] += count;
                             }
@@ -2219,8 +2223,7 @@ impl super::TurnEngine {
                 if yc.blade_hearts[i] > 0 {
                     *owned_hearts
                         .hearts
-                        .entry(HeartColor::from_index(i))
-                        .or_insert(0) += yc.blade_hearts[i];
+                        .entry_or_default(HeartColor::from_index(i)) += yc.blade_hearts[i];
                 }
             }
         }
@@ -2246,7 +2249,7 @@ impl super::TurnEngine {
                             .is_some_and(|m| m.values().any(|e| e.set != 0));
                         let mut adjusted = if has_set {
                             BaseHeart {
-                                hearts: HashMap::new(),
+                                hearts: HeartMap::new(),
                             }
                         } else {
                             nh.clone()
@@ -2258,8 +2261,10 @@ impl super::TurnEngine {
                                     adjusted.hearts.insert(*color, me.set as u32);
                                 }
                                 if me.additive != 0 {
-                                    let entry = adjusted.hearts.entry(*color).or_insert(0);
-                                    *entry = (*entry as i32 + me.additive).max(0) as u32;
+                                    *adjusted.hearts.entry_or_default(*color) =
+                                        (adjusted.hearts.get(color).copied().unwrap_or(0) as i32
+                                            + me.additive)
+                                            .max(0) as u32;
                                 }
                             }
                         }

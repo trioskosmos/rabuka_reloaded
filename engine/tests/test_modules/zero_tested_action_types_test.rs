@@ -4,7 +4,7 @@
 /// 2. set_blade_type — VIVID WORLD (PL!N-bp4-025-L), Dazzling Game (PL!SP-bp4-023-L)
 /// 3. any_number pay_energy — 常夏☆サンシャイン (PL!SP-bp5-025-L): pay any energy for score
 use crate::helpers::*;
-use rabuka_engine::card::{BaseHeart, HeartColor};
+use rabuka_engine::card::{BaseHeart, HeartColor, HeartMap};
 use rabuka_engine::game_setup::ActionType;
 use rabuka_engine::game_state::Phase;
 use rabuka_engine::turn::TurnEngine;
@@ -189,12 +189,11 @@ fn vivid_world_all_heart_colors_present() {
 
     // Inject Heart00 wildcard into stage_hearts to guarantee live success
     let mut h = BaseHeart {
-        hearts: HashMap::new(),
+        hearts: HeartMap::new(),
     };
     h.hearts.insert(HeartColor::Heart00, 20);
     game.state.player1.stage_hearts = Some(h);
 
-    // Populate revealed_cards with 虹ヶ咲 members covering all 6 heart colors
     game.state.revealed_cards.extend([y1, y2, y3, y4, y5]);
 
     game.state.current_phase = Phase::LiveVictoryDetermination;
@@ -222,7 +221,7 @@ fn vivid_world_missing_heart_color() {
     game.state.player1.live_card_zone.cards.push(live_card);
 
     let mut h = BaseHeart {
-        hearts: HashMap::new(),
+        hearts: HeartMap::new(),
     };
     h.hearts.insert(HeartColor::Heart00, 20);
     game.state.player1.stage_hearts = Some(h);
@@ -256,7 +255,7 @@ fn vivid_world_half_nijigasaki_half_other() {
     game.state.player1.live_card_zone.cards.push(live_card);
 
     let mut h = BaseHeart {
-        hearts: HashMap::new(),
+        hearts: HeartMap::new(),
     };
     h.hearts.insert(HeartColor::Heart00, 20);
     game.state.player1.stage_hearts = Some(h);

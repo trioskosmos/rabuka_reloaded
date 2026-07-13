@@ -1,10 +1,9 @@
 /// Choice/Bullet-point cards — engine fix validation.
 use crate::helpers::*;
-use rabuka_engine::card::{BaseHeart, HeartColor};
+use rabuka_engine::card::{BaseHeart, HeartColor, HeartMap};
 use rabuka_engine::core::types::Phase;
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
-use std::collections::HashMap;
 
 fn fill_decks(game: &mut TestGame) {
     let filler = game.id("PL!-sd1-010-SD");
@@ -474,7 +473,7 @@ fn bouken_gain_ability_draws_on_live_success() {
     // Trigger LiveSuccess with hearts
     game.state.current_phase = Phase::LiveVictoryDetermination;
     let mut h = BaseHeart {
-        hearts: HashMap::new(),
+        hearts: HeartMap::new(),
     };
     h.hearts.insert(HeartColor::Heart00, 20);
     game.state.player1.stage_hearts = Some(h);

@@ -32,10 +32,9 @@ fn advance_to_live_start(game: &mut TestGame) {
 /// Q93: Partial resolution with insufficient hand cards
 //=====================================================================
 use crate::helpers::*;
-use rabuka_engine::card::{BaseHeart, HeartColor};
+use rabuka_engine::card::{BaseHeart, HeartColor, HeartMap};
 use rabuka_engine::game_state::Phase;
 use rabuka_engine::turn::TurnEngine;
-use std::collections::HashMap;
 
 #[test]
 fn kanon_ab1_live_success_fires_but_live_fails_no_hearts() {
@@ -196,7 +195,7 @@ fn kanon_ab1_live_success_pay_optional_cost() {
 
     // Inject Heart00 to force live success (like vivid_world tests)
     let mut h = BaseHeart {
-        hearts: HashMap::new(),
+        hearts: HeartMap::new(),
     };
     h.hearts.insert(HeartColor::Heart00, 20);
     game.state.player1.stage_hearts = Some(h);
@@ -259,7 +258,7 @@ fn kanon_ab1_live_success_skip_optional_cost() {
     game.state.player1.live_card_zone.cards.push(live);
 
     let mut h = BaseHeart {
-        hearts: HashMap::new(),
+        hearts: HeartMap::new(),
     };
     h.hearts.insert(HeartColor::Heart00, 20);
     game.state.player1.stage_hearts = Some(h);

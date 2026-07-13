@@ -626,7 +626,7 @@ impl AbilityResolver {
             let single_cond = effect
                 .compound
                 .alternative_condition
-                .as_ref()
+                .as_deref()
                 .or(effect.condition.as_deref());
             if let Some(cond) = single_cond {
                 if ctx.evaluate_condition(cond) {

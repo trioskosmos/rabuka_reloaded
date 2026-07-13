@@ -16,7 +16,7 @@ fn test_yoshiko_group_matching() {
     for (name, card_id) in [("Yoshiko", yoshiko), ("Chika", chika), ("Riko", riko)] {
         if let Some(card) = game.state.card_database.get_card(card_id) {
             let _matches_unit = card.unit.as_deref() == Some("Aqours");
-            let matches_group = card.group == "Aqours";
+            let matches_group = card.group.as_ref() == "Aqours";
             let matches_series = card.series.contains("サンシャイン");
 
             println!(

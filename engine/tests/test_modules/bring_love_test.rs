@@ -1,5 +1,5 @@
 use crate::helpers::*;
-use rabuka_engine::card::{BaseHeart, HeartColor};
+use rabuka_engine::card::{BaseHeart, HeartColor, HeartMap};
 use rabuka_engine::core::types::Phase;
 use rabuka_engine::turn::TurnEngine;
 /// Tests for LL-bp5-002-L (Bring the LOVE!) distinct group name condition.
@@ -14,7 +14,6 @@ use rabuka_engine::turn::TurnEngine;
 /// Q105: Multi-name contributes ONE constituent group.
 /// Q208: When a multi-name card shares a name with another card on stage,
 ///   it uses one of its OTHER names.
-use std::collections::HashMap;
 
 fn fill_deck(game: &mut TestGame, filler: i16) {
     game.state.player1.main_deck.cards.clear();
@@ -34,7 +33,7 @@ fn fill_deck(game: &mut TestGame, filler: i16) {
 fn force_live_success(game: &mut TestGame, live_card_id: i16) {
     // Technique: inject stage_hearts directly (heart00=20 wildcard
     // is enough to satisfy ANY live card's need_heart).
-    let mut heart_map = HashMap::new();
+    let mut heart_map = HeartMap::new();
     heart_map.insert(HeartColor::Heart00, 20);
     game.state.player1.stage_hearts = Some(BaseHeart { hearts: heart_map });
 

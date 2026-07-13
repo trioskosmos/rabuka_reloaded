@@ -209,7 +209,10 @@ impl GameState {
         // Recurse into compound conditions — if any child is event-based,
         // the whole compound is pre-filtered.
         if let Some(ref children) = condition.conditions {
-            if children.iter().any(Self::condition_is_event_based) {
+            if children
+                .iter()
+                .any(|c| Self::condition_is_event_based(c.as_ref()))
+            {
                 return true;
             }
         }
@@ -2089,7 +2092,7 @@ impl GameState {
                             .get(card_id)
                             .is_some_and(|m| m.values().any(|e| e.set != 0));
                         if has_set {
-                            let mut hearts = std::collections::HashMap::new();
+                            let mut hearts = crate::card::HeartMap::new();
                             if let Some(color_mods) = self.mods.need_heart_modifiers.get(card_id) {
                                 for (color, me) in color_mods {
                                     if me.set != 0 {
@@ -2102,8 +2105,10 @@ impl GameState {
                             let mut hearts = need_heart.hearts.clone();
                             if let Some(color_mods) = self.mods.need_heart_modifiers.get(card_id) {
                                 for (color, me) in color_mods {
-                                    let entry = hearts.entry(*color).or_insert(0);
-                                    *entry = ((*entry as i32) + me.additive).max(0) as u32;
+                                    *hearts.entry_or_default(*color) =
+                                        (hearts.get(color).copied().unwrap_or(0) as i32
+                                            + me.additive)
+                                            .max(0) as u32;
                                 }
                             }
                             crate::card::BaseHeart { hearts }

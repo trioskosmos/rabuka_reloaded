@@ -1061,7 +1061,7 @@ impl AbilityResolver {
                         }
                         if let Some(card) = card_db.get_card(cid) {
                             if !card.group.is_empty() {
-                                groups.insert(card.group.clone());
+                                groups.insert(card.group.to_string());
                             }
                         }
                     }

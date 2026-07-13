@@ -6,7 +6,7 @@ use crate::card::Condition;
 impl<'a> ConditionContext<'a> {
     pub(crate) fn evaluate_condition_list(
         &self,
-        conditions: &[Condition],
+        conditions: &[Box<Condition>],
         operator: &str,
     ) -> (usize, bool) {
         let mut passed = 0usize;

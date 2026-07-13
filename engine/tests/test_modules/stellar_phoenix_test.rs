@@ -14,7 +14,7 @@ fn setup_both_in_live_zone(game: &mut TestGame) -> (i16, i16, i16) {
         .set_area(MemberArea::Center, member);
     game.state.player1.live_card_zone.cards.push(phoenix);
     game.state.player1.live_card_zone.cards.push(stellar);
-    let mut hearts = std::collections::HashMap::new();
+    let mut hearts = rabuka_engine::card::HeartMap::new();
     hearts.insert(HeartColor::Heart01, 7);
     hearts.insert(HeartColor::Heart02, 2);
     hearts.insert(HeartColor::Heart06, 6);
@@ -73,7 +73,7 @@ fn subject_in_live_target_in_success() {
         .success_live_card_zone
         .cards
         .push(stellar);
-    let mut hearts = std::collections::HashMap::new();
+    let mut hearts = rabuka_engine::card::HeartMap::new();
     hearts.insert(HeartColor::Heart01, 7);
     hearts.insert(HeartColor::Heart02, 2);
     hearts.insert(HeartColor::Heart06, 6);
@@ -120,7 +120,7 @@ fn subject_in_success_does_not_trigger() {
         .push(phoenix);
     // Target (Stellar Stream) in LIVE zone → would match condition if ability fired
     game.state.player1.live_card_zone.cards.push(stellar);
-    let mut hearts = std::collections::HashMap::new();
+    let mut hearts = rabuka_engine::card::HeartMap::new();
     hearts.insert(HeartColor::Heart01, 7);
     hearts.insert(HeartColor::Heart02, 2);
     hearts.insert(HeartColor::Heart06, 6);
@@ -168,7 +168,7 @@ fn both_in_success_does_not_trigger() {
         .success_live_card_zone
         .cards
         .push(stellar);
-    let mut hearts = std::collections::HashMap::new();
+    let mut hearts = rabuka_engine::card::HeartMap::new();
     hearts.insert(HeartColor::Heart01, 7);
     hearts.insert(HeartColor::Heart02, 2);
     hearts.insert(HeartColor::Heart06, 6);
@@ -207,7 +207,7 @@ fn both_in_live_zone_check_success_zone_condition() {
         // Their conditions check success+live zones for matching cards.
         game.state.player1.live_card_zone.cards.push(phoenix);
         game.state.player1.live_card_zone.cards.push(stellar);
-        let mut hearts = std::collections::HashMap::new();
+        let mut hearts = rabuka_engine::card::HeartMap::new();
         hearts.insert(HeartColor::Heart01, 7);
         hearts.insert(HeartColor::Heart02, 2);
         hearts.insert(HeartColor::Heart06, 6);
@@ -249,7 +249,7 @@ fn non_niji_live_card_does_not_trigger() {
         .set_area(MemberArea::Center, member);
     game.state.player1.live_card_zone.cards.push(phoenix);
     game.state.player1.live_card_zone.cards.push(filler_live);
-    let mut hearts = std::collections::HashMap::new();
+    let mut hearts = rabuka_engine::card::HeartMap::new();
     hearts.insert(HeartColor::Heart01, 7);
     hearts.insert(HeartColor::Heart02, 2);
     hearts.insert(HeartColor::Heart06, 6);
@@ -292,7 +292,7 @@ fn stellar_stream_chooses_one_of_multiple_members() {
         .set_area(MemberArea::LeftSide, member_b);
     game.state.player1.live_card_zone.cards.push(phoenix);
     game.state.player1.live_card_zone.cards.push(stellar);
-    let mut hearts = std::collections::HashMap::new();
+    let mut hearts = rabuka_engine::card::HeartMap::new();
     hearts.insert(HeartColor::Heart01, 7);
     hearts.insert(HeartColor::Heart02, 2);
     hearts.insert(HeartColor::Heart06, 6);

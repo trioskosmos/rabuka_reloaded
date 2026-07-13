@@ -998,7 +998,7 @@ impl AbilityResolver {
                         }
                         if let Some(card) = card_db.get_card(cid) {
                             if !card.group.is_empty() {
-                                stage_groups.insert(card.group.clone());
+                                stage_groups.insert(card.group.to_string());
                             } else {
                                 for known_group in ["μ's", "Aqours", "虹ヶ咲", "Liella!", "蓮ノ空"]
                                 {
@@ -2507,7 +2507,7 @@ impl AbilityResolver {
                     let cid = looked_at[idx];
                     if let Some(card) = card_db.get_card(cid) {
                         if !card.series.is_empty() {
-                            let count = group_counts.entry(card.series.clone()).or_insert(0);
+                            let count = group_counts.entry(card.series.to_string()).or_insert(0);
                             *count += 1;
                             if *count > mpg {
                                 return Err(format!(

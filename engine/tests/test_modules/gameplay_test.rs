@@ -2372,10 +2372,7 @@ fn lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1() {
         &Default::default(),
         &Default::default(),
     );
-    *p1_hearts
-        .hearts
-        .entry(rabuka_engine::card::HeartColor::Heart03)
-        .or_insert(0) += 7;
+    p1_hearts.hearts[&rabuka_engine::card::HeartColor::Heart03] += 7;
     game.state.player1.stage_hearts = Some(p1_hearts);
     game.state.player2.stage_hearts = Some(game.state.player2.calculate_stage_hearts(
         &game.state.card_database,

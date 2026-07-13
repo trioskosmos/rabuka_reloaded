@@ -285,7 +285,7 @@ impl AbilityResolver {
                                     if c.group.is_empty() {
                                         None
                                     } else {
-                                        Some(c.group.clone())
+                                        Some(c.group.to_string())
                                     }
                                 })
                         } else {

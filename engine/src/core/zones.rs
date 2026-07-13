@@ -1,4 +1,4 @@
-use crate::card::{BaseHeart, CardDatabase, HeartColor, HeartIcon, Keyword};
+use crate::card::{BaseHeart, CardDatabase, HeartColor, HeartIcon, HeartMap, Keyword};
 use crate::core::game_modifiers::ModifierEntry;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
@@ -410,7 +410,7 @@ impl Stage {
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
         heart_color_multiplier: &HashMap<i16, HeartColor>,
     ) -> BaseHeart {
-        let mut hearts = HashMap::new();
+        let mut hearts = HeartMap::new();
 
         for &card_id in &self.stage {
             if card_id == -1 {
@@ -418,33 +418,33 @@ impl Stage {
             }
 
             if let Some(&(override_color, override_count)) = heart_override.get(&card_id) {
-                *hearts.entry(override_color).or_insert(0) += override_count;
+                *hearts.entry_or_default(override_color) += override_count;
                 continue;
             }
 
-            let mut card_hearts: HashMap<HeartColor, u32> = HashMap::new();
+            let mut card_hearts = HeartMap::new();
             if let Some(card) = card_db.get_card(card_id) {
                 if let Some(ref base_heart) = card.base_heart {
                     for (color, count) in &base_heart.hearts {
-                        *card_hearts.entry(*color).or_insert(0) += count;
+                        *card_hearts.entry_or_default(*color) += count;
                     }
                 }
             }
 
-            // Apply heart_color_multiplier: transform all this card's hearts to one color
             if let Some(override_color) = heart_color_multiplier.get(&card_id) {
-                let total: u32 = card_hearts.values().sum();
+                let total: u32 = card_hearts.values_sum();
                 card_hearts.clear();
                 card_hearts.insert(*override_color, total);
             }
 
             for (color, count) in &card_hearts {
-                *hearts.entry(*color).or_insert(0) += count;
+                *hearts.entry_or_default(*color) += count;
             }
 
             if let Some(mods) = heart_modifiers.get(&card_id) {
                 for (color, delta) in mods {
-                    let new_val = (*hearts.get(color).unwrap_or(&0) as i32 + *delta).max(0) as u32;
+                    let new_val =
+                        (hearts.get(color).copied().unwrap_or(0) as i32 + *delta).max(0) as u32;
                     if new_val > 0 {
                         hearts.insert(*color, new_val);
                     } else {
@@ -553,7 +553,7 @@ impl LiveCardZone {
                                 let has_set = card_mods.values().any(|e| e.set != 0);
                                 let mut adjusted = if has_set {
                                     BaseHeart {
-                                        hearts: HashMap::new(),
+                                        hearts: HeartMap::new(),
                                     }
                                 } else {
                                     need_heart.clone()
@@ -563,8 +563,12 @@ impl LiveCardZone {
                                         adjusted.hearts.insert(*color, me.set as u32);
                                     }
                                     if me.additive != 0 {
-                                        let entry = adjusted.hearts.entry(*color).or_insert(0);
-                                        *entry = (*entry as i32 + me.additive).max(0) as u32;
+                                        *adjusted.hearts.entry_or_default(*color) =
+                                            (adjusted.hearts.get(color).copied().unwrap_or(0)
+                                                as i32
+                                                + me.additive)
+                                                .max(0)
+                                                as u32;
                                     }
                                 }
                                 Some(adjusted)

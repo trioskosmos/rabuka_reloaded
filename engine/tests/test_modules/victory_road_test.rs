@@ -1,6 +1,5 @@
 use crate::helpers::*;
-use rabuka_engine::card::{BaseHeart, HeartColor};
-use std::collections::HashMap;
+use rabuka_engine::card::{BaseHeart, HeartColor, HeartMap};
 
 fn advance_to_live_start(game: &mut TestGame) {
     for _ in 0..5 {
@@ -15,7 +14,7 @@ fn finish_live_setup(game: &mut TestGame) {
 
 fn set_stage_hearts(game: &mut TestGame) {
     let mut h = BaseHeart {
-        hearts: HashMap::new(),
+        hearts: HeartMap::new(),
     };
     h.hearts.insert(HeartColor::Heart00, 7);
     h.hearts.insert(HeartColor::Heart01, 1);

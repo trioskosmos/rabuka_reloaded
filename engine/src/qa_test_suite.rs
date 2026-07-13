@@ -1754,7 +1754,7 @@ fn test_ability_optional_cost_user_choice() {
     // Setup discard with '虹ヶ咲' live card
     let nijigasaki_live = cards
         .iter()
-        .filter(|c| c.is_live() && c.group == "虹ヶ咲")
+        .filter(|c| c.is_live() && c.group.as_ref() == "虹ヶ咲")
         .take(1)
         .next()
         .expect("No Nijigasaki live card");
@@ -1844,21 +1844,21 @@ fn test_ability_group_filtering() {
     // Setup discard with live cards from different groups
     let nijigasaki_live = cards
         .iter()
-        .filter(|c| c.is_live() && c.group == "虹ヶ咲")
+        .filter(|c| c.is_live() && c.group.as_ref() == "虹ヶ咲")
         .take(1)
         .next()
         .expect("No Nijigasaki live card");
 
     let muse_live = cards
         .iter()
-        .filter(|c| c.is_live() && c.group == "μ's")
+        .filter(|c| c.is_live() && c.group.as_ref() == "μ's")
         .take(1)
         .next()
         .expect("No Muse live card");
 
     let aqours_live = cards
         .iter()
-        .filter(|c| c.is_live() && c.group == "Aqours")
+        .filter(|c| c.is_live() && c.group.as_ref() == "Aqours")
         .take(1)
         .next()
         .expect("No Aqours live card");
@@ -1886,7 +1886,7 @@ fn test_ability_group_filtering() {
         .filter(|&&id| {
             card_database
                 .get_card(id)
-                .map(|c| c.group == target_group)
+                .map(|c| c.group.as_ref() == target_group)
                 .unwrap_or(false)
         })
         .count();

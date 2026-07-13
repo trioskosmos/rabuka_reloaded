@@ -1032,7 +1032,7 @@ impl<'a> ConditionContext<'a> {
                 for &cid in cards.iter() {
                     if let Some(card) = card_db.get_card(cid) {
                         if !card.group.is_empty() {
-                            seen.insert(card.group.clone());
+                            seen.insert(card.group.to_string());
                         }
                     }
                 }
@@ -1261,7 +1261,7 @@ impl<'a> ConditionContext<'a> {
             if gr == "same_group_name" {
                 self.activating_card_id
                     .and_then(|cid| self.game_state.card_database.get_card(cid))
-                    .map(|c| c.group.as_str())
+                    .map(|c| c.group.as_ref())
             } else {
                 None
             }
@@ -1390,7 +1390,7 @@ impl<'a> ConditionContext<'a> {
             return HeartTotal::All;
         }
 
-        let base_sum: u32 = base.hearts.values().sum();
+        let base_sum: u32 = base.hearts.values_sum();
 
         let modifier_total: i32 = self
             .game_state
@@ -1649,7 +1649,7 @@ impl<'a> ConditionContext<'a> {
                         }
                         if let Some(card) = card_db.get_card(cid) {
                             if !card.group.is_empty() {
-                                distinct_groups.insert(card.group.clone());
+                                distinct_groups.insert(card.group.to_string());
                             }
                         }
                     }
@@ -2553,7 +2553,7 @@ impl<'a> ConditionContext<'a> {
             if condition.group_reference.as_deref() == Some("same_group_name") {
                 self.activating_card_id
                     .and_then(|cid| self.game_state.card_database.get_card(cid))
-                    .map(|c| c.group.clone())
+                    .map(|c| c.group.to_string())
                     .map(|g| vec![g])
             } else {
                 None
@@ -3561,7 +3561,7 @@ impl<'a> ConditionContext<'a> {
                 let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
                 for &cid in &matching {
                     if let Some(card) = card_db.get_card(cid) {
-                        seen.insert(card.group.clone());
+                        seen.insert(card.group.to_string());
                     }
                 }
                 seen.len() as u32
@@ -3593,7 +3593,7 @@ impl<'a> ConditionContext<'a> {
             .map(|card| {
                 card.base_heart
                     .as_ref()
-                    .map(|bh| bh.hearts.values().copied().sum::<u32>())
+                    .map(|bh| bh.hearts.values_sum())
                     .unwrap_or(0)
             })
             .sum()
@@ -4162,7 +4162,7 @@ impl<'a> ConditionContext<'a> {
                         .map(|card| {
                             card.need_heart
                                 .as_ref()
-                                .map(|nh| nh.hearts.values().copied().sum::<u32>())
+                                .map(|nh| nh.hearts.values_sum())
                                 .unwrap_or(0)
                         })
                         .sum()

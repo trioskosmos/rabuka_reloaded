@@ -338,7 +338,7 @@ impl AbilityResolver {
                     if let Some(card) = card_db.get_card(cid) {
                         // Use base_heart for member cards (need_heart is only on live cards)
                         if let Some(ref bh) = card.base_heart {
-                            for (&color, &amt) in &bh.hearts {
+                            for &(color, amt) in &bh.hearts {
                                 if amt > 0 && !distinct_colors.contains(&color) {
                                     distinct_colors.push(color);
                                 }
@@ -609,7 +609,7 @@ impl AbilityResolver {
                         );
                     }
                     if let Some(ref base_heart) = selected_card.base_heart {
-                        for (&color, _) in &base_heart.hearts {
+                        for &(color, _) in &base_heart.hearts {
                             for &target_id in &target_ids {
                                 if crate::ability::debug::ABILITY_DEBUG
                                     .load(std::sync::atomic::Ordering::Relaxed)
@@ -942,7 +942,7 @@ impl AbilityResolver {
                     .moved_cards
                     .first()
                     .and_then(|cid| gs.card_database.get_card(*cid))
-                    .map(|c| c.group.clone());
+                    .map(|c| c.group.to_string());
                 if let Some(ref group) = ref_group {
                     candidates.retain(|&cid| {
                         util::card_matches_group_str(&gs.card_database, cid, Some(group.as_str()))
@@ -1533,7 +1533,7 @@ impl AbilityResolver {
                     );
                     c
                 })
-                .map(|c| c.group.clone());
+                .map(|c| c.group.to_string());
             log::debug!("[SAME_GROUP] ref_group={:?}", ref_group);
             if let Some(ref group) = ref_group {
                 let before = heart_targets.len();

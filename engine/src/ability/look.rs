@@ -139,7 +139,9 @@ impl AbilityResolver {
             .card_type(select_action.card_type_any().map(|s| s.to_string()))
             .cost_limit(
                 select_action.cost_limit_any(),
-                select_action.cost_limit_operator_any().map(|s| s.to_string()),
+                select_action
+                    .cost_limit_operator_any()
+                    .map(|s| s.to_string()),
             )
             .group(
                 select_action
@@ -241,7 +243,9 @@ impl AbilityResolver {
                         .description_ja(Some(desc_ja))
                         .card_type(card_type.map(|s| s.to_string()))
                         .cost_limit(
-                            self.current_effect.as_ref().and_then(|e| e.cost_limit_any()),
+                            self.current_effect
+                                .as_ref()
+                                .and_then(|e| e.cost_limit_any()),
                             self.current_effect
                                 .as_ref()
                                 .and_then(|e| e.cost_limit_operator_any())
@@ -344,60 +348,64 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         // Handle or_card_types (type choice, e.g. Honoka: pick live_card or member_card)
-        let chosen_card_type: Option<String> = if let Some(ref or_types) = effect.or_card_types_any() {
-            if !or_types.is_empty() {
-                let maybe_cc = gs
-                    .ability_queue
-                    .current_entry()
-                    .and_then(|e| e.conditional_choice.clone());
-                if let Some(ref cc) = maybe_cc {
-                    if or_types.contains(cc) {
-                        Some(cc.clone())
+        let chosen_card_type: Option<String> =
+            if let Some(ref or_types) = effect.or_card_types_any() {
+                if !or_types.is_empty() {
+                    let maybe_cc = gs
+                        .ability_queue
+                        .current_entry()
+                        .and_then(|e| e.conditional_choice.clone());
+                    if let Some(ref cc) = maybe_cc {
+                        if or_types.contains(cc) {
+                            Some(cc.clone())
+                        } else {
+                            None
+                        }
                     } else {
-                        None
+                        let desc_parts: Vec<String> = or_types
+                            .iter()
+                            .map(|t| {
+                                let base = match t.as_str() {
+                                    "live_card" => "Live card".to_string(),
+                                    "member_card" => "Member card".to_string(),
+                                    "energy_card" => "Energy card".to_string(),
+                                    _ => t.clone(),
+                                };
+                                match (
+                                    effect.cost_limit_any(),
+                                    effect.cost_limit_operator_any().as_deref(),
+                                ) {
+                                    (Some(l), Some("<=")) => {
+                                        format!("{} with cost {} or less", base, l)
+                                    }
+                                    (Some(l), Some(">=")) => {
+                                        format!("{} with cost {} or more", base, l)
+                                    }
+                                    (Some(l), _) => format!("{} with cost {}", base, l),
+                                    _ => base,
+                                }
+                            })
+                            .collect();
+                        self.pending_choice = Some(Choice::SelectTarget {
+                            target: "choice_string".to_string(),
+                            description: format!("Choose: {}", desc_parts.join(", or ")),
+                            description_en: Some(format!("Choose: {}", desc_parts.join(", or "))),
+                            description_ja: Some(format!("選択: {}", desc_parts.join(", または "))),
+                            allow_skip: false,
+                            options: Some(desc_parts.clone()),
+                        });
+                        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                        if let Some(e) = gs.ability_queue.current_entry_mut() {
+                            e.conditional_choice = Some(serde_json::to_string(or_types).unwrap());
+                        }
+                        return Ok(());
                     }
                 } else {
-                    let desc_parts: Vec<String> = or_types
-                        .iter()
-                        .map(|t| {
-                            let base = match t.as_str() {
-                                "live_card" => "Live card".to_string(),
-                                "member_card" => "Member card".to_string(),
-                                "energy_card" => "Energy card".to_string(),
-                                _ => t.clone(),
-                            };
-                            match (effect.cost_limit_any(), effect.cost_limit_operator_any().as_deref()) {
-                                (Some(l), Some("<=")) => {
-                                    format!("{} with cost {} or less", base, l)
-                                }
-                                (Some(l), Some(">=")) => {
-                                    format!("{} with cost {} or more", base, l)
-                                }
-                                (Some(l), _) => format!("{} with cost {}", base, l),
-                                _ => base,
-                            }
-                        })
-                        .collect();
-                    self.pending_choice = Some(Choice::SelectTarget {
-                        target: "choice_string".to_string(),
-                        description: format!("Choose: {}", desc_parts.join(", or ")),
-                        description_en: Some(format!("Choose: {}", desc_parts.join(", or "))),
-                        description_ja: Some(format!("選択: {}", desc_parts.join(", または "))),
-                        allow_skip: false,
-                        options: Some(desc_parts.clone()),
-                    });
-                    self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
-                    if let Some(e) = gs.ability_queue.current_entry_mut() {
-                        e.conditional_choice = Some(serde_json::to_string(or_types).unwrap());
-                    }
-                    return Ok(());
+                    None
                 }
             } else {
                 None
-            }
-        } else {
-            None
-        };
+            };
 
         let ct_binding = effect.card_type_any();
         let card_type = chosen_card_type.as_deref().or(ct_binding.as_deref());
@@ -550,8 +558,16 @@ impl AbilityResolver {
             Choice::select_cards(source.to_string(), count as usize, desc_en, optional)
                 .description_ja(Some(desc_ja))
                 .card_type(effect.card_type_any().map(|s| s.to_string()))
-                .cost_limit(effect.cost_limit_any(), effect.cost_limit_operator_any().map(|s| s.to_string()))
-                .group(effect.group_names_any().as_ref().and_then(|v| v.first().cloned()))
+                .cost_limit(
+                    effect.cost_limit_any(),
+                    effect.cost_limit_operator_any().map(|s| s.to_string()),
+                )
+                .group(
+                    effect
+                        .group_names_any()
+                        .as_ref()
+                        .and_then(|v| v.first().cloned()),
+                )
                 .characters(effect.characters_any().cloned())
                 .filtered_indices(filtered_indices.clone())
                 .target_player_id(Some(target.clone()))
@@ -603,8 +619,16 @@ impl AbilityResolver {
             )
             .description_ja(Some("公開されたカードからカードを選択".to_string()))
             .card_type(effect.card_type_any().map(|s| s.to_string()))
-            .cost_limit(effect.cost_limit_any(), effect.cost_limit_operator_any().map(|s| s.to_string()))
-            .group(effect.group_names_any().as_ref().and_then(|v| v.first().cloned()))
+            .cost_limit(
+                effect.cost_limit_any(),
+                effect.cost_limit_operator_any().map(|s| s.to_string()),
+            )
+            .group(
+                effect
+                    .group_names_any()
+                    .as_ref()
+                    .and_then(|v| v.first().cloned()),
+            )
             .characters(effect.characters_any().cloned())
             .destination(effect.destination.clone())
             .build();
@@ -613,66 +637,70 @@ impl AbilityResolver {
         }
 
         // Handle or_card_types (type choice) — same as execute_select.
-        let chosen_card_type: Option<String> = if let Some(ref or_types) = effect.or_card_types_any() {
-            if !or_types.is_empty() {
-                let maybe_cc = gs
-                    .ability_queue
-                    .current_entry()
-                    .and_then(|e| e.conditional_choice.clone());
-                if let Some(ref cc) = maybe_cc {
-                    if or_types.contains(cc) {
-                        Some(cc.clone())
+        let chosen_card_type: Option<String> =
+            if let Some(ref or_types) = effect.or_card_types_any() {
+                if !or_types.is_empty() {
+                    let maybe_cc = gs
+                        .ability_queue
+                        .current_entry()
+                        .and_then(|e| e.conditional_choice.clone());
+                    if let Some(ref cc) = maybe_cc {
+                        if or_types.contains(cc) {
+                            Some(cc.clone())
+                        } else {
+                            None
+                        }
                     } else {
-                        None
+                        let desc_parts: Vec<String> = or_types
+                            .iter()
+                            .map(|t| {
+                                let base = match t.as_str() {
+                                    "live_card" => "Live card".to_string(),
+                                    "member_card" => "Member card".to_string(),
+                                    "energy_card" => "Energy card".to_string(),
+                                    _ => t.clone(),
+                                };
+                                match (
+                                    effect.cost_limit_any(),
+                                    effect.cost_limit_operator_any().as_deref(),
+                                ) {
+                                    (Some(l), Some("<=")) => {
+                                        format!("{} with cost {} or less", base, l)
+                                    }
+                                    (Some(l), Some(">=")) => {
+                                        format!("{} with cost {} or more", base, l)
+                                    }
+                                    (Some(l), _) => format!("{} with cost {}", base, l),
+                                    _ => base,
+                                }
+                            })
+                            .collect();
+                        self.pending_choice = Some(Choice::SelectTarget {
+                            target: "choice_string".to_string(),
+                            description: format!("Choose: {}", desc_parts.join(", or ")),
+                            description_en: Some(format!("Choose: {}", desc_parts.join(", or "))),
+                            description_ja: Some(format!("選択: {}", desc_parts.join(", または "))),
+                            allow_skip: false,
+                            options: Some(desc_parts.clone()),
+                        });
+                        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                        if let Some(e) = gs.ability_queue.current_entry_mut() {
+                            e.conditional_choice = Some(serde_json::to_string(or_types).unwrap());
+                        }
+                        // Save a copy of this effect so it re-executes after the choice.
+                        {
+                            let mut remaining = gs.ability_queue.take_pending_actions();
+                            remaining.push(effect.clone());
+                            gs.ability_queue.set_pending_actions(remaining);
+                        }
+                        return Ok(());
                     }
                 } else {
-                    let desc_parts: Vec<String> = or_types
-                        .iter()
-                        .map(|t| {
-                            let base = match t.as_str() {
-                                "live_card" => "Live card".to_string(),
-                                "member_card" => "Member card".to_string(),
-                                "energy_card" => "Energy card".to_string(),
-                                _ => t.clone(),
-                            };
-                            match (effect.cost_limit_any(), effect.cost_limit_operator_any().as_deref()) {
-                                (Some(l), Some("<=")) => {
-                                    format!("{} with cost {} or less", base, l)
-                                }
-                                (Some(l), Some(">=")) => {
-                                    format!("{} with cost {} or more", base, l)
-                                }
-                                (Some(l), _) => format!("{} with cost {}", base, l),
-                                _ => base,
-                            }
-                        })
-                        .collect();
-                    self.pending_choice = Some(Choice::SelectTarget {
-                        target: "choice_string".to_string(),
-                        description: format!("Choose: {}", desc_parts.join(", or ")),
-                        description_en: Some(format!("Choose: {}", desc_parts.join(", or "))),
-                        description_ja: Some(format!("選択: {}", desc_parts.join(", または "))),
-                        allow_skip: false,
-                        options: Some(desc_parts.clone()),
-                    });
-                    self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
-                    if let Some(e) = gs.ability_queue.current_entry_mut() {
-                        e.conditional_choice = Some(serde_json::to_string(or_types).unwrap());
-                    }
-                    // Save a copy of this effect so it re-executes after the choice.
-                    {
-                        let mut remaining = gs.ability_queue.take_pending_actions();
-                        remaining.push(effect.clone());
-                        gs.ability_queue.set_pending_actions(remaining);
-                    }
-                    return Ok(());
+                    None
                 }
             } else {
                 None
-            }
-        } else {
-            None
-        };
+            };
 
         // Override card_type with player's choice from or_card_types.
         let override_card_type: Option<String> = chosen_card_type.map(|s| s.to_string());
@@ -794,8 +822,16 @@ impl AbilityResolver {
                 .clone()
                 .or_else(|| effect.card_type_any().map(|s| s.to_string())),
         )
-        .cost_limit(effect.cost_limit_any(), effect.cost_limit_operator_any().map(|s| s.to_string()))
-        .group(effect.group_names_any().as_ref().and_then(|v| v.first().cloned()))
+        .cost_limit(
+            effect.cost_limit_any(),
+            effect.cost_limit_operator_any().map(|s| s.to_string()),
+        )
+        .group(
+            effect
+                .group_names_any()
+                .as_ref()
+                .and_then(|v| v.first().cloned()),
+        )
         .characters(effect.characters_any().cloned())
         .filtered_indices(Some(matching_indices))
         .build();
@@ -955,7 +991,7 @@ impl AbilityResolver {
         for &card_id in &card_ids {
             let group_name = card_db
                 .get_card(card_id)
-                .map(|c| c.group.clone())
+                .map(|c| c.group.to_string())
                 .unwrap_or_default();
             by_group.entry(group_name).or_default().push(card_id);
         }

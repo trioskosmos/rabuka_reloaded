@@ -15,7 +15,7 @@ fn process_abilities(game: &mut TestGame) {
 
 fn setup_live_phase_with_hearts(game: &mut TestGame) {
     game.state.current_phase = Phase::LiveCardSetFirstAttacker;
-    let mut hearts = std::collections::HashMap::new();
+    let mut hearts = rabuka_engine::card::HeartMap::new();
     hearts.insert(HeartColor::Heart01, 7);
     hearts.insert(HeartColor::Heart02, 2);
     hearts.insert(HeartColor::Heart06, 6);
@@ -72,7 +72,7 @@ fn distinct_card_name_prevents_same_card_twice() {
     // modify_required_hearts with distinct=card_name
     let live_card = game.id("PL!SP-bp1-026-L");
     game.state.player1.live_card_zone.cards.push(live_card);
-    let mut hearts = std::collections::HashMap::new();
+    let mut hearts = rabuka_engine::card::HeartMap::new();
     hearts.insert(HeartColor::Heart01, 5);
     hearts.insert(HeartColor::Heart00, 5);
     use rabuka_engine::card::BaseHeart;

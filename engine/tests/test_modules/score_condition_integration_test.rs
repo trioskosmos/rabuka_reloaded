@@ -187,22 +187,22 @@ fn compound_dododo_condition() -> Condition {
         operator: Some("and".to_string()),
         conditions: Some(vec![
             // Sub-condition 1: score > opponent
-            Condition {
+            Box::new(Condition {
                 condition_type: Some(ConditionType::ComparisonCondition),
                 comparison_type: Some("score".to_string()),
                 comparison_target: Some("opponent".to_string()),
                 operator: Some(">".to_string()),
                 ..Default::default()
-            },
+            }),
             // Sub-condition 2: 蓮ノ空 member on self stage
-            Condition {
+            Box::new(Condition {
                 condition_type: Some(ConditionType::GroupCondition),
                 target: Some("self".to_string()),
                 location: Some("stage".to_string()),
                 card_type: Some("member_card".to_string()),
                 group_names: Some(vec!["蓮ノ空".to_string()]),
                 ..Default::default()
-            },
+            }),
         ]),
         ..Default::default()
     }

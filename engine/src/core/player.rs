@@ -9,7 +9,6 @@ use crate::core::game_modifiers::{GameModifiers, ModifierEntry};
 
 use std::collections::VecDeque;
 
-
 #[derive(Debug, Clone)]
 
 pub struct Player {
@@ -238,7 +237,10 @@ impl Player {
                 if let Some(ref effect) = ability.effect {
                     if crate::ability::enums::ActionType::from_str(&effect.action)
                         == Some(crate::ability::enums::ActionType::ModifyCost)
-                        && matches!(effect.operation_any().as_deref(), Some("increase") | Some("add"))
+                        && matches!(
+                            effect.operation_any().as_deref(),
+                            Some("increase") | Some("add")
+                        )
                         && Zone::from_str(effect.location_any().as_deref().unwrap_or(""))
                             == Some(Zone::SuccessLiveZone)
                     {
@@ -315,7 +317,9 @@ impl Player {
                     let has_protection = card_db.get_card(member_id).is_some_and(|existing_card| {
                         existing_card.abilities.iter().any(|a| {
                             a.effect.as_ref().is_some_and(|ef| {
-                                if ef.restriction_type_any().as_deref() != Some("cannot_baton_touch") {
+                                if ef.restriction_type_any().as_deref()
+                                    != Some("cannot_baton_touch")
+                                {
                                     return false;
                                 }
                                 if let Some(ref exclude_groups) = ef.exclude_group_names_any() {
@@ -460,41 +464,38 @@ impl Player {
         >,
     ) -> crate::card::BaseHeart {
         use crate::card::HeartColor;
-        use std::collections::HashMap;
 
-        let mut total_hearts: HashMap<HeartColor, u32> = HashMap::new();
+        let mut total_hearts = crate::card::HeartMap::new();
 
         for &card_id in &self.stage.stage {
             if card_id == crate::constants::EMPTY_SLOT {
                 continue;
             }
 
-            // heart_override: replace card's hearts entirely
             if let Some(&(override_color, override_count)) = heart_override.get(&card_id) {
-                *total_hearts.entry(override_color).or_insert(0) += override_count;
+                *total_hearts.entry_or_default(override_color) += override_count;
                 continue;
             }
 
             if let Some(card) = card_db.get_card(card_id) {
                 if let Some(ref base_heart) = card.base_heart {
                     if let Some(override_color) = heart_color_multiplier.get(&card_id) {
-                        let total: u32 = base_heart.hearts.values().sum();
-                        *total_hearts.entry(*override_color).or_insert(0) += total;
+                        let total: u32 = base_heart.hearts.values_sum();
+                        *total_hearts.entry_or_default(*override_color) += total;
                     } else {
                         for (color, count) in &base_heart.hearts {
-                            *total_hearts.entry(*color).or_insert(0) += count;
+                            *total_hearts.entry_or_default(*color) += count;
                         }
                     }
                 }
             }
 
-            // heart_modifiers: additive per-color adjustments
             if let Some(mods) = heart_modifiers.get(&card_id) {
                 for (color, entry) in mods {
                     let delta = entry.total();
                     if delta != 0 {
-                        let new_val =
-                            (*total_hearts.get(color).unwrap_or(&0) as i32 + delta).max(0) as u32;
+                        let new_val = (total_hearts.get(color).copied().unwrap_or(0) as i32 + delta)
+                            .max(0) as u32;
                         if new_val > 0 {
                             total_hearts.insert(*color, new_val);
                         } else {

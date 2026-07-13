@@ -1008,7 +1008,7 @@ pub fn player_to_display(
                 if let Some(&override_color) = heart_color_multiplier.get(&card_id) {
                     // Heart transform: sum all base hearts into the override color
                     if let Some(idx) = heart_color_index(&override_color) {
-                        let total: u32 = base_heart.hearts.values().sum();
+                        let total: u32 = base_heart.hearts.values_sum();
                         total_hearts[idx] += total;
                     }
                 } else {

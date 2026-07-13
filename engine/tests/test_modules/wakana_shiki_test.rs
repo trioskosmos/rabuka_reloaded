@@ -1,8 +1,7 @@
 use crate::helpers::*;
-use rabuka_engine::card::{BaseHeart, HeartColor};
+use rabuka_engine::card::{BaseHeart, HeartColor, HeartMap};
 use rabuka_engine::game_state::Phase;
 use rabuka_engine::turn::TurnEngine;
-use std::collections::HashMap;
 
 fn trigger_and_drain(game: &mut TestGame) {
     game.state.current_phase = Phase::LiveVictoryDetermination;
@@ -67,7 +66,7 @@ fn shiki_per_unit_score_capped_at_2() {
     }
 
     let mut h = BaseHeart {
-        hearts: HashMap::new(),
+        hearts: HeartMap::new(),
     };
     h.hearts.insert(HeartColor::Heart00, 20);
     game.state.player1.stage_hearts = Some(h);
@@ -108,7 +107,7 @@ fn shiki_per_unit_score_no_cap_needed() {
     }
 
     let mut h = BaseHeart {
-        hearts: HashMap::new(),
+        hearts: HeartMap::new(),
     };
     h.hearts.insert(HeartColor::Heart00, 20);
     game.state.player1.stage_hearts = Some(h);
@@ -144,7 +143,7 @@ fn shiki_per_unit_score_zero_matching() {
     game.state.player1.live_card_zone.cards.push(live);
 
     let mut h = BaseHeart {
-        hearts: HashMap::new(),
+        hearts: HeartMap::new(),
     };
     h.hearts.insert(HeartColor::Heart00, 20);
     game.state.player1.stage_hearts = Some(h);

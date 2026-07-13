@@ -346,7 +346,7 @@ pub fn card_matches_group(
     match group_filter {
         Some(group_name) => card_db
             .get_card(card_id)
-            .map(|c| c.group == *group_name)
+            .map(|c| c.group.as_ref() == group_name.as_str())
             .unwrap_or(false),
         None => true,
     }
@@ -362,7 +362,7 @@ fn debug_group_match(card_db: &CardDatabase, card_id: i16, group_name: Option<&s
     }
     let card = card_db.get_card(card_id);
     let card_name = card.as_ref().map(|c| c.name.as_str()).unwrap_or("?");
-    let series = card.as_ref().map(|c| c.series.as_str()).unwrap_or("?");
+    let series = card.as_ref().map(|c| c.series.as_ref()).unwrap_or("?");
     let unit = card.as_ref().and_then(|c| c.unit.as_deref()).unwrap_or("?");
     let _group = group_name.unwrap_or("None");
     let checks = match group_name {
@@ -374,7 +374,7 @@ fn debug_group_match(card_db: &CardDatabase, card_id: i16, group_name: Option<&s
             card.as_ref()
                 .map(|c| {
                     let unit_ok = norm(c.unit.as_deref().unwrap_or("")) == gn;
-                    let group_ok = c.group == g;
+                    let group_ok = c.group.as_ref() == g;
                     let name_ok = card_db
                         .get_card_names(card_id)
                         .iter()
@@ -422,7 +422,7 @@ pub fn card_matches_group_str(
                     let unit = c.unit.as_deref().unwrap_or("");
                     let unit_match = unit == gn || ((unit.contains('\u{FF01}') || unit.contains('\u{00B5}')) && norm(unit) == gn);
                     unit_match
-                || c.group == g
+                || c.group.as_ref() == g
                 // Check name fragments for multi-name cards (e.g. "にこ" in "矢澤にこ")
                 || card_db.get_card_names(card_id).iter().any(|n| n.contains(&gn) || ((n.contains('\u{FF01}') || n.contains('\u{00B5}')) && norm(n).contains(&gn)))
                 // Multi-name cards (e.g. 渡辺曜&鬼塚夏美&大沢瑠璃乃) should match

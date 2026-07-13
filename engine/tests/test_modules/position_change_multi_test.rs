@@ -510,9 +510,8 @@ fn position_change_tracks_card_movement() {
 /// offered because this is a formation change (multiple_targets=true).
 #[test]
 fn formation_change_with_group_names_and_empty_slots() {
-    use rabuka_engine::card::HeartColor;
+    use rabuka_engine::card::{HeartColor, HeartMap};
     use rabuka_engine::turn::TurnEngine;
-    use std::collections::HashMap;
 
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
@@ -534,7 +533,7 @@ fn formation_change_with_group_names_and_empty_slots() {
     game.state.player1.live_card_zone.cards.push(chance_day);
 
     // Set stage hearts to satisfy Chance Day's need_heart: heart02=1, heart0=2
-    let mut heart_map = HashMap::new();
+    let mut heart_map = HeartMap::new();
     heart_map.insert(HeartColor::Heart02, 1);
     heart_map.insert(HeartColor::Heart00, 2);
     let hearts = rabuka_engine::card::BaseHeart { hearts: heart_map };
