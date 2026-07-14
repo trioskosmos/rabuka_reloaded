@@ -440,6 +440,64 @@ Rough estimate for a typical ability with 1 condition and 3 option effects:
 
 ---
 
+## CPU vs RAM tradeoff analysis
+
+The core tension: **does boxing EffectKind (808B per effect → 8B on stack + 808B on heap) make things faster or slower?**
+
+### Concrete example: evaluating "西木野真姫" (8 effects)
+
+This ability does: discard → specify heart color → reveal 5 → check revealed → select cards → gain blade.
+
+**Memory cost (storage, loaded once):**
+```
+EffectKind enum:           808B × 8 effects =  6,464B  (heap, counted once)
+AbilityEffect struct:      264B × 8 effects =  2,112B  (stack, per-context copy)
+Condition enum:            536B × 2           =  1,072B  (2 conditions on this ability)
+Text fields (Japanese):    635B × 2 (UTF-16)  =  1,270B  (full_text + triggerless_text)
+Total per ability:                              ~10.9 KB
+```
+
+**Runtime cost (per execution, when this ability triggers):**
+```
+Step 1: Condition evaluation
+  │  evaluate_card_count_condition()
+  │   │  get_count()         1 getter  ~3 cycles
+  │   │  get_group_reference() 1 getter ~3 cycles
+  │   │  get_card(cid) → c.group   ~20 cycles (HashMap lookup)
+  │   │  resolve_zone_card_count() ~200 cycles (filter 5 revealed cards)
+  │   └─ compare_counts()    ~5 cycles
+  └── Total: ~250 cycles  (99.9% of work is in resolve_zone_card_count)
+
+Step 2: Effect execution (sequential → specify_heart_color → reveal → select)
+  │  getter calls: source_any(), destination_any(), count_any(),
+  │               target_any(), card_type_any(), group_names_any()
+  │  ~6 getters × ~3 cycles = 18 cycles
+  │  Actual work: shuffling cards, checking hearts, granting blade
+  │  Each sub-step: 100-5000 cycles (card movement, database lookups)
+  └── Total: ~500-10000 cycles
+
+Step 3: Logging
+  │  serialize AbilityEffect → JSON: ~500 cycles
+  └── Total: ~500 cycles
+
+Grand total per trigger: ~1000-11000 cycles
+Getter overhead (Box deref): ~18 cycles per trigger = 0.16-1.8% of total
+```
+
+**The Box deref cost:**
+- Without Box: `self.kind` → `Option<EffectKind>` inline. `match &self.kind` → LDR from struct offset (1 cycle).
+- With Box: `self.kind` → `Option<Box<EffectKind>>`. `self.kind.as_deref()` → LDR pointer (1 cycle) + LDR through pointer (1 cycle).
+
+For 8 effects × 6 getters × 2 extra cycles = **96 extra cycles per full turn** on a 3DS (268MHz). That's **0.000036% of one frame** (1 frame = 16.6M cycles). Completely invisible.
+
+### Why boxing is still the right call
+
+Stack memory from EffectKind = 808B × 1451 effects = **1,171,208 bytes**. Boxing moves this to the heap. The heap is where most game data already lives (Strings, Vecs). The 3DS has 128MB total — losing 1.1MB of stack to EffectKind would overflow the per-thread stack limit (~256KB default on 3DS). Boxing is required for correctness, not just performance.
+
+### The real bottleneck: heap fragmentation
+
+Each Box<EffectKind> is an individual 808B heap allocation. 1451 of them. On a 3DS with 8KB block alignment, each allocation wastes 208-720B. A ROM-based compact representation (128B per effect, mmap'd) would both save 680B per effect AND eliminate the 1451 individual allocs. That's the next target.
+
 ## How to measure
 
 ```
