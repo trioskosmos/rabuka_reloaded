@@ -1,3 +1,4 @@
+use rabuka_engine::core::types::ArcStr;
 use rabuka_engine::ability::condition::ConditionContext;
 use rabuka_engine::card::{CardDatabase, Condition};
 use rabuka_engine::game_state::{GameState, Phase};
@@ -18,7 +19,7 @@ fn temporal_condition(turn_number: Option<u32>, text: &str) -> Condition {
     Condition::Temporal {
         text: Some(text.to_string()),
         negation: None,
-        phase: Some(Box::from("live_phase")),
+        phase: Some(ArcStr::from("live_phase")),
         phase_target: None,
         cache: None,
         trigger_event: None,

@@ -1,4 +1,5 @@
 use crate::ability::enums::{ActionType, ConditionType, Zone};
+use crate::core::types::ArcStr;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::collections::HashMap;
@@ -221,7 +222,7 @@ pub struct BaseHeart {
 #[derive(Debug, Clone, Serialize)]
 pub struct Card {
     pub card_no: String,
-    pub img: Option<Box<str>>,
+    pub img: Option<ArcStr>,
     pub name: String,
     #[serde(default)]
     pub product: Box<str>,
@@ -231,7 +232,7 @@ pub struct Card {
     pub series: Box<str>,
     #[serde(default = "default_group_from_series")]
     pub group: Box<str>,
-    pub unit: Option<Box<str>>,
+    pub unit: Option<ArcStr>,
     pub cost: Option<u32>,
     pub base_heart: Option<BaseHeart>,
     pub blade_heart: Option<BladeHeart>,
@@ -244,7 +245,7 @@ pub struct Card {
     #[serde(default)]
     pub faq: Vec<FAQEntry>,
     #[serde(rename = "_img")]
-    pub _img: Option<Box<str>>,
+    pub _img: Option<ArcStr>,
     // Live card fields
     pub score: Option<u32>,
     pub need_heart: Option<BaseHeart>,
@@ -439,7 +440,7 @@ impl<'de> Deserialize<'de> for Card {
         #[derive(Debug, Clone, Deserialize)]
         struct CardHelper {
             pub card_no: String,
-            pub img: Option<Box<str>>,
+            pub img: Option<ArcStr>,
             pub name: String,
             #[serde(default)]
             pub product: String,
@@ -447,7 +448,7 @@ impl<'de> Deserialize<'de> for Card {
             pub card_type: CardType,
             #[serde(default)]
             pub series: String,
-            pub unit: Option<Box<str>>,
+            pub unit: Option<ArcStr>,
             pub cost: Option<u32>,
             pub base_heart: Option<BaseHeart>,
             pub blade_heart: Option<BladeHeart>,
@@ -460,7 +461,7 @@ impl<'de> Deserialize<'de> for Card {
             #[serde(default)]
             pub faq: Vec<FAQEntry>,
             #[serde(rename = "_img")]
-            pub _img: Option<Box<str>>,
+            pub _img: Option<ArcStr>,
             pub score: Option<u32>,
             pub need_heart: Option<BaseHeart>,
             pub special_heart: Option<SpecialHeart>,
@@ -521,7 +522,7 @@ pub struct Ability {
     pub full_text: String,
     #[serde(default = "default_empty_string")]
     pub triggerless_text: String,
-    pub triggers: Option<Box<str>>,
+    pub triggers: Option<ArcStr>,
     pub use_limit: Option<u32>,
     #[serde(default)]
     pub is_null: bool,
@@ -712,7 +713,7 @@ impl<'de> serde::Deserialize<'de> for AbilityCost {
                     if let Some(kind) =
                         build_kind_from_action(&effect.action, &serde_json::Value::Object(extra))
                     {
-                        effect.kind = Some(Box::new(kind));
+                        effect.kind = Some(crate::core::pool::EkBox::new(kind));
                     }
                 }
 
@@ -819,15 +820,15 @@ pub enum EffectKind {
     /// MoveCards effect fields
     MoveCards {
         #[serde(default)]
-        source: Option<Box<str>>,
+        source: Option<ArcStr>,
         #[serde(default)]
-        target: Option<Box<str>>,
+        target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Box<str>>,
+        destination: Option<ArcStr>,
         #[serde(default)]
         count: Option<u32>,
         #[serde(default)]
-        card_type: Option<Box<str>>,
+        card_type: Option<ArcStr>,
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
@@ -863,11 +864,11 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_selected: Option<bool>,
         #[serde(default)]
-        exclude_by_name_source: Option<Box<str>>,
+        exclude_by_name_source: Option<ArcStr>,
         #[serde(default)]
-        name_constraint: Option<Box<str>>,
+        name_constraint: Option<ArcStr>,
         #[serde(default)]
-        name_constraint_source: Option<Box<str>>,
+        name_constraint_source: Option<ArcStr>,
         #[serde(default)]
         ability_filter: Option<AbilityFilter>,
         #[serde(default)]
@@ -875,19 +876,19 @@ pub enum EffectKind {
         #[serde(default)]
         or_ability_filters: Option<Vec<AbilityFilterBranch>>,
         #[serde(default)]
-        card_property: Option<Box<str>>,
+        card_property: Option<ArcStr>,
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
-        source_position: Option<Box<str>>,
+        source_position: Option<ArcStr>,
         #[serde(default)]
-        exclude_position: Option<Box<str>>,
+        exclude_position: Option<ArcStr>,
         #[serde(default)]
         allow_occupied_stage: Option<bool>,
         #[serde(default)]
         target_from_selection: Option<bool>,
         #[serde(default)]
-        group_reference: Option<Box<str>>,
+        group_reference: Option<ArcStr>,
         #[serde(default)]
         cost_from_revealed: Option<bool>,
         #[serde(default)]
@@ -897,13 +898,13 @@ pub enum EffectKind {
         #[serde(default)]
         per_group_count: Option<u32>,
         #[serde(default)]
-        state: Option<Box<str>>,
+        state: Option<ArcStr>,
         #[serde(default)]
         negation: Option<bool>,
         #[serde(default)]
-        location: Option<Box<str>>,
+        location: Option<ArcStr>,
         #[serde(default)]
-        activation_position: Option<Box<str>>,
+        activation_position: Option<ArcStr>,
         #[serde(default)]
         exclude_heart_colors: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -917,11 +918,11 @@ pub enum EffectKind {
         #[serde(default)]
         need_heart_operator: Option<Operator>,
         #[serde(default)]
-        need_heart_color: Option<Box<str>>,
+        need_heart_color: Option<ArcStr>,
         #[serde(default)]
         distinct: Option<DistinctType>,
         #[serde(default)]
-        state_change: Option<Box<str>>,
+        state_change: Option<ArcStr>,
         #[serde(default)]
         self_cost: Option<bool>,
         #[serde(default)]
@@ -931,7 +932,7 @@ pub enum EffectKind {
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
-        cost_reference: Option<Box<str>>,
+        cost_reference: Option<ArcStr>,
         #[serde(default)]
         cost_offset: Option<i32>,
         #[serde(default)]
@@ -943,11 +944,11 @@ pub enum EffectKind {
         #[serde(default)]
         baton_touch_trigger: Option<bool>,
         #[serde(default)]
-        target_member: Option<Box<str>>,
+        target_member: Option<ArcStr>,
         #[serde(default)]
         same_unit_name: Option<bool>,
         #[serde(default)]
-        action_by: Option<Box<str>>,
+        action_by: Option<ArcStr>,
         #[serde(default)]
         activation_condition_parsed: Option<Box<Condition>>,
         #[serde(default)]
@@ -956,21 +957,21 @@ pub enum EffectKind {
     /// DrawCards effect fields
     DrawCards {
         #[serde(default)]
-        source: Option<Box<str>>,
+        source: Option<ArcStr>,
         #[serde(default)]
-        target: Option<Box<str>>,
+        target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Box<str>>,
+        destination: Option<ArcStr>,
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
-        card_type: Option<Box<str>>,
+        card_type: Option<ArcStr>,
         #[serde(default)]
         dynamic_count: Option<DynamicCount>,
         #[serde(default)]
         card_names: Box<Vec<String>>,
         #[serde(default)]
-        location: Option<Box<str>>,
+        location: Option<ArcStr>,
         #[serde(default)]
         exclude_self: Option<bool>,
         #[serde(default)]
@@ -978,36 +979,36 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_count: Option<u32>,
         #[serde(default)]
-        per_unit_type: Option<Box<str>>,
+        per_unit_type: Option<ArcStr>,
         #[serde(default)]
         per_unit_heart_colors: Box<Vec<String>>,
         #[serde(default)]
-        per_unit_location: Option<Box<str>>,
+        per_unit_location: Option<ArcStr>,
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
-        state: Option<Box<str>>,
+        state: Option<ArcStr>,
         #[serde(default)]
         heart_colors: Box<Vec<String>>,
         #[serde(default)]
-        trigger_type: Option<Box<str>>,
+        trigger_type: Option<ArcStr>,
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
-        action_by: Option<Box<str>>,
+        action_by: Option<ArcStr>,
     },
     /// SelectTarget effect fields
     SelectTarget {
         #[serde(default)]
-        source: Option<Box<str>>,
+        source: Option<ArcStr>,
         #[serde(default)]
-        target: Option<Box<str>>,
+        target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Box<str>>,
+        destination: Option<ArcStr>,
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
-        card_type: Option<Box<str>>,
+        card_type: Option<ArcStr>,
         #[serde(default)]
         characters: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1035,9 +1036,9 @@ pub enum EffectKind {
         #[serde(default)]
         distinct: Option<DistinctType>,
         #[serde(default)]
-        name_constraint: Option<Box<str>>,
+        name_constraint: Option<ArcStr>,
         #[serde(default)]
-        name_constraint_source: Option<Box<str>>,
+        name_constraint_source: Option<ArcStr>,
         #[serde(default)]
         ability_filter: Option<AbilityFilter>,
         #[serde(default)]
@@ -1045,7 +1046,7 @@ pub enum EffectKind {
         #[serde(default)]
         or_ability_filters: Option<Vec<AbilityFilterBranch>>,
         #[serde(default)]
-        card_property: Option<Box<str>>,
+        card_property: Option<ArcStr>,
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
@@ -1057,31 +1058,31 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_count: Option<u32>,
         #[serde(default)]
-        per_unit_type: Option<Box<str>>,
+        per_unit_type: Option<ArcStr>,
         #[serde(default)]
         per_unit_heart_colors: Box<Vec<String>>,
         #[serde(default)]
-        per_unit_location: Option<Box<str>>,
+        per_unit_location: Option<ArcStr>,
         #[serde(default)]
         optional: Option<bool>,
         #[serde(default)]
-        location: Option<Box<str>>,
+        location: Option<ArcStr>,
         #[serde(default)]
-        state: Option<Box<str>>,
+        state: Option<ArcStr>,
         #[serde(default)]
-        activation_position: Option<Box<str>>,
+        activation_position: Option<ArcStr>,
         #[serde(default)]
-        group_reference: Option<Box<str>>,
+        group_reference: Option<ArcStr>,
         #[serde(default)]
         multiple_targets: Option<bool>,
         #[serde(default)]
-        question: Option<Box<str>>,
+        question: Option<ArcStr>,
         #[serde(default)]
         answers: Option<Box<Vec<String>>>,
         #[serde(default)]
-        choice_maker: Option<Box<str>>,
+        choice_maker: Option<ArcStr>,
         #[serde(default)]
-        choice_type: Option<Box<str>>,
+        choice_type: Option<ArcStr>,
         #[serde(default)]
         choice_options: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1095,7 +1096,7 @@ pub enum EffectKind {
         #[serde(default)]
         or_card_types: Option<Box<Vec<String>>>,
         #[serde(default)]
-        action_by: Option<Box<str>>,
+        action_by: Option<ArcStr>,
         #[serde(default)]
         require_all_heart_colors: Option<bool>,
         #[serde(default)]
@@ -1116,13 +1117,13 @@ pub enum EffectKind {
     /// LookReveal effect fields
     LookReveal {
         #[serde(default)]
-        source: Option<Box<str>>,
+        source: Option<ArcStr>,
         #[serde(default)]
-        target: Option<Box<str>>,
+        target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Box<str>>,
+        destination: Option<ArcStr>,
         #[serde(default)]
-        card_type: Option<Box<str>>,
+        card_type: Option<ArcStr>,
         #[serde(default)]
         characters: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1146,9 +1147,9 @@ pub enum EffectKind {
         #[serde(default)]
         distinct: Option<DistinctType>,
         #[serde(default)]
-        name_constraint: Option<Box<str>>,
+        name_constraint: Option<ArcStr>,
         #[serde(default)]
-        name_constraint_source: Option<Box<str>>,
+        name_constraint_source: Option<ArcStr>,
         #[serde(default)]
         ability_filter: Option<AbilityFilter>,
         #[serde(default)]
@@ -1156,7 +1157,7 @@ pub enum EffectKind {
         #[serde(default)]
         or_ability_filters: Option<Vec<AbilityFilterBranch>>,
         #[serde(default)]
-        card_property: Option<Box<str>>,
+        card_property: Option<ArcStr>,
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
@@ -1168,15 +1169,15 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_count: Option<u32>,
         #[serde(default)]
-        per_unit_type: Option<Box<str>>,
+        per_unit_type: Option<ArcStr>,
         #[serde(default)]
         per_unit_heart_colors: Box<Vec<String>>,
         #[serde(default)]
-        per_unit_location: Option<Box<str>>,
+        per_unit_location: Option<ArcStr>,
         #[serde(default)]
-        location: Option<Box<str>>,
+        location: Option<ArcStr>,
         #[serde(default)]
-        group_reference: Option<Box<str>>,
+        group_reference: Option<ArcStr>,
         #[serde(default)]
         dynamic_count: Option<DynamicCount>,
         #[serde(default)]
@@ -1186,9 +1187,9 @@ pub enum EffectKind {
         #[serde(default)]
         filter_targets_by_heart_colors: Option<bool>,
         #[serde(default)]
-        activation_position: Option<Box<str>>,
+        activation_position: Option<ArcStr>,
         #[serde(default)]
-        state: Option<Box<str>>,
+        state: Option<ArcStr>,
         #[serde(default)]
         optional: Option<bool>,
         #[serde(default)]
@@ -1196,7 +1197,7 @@ pub enum EffectKind {
         #[serde(default)]
         is_reveal: Option<bool>,
         #[serde(default)]
-        picker: Option<Box<str>>,
+        picker: Option<ArcStr>,
         #[serde(default)]
         multiple_targets: Option<bool>,
         #[serde(default)]
@@ -1211,19 +1212,19 @@ pub enum EffectKind {
     /// ModifyScore effect fields
     ModifyScore {
         #[serde(default)]
-        source: Option<Box<str>>,
+        source: Option<ArcStr>,
         #[serde(default)]
-        target: Option<Box<str>>,
+        target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Box<str>>,
+        destination: Option<ArcStr>,
         #[serde(default)]
-        operation: Option<Box<str>>,
+        operation: Option<ArcStr>,
         #[serde(default)]
         value: Option<u32>,
         #[serde(default)]
-        duration: Option<Box<str>>,
+        duration: Option<ArcStr>,
         #[serde(default)]
-        card_type: Option<Box<str>>,
+        card_type: Option<ArcStr>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1231,15 +1232,15 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_count: Option<u32>,
         #[serde(default)]
-        per_unit_type: Option<Box<str>>,
+        per_unit_type: Option<ArcStr>,
         #[serde(default)]
-        per_unit_location: Option<Box<str>>,
+        per_unit_location: Option<ArcStr>,
         #[serde(default)]
         per_unit_heart_colors: Box<Vec<String>>,
         #[serde(default)]
-        location: Option<Box<str>>,
+        location: Option<ArcStr>,
         #[serde(default)]
-        effect_constraint: Option<Box<str>>,
+        effect_constraint: Option<ArcStr>,
         #[serde(default)]
         self_target: Option<bool>,
         #[serde(default)]
@@ -1261,13 +1262,13 @@ pub enum EffectKind {
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
-        activation_position: Option<Box<str>>,
+        activation_position: Option<ArcStr>,
         #[serde(default)]
         card_names: Box<Vec<String>>,
         #[serde(default)]
-        card_property: Option<Box<str>>,
+        card_property: Option<ArcStr>,
         #[serde(default)]
-        state: Option<Box<str>>,
+        state: Option<ArcStr>,
         #[serde(default)]
         negation: Option<bool>,
         #[serde(default)]
@@ -1280,11 +1281,11 @@ pub enum EffectKind {
     /// ModifyHearts effect fields
     ModifyHearts {
         #[serde(default)]
-        operation: Option<Box<str>>,
+        operation: Option<ArcStr>,
         #[serde(default)]
         value: Option<u32>,
         #[serde(default)]
-        duration: Option<Box<str>>,
+        duration: Option<ArcStr>,
         #[serde(default)]
         heart_colors: Box<Vec<String>>,
         #[serde(default)]
@@ -1296,9 +1297,9 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_heart_colors: Box<Vec<String>>,
         #[serde(default)]
-        location: Option<Box<str>>,
+        location: Option<ArcStr>,
         #[serde(default)]
-        timing_condition: Option<Box<str>>,
+        timing_condition: Option<ArcStr>,
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
@@ -1314,7 +1315,7 @@ pub enum EffectKind {
         #[serde(default)]
         repeat_limit: Option<u32>,
         #[serde(default)]
-        card_type: Option<Box<str>>,
+        card_type: Option<ArcStr>,
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
@@ -1324,7 +1325,7 @@ pub enum EffectKind {
         #[serde(default)]
         cost_total_operator: Option<Operator>,
         #[serde(default)]
-        group_reference: Option<Box<str>>,
+        group_reference: Option<ArcStr>,
         #[serde(default)]
         negation: Option<bool>,
         #[serde(default)]
@@ -1334,22 +1335,22 @@ pub enum EffectKind {
         #[serde(default)]
         all: Option<bool>,
         #[serde(default)]
-        per_unit_type: Option<Box<str>>,
+        per_unit_type: Option<ArcStr>,
         #[serde(default)]
         distinct: Option<DistinctType>,
     },
     /// GainResource effect fields
     GainResource {
         #[serde(default)]
-        resource: Option<Box<str>>,
+        resource: Option<ArcStr>,
         #[serde(default)]
         heart_colors: Box<Vec<String>>,
         #[serde(default)]
         heart_colors_from_selected_card: Option<bool>,
         #[serde(default)]
-        sign: Option<Box<str>>,
+        sign: Option<ArcStr>,
         #[serde(default)]
-        operation: Option<Box<str>>,
+        operation: Option<ArcStr>,
         #[serde(default)]
         value: Option<u32>,
         #[serde(default, alias = "energy")]
@@ -1359,7 +1360,7 @@ pub enum EffectKind {
         #[serde(default)]
         optional: Option<bool>,
         #[serde(default)]
-        duration: Option<Box<str>>,
+        duration: Option<ArcStr>,
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
@@ -1369,17 +1370,17 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_count: Option<u32>,
         #[serde(default)]
-        per_unit_type: Option<Box<str>>,
+        per_unit_type: Option<ArcStr>,
         #[serde(default)]
         per_unit_heart_colors: Box<Vec<String>>,
         #[serde(default)]
-        per_unit_location: Option<Box<str>>,
+        per_unit_location: Option<ArcStr>,
         #[serde(default)]
-        location: Option<Box<str>>,
+        location: Option<ArcStr>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
-        card_type: Option<Box<str>>,
+        card_type: Option<ArcStr>,
         #[serde(default)]
         cost_limit: Option<u32>,
         #[serde(default)]
@@ -1395,7 +1396,7 @@ pub enum EffectKind {
         #[serde(default)]
         target_from_selection: Option<bool>,
         #[serde(default)]
-        card_property: Option<Box<str>>,
+        card_property: Option<ArcStr>,
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
@@ -1403,11 +1404,11 @@ pub enum EffectKind {
         #[serde(default)]
         filter_targets_by_heart_colors: Option<bool>,
         #[serde(default)]
-        activation_position: Option<Box<str>>,
+        activation_position: Option<ArcStr>,
         #[serde(default)]
-        state: Option<Box<str>>,
+        state: Option<ArcStr>,
         #[serde(default)]
-        heart_type: Option<Box<str>>,
+        heart_type: Option<ArcStr>,
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
@@ -1417,15 +1418,15 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_self: Option<bool>,
         #[serde(default)]
-        group_reference: Option<Box<str>>,
+        group_reference: Option<ArcStr>,
         #[serde(default)]
-        trigger_type: Option<Box<str>>,
+        trigger_type: Option<ArcStr>,
         #[serde(default)]
         distinct: Option<DistinctType>,
         #[serde(default)]
-        heart_color: Option<Box<str>>,
+        heart_color: Option<ArcStr>,
         #[serde(default)]
-        action_by: Option<Box<str>>,
+        action_by: Option<ArcStr>,
         #[serde(default)]
         activation_condition_parsed: Option<Box<Condition>>,
         #[serde(default)]
@@ -1433,7 +1434,7 @@ pub enum EffectKind {
         #[serde(default, alias = "max_repeats")]
         repeat_limit: Option<u32>,
         #[serde(default)]
-        timing_condition: Option<Box<str>>,
+        timing_condition: Option<ArcStr>,
         #[serde(default)]
         require_all_heart_colors: Option<bool>,
         #[serde(default)]
@@ -1442,15 +1443,15 @@ pub enum EffectKind {
     /// ChangeState effect fields
     ChangeState {
         #[serde(default)]
-        source: Option<Box<str>>,
+        source: Option<ArcStr>,
         #[serde(default)]
-        target: Option<Box<str>>,
+        target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Box<str>>,
+        destination: Option<ArcStr>,
         #[serde(default)]
-        state_change: Option<Box<str>>,
+        state_change: Option<ArcStr>,
         #[serde(default)]
-        card_type: Option<Box<str>>,
+        card_type: Option<ArcStr>,
         #[serde(default)]
         cost_limit: Option<u32>,
         #[serde(default)]
@@ -1478,13 +1479,13 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_count: Option<u32>,
         #[serde(default)]
-        per_unit_type: Option<Box<str>>,
+        per_unit_type: Option<ArcStr>,
         #[serde(default)]
         per_unit_heart_colors: Box<Vec<String>>,
         #[serde(default)]
-        per_unit_location: Option<Box<str>>,
+        per_unit_location: Option<ArcStr>,
         #[serde(default)]
-        location: Option<Box<str>>,
+        location: Option<ArcStr>,
         #[serde(default)]
         distinct: Option<DistinctType>,
         #[serde(default)]
@@ -1504,19 +1505,19 @@ pub enum EffectKind {
         #[serde(default)]
         cost_total_operator: Option<Operator>,
         #[serde(default)]
-        card_property: Option<Box<str>>,
+        card_property: Option<ArcStr>,
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
-        name_constraint: Option<Box<str>>,
+        name_constraint: Option<ArcStr>,
         #[serde(default)]
-        name_constraint_source: Option<Box<str>>,
+        name_constraint_source: Option<ArcStr>,
         #[serde(default)]
         filter_targets_by_heart_colors: Option<bool>,
         #[serde(default)]
-        group_reference: Option<Box<str>>,
+        group_reference: Option<ArcStr>,
         #[serde(default)]
-        activation_position: Option<Box<str>>,
+        activation_position: Option<ArcStr>,
         #[serde(default)]
         ability_filter: Option<AbilityFilter>,
         #[serde(default)]
@@ -1532,36 +1533,36 @@ pub enum EffectKind {
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
-        state: Option<Box<str>>,
+        state: Option<ArcStr>,
         #[serde(default)]
-        action_by: Option<Box<str>>,
+        action_by: Option<ArcStr>,
         #[serde(default)]
         activation_condition_parsed: Option<Box<Condition>>,
     },
     /// AbilityOp effect fields
     AbilityOp {
         #[serde(default)]
-        source: Option<Box<str>>,
+        source: Option<ArcStr>,
         #[serde(default)]
-        target: Option<Box<str>>,
+        target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Box<str>>,
+        destination: Option<ArcStr>,
         #[serde(default)]
-        ability_gain: Option<Box<str>>,
+        ability_gain: Option<ArcStr>,
         #[serde(default)]
-        ability_gain_trigger: Option<Box<str>>,
+        ability_gain_trigger: Option<ArcStr>,
         #[serde(default)]
         gained_effect: Option<Box<AbilityEffect>>,
         #[serde(default)]
-        ability_text: Option<Box<str>>,
+        ability_text: Option<ArcStr>,
         #[serde(default)]
-        target_trigger: Option<Box<str>>,
+        target_trigger: Option<ArcStr>,
         #[serde(default)]
-        source_card: Option<Box<str>>,
+        source_card: Option<ArcStr>,
         #[serde(default)]
-        suppressed_trigger: Option<Box<str>>,
+        suppressed_trigger: Option<ArcStr>,
         #[serde(default)]
-        card_type: Option<Box<str>>,
+        card_type: Option<ArcStr>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1575,31 +1576,31 @@ pub enum EffectKind {
         #[serde(default)]
         cost_limit_operator: Option<Operator>,
         #[serde(default)]
-        location: Option<Box<str>>,
+        location: Option<ArcStr>,
         #[serde(default)]
         trigger_filter: Option<Box<Vec<String>>>,
         #[serde(default)]
-        trigger_type: Option<Box<str>>,
+        trigger_type: Option<ArcStr>,
         #[serde(default)]
-        duration: Option<Box<str>>,
+        duration: Option<ArcStr>,
         #[serde(default)]
         self_target: Option<bool>,
         #[serde(default)]
         exclude_self: Option<bool>,
         #[serde(default)]
-        effect_type: Option<Box<str>>,
+        effect_type: Option<ArcStr>,
         #[serde(default)]
         use_limit: Option<u32>,
         #[serde(default)]
-        triggers: Option<Box<str>>,
+        triggers: Option<ArcStr>,
         #[serde(default)]
         activation_condition_parsed: Option<Box<Condition>>,
         #[serde(default)]
-        option: Option<Box<str>>,
+        option: Option<ArcStr>,
         #[serde(default)]
         all: Option<bool>,
         #[serde(default)]
-        activation_position: Option<Box<str>>,
+        activation_position: Option<ArcStr>,
         #[serde(default)]
         heart_colors: Box<Vec<String>>,
         #[serde(default)]
@@ -1608,25 +1609,25 @@ pub enum EffectKind {
     /// CompoundEffect effect fields
     CompoundEffect {
         #[serde(default)]
-        source: Option<Box<str>>,
+        source: Option<ArcStr>,
         #[serde(default)]
-        target: Option<Box<str>>,
+        target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Box<str>>,
+        destination: Option<ArcStr>,
         #[serde(default, alias = "max_repeats")]
         repeat_limit: Option<u32>,
         #[serde(default)]
         options: Option<Vec<Box<AbilityEffect>>>,
         #[serde(default)]
-        choice_type: Option<Box<str>>,
+        choice_type: Option<ArcStr>,
         #[serde(default)]
         choice_options: Option<Box<Vec<String>>>,
         #[serde(default)]
-        question: Option<Box<str>>,
+        question: Option<ArcStr>,
         #[serde(default)]
         answers: Option<Box<Vec<String>>>,
         #[serde(default)]
-        choice_maker: Option<Box<str>>,
+        choice_maker: Option<ArcStr>,
         #[serde(default)]
         alternative_effect: Option<Box<AbilityEffect>>,
         #[serde(default)]
@@ -1640,17 +1641,17 @@ pub enum EffectKind {
         #[serde(default)]
         exclude_self: Option<bool>,
         #[serde(default)]
-        duration: Option<Box<str>>,
+        duration: Option<ArcStr>,
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
         all: Option<bool>,
         #[serde(default)]
-        activation_position: Option<Box<str>>,
+        activation_position: Option<ArcStr>,
         #[serde(default)]
-        card_type: Option<Box<str>>,
+        card_type: Option<ArcStr>,
         #[serde(default)]
-        trigger_type: Option<Box<str>>,
+        trigger_type: Option<ArcStr>,
         #[serde(default)]
         activation_condition_parsed: Option<Box<Condition>>,
         #[serde(default)]
@@ -1660,52 +1661,52 @@ pub enum EffectKind {
         #[serde(default)]
         distinct: Option<DistinctType>,
         #[serde(default)]
-        group_reference: Option<Box<str>>,
+        group_reference: Option<ArcStr>,
         #[serde(default)]
         per_unit: Option<bool>,
         #[serde(default)]
         per_unit_count: Option<u32>,
         #[serde(default)]
-        per_unit_type: Option<Box<str>>,
+        per_unit_type: Option<ArcStr>,
         #[serde(default)]
-        alternative_count_type: Option<Box<str>>,
+        alternative_count_type: Option<ArcStr>,
     },
     /// RestrictionOp effect fields
     RestrictionOp {
         #[serde(default)]
-        restriction_type: Option<Box<str>>,
+        restriction_type: Option<ArcStr>,
         #[serde(default)]
-        restricted_destination: Option<Box<str>>,
+        restricted_destination: Option<ArcStr>,
         #[serde(default)]
         delayed: Option<bool>,
         #[serde(default)]
-        timing: Option<Box<str>>,
+        timing: Option<ArcStr>,
         #[serde(default)]
-        treat_as: Option<Box<str>>,
+        treat_as: Option<ArcStr>,
         #[serde(default)]
-        timing_condition: Option<Box<str>>,
+        timing_condition: Option<ArcStr>,
         #[serde(default)]
-        phase: Option<Box<str>>,
+        phase: Option<ArcStr>,
         #[serde(default)]
         non_stackable: Option<bool>,
         #[serde(default)]
-        operation: Option<Box<str>>,
+        operation: Option<ArcStr>,
         #[serde(default)]
-        card_type: Option<Box<str>>,
+        card_type: Option<ArcStr>,
         #[serde(default)]
-        location: Option<Box<str>>,
+        location: Option<ArcStr>,
         #[serde(default)]
-        effect_type: Option<Box<str>>,
+        effect_type: Option<ArcStr>,
         #[serde(default)]
-        replaces_event: Option<Box<str>>,
+        replaces_event: Option<ArcStr>,
         #[serde(default)]
         choice_based: Option<bool>,
         #[serde(default)]
-        trigger_type: Option<Box<str>>,
+        trigger_type: Option<ArcStr>,
         #[serde(default)]
         trigger_filter: Option<Box<Vec<String>>>,
         #[serde(default)]
-        duration: Option<Box<str>>,
+        duration: Option<ArcStr>,
         #[serde(default)]
         self_target: Option<bool>,
         #[serde(default)]
@@ -1722,25 +1723,25 @@ pub enum EffectKind {
     /// PositionOp effect fields
     PositionOp {
         #[serde(default)]
-        source: Option<Box<str>>,
+        source: Option<ArcStr>,
         #[serde(default)]
-        target: Option<Box<str>>,
+        target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Box<str>>,
+        destination: Option<ArcStr>,
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
-        target_member: Option<Box<str>>,
+        target_member: Option<ArcStr>,
         #[serde(default)]
-        source_position: Option<Box<str>>,
+        source_position: Option<ArcStr>,
         #[serde(default)]
-        exclude_position: Option<Box<str>>,
+        exclude_position: Option<ArcStr>,
         #[serde(default)]
         allow_occupied_stage: Option<bool>,
         #[serde(default)]
         optional: Option<bool>,
         #[serde(default)]
-        card_type: Option<Box<str>>,
+        card_type: Option<ArcStr>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1768,26 +1769,26 @@ pub enum EffectKind {
         #[serde(default)]
         self_target: Option<bool>,
         #[serde(default)]
-        state: Option<Box<str>>,
+        state: Option<ArcStr>,
         #[serde(default)]
-        activation_position: Option<Box<str>>,
+        activation_position: Option<ArcStr>,
         #[serde(default)]
-        group_reference: Option<Box<str>>,
+        group_reference: Option<ArcStr>,
     },
     /// MiscOp effect fields
     MiscOp {
         #[serde(default)]
-        source: Option<Box<str>>,
+        source: Option<ArcStr>,
         #[serde(default)]
-        target: Option<Box<str>>,
+        target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Box<str>>,
+        destination: Option<ArcStr>,
         #[serde(default)]
-        operation: Option<Box<str>>,
+        operation: Option<ArcStr>,
         #[serde(default)]
         value: Option<u32>,
         #[serde(default)]
-        card_type: Option<Box<str>>,
+        card_type: Option<ArcStr>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1801,17 +1802,17 @@ pub enum EffectKind {
         #[serde(default)]
         cost_limit_operator: Option<Operator>,
         #[serde(default)]
-        location: Option<Box<str>>,
+        location: Option<ArcStr>,
         #[serde(default)]
-        duration: Option<Box<str>>,
+        duration: Option<ArcStr>,
         #[serde(default)]
         heart_colors: Box<Vec<String>>,
         #[serde(default)]
-        heart_type: Option<Box<str>>,
+        heart_type: Option<ArcStr>,
         #[serde(default)]
         heart_selection: Option<bool>,
         #[serde(default)]
-        blade_type: Option<Box<str>>,
+        blade_type: Option<ArcStr>,
         #[serde(default)]
         self_target: Option<bool>,
         #[serde(default)]
@@ -1827,11 +1828,11 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_count: Option<u32>,
         #[serde(default)]
-        per_unit_type: Option<Box<str>>,
+        per_unit_type: Option<ArcStr>,
         #[serde(default)]
         per_unit_heart_colors: Box<Vec<String>>,
         #[serde(default)]
-        per_unit_location: Option<Box<str>>,
+        per_unit_location: Option<ArcStr>,
         #[serde(default)]
         repeat_limit: Option<u32>,
         #[serde(default)]
@@ -1839,11 +1840,11 @@ pub enum EffectKind {
         #[serde(default)]
         all_regions: Option<bool>,
         #[serde(default)]
-        timing: Option<Box<str>>,
+        timing: Option<ArcStr>,
         #[serde(default)]
-        treat_as: Option<Box<str>>,
+        treat_as: Option<ArcStr>,
         #[serde(default)]
-        effect_constraint: Option<Box<str>>,
+        effect_constraint: Option<ArcStr>,
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
@@ -1859,11 +1860,11 @@ pub enum EffectKind {
         #[serde(default)]
         negation: Option<bool>,
         #[serde(default)]
-        activation_position: Option<Box<str>>,
+        activation_position: Option<ArcStr>,
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
-        group_reference: Option<Box<str>>,
+        group_reference: Option<ArcStr>,
         #[serde(default)]
         parenthetical: Option<Vec<String>>,
         #[serde(default)]
@@ -1871,7 +1872,7 @@ pub enum EffectKind {
         #[serde(default)]
         same_unit_name: Option<bool>,
         #[serde(default)]
-        alternative_count_type: Option<Box<str>>,
+        alternative_count_type: Option<ArcStr>,
         #[serde(default)]
         per_group: Option<bool>,
         #[serde(default)]
@@ -1883,17 +1884,17 @@ pub enum EffectKind {
         #[serde(default)]
         cost_total_operator: Option<Operator>,
         #[serde(default)]
-        cost_reference: Option<Box<str>>,
+        cost_reference: Option<ArcStr>,
         #[serde(default)]
         cost_offset: Option<i32>,
         #[serde(default)]
         blind: Option<bool>,
         #[serde(default)]
-        picker: Option<Box<str>>,
+        picker: Option<ArcStr>,
         #[serde(default)]
         all: Option<bool>,
         #[serde(default)]
-        sign: Option<Box<str>>,
+        sign: Option<ArcStr>,
         #[serde(default)]
         heart_color_count: Option<u32>,
         #[serde(default)]
@@ -1903,11 +1904,11 @@ pub enum EffectKind {
         #[serde(default)]
         placement_order: Option<PlacementOrder>,
         #[serde(default)]
-        ref_value: Option<Box<str>>,
+        ref_value: Option<ArcStr>,
         #[serde(default)]
         ref_offset: Option<i32>,
         #[serde(default)]
-        id: Option<Box<str>>,
+        id: Option<ArcStr>,
         #[serde(default)]
         card_names: Box<Vec<String>>,
         #[serde(default)]
@@ -1924,17 +1925,17 @@ pub enum EffectKind {
     /// CustomOp effect fields
     CustomOp {
         #[serde(default)]
-        action_by: Option<Box<str>>,
+        action_by: Option<ArcStr>,
         #[serde(default)]
         opponent_action: Option<Box<AbilityEffect>>,
         #[serde(default)]
-        effect_type: Option<Box<str>>,
+        effect_type: Option<ArcStr>,
         #[serde(default)]
-        replaces_event: Option<Box<str>>,
+        replaces_event: Option<ArcStr>,
         #[serde(default)]
         choice_based: Option<bool>,
         #[serde(default)]
-        card_type: Option<Box<str>>,
+        card_type: Option<ArcStr>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1948,17 +1949,17 @@ pub enum EffectKind {
         #[serde(default)]
         all_regions: Option<bool>,
         #[serde(default)]
-        question: Option<Box<str>>,
+        question: Option<ArcStr>,
         #[serde(default)]
         answers: Option<Box<Vec<String>>>,
         #[serde(default)]
-        choice_maker: Option<Box<str>>,
+        choice_maker: Option<ArcStr>,
         #[serde(default)]
         options: Option<Vec<Box<AbilityEffect>>>,
         #[serde(default)]
-        location: Option<Box<str>>,
+        location: Option<ArcStr>,
         #[serde(default)]
-        duration: Option<Box<str>>,
+        duration: Option<ArcStr>,
         #[serde(default)]
         self_target: Option<bool>,
         #[serde(default)]
@@ -1966,11 +1967,11 @@ pub enum EffectKind {
         #[serde(default)]
         original_value: Option<bool>,
         #[serde(default)]
-        timing: Option<Box<str>>,
+        timing: Option<ArcStr>,
         #[serde(default)]
-        treat_as: Option<Box<str>>,
+        treat_as: Option<ArcStr>,
         #[serde(default)]
-        trigger_type: Option<Box<str>>,
+        trigger_type: Option<ArcStr>,
         #[serde(default)]
         trigger_filter: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1978,7 +1979,7 @@ pub enum EffectKind {
         #[serde(default)]
         use_limit: Option<u32>,
         #[serde(default)]
-        triggers: Option<Box<str>>,
+        triggers: Option<ArcStr>,
     },
 }
 
@@ -2054,26 +2055,26 @@ pub struct AbilityEffect {
     #[serde(default = "default_empty_string")]
     pub action: String,
     #[serde(default)]
-    pub source: Option<Box<str>>,
+    pub source: Option<ArcStr>,
     #[serde(default)]
-    pub destination: Option<Box<str>>,
+    pub destination: Option<ArcStr>,
     #[serde(default)]
     pub count: Option<u32>,
     #[serde(default)]
-    pub target: Option<Box<str>>,
+    pub target: Option<ArcStr>,
     #[serde(default)]
     pub condition: Option<Box<Condition>>,
     #[serde(flatten)]
     pub compound: CompoundBranch,
-    pub kind: Option<Box<EffectKind>>,
     #[serde(default)]
+    pub kind: Option<crate::core::pool::EkBox>,
     pub non_stackable: Option<bool>,
     #[serde(default)]
     pub conditional: Option<bool>,
     #[serde(default)]
     pub is_further: Option<bool>,
     #[serde(default)]
-    pub r#ref: Option<Box<str>>,
+    pub r#ref: Option<ArcStr>,
     #[serde(default)]
     pub optional: Option<bool>,
     #[serde(default)]
@@ -2865,7 +2866,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_ability_gain(&mut self, val: Option<Box<str>>) {
+    pub fn set_ability_gain(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut ability_gain,
@@ -2875,7 +2876,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_ability_gain_trigger(&mut self, val: Option<Box<str>>) {
+    pub fn set_ability_gain_trigger(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut ability_gain_trigger,
@@ -2885,7 +2886,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_ability_text(&mut self, val: Option<Box<str>>) {
+    pub fn set_ability_text(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut ability_text,
@@ -2895,7 +2896,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_action_by(&mut self, val: Option<Box<str>>) {
+    pub fn set_action_by(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::CustomOp {
                 ref mut action_by, ..
@@ -2904,7 +2905,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_activation_position(&mut self, val: Option<Box<str>>) {
+    pub fn set_activation_position(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut activation_position,
@@ -2977,7 +2978,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_alternative_count_type(&mut self, val: Option<Box<str>>) {
+    pub fn set_alternative_count_type(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut alternative_count_type,
@@ -3048,7 +3049,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_blade_type(&mut self, val: Option<Box<str>>) {
+    pub fn set_blade_type(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut blade_type, ..
@@ -3088,7 +3089,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_card_property(&mut self, val: Option<Box<str>>) {
+    pub fn set_card_property(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut card_property,
@@ -3114,7 +3115,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_card_type(&mut self, val: Option<Box<str>>) {
+    pub fn set_card_type(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut card_type, ..
@@ -3216,7 +3217,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_choice_maker(&mut self, val: Option<Box<str>>) {
+    pub fn set_choice_maker(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::SelectTarget {
                 ref mut choice_maker,
@@ -3248,7 +3249,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_choice_type(&mut self, val: Option<Box<str>>) {
+    pub fn set_choice_type(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::SelectTarget {
                 ref mut choice_type,
@@ -3394,7 +3395,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_cost_reference(&mut self, val: Option<Box<str>>) {
+    pub fn set_cost_reference(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut cost_reference,
@@ -3498,7 +3499,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_duration(&mut self, val: Option<Box<str>>) {
+    pub fn set_duration(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::ModifyScore {
                 ref mut duration, ..
@@ -3525,7 +3526,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_effect_constraint(&mut self, val: Option<Box<str>>) {
+    pub fn set_effect_constraint(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::ModifyScore {
                 ref mut effect_constraint,
@@ -3539,7 +3540,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_effect_type(&mut self, val: Option<Box<str>>) {
+    pub fn set_effect_type(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut effect_type,
@@ -3575,7 +3576,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_exclude_by_name_source(&mut self, val: Option<Box<str>>) {
+    pub fn set_exclude_by_name_source(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut exclude_by_name_source,
@@ -3695,7 +3696,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_exclude_position(&mut self, val: Option<Box<str>>) {
+    pub fn set_exclude_position(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut exclude_position,
@@ -3861,7 +3862,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_group_reference(&mut self, val: Option<Box<str>>) {
+    pub fn set_group_reference(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut group_reference,
@@ -3905,7 +3906,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_heart_color(&mut self, val: Option<Box<str>>) {
+    pub fn set_heart_color(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::GainResource {
                 ref mut heart_color,
@@ -3935,7 +3936,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_heart_type(&mut self, val: Option<Box<str>>) {
+    pub fn set_heart_type(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut heart_type, ..
@@ -3944,7 +3945,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_id(&mut self, val: Option<Box<str>>) {
+    pub fn set_id(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp { ref mut id, .. }) => *id = val,
             _ => {}
@@ -3966,7 +3967,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_location(&mut self, val: Option<Box<str>>) {
+    pub fn set_location(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut location, ..
@@ -4036,7 +4037,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_name_constraint(&mut self, val: Option<Box<str>>) {
+    pub fn set_name_constraint(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut name_constraint,
@@ -4058,7 +4059,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_name_constraint_source(&mut self, val: Option<Box<str>>) {
+    pub fn set_name_constraint_source(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut name_constraint_source,
@@ -4080,7 +4081,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_need_heart_color(&mut self, val: Option<Box<str>>) {
+    pub fn set_need_heart_color(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut need_heart_color,
@@ -4147,7 +4148,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_operation(&mut self, val: Option<Box<str>>) {
+    pub fn set_operation(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::ModifyScore {
                 ref mut operation, ..
@@ -4168,7 +4169,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_option(&mut self, val: Option<Box<str>>) {
+    pub fn set_option(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp { ref mut option, .. }) => *option = val,
             _ => {}
@@ -4392,7 +4393,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_per_unit_location(&mut self, val: Option<Box<str>>) {
+    pub fn set_per_unit_location(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::SelectTarget {
                 ref mut per_unit_location,
@@ -4422,7 +4423,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_per_unit_type(&mut self, val: Option<Box<str>>) {
+    pub fn set_per_unit_type(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::SelectTarget {
                 ref mut per_unit_type,
@@ -4452,14 +4453,14 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_phase(&mut self, val: Option<Box<str>>) {
+    pub fn set_phase(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::RestrictionOp { ref mut phase, .. }) => *phase = val,
             _ => {}
         }
     }
 
-    pub fn set_picker(&mut self, val: Option<Box<str>>) {
+    pub fn set_picker(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp { ref mut picker, .. }) => *picker = val,
             _ => {}
@@ -4484,7 +4485,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_question(&mut self, val: Option<Box<str>>) {
+    pub fn set_question(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::SelectTarget {
                 ref mut question, ..
@@ -4508,7 +4509,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_ref_value(&mut self, val: Option<Box<str>>) {
+    pub fn set_ref_value(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut ref_value, ..
@@ -4539,7 +4540,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_replaces_event(&mut self, val: Option<Box<str>>) {
+    pub fn set_replaces_event(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::RestrictionOp {
                 ref mut replaces_event,
@@ -4573,7 +4574,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_resource(&mut self, val: Option<Box<str>>) {
+    pub fn set_resource(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::GainResource {
                 ref mut resource, ..
@@ -4592,7 +4593,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_restricted_destination(&mut self, val: Option<Box<str>>) {
+    pub fn set_restricted_destination(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::RestrictionOp {
                 ref mut restricted_destination,
@@ -4602,7 +4603,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_restriction_type(&mut self, val: Option<Box<str>>) {
+    pub fn set_restriction_type(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::RestrictionOp {
                 ref mut restriction_type,
@@ -4702,7 +4703,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_sign(&mut self, val: Option<Box<str>>) {
+    pub fn set_sign(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::GainResource { ref mut sign, .. }) => *sign = val,
             Some(EffectKind::MiscOp { ref mut sign, .. }) => *sign = val,
@@ -4710,7 +4711,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_source_card(&mut self, val: Option<Box<str>>) {
+    pub fn set_source_card(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut source_card,
@@ -4720,7 +4721,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_source_position(&mut self, val: Option<Box<str>>) {
+    pub fn set_source_position(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut source_position,
@@ -4734,7 +4735,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_state(&mut self, val: Option<Box<str>>) {
+    pub fn set_state(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards { ref mut state, .. }) => *state = val,
             Some(EffectKind::LookReveal { ref mut state, .. }) => *state = val,
@@ -4744,7 +4745,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_state_change(&mut self, val: Option<Box<str>>) {
+    pub fn set_state_change(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::ChangeState {
                 ref mut state_change,
@@ -4754,7 +4755,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_suppressed_trigger(&mut self, val: Option<Box<str>>) {
+    pub fn set_suppressed_trigger(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut suppressed_trigger,
@@ -4812,7 +4813,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_target_member(&mut self, val: Option<Box<str>>) {
+    pub fn set_target_member(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::PositionOp {
                 ref mut target_member,
@@ -4822,7 +4823,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_target_trigger(&mut self, val: Option<Box<str>>) {
+    pub fn set_target_trigger(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut target_trigger,
@@ -4832,7 +4833,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_timing(&mut self, val: Option<Box<str>>) {
+    pub fn set_timing(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::RestrictionOp { ref mut timing, .. }) => *timing = val,
             Some(EffectKind::MiscOp { ref mut timing, .. }) => *timing = val,
@@ -4841,7 +4842,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_timing_condition(&mut self, val: Option<Box<str>>) {
+    pub fn set_timing_condition(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::ModifyHearts {
                 ref mut timing_condition,
@@ -4855,7 +4856,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_treat_as(&mut self, val: Option<Box<str>>) {
+    pub fn set_treat_as(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::RestrictionOp {
                 ref mut treat_as, ..
@@ -4888,7 +4889,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_trigger_type(&mut self, val: Option<Box<str>>) {
+    pub fn set_trigger_type(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut trigger_type,
@@ -4906,7 +4907,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn set_triggers(&mut self, val: Option<Box<str>>) {
+    pub fn set_triggers(&mut self, val: Option<ArcStr>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut triggers, ..
@@ -5147,8 +5148,8 @@ impl AbilityEffect {
 pub enum PositionInfo {
     String(String),
     Struct {
-        position: Option<Box<str>>,
-        target: Option<Box<str>>,
+        position: Option<ArcStr>,
+        target: Option<ArcStr>,
     },
 }
 
@@ -5165,10 +5166,10 @@ impl PositionInfo {
 pub struct DynamicCount {
     #[serde(rename = "type")]
     pub count_type: String,
-    pub reference: Option<Box<str>>,
-    pub mode: Option<Box<str>>,
-    pub base_reference: Option<Box<str>>,
-    pub calculation: Option<Box<str>>,
+    pub reference: Option<ArcStr>,
+    pub mode: Option<ArcStr>,
+    pub base_reference: Option<ArcStr>,
+    pub calculation: Option<ArcStr>,
     pub calculation_value: Option<u32>,
 }
 
@@ -5538,13 +5539,13 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
-        operator: Option<Box<str>>,
-        target: Option<Box<str>>,
+        operator: Option<ArcStr>,
+        target: Option<ArcStr>,
         #[serde(default)]
         conditions: Option<Vec<Box<Condition>>>,
     },
@@ -5554,31 +5555,31 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
         // Core location fields (commonly accessed)
-        location: Option<Box<str>>,
+        location: Option<ArcStr>,
         #[serde(default)]
         locations: Option<Vec<String>>,
-        target: Option<Box<str>>,
+        target: Option<ArcStr>,
         count: Option<u32>,
-        operator: Option<Box<str>>,
+        operator: Option<ArcStr>,
         card_type: Option<ConditionCardType>,
         #[serde(default)]
-        unit: Option<Box<str>>,
+        unit: Option<ArcStr>,
         #[serde(default)]
         comparison_target: Option<ComparisonTarget>,
         #[serde(default)]
         comparison_type: Option<ComparisonType>,
         #[serde(default)]
-        aggregate: Option<Box<str>>,
+        aggregate: Option<ArcStr>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
-        group_reference: Option<Box<str>>,
+        group_reference: Option<ArcStr>,
         #[serde(default)]
         exclude_group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -5589,27 +5590,27 @@ pub enum Condition {
         cost_limit_operator: Option<Operator>,
         #[serde(default)]
         heart_colors: Option<Vec<String>>,
-        heart_type: Option<Box<str>>,
-        heart_source: Option<Box<str>>,
+        heart_type: Option<ArcStr>,
+        heart_source: Option<ArcStr>,
         distinct: Option<DistinctInfo>,
         exclude_self: Option<bool>,
         self_target: Option<bool>,
-        source: Option<Box<str>>,
+        source: Option<ArcStr>,
         #[serde(default)]
-        activation_position: Option<Box<str>>,
-        destination: Option<Box<str>>,
+        activation_position: Option<ArcStr>,
+        destination: Option<ArcStr>,
         state: Option<CardState>,
         position: Option<PositionInfo>,
-        position_compare: Option<Box<str>>,
+        position_compare: Option<ArcStr>,
         require_position_cards: Option<bool>,
         all: Option<bool>,
         all_areas: Option<bool>,
-        temporal: Option<Box<str>>,
+        temporal: Option<ArcStr>,
         yell_trigger: Option<bool>,
         same_name: Option<bool>,
         #[serde(default)]
         card_property: Option<CardProperty>,
-        scope: Option<Box<str>>,
+        scope: Option<ArcStr>,
         // Boxed sub-checks (rarely accessed together)
         #[serde(default)]
         sub_checks: Option<Box<LocationSubChecks>>,
@@ -5629,16 +5630,16 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
         comparison_type: Option<ComparisonType>,
         comparison_target: Option<ComparisonTarget>,
-        target: Option<Box<str>>,
-        location: Option<Box<str>>,
-        operator: Option<Box<str>>,
+        target: Option<ArcStr>,
+        location: Option<ArcStr>,
+        operator: Option<ArcStr>,
         count: Option<u32>,
         #[serde(default)]
         values: Option<Vec<u32>>,
@@ -5646,22 +5647,22 @@ pub enum Condition {
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         position: Option<PositionInfo>,
-        position_compare: Option<Box<str>>,
+        position_compare: Option<ArcStr>,
         #[serde(default)]
-        aggregate: Option<Box<str>>,
+        aggregate: Option<ArcStr>,
         #[serde(default)]
         heart_colors: Option<Vec<String>>,
         #[serde(default)]
-        scope: Option<Box<str>>,
+        scope: Option<ArcStr>,
         cost_total: Option<u32>,
         cost_total_operator: Option<Operator>,
-        resource_type: Option<Box<str>>,
+        resource_type: Option<ArcStr>,
         #[serde(default)]
         delta: Option<bool>,
         cost_limit: Option<u32>,
-        source: Option<Box<str>>,
+        source: Option<ArcStr>,
         #[serde(default)]
-        comparison_source: Option<Box<str>>,
+        comparison_source: Option<ArcStr>,
         #[serde(default)]
         locations: Option<Vec<String>>,
         #[serde(default)]
@@ -5683,13 +5684,13 @@ pub enum Condition {
         #[serde(default)]
         self_target: Option<bool>,
         #[serde(default)]
-        destination: Option<Box<str>>,
+        destination: Option<ArcStr>,
         #[serde(default)]
         state: Option<CardState>,
         #[serde(default)]
         require_position_cards: Option<bool>,
         #[serde(default)]
-        temporal: Option<Box<str>>,
+        temporal: Option<ArcStr>,
         #[serde(default)]
         yell_trigger: Option<bool>,
         #[serde(default)]
@@ -5697,7 +5698,7 @@ pub enum Condition {
         #[serde(default)]
         card_property: Option<CardProperty>,
         #[serde(default)]
-        ability_filter: Option<Box<str>>,
+        ability_filter: Option<ArcStr>,
         #[serde(default)]
         ability_filter_triggers: Option<Vec<String>>,
         #[serde(default)]
@@ -5705,9 +5706,9 @@ pub enum Condition {
         #[serde(default)]
         min_baton_touch_count: Option<u32>,
         #[serde(default)]
-        from_state: Option<Box<str>>,
+        from_state: Option<ArcStr>,
         #[serde(default)]
-        to_state: Option<Box<str>>,
+        to_state: Option<ArcStr>,
     },
     #[serde(
         rename = "movement_condition",
@@ -5719,14 +5720,14 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
-        movement: Option<Box<str>>,
-        location: Option<Box<str>>,
-        target: Option<Box<str>>,
+        movement: Option<ArcStr>,
+        location: Option<ArcStr>,
+        target: Option<ArcStr>,
         cost_limit: Option<u32>,
         cost_limit_operator: Option<Operator>,
         baton_touch_trigger: Option<bool>,
@@ -5737,20 +5738,20 @@ pub enum Condition {
         card_type: Option<ConditionCardType>,
         #[serde(default)]
         characters: Option<Box<Vec<String>>>,
-        baton_touch_source: Option<Box<str>>,
+        baton_touch_source: Option<ArcStr>,
         card_property: Option<CardProperty>,
         comparison_type: Option<ComparisonType>,
-        operator: Option<Box<str>>,
+        operator: Option<ArcStr>,
         self_effect_only: Option<bool>,
         energy_placed: Option<bool>,
-        area_direction: Option<Box<str>>,
+        area_direction: Option<ArcStr>,
         position: Option<PositionInfo>,
         self_target: Option<bool>,
         ability_filter: Option<AbilityFilter>,
-        source: Option<Box<str>>,
-        destination: Option<Box<str>>,
-        from_state: Option<Box<str>>,
-        to_state: Option<Box<str>>,
+        source: Option<ArcStr>,
+        destination: Option<ArcStr>,
+        from_state: Option<ArcStr>,
+        to_state: Option<ArcStr>,
     },
     #[serde(rename = "group_condition")]
     Group {
@@ -5758,29 +5759,29 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         all_members: Option<bool>,
-        location: Option<Box<str>>,
-        target: Option<Box<str>>,
+        location: Option<ArcStr>,
+        target: Option<ArcStr>,
         #[serde(default)]
         heart_colors: Option<Vec<String>>,
         card_type: Option<ConditionCardType>,
-        operator: Option<Box<str>>,
+        operator: Option<ArcStr>,
         count: Option<u32>,
-        aggregate: Option<Box<str>>,
+        aggregate: Option<ArcStr>,
         #[serde(default)]
         exclude_characters: Option<Box<Vec<String>>>,
-        temporal: Option<Box<str>>,
+        temporal: Option<ArcStr>,
         self_target: Option<bool>,
         exclude_self: Option<bool>,
-        heart_source: Option<Box<str>>,
-        source: Option<Box<str>>,
+        heart_source: Option<ArcStr>,
+        source: Option<ArcStr>,
         #[serde(default)]
         locations: Option<Vec<String>>,
         position: Option<PositionInfo>,
@@ -5791,15 +5792,15 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
         appearance: Option<bool>,
         baton_touch_trigger: Option<bool>,
-        location: Option<Box<str>>,
-        target: Option<Box<str>>,
+        location: Option<ArcStr>,
+        target: Option<ArcStr>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         cost_limit: Option<u32>,
@@ -5809,17 +5810,17 @@ pub enum Condition {
         #[serde(default)]
         positions_characters: Option<Vec<PositionCharacter>>,
         min_baton_touch_count: Option<u32>,
-        activation_position: Option<Box<str>>,
+        activation_position: Option<ArcStr>,
         exclude_self: Option<bool>,
-        position_compare: Option<Box<str>>,
+        position_compare: Option<ArcStr>,
         position: Option<PositionInfo>,
         card_property: Option<CardProperty>,
         #[serde(default)]
         all_areas: Option<bool>,
-        cost_reference_character: Option<Box<str>>,
+        cost_reference_character: Option<ArcStr>,
         cost_reference_operator: Option<Operator>,
-        appearance_source: Option<Box<str>>,
-        operator: Option<Box<str>>,
+        appearance_source: Option<ArcStr>,
+        operator: Option<ArcStr>,
     },
     #[serde(rename = "temporal_condition")]
     Temporal {
@@ -5827,26 +5828,26 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
-        temporal: Option<Box<str>>,
+        temporal: Option<ArcStr>,
         turn_number: Option<u32>,
         count: Option<u32>,
-        location: Option<Box<str>>,
+        location: Option<ArcStr>,
         card_type: Option<ConditionCardType>,
-        target: Option<Box<str>>,
+        target: Option<ArcStr>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
-        temporal_scope: Option<Box<str>>,
+        temporal_scope: Option<ArcStr>,
         position: Option<PositionInfo>,
         #[serde(default)]
         locations: Option<Vec<String>>,
         #[serde(default)]
         heart_colors: Option<Vec<String>>,
-        aggregate: Option<Box<str>>,
+        aggregate: Option<ArcStr>,
         self_target: Option<bool>,
         condition: Option<Box<Condition>>,
     },
@@ -5860,15 +5861,15 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
-        state: Option<Box<str>>,
-        energy_state: Option<Box<str>>,
-        target: Option<Box<str>>,
-        resource_type: Option<Box<str>>,
+        state: Option<ArcStr>,
+        energy_state: Option<ArcStr>,
+        target: Option<ArcStr>,
+        resource_type: Option<ArcStr>,
         all: Option<bool>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
@@ -5877,10 +5878,10 @@ pub enum Condition {
         characters: Option<Box<Vec<String>>>,
         cost_limit: Option<u32>,
         cost_limit_operator: Option<Operator>,
-        from_state: Option<Box<str>>,
-        to_state: Option<Box<str>>,
+        from_state: Option<ArcStr>,
+        to_state: Option<ArcStr>,
         count: Option<u32>,
-        operator: Option<Box<str>>,
+        operator: Option<ArcStr>,
     },
     #[serde(rename = "resource_condition", alias = "card_blade_condition")]
     Resource {
@@ -5888,21 +5889,21 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
-        resource_type: Option<Box<str>>,
-        target: Option<Box<str>>,
-        location: Option<Box<str>>,
-        operator: Option<Box<str>>,
+        resource_type: Option<ArcStr>,
+        target: Option<ArcStr>,
+        location: Option<ArcStr>,
+        operator: Option<ArcStr>,
         count: Option<u32>,
         delta: Option<bool>,
         #[serde(default)]
         heart_colors: Option<Vec<String>>,
         position: Option<PositionInfo>,
-        source: Option<Box<str>>,
+        source: Option<ArcStr>,
     },
     #[serde(rename = "ability_filter_condition")]
     AbilityFilter {
@@ -5910,17 +5911,17 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
         ability_filter: Option<AbilityFilter>,
         #[serde(default)]
         ability_filter_triggers: Option<Vec<String>>,
-        target: Option<Box<str>>,
-        location: Option<Box<str>>,
-        operator: Option<Box<str>>,
+        target: Option<ArcStr>,
+        location: Option<ArcStr>,
+        operator: Option<ArcStr>,
         count: Option<u32>,
     },
     #[serde(rename = "score_threshold_condition")]
@@ -5929,14 +5930,14 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
         count: Option<u32>,
-        operator: Option<Box<str>>,
-        target: Option<Box<str>>,
+        operator: Option<ArcStr>,
+        target: Option<ArcStr>,
     },
     #[serde(rename = "choice_condition", alias = "position_change_condition")]
     Choice {
@@ -5944,8 +5945,8 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
@@ -5958,8 +5959,8 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
@@ -5972,12 +5973,12 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
-        target: Option<Box<str>>,
+        target: Option<ArcStr>,
         position: Option<PositionInfo>,
     },
     #[serde(rename = "opponent_choice_condition")]
@@ -5986,12 +5987,12 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
-        target: Option<Box<str>>,
+        target: Option<ArcStr>,
     },
     #[serde(rename = "opponent_live_success")]
     OpponentLiveSuccess {
@@ -5999,8 +6000,8 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
@@ -6012,12 +6013,12 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
-        target: Option<Box<str>>,
+        target: Option<ArcStr>,
     },
     #[serde(
         rename = "otherwise_condition",
@@ -6029,8 +6030,8 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
@@ -6041,8 +6042,8 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
@@ -6055,15 +6056,15 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         text: Option<String>,
         negation: Option<bool>,
-        phase: Option<Box<str>>,
-        phase_target: Option<Box<str>>,
+        phase: Option<ArcStr>,
+        phase_target: Option<ArcStr>,
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
         #[serde(default)]
         count: Option<u32>,
         #[serde(default)]
-        operator: Option<Box<str>>,
+        operator: Option<ArcStr>,
     },
 }
 
@@ -6074,20 +6075,20 @@ pub enum Condition {
 pub struct LocationSubChecks {
     pub card_property: Option<CardProperty>,
     pub baton_touch_trigger: Option<bool>,
-    pub baton_touch_source: Option<Box<str>>,
+    pub baton_touch_source: Option<ArcStr>,
     pub min_baton_touch_count: Option<u32>,
     pub ability_filter: Option<AbilityFilter>,
     #[serde(default)]
     pub ability_filter_triggers: Option<Vec<String>>,
-    pub aggregate: Option<Box<str>>,
+    pub aggregate: Option<ArcStr>,
     pub no_excess_heart: Option<bool>,
     pub original_value: Option<bool>,
-    pub activation_position: Option<Box<str>>,
-    pub unit: Option<Box<str>>,
+    pub activation_position: Option<ArcStr>,
+    pub unit: Option<ArcStr>,
     #[serde(default)]
     pub values: Option<Vec<u32>>,
-    pub group_reference: Option<Box<str>>,
-    pub reference_card: Option<Box<str>>,
+    pub group_reference: Option<ArcStr>,
+    pub reference_card: Option<ArcStr>,
 }
 
 impl Default for Condition {
@@ -6676,25 +6677,25 @@ impl Condition {
 #[serde(default)]
 pub struct TriggerEvent {
     #[serde(rename = "type")]
-    pub event_type: Option<Box<str>>,
-    pub tense: Option<Box<str>>,
-    pub location: Option<Box<str>>,
-    pub source_character: Option<Box<str>>,
-    pub source_group: Option<Box<str>>,
+    pub event_type: Option<ArcStr>,
+    pub tense: Option<ArcStr>,
+    pub location: Option<ArcStr>,
+    pub source_character: Option<ArcStr>,
+    pub source_group: Option<ArcStr>,
     pub cost_comparison: Option<CostComparison>,
     pub min_count: Option<u32>,
     pub exclude_characters: Option<Box<Vec<String>>>,
     pub ability_filter: Option<AbilityFilter>,
     pub self_effect_only: Option<bool>,
     pub energy_placed: Option<bool>,
-    pub phase: Option<Box<str>>,
-    pub phase_target: Option<Box<str>>,
-    pub recurrence: Option<Box<str>>,
+    pub phase: Option<ArcStr>,
+    pub phase_target: Option<ArcStr>,
+    pub recurrence: Option<ArcStr>,
     pub events: Option<Vec<TriggerEvent>>,
-    pub source: Option<Box<str>>,
-    pub destination: Option<Box<str>>,
-    pub from_state: Option<Box<str>>,
-    pub to_state: Option<Box<str>>,
+    pub source: Option<ArcStr>,
+    pub destination: Option<ArcStr>,
+    pub from_state: Option<ArcStr>,
+    pub to_state: Option<ArcStr>,
 }
 
 /// Cost comparison for baton touch: e.g. "このメンバーよりコストが低い" (cost < activating).
@@ -6702,7 +6703,7 @@ pub struct TriggerEvent {
 #[serde(default)]
 pub struct CostComparison {
     pub operator: Option<Operator>,
-    pub relative_to: Option<Box<str>>,
+    pub relative_to: Option<ArcStr>,
     pub cost_limit: Option<u32>,
     pub cost_limit_operator: Option<Operator>,
 }

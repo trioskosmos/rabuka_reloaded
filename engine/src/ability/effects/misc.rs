@@ -3,6 +3,7 @@ use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
 use super::super::util;
 use crate::card::{AbilityEffect, PlacementOrder, PositionInfo};
+use crate::core::types::ArcStr;
 use crate::game_state::GameState;
 
 impl AbilityResolver {
@@ -2286,7 +2287,7 @@ impl AbilityResolver {
             if let Some(ref area) = stored_area {
                 self.selected_area = None;
                 let mut copy = effect.clone();
-                copy.destination = Some(Box::from(area.as_str()));
+                copy.destination = Some(ArcStr::from(area.as_str()));
                 return self.execute_position_change_with_destination(gs, &copy, area);
             }
 

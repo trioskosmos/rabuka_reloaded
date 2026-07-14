@@ -1,3 +1,4 @@
+use rabuka_engine::core::types::ArcStr;
 use crate::helpers::*;
 use rabuka_engine::ability::condition::ConditionContext;
 use rabuka_engine::card::{ComparisonTarget, ComparisonType, Condition, ConditionCardType};
@@ -33,7 +34,7 @@ fn score_comparison_condition(operator: Option<&str>) -> Condition {
         comparison_target: Some(ComparisonTarget::Opponent),
         target: None,
         location: None,
-        operator: operator.map(Box::from),
+        operator: operator.map(ArcStr::from),
         count: None,
         values: None,
         card_type: None,
@@ -86,8 +87,8 @@ fn group_condition() -> Condition {
         trigger_event: None,
         group_names: Some(Box::new(vec!["蓮ノ空".to_string()])),
         all_members: None,
-        location: Some(Box::from("stage")),
-        target: Some(Box::from("self")),
+        location: Some(ArcStr::from("stage")),
+        target: Some(ArcStr::from("self")),
         heart_colors: None,
         card_type: Some(ConditionCardType::MemberCard),
         operator: None,
@@ -118,7 +119,7 @@ fn compound_dododo_condition() -> Condition {
         phase_target: None,
         cache: None,
         trigger_event: None,
-        operator: Some(Box::from("and")),
+        operator: Some(ArcStr::from("and")),
         target: None,
         conditions: Some(vec![
             Box::new(score_comparison_condition(Some(">"))),

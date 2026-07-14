@@ -1,6 +1,84 @@
 use crate::card::{AbilityEffect, HeartColor};
 use crate::core::game_modifiers::ModifierEntry;
+use serde::de::Deserializer;
+use serde::ser::Serializer;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
+
+/// Like `Box<str>` but `Arc`-backed for cheap clone (refcount bump, no str copy).
+/// Used in `EffectKind` fields where the same string value may be accessed
+/// across multiple effect evaluations.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct ArcStr(pub Arc<str>);
+
+impl std::ops::Deref for ArcStr {
+    type Target = str;
+    fn deref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<String> for ArcStr {
+    fn from(s: String) -> Self {
+        ArcStr(Arc::from(s))
+    }
+}
+
+impl From<&str> for ArcStr {
+    fn from(s: &str) -> Self {
+        ArcStr(Arc::from(s.to_string()))
+    }
+}
+
+impl From<Box<str>> for ArcStr {
+    fn from(b: Box<str>) -> Self {
+        ArcStr(Arc::from(b))
+    }
+}
+
+impl std::fmt::Display for ArcStr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl PartialEq<&str> for ArcStr {
+    fn eq(&self, other: &&str) -> bool {
+        self.0.as_ref() == *other
+    }
+}
+
+impl PartialEq<str> for ArcStr {
+    fn eq(&self, other: &str) -> bool {
+        self.0.as_ref() == other
+    }
+}
+
+impl AsRef<str> for ArcStr {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
+    }
+}
+
+impl Serialize for ArcStr {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.0.as_ref().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ArcStr {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        Ok(ArcStr(Arc::from(s)))
+    }
+}
+
+impl ArcStr {
+    pub fn as_deref(&self) -> &str {
+        self
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AbilityTrigger {

@@ -1,3 +1,4 @@
+use rabuka_engine::core::types::ArcStr;
 use crate::helpers::*;
 use rabuka_engine::ability::condition::ConditionContext;
 use rabuka_engine::card::{Condition, ConditionCardType};
@@ -76,7 +77,7 @@ fn source_dest_condition_targeted(source: &str, destination: &str) -> Condition 
         trigger_event: None,
         location: None,
         locations: None,
-        target: Some(Box::from("opponent")),
+        target: Some(ArcStr::from("opponent")),
         count: Some(1),
         operator: Some(">=".into()),
         card_type: Some(ConditionCardType::MemberCard),

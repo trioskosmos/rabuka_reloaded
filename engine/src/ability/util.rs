@@ -366,18 +366,22 @@ fn debug_group_match(card_db: &CardDatabase, card_id: i16, group_name: Option<&s
     let _group = group_name.unwrap_or("None");
     let checks = match group_name {
         Some(g) => {
-            fn norm(s: &str) -> String {
-                s.replace('\u{FF01}', "!")
+            fn norm(s: &str) -> std::borrow::Cow<'_, str> {
+                if s.contains('\u{FF01}') {
+                    std::borrow::Cow::Owned(s.replace('\u{FF01}', "!"))
+                } else {
+                    std::borrow::Cow::Borrowed(s)
+                }
             }
             let gn = norm(g);
             card.as_ref()
                 .map(|c| {
-                    let unit_ok = norm(c.unit.as_deref().unwrap_or("")) == gn;
+                    let unit_ok = norm(c.unit.as_deref().unwrap_or("")).as_ref() == gn.as_ref();
                     let group_ok = c.group.as_ref() == g;
                     let name_ok = card_db
                         .get_card_names(card_id)
                         .iter()
-                        .any(|n| norm(n).contains(&gn));
+                        .any(|n| norm(n).as_ref().contains(gn.as_ref()));
                     let series_ok =
                         !c.series.contains('\n') && card_series_matches_group(&c.series, g);
                     format!(
@@ -411,23 +415,38 @@ pub fn card_matches_group_str(
             // either ！(U+FF01) or !(U+0021).
             // Also normalize µ (micro sign U+00B5) to μ (mu U+03BC) for
             // μ's group matching.
-            fn norm(s: &str) -> String {
-                s.replace('\u{FF01}', "!").replace('\u{00B5}', "\u{03BC}")
+            fn norm(s: &str) -> std::borrow::Cow<'_, str> {
+                let has_ff01 = s.contains('\u{FF01}');
+                let has_mu = s.contains('\u{00B5}');
+                if has_ff01 || has_mu {
+                    let mut r = if has_ff01 {
+                        s.replace('\u{FF01}', "!")
+                    } else {
+                        s.to_string()
+                    };
+                    if has_mu {
+                        r = r.replace('\u{00B5}', "\u{03BC}");
+                    }
+                    std::borrow::Cow::Owned(r)
+                } else {
+                    std::borrow::Cow::Borrowed(s)
+                }
             }
             let gn = norm(g);
             card_db
                 .get_card(card_id)
                 .map(|c| {
                     let unit = c.unit.as_deref().unwrap_or("");
-                    let unit_match = unit == gn || ((unit.contains('\u{FF01}') || unit.contains('\u{00B5}')) && norm(unit) == gn);
+                    let unit_match = unit == gn.as_ref()
+                        || ((unit.contains('\u{FF01}') || unit.contains('\u{00B5}')) && norm(unit).as_ref() == gn.as_ref());
                     unit_match
                 || c.group.as_ref() == g
-                // Check name fragments for multi-name cards (e.g. "にこ" in "矢澤にこ")
-                || card_db.get_card_names(card_id).iter().any(|n| n.contains(&gn) || ((n.contains('\u{FF01}') || n.contains('\u{00B5}')) && norm(n).contains(&gn)))
+                || card_db.get_card_names(card_id).iter().any(|n| n.contains(gn.as_ref())
+                    || ((n.contains('\u{FF01}') || n.contains('\u{00B5}')) && norm(n).as_ref().contains(gn.as_ref())))
                 // Multi-name cards (e.g. 渡辺曜&鬼塚夏美&大沢瑠璃乃) should match
                 // group names through any of their constituent series (Q105).
                 // Example: LL-bp2-001-R+ matches "Aqours" via ラブライブ！サンシャイン!!
-                || card_series_matches_group(&c.series, &gn)
+                || card_series_matches_group(&c.series, gn.as_ref())
                 // Constant `set_card_identity` ("treated as") abilities give the
                 // card additional group memberships in all zones. Examples:
                 //   AURORA FLOWER (PL!HS-bp5-018-L) is "スリーズブーケ" /
@@ -436,7 +455,7 @@ pub fn card_matches_group_str(
                     ab.effect.as_ref().is_some_and(|eff| {
                         eff.action == "set_card_identity"
                             && eff.identities_any().as_ref().is_some_and(|ids| {
-                                ids.iter().any(|id| id == &gn || ((id.contains('\u{FF01}') || id.contains('\u{00B5}')) && norm(id) == gn))
+                                ids.iter().any(|id| id == gn.as_ref() || ((id.contains('\u{FF01}') || id.contains('\u{00B5}')) && norm(id).as_ref() == gn.as_ref()))
                             })
                     })
                 })

@@ -128,7 +128,7 @@ impl CardLoader {
                         if let Some(ref act) = effect_action {
                             if let Some(ref ej) = effect_entry {
                                 if let Some(kind) = build_kind_from_action(act, ej) {
-                                    effect.kind = Some(Box::new(kind));
+                                    effect.kind = Some(crate::core::pool::EkBox::new(kind));
                                 }
                             }
                         }
@@ -165,7 +165,7 @@ impl CardLoader {
                         json_val: &serde_json::Value,
                     ) {
                         if let Some(kind) = build_kind_from_action(&effect.action, json_val) {
-                            effect.kind = Some(Box::new(kind));
+                            effect.kind = Some(crate::core::pool::EkBox::new(kind));
                         }
                         if let Some(ref mut sub) = effect.compound.look_action {
                             if let Some(sub_json) = json_val.get("look_action") {
@@ -397,7 +397,7 @@ impl CardLoader {
                                 .and_then(|v| v.as_str());
                             if let Some(act) = cost_action {
                                 if let Some(kind) = build_kind_from_action(act, cj) {
-                                    cost.0.kind = Some(Box::new(kind));
+                                    cost.0.kind = Some(crate::core::pool::EkBox::new(kind));
                                 }
                             }
                         }
@@ -416,7 +416,7 @@ impl CardLoader {
                                             build_kind_from_action(&sub.action, &json_costs[i])
                                         {
                                             if i < fixed.len() {
-                                                fixed[i].kind = Some(Box::new(k));
+                                                fixed[i].kind = Some(crate::core::pool::EkBox::new(k));
                                             }
                                         }
                                     }
@@ -500,7 +500,7 @@ impl CardLoader {
                         if let Some(ref act) = effect_action {
                             if let Some(ref ej) = effect_entry {
                                 if let Some(kind) = build_kind_from_action(act, ej) {
-                                    effect.kind = Some(Box::new(kind));
+                                    effect.kind = Some(crate::core::pool::EkBox::new(kind));
                                 }
                             }
                         }
@@ -537,7 +537,7 @@ impl CardLoader {
                         json_val: &serde_json::Value,
                     ) {
                         if let Some(kind) = build_kind_from_action(&effect.action, json_val) {
-                            effect.kind = Some(Box::new(kind));
+                            effect.kind = Some(crate::core::pool::EkBox::new(kind));
                         }
                         if let Some(ref mut sub) = effect.compound.look_action {
                             if let Some(sub_json) = json_val.get("look_action") {
@@ -763,7 +763,7 @@ impl CardLoader {
                                 .and_then(|v| v.as_str());
                             if let Some(act) = cost_action {
                                 if let Some(kind) = build_kind_from_action(act, cj) {
-                                    cost.0.kind = Some(Box::new(kind));
+                                    cost.0.kind = Some(crate::core::pool::EkBox::new(kind));
                                 }
                             }
                         }
@@ -782,7 +782,7 @@ impl CardLoader {
                                             build_kind_from_action(&sub.action, &json_costs[i])
                                         {
                                             if i < fixed.len() {
-                                                fixed[i].kind = Some(Box::new(k));
+                                                fixed[i].kind = Some(crate::core::pool::EkBox::new(k));
                                             }
                                         }
                                     }

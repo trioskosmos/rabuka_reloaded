@@ -1,3 +1,4 @@
+use rabuka_engine::core::types::ArcStr;
 use crate::helpers::*;
 use rabuka_engine::card::ConditionCardType;
 use rabuka_engine::game_setup::{generate_possible_actions, ActionType};
@@ -304,11 +305,11 @@ fn card_count_condition_baton_touch_filter() {
         phase_target: None,
         cache: None,
         trigger_event: None,
-        location: Some(Box::from("stage")),
+        location: Some(ArcStr::from("stage")),
         locations: None,
-        target: Some(Box::from("self")),
+        target: Some(ArcStr::from("self")),
         count: Some(2),
-        operator: Some(Box::from(">=")),
+        operator: Some(ArcStr::from(">=")),
         card_type: Some(ConditionCardType::MemberCard),
         group_names: Some(Box::new(vec!["蓮ノ空".to_string()])),
         exclude_group_names: None,

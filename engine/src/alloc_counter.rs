@@ -7,11 +7,41 @@ static BYTES_ALLOCATED: AtomicI64 = AtomicI64::new(0);
 static PEAK_BYTES: AtomicI64 = AtomicI64::new(0);
 static TOTAL_BYTES_ALLOCATED: AtomicU64 = AtomicU64::new(0);
 
+// Size-class histogram: count of allocs per power-of-2 bucket
+// 0=1-7B, 1=8-15B, 2=16-31B, ..., 12=4KB+, 13=8KB+
+static SIZE_BUCKETS: [AtomicU64; 14] = [
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+    AtomicU64::new(0),
+];
+
+fn size_bucket(size: usize) -> usize {
+    let bits = (usize::BITS - size.leading_zeros()) as usize; // floor(log2(size)) + 1
+    if bits <= 3 {
+        return 0;
+    } // 1-7 bytes
+    let idx = bits - 3; // 8B → bucket 1, 16B → 2, 32B → 3, ...
+    idx.min(SIZE_BUCKETS.len() - 1)
+}
+
 pub struct CountingAllocator;
 
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         ALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
+        let bucket = size_bucket(layout.size());
+        SIZE_BUCKETS[bucket].fetch_add(1, Ordering::Relaxed);
         let size = layout.size() as i64;
         let prev = BYTES_ALLOCATED.fetch_add(size, Ordering::Relaxed);
         TOTAL_BYTES_ALLOCATED.fetch_add(size as u64, Ordering::Relaxed);
@@ -33,6 +63,34 @@ unsafe impl GlobalAlloc for CountingAllocator {
     }
 }
 
+fn read_buckets() -> [u64; 14] {
+    let mut b = [0u64; 14];
+    for (i, bucket) in SIZE_BUCKETS.iter().enumerate() {
+        b[i] = bucket.load(Ordering::Relaxed);
+    }
+    b
+}
+
+fn bucket_label(i: usize) -> &'static str {
+    match i {
+        0 => "1-7B   ",
+        1 => "8-15B  ",
+        2 => "16-31B ",
+        3 => "32-63B ",
+        4 => "64-127B",
+        5 => "128-255",
+        6 => "256-511",
+        7 => "512-1K ",
+        8 => "1K-2K  ",
+        9 => "2K-4K  ",
+        10 => "4K-8K  ",
+        11 => "8K-16K ",
+        12 => "16K-32K",
+        13 => "32K+   ",
+        _ => "?",
+    }
+}
+
 #[derive(Clone, Copy)]
 struct Snapshot {
     alloc_calls: u64,
@@ -40,6 +98,7 @@ struct Snapshot {
     live_bytes: i64,
     peak_bytes: i64,
     total_allocated: u64,
+    buckets: [u64; 14],
 }
 
 fn snapshot() -> Snapshot {
@@ -49,6 +108,7 @@ fn snapshot() -> Snapshot {
         live_bytes: BYTES_ALLOCATED.load(Ordering::Relaxed),
         peak_bytes: PEAK_BYTES.load(Ordering::Relaxed),
         total_allocated: TOTAL_BYTES_ALLOCATED.load(Ordering::Relaxed),
+        buckets: read_buckets(),
     }
 }
 
@@ -106,6 +166,14 @@ impl Drop for AllocGuard {
                 now.peak_bytes / 1024
             );
             eprintln!("  total allocated:   {} B  ({} KB)", total, total / 1024);
+            // Size-class histogram (delta from baseline)
+            eprintln!("  --- allocs by size ---");
+            for i in 0..SIZE_BUCKETS.len() {
+                let cnt = now.buckets[i].saturating_sub(self.baseline.buckets[i]);
+                if cnt > 0 {
+                    eprintln!("    {}: {} allocs", bucket_label(i), cnt);
+                }
+            }
         }
         if std::env::var("RABUKA_CPU_TRACK").is_ok() {
             eprintln!();
