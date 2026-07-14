@@ -1,5 +1,5 @@
 use crate::helpers::*;
-use rabuka_engine::card::{ConditionCardType, ConditionTarget, Location};
+use rabuka_engine::card::{ConditionCardType,};
 use rabuka_engine::game_setup::{generate_possible_actions, ActionType};
 use rabuka_engine::zones::MemberArea;
 
@@ -283,7 +283,6 @@ fn opponent_baton_touch_discard_does_not_trigger() {
 #[test]
 fn card_count_condition_baton_touch_filter() {
     use rabuka_engine::ability::condition::ConditionContext;
-    use rabuka_engine::ability::enums::ConditionType;
     use rabuka_engine::card::Condition;
 
     let db = load_real_database();
@@ -298,17 +297,53 @@ fn card_count_condition_baton_touch_filter() {
 
     // Create a card_count_condition that checks stage for 蓮ノ空 members
     // with baton_touch_trigger and min_baton_touch_count=2
-    let condition = Condition {
-        condition_type: Some(ConditionType::CardCountCondition),
+    let condition = Condition::Location {
+        text: None,
+        negation: None,
+        phase: None,
+        phase_target: None,
+        cache: None,
+        trigger_event: None,
+        location: Some(Box::from("stage")),
+        locations: None,
+        target: Some(Box::from("self")),
+        count: Some(2),
+        operator: Some(Box::from(">=")),
         card_type: Some(ConditionCardType::MemberCard),
-        location: Some(Location::Stage),
-        target: Some(ConditionTarget::Self_),
         group_names: Some(vec!["蓮ノ空".to_string()]),
+        exclude_group_names: None,
+        characters: None,
+        exclude_characters: None,
+        cost_limit: None,
+        cost_limit_operator: None,
+        heart_colors: None,
+        heart_type: None,
+        heart_source: None,
+        distinct: None,
+        exclude_self: None,
+        self_target: None,
+        source: None,
+        destination: None,
+        state: None,
+        position: None,
+        position_compare: None,
+        require_position_cards: None,
+        all: None,
+        all_areas: None,
+        temporal: None,
+        yell_trigger: None,
+        same_name: None,
+        card_property: None,
+        scope: None,
+        sub_checks: None,
         baton_touch_trigger: Some(true),
         min_baton_touch_count: Some(2),
-        count: Some(2),
-        operator: Some(">=".into()),
-        ..Default::default()
+        unit: None,
+        comparison_target: None,
+        comparison_type: None,
+        activation_position: None,
+        group_reference: None,
+        aggregate: None,
     };
 
     // Without any baton touches, the condition should fail

@@ -1,9 +1,8 @@
 use super::condition::ConditionContext;
-use super::enums::ConditionType;
 use super::resolver::AbilityResolver;
 use super::types::{AbilityTraceNode, Choice, ExecutionContext, StepOutput, ZoneSnapshot};
 use crate::ability::debug::ABILITY_DEBUG;
-use crate::card::AbilityEffect;
+use crate::card::{AbilityEffect, Condition};
 use crate::game_state::GameState;
 use std::sync::atomic::Ordering;
 
@@ -117,9 +116,13 @@ impl AbilityResolver {
             );
             // Track if a preceding conditional step was satisfied, for
             // if-then-else (otherwise_condition) support.
-            let mut condition_failed: Option<bool> = None;
+            let mut condition_failed: Option<bool>;
             for _repeat in 0..repeat_max {
                 let repeats_remaining = repeat_max.saturating_sub(_repeat + 1);
+                // Reset the conditional-failed flag at the start of each repeat
+                // iteration so a failed result_condition in one iteration doesn't
+                // cause the next iteration's actions to be skipped.
+                condition_failed = None;
                 'action_loop: for (i, action) in repeat_actions.iter().enumerate() {
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
                         log::debug!(
@@ -142,8 +145,10 @@ impl AbilityResolver {
                     //  • is_otherwise  → skip if condition met, execute if failed
                     //  • has condition  → evaluate directly (for otherwise routing)
                     //  • no condition + parent-conditional → skip if preceding failed
-                    let is_otherwise = action.condition.as_ref().and_then(|c| c.condition_type)
-                        == Some(ConditionType::OtherwiseCondition);
+                    let is_otherwise = action
+                        .condition
+                        .as_ref()
+                        .is_some_and(|c| matches!(c.as_ref(), Condition::AlwaysTrue { .. }));
                     if is_otherwise {
                         match condition_failed {
                             Some(false) => {
@@ -174,8 +179,8 @@ impl AbilityResolver {
                             && repeat_actions[i - 1]
                                 .condition
                                 .as_ref()
-                                .map(|c| c.text.as_str())
-                                == action.condition.as_ref().map(|c| c.text.as_str());
+                                .and_then(|c| c.get_text())
+                                == action.condition.as_ref().and_then(|c| c.get_text());
                         if same_as_prev {
                             if condition_failed == Some(true) {
                                 continue 'action_loop;
@@ -184,9 +189,11 @@ impl AbilityResolver {
                             let cond = action.condition.as_ref().unwrap();
                             // Check cache first — avoids re-evaluation against stale
                             // game state after a choice round-trip.
-                            let passed = if cond.cache.unwrap_or(false) {
+                            let passed = if cond.get_cache().unwrap_or(false) {
                                 if let Some(entry) = gs.ability_queue.current_entry() {
-                                    if let Some(&cached) = entry.condition_cache.get(&cond.text) {
+                                    if let Some(&cached) =
+                                        entry.condition_cache.get(cond.get_text().unwrap_or(""))
+                                    {
                                         cached
                                     } else {
                                         false // not cached yet — evaluate below
@@ -203,9 +210,11 @@ impl AbilityResolver {
                                 let ctx = ConditionContext::with_moved_cards(gs, &self.moved_cards);
                                 let p = ctx.evaluate_condition(cond);
                                 // Cache the result if condition asks for it
-                                if cond.cache.unwrap_or(false) {
+                                if cond.get_cache().unwrap_or(false) {
                                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                                        entry.condition_cache.insert(cond.text.clone(), p);
+                                        entry
+                                            .condition_cache
+                                            .insert(cond.get_text().unwrap_or("").to_string(), p);
                                     }
                                 }
                                 p
@@ -414,7 +423,7 @@ impl AbilityResolver {
                                     let mut actions: Vec<Box<AbilityEffect>> =
                                         repeat_actions[i..].to_vec();
                                     if !actions.is_empty() {
-                                        actions[0].optional = None;
+                                        actions[0].set_optional(None);
                                     }
                                     actions
                                 } else {
@@ -425,8 +434,9 @@ impl AbilityResolver {
                                 // so they aren't re-executed by RPC.
                                 if condition_failed == Some(false) {
                                     remaining.retain(|a| {
-                                        !(a.condition.as_ref().and_then(|c| c.condition_type)
-                                            == Some(crate::ability::enums::ConditionType::OtherwiseCondition))
+                                        !a.condition.as_ref().is_some_and(|c| {
+                                            matches!(c.as_ref(), Condition::AlwaysTrue { .. })
+                                        })
                                     });
                                 }
                                 // Strip AllRevealedMatchHeartColor conditions from
@@ -438,9 +448,12 @@ impl AbilityResolver {
                                 // during resume_pending_actions.
                                 if condition_failed == Some(false) {
                                     for a in &mut remaining {
-                                        if a.condition.as_ref().and_then(|c| c.condition_type)
-                                            == Some(crate::ability::enums::ConditionType::AllRevealedMatchHeartColor)
-                                        {
+                                        if a.condition.as_ref().is_some_and(|c| {
+                                            matches!(
+                                                c.as_ref(),
+                                                Condition::AllRevealedMatchHeartColor { .. }
+                                            )
+                                        }) {
                                             a.condition = None;
                                         }
                                     }
@@ -778,6 +791,11 @@ impl AbilityResolver {
             }
         } else {
             log::debug!("Result condition not met, skipping followup action");
+        }
+        // Clear conditional_choice so the next repeat iteration creates a
+        // fresh optional prompt instead of silently reusing the previous answer.
+        if let Some(entry_mut) = gs.ability_queue.current_entry_mut() {
+            entry_mut.conditional_choice = None;
         }
         Ok(())
     }

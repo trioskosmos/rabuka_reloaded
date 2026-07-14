@@ -1374,7 +1374,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     .as_ref()
                     .and_then(|e| e.activation_condition_parsed_any())
                     .is_some_and(|c| {
-                        Zone::from_str(c.location.as_deref().unwrap_or("")) == Some(Zone::Discard)
+                        Zone::from_str(c.get_location().unwrap_or("")) == Some(Zone::Discard)
                     });
                 if !is_discard_activation {
                     continue;

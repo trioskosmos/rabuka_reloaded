@@ -22,7 +22,7 @@ struct AbilitiesMapFile {
 
 fn main() {
     let abilities_path = "cards/abilities.json";
-    let out_path = "engine_3ds/romfs/abilities_map.json";
+    let _out_path = "engine_3ds/romfs/abilities_map.json";
 
     let abilities_json = fs::read_to_string(abilities_path)
         .unwrap_or_else(|e| panic!("Could not read {}: {}", abilities_path, e));

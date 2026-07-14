@@ -78,14 +78,13 @@ impl super::resolver::AbilityResolver {
                     // the same condition type from remaining actions. This prevents
                     // re-evaluation against stale game state (e.g. revealed_cards
                     // mutated by select_cards filtering).
-                    if let Some(cond_type) =
-                        effect.condition.as_ref().and_then(|c| c.condition_type)
-                    {
+                    if let Some(ref cond) = effect.condition {
+                        let disc = std::mem::discriminant(cond.as_ref());
                         for a in &mut remaining {
-                            if a.condition.as_ref().and_then(|c| c.condition_type)
-                                == Some(cond_type)
-                            {
-                                a.condition = None;
+                            if let Some(ref a_cond) = a.condition {
+                                if std::mem::discriminant(a_cond.as_ref()) == disc {
+                                    a.condition = None;
+                                }
                             }
                         }
                     }
@@ -1495,7 +1494,11 @@ impl super::resolver::AbilityResolver {
                     let cid = player.hand.cards[idx];
                     let passes =
                         util::card_matches_type(&card_db, cid, cost.card_type_any().as_deref())
-                            && util::card_matches_characters(&card_db, cid, cost.characters_any())
+                            && util::card_matches_characters(
+                                &card_db,
+                                cid,
+                                cost.characters_any().map(|v| &**v),
+                            )
                             && match cost.group_names_any().as_ref() {
                                 Some(groups) => groups.iter().any(|g| {
                                     util::card_matches_group_str(&card_db, cid, Some(g.as_str()))

@@ -922,7 +922,9 @@ fn baad_cage_cost_limit_no_match() {
         let has_cost_limit = card.abilities.iter().any(|ab| {
             ab.effect.as_ref().is_some_and(|eff| {
                 eff.condition.as_ref().is_some_and(|cond| {
-                    cond.cost_limit == Some(10) && cond.cost_limit_operator.as_deref() == Some(">=")
+                    cond.get_cost_limit() == Some(10)
+                        && cond.get_cost_limit_operator()
+                            == Some(rabuka_engine::card::Operator::Gte)
                 })
             })
         });

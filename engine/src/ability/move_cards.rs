@@ -133,7 +133,7 @@ impl AbilityResolver {
                     effect.cost_total_operator_any().map(|s| s.to_string()),
                 )
                 .group(filter.group.map(|s| s.to_string()))
-                .characters(filter.characters.cloned())
+                .characters(filter.characters.map(|v| v.to_vec()))
                 .target_player_id(Some(effect.target.as_deref().unwrap_or("self").to_string()))
                 .filtered_indices(filtered_indices)
                 .destination(effect.destination.clone().map(|s| s.to_string()))
@@ -694,7 +694,7 @@ impl AbilityResolver {
                         .as_ref()
                         .and_then(|e| e.conditional_choice.as_ref())
                         .is_some();
-                    let opt_paid = entry
+                    let _opt_paid = entry
                         .as_ref()
                         .and_then(|e| e.optional_cost_result)
                         .is_some();
@@ -977,7 +977,7 @@ impl AbilityResolver {
                     .condition
                     .as_ref()
                     .and_then(|c| {
-                        if c.group_reference.as_deref() == Some("different_group_names") {
+                        if c.get_group_reference() == Some("different_group_names") {
                             Some(true)
                         } else {
                             None
@@ -1082,7 +1082,7 @@ impl AbilityResolver {
                                 effect.cost_total_operator_any().map(|s| s.to_string()),
                             )
                             .group(filter.group.map(|s| s.to_string()))
-                            .characters(filter.characters.cloned())
+                            .characters(filter.characters.map(|v| v.to_vec()))
                             .target_player_id(Some(
                                 effect.target.as_deref().unwrap_or("self").to_string(),
                             ))
@@ -1412,6 +1412,7 @@ impl AbilityResolver {
             &destination,
             &card_db,
         )?;
+
         // --- STEP 2: Any-order deck placement (before consuming taken) ---
         let is_deck_dest = Zone::from_str(&destination) == Some(Zone::Deck)
             || Zone::from_str(&destination) == Some(Zone::DeckTop);

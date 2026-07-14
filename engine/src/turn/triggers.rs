@@ -87,7 +87,9 @@ impl super::TurnEngine {
                                             .effect
                                             .as_ref()
                                             .and_then(|e| e.condition.as_ref())
-                                            .is_some_and(|c| c.baton_touch_trigger.unwrap_or(false))
+                                            .is_some_and(|c| {
+                                                c.get_baton_touch_trigger().unwrap_or(false)
+                                            })
                                     {
                                         continue;
                                     }

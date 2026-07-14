@@ -1,7 +1,6 @@
 use crate::helpers::*;
 use rabuka_engine::ability::condition::ConditionContext;
-use rabuka_engine::ability::enums::ConditionType;
-use rabuka_engine::card::{Condition, ConditionCardType, ConditionTarget};
+use rabuka_engine::card::{Condition, ConditionCardType};
 
 fn fill_decks(game: &mut TestGame, filler: i16) {
     game.state.player1.main_deck.cards.clear();
@@ -13,27 +12,108 @@ fn fill_decks(game: &mut TestGame, filler: i16) {
 }
 
 fn source_dest_condition(source: &str, destination: &str) -> Condition {
-    Condition {
-        condition_type: Some(ConditionType::CardCountCondition),
-        count: Some(1),
+    source_dest_condition_with_count(source, destination, 1)
+}
+
+fn source_dest_condition_with_count(source: &str, destination: &str, count: u32) -> Condition {
+    Condition::Location {
+        text: None,
+        negation: None,
+        phase: None,
+        phase_target: None,
+        cache: None,
+        trigger_event: None,
+        location: None,
+        locations: None,
+        target: None,
+        count: Some(count),
         operator: Some(">=".into()),
+        card_type: Some(ConditionCardType::MemberCard),
+        group_names: None,
+        exclude_group_names: None,
+        characters: None,
+        exclude_characters: None,
+        cost_limit: None,
+        cost_limit_operator: None,
+        heart_colors: None,
+        heart_type: None,
+        heart_source: None,
+        distinct: None,
+        exclude_self: None,
+        self_target: None,
         source: Some(source.into()),
         destination: Some(destination.into()),
-        card_type: Some(ConditionCardType::MemberCard),
-        ..Default::default()
+        state: None,
+        position: None,
+        position_compare: None,
+        require_position_cards: None,
+        all: None,
+        all_areas: None,
+        temporal: None,
+        yell_trigger: None,
+        same_name: None,
+        card_property: None,
+        scope: None,
+        sub_checks: None,
+        baton_touch_trigger: None,
+        min_baton_touch_count: None,
+        unit: None,
+        comparison_target: None,
+        comparison_type: None,
+        activation_position: None,
+        group_reference: None,
+        aggregate: None,
     }
 }
 
 fn source_dest_condition_targeted(source: &str, destination: &str) -> Condition {
-    Condition {
-        condition_type: Some(ConditionType::CardCountCondition),
+    Condition::Location {
+        text: None,
+        negation: None,
+        phase: None,
+        phase_target: None,
+        cache: None,
+        trigger_event: None,
+        location: None,
+        locations: None,
+        target: Some(Box::from("opponent")),
         count: Some(1),
         operator: Some(">=".into()),
+        card_type: Some(ConditionCardType::MemberCard),
+        group_names: None,
+        exclude_group_names: None,
+        characters: None,
+        exclude_characters: None,
+        cost_limit: None,
+        cost_limit_operator: None,
+        heart_colors: None,
+        heart_type: None,
+        heart_source: None,
+        distinct: None,
+        exclude_self: None,
+        self_target: None,
         source: Some(source.into()),
         destination: Some(destination.into()),
-        card_type: Some(ConditionCardType::MemberCard),
-        target: Some(ConditionTarget::Opponent),
-        ..Default::default()
+        state: None,
+        position: None,
+        position_compare: None,
+        require_position_cards: None,
+        all: None,
+        all_areas: None,
+        temporal: None,
+        yell_trigger: None,
+        same_name: None,
+        card_property: None,
+        scope: None,
+        sub_checks: None,
+        baton_touch_trigger: None,
+        min_baton_touch_count: None,
+        unit: None,
+        comparison_target: None,
+        comparison_type: None,
+        activation_position: None,
+        group_reference: None,
+        aggregate: None,
     }
 }
 
@@ -146,8 +226,7 @@ fn source_dest_condition_needs_multiple_fails() {
     push_movement_p1(&mut game, member, "live_card_zone", "waitroom");
     game.state.player1.waitroom.cards.push(member);
 
-    let mut cond = source_dest_condition("live_card_zone", "discard");
-    cond.count = Some(2);
+    let cond = source_dest_condition_with_count("live_card_zone", "discard", 2);
     let ctx = ConditionContext::new(&game.state);
     assert!(!ctx.evaluate_condition(&cond));
 }

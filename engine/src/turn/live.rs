@@ -919,8 +919,7 @@ impl super::TurnEngine {
                 continue;
             }
             let cond_matches = effect.condition.as_ref().is_some_and(|c| {
-                c.location
-                    .as_deref()
+                c.get_location()
                     .is_some_and(|loc| Zone::from_str(loc) == Some(Zone::SuccessLiveZone))
             });
             if !cond_matches {

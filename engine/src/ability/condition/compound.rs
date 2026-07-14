@@ -61,17 +61,17 @@ impl<'a> ConditionContext<'a> {
     }
 
     pub(crate) fn evaluate_compound_condition(&self, condition: &Condition) -> bool {
-        if let Some(ref conditions) = condition.conditions {
+        if let Some(conditions) = condition.get_conditions() {
             let mut dbg = AbDebug::new();
             dbg.p(
                 "COMPOUND",
                 format_args!(
                     "{} sub-conditions, operator={}",
                     conditions.len(),
-                    condition.operator.as_deref().unwrap_or("and")
+                    condition.get_operator().unwrap_or("and")
                 ),
             );
-            let op = condition.operator.as_deref().unwrap_or("and");
+            let op = condition.get_operator().unwrap_or("and");
             let before = crate::ability::log::buffer_len();
             let (passed_count, result) = self.evaluate_condition_list(conditions, op);
             let children = crate::ability::log::drain_verdicts_since(before);
@@ -99,7 +99,7 @@ impl<'a> ConditionContext<'a> {
     }
 
     pub(crate) fn evaluate_or_condition(&self, condition: &Condition) -> bool {
-        if let Some(ref conditions) = condition.conditions {
+        if let Some(conditions) = condition.get_conditions() {
             let before = crate::ability::log::buffer_len();
             let (passed_count, result) = self.evaluate_condition_list(conditions, "or");
             let children = crate::ability::log::drain_verdicts_since(before);
@@ -116,7 +116,7 @@ impl<'a> ConditionContext<'a> {
     }
 
     pub(crate) fn evaluate_any_of_condition(&self, condition: &Condition) -> bool {
-        if let Some(ref any_of) = condition.any_of {
+        if let Some(any_of) = condition.get_any_of() {
             any_of
                 .iter()
                 .any(|condition_type| self.any_of_matches(condition_type))

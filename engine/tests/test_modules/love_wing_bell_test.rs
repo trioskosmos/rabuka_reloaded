@@ -33,7 +33,7 @@ fn love_wing_bell_debug_card_abilities() {
             );
             eprintln!(
                 "[TEST_DEBUG]     effect condition={:?}",
-                eff.condition.as_ref().map(|c| &c.condition_type)
+                eff.condition.as_ref().map(|c| c.as_ref())
             );
         }
     }

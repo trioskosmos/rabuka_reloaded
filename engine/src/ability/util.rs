@@ -206,7 +206,7 @@ fn scan_abilities_for_cost_reduction(
             // (the card is on stage/live zone so this condition can't be met).
             if hand_condition_guard {
                 if let Some(ref cond) = effect.condition {
-                    if cond.location.as_deref() == Some("hand") {
+                    if cond.get_location() == Some("hand") {
                         continue;
                     }
                 }
@@ -485,7 +485,7 @@ fn card_series_matches_group(series: &str, group: &str) -> bool {
 pub fn card_matches_characters(
     card_db: &CardDatabase,
     card_id: i16,
-    characters: Option<&Vec<String>>,
+    characters: Option<&[String]>,
 ) -> bool {
     match characters {
         Some(names) if !names.is_empty() => {

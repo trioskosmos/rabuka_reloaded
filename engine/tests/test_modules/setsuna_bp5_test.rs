@@ -208,7 +208,7 @@ fn landing_action_yeah_surplus_heart_condition() -> rabuka_engine::core::card::C
         .find_map(|ability| {
             let effect = ability.effect.as_ref()?;
             let condition = effect.condition.as_ref()?;
-            if condition.resource_type.as_deref() == Some("surplus_heart") {
+            if condition.get_resource_type() == Some("surplus_heart") {
                 Some((**condition).clone())
             } else {
                 None
@@ -230,7 +230,7 @@ fn landing_action_yeah_surplus_heart_effect() -> rabuka_engine::core::card::Abil
             if effect
                 .condition
                 .as_ref()
-                .is_some_and(|c| c.resource_type.as_deref() == Some("surplus_heart"))
+                .is_some_and(|c| c.get_resource_type() == Some("surplus_heart"))
             {
                 Some((**effect).clone())
             } else {

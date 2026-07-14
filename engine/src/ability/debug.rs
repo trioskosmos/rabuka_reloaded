@@ -106,22 +106,21 @@ impl AbDebug {
     }
 
     pub fn condition(&mut self, cond: &Condition, actual: u32, threshold: u32, passed: bool) {
-        let ct = cond.condition_type;
-        let loc = cond.location.as_deref().unwrap_or("");
-        let tgt = cond.target.as_deref().unwrap_or("");
+        let ct = cond.condition_type();
+        let loc = cond.get_location().unwrap_or("");
+        let tgt = cond.get_target().unwrap_or("");
         let gn = cond
-            .group_names
-            .as_ref()
+            .get_group_names()
             .map(|g| format!("{:?}", g))
             .unwrap_or_default();
-        let op = cond.operator.as_deref().unwrap_or(">=");
+        let op = cond.get_operator().unwrap_or(">=");
         let pass = if passed { "PASS" } else { "FAIL" };
         let (ct_label, detail): (&str, String) = match ct {
             Some(ConditionType::Compound) => (
                 "compound",
                 format!(
                     "{} sub-conditions",
-                    cond.conditions.as_ref().map(|c| c.len()).unwrap_or(0)
+                    cond.get_conditions().map(|c| c.len()).unwrap_or(0)
                 ),
             ),
             Some(ConditionType::CardCountCondition) => ("card_count_condition", {
@@ -129,7 +128,7 @@ impl AbDebug {
                     "{}{} {}{}",
                     op,
                     threshold,
-                    cond.unit.as_deref().unwrap_or("x"),
+                    cond.get_unit().unwrap_or("x"),
                     loc
                 )];
                 if !tgt.is_empty() {
@@ -143,7 +142,7 @@ impl AbDebug {
                 parts.join(" ")
             }),
             Some(ConditionType::LocationCondition) => ("location_condition", {
-                let extras = if cond.distinct.as_ref().is_some_and(|d| d.is_distinct()) {
+                let extras = if cond.get_distinct().is_some_and(|d| d.is_distinct()) {
                     " distinct=names"
                 } else {
                     ""
@@ -154,14 +153,14 @@ impl AbDebug {
                 )
             }),
             Some(ConditionType::ComparisonCondition) => ("comparison_condition", {
-                let rt = cond.resource_type.as_deref().unwrap_or("?");
+                let rt = cond.get_resource_type().unwrap_or("?");
                 format!(
                     "{}{} {}{} → actual={} {}",
                     op, threshold, rt, loc, actual, pass
                 )
             }),
             Some(ConditionType::AppearanceCondition) => ("appearance_condition", {
-                let areas = if cond.all_areas.unwrap_or(false) {
+                let areas = if cond.get_all_areas().unwrap_or(false) {
                     " all_areas"
                 } else {
                     ""
@@ -169,7 +168,7 @@ impl AbDebug {
                 format!(
                     "check presence{}{} → {}",
                     areas,
-                    if cond.baton_touch_trigger.unwrap_or(false) {
+                    if cond.get_baton_touch_trigger().unwrap_or(false) {
                         " baton_touch"
                     } else {
                         ""
@@ -181,7 +180,7 @@ impl AbDebug {
                 "movement_condition",
                 format!(
                     "movement={}{} → {}",
-                    cond.movement.as_deref().unwrap_or("?"),
+                    cond.get_movement().unwrap_or("?"),
                     loc,
                     pass
                 ),
@@ -190,7 +189,7 @@ impl AbDebug {
                 "or_condition",
                 format!(
                     "{} sub-conditions (any)",
-                    cond.conditions.as_ref().map(|c| c.len()).unwrap_or(0)
+                    cond.get_conditions().map(|c| c.len()).unwrap_or(0)
                 ),
             ),
             Some(ConditionType::OtherwiseCondition) => {
@@ -288,7 +287,10 @@ impl AbDebug {
             "modify_score" => format!(
                 "score {}{}",
                 effect.operation_any().as_deref().unwrap_or("add"),
-                effect.value_any().map(|v| format!(" {}", v)).unwrap_or_default()
+                effect
+                    .value_any()
+                    .map(|v| format!(" {}", v))
+                    .unwrap_or_default()
             ),
             "change_state" => format!(
                 "change state → {}",
@@ -327,7 +329,7 @@ impl AbDebug {
         if let Some(ref cond) = effect.condition {
             self.p(
                 "COND",
-                format_args!("(gated by: {})", trunc(&cond.text, 60)),
+                format_args!("(gated by: {})", trunc(cond.get_text().unwrap_or(""), 60)),
             );
         }
     }
@@ -355,7 +357,10 @@ impl AbDebug {
                 cost.count.unwrap_or(1),
                 cost.card_type_any().as_deref().unwrap_or("card")
             ),
-            "change_state" => format!("set self → {}", cost.state_change_any().as_deref().unwrap_or("?")),
+            "change_state" => format!(
+                "set self → {}",
+                cost.state_change_any().as_deref().unwrap_or("?")
+            ),
             "reveal" => format!(
                 "reveal {} {}",
                 cost.count.unwrap_or(1),

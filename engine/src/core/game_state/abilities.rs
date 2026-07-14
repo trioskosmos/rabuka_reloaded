@@ -169,7 +169,7 @@ impl GameState {
     /// comparison) depend on game state that may change between TAS and
     /// ability resolution, so they are deferred.
     fn condition_is_event_based(condition: &crate::card::Condition) -> bool {
-        let movement = condition.movement.as_deref();
+        let movement = condition.get_movement();
         // All movement types ("moved", "moves", and "position_change") are event-based.
         // "moved" → card has already moved (can be checked now).
         // "moves" → card is / was moving (checkable because we set
@@ -191,29 +191,23 @@ impl GameState {
         // card_count (all variants — zone counts are stable state checks)
         // Exception: conditions on revealed_cards are NOT event-based because
         // revealed_cards is populated during yell, not at the trigger event.
-        if matches!(
-            condition.condition_type,
-            Some(crate::ability::enums::ConditionType::CardCountCondition)
-        ) && condition.location.as_deref() != Some("revealed_cards")
+        if matches!(condition, crate::card::Condition::Location { .. })
+            && condition.get_location() != Some("revealed_cards")
         {
             return true;
         }
         // State change (active↔wait) — pre-filter so the condition only
         // fires when a recorded transition is available.
-        if matches!(
-            condition.condition_type,
-            Some(crate::ability::enums::ConditionType::StateChangeCondition)
-        ) {
+        if matches!(condition, crate::card::Condition::State { .. }) {
             return true;
         }
         // Recurse into compound conditions — if any child is event-based,
         // the whole compound is pre-filtered.
-        if let Some(ref children) = condition.conditions {
-            if children
-                .iter()
-                .any(|c| Self::condition_is_event_based(c.as_ref()))
-            {
-                return true;
+        if let crate::card::Condition::Compound { ref conditions, .. } = condition {
+            if let Some(ref children) = conditions {
+                if children.iter().any(|c| Self::condition_is_event_based(c)) {
+                    return true;
+                }
             }
         }
         false
@@ -297,19 +291,18 @@ impl GameState {
                                     // watchers — those track OTHER cards moving to
                                     // discard, not the card itself being in discard.
                                     let cond_location = condition
-                                        .location
-                                        .as_deref()
+                                        .get_location()
                                         .or_else(|| {
                                             condition
-                                                .trigger_event
-                                                .as_ref()
+                                                .get_trigger_event()
                                                 .and_then(|t| t.location.as_deref())
                                         })
                                         .unwrap_or("");
-                                    if condition.source.as_deref() != Some("preceding_moved")
+                                    if condition.get_source() != Some("preceding_moved")
                                         && Zone::from_str(cond_location) == Some(Zone::Discard)
-                                        && (condition.card_type.as_deref() == Some("member_card")
-                                            || condition.target.as_deref() == Some("self"))
+                                        && (condition.get_card_type().as_deref()
+                                            == Some("member_card")
+                                            || condition.get_target() == Some("self"))
                                     {
                                         let in_discard =
                                             self.player1.waitroom.cards.contains(&card_id)
@@ -344,7 +337,7 @@ impl GameState {
                                             log::debug!(
                                                 "[TAS_COND] card={} cond_type={:?} passes={}",
                                                 card.name,
-                                                condition.condition_type,
+                                                condition,
                                                 passes
                                             );
                                         }
@@ -360,9 +353,10 @@ impl GameState {
                                     // like "energy_zone >= 0" during phase-based
                                     // energy placement).
                                     if effect.trigger_type_any().as_deref() == Some("each_time") {
-                                        if condition.condition_type
-                                            == Some(crate::ability::enums::ConditionType::ComparisonCondition)
-                                            && condition.location.as_deref() == Some("energy_zone")
+                                        if matches!(
+                                            condition.as_ref(),
+                                            crate::card::Condition::Comparison { .. }
+                                        ) && condition.get_location() == Some("energy_zone")
                                             && !self.last_energy_placed_by_effect()
                                         {
                                             continue;
@@ -392,9 +386,9 @@ impl GameState {
                             // the card to be in event.moved_cards (recently placed).
                             if let Some(ref eff) = ability.effect {
                                 if let Some(ref cond) = eff.condition {
-                                    if cond.self_target.unwrap_or(false)
-                                        && cond.movement.as_deref() == Some("moved")
-                                        && cond.locations.as_ref().map_or(true, |l| l.len() < 2)
+                                    if cond.get_self_target().unwrap_or(false)
+                                        && cond.get_movement() == Some("moved")
+                                        && cond.get_locations().map_or(true, |l| l.len() < 2)
                                         && !event.moved_cards.contains(&card_id)
                                     {
                                         continue;
@@ -456,8 +450,8 @@ impl GameState {
                                         if !passes {
                                             continue;
                                         }
-                                    } else if condition.self_target.unwrap_or(false) {
-                                        if let Some(ref locs) = condition.locations {
+                                    } else if condition.get_self_target().unwrap_or(false) {
+                                        if let Some(locs) = condition.get_locations() {
                                             if locs.len() == 2 {
                                                 continue;
                                             }
@@ -468,9 +462,9 @@ impl GameState {
                             // Same movement gate for live cards:
                             if let Some(ref eff) = ability.effect {
                                 if let Some(ref cond) = eff.condition {
-                                    if cond.self_target.unwrap_or(false)
-                                        && cond.movement.as_deref() == Some("moved")
-                                        && cond.locations.as_ref().map_or(true, |l| l.len() < 2)
+                                    if cond.get_self_target().unwrap_or(false)
+                                        && cond.get_movement() == Some("moved")
+                                        && cond.get_locations().map_or(true, |l| l.len() < 2)
                                         && !event.moved_cards.contains(&card_id)
                                     {
                                         continue;
@@ -539,8 +533,8 @@ impl GameState {
                                     // moved-cards scan so that cards removed from
                                     // stage (e.g. by baton touch) don't falsely fire.
                                     if matches!(
-                                        condition.condition_type,
-                                        Some(crate::ability::enums::ConditionType::AppearanceCondition)
+                                        condition.as_ref(),
+                                        crate::card::Condition::Appearance { .. }
                                     ) {
                                         continue;
                                     }
@@ -609,9 +603,8 @@ impl GameState {
             Some(c) => c,
             None => return 1,
         };
-        if condition.condition_type
-            != Some(crate::ability::enums::ConditionType::CardCountCondition)
-            || condition.source.as_deref() != Some("preceding_moved")
+        if !matches!(condition.as_ref(), crate::card::Condition::Location { .. })
+            || condition.get_source() != Some("preceding_moved")
         {
             return 1;
         }
@@ -621,12 +614,12 @@ impl GameState {
                 if cid == -1 {
                     return false;
                 }
-                if let Some(ref ct) = condition.card_type {
-                    if !crate::ability::util::card_matches_type(card_db, cid, Some(ct)) {
+                if let Some(ct) = condition.get_card_type() {
+                    if !crate::ability::util::card_matches_type(card_db, cid, Some(&*ct)) {
                         return false;
                     }
                 }
-                if let Some(ref hc) = condition.heart_colors {
+                if let Some(hc) = condition.get_heart_colors() {
                     if !hc.is_empty()
                         && !crate::ability::util::card_matches_heart_colors(card_db, cid, hc)
                     {
@@ -640,17 +633,18 @@ impl GameState {
         if match_count <= 1 {
             return match_count;
         }
-        let ct = &condition.text;
-        if ct.contains("すべて") || ct.contains("全て") || ct.contains("全部") {
+        let ct = condition.get_text();
+        if ct.is_some_and(|t| t.contains("すべて") || t.contains("全て") || t.contains("全部"))
+        {
             return 1;
         }
-        if ct.contains("1枚以上") || ct.contains("1つ以上") {
+        if ct.is_some_and(|t| t.contains("1枚以上") || t.contains("1つ以上")) {
             return 1;
         }
-        if condition.count == Some(1) && condition.operator.as_deref() == Some(">=") {
+        if condition.get_count() == Some(1) && condition.get_operator() == Some(">=") {
             return 1;
         }
-        if condition.self_target.unwrap_or(false) {
+        if condition.get_self_target().unwrap_or(false) {
             return 1;
         }
         match_count
@@ -864,10 +858,10 @@ impl GameState {
                         continue;
                     }
                     let watch_text = match &effect.condition {
-                        Some(c) => &c.text,
-                        None => &effect.text,
+                        Some(c) => c.get_text(),
+                        None => Some(effect.text.as_str()),
                     };
-                    if !watch_text.contains(trigger_substring) {
+                    if !watch_text.is_some_and(|t| t.contains(trigger_substring)) {
                         continue;
                     }
                     let aid = format!("{}_{}", card.card_no, ability.full_text);

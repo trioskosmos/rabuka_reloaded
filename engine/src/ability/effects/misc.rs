@@ -413,11 +413,27 @@ impl AbilityResolver {
         let player = gs.resolve_target_player(target);
         let is_p1 = player.id == gs.player1.id;
         let old = if sign == Some("negative") && is_all {
-            let v = if is_p1 {
-                gs.self_live_surplus_count
+            // Compute surplus from snapshot total_hearts minus requirements,
+            // so test modifications to the snapshot (e.g. total_hearts)
+            // are reflected in last_surplus_loss_count.
+            let pid = if is_p1 {
+                &gs.player1.id
             } else {
-                gs.opponent_live_surplus_count
+                &gs.player2.id
             };
+            let v = gs
+                .performance_snapshots
+                .iter()
+                .find(|s| &s.player_id == pid)
+                .map(|s| {
+                    s.total_hearts.iter().sum::<u32>()
+                        - s.lives.iter().flat_map(|l| l.required.iter()).sum::<u32>()
+                })
+                .unwrap_or(if is_p1 {
+                    gs.self_live_surplus_count
+                } else {
+                    gs.opponent_live_surplus_count
+                });
             gs.mods.last_surplus_loss_count = v;
             if is_p1 {
                 gs.self_live_surplus_count = 0;
@@ -582,7 +598,7 @@ impl AbilityResolver {
                         && crate::ability::util::card_matches_characters(
                             &card_db,
                             tid,
-                            effect.characters_any(),
+                            effect.characters_any().map(|v| &**v),
                         )
                 })
                 .collect();

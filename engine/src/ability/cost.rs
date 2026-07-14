@@ -11,10 +11,7 @@ impl AbilityResolver {
     /// Clears the list after paying. Returns error if any cost cannot be paid.
     pub fn pay_deferred_costs(&mut self, gs: &mut GameState) -> Result<(), String> {
         let costs = std::mem::take(&mut self.pending_deferred_costs);
-        log::debug!("[PAY_DEFERRED] {} costs to pay", costs.len());
         for cost in &costs {
-            log::debug!("[PAY_DEFERRED] paying cost: action={} self_cost={:?} state_change={:?} optional={:?}",
-                cost.action, cost.self_cost_any(), cost.state_change_any(), cost.optional);
             self.pay_cost(gs, cost)?;
         }
         Ok(())
@@ -198,7 +195,7 @@ impl AbilityResolver {
                             (i + 1..costs.len()).any(|j| !has_skip_prompt(&costs[j]));
                         if is_binary && has_choice_ahead {
                             let mut auto = sub_cost.clone();
-                            auto.optional = Some(false);
+                            auto.set_optional(Some(false));
                             self.pending_deferred_costs.push(auto);
                             had_binary_auto_pay = true;
                         } else {
@@ -955,7 +952,6 @@ impl AbilityResolver {
         gs: &mut GameState,
         selected: &str,
     ) -> Result<(), String> {
-        eprintln!("[HOC_ENTRY] selected={}", selected);
         if selected == "skip_optional_cost" || selected == "0" {
             self.pending_choice = None;
             self.pending_energy_payment = None;
@@ -999,8 +995,18 @@ impl AbilityResolver {
         let is_deck_top = gs
             .entry_effect()
             .and_then(|e| e.source.as_deref())
-            .is_some_and(|s| s == "deck_top" || s == "deck");
-
+            .is_some_and(|s| s == "deck_top" || s == "deck")
+            || gs
+                .ability_queue
+                .current_entry()
+                .map(|e| &e.pending_actions)
+                .map(|pa| {
+                    pa.iter().any(|a| {
+                        a.source.as_deref() == Some("deck_top")
+                            || a.source.as_deref() == Some("deck")
+                    })
+                })
+                .unwrap_or(false);
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
             entry.cost_paid = true;
             entry.optional_cost_result = Some(true);
@@ -1010,7 +1016,6 @@ impl AbilityResolver {
                 entry.optional_cost_result = None;
             }
         }
-        eprintln!("[HOC_PENDING] has_pending={}", has_pending);
         if has_pending {
             return self.resume_pending_actions(gs);
         }

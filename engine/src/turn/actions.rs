@@ -200,10 +200,10 @@ impl super::TurnEngine {
                     .as_ref()
                     .and_then(|e| e.activation_condition_parsed_any())
                     .and_then(|c| {
-                        if c.condition_type == Some(ConditionType::LocationCondition)
-                            || matches!(c.location.as_deref(), Some("hand") | Some("discard"))
+                        if c.condition_type() == Some(ConditionType::LocationCondition)
+                            || matches!(c.get_location(), Some("hand") | Some("discard"))
                         {
-                            Zone::from_str(c.location.as_deref().unwrap_or(""))
+                            Zone::from_str(c.get_location().unwrap_or(""))
                         } else {
                             None
                         }
@@ -728,19 +728,6 @@ impl super::TurnEngine {
             return Ok(());
         }
 
-        eprintln!(
-            "[RWC_DEBUG] after provide: pending_choice={:?} choice_type={}",
-            resolver.pending_choice.is_some(),
-            resolver
-                .pending_choice
-                .as_ref()
-                .map(|c| match c {
-                    crate::ability::types::Choice::SelectCard { .. } => "SelectCard",
-                    crate::ability::types::Choice::SelectTarget { .. } => "SelectTarget",
-                    _ => "Other",
-                })
-                .unwrap_or("None")
-        );
         log::debug!(
             "[RWC] after provide: pending_choice={:?} moved_cards={:?} selected={:?}",
             resolver.pending_choice.is_some(),

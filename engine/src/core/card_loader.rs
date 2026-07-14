@@ -326,36 +326,64 @@ impl CardLoader {
                         cond: &mut Condition,
                         cond_json: &serde_json::Value,
                     ) {
-                        if let Some(ref mut opts) = cond.options {
-                            if let Some(json_opts) =
-                                cond_json.get("options").and_then(|a| a.as_array())
-                            {
-                                for (i, opt) in opts.iter_mut().enumerate() {
-                                    if i < json_opts.len() {
-                                        shared_populate_nested(opt, &json_opts[i]);
+                        if let Condition::Choice {
+                            ref mut options, ..
+                        } = cond
+                        {
+                            if let Some(ref mut opts) = options {
+                                if let Some(json_opts) =
+                                    cond_json.get("options").and_then(|a| a.as_array())
+                                {
+                                    for (i, opt) in opts.iter_mut().enumerate() {
+                                        if i < json_opts.len() {
+                                            shared_populate_nested(opt, &json_opts[i]);
+                                        }
                                     }
                                 }
                             }
                         }
-                        if let Some(ref mut eff) = cond.effect {
-                            if let Some(eff_json) = cond_json.get("effect") {
-                                shared_populate_nested(eff, eff_json);
+                        if let Condition::Complex { ref mut effect, .. } = cond {
+                            if let Some(ref mut eff) = effect {
+                                if let Some(eff_json) = cond_json.get("effect") {
+                                    shared_populate_nested(eff, eff_json);
+                                }
                             }
                         }
-                        if let Some(ref mut conditions) = cond.conditions {
-                            if let Some(json_conditions) =
-                                cond_json.get("conditions").and_then(|a| a.as_array())
+                        if let Condition::Compound {
+                            ref mut conditions,
+                            ref mut operator,
+                            ..
+                        } = cond
+                        {
+                            if operator.is_none()
+                                && cond_json.get("type").and_then(|t| t.as_str())
+                                    == Some("or_condition")
                             {
-                                for (i, sub_cond) in conditions.iter_mut().enumerate() {
-                                    if i < json_conditions.len() {
-                                        shared_populate_condition(sub_cond, &json_conditions[i]);
+                                *operator = Some("or".into());
+                            }
+                            if let Some(ref mut conditions) = conditions {
+                                if let Some(json_conditions) =
+                                    cond_json.get("conditions").and_then(|a| a.as_array())
+                                {
+                                    for (i, sub_cond) in conditions.iter_mut().enumerate() {
+                                        if i < json_conditions.len() {
+                                            shared_populate_condition(
+                                                sub_cond,
+                                                &json_conditions[i],
+                                            );
+                                        }
                                     }
                                 }
                             }
                         }
-                        if let Some(ref mut sub_cond) = cond.condition {
-                            if let Some(sub_cond_json) = cond_json.get("condition") {
-                                shared_populate_condition(sub_cond, sub_cond_json);
+                        if let Condition::Temporal {
+                            ref mut condition, ..
+                        } = cond
+                        {
+                            if let Some(ref mut sub_cond) = condition {
+                                if let Some(sub_cond_json) = cond_json.get("condition") {
+                                    shared_populate_condition(sub_cond, sub_cond_json);
+                                }
                             }
                         }
                     }
@@ -667,36 +695,61 @@ impl CardLoader {
                         }
                     }
                     fn map_populate_condition(cond: &mut Condition, cond_json: &serde_json::Value) {
-                        if let Some(ref mut opts) = cond.options {
-                            if let Some(json_opts) =
-                                cond_json.get("options").and_then(|a| a.as_array())
-                            {
-                                for (i, opt) in opts.iter_mut().enumerate() {
-                                    if i < json_opts.len() {
-                                        map_populate_nested(opt, &json_opts[i]);
+                        if let Condition::Choice {
+                            ref mut options, ..
+                        } = cond
+                        {
+                            if let Some(ref mut opts) = options {
+                                if let Some(json_opts) =
+                                    cond_json.get("options").and_then(|a| a.as_array())
+                                {
+                                    for (i, opt) in opts.iter_mut().enumerate() {
+                                        if i < json_opts.len() {
+                                            map_populate_nested(opt, &json_opts[i]);
+                                        }
                                     }
                                 }
                             }
                         }
-                        if let Some(ref mut eff) = cond.effect {
-                            if let Some(eff_json) = cond_json.get("effect") {
-                                map_populate_nested(eff, eff_json);
+                        if let Condition::Complex { ref mut effect, .. } = cond {
+                            if let Some(ref mut eff) = effect {
+                                if let Some(eff_json) = cond_json.get("effect") {
+                                    map_populate_nested(eff, eff_json);
+                                }
                             }
                         }
-                        if let Some(ref mut conditions) = cond.conditions {
-                            if let Some(json_conditions) =
-                                cond_json.get("conditions").and_then(|a| a.as_array())
+                        if let Condition::Compound {
+                            ref mut conditions,
+                            ref mut operator,
+                            ..
+                        } = cond
+                        {
+                            if operator.is_none()
+                                && cond_json.get("type").and_then(|t| t.as_str())
+                                    == Some("or_condition")
                             {
-                                for (i, sub_cond) in conditions.iter_mut().enumerate() {
-                                    if i < json_conditions.len() {
-                                        map_populate_condition(sub_cond, &json_conditions[i]);
+                                *operator = Some("or".into());
+                            }
+                            if let Some(ref mut conditions) = conditions {
+                                if let Some(json_conditions) =
+                                    cond_json.get("conditions").and_then(|a| a.as_array())
+                                {
+                                    for (i, sub_cond) in conditions.iter_mut().enumerate() {
+                                        if i < json_conditions.len() {
+                                            map_populate_condition(sub_cond, &json_conditions[i]);
+                                        }
                                     }
                                 }
                             }
                         }
-                        if let Some(ref mut sub_cond) = cond.condition {
-                            if let Some(sub_cond_json) = cond_json.get("condition") {
-                                map_populate_condition(sub_cond, sub_cond_json);
+                        if let Condition::Temporal {
+                            ref mut condition, ..
+                        } = cond
+                        {
+                            if let Some(ref mut sub_cond) = condition {
+                                if let Some(sub_cond_json) = cond_json.get("condition") {
+                                    map_populate_condition(sub_cond, sub_cond_json);
+                                }
                             }
                         }
                     }

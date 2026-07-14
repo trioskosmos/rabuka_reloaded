@@ -489,7 +489,7 @@ impl GameState {
             // Restore the previous activating_card
             self.activating_card = prev_activating;
         }
-        let jyouji_len = jyouji_statuses.len();
+        let _jyouji_len = jyouji_statuses.len();
         self.constant_ability_statuses = jyouji_statuses;
         tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", jyouji_len);
 

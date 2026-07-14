@@ -179,11 +179,11 @@ impl AbilityResolver {
             if let Some(ref activation_condition) = effect.activation_condition_parsed_any() {
                 let mut merged_cond = Box::clone(activation_condition);
                 // Merge the effect's position info into the condition so it's checked.
-                if merged_cond.position.is_none() && merged_cond.positions_characters.is_none() {
+                if merged_cond.get_position().is_none() && merged_cond.get_positions_characters().is_none() {
                     if let Some(ref pos) = effect.position_any() {
-                        merged_cond.position = Some((*pos).clone());
+                        merged_cond.set_position((*pos).clone());
                     } else if let Some(ref act_pos) = effect.activation_position_any() {
-                        merged_cond.activation_position = Some((*act_pos).into());
+                        merged_cond.set_activation_position((*act_pos).to_string());
                     }
                 }
                 let snapshot = crate::ability::log::buffer_len();
@@ -205,22 +205,24 @@ impl AbilityResolver {
             } else {
                 // Check cache first — avoids re-evaluation against stale state
                 // (e.g. revealed_cards modified by a prior select_cards filter).
-                if condition.cache.unwrap_or(false) {
+                if condition.get_cache().unwrap_or(false) {
                     if let Some(entry) = gs.ability_queue.current_entry() {
-                        if let Some(cached) = entry.condition_cache.get(&condition.text) {
-                            if *cached {
-                                return true;
+                        if let Some(text) = condition.get_text() {
+                            if let Some(cached) = entry.condition_cache.get(text) {
+                                if *cached {
+                                    return true;
+                                }
+                                return false;
                             }
-                            return false;
                         }
                     }
                 }
                 let mut cond = condition.clone();
-                if cond.position.is_none() && cond.positions_characters.is_none() {
+                if cond.get_position().is_none() && cond.get_positions_characters().is_none() {
                     if let Some(ref pos) = effect.position_any() {
-                        cond.position = Some((*pos).clone());
+                        cond.set_position((*pos).clone());
                     } else if let Some(ref act_pos) = effect.activation_position_any() {
-                        cond.activation_position = Some((*act_pos).into());
+                        cond.set_activation_position((*act_pos).to_string());
                     }
                 }
                 // Merge effect-level group_names into conditions that need
@@ -228,20 +230,20 @@ impl AbilityResolver {
                 // and conditions with distinct (name distinctness within group).
                 // Recurse into compound sub-conditions with the same logic.
                 fn merge_group_names(cond: &mut Condition, group_names: Option<&Vec<String>>) {
-                    let needs_group = cond.condition_type
+                    let needs_group = cond.condition_type()
                         == Some(crate::ability::enums::ConditionType::AppearanceCondition)
-                        || cond.distinct.as_ref().is_some_and(|d| d.is_distinct());
+                        || cond.get_distinct().is_some_and(|d| d.is_distinct());
                     if needs_group
-                        && (cond.group_names.is_none()
-                            || cond.group_names.as_ref().is_some_and(|v| v.is_empty()))
+                        && (cond.get_group_names().is_none()
+                            || cond.get_group_names().is_some_and(|v| v.is_empty()))
                     {
                         if let Some(gns) = group_names {
                             if !gns.is_empty() {
-                                cond.group_names = Some(gns.clone());
+                                cond.set_group_names(gns.clone());
                             }
                         }
                     }
-                    if let Some(ref mut sub_conds) = cond.conditions {
+                    if let Some(ref mut sub_conds) = cond.get_conditions_mut() {
                         for sub in sub_conds.iter_mut() {
                             merge_group_names(sub, group_names);
                         }
@@ -259,14 +261,16 @@ impl AbilityResolver {
                         crate::ability::log::drain_verdicts_since(cond_snapshot);
                 }
                 // Cache the result if the condition asks for it
-                if condition.cache.unwrap_or(false) {
+                if condition.get_cache().unwrap_or(false) {
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                        entry.condition_cache.insert(condition.text.clone(), passed);
+                        if let Some(text) = condition.get_text() {
+                            entry.condition_cache.insert(text.to_string(), passed);
+                        }
                     }
                 }
                 if !passed {
                     log::debug!("[CAN_ACTIVATE] condition FAILED for {}: type={:?} location={:?} group={:?} exclude={:?}",
-                        effect.action, condition.condition_type, condition.location, condition.group_names, condition.exclude_characters);
+                        effect.action, condition.condition_type(), condition.get_location(), condition.get_group_names(), condition.get_exclude_characters());
                     return false;
                 }
             }

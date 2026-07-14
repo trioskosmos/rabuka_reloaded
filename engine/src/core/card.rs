@@ -1,4 +1,4 @@
-use crate::ability::enums::{ActionType, Zone};
+use crate::ability::enums::{ActionType, ConditionType, Zone};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::collections::HashMap;
@@ -745,6 +745,8 @@ impl AbilityCost {
                 None
             },
             exclude_group_names: self.exclude_group_names_any(),
+            card_property: self.card_property_any(),
+            negation: self.negation_any().unwrap_or(false),
             ..Default::default()
         }
     }
@@ -5171,6 +5173,9 @@ impl AbilityEffect {
     }
 
     pub fn set_optional(&mut self, val: Option<bool>) {
+        // Also update the flat field — cost.rs and compound.rs read
+        // effect.optional (the AbilityEffect field), not the EffectKind copy.
+        self.optional = val;
         match &mut self.kind {
             Some(EffectKind::SelectTarget {
                 ref mut optional, ..
@@ -5934,7 +5939,6 @@ impl AbilityEffect {
 }
 
 impl AbilityEffect {
-    /// Returns the target player string, defaulting to "self".
     pub fn target_name(&self) -> &str {
         self.target.as_deref().unwrap_or("self")
     }
@@ -6515,189 +6519,1111 @@ impl std::ops::Deref for Location {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
-pub struct Condition {
-    #[serde(default = "default_empty_string")]
-    pub text: String,
-    #[serde(rename = "type")]
-    pub condition_type: Option<crate::ability::enums::ConditionType>,
-    pub location: Option<Location>,
-    pub locations: Option<Vec<String>>,
-    pub count: Option<u32>,
-    pub operator: Option<Box<str>>,
-    pub card_type: Option<ConditionCardType>,
-    pub target: Option<ConditionTarget>,
-    pub group_names: Option<Vec<String>>,
-    /// Dynamic group reference: "same_group_name" — resolve from activating card's unit
-    #[serde(default)]
-    pub group_reference: Option<Box<str>>,
-    #[serde(default)]
-    pub exclude_group_names: Option<Vec<String>>,
-    pub characters: Option<Vec<String>>,
-    pub exclude_characters: Option<Vec<String>>,
-    /// Per-position character requirements for appearance conditions.
-    /// Example: [{"position": "right_side", "character": "大沢瑠璃乃"},
-    ///           {"position": "left_side", "character": "安養寺姫芽"},
-    ///           {"position": "center", "character": "藤島慈"}]
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub positions_characters: Option<Vec<PositionCharacter>>,
-    pub state: Option<CardState>,
-    pub position: Option<PositionInfo>,
-    /// Cross-position comparison target (e.g. "right_side" when position is "left_side")
-    #[serde(default)]
-    pub position_compare: Option<Box<str>>,
-    /// When true, cross-position equality checks require both positions to have
-    /// cards.  Empty slots return false instead of treating cost as 0.
-    /// Set by Python parser when "にいる" appears near position keywords
-    /// (e.g. "右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合").
-    #[serde(default)]
-    pub require_position_cards: Option<bool>,
-    /// Direction for area move: "from" = position is source (was AT this pos),
-    /// "to" or absent = position is destination (moved TO this pos).
-    #[serde(default)]
-    pub area_direction: Option<Box<str>>,
-    pub temporal_scope: Option<Box<str>>,
-    #[serde(default)]
-    pub distinct: Option<DistinctInfo>,
-    pub exclude_self: Option<bool>,
-    pub any_of: Option<Vec<String>>,
-    pub cost_limit: Option<u32>,
-    #[serde(default)]
-    pub cost_limit_operator: Option<Operator>,
-    pub negation: Option<bool>,
+/// The distinct Condition type as a serde internally-tagged enum.
+/// The Python parser already emits `"type": "card_count_condition"` etc.
+/// in the JSON — this enum consumes that tag directly via `#[serde(tag = "type")]`.
+///
+/// Each variant holds only the fields relevant to that condition kind.
+/// The common fields (text, negation, phase, cache, trigger_event) appear
+/// on every variant because any condition can carry them.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "type")]
+pub enum Condition {
+    #[serde(rename = "compound", alias = "or_condition")]
+    Compound {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        operator: Option<Box<str>>,
+        target: Option<Box<str>>,
+        #[serde(default)]
+        conditions: Option<Vec<Box<Condition>>>,
+    },
+    #[serde(rename = "card_count_condition", alias = "location_condition")]
+    Location {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        // Core location fields (commonly accessed)
+        location: Option<Box<str>>,
+        #[serde(default)]
+        locations: Option<Vec<String>>,
+        target: Option<Box<str>>,
+        count: Option<u32>,
+        operator: Option<Box<str>>,
+        card_type: Option<ConditionCardType>,
+        #[serde(default)]
+        unit: Option<Box<str>>,
+        #[serde(default)]
+        comparison_target: Option<ComparisonTarget>,
+        #[serde(default)]
+        comparison_type: Option<ComparisonType>,
+        #[serde(default)]
+        aggregate: Option<Box<str>>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        #[serde(default)]
+        group_reference: Option<Box<str>>,
+        #[serde(default)]
+        exclude_group_names: Option<Vec<String>>,
+        #[serde(default)]
+        characters: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_characters: Option<Vec<String>>,
+        cost_limit: Option<u32>,
+        cost_limit_operator: Option<Operator>,
+        #[serde(default)]
+        heart_colors: Option<Vec<String>>,
+        heart_type: Option<Box<str>>,
+        heart_source: Option<Box<str>>,
+        distinct: Option<DistinctInfo>,
+        exclude_self: Option<bool>,
+        self_target: Option<bool>,
+        source: Option<Box<str>>,
+        #[serde(default)]
+        activation_position: Option<Box<str>>,
+        destination: Option<Box<str>>,
+        state: Option<CardState>,
+        position: Option<PositionInfo>,
+        position_compare: Option<Box<str>>,
+        require_position_cards: Option<bool>,
+        all: Option<bool>,
+        all_areas: Option<bool>,
+        temporal: Option<Box<str>>,
+        yell_trigger: Option<bool>,
+        same_name: Option<bool>,
+        #[serde(default)]
+        card_property: Option<CardProperty>,
+        scope: Option<Box<str>>,
+        // Boxed sub-checks (rarely accessed together)
+        #[serde(default)]
+        sub_checks: Option<Box<LocationSubChecks>>,
+        #[serde(default)]
+        baton_touch_trigger: Option<bool>,
+        #[serde(default)]
+        min_baton_touch_count: Option<u32>,
+    },
+    #[serde(
+        rename = "comparison_condition",
+        alias = "both_condition",
+        alias = "all_cost_comparison_condition",
+        alias = "highest_cost_on_stage_condition"
+    )]
+    Comparison {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        comparison_type: Option<ComparisonType>,
+        comparison_target: Option<ComparisonTarget>,
+        target: Option<Box<str>>,
+        location: Option<Box<str>>,
+        operator: Option<Box<str>>,
+        count: Option<u32>,
+        #[serde(default)]
+        values: Option<Vec<u32>>,
+        card_type: Option<ConditionCardType>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        position: Option<PositionInfo>,
+        position_compare: Option<Box<str>>,
+        #[serde(default)]
+        aggregate: Option<Box<str>>,
+        #[serde(default)]
+        heart_colors: Option<Vec<String>>,
+        #[serde(default)]
+        scope: Option<Box<str>>,
+        cost_total: Option<u32>,
+        cost_total_operator: Option<Operator>,
+        resource_type: Option<Box<str>>,
+        #[serde(default)]
+        delta: Option<bool>,
+        cost_limit: Option<u32>,
+        source: Option<Box<str>>,
+        #[serde(default)]
+        comparison_source: Option<Box<str>>,
+        #[serde(default)]
+        locations: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_group_names: Option<Vec<String>>,
+        #[serde(default)]
+        characters: Option<Vec<String>>,
+        #[serde(default)]
+        exclude_characters: Option<Vec<String>>,
+        #[serde(default)]
+        same_name: Option<bool>,
+        #[serde(default)]
+        distinct: Option<DistinctInfo>,
+        #[serde(default)]
+        all: Option<bool>,
+        #[serde(default)]
+        all_areas: Option<bool>,
+        #[serde(default)]
+        exclude_self: Option<bool>,
+        #[serde(default)]
+        self_target: Option<bool>,
+        #[serde(default)]
+        destination: Option<Box<str>>,
+        #[serde(default)]
+        state: Option<CardState>,
+        #[serde(default)]
+        require_position_cards: Option<bool>,
+        #[serde(default)]
+        temporal: Option<Box<str>>,
+        #[serde(default)]
+        yell_trigger: Option<bool>,
+        #[serde(default)]
+        no_excess_heart: Option<bool>,
+        #[serde(default)]
+        card_property: Option<CardProperty>,
+        #[serde(default)]
+        ability_filter: Option<Box<str>>,
+        #[serde(default)]
+        ability_filter_triggers: Option<Vec<String>>,
+        #[serde(default)]
+        baton_touch_trigger: Option<bool>,
+        #[serde(default)]
+        min_baton_touch_count: Option<u32>,
+        #[serde(default)]
+        from_state: Option<Box<str>>,
+        #[serde(default)]
+        to_state: Option<Box<str>>,
+    },
+    #[serde(
+        rename = "movement_condition",
+        alias = "not_moved",
+        alias = "has_moved"
+    )]
+    Movement {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        movement: Option<Box<str>>,
+        location: Option<Box<str>>,
+        target: Option<Box<str>>,
+        cost_limit: Option<u32>,
+        cost_limit_operator: Option<Operator>,
+        baton_touch_trigger: Option<bool>,
+        min_baton_touch_count: Option<u32>,
+        exclude_self: Option<bool>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        card_type: Option<ConditionCardType>,
+        #[serde(default)]
+        characters: Option<Vec<String>>,
+        baton_touch_source: Option<Box<str>>,
+        card_property: Option<CardProperty>,
+        comparison_type: Option<ComparisonType>,
+        operator: Option<Box<str>>,
+        self_effect_only: Option<bool>,
+        energy_placed: Option<bool>,
+        area_direction: Option<Box<str>>,
+        position: Option<PositionInfo>,
+        self_target: Option<bool>,
+        ability_filter: Option<AbilityFilter>,
+        source: Option<Box<str>>,
+        destination: Option<Box<str>>,
+        from_state: Option<Box<str>>,
+        to_state: Option<Box<str>>,
+    },
+    #[serde(rename = "group_condition")]
+    Group {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        all_members: Option<bool>,
+        location: Option<Box<str>>,
+        target: Option<Box<str>>,
+        #[serde(default)]
+        heart_colors: Option<Vec<String>>,
+        card_type: Option<ConditionCardType>,
+        operator: Option<Box<str>>,
+        count: Option<u32>,
+        aggregate: Option<Box<str>>,
+        #[serde(default)]
+        exclude_characters: Option<Vec<String>>,
+        temporal: Option<Box<str>>,
+        self_target: Option<bool>,
+        exclude_self: Option<bool>,
+        heart_source: Option<Box<str>>,
+        source: Option<Box<str>>,
+        #[serde(default)]
+        locations: Option<Vec<String>>,
+        position: Option<PositionInfo>,
+    },
+    #[serde(rename = "appearance_condition")]
+    Appearance {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        appearance: Option<bool>,
+        baton_touch_trigger: Option<bool>,
+        location: Option<Box<str>>,
+        target: Option<Box<str>>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        cost_limit: Option<u32>,
+        card_type: Option<ConditionCardType>,
+        #[serde(default)]
+        characters: Option<Vec<String>>,
+        #[serde(default)]
+        positions_characters: Option<Vec<PositionCharacter>>,
+        min_baton_touch_count: Option<u32>,
+        activation_position: Option<Box<str>>,
+        exclude_self: Option<bool>,
+        position_compare: Option<Box<str>>,
+        position: Option<PositionInfo>,
+        card_property: Option<CardProperty>,
+        #[serde(default)]
+        all_areas: Option<bool>,
+        cost_reference_character: Option<Box<str>>,
+        cost_reference_operator: Option<Operator>,
+        appearance_source: Option<Box<str>>,
+        operator: Option<Box<str>>,
+    },
+    #[serde(rename = "temporal_condition")]
+    Temporal {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        temporal: Option<Box<str>>,
+        turn_number: Option<u32>,
+        count: Option<u32>,
+        location: Option<Box<str>>,
+        card_type: Option<ConditionCardType>,
+        target: Option<Box<str>>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        temporal_scope: Option<Box<str>>,
+        position: Option<PositionInfo>,
+        #[serde(default)]
+        locations: Option<Vec<String>>,
+        #[serde(default)]
+        heart_colors: Option<Vec<String>>,
+        aggregate: Option<Box<str>>,
+        self_target: Option<bool>,
+        condition: Option<Box<Condition>>,
+    },
+    #[serde(
+        rename = "state_condition",
+        alias = "energy_state_condition",
+        alias = "state_change_condition"
+    )]
+    State {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        state: Option<Box<str>>,
+        energy_state: Option<Box<str>>,
+        target: Option<Box<str>>,
+        resource_type: Option<Box<str>>,
+        all: Option<bool>,
+        #[serde(default)]
+        group_names: Option<Vec<String>>,
+        card_type: Option<ConditionCardType>,
+        #[serde(default)]
+        characters: Option<Vec<String>>,
+        cost_limit: Option<u32>,
+        cost_limit_operator: Option<Operator>,
+        from_state: Option<Box<str>>,
+        to_state: Option<Box<str>>,
+        count: Option<u32>,
+        operator: Option<Box<str>>,
+    },
+    #[serde(rename = "resource_condition", alias = "card_blade_condition")]
+    Resource {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        resource_type: Option<Box<str>>,
+        target: Option<Box<str>>,
+        location: Option<Box<str>>,
+        operator: Option<Box<str>>,
+        count: Option<u32>,
+        delta: Option<bool>,
+        #[serde(default)]
+        heart_colors: Option<Vec<String>>,
+        position: Option<PositionInfo>,
+        source: Option<Box<str>>,
+    },
+    #[serde(rename = "ability_filter_condition")]
+    AbilityFilter {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        ability_filter: Option<AbilityFilter>,
+        #[serde(default)]
+        ability_filter_triggers: Option<Vec<String>>,
+        target: Option<Box<str>>,
+        location: Option<Box<str>>,
+        operator: Option<Box<str>>,
+        count: Option<u32>,
+    },
+    #[serde(rename = "score_threshold_condition")]
+    ScoreThreshold {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        count: Option<u32>,
+        operator: Option<Box<str>>,
+        target: Option<Box<str>>,
+    },
+    #[serde(rename = "choice_condition", alias = "position_change_condition")]
+    Choice {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        #[serde(default)]
+        options: Option<Vec<Box<AbilityEffect>>>,
+    },
+    #[serde(rename = "complex_condition")]
+    Complex {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        cause: Option<Box<Condition>>,
+        effect: Option<Box<AbilityEffect>>,
+    },
+    #[serde(rename = "position_condition")]
+    PositionCond {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        target: Option<Box<str>>,
+        position: Option<PositionInfo>,
+    },
+    #[serde(rename = "opponent_choice_condition")]
+    OpponentChoice {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        target: Option<Box<str>>,
+    },
+    #[serde(rename = "opponent_live_success")]
+    OpponentLiveSuccess {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        no_excess_heart: Option<bool>,
+    },
+    #[serde(rename = "no_excess_heart")]
+    NoExcessHeart {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        target: Option<Box<str>>,
+    },
+    #[serde(
+        rename = "otherwise_condition",
+        alias = "action_success_condition",
+        alias = "custom"
+    )]
+    AlwaysTrue {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+    },
+    #[serde(rename = "any_of_condition")]
+    AnyOf {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        #[serde(default)]
+        any_of: Option<Vec<String>>,
+    },
+    #[serde(rename = "all_revealed_match_heart_color")]
+    AllRevealedMatchHeartColor {
+        #[serde(default)]
+        text: Option<String>,
+        negation: Option<bool>,
+        phase: Option<Box<str>>,
+        phase_target: Option<Box<str>>,
+        cache: Option<bool>,
+        trigger_event: Option<Box<TriggerEvent>>,
+        #[serde(default)]
+        count: Option<u32>,
+        #[serde(default)]
+        operator: Option<Box<str>>,
+    },
+}
+
+/// Sub-checks that can appear on Location conditions.
+/// Boxed together because they're rarely all present at once.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct LocationSubChecks {
+    pub card_property: Option<CardProperty>,
     pub baton_touch_trigger: Option<bool>,
     pub baton_touch_source: Option<Box<str>>,
     pub min_baton_touch_count: Option<u32>,
-    pub movement_state: Option<Box<str>>,
-    pub energy_state: Option<Box<str>>,
-    pub comparison_target: Option<ComparisonTarget>,
-    #[serde(default)]
-    pub comparison_source: Option<Box<str>>,
-    pub movement: Option<Box<str>>,
-    pub temporal: Option<Box<str>>,
-    pub phase: Option<Box<str>>,
-    pub phase_target: Option<Box<str>>,
-    pub comparison_type: Option<ComparisonType>,
-    pub appearance: Option<bool>,
-    #[serde(default)]
-    pub appearance_source: Option<Box<str>>,
-    pub conditions: Option<Vec<Box<Condition>>>,
-    pub options: Option<Vec<Box<AbilityEffect>>>,
-    #[serde(default)]
-    pub condition: Option<Box<Condition>>,
-    pub card_property: Option<CardProperty>,
-    // New fields from parser improvements
-    pub all_areas: Option<bool>,
-    pub no_excess_heart: Option<bool>,
-    pub resource_type: Option<Box<str>>,
-    pub turn_number: Option<u32>,
-    pub activation_position: Option<Box<str>>,
-    pub all: Option<bool>,
-    pub unit: Option<Box<str>>,
-    pub values: Option<Vec<u32>>,
-    // Complex condition fields
-    #[serde(default)]
-    pub cause: Option<Box<Condition>>,
-    #[serde(default)]
-    pub effect: Option<Box<AbilityEffect>>,
-    // Same-name constraint: members must share a character name
-    #[serde(default)]
-    pub same_name: Option<bool>,
-    // Parser-only fields that were missing struct fields
-    #[serde(default)]
-    pub from_state: Option<Box<str>>,
-    #[serde(default)]
-    pub heart_type: Option<Box<str>>,
-    #[serde(default)]
-    pub to_state: Option<Box<str>>,
-    #[serde(default)]
-    pub aggregate: Option<Box<str>>,
-    /// Heart colors required collectively from stage members (e.g. all 6 colors)
-    #[serde(default)]
-    pub heart_colors: Option<Vec<String>>,
-    /// Heart source for heart color checks: "blade" means check blade_heart (ブレードハート),
-    /// absent or other value means check base_heart (printed/natural hearts).
-    #[serde(default)]
-    pub heart_source: Option<Box<str>>,
-    /// ability_filter: "no_ability" for "能力を持たない" (card does not have abilities)
-    /// or "has_ability" for "能力を持つ" (card has abilities)
-    /// or "no_ability_type" for "能力も...能力も持たない" (card has neither type)
-    #[serde(default)]
     pub ability_filter: Option<AbilityFilter>,
-    /// Trigger types excluded by ability_filter (e.g. ["live_start", "live_success"])
-    /// Used when ability_filter is "no_ability_type"
     #[serde(default)]
     pub ability_filter_triggers: Option<Vec<String>>,
-    /// True when this condition represents "エールしたとき" (when you yell)
-    /// as opposed to "エールにより公開された" (when cards are revealed by yell).
-    /// The engine checks this against the yell_occurred flag on GameState.
-    #[serde(default)]
-    pub yell_trigger: Option<bool>,
-    /// Sum-total cost comparison value (e.g. "コストの合計がN")
-    #[serde(default)]
-    pub cost_total: Option<u32>,
-    #[serde(default)]
-    pub cost_total_operator: Option<Operator>,
-    /// "元々持つ" — compare against original/natural value, not current modified value
-    #[serde(default)]
+    pub aggregate: Option<Box<str>>,
+    pub no_excess_heart: Option<bool>,
     pub original_value: Option<bool>,
-    /// scope: "both" for conditions that check both players (e.g. energy total of both)
+    pub activation_position: Option<Box<str>>,
+    pub unit: Option<Box<str>>,
     #[serde(default)]
-    pub scope: Option<Box<str>>,
-    /// "のみ" — ALL members on stage must match the group (not just any)
-    #[serde(default)]
-    pub all_members: Option<bool>,
-    /// Source zone for movement-based conditions (e.g. "live_card_zone", "stage", "hand").
-    /// When paired with `destination`, this is the zone cards move FROM.
-    /// Backward compat: "preceding_moved" / "previous_moved_cards" still signal
-    /// the old movement-check pattern.
-    #[serde(default)]
-    pub source: Option<Box<str>>,
-    /// Destination zone for movement-based conditions (e.g. "discard", "waitroom", "stage").
-    /// When paired with `source` set to a zone name, expresses a zone-transition check
-    /// (cards moved FROM source TO destination). Replaces the old pattern of
-    /// `source: "preceding_moved"` + `location`/`locations` inference.
-    #[serde(default)]
-    pub destination: Option<Box<str>>,
-    /// "自分のカードの効果" — only trigger if the event was caused by the player's own card effect.
-    #[serde(default)]
-    pub self_effect_only: Option<bool>,
-    /// "エネルギーが置かれた" — trigger is specifically about energy being placed in the energy zone.
-    #[serde(default)]
-    pub energy_placed: Option<bool>,
-    /// Cost comparison between characters: 「A」よりコストの(大きい|高い)「B」
-    /// When set, the subject character (characters list) must have cost greater
-    /// than cost_reference_character on the target's stage.
-    #[serde(default)]
-    pub cost_reference_character: Option<Box<str>>,
-    #[serde(default)]
-    pub cost_reference_operator: Option<Operator>,
-    #[serde(default)]
-    pub cost_reference_type: Option<Box<str>>,
-    /// delta: true — check the change (difference) caused by preceding action,
-    /// not the absolute current value. Used for surplus heart loss tracking.
-    #[serde(default)]
-    pub delta: Option<bool>,
-    /// reference_card: "previous_selected" — compare card names against the
-    /// card selected by the preceding select action. Used for "同じカード名"
-    /// (same card name) conditions.
-    #[serde(default)]
+    pub values: Option<Vec<u32>>,
+    pub group_reference: Option<Box<str>>,
     pub reference_card: Option<Box<str>>,
-    /// self_target: condition refers to this specific card ("このメンバーが" / "このカードが").
-    #[serde(default)]
-    pub self_target: Option<bool>,
-    /// Rich trigger event metadata: describes what event triggers this condition.
-    /// Populated by the parser alongside the flat engine fields. The engine
-    /// reads from `trigger_event` when the corresponding flat field is absent.
-    #[serde(default)]
-    pub trigger_event: Option<TriggerEvent>,
-    /// When true, the condition result is cached on the ability queue entry
-    /// after the first evaluation. Subsequent evaluations (e.g. after a choice
-    /// round-trip) return the cached value instead of re-evaluating against
-    /// potentially modified game state. The parser sets this on conditions
-    /// that depend on mutable state (e.g. all_revealed_match_heart_color).
-    #[serde(default)]
-    pub cache: Option<bool>,
+}
+
+impl Default for Condition {
+    fn default() -> Self {
+        Condition::AlwaysTrue {
+            text: None,
+            negation: None,
+            phase: None,
+            phase_target: None,
+            cache: None,
+            trigger_event: None,
+        }
+    }
+}
+
+// ============== Condition field accessor methods ==============
+
+impl Condition {
+    pub fn get_text(&self) -> Option<&str> {
+        let t: Option<&str> = match self {
+            Condition::Compound { text, .. }
+            | Condition::Location { text, .. }
+            | Condition::Comparison { text, .. }
+            | Condition::Movement { text, .. }
+            | Condition::Group { text, .. }
+            | Condition::Appearance { text, .. }
+            | Condition::Temporal { text, .. }
+            | Condition::State { text, .. }
+            | Condition::Resource { text, .. }
+            | Condition::AbilityFilter { text, .. }
+            | Condition::ScoreThreshold { text, .. }
+            | Condition::Choice { text, .. }
+            | Condition::Complex { text, .. }
+            | Condition::PositionCond { text, .. }
+            | Condition::OpponentChoice { text, .. }
+            | Condition::OpponentLiveSuccess { text, .. }
+            | Condition::NoExcessHeart { text, .. }
+            | Condition::AlwaysTrue { text, .. }
+            | Condition::AnyOf { text, .. }
+            | Condition::AllRevealedMatchHeartColor { text, .. } => text.as_deref(),
+        };
+        // Preserve old behavior: text was always "" even when absent.
+        // Code that compares condition text (e.g. same_as_prev in compound.rs)
+        // relies on None == None matching the old "" == "".
+        if t.is_none() {
+            Some("")
+        } else {
+            t
+        }
+    }
+
+    pub fn get_negation(&self) -> Option<bool> {
+        match self {
+            Condition::Compound { negation, .. }
+            | Condition::Location { negation, .. }
+            | Condition::Comparison { negation, .. }
+            | Condition::Movement { negation, .. }
+            | Condition::Group { negation, .. }
+            | Condition::Appearance { negation, .. }
+            | Condition::Temporal { negation, .. }
+            | Condition::State { negation, .. }
+            | Condition::Resource { negation, .. }
+            | Condition::AbilityFilter { negation, .. }
+            | Condition::ScoreThreshold { negation, .. }
+            | Condition::Choice { negation, .. }
+            | Condition::Complex { negation, .. }
+            | Condition::PositionCond { negation, .. }
+            | Condition::OpponentChoice { negation, .. }
+            | Condition::OpponentLiveSuccess { negation, .. }
+            | Condition::NoExcessHeart { negation, .. }
+            | Condition::AlwaysTrue { negation, .. }
+            | Condition::AnyOf { negation, .. }
+            | Condition::AllRevealedMatchHeartColor { negation, .. } => *negation,
+        }
+    }
+
+    pub fn get_phase(&self) -> Option<&str> {
+        match self {
+            Condition::Compound { phase, .. }
+            | Condition::Location { phase, .. }
+            | Condition::Comparison { phase, .. }
+            | Condition::Movement { phase, .. }
+            | Condition::Group { phase, .. }
+            | Condition::Appearance { phase, .. }
+            | Condition::Temporal { phase, .. }
+            | Condition::State { phase, .. }
+            | Condition::Resource { phase, .. }
+            | Condition::AbilityFilter { phase, .. }
+            | Condition::ScoreThreshold { phase, .. }
+            | Condition::Choice { phase, .. }
+            | Condition::Complex { phase, .. }
+            | Condition::PositionCond { phase, .. }
+            | Condition::OpponentChoice { phase, .. }
+            | Condition::OpponentLiveSuccess { phase, .. }
+            | Condition::NoExcessHeart { phase, .. }
+            | Condition::AlwaysTrue { phase, .. }
+            | Condition::AnyOf { phase, .. }
+            | Condition::AllRevealedMatchHeartColor { phase, .. } => phase.as_deref(),
+        }
+    }
+
+    pub fn get_phase_target(&self) -> Option<&str> {
+        match self {
+            Condition::Compound { phase_target, .. }
+            | Condition::Location { phase_target, .. }
+            | Condition::Comparison { phase_target, .. }
+            | Condition::Movement { phase_target, .. }
+            | Condition::Group { phase_target, .. }
+            | Condition::Appearance { phase_target, .. }
+            | Condition::Temporal { phase_target, .. }
+            | Condition::State { phase_target, .. }
+            | Condition::Resource { phase_target, .. }
+            | Condition::AbilityFilter { phase_target, .. }
+            | Condition::ScoreThreshold { phase_target, .. }
+            | Condition::Choice { phase_target, .. }
+            | Condition::Complex { phase_target, .. }
+            | Condition::PositionCond { phase_target, .. }
+            | Condition::OpponentChoice { phase_target, .. }
+            | Condition::OpponentLiveSuccess { phase_target, .. }
+            | Condition::NoExcessHeart { phase_target, .. }
+            | Condition::AlwaysTrue { phase_target, .. }
+            | Condition::AnyOf { phase_target, .. }
+            | Condition::AllRevealedMatchHeartColor { phase_target, .. } => phase_target.as_deref(),
+        }
+    }
+
+    pub fn get_cache(&self) -> Option<bool> {
+        match self {
+            Condition::Compound { cache, .. }
+            | Condition::Location { cache, .. }
+            | Condition::Comparison { cache, .. }
+            | Condition::Movement { cache, .. }
+            | Condition::Group { cache, .. }
+            | Condition::Appearance { cache, .. }
+            | Condition::Temporal { cache, .. }
+            | Condition::State { cache, .. }
+            | Condition::Resource { cache, .. }
+            | Condition::AbilityFilter { cache, .. }
+            | Condition::ScoreThreshold { cache, .. }
+            | Condition::Choice { cache, .. }
+            | Condition::Complex { cache, .. }
+            | Condition::PositionCond { cache, .. }
+            | Condition::OpponentChoice { cache, .. }
+            | Condition::OpponentLiveSuccess { cache, .. }
+            | Condition::NoExcessHeart { cache, .. }
+            | Condition::AlwaysTrue { cache, .. }
+            | Condition::AnyOf { cache, .. }
+            | Condition::AllRevealedMatchHeartColor { cache, .. } => *cache,
+        }
+    }
+
+    pub fn get_trigger_event(&self) -> Option<&TriggerEvent> {
+        match self {
+            Condition::Compound { trigger_event, .. }
+            | Condition::Location { trigger_event, .. }
+            | Condition::Comparison { trigger_event, .. }
+            | Condition::Movement { trigger_event, .. }
+            | Condition::Group { trigger_event, .. }
+            | Condition::Appearance { trigger_event, .. }
+            | Condition::Temporal { trigger_event, .. }
+            | Condition::State { trigger_event, .. }
+            | Condition::Resource { trigger_event, .. }
+            | Condition::AbilityFilter { trigger_event, .. }
+            | Condition::ScoreThreshold { trigger_event, .. }
+            | Condition::Choice { trigger_event, .. }
+            | Condition::Complex { trigger_event, .. }
+            | Condition::PositionCond { trigger_event, .. }
+            | Condition::OpponentChoice { trigger_event, .. }
+            | Condition::OpponentLiveSuccess { trigger_event, .. }
+            | Condition::NoExcessHeart { trigger_event, .. }
+            | Condition::AlwaysTrue { trigger_event, .. }
+            | Condition::AnyOf { trigger_event, .. }
+            | Condition::AllRevealedMatchHeartColor { trigger_event, .. } => {
+                trigger_event.as_deref()
+            }
+        }
+    }
+
+    pub fn get_location(&self) -> Option<&str> {
+        match self {
+            Condition::Location { location, .. } => location.as_deref(),
+            Condition::Comparison { location, .. } => location.as_deref(),
+            Condition::Movement { location, .. } => location.as_deref(),
+            Condition::Group { location, .. } => location.as_deref(),
+            Condition::Appearance { location, .. } => location.as_deref(),
+            Condition::Temporal { location, .. } => location.as_deref(),
+            Condition::Resource { location, .. } => location.as_deref(),
+            Condition::AbilityFilter { location, .. } => location.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_locations(&self) -> Option<&[String]> {
+        match self {
+            Condition::Location { locations, .. } => locations.as_deref(),
+            Condition::Group { locations, .. } => locations.as_deref(),
+            Condition::Temporal { locations, .. } => locations.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_target(&self) -> Option<&str> {
+        match self {
+            Condition::Compound { target, .. } => target.as_deref(),
+            Condition::Location { target, .. } => target.as_deref(),
+            Condition::Comparison { target, .. } => target.as_deref(),
+            Condition::Movement { target, .. } => target.as_deref(),
+            Condition::Group { target, .. } => target.as_deref(),
+            Condition::Appearance { target, .. } => target.as_deref(),
+            Condition::Temporal { target, .. } => target.as_deref(),
+            Condition::State { target, .. } => target.as_deref(),
+            Condition::Resource { target, .. } => target.as_deref(),
+            Condition::AbilityFilter { target, .. } => target.as_deref(),
+            Condition::ScoreThreshold { target, .. } => target.as_deref(),
+            Condition::PositionCond { target, .. } => target.as_deref(),
+            Condition::OpponentChoice { target, .. } => target.as_deref(),
+            Condition::NoExcessHeart { target, .. } => target.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_count(&self) -> Option<u32> {
+        match self {
+            Condition::Location { count, .. } => *count,
+            Condition::Comparison { count, .. } => *count,
+            Condition::Group { count, .. } => *count,
+            Condition::Appearance { .. } => None,
+            Condition::Temporal { count, .. } => *count,
+            Condition::State { count, .. } => *count,
+            Condition::Resource { count, .. } => *count,
+            Condition::AbilityFilter { count, .. } => *count,
+            Condition::ScoreThreshold { count, .. } => *count,
+            Condition::AllRevealedMatchHeartColor { count, .. } => *count,
+            _ => None,
+        }
+    }
+
+    pub fn get_operator(&self) -> Option<&str> {
+        match self {
+            Condition::Compound { operator, .. }
+            | Condition::Location { operator, .. }
+            | Condition::Comparison { operator, .. }
+            | Condition::Movement { operator, .. }
+            | Condition::Group { operator, .. }
+            | Condition::Appearance { operator, .. }
+            | Condition::State { operator, .. }
+            | Condition::Resource { operator, .. }
+            | Condition::AbilityFilter { operator, .. }
+            | Condition::ScoreThreshold { operator, .. }
+            | Condition::AllRevealedMatchHeartColor { operator, .. } => operator.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_card_type(&self) -> Option<ConditionCardType> {
+        match self {
+            Condition::Location { card_type, .. } => *card_type,
+            Condition::Comparison { card_type, .. } => *card_type,
+            Condition::Movement { card_type, .. } => *card_type,
+            Condition::Group { card_type, .. } => *card_type,
+            Condition::Appearance { card_type, .. } => *card_type,
+            Condition::Temporal { card_type, .. } => *card_type,
+            Condition::State { card_type, .. } => *card_type,
+            _ => None,
+        }
+    }
+
+    pub fn get_group_names(&self) -> Option<&[String]> {
+        match self {
+            Condition::Location { group_names, .. } => group_names.as_deref(),
+            Condition::Comparison { group_names, .. } => group_names.as_deref(),
+            Condition::Movement { group_names, .. } => group_names.as_deref(),
+            Condition::Group { group_names, .. } => group_names.as_deref(),
+            Condition::Appearance { group_names, .. } => group_names.as_deref(),
+            Condition::Temporal { group_names, .. } => group_names.as_deref(),
+            Condition::State { group_names, .. } => group_names.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_characters(&self) -> Option<&[String]> {
+        match self {
+            Condition::Location { characters, .. } => characters.as_deref(),
+            Condition::Movement { characters, .. } => characters.as_deref(),
+            Condition::Group { .. } => None,
+            Condition::Appearance { characters, .. } => characters.as_deref(),
+            Condition::State { characters, .. } => characters.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_exclude_characters(&self) -> Option<&[String]> {
+        match self {
+            Condition::Location {
+                exclude_characters, ..
+            } => exclude_characters.as_deref(),
+            Condition::Group {
+                exclude_characters, ..
+            } => exclude_characters.as_deref(),
+            Condition::Movement { .. } => None,
+            _ => None,
+        }
+    }
+
+    pub fn get_state(&self) -> Option<CardState> {
+        match self {
+            Condition::Location { state, .. } => *state,
+            Condition::State { state, .. } => state.as_deref().and_then(|s| match s {
+                "active" => Some(CardState::Active),
+                "wait" => Some(CardState::Wait),
+                _ => None,
+            }),
+            _ => None,
+        }
+    }
+
+    pub fn get_position(&self) -> Option<&PositionInfo> {
+        match self {
+            Condition::Location { position, .. } => position.as_ref(),
+            Condition::Comparison { position, .. } => position.as_ref(),
+            Condition::Movement { position, .. } => position.as_ref(),
+            Condition::Group { position, .. } => position.as_ref(),
+            Condition::Appearance { position, .. } => position.as_ref(),
+            Condition::Temporal { position, .. } => position.as_ref(),
+            Condition::Resource { position, .. } => position.as_ref(),
+            Condition::PositionCond { position, .. } => position.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_movement(&self) -> Option<&str> {
+        match self {
+            Condition::Movement { movement, .. } => movement.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_temporal(&self) -> Option<&str> {
+        match self {
+            Condition::Location { temporal, .. } => temporal.as_deref(),
+            Condition::Group { temporal, .. } => temporal.as_deref(),
+            Condition::Temporal { temporal, .. } => temporal.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_source(&self) -> Option<&str> {
+        let direct = match self {
+            Condition::Location { source, .. } => source.as_deref(),
+            Condition::Movement { source, .. } => source.as_deref(),
+            Condition::Group { source, .. } => source.as_deref(),
+            Condition::Comparison { source, .. } => source.as_deref(),
+            Condition::Resource { source, .. } => source.as_deref(),
+            _ => None,
+        };
+        direct.or_else(|| self.get_trigger_event()?.source.as_deref())
+    }
+
+    pub fn get_destination(&self) -> Option<&str> {
+        let direct = match self {
+            Condition::Location { destination, .. } => destination.as_deref(),
+            Condition::Movement { destination, .. } => destination.as_deref(),
+            _ => None,
+        };
+        direct.or_else(|| self.get_trigger_event()?.destination.as_deref())
+    }
+
+    pub fn get_from_state(&self) -> Option<&str> {
+        let direct = match self {
+            Condition::Movement { from_state, .. } => from_state.as_deref(),
+            Condition::State { from_state, .. } => from_state.as_deref(),
+            _ => None,
+        };
+        direct.or_else(|| self.get_trigger_event()?.from_state.as_deref())
+    }
+
+    pub fn get_to_state(&self) -> Option<&str> {
+        let direct = match self {
+            Condition::Movement { to_state, .. } => to_state.as_deref(),
+            Condition::State { to_state, .. } => to_state.as_deref(),
+            _ => None,
+        };
+        direct.or_else(|| self.get_trigger_event()?.to_state.as_deref())
+    }
+
+    pub fn get_self_effect_only(&self) -> Option<bool> {
+        let direct = match self {
+            Condition::Movement {
+                self_effect_only, ..
+            } => *self_effect_only,
+            _ => None,
+        };
+        direct.or_else(|| self.get_trigger_event()?.self_effect_only)
+    }
+
+    pub fn get_heart_colors(&self) -> Option<&[String]> {
+        match self {
+            Condition::Location { heart_colors, .. } => heart_colors.as_deref(),
+            Condition::Comparison { heart_colors, .. } => heart_colors.as_deref(),
+            Condition::Group { heart_colors, .. } => heart_colors.as_deref(),
+            Condition::Temporal { heart_colors, .. } => heart_colors.as_deref(),
+            Condition::Resource { heart_colors, .. } => heart_colors.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_exclude_self(&self) -> Option<bool> {
+        match self {
+            Condition::Location { exclude_self, .. } => *exclude_self,
+            Condition::Movement { exclude_self, .. } => *exclude_self,
+            Condition::Appearance { exclude_self, .. } => *exclude_self,
+            Condition::Group { exclude_self, .. } => *exclude_self,
+            _ => None,
+        }
+    }
+
+    pub fn get_self_target(&self) -> Option<bool> {
+        match self {
+            Condition::Location { self_target, .. } => *self_target,
+            Condition::Movement { self_target, .. } => *self_target,
+            Condition::Group { self_target, .. } => *self_target,
+            Condition::Temporal { self_target, .. } => *self_target,
+            _ => None,
+        }
+    }
+
+    pub fn get_cost_limit(&self) -> Option<u32> {
+        match self {
+            Condition::Location { cost_limit, .. } => *cost_limit,
+            Condition::Comparison { cost_limit, .. } => *cost_limit,
+            Condition::Movement { cost_limit, .. } => *cost_limit,
+            Condition::Appearance { cost_limit, .. } => *cost_limit,
+            Condition::State { cost_limit, .. } => *cost_limit,
+            _ => None,
+        }
+    }
+
+    pub fn get_cost_limit_operator(&self) -> Option<Operator> {
+        match self {
+            Condition::Location {
+                cost_limit_operator,
+                ..
+            } => *cost_limit_operator,
+            Condition::Movement {
+                cost_limit_operator,
+                ..
+            } => *cost_limit_operator,
+            Condition::State {
+                cost_limit_operator,
+                ..
+            } => *cost_limit_operator,
+            _ => None,
+        }
+    }
+
+    pub fn get_comparison_type(&self) -> Option<&str> {
+        match self {
+            Condition::Comparison {
+                comparison_type, ..
+            } => comparison_type.map(|ct| ct.as_str()),
+            Condition::Movement {
+                comparison_type, ..
+            } => comparison_type.map(|ct| ct.as_str()),
+            Condition::Location {
+                comparison_type, ..
+            } => comparison_type.map(|ct| ct.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn get_resource_type(&self) -> Option<&str> {
+        match self {
+            Condition::Comparison { resource_type, .. } => resource_type.as_deref(),
+            Condition::State { resource_type, .. } => resource_type.as_deref(),
+            Condition::Resource { resource_type, .. } => resource_type.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_card_property(&self) -> Option<CardProperty> {
+        match self {
+            Condition::Location { card_property, .. } => *card_property,
+            Condition::Comparison { card_property, .. } => *card_property,
+            Condition::Movement { card_property, .. } => *card_property,
+            Condition::Appearance { card_property, .. } => *card_property,
+            _ => None,
+        }
+    }
+
+    pub fn get_aggregate(&self) -> Option<&str> {
+        match self {
+            Condition::Location { aggregate, .. } => aggregate.as_deref(),
+            Condition::Comparison { aggregate, .. } => aggregate.as_deref(),
+            Condition::Group { aggregate, .. } => aggregate.as_deref(),
+            Condition::Temporal { aggregate, .. } => aggregate.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_ability_filter(&self) -> Option<&AbilityFilter> {
+        match self {
+            Condition::Movement { ability_filter, .. } => ability_filter.as_ref(),
+            Condition::AbilityFilter { ability_filter, .. } => ability_filter.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_baton_touch_trigger(&self) -> Option<bool> {
+        match self {
+            Condition::Movement {
+                baton_touch_trigger,
+                ..
+            } => *baton_touch_trigger,
+            Condition::Appearance {
+                baton_touch_trigger,
+                ..
+            } => *baton_touch_trigger,
+            Condition::Location {
+                baton_touch_trigger,
+                ..
+            } => *baton_touch_trigger,
+            _ => None,
+        }
+    }
+
+    pub fn get_energy_state(&self) -> Option<&str> {
+        match self {
+            Condition::State { energy_state, .. } => energy_state.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_heart_source(&self) -> Option<&str> {
+        match self {
+            Condition::Location { heart_source, .. } => heart_source.as_deref(),
+            Condition::Group { heart_source, .. } => heart_source.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_exclude_group_names(&self) -> Option<&[String]> {
+        match self {
+            Condition::Location {
+                exclude_group_names,
+                ..
+            } => exclude_group_names.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_distinct(&self) -> Option<&DistinctInfo> {
+        match self {
+            Condition::Location { distinct, .. } => distinct.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_position_compare(&self) -> Option<&str> {
+        match self {
+            Condition::Location {
+                position_compare, ..
+            } => position_compare.as_deref(),
+            Condition::Comparison {
+                position_compare, ..
+            } => position_compare.as_deref(),
+            Condition::Appearance {
+                position_compare, ..
+            } => position_compare.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_delta(&self) -> Option<bool> {
+        match self {
+            Condition::Comparison { delta, .. } => *delta,
+            Condition::Resource { delta, .. } => *delta,
+            _ => None,
+        }
+    }
 }
 
 /// Rich description of what event triggers a condition.
@@ -6741,62 +7667,524 @@ pub struct CostComparison {
 impl Condition {
     /// Build a `CardFilter` containing the 7 base filter fields, mirroring
     /// `AbilityEffect::filter_subset` and `AbilityCost::filter_subset`.
-    /// Note: Condition uses `operator` where AbilityEffect uses
-    /// `cost_limit_operator`; the mapping is direct since both are
-    /// comparison operators for the cost filter.
     pub fn filter_subset(&self) -> crate::ability::util::CardFilter<'_> {
+        let (
+            card_type,
+            group,
+            cost_limit,
+            cost_operator,
+            characters,
+            exclude_characters,
+            exclude_group_names,
+        ) = match self {
+            Condition::Location {
+                card_type,
+                group_names,
+                exclude_group_names: egn,
+                characters: ch,
+                exclude_characters: ec,
+                cost_limit: cl,
+                cost_limit_operator: clo,
+                operator,
+                ..
+            } => (
+                *card_type,
+                group_names.as_ref(),
+                *cl,
+                clo.as_deref().or(operator.as_deref()),
+                ch.as_ref(),
+                ec.as_ref(),
+                egn.as_ref(),
+            ),
+            Condition::Group {
+                card_type,
+                group_names,
+                operator,
+                ..
+            } => (
+                *card_type,
+                group_names.as_ref(),
+                None,
+                operator.as_deref(),
+                None,
+                None,
+                None,
+            ),
+            Condition::Movement {
+                card_type,
+                group_names,
+                characters,
+                ..
+            } => (
+                *card_type,
+                group_names.as_ref(),
+                None,
+                None,
+                characters.as_ref(),
+                None,
+                None,
+            ),
+            Condition::Comparison {
+                card_type,
+                group_names,
+                cost_limit,
+                operator,
+                ..
+            } => (
+                *card_type,
+                group_names.as_ref(),
+                *cost_limit,
+                operator.as_deref(),
+                None,
+                None,
+                None,
+            ),
+            Condition::Appearance {
+                card_type,
+                group_names,
+                cost_limit,
+                characters,
+                operator,
+                ..
+            } => (
+                *card_type,
+                group_names.as_ref(),
+                *cost_limit,
+                operator.as_deref(),
+                characters.as_ref(),
+                None,
+                None,
+            ),
+            _ => (None, None, None, None, None, None, None),
+        };
         crate::ability::util::CardFilter {
-            card_type: self.card_type.as_deref(),
-            group: self
-                .group_names
-                .as_ref()
-                .and_then(|v| v.first())
-                .map(|s| s.as_str()),
-            cost_limit: self.cost_limit,
-            cost_operator: self
-                .cost_limit_operator
-                .as_deref()
-                .or(self.operator.as_deref()),
-            characters: self.characters.as_ref(),
-            exclude_characters: self.exclude_characters.as_ref(),
+            card_type: card_type.map(|ct| ct.as_str()),
+            group: group.and_then(|v| v.first()).map(|s| s.as_str()),
+            cost_limit,
+            cost_operator: cost_operator,
+            characters: characters,
+            exclude_characters: exclude_characters,
             exclude_self: None,
-            exclude_group_names: self.exclude_group_names.as_ref(),
+            exclude_group_names: exclude_group_names,
             ..Default::default()
         }
     }
 
-    /// Helper: resolve `source` from the flat field (legacy JSON) or `trigger_event` (new JSON).
-    pub fn get_source(&self) -> Option<&str> {
-        self.source
-            .as_deref()
-            .or_else(|| self.trigger_event.as_ref()?.source.as_deref())
+
+    pub fn condition_type(&self) -> Option<ConditionType> {
+        match self {
+            Condition::Compound { .. } => Some(ConditionType::Compound),
+            Condition::Location { .. } => Some(ConditionType::LocationCondition),
+            Condition::Comparison { .. } => Some(ConditionType::ComparisonCondition),
+            Condition::Movement { movement: None, .. } => Some(ConditionType::NotMoved),
+            Condition::Movement {
+                movement: Some(m), ..
+            } if m.as_ref() == "has_moved" => Some(ConditionType::HasMoved),
+            Condition::Movement { .. } => Some(ConditionType::MovementCondition),
+            Condition::Group { .. } => Some(ConditionType::GroupCondition),
+            Condition::Appearance { .. } => Some(ConditionType::AppearanceCondition),
+            Condition::Temporal { .. } => Some(ConditionType::TemporalCondition),
+            Condition::State { .. } => Some(ConditionType::StateCondition),
+            Condition::Resource { .. } => Some(ConditionType::ResourceCondition),
+            Condition::AbilityFilter { .. } => Some(ConditionType::AbilityFilterCondition),
+            Condition::ScoreThreshold { .. } => Some(ConditionType::ScoreThresholdCondition),
+            Condition::Choice { .. } => Some(ConditionType::ChoiceCondition),
+            Condition::Complex { .. } => Some(ConditionType::ComplexCondition),
+            Condition::PositionCond { .. } => Some(ConditionType::PositionCondition),
+            Condition::OpponentChoice { .. } => Some(ConditionType::OpponentChoiceCondition),
+            Condition::OpponentLiveSuccess { .. } => Some(ConditionType::OpponentLiveSuccess),
+            Condition::NoExcessHeart { .. } => Some(ConditionType::NoExcessHeart),
+            Condition::AlwaysTrue { .. } => Some(ConditionType::OtherwiseCondition),
+            Condition::AnyOf { .. } => Some(ConditionType::AnyOfCondition),
+            Condition::AllRevealedMatchHeartColor { .. } => {
+                Some(ConditionType::AllRevealedMatchHeartColor)
+            }
+        }
     }
 
-    /// Helper: resolve `destination` from the flat field or `trigger_event`.
-    pub fn get_destination(&self) -> Option<&str> {
-        self.destination
-            .as_deref()
-            .or_else(|| self.trigger_event.as_ref()?.destination.as_deref())
+    pub fn get_positions_characters(&self) -> Option<&[PositionCharacter]> {
+        match self {
+            Condition::Appearance {
+                positions_characters,
+                ..
+            } => positions_characters.as_deref(),
+            _ => None,
+        }
     }
 
-    /// Helper: resolve `from_state` from the flat field or `trigger_event`.
-    pub fn get_from_state(&self) -> Option<&str> {
-        self.from_state
-            .as_deref()
-            .or_else(|| self.trigger_event.as_ref()?.from_state.as_deref())
+    pub fn get_activation_position(&self) -> Option<&str> {
+        match self {
+            Condition::Appearance {
+                activation_position,
+                ..
+            } => activation_position.as_deref(),
+            Condition::Location { sub_checks, .. } => sub_checks
+                .as_ref()
+                .and_then(|sc| sc.activation_position.as_deref()),
+            _ => None,
+        }
     }
 
-    /// Helper: resolve `to_state` from the flat field or `trigger_event`.
-    pub fn get_to_state(&self) -> Option<&str> {
-        self.to_state
-            .as_deref()
-            .or_else(|| self.trigger_event.as_ref()?.to_state.as_deref())
+    pub fn set_position(&mut self, pos: PositionInfo) {
+        match self {
+            Condition::Location { position, .. }
+            | Condition::Comparison { position, .. }
+            | Condition::Movement { position, .. }
+            | Condition::Group { position, .. }
+            | Condition::Appearance { position, .. }
+            | Condition::Temporal { position, .. }
+            | Condition::Resource { position, .. }
+            | Condition::PositionCond { position, .. } => {
+                *position = Some(pos);
+            }
+            _ => {}
+        }
     }
 
-    /// Helper: resolve `self_effect_only` from the flat field or `trigger_event`.
-    pub fn get_self_effect_only(&self) -> Option<bool> {
-        self.self_effect_only
-            .or_else(|| self.trigger_event.as_ref()?.self_effect_only)
+    pub fn set_activation_position(&mut self, act_pos: String) {
+        match self {
+            Condition::Appearance {
+                activation_position,
+                ..
+            } => {
+                *activation_position = Some(act_pos.into());
+            }
+            Condition::Location { sub_checks, .. } => {
+                let mut checks = sub_checks.take().unwrap_or_default();
+                checks.activation_position = Some(act_pos.into());
+                *sub_checks = Some(checks);
+            }
+            _ => {}
+        }
+    }
+
+    pub fn set_group_names(&mut self, gns: Vec<String>) {
+        match self {
+            Condition::Location { group_names, .. }
+            | Condition::Comparison { group_names, .. }
+            | Condition::Movement { group_names, .. }
+            | Condition::Group { group_names, .. }
+            | Condition::Appearance { group_names, .. }
+            | Condition::Temporal { group_names, .. }
+            | Condition::State { group_names, .. } => {
+                *group_names = Some(gns);
+            }
+            _ => {}
+        }
+    }
+
+    pub fn get_conditions_mut(&mut self) -> Option<&mut Vec<Box<Condition>>> {
+        match self {
+            Condition::Compound { conditions, .. } => conditions.as_mut(),
+            _ => None,
+        }
+    }
+
+    pub fn get_options(&self) -> Option<&[Box<AbilityEffect>]> {
+        match self {
+            Condition::Choice { options, .. } => options.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_effect(&self) -> Option<&AbilityEffect> {
+        match self {
+            Condition::Complex { effect, .. } => effect.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_cause(&self) -> Option<&Condition> {
+        match self {
+            Condition::Complex { cause, .. } => cause.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_condition(&self) -> Option<&Condition> {
+        match self {
+            Condition::Temporal { condition, .. } => condition.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_conditions(&self) -> Option<&[Box<Condition>]> {
+        match self {
+            Condition::Compound { conditions, .. } => conditions.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_no_excess_heart(&self) -> Option<bool> {
+        match self {
+            Condition::OpponentLiveSuccess {
+                no_excess_heart, ..
+            } => *no_excess_heart,
+            Condition::Location { sub_checks, .. } => {
+                sub_checks.as_ref().and_then(|sc| sc.no_excess_heart)
+            }
+            _ => None,
+        }
+    }
+
+    pub fn get_group_reference(&self) -> Option<&str> {
+        match self {
+            Condition::Location {
+                group_reference,
+                sub_checks,
+                ..
+            } => group_reference.as_deref().or_else(|| {
+                sub_checks
+                    .as_ref()
+                    .and_then(|sc| sc.group_reference.as_deref())
+            }),
+            _ => None,
+        }
+    }
+
+    pub fn get_unit(&self) -> Option<&str> {
+        match self {
+            Condition::Location {
+                unit, sub_checks, ..
+            } => unit
+                .as_deref()
+                .or_else(|| sub_checks.as_ref().and_then(|sc| sc.unit.as_deref())),
+            _ => None,
+        }
+    }
+
+    pub fn get_all_areas(&self) -> Option<bool> {
+        match self {
+            Condition::Location { all_areas, .. } => *all_areas,
+            Condition::Appearance { all_areas, .. } => *all_areas,
+            _ => None,
+        }
+    }
+
+    pub fn get_min_baton_touch_count(&self) -> Option<u32> {
+        match self {
+            Condition::Movement {
+                min_baton_touch_count,
+                ..
+            } => *min_baton_touch_count,
+            Condition::Appearance {
+                min_baton_touch_count,
+                ..
+            } => *min_baton_touch_count,
+            Condition::Location {
+                min_baton_touch_count,
+                ..
+            } => *min_baton_touch_count,
+            _ => None,
+        }
+    }
+
+    pub fn get_baton_touch_source(&self) -> Option<&str> {
+        match self {
+            Condition::Movement {
+                baton_touch_source, ..
+            } => baton_touch_source.as_deref(),
+            Condition::Location { sub_checks, .. } => sub_checks
+                .as_ref()
+                .and_then(|sc| sc.baton_touch_source.as_deref()),
+            _ => None,
+        }
+    }
+
+    pub fn get_energy_placed(&self) -> Option<bool> {
+        match self {
+            Condition::Movement { energy_placed, .. } => *energy_placed,
+            _ => None,
+        }
+    }
+
+    pub fn get_turn_number(&self) -> Option<u32> {
+        match self {
+            Condition::Temporal { turn_number, .. } => *turn_number,
+            _ => None,
+        }
+    }
+
+    pub fn get_all(&self) -> Option<bool> {
+        match self {
+            Condition::Comparison { all, .. } => *all,
+            Condition::State { all, .. } => *all,
+            Condition::Location { all, .. } => *all,
+            _ => None,
+        }
+    }
+
+    pub fn get_area_direction(&self) -> Option<&str> {
+        match self {
+            Condition::Movement { area_direction, .. } => area_direction.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_any_of(&self) -> Option<&[String]> {
+        match self {
+            Condition::AnyOf { any_of, .. } => any_of.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_temporal_scope(&self) -> Option<&str> {
+        match self {
+            Condition::Temporal { temporal_scope, .. } => temporal_scope.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_appearance(&self) -> Option<bool> {
+        match self {
+            Condition::Appearance { appearance, .. } => *appearance,
+            _ => None,
+        }
+    }
+
+    pub fn get_appearance_source(&self) -> Option<&str> {
+        match self {
+            Condition::Appearance {
+                appearance_source, ..
+            } => appearance_source.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_all_members(&self) -> Option<bool> {
+        match self {
+            Condition::Group { all_members, .. } => *all_members,
+            _ => None,
+        }
+    }
+
+    pub fn get_comparison_target(&self) -> Option<ComparisonTarget> {
+        match self {
+            Condition::Comparison {
+                comparison_target, ..
+            } => *comparison_target,
+            Condition::Location {
+                comparison_target, ..
+            } => *comparison_target,
+            _ => None,
+        }
+    }
+
+    pub fn get_cost_reference_character(&self) -> Option<&str> {
+        match self {
+            Condition::Appearance {
+                cost_reference_character,
+                ..
+            } => cost_reference_character.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_cost_reference_operator(&self) -> Option<&Operator> {
+        match self {
+            Condition::Appearance {
+                cost_reference_operator,
+                ..
+            } => cost_reference_operator.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_cost_total(&self) -> Option<u32> {
+        match self {
+            Condition::Comparison { cost_total, .. } => *cost_total,
+            _ => None,
+        }
+    }
+
+    pub fn get_cost_total_operator(&self) -> Option<&Operator> {
+        match self {
+            Condition::Comparison {
+                cost_total_operator,
+                ..
+            } => cost_total_operator.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_heart_type(&self) -> Option<&str> {
+        match self {
+            Condition::Location { heart_type, .. } => heart_type.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_original_value(&self) -> Option<bool> {
+        match self {
+            Condition::Location { sub_checks, .. } => {
+                sub_checks.as_ref().and_then(|sc| sc.original_value)
+            }
+            _ => None,
+        }
+    }
+
+    pub fn get_reference_card(&self) -> Option<&str> {
+        match self {
+            Condition::Location { sub_checks, .. } => sub_checks
+                .as_ref()
+                .and_then(|sc| sc.reference_card.as_deref()),
+            _ => None,
+        }
+    }
+
+    pub fn get_require_position_cards(&self) -> Option<bool> {
+        match self {
+            Condition::Location {
+                require_position_cards,
+                ..
+            } => *require_position_cards,
+            _ => None,
+        }
+    }
+
+    pub fn get_same_name(&self) -> Option<bool> {
+        match self {
+            Condition::Location { same_name, .. } => *same_name,
+            _ => None,
+        }
+    }
+
+    pub fn get_scope(&self) -> Option<&str> {
+        match self {
+            Condition::Location { scope, .. } => scope.as_deref(),
+            Condition::Comparison { scope, .. } => scope.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn get_values(&self) -> Option<&[u32]> {
+        match self {
+            Condition::Comparison { values, .. } => values.as_deref(),
+            Condition::Location { sub_checks, .. } => {
+                sub_checks.as_ref().and_then(|sc| sc.values.as_deref())
+            }
+            _ => None,
+        }
+    }
+
+    pub fn get_yell_trigger(&self) -> Option<bool> {
+        match self {
+            Condition::Location { yell_trigger, .. } => *yell_trigger,
+            _ => None,
+        }
+    }
+
+    pub fn get_ability_filter_triggers(&self) -> Option<&[String]> {
+        match self {
+            Condition::AbilityFilter {
+                ability_filter_triggers,
+                ..
+            } => ability_filter_triggers.as_deref(),
+            Condition::Location { sub_checks, .. } => sub_checks
+                .as_ref()
+                .and_then(|sc| sc.ability_filter_triggers.as_deref()),
+            _ => None,
+        }
     }
 }
 

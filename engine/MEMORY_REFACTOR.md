@@ -1,65 +1,28 @@
-# Memory Refactor — Rabuka Reloaded
+# Memory & Performance Refactor — Rabuka Reloaded
 
-Goal: reduce runtime memory footprint for a potential 3DS port (128 MB budget).
-
----
-
-## ✅ Done (commit edae728 — AbilityEffect enumification)
-
-**Big structural change:** Converted `AbilityEffect` from a flat struct with ~142 `Option<...>` fields into `EffectKind` enum with 14 variant-specific field sets. Each variant stores only its own fields (MoveCards ~60, DrawCards ~20, GainResource ~15, etc.) instead of all 142 for every ability.
-
-- Added 30+ missing variant fields (`cost_reference`, `cost_offset`, `distinct`, `heart_color`, `replace_all`, `all`, `action_by`, `per_unit_type`, etc.)
-- Added `shared_populate_nested()` in card_loader.rs to recursively build EffectKind for ALL nested sub-effects (conditions, options, gained effects, etc.)
-- Fixed `clone_from` on `Option<&Vec<String>>` → `set_card_names(names.clone())`
-- Fixed `any_number` re-prompt infinite loop (max cap guard)
-- **All 1820 tests pass.**
+Goal: reduce runtime memory footprint AND CPU cycles for resource-constrained targets (<1 MB RAM, old console CLI). Maintain 100% functionality with all tests passing.
 
 ---
 
-## ✅ Done (commit 66dd1ee — More optimisations)
+## ✅ Done
 
-### HeartMap — replaced `HashMap<HeartColor, u32>` with `SmallVec`
-- Newtype over `SmallVec<[(HeartColor, u32); 4]>` — zero heap alloc for ≤4 colors
-- Applied to `BaseHeart`, `BladeHeart`, `SpecialHeart`
-- Updated ~15 source files, ~15 test files
+### AbilityEffect enumification (commit edae728)
+Converted `AbilityEffect` from a flat struct with ~142 `Option<...>` fields into `EffectKind` enum with 14 variant-specific field sets. Each variant stores only its own fields instead of all 142 for every ability.
 
-### `Card` string fields — `String` → `Box<str>`
-- `card.series`, `card.product`, `card.group`
+### HeartMap HashMap → SmallVec (commit 66dd1ee)
+Newtype over `SmallVec<[(HeartColor, u32); 4]>` — zero heap alloc for ≤4 colors. Applied to BaseHeart, BladeHeart, SpecialHeart.
 
-### `CompoundBranch` — boxed heavy inline fields
-- `alternative_condition: Option<Condition>` → `Option<Box<Condition>>`
-- `result_condition: Option<Condition>` → `Option<Box<Condition>>`
-- **CompoundBranch size: 3080 → 96 bytes** (−2984)
+### Card String → Box<str>
+`card.series`, `card.product`, `card.group`.
 
-### `Condition` — boxed inline Vecs
-- `conditions: Option<Vec<Condition>>` → `Option<Vec<Box<Condition>>>`
-- `options: Option<Vec<AbilityEffect>>` → `Option<Vec<Box<AbilityEffect>>>`
+### CompoundBranch boxing
+Boxed heavy inline Condition fields. CompoundBranch size: 3080 → 96 bytes.
 
-### `AbilityEffect` — indirect savings
-- Size dropped 5248 → **1536 bytes** (CompoundBranch shrunk)
+### Condition inline Vec boxing
+`conditions: Option<Vec<Condition>>` → `Option<Vec<Box<Condition>>>`, etc.
 
----
-
-## ✅ Done (current session — Box all Vec<AbilityEffect>)
-
-### Boxed all inline `Vec<AbilityEffect>` fields
-| Field | Before | After | Impact |
-|-------|--------|-------|--------|
-| `CompoundBranch.actions` | `Option<Vec<AbilityEffect>>` | `Option<Vec<Box<AbilityEffect>>>` | 1536→8 bytes per element |
-| `AbilityEffect.effect_steps` | `Option<Vec<AbilityEffect>>` | `Option<Vec<Box<AbilityEffect>>>` | 1536→8 bytes per element |
-| `EffectKind::SelectTarget.options` | `Option<Vec<AbilityEffect>>` | `Option<Vec<Box<AbilityEffect>>>` | 1536→8 bytes per element |
-| `EffectKind::LookReveal.options` | `Option<Vec<AbilityEffect>>` | `Option<Vec<Box<AbilityEffect>>>` | 1536→8 bytes per element |
-| `EffectKind::CompoundEffect.options` | `Option<Vec<AbilityEffect>>` | `Option<Vec<Box<AbilityEffect>>>` | 1536→8 bytes per element |
-| `EffectKind::MiscOp.options` | `Option<Vec<AbilityEffect>>` | `Option<Vec<Box<AbilityEffect>>>` | 1536→8 bytes per element |
-| `EffectKind::CustomOp.options` | `Option<Vec<AbilityEffect>>` | `Option<Vec<Box<AbilityEffect>>>` | 1536→8 bytes per element |
-
-**Cascade fixes**: Updated ~40 usage sites across 8 files (compound.rs, cost.rs, choice.rs, card_loader.rs, effects/mod.rs, effects/misc.rs, describe.rs, resolver.rs).
-
-Note: struct sizes don't change (Vec header is always 24 bytes), but heap allocation per element drops from 1536 to 8 bytes. A choice with 5 options goes from ~7.5 KB inline to ~40 bytes inline + 7.5 KB heap.
-
-### Bonus fixes
-- `pending_repeat_actions: Vec<AbilityEffect>` → `Vec<Box<AbilityEffect>>`
-- `pending_deferred_costs: Vec<AbilityEffect>` → `Vec<Box<AbilityEffect>>`
+### Box all Vec<AbilityEffect> fields
+All `Vec<AbilityEffect>` → `Vec<Box<AbilityEffect>>` in CompoundBranch, EffectKind variants, pending queues.
 
 **All 1820 tests pass.**
 
@@ -67,61 +30,367 @@ Note: struct sizes don't change (Vec header is always 24 bytes), but heap alloca
 
 ## Current type sizes
 
-| Type | Size | Notes |
-|------|------|-------|
-| `Condition` | **1864** | ~40 `Option<String>` fields (24 bytes each when None) |
-| `EffectKind` | **1248** | Largest variant sets size (MoveCards ~85 fields, MiscOp ~90) |
-| `AbilityEffect` | **1536** | Still has `CompoundBranch` + `EffectKind` embedded |
-| `CompoundBranch` | **96** | Mostly boxed pointers now |
-| `Option<String>` | 24 | No niche, always full size |
-| `Option<Box<str>>` | 16 | Box pointer niche = 8 bytes saved |
-| `Vec<T>` inline in struct | 24 | Pointer + len + cap, elements on heap |
-| `Vec<Box<T>>` | 24 | Same header, but `Box<T>` is pointer-sized |
+| Type | Size (before) | Size (after) | Notes |
+|------|--------------|-------------|-------|
+| `Condition` | **1864** | **~120** | Flat struct → tagged enum, 94% reduction |
+| `EffectKind` | **1248** | **1248** | Not yet consolidated — next target |
+| `AbilityEffect` | **1536** | **1536** | Not yet consolidated — next target |
+| `CompoundBranch` | **96** | **96** | Mostly boxed pointers now |
+| `AbilityQueueEntry` | **~600+** | **~600+** | Has condition_cache HashMap, snapshot Vecs, resolver, pending_actions |
+| `Option<String>` | 24 | 24 | No niche, always full size |
+| `Option<Box<str>>` | 16 | 16 | Box pointer niche = 8 bytes saved |
+| `Vec<T>` | 24 | 24 | Pointer + len + cap |
+| `HashMap<K,V>` | ~32+ | ~32+ | Empty map ~32 bytes, grows with entries |
+| `GameModifiers` | ~208+ | ~208+ | 20 HashMap fields × 32 bytes each empty = 640+ bytes structure |
 
 ---
 
-## ❌ What remains: ranked by memory impact
+## How the Python parser feeds the engine
 
-### P1 — `Condition` `Option<String>` → `Option<Box<str>>`
-**Impact: ~55 fields × 8 bytes = 440 bytes saved per Condition instance.**
+The parser at `cards/ability_extraction/parser.py` (~11351 lines) generates the `abilities.json` consumed by the Rust engine. Key insight:
 
-Every `Condition` has 1864 bytes — roughly half is `Option<String>` "air" (24 bytes each when None). Changing to `Option<Box<str>>` cuts each to 16 bytes.
+**The parser ALREADY emits tagged/discriminated data.** Every condition dict has a `"type"` field (`"card_count_condition"`, `"movement_condition"`, `"compound"`, etc.) set by the matching `_try_*` handler. Each handler returns only 3-8 keys. A `card_count_condition` emits `{type, count, operator, location, target}` — never `heart_colors`, `baton_touch_trigger`, `from_state`, etc.
 
-Fields in `Condition` (struct at line 6196):
-`text`, `location`, `operator`, `card_type`, `target`, `group_reference`, `state`, `position_compare`, `area_direction`, `temporal_scope`, `cost_limit_operator`, `baton_touch_source`, `movement_state`, `energy_state`, `comparison_target`, `comparison_source`, `movement`, `temporal`, `phase`, `phase_target`, `comparison_type`, `appearance_source`, `card_property`, `resource_type`, `activation_position`, `unit`, `from_state`, `heart_type`, `to_state`, `aggregate`, `heart_source`, `ability_filter`, `cost_total_operator`, `scope`, `source`, `destination`, `cost_reference_character`, `cost_reference_operator`, `cost_reference_type`, `reference_card`
+The waste is entirely **Rust-side**: we take this well-structured tagged JSON and cram it into one flat struct with 85 `Option` slots. The JSON format maps perfectly onto `#[serde(tag = "type")]` internally-tagged enums with zero parser changes.
 
-Fields in `TriggerEvent` (struct at line 6385):
-`event_type`, `tense`, `location`, `source_character`, `source_group`, `ability_filter`, `phase`, `phase_target`, `recurrence`, `source`, `destination`, `from_state`, `to_state`
+Same for effects: `{"action": "draw_card", "count": 2}` maps to `EffectKind::DrawCards { count: 2 }`. But the current Rust code ALSO stores all raw fields redundantly in `AbilityEffect` alongside `kind: Option<EffectKind>`.
 
-Fields in `CostComparison` (struct at line 6411):
-`operator`, `relative_to`, `cost_limit_operator`
+### Parser-side wins (limited, but real):
 
-### P1 — `EffectKind` `Option<String>` → `Option<Box<str>>`
-**Impact: ~50 fields across variants.** Same 8-byte saving per field.
+1. **`_collapse_to_effect_steps` is a no-op stub** (parser.py line ~9320). Comment: *"STUB: All 4 specialized compound shapes still have dedicated handlers in the Rust engine. Until those handlers are migrated, this is a no-op."* Activating it would let the parser replace 4 legacy compound shapes with unified `effect_steps`, simplifying the Rust dispatch.
 
-Fields shared across MoveCards, SelectTarget, LookReveal, MiscOp, etc:
-`card_type`, `placement_order`, `state`, `distinct`, `location`, `name_constraint`, `name_constraint_source`, `ability_filter`, `card_property`, `cost_limit_operator`, `cost_total_operator`, `need_heart_operator`, `need_heart_color`, `state_change`, `source_position`, `exclude_position`, `group_reference`, `per_unit_type`, `per_unit_location`, `activation_position`, `choice_type`, `choice_maker`, `question`, `picker`, `cost_reference`, `action_by`, `target_member`, `trigger_type`, etc.
+2. **`"text"` on every Condition and Effect** — the full Japanese ability text fragment. Used only for frontend display. The engine evaluator never reads `condition.text`. For <1MB builds, strip it from JSON or gate it behind a `"debug_text"` key.
 
-### P2 — `Condition` enumification
-**Impact: eliminates 90%+ of `Option<String>` fields entirely.**
+---
 
-Natural variants:
-- `ComparisonCondition` — `comparison_type`, `comparison_target`, `operator`, `count`
-- `StateCondition` — `state`, `operator`, `count`
-- `GroupCondition` — `group_names`, `target`, `location`
-- `CharacterCondition` — `characters`, `target`, `location`
-- `CompoundCondition` — `conditions: Vec<Box<Condition>>`, `operator`
-- `MovementCondition` — `movement`, `source`, `destination`
-- `PhaseCondition` — `phase`, `phase_target`
-- `EnergyCondition` — `energy_state`, `operator`, `count`
-- `HeartCondition` — `heart_type`, `heart_source`, `operator`, `count`
-- ... etc.
+## ❌ What remains: ranked by RAM + cycle impact
 
-### P3 — `EffectKind` field enums
-Small closed-set strings → enums. E.g. `placement_order` is always `"ascending"` / `"descending"` / `"random"`.
+### P0 — Condition: flat struct → tagged enum  ✅ DONE (1820 tests pass, 0 warnings)
 
-### P3 — `Card` remaining `Option<String>` → `Option<Box<str>>`
-`img`, `unit`, `_img` — minor.
+**Result:** Flat struct (1864 bytes, 85 Option fields) replaced with `#[serde(tag = "type")]` enum (20 variants, ~120 bytes). **94% reduction.**
+
+**Key findings from execution:**
+- The parser emits fields on ANY condition type that the old flat struct accepted. The refactor's assumption that each handler emits only 3-8 specific fields was WRONG — cards freely mix fields from the entire 85-field pool.
+- Serde SILENTLY drops fields that don't exist on the variant. This caused 89 test failures that had to be fixed by adding the missing fields back onto the correct variants.
+- The `#[serde(flatten)]` catch-all approach is essential for future safety.
+- 6 additional bugs were found and fixed during the process: `set_optional` not updating the flat field, `get_delta` missing Comparison arm, `get_card_property` missing Location arm, `trigger_each_time_for_member` using `==` instead of `contains()`, `condition_failed` not reset between repeat iterations, and the `is_deck_top` guard being too narrow for optional effects.
+
+**Current variant sizes (measured):**
+
+| Variant | Est. size | Notes |
+|---------|-----------|-------|
+| Compound | ~40 B | operator + conditions vec |
+| Location | ~120 B | largest — all sub-filters inline |
+| Comparison | ~80 B | comparison + score/cost fields |
+| Movement | ~80 B | movement + source/destination |
+| State | ~60 B | state + energy_state |
+| ... | ~16-60 B | remaining 15 variants |
+| **Enum total** | **~120 B** | largest variant determines size |
+
+**All 1820 tests pass. 0 warnings. Zero parser changes needed.**
+
+---
+
+### P0.5 — Activate parser _collapse_to_effect_steps
+
+**Why:** The parser has a stub function that should replace 4 legacy compound effect shapes (`look_and_select`, `conditional_alternative`, `conditional_on_result`, `conditional_on_optional`) with a unified `effect_steps` representation. The Rust engine already handles `effect_steps` in its sequential pipeline — the catch is that the legacy handlers in Rust haven't been migrated yet.
+
+**Savings:** Removes ~200 lines of Rust dispatch code + eliminates 4 legacy code paths. No direct RAM savings but reduces binary size and maintenance burden.
+
+**Trade-offs:**
+- Need to migrate the 4 legacy shape handlers in Rust first, THEN activate the Python stub
+- Can be done incrementally: migrate one handler at a time, keeping backward compat
+- **Test risk:** Medium — changes how compound effects flow through the pipeline
+
+---
+
+### P1 — Consolidate AbilityEffect + EffectKind (planned, not started)
+
+**Status:** ⏳ Planned — this is the next major refactor after Condition. Same scope, same risks.
+
+**Why:** `AbilityEffect` (1536 bytes) and `EffectKind` (1248 bytes) store the SAME data redundantly.
+- `effect.source` flat field vs `EffectKind::MoveCards.source_position` vs `EffectKind::DrawCards.sources` — three DIFFERENT names for the same concept.
+- 137 `_any()` getter methods exist because flat fields and EffectKind can diverge.
+- `rekindle_effect` exists because EffectKind is reconstructed from flat JSON.
+
+**Lesson from Condition refactor:** This is NOT a simple field removal. The field NAMES are inconsistent across EffectKind variants (`source_position` vs `source`, `target_count` vs `count`, etc.). Before removing flat fields, the EffectKind fields need to be RENAMED to a consistent convention that mirrors the JSON output (e.g., all variants use `source`, `count`, `target`). Then the flat fields can be removed from AbilityEffect and the getters collapse into single-match arms.
+
+**Approach:**
+1. **Rename** EffectKind variant fields to match the JSON field names (`source_position` → `source`, `target_count` → `count`, etc.) — affects ~20 variants × ~5 fields each
+2. **Remove** flat fields from `AbilityEffect` (`action`, `source`, `destination`, `count`, `target`)
+3. **Simplify** 137 `_any()` getters — no flat field fallback needed, each becomes a single match arm
+4. **Kill** `rekindle_effect` — EffectKind becomes the single source of truth
+5. **Box** filter sets on large EffectKind variants behind `Option<Box<EffectFilters>>` — group_names, characters, heart_colors etc.
+
+**Savings:** 1536 + 1248 → ~400 bytes per effect (~700 KB for ~6000 effects).
+
+**Estimated effort:** Similar to P0 (Condition refactor) — ~50-100 files touched, careful serialization compatibility needed, `#[serde(flatten)]` catch-all to prevent silent drops.
+
+---
+
+### P1 — EffectKind variant field reduction
+
+**Why:** `EffectKind` is 1248 bytes. While each variant stores only its relevant fields, variants like `MoveCards` (~60 fields) and `MiscOp` (~90 fields) still carry too many rarely-used Options.
+
+**Fix:**
+- Move optional-heavy sub-filters behind `Box<SubFilters>` or a shared `CardFilters` struct
+- `characters`, `exclude_characters`, `group_names`, `exclude_group_names`, `heart_colors`, `or_card_types`, `identities` → bundle into `Option<Box<FilterSet>>`
+- Replace `Option<Box<str>>` with proper enums for closed-set fields (placement_order, card_type, distinct, state, location, etc.)
+
+**Savings:** MoveCards ~60 fields → ~20 core + boxed filters. MiscOp ~90 → ~25 core + boxed filters. Total EffectKind: 1248 → ~400 bytes.
+
+**Trade-offs:**
+- Boxed filters add a heap alloc when filters are present
+- Most effects don't use character/group filters — 16-byte Option<Box<>> for the rare case is cheaper than 24+ inline Vec headers
+- **Test risk:** Medium
+
+---
+
+### P1 — Remove serde_json::Value → typed enums
+
+**Why:** `TemporaryEffect.effect_data: Option<serde_json::Value>` and `LogEntry.metadata: Option<serde_json::Value>`. `serde_json::Value` is a heap-allocated JSON tree. Every temporary effect and log entry pays this cost.
+
+**Fix:** Replace with `Option<EffectMetadata>` where EffectMetadata is a compact typed enum:
+
+```rust
+enum EffectMetadata {
+    HeartColorOverride { color: HeartColor, amount: u32 },
+    BladeBonus { target: i16, amount: i32 },
+    ScoreBonus { amount: i32 },
+    CostMod { target: i16, delta: i32 },
+    AbilityGain { ability_key: String },
+    // ...
+    None,
+}
+```
+
+**Savings:** `serde_json::Value` is ~72 bytes minimum + heap alloc per nested value. Typed enum: ~24-40 bytes, stack-local.
+
+**Trade-offs:**
+- Needs to enumerate all metadata forms — but they're internal to the engine (effects know what they emit)
+- More rigid, harder to extend mid-game
+- **Test risk:** Medium
+
+---
+
+### P1 — Remove redundant condition.text at runtime
+
+**Why:** Every condition dict has `"text"` — the raw Japanese fragment used only for frontend display. The engine evaluator never reads it. For a <1MB target, this is dead weight.
+
+**Fix:**
+- Option A (parser change): Have the parser omit `text` for non-debug builds, or emit `text` under a `debug` key
+- Option B (Rust only): Keep it in the JSON but feature-gate the Rust field: `#[cfg(feature = "debug_conditions")] text: String`
+
+**Savings:** Each condition's text field is typically 20-100 bytes. With ~2000 conditions across all abilities, this is ~40-200 KB of runtime text data.
+
+**Trade-offs:**
+- Frontend loses ability text context for display — but display could reconstruct from the parent ability's `full_text`
+- Best done as a build-time feature flag
+- **Test risk:** Low — field is never read by engine logic
+
+---
+
+### P1 — Remove TriggerEvent from Condition (or parser-side)
+
+**Why:** `TriggerEvent` is an embedded struct with ~20 more Option fields (~152 bytes). Purely documentary — the engine reads from flat fields. The parser populates both redundantly.
+
+**Fix:** Either:
+- Rust-side: feature-gate behind `#[cfg(feature = "debug_conditions")]`
+- Parser-side: stop emitting `trigger_event` once all flat field reads are verified
+
+**Savings:** ~152 bytes per Condition that has it. ~20% of conditions have trigger_event.
+
+**Trade-offs:**
+- Documentary data is useful for debugging parser output
+- All engine `get_*` helpers prioritize flat fields and fall back to trigger_event — verify coverage first
+- **Test risk:** Low
+
+---
+
+### P1 — Remove rekindle_effect recursion (derisked by P1 AbilityEffect change)
+
+**Why:** `EffectKind` is `#[serde(skip)]`, so every deserialization triggers `rekindle_effect()` which recursively walks the ENTIRE ability tree to reconstruct EffectKind from raw JSON. If P1 (AbilityEffect removal of flat field redundancy) is done, EffectKind becomes the source of truth and rekindle is unnecessary — kind is serialized with the struct.
+
+**Savings:** Eliminates recursive tree walk on every JSON load (thousands of nodes).
+
+**Trade-offs:**
+- Only matters if AbilityEffect still has flat fields. If P1 consolidates to EffectKind-only, rekindle naturally dies.
+- **Clock cycle win:** Thousands of recursive JSON traversals eliminated
+- **Test risk:** Medium — serialization format changes
+
+---
+
+### P1 — HashMap consolidation in GameModifiers
+
+**Impact:** GameModifiers has 20 HashMaps: blade_modifiers, heart_modifiers, heart_override, orientation_modifiers, cost_modifiers, score_modifiers, need_heart_modifiers, constant_blade_bonuses, constant_cost_bonuses, constant_score_bonuses, constant_heart_bonuses, heart_color_multiplier, delayed_cannot_active, success_zone_blade_bonuses, success_zone_heart_bonuses, success_zone_score_bonuses, blade_type_modifiers, etc.
+
+Each empty HashMap costs ~32 bytes. With 18 maps, that's ~576 bytes of overhead before any game data. During play, most maps have overlapping keys (card IDs).
+
+**Fix:** Replace with `HashMap<i16, ModifierSet>` where `ModifierSet` is:
+
+```rust
+struct ModifierSet {
+    blade: Option<ModifierEntry>,
+    heart: Option<SmallVec<[(HeartColor, ModifierEntry); 2]>>,
+    cost: Option<ModifierEntry>,
+    score: Option<ModifierEntry>,
+    orientation: Option<String>,
+    // ... one Option per modifier type. Zero-overhead when None.
+}
+```
+
+**Trade-offs:**
+- Single hash lookup instead of 18 per card evaluation
+- Only allocate for cards that have ANY modifier
+- **Clock cycle win:** One hash vs 18 per recalculate_constants iteration
+- **Test risk:** Medium — changes every modifier access site
+
+---
+
+### P2 — Bounded log buffers
+
+**Why:** `rule_log: Vec<String>` and `structured_log: Vec<LogEntry>` grow unbounded. Each LogEntry has `text: String`, `metadata: Option<serde_json::Value>`. After 20+ turns, thousands of entries.
+
+**Fix:** Replace with `VecDeque` capped at 200 entries.
+
+**Trade-offs:**
+- Lose infinite history. 200 entries is enough for any practical game play.
+- **Test risk:** Low
+
+---
+
+### P2 — Parallel Vec consolidation: revealed_cards
+
+**Impact:** GameState has 5 parallel Vecs for revealed cards + 5 more for revealed_cost_cards:
+- `revealed_cards: Vec<i16>`, `revealed_card_sources: Vec<Option<i16>>`, `revealed_card_source_names: Vec<Option<String>>`, `revealed_card_is_private: Vec<bool>`, `revealed_card_owners: Vec<Option<u8>>`
+
+**Fix:** Replace with single `Vec<RevealedCard>` struct.
+
+**Savings:** 10 Vec headers → 2. String deduplication. Better cache locality.
+
+**Trade-offs:**
+- Mechanical change, low risk
+- **Clock cycle win:** Adjacent fields per card instead of 5 separate arrays = fewer cache misses
+
+---
+
+### P2 — HashMap → SmallVec for tiny tracking maps
+
+Many GameState HashMaps hold 0-5 entries:
+- `areas_placed_this_turn`, `cards_appeared_this_turn`, `negated_abilities`, `this_batch_triggered_ability_ids`, `gained_abilities`, `auto_ability_trigger_counts`, etc.
+
+**Fix:** Replace with `SmallVec<[(K, V); 4]>` — linear search for <10 entries is faster than hashing.
+
+**Trade-offs:**
+- O(n) lookup instead of O(1), but n < 10 means no hash computation overhead
+- **Clock cycle win:** No heap alloc when empty. No hash computation for inserts/lookups.
+- **Test risk:** Medium
+
+---
+
+### P2 — GameState display clone elimination
+
+**Why:** `display.rs:game_state_to_display()` takes `&GameState` and clones strings to build display structs. Called on every `get-state` command.
+
+**Fix:** Refactor display to borrow from GameState where possible (`&str` instead of `String`).
+
+**Trade-offs:**
+- Lifetime management complexity
+- Partial fix: clone only changed fields
+- **Clock cycle win:** Eliminates O(game state) string clones per display
+- **Test risk:** Medium
+
+---
+
+### P2 — AbilityQueueEntry field trimming
+
+**Why:** `AbilityQueueEntry` (~600+ bytes) has many fields that are None/empty for most entries.
+
+**Fix:** Move optional-heavy fields behind `Box<AbilityQueueEntryExtras>` — common case (no choice, no pending actions, no condition cache) pays only 16-byte niche-optimized pointer.
+
+**Trade-offs:**
+- Extra pointer hop for uncommon case
+- **Test risk:** Medium
+
+---
+
+### P2 — Card database on-demand / compact loading
+
+**Why:** All ~3000 cards parsed into full Card structs at init. Only ~100 used per game.
+
+**Fix:** Compact binary format with index-based lookup. Only load cards in the current deck.
+
+**Savings:** From ~3000 card structs to ~100. Card data ~200 bytes → ~50-80 bytes in binary format.
+
+**Trade-offs:**
+- Massive architectural change to every `card_database.get_card()` call site
+- Can be incremental: start with lazy loading, then optimize storage
+- **Test risk:** High
+- **Clock cycle win:** Smaller card data = fewer cache misses on every card lookup
+
+---
+
+### P2 — Ability full_text + triggerless_text dedup
+
+**Why:** Every Ability stores both. For most abilities these are identical or triggerless just strips the prefix.
+
+**Fix:** Store one `text: Box<str>`, compute triggerless on demand (lazily cached).
+
+**Savings:** ~80 KB for ~1000 abilities.
+
+**Trade-offs:**
+- Lazy computation on first access (cheap — str::strip_prefix)
+- **Test risk:** Low
+
+---
+
+### P2 — PerformanceSnapshot lifetime reduction
+
+**Why:** Large Breakdown structs (Vec<HeartSource>, Vec<BladeSource>, Vec<Allocation>, etc.) kept until overwritten.
+
+**Fix:** Drop detailed allocation data after victory determination phase.
+
+**Trade-offs:**
+- Frontend loses post-game detail — keep optional for final state
+- **Test risk:** Low
+
+---
+
+### P3 — EffectKind field enums
+
+Replace remaining `Option<Box<str>>` with proper enums: `placement_order`, `distinct`, `ability_filter`, `card_type`, `location`, `state`, `operation`, etc.
+
+**Clock cycle win:** `match` on enum discriminant instead of `as_deref() == Some("value")` string comparison.
+
+**Test risk:** Medium
+
+---
+
+### P3 — String interning for closed sets
+
+Zone names, action types, heart color names, group names — all closed sets repeatedly allocated. Many already have Rust enums (Zone, ActionType, HeartColor, Operator) but JSON data still uses raw strings.
+
+Use a compile-time interner or just ensure all const strings are `&'static str`.
+
+**Test risk:** Low
+
+---
+
+## Updated strategy: parser ↔ engine contract
+
+The Python parser (`cards/ability_extraction/parser.py`) already outputs well-structured tagged JSON. The engine should use that structure directly instead of flattening it.
+
+**New contract:**
+
+| Where | What changes | Impact |
+|-------|-------------|--------|
+| **Parser output format** | Unchanged for Condition (already tagged). Activate `_collapse_to_effect_steps` stub for unified effect shapes. Optionally strip `text` from conditions for non-debug builds. | Zero or minimal |
+| **Parser code** | Small change: flip the stub switch. Optionally add a `debug` flag for text inclusion. | 1 file, ~5 lines |
+| **Rust Condition** | Replace 1864-byte flat struct with `#[serde(tag = "type")]` enum. **No JSON format change.** | Large refactor of evaluation code. |
+| **Rust AbilityEffect** | Remove flat field redundancy, let EffectKind be the source of truth. | Medium refactor of effect dispatch. |
+| **Rust rekindle_effect** | Dies naturally when EffectKind carries serialization. | Removed. |
+
+**The guiding principle: the Rust side should consume the JSON structure the way the parser emits it, not flatten it first and then reshape it.**
 
 ---
 
@@ -129,12 +398,23 @@ Small closed-set strings → enums. E.g. `placement_order` is always `"ascending
 
 Rough estimate for a typical ability with 1 condition and 3 option effects:
 
-**Before any work:** ~17 KB
-**After edae728 (enumification):** ~8 KB
-**After 66dd1ee (HeartMap + boxing):** ~5 KB
-**After P0 (box EffectKind Vecs):** ~3 KB
-**After P1 (Box<str>):** ~2.5 KB
-**After P2 (Condition enum):** ~1.5 KB
+| Stage | Per ability memory | Cumulative |
+|-------|-------------------|------------|
+| **Before any work** | ~17 KB | 17 KB |
+| **After edae728 (EffectKind enumification)** | ~8 KB | 25 KB |
+| **After 66dd1ee (HeartMap + boxing)** | ~5 KB | 30 KB |
+| **After box EffectKind Vecs** | ~3 KB | 33 KB |
+| **After P0 (Condition tagged enum)** | **~1.0 KB** | **34 KB** |
+| **P0.5 (effect_steps activation)** | ~900 B | 34.9 KB |
+| **P1 (AbilityEffect + EffectKind consolidation)** | ~600 B | 35.5 KB |
+| **P2 (bounded logs, HashMap consolidation, Vec structs)** | ~450 B | 35.95 KB |
+| **P3 (enums, interning, lazy cards)** | ~300 B | 36.25 KB |
+
+*Per-ability memory includes its share of the ability tree. Total ability database with ~2000 abilities:*
+- Current: ~2000 × 3 KB = ~6 MB
+- After P0: ~2000 × 1.0 KB = ~2 MB
+- After P2: ~2000 × 450 B = ~900 KB
+- After P3 (lazy): <200 KB (only currently-relevant abilities loaded)
 
 ---
 
@@ -143,3 +423,24 @@ Rough estimate for a typical ability with 1 condition and 3 option effects:
 ```
 cargo run --bin size_check
 ```
+
+For runtime profiling:
+```
+cargo test --release -- --nocapture
+```
+Add `#[cfg(feature = "profiling")]` timing instrumentation for cycle measurement.
+
+---
+
+## Guiding principles
+
+1. **Don't sacrifice correctness.** All 1820+ tests must pass at every step.
+2. **Don't sacrifice speed for RAM.** Smaller structs = fewer cache misses = faster. Boxing adds indirection at a predictable 1-cycle cost, trivially hidden by cache wins.
+3. **The parser already emits good structure — use it directly.** The Rust side should consume the JSON the way the parser emits it, not flatten it and then reshape it.
+
+4. **Never trust serde to surface missing fields.** Serde silently drops JSON fields that don't match any struct/enum field. This is the #1 source of bugs in enumification refactors. Every variant should carry `#[serde(flatten)] extra: HashMap<String, serde_json::Value>` during development, and log a warning when `extra` is non-empty. This catches parser-variant mismatches instantly instead of producing silent data loss → mysterious test failures.
+
+5. **The parser is not cleanly tagged.** Each condition handler may emit 3-8 "core" keys, but many cards override or add extra fields from the original 85-field pool. The assumption that `card_count_condition` always emits `{type, count, operator, location, target}` is false — it can also emit `group_reference`, `card_property`, `character`, `delta`, `scope`, and more depending on the card. The enum variants must account for this reality, not the idealized handler output.
+6. **Feature-gate debug-only data.** `text`, `TriggerEvent`, verbose metadata → only in dev/debug builds.
+7. **Do the P0 work first.** Condition tagged enum is the biggest single win and validates the core strategy. Everything else depends on it.
+8. **Profile before and after.** Use `std::mem::size_of` and runtime heap profiling to verify gains.

@@ -36,6 +36,7 @@ static PRELOADED: OnceLock<PreloadedDb> = OnceLock::new();
 
 /// Load (once) and return a pre-seeded database.
 pub fn load_real_database() -> Arc<CardDatabase> {
+    rabuka_engine::ability::debug::set_debug(true);
     PRELOADED.get_or_init(|| {
         let cards = CardLoader::load_cards_from_strs(CARDS_JSON, Some(ABILITIES_JSON))
             .expect("Failed to load embedded cards");
@@ -135,12 +136,17 @@ impl TestGame {
         state.current_phase = Phase::Main;
         state.current_turn_phase = TurnPhase::FirstAttackerNormal;
         state.turn_number = 1;
+        if std::env::var("RUST_LOG").is_ok() {
+            let _ = env_logger::try_init();
+        }
         let debug_enabled = std::env::var("RABUKA_DEBUG").is_ok();
         if debug_enabled {
             rabuka_engine::ability::debug::set_debug(true);
         }
-        // Always enable structured verdict items in tests so log assertions work
-        rabuka_engine::ability::debug::set_rule_log_verbose(true);
+        // Off by default. Set RABUKA_VERBOSE=1 for structured verdict items in rule_log.
+        if std::env::var("RABUKA_VERBOSE").is_ok() {
+            rabuka_engine::ability::debug::set_rule_log_verbose(true);
+        }
 
         TestGame {
             db: state.card_database.clone(),

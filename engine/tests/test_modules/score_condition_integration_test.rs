@@ -1,7 +1,6 @@
 use crate::helpers::*;
-use rabuka_engine::card::{
-    ComparisonTarget, ComparisonType, ConditionCardType, ConditionTarget, Location,
-};
+use rabuka_engine::ability::condition::ConditionContext;
+use rabuka_engine::card::{ComparisonTarget, ComparisonType, Condition, ConditionCardType};
 use rabuka_engine::zones::MemberArea;
 
 /// Helper to calculate total score in P1's success_live_card_zone
@@ -20,6 +19,112 @@ fn total_success_score(game: &TestGame) -> u32 {
 /// Build a live card ID by name (for readability)
 fn live_named(game: &TestGame, name: &str) -> i16 {
     game.id(name)
+}
+
+fn score_comparison_condition(operator: Option<&str>) -> Condition {
+    Condition::Comparison {
+        text: None,
+        negation: None,
+        phase: None,
+        phase_target: None,
+        cache: None,
+        trigger_event: None,
+        comparison_type: Some(ComparisonType::Score),
+        comparison_target: Some(ComparisonTarget::Opponent),
+        target: None,
+        location: None,
+        operator: operator.map(Box::from),
+        count: None,
+        values: None,
+        card_type: None,
+        group_names: None,
+        position: None,
+        position_compare: None,
+        aggregate: None,
+        heart_colors: None,
+        scope: None,
+        cost_total: None,
+        cost_total_operator: None,
+        resource_type: None,
+        delta: None,
+        cost_limit: None,
+        source: None,
+        comparison_source: None,
+        locations: None,
+        exclude_group_names: None,
+        characters: None,
+        exclude_characters: None,
+        same_name: None,
+        distinct: None,
+        all: None,
+        all_areas: None,
+        exclude_self: None,
+        self_target: None,
+        destination: None,
+        state: None,
+        require_position_cards: None,
+        temporal: None,
+        yell_trigger: None,
+        no_excess_heart: None,
+        card_property: None,
+        ability_filter: None,
+        ability_filter_triggers: None,
+        baton_touch_trigger: None,
+        min_baton_touch_count: None,
+        from_state: None,
+        to_state: None,
+    }
+}
+
+fn group_condition() -> Condition {
+    Condition::Group {
+        text: None,
+        negation: None,
+        phase: None,
+        phase_target: None,
+        cache: None,
+        trigger_event: None,
+        group_names: Some(vec!["蓮ノ空".to_string()]),
+        all_members: None,
+        location: Some(Box::from("stage")),
+        target: Some(Box::from("self")),
+        heart_colors: None,
+        card_type: Some(ConditionCardType::MemberCard),
+        operator: None,
+        count: None,
+        aggregate: None,
+        exclude_characters: None,
+        temporal: None,
+        self_target: None,
+        exclude_self: None,
+        heart_source: None,
+        source: None,
+        locations: None,
+        position: None,
+    }
+}
+
+/// Helper: create a score comparison condition
+fn score_gt_opponent_condition() -> Condition {
+    score_comparison_condition(Some(">"))
+}
+
+/// Helper: create compound condition (score > opponent AND 蓮ノ空 on stage)
+fn compound_dododo_condition() -> Condition {
+    Condition::Compound {
+        text: None,
+        negation: None,
+        phase: None,
+        phase_target: None,
+        cache: None,
+        trigger_event: None,
+        operator: Some(Box::from("and")),
+        target: None,
+        conditions: Some(vec![
+            Box::new(score_comparison_condition(Some(">"))),
+            Box::new(group_condition()),
+        ]),
+    }
 }
 
 /// RIN (PL!-bp5-005-R): 登場, if success_zone total score >= 6 → gain 1 energy from energy_deck.
@@ -168,48 +273,6 @@ fn rin_score_condition_no_cards() {
 // where the operator was missing when compound conditions used 高く / 低く
 // instead of 高い / 低い before かつ/、.
 // ======================================================================
-use rabuka_engine::ability::condition::ConditionContext;
-use rabuka_engine::ability::enums::ConditionType;
-use rabuka_engine::card::Condition;
-
-/// Helper: create a score comparison condition
-fn score_gt_opponent_condition() -> Condition {
-    Condition {
-        condition_type: Some(ConditionType::ComparisonCondition),
-        comparison_type: Some(ComparisonType::Score),
-        comparison_target: Some(ComparisonTarget::Opponent),
-        operator: Some(">".into()),
-        ..Default::default()
-    }
-}
-
-/// Helper: create compound condition (score > opponent AND 蓮ノ空 on stage)
-fn compound_dododo_condition() -> Condition {
-    Condition {
-        condition_type: Some(ConditionType::Compound),
-        operator: Some("and".into()),
-        conditions: Some(vec![
-            // Sub-condition 1: score > opponent
-            Box::new(Condition {
-                condition_type: Some(ConditionType::ComparisonCondition),
-                comparison_type: Some(ComparisonType::Score),
-                comparison_target: Some(ComparisonTarget::Opponent),
-                operator: Some(">".into()),
-                ..Default::default()
-            }),
-            // Sub-condition 2: 蓮ノ空 member on self stage
-            Box::new(Condition {
-                condition_type: Some(ConditionType::GroupCondition),
-                target: Some(ConditionTarget::Self_),
-                location: Some(Location::Stage),
-                card_type: Some(ConditionCardType::MemberCard),
-                group_names: Some(vec!["蓮ノ空".to_string()]),
-                ..Default::default()
-            }),
-        ]),
-        ..Default::default()
-    }
-}
 
 /// P1 score=2, P2 score=0, operator=">" → PASS
 #[test]
@@ -346,17 +409,6 @@ fn compound_dododo_tied_score_with_hasunosora_fails() {
 // Group condition verification: 蓮ノ空 group condition
 // ======================================================================
 
-fn hasunosora_group_condition() -> Condition {
-    Condition {
-        condition_type: Some(ConditionType::GroupCondition),
-        target: Some(ConditionTarget::Self_),
-        location: Some(Location::Stage),
-        card_type: Some(ConditionCardType::MemberCard),
-        group_names: Some(vec!["蓮ノ空".to_string()]),
-        ..Default::default()
-    }
-}
-
 /// 蓮ノ空 member on stage → PASS
 #[test]
 fn hasunosora_group_member_present_passes() {
@@ -368,7 +420,7 @@ fn hasunosora_group_member_present_passes() {
 
     let ctx = ConditionContext::new(&game.state);
     assert!(
-        ctx.evaluate_condition(&hasunosora_group_condition()),
+        ctx.evaluate_condition(&group_condition()),
         "蓮ノ空 member on stage → group condition should PASS"
     );
 }
@@ -384,7 +436,7 @@ fn hasunosora_group_no_member_fails() {
 
     let ctx = ConditionContext::new(&game.state);
     assert!(
-        !ctx.evaluate_condition(&hasunosora_group_condition()),
+        !ctx.evaluate_condition(&group_condition()),
         "Non-蓮ノ空 member on stage → group condition should FAIL"
     );
 }
@@ -401,7 +453,7 @@ fn hasunosora_group_mixed_stage_passes() {
 
     let ctx = ConditionContext::new(&game.state);
     assert!(
-        ctx.evaluate_condition(&hasunosora_group_condition()),
+        ctx.evaluate_condition(&group_condition()),
         "蓮ノ空 member + other members on stage → group condition should PASS (at least one)"
     );
 }
@@ -421,13 +473,7 @@ fn score_comparison_without_operator_always_passes() {
     let game = TestGame::new(db);
 
     // P1 score = 0 (no cards), P2 score = 0 (no cards) — equal
-    let condition_no_op = Condition {
-        condition_type: Some(ConditionType::ComparisonCondition),
-        comparison_type: Some(ComparisonType::Score),
-        comparison_target: Some(ComparisonTarget::Opponent),
-        operator: None, // ← no operator → defaults to pass-through
-        ..Default::default()
-    };
+    let condition_no_op = score_comparison_condition(None);
 
     let ctx = ConditionContext::new(&game.state);
     assert!(
@@ -436,10 +482,7 @@ fn score_comparison_without_operator_always_passes() {
     );
 
     // Now verify that WITH operator=">" it correctly fails for equal scores
-    let condition_with_op = Condition {
-        operator: Some(">".into()),
-        ..condition_no_op.clone()
-    };
+    let condition_with_op = score_comparison_condition(Some(">"));
     assert!(
         !ctx.evaluate_condition(&condition_with_op),
         "With operator='>', 0 == 0 should FAIL"

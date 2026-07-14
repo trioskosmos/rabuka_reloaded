@@ -2,14 +2,13 @@ use std::sync::atomic::Ordering;
 
 use super::debug::AbDebug;
 use crate::ability::debug::ABILITY_DEBUG;
-use crate::ability::enums::ConditionType;
-use crate::ability::enums::Zone;
+use crate::ability::enums::{ConditionType, Zone};
 use crate::card::{CardState, Condition};
 use crate::game_state::Phase;
 use serde_json::json;
 
 pub(crate) fn comparison_default_count(condition: &Condition) -> u32 {
-    if condition.location.is_some() || condition.card_type.is_some() {
+    if condition.get_location().is_some() || condition.get_card_type().is_some() {
         1
     } else {
         0
@@ -152,24 +151,64 @@ pub fn push_cond_verdict(
     children: Vec<crate::ability::log::AbilityLogItem>,
 ) {
     use crate::ability::log::{push_verdict, AbilityLogItem};
-    let ct = condition.condition_type;
-    let condition_type = ct.map(|t| t.to_str().to_string()).unwrap_or_default();
-    let op = condition.operator.as_deref().unwrap_or(">=");
-    let threshold = condition.count.map(|c| c.to_string()).unwrap_or_default();
-    let resource = condition.resource_type.as_deref().unwrap_or("");
-    let location = condition.location.as_deref().unwrap_or("");
+    let condition_type = match condition {
+        Condition::Appearance { .. } => "appearance_condition",
+        Condition::Comparison { .. } => "comparison_condition",
+        Condition::Location { .. } => "card_count_condition",
+        Condition::Movement { .. } => "movement_condition",
+        Condition::Group { .. } => "group_condition",
+        Condition::PositionCond { .. } => "position_condition",
+        Condition::Resource { .. } => "resource_condition",
+        Condition::ScoreThreshold { .. } => "score_threshold_condition",
+        Condition::State { .. } => "state_condition",
+        Condition::Temporal { .. } => "temporal_condition",
+        Condition::AbilityFilter { .. } => "ability_filter_condition",
+        Condition::Choice { .. } => "choice_condition",
+        Condition::Complex { .. } => "complex_condition",
+        Condition::OpponentChoice { .. } => "opponent_choice_condition",
+        Condition::OpponentLiveSuccess { .. } => "opponent_live_success",
+        Condition::NoExcessHeart { .. } => "no_excess_heart",
+        Condition::Compound { .. } => "compound",
+        Condition::AnyOf { .. } => "any_of_condition",
+        Condition::AlwaysTrue { .. } => "otherwise_condition",
+        Condition::AllRevealedMatchHeartColor { .. } => "all_revealed_match_heart_color",
+    }
+    .to_string();
+    let op = condition.get_operator().unwrap_or(">=");
+    let threshold = condition
+        .get_count()
+        .map(|c| c.to_string())
+        .unwrap_or_default();
+    let resource = condition.get_resource_type().unwrap_or("");
+    let location = condition.get_location().unwrap_or("");
 
-    let expectation = match ct {
-        Some(ConditionType::AppearanceCondition) => {
-            if let Some(ref chars) = condition.characters {
+    let expectation = match condition {
+        Condition::Appearance { .. } => {
+            if let Some(ref chars) = condition.get_characters() {
                 if !chars.is_empty() {
-                    if condition.cost_reference_character.is_some() {
-                        format!(
-                            "{} {} {}",
-                            chars[0],
-                            condition.cost_reference_operator.as_deref().unwrap_or(">"),
-                            condition.cost_reference_character.as_deref().unwrap_or("")
-                        )
+                    let has_cost_ref = matches!(
+                        condition,
+                        Condition::Appearance {
+                            cost_reference_character: Some(_),
+                            ..
+                        }
+                    );
+                    if has_cost_ref {
+                        if let Condition::Appearance {
+                            cost_reference_operator,
+                            cost_reference_character,
+                            ..
+                        } = condition
+                        {
+                            format!(
+                                "{} {} {}",
+                                chars[0],
+                                cost_reference_operator.as_deref().unwrap_or(">"),
+                                cost_reference_character.as_deref().unwrap_or("")
+                            )
+                        } else {
+                            format!("{} = true", chars[0])
+                        }
                     } else {
                         format!("{} = true", chars[0])
                     }
@@ -180,7 +219,7 @@ pub fn push_cond_verdict(
                 "登場=true".into()
             }
         }
-        Some(ConditionType::ComparisonCondition) => {
+        Condition::Comparison { .. } => {
             if !resource.is_empty() {
                 format!("{}{} {}{}", op, threshold, resource, location)
             } else if !location.is_empty() {
@@ -189,8 +228,11 @@ pub fn push_cond_verdict(
                 format!("{}{}", op, threshold)
             }
         }
-        Some(ConditionType::CardCountCondition) => {
-            let ct_field = condition.card_type.as_deref().unwrap_or("");
+        Condition::Location { .. } => {
+            let ct_field = condition
+                .get_card_type()
+                .map(|ct| ct.as_str())
+                .unwrap_or("");
             if !ct_field.is_empty() {
                 format!("{}{} {} {}", op, threshold, ct_field, location)
             } else if !location.is_empty() {
@@ -199,60 +241,60 @@ pub fn push_cond_verdict(
                 format!("{}{}", op, threshold)
             }
         }
-        Some(ConditionType::LocationCondition) => {
-            format!("位置={}", location)
-        }
-        Some(ConditionType::GroupCondition) => {
-            if let Some(ref gns) = condition.group_names {
+        Condition::Group { .. } => {
+            if let Some(gns) = condition.get_group_names() {
                 format!("所属={}", gns.join(","))
             } else {
                 "所属条件".into()
             }
         }
-        Some(ConditionType::PositionCondition) => {
-            if let Some(ref pos) = condition.position {
+        Condition::PositionCond { .. } => {
+            if let Some(pos) = condition.get_position() {
                 format!("位置={}", pos.get_position().unwrap_or("?"))
             } else {
                 "位置条件".into()
             }
         }
-        Some(ConditionType::CardBladeCondition) => {
+        Condition::Resource { .. } => {
             format!("ブレード{}{}", op, threshold)
         }
-        Some(ConditionType::ScoreThresholdCondition) => {
+        Condition::ScoreThreshold { .. } => {
             format!("スコア{}{}", op, threshold)
         }
-        Some(ConditionType::ResourceCondition) => {
-            format!("資源{}{}", op, threshold)
+        Condition::State {
+            energy_state,
+            state,
+            ..
+        } => {
+            if energy_state.is_some() {
+                energy_state
+                    .as_deref()
+                    .unwrap_or("エネルギー状態")
+                    .to_string()
+            } else {
+                let st = state.as_deref().unwrap_or("状態");
+                let loc = condition.get_location().unwrap_or("stage");
+                format!("{}状態を{}で確認", st, loc)
+            }
         }
-        Some(ConditionType::StateCondition) => {
-            let state = condition.state.map(CardState::as_str).unwrap_or("状態");
-            let loc = condition.location.as_deref().unwrap_or("stage");
-            format!("{}状態を{}で確認", state, loc)
+        Condition::Movement { .. } => {
+            format!("移動={}", condition.get_movement().unwrap_or("?"))
         }
-        Some(ConditionType::MovementCondition) => {
-            format!("移動={}", condition.movement.as_deref().unwrap_or("?"))
-        }
-        Some(ConditionType::TemporalCondition) => condition
-            .temporal
-            .as_deref()
-            .unwrap_or("タイミング")
-            .to_string(),
-        Some(ConditionType::EnergyStateCondition) => condition
-            .energy_state
-            .as_deref()
-            .unwrap_or("エネルギー状態")
-            .to_string(),
-        Some(ConditionType::AbilityFilterCondition) => condition
-            .ability_filter
-            .as_deref()
+        Condition::Temporal { .. } => condition.get_temporal().unwrap_or("タイミング").to_string(),
+        Condition::AbilityFilter { .. } => condition
+            .get_ability_filter()
+            .map(|_| "フィルター")
             .unwrap_or("フィルター")
             .to_string(),
-        Some(ConditionType::NoExcessHeart) => "余剰ハートなし".into(),
-        Some(ConditionType::AllCostComparisonCondition) => {
-            format!("全コスト合計{}{}", op, threshold)
-        }
-        _ => String::new(),
+        Condition::NoExcessHeart { .. } => "余剰ハートなし".into(),
+        Condition::Choice { .. }
+        | Condition::Complex { .. }
+        | Condition::OpponentChoice { .. }
+        | Condition::OpponentLiveSuccess { .. }
+        | Condition::Compound { .. }
+        | Condition::AnyOf { .. }
+        | Condition::AlwaysTrue { .. }
+        | Condition::AllRevealedMatchHeartColor { .. } => String::new(),
     };
 
     let actual = if !extra_actual.is_empty() {
@@ -264,7 +306,10 @@ pub fn push_cond_verdict(
     };
 
     push_verdict(AbilityLogItem::Condition {
-        text: condition.text.clone(),
+        text: condition
+            .get_text()
+            .map(|s| s.to_string())
+            .unwrap_or_default(),
         condition_type,
         expectation,
         actual,
@@ -282,10 +327,9 @@ impl<'a> ConditionContext<'a> {
         if self.skip_phase_gate {
             return true;
         }
-        let te = condition.trigger_event.as_ref();
+        let te = condition.get_trigger_event();
         let Some(phase) = condition
-            .phase
-            .as_deref()
+            .get_phase()
             .or_else(|| te.and_then(|t| t.phase.as_deref()))
         else {
             return true; // no phase restriction
@@ -296,8 +340,7 @@ impl<'a> ConditionContext<'a> {
                     return false;
                 }
                 let pt = condition
-                    .phase_target
-                    .as_deref()
+                    .get_phase_target()
                     .or_else(|| te.and_then(|t| t.phase_target.as_deref()));
                 match pt {
                     Some("self") => self
@@ -316,8 +359,7 @@ impl<'a> ConditionContext<'a> {
                     return false;
                 }
                 let pt = condition
-                    .phase_target
-                    .as_deref()
+                    .get_phase_target()
                     .or_else(|| te.and_then(|t| t.phase_target.as_deref()));
                 match pt {
                     Some("self") => self
@@ -343,8 +385,7 @@ impl<'a> ConditionContext<'a> {
                     return false;
                 }
                 let pt = condition
-                    .phase_target
-                    .as_deref()
+                    .get_phase_target()
                     .or_else(|| te.and_then(|t| t.phase_target.as_deref()));
                 match pt {
                     Some("self") => self
@@ -365,16 +406,13 @@ impl<'a> ConditionContext<'a> {
     pub fn evaluate_condition(&self, condition: &Condition) -> bool {
         // Handle aggregate total with heart_colors — runs before type dispatch.
         // Skip early return for TemporalCondition so the phase gate is checked too.
-        if condition.condition_type != Some(ConditionType::TemporalCondition)
-            && condition.aggregate.as_deref() == Some("total")
-            && condition
-                .heart_colors
-                .as_ref()
-                .is_some_and(|c| !c.is_empty())
-            && Zone::from_str(condition.location.as_deref().unwrap_or("")) != Some(Zone::Stage)
+        if !matches!(condition, Condition::Temporal { .. })
+            && condition.get_aggregate() == Some("total")
+            && condition.get_heart_colors().is_some_and(|c| !c.is_empty())
+            && Zone::from_str(condition.get_location().unwrap_or("")) != Some(Zone::Stage)
         {
-            let location = condition.location.as_deref().unwrap_or("");
-            let target = condition.target.as_deref().unwrap_or("self");
+            let location = condition.get_location().unwrap_or("");
+            let target = condition.get_target().unwrap_or("self");
             let player = self.resolve_condition_player(target);
             if let Some(result) = self.check_aggregate_total(condition, player, location) {
                 return result;
@@ -382,20 +420,16 @@ impl<'a> ConditionContext<'a> {
         }
 
         let mut dbg = AbDebug::new();
-        let ct = condition.condition_type;
         // Snapshot buffer before compound/or so children can be collected
         let _before = crate::ability::log::buffer_len();
         // Handle compound/or first — they push their own verdicts with children
-        match ct {
-            Some(ConditionType::Compound) => {
-                let r = self.evaluate_compound_condition(condition);
-                return r;
-            }
-            Some(ConditionType::OrCondition) => {
+        if let Condition::Compound { .. } = condition {
+            if condition.get_operator() == Some("or") {
                 let r = self.evaluate_or_condition(condition);
                 return r;
             }
-            _ => {}
+            let r = self.evaluate_compound_condition(condition);
+            return r;
         }
         // Phase gate: check phase/phase_target restrictions. This must run
         // BEFORE individual type evaluators so the gate applies universally.
@@ -405,80 +439,102 @@ impl<'a> ConditionContext<'a> {
             return false;
         }
         // For all other types: run evaluator, then push generic verdict
-        let result: bool = match ct {
-            Some(ConditionType::AppearanceCondition) => {
-                self.evaluate_appearance_condition(condition)
+        let result: bool = match condition {
+            Condition::Appearance { .. } => self.evaluate_appearance_condition(condition),
+            Condition::Comparison { .. } => {
+                // both_condition: has values but NO operator and NO comparison_type
+                if condition.get_values().is_some() && condition.get_operator().is_none() {
+                    self.evaluate_both_condition(condition)
+                } else if condition.get_position().is_some()
+                    && condition.get_count().is_none()
+                    && condition.get_position_compare().is_none()
+                    && condition.get_comparison_target().is_none()
+                {
+                    // highest_cost_on_stage_condition: position set, no count,
+                    // no position_compare, and NO comparison_target (if comparison_target
+                    // is set, e.g. "opponent", it's a cross-player comparison handled by
+                    // evaluate_comparison_condition instead).
+                    self.evaluate_highest_cost_on_stage_condition(condition)
+                } else if condition.get_comparison_type() == Some("cost")
+                    && condition.get_position().is_none()
+                    && condition.get_count().is_none()
+                    && condition.get_values().is_none()
+                    && (condition.get_comparison_target().is_none()
+                        || condition.get_comparison_target()
+                            == Some(crate::card::ComparisonTarget::Self_))
+                    && condition.get_all().unwrap_or(false)
+                {
+                    // all_cost_comparison_condition: cost comparison, no position/count/values,
+                    // comparison_target is either None or Self_, AND all=true
+                    self.evaluate_all_cost_comparison_condition(condition)
+                } else {
+                    self.evaluate_comparison_condition(condition)
+                }
             }
-            Some(ConditionType::ComparisonCondition) => {
-                self.evaluate_comparison_condition(condition)
+            Condition::Location { .. } => {
+                if condition.get_count().is_some()
+                    || condition.get_source() == Some("preceding_moved")
+                {
+                    // For distinct conditions with multiple locations (e.g. stage+waitroom),
+                    // route to evaluate_multi_location_condition which handles combined zones.
+                    if condition.get_distinct().is_some_and(|d| d.is_distinct())
+                        && condition.get_locations().is_some()
+                    {
+                        self.evaluate_multi_location_condition(condition)
+                    } else {
+                        self.evaluate_card_count_condition(condition)
+                    }
+                } else {
+                    self.evaluate_location_condition(condition)
+                }
             }
-            Some(ConditionType::CardCountCondition) => {
-                self.evaluate_card_count_condition(condition)
+            Condition::Resource { .. } => {
+                if condition.get_resource_type().is_some() {
+                    self.evaluate_resource_condition(condition)
+                } else {
+                    self.evaluate_card_blade_condition(condition)
+                }
             }
-            Some(ConditionType::LocationCondition) => self.evaluate_location_condition(condition),
-            Some(ConditionType::CardBladeCondition) => {
-                self.evaluate_card_blade_condition(condition)
+            Condition::Group { .. } => self.evaluate_group_condition(condition),
+            Condition::PositionCond { .. } => self.evaluate_position_condition(condition),
+            Condition::Temporal { .. } => self.evaluate_temporal_condition(condition),
+            Condition::Movement { .. } => self.evaluate_movement_condition(condition),
+            Condition::State { energy_state, .. } => {
+                if condition.get_from_state().is_some() || condition.get_to_state().is_some() {
+                    self.evaluate_state_change_condition(condition)
+                } else if energy_state.is_some() {
+                    self.evaluate_energy_state_condition(condition)
+                } else {
+                    self.evaluate_state_condition(condition)
+                }
             }
-            Some(ConditionType::GroupCondition) => self.evaluate_group_condition(condition),
-            Some(ConditionType::PositionCondition) => self.evaluate_position_condition(condition),
-            Some(ConditionType::TemporalCondition) => self.evaluate_temporal_condition(condition),
-            Some(ConditionType::MovementCondition) => self.evaluate_movement_condition(condition),
-            Some(ConditionType::StateCondition) => self.evaluate_state_condition(condition),
-            Some(ConditionType::EnergyStateCondition) => {
-                self.evaluate_energy_state_condition(condition)
-            }
-            Some(ConditionType::AbilityFilterCondition) => {
-                self.evaluate_ability_filter_condition(condition)
-            }
-            Some(ConditionType::AnyOfCondition) => self.evaluate_any_of_condition(condition),
-            Some(ConditionType::ScoreThresholdCondition) => {
-                self.evaluate_score_threshold_condition(condition)
-            }
-            Some(ConditionType::ChoiceCondition) => self.evaluate_choice_condition(condition),
-            Some(ConditionType::PositionChangeCondition) => {
-                self.evaluate_position_change_condition(condition)
-            }
-            Some(ConditionType::StateChangeCondition) => {
-                self.evaluate_state_change_condition(condition)
-            }
-            Some(ConditionType::OpponentChoiceCondition) => {
-                self.evaluate_opponent_choice_condition(condition)
-            }
-            Some(ConditionType::OpponentLiveSuccess) => {
+            Condition::AbilityFilter { .. } => self.evaluate_ability_filter_condition(condition),
+            Condition::AnyOf { .. } => self.evaluate_any_of_condition(condition),
+            Condition::ScoreThreshold { .. } => self.evaluate_score_threshold_condition(condition),
+            Condition::Choice { .. } => self.evaluate_choice_condition(condition),
+            Condition::OpponentChoice { .. } => self.evaluate_opponent_choice_condition(condition),
+            Condition::OpponentLiveSuccess { .. } => {
                 self.evaluate_opponent_live_success_condition(condition)
             }
-            Some(ConditionType::ComplexCondition) => self.evaluate_complex_condition(condition),
-            Some(ConditionType::NoExcessHeart) => {
-                self.evaluate_no_excess_heart_condition(condition)
-            }
-            Some(ConditionType::ResourceCondition) => self.evaluate_resource_condition(condition),
-            Some(ConditionType::AllCostComparisonCondition) => {
-                self.evaluate_all_cost_comparison_condition(condition)
-            }
-            Some(ConditionType::HighestCostOnStageCondition) => {
-                self.evaluate_highest_cost_on_stage_condition(condition)
-            }
-            Some(ConditionType::OtherwiseCondition) => true,
-            Some(ConditionType::ActionSuccessCondition) => true,
-            Some(ConditionType::BothCondition) => self.evaluate_both_condition(condition),
-            Some(ConditionType::AllRevealedMatchHeartColor) => {
+            Condition::Complex { .. } => self.evaluate_complex_condition(condition),
+            Condition::NoExcessHeart { .. } => self.evaluate_no_excess_heart_condition(condition),
+            Condition::AlwaysTrue { .. } => true,
+            Condition::AllRevealedMatchHeartColor { .. } => {
                 self.evaluate_all_revealed_match_heart_color(condition)
             }
-            Some(ConditionType::Custom) => true,
-            Some(ConditionType::NotMoved) | Some(ConditionType::HasMoved) => false,
-            // Compound & OrCondition handled above via early return — never reachable here
-            Some(ConditionType::Compound) | Some(ConditionType::OrCondition) => unreachable!(),
-            None => false,
+            Condition::Compound { .. } => unreachable!(),
         };
 
-        let final_result = if condition.negation.unwrap_or(false)
-            && !(ct == Some(ConditionType::CardCountCondition) && condition.card_property.is_some())
-            && !(ct == Some(ConditionType::MovementCondition) && condition.card_property.is_some())
-            && !(ct == Some(ConditionType::LocationCondition) && condition.card_property.is_some())
-            && !(ct == Some(ConditionType::LocationCondition)
-                && condition.heart_type.as_deref() == Some("all"))
-            && !(ct == Some(ConditionType::LocationCondition)
-                && condition.location.as_deref() == Some("revealed_cards")
+        let is_plain_location = matches!(condition, Condition::Location { count: None, .. });
+
+        let final_result = if condition.get_negation().unwrap_or(false)
+            && !(matches!(condition, Condition::Location { .. })
+                && condition.get_card_property().is_some())
+            && !(matches!(condition, Condition::Movement { .. })
+                && condition.get_card_property().is_some())
+            && !(is_plain_location && condition.get_heart_type() == Some("all"))
+            && !(is_plain_location
+                && condition.get_location() == Some("revealed_cards")
                 && self.game_state.revealed_cards.is_empty())
         {
             !result
@@ -493,23 +549,23 @@ impl<'a> ConditionContext<'a> {
             push_cond_verdict(condition, &actual, final_result, vec![]);
         }
         if ABILITY_DEBUG.load(Ordering::Relaxed) {
-            let thresh = if ct == Some(ConditionType::ComparisonCondition) {
-                condition.count.unwrap_or(0)
+            let thresh = if matches!(condition, Condition::Comparison { .. }) {
+                condition.get_count().unwrap_or(0)
             } else {
                 1
             };
             let dbg_actual = if result {
-                condition.count.unwrap_or(1)
+                condition.get_count().unwrap_or(1)
             } else {
                 0
             };
             dbg.condition(condition, dbg_actual, thresh, final_result);
         }
 
-        if let Some(ref filter) = condition.ability_filter {
+        if let Some(filter) = condition.get_ability_filter() {
             // MovementCondition handles ability_filter internally (applies to
             // the baton-touch source/replaced member, not the activating card).
-            if ct != Some(ConditionType::MovementCondition) {
+            if !matches!(condition, Condition::Movement { .. }) {
                 let filtered =
                     self.evaluate_ability_filter_condition_with_card_check(condition, filter);
                 if !filtered {
@@ -547,8 +603,8 @@ impl<'a> ConditionContext<'a> {
             }
         };
         let cards = &self.game_state.revealed_cards;
-        let count = condition.count.unwrap_or(1) as usize;
-        let operator = condition.operator.as_deref().unwrap_or(">=");
+        let count = condition.get_count().unwrap_or(1) as usize;
+        let operator = condition.get_operator().unwrap_or(">=");
         let card_db = &self.game_state.card_database;
 
         let matching = cards
@@ -576,13 +632,13 @@ impl<'a> ConditionContext<'a> {
         let passed = self.evaluate_condition(condition);
         let actual_str = self.describe_condition_actual(condition);
         let count = self.get_count_for_condition(condition);
-        let ct = condition.condition_type;
+        let ct = condition.condition_type();
         let threshold = match ct {
-            Some(ConditionType::ComparisonCondition) => condition.count.unwrap_or(0),
-            Some(ConditionType::ScoreThresholdCondition) => condition.count.unwrap_or(0),
-            Some(ConditionType::CardCountCondition) => condition.count.unwrap_or(1),
-            Some(ConditionType::CardBladeCondition) => condition.count.unwrap_or(1),
-            _ => condition.count.unwrap_or(0),
+            Some(ConditionType::ComparisonCondition) => condition.get_count().unwrap_or(0),
+            Some(ConditionType::ScoreThresholdCondition) => condition.get_count().unwrap_or(0),
+            Some(ConditionType::CardCountCondition) => condition.get_count().unwrap_or(1),
+            Some(ConditionType::CardBladeCondition) => condition.get_count().unwrap_or(1),
+            _ => condition.get_count().unwrap_or(0),
         };
         (
             passed,
@@ -597,7 +653,7 @@ impl<'a> ConditionContext<'a> {
     /// Query game state to produce a human-readable "actual" string for this condition.
     /// This runs immediately after evaluation (game state is fresh).
     fn describe_condition_actual(&self, condition: &Condition) -> String {
-        let ct = condition.condition_type;
+        let ct = condition.condition_type();
         match ct {
             Some(ConditionType::AppearanceCondition) => self.describe_appearance_actual(condition),
             Some(ConditionType::ComparisonCondition) => {
@@ -607,8 +663,7 @@ impl<'a> ConditionContext<'a> {
             Some(ConditionType::BothCondition) => {
                 let count = self.get_count_for_condition(condition);
                 let vals = condition
-                    .values
-                    .as_ref()
+                    .get_values()
                     .map(|v| format!("{:?}", v))
                     .unwrap_or_default();
                 format!("count={}, values={}", count, vals)
@@ -618,16 +673,21 @@ impl<'a> ConditionContext<'a> {
                 format!("{}", count)
             }
             Some(ConditionType::CardBladeCondition) => {
-                if let Some(op) = condition.operator.as_deref() {
-                    format!("{} {} {}", "ブレード", op, condition.count.unwrap_or(1))
+                if let Some(op) = condition.get_operator() {
+                    format!(
+                        "{} {} {}",
+                        "ブレード",
+                        op,
+                        condition.get_count().unwrap_or(1)
+                    )
                 } else {
                     String::new()
                 }
             }
             Some(ConditionType::GroupCondition) => {
                 let player =
-                    self.resolve_condition_player(condition.target.as_deref().unwrap_or("self"));
-                let loc = condition.location.as_deref().unwrap_or("stage");
+                    self.resolve_condition_player(condition.get_target().unwrap_or("self"));
+                let loc = condition.get_location().unwrap_or("stage");
                 let ids: Vec<i16> = match Zone::from_str(loc) {
                     Some(Zone::Stage) => player
                         .stage
@@ -655,7 +715,7 @@ impl<'a> ConditionContext<'a> {
             }
             Some(ConditionType::PositionCondition) => {
                 let player =
-                    self.resolve_condition_player(condition.target.as_deref().unwrap_or("self"));
+                    self.resolve_condition_player(condition.get_target().unwrap_or("self"));
                 let ids: Vec<(usize, &i16)> = player
                     .stage
                     .stage
@@ -683,8 +743,8 @@ impl<'a> ConditionContext<'a> {
                 }
             }
             Some(ConditionType::LocationCondition) => {
-                let loc = condition.location.as_deref().unwrap_or("");
-                if let Some(ref pos) = condition.position {
+                let loc = condition.get_location().unwrap_or("");
+                if let Some(ref pos) = condition.get_position() {
                     let pos_str = pos.get_position().unwrap_or("?");
                     format!("位置={}", pos_str)
                 } else {
@@ -692,16 +752,16 @@ impl<'a> ConditionContext<'a> {
                 }
             }
             Some(ConditionType::StateCondition) => {
-                let state = condition.state.map(CardState::as_str).unwrap_or("状態");
-                let target = condition.target.as_deref().unwrap_or("self");
+                let state = condition.get_state().map(|s| s.as_str()).unwrap_or("状態");
+                let target = condition.get_target().unwrap_or("self");
                 let player = self.resolve_condition_player(target);
-                let resource_type = condition.resource_type.as_deref();
+                let resource_type = condition.get_resource_type();
                 if resource_type == Some("energy") {
                     let active = player.energy_zone.active_count();
                     let total = player.energy_zone.cards.len();
                     format!("エネルギー active={}/{}", active, total)
                 } else {
-                    let loc = condition.location.as_deref().unwrap_or("stage");
+                    let loc = condition.get_location().unwrap_or("stage");
                     let stage_cards: Vec<i16> = match Zone::from_str(loc) {
                         Some(Zone::Stage) => player
                             .stage
@@ -730,7 +790,7 @@ impl<'a> ConditionContext<'a> {
                 }
             }
             Some(ConditionType::MovementCondition) => {
-                let mov = condition.movement.as_deref().unwrap_or("?");
+                let mov = condition.get_movement().unwrap_or("?");
                 let count = self
                     .game_state
                     .recently_moved_cards
@@ -745,61 +805,61 @@ impl<'a> ConditionContext<'a> {
                 format!("登場={}, 移動={}", appeared, moved)
             }
             Some(ConditionType::NoExcessHeart) => {
-                if self.no_excess_heart_flag(condition.target.as_deref().unwrap_or("self")) {
+                if self.no_excess_heart_flag(condition.get_target().unwrap_or("self")) {
                     "余剰ハートなし".into()
                 } else {
                     "余剰ハートあり".into()
                 }
             }
             Some(ConditionType::AnyOfCondition) => {
-                if let Some(ref any_of) = condition.any_of {
+                if let Some(ref any_of) = condition.get_any_of() {
                     format!("条件={:?}", any_of)
                 } else {
                     String::new()
                 }
             }
             Some(ConditionType::ChoiceCondition) => {
-                if let Some(ref opts) = condition.options {
+                if let Some(ref opts) = condition.get_options() {
                     format!("選択肢={}個", opts.len())
                 } else {
                     "選択肢なし".into()
                 }
             }
             Some(ConditionType::EnergyStateCondition) => condition
-                .state
+                .get_state()
                 .map(CardState::as_str)
                 .map(|s| format!("エネルギー状態={}", s))
                 .unwrap_or_default(),
             Some(ConditionType::StateChangeCondition) => {
-                let from = condition.from_state.as_deref().unwrap_or("?");
-                let to = condition.to_state.as_deref().unwrap_or("?");
+                let from = condition.get_from_state().unwrap_or("?");
+                let to = condition.get_to_state().unwrap_or("?");
                 format!("状態変化: {}→{}", from, to)
             }
             Some(ConditionType::AllCostComparisonCondition) => {
-                let op = condition.operator.as_deref().unwrap_or(">");
+                let op = condition.get_operator().unwrap_or(">");
                 format!("全コスト比較{}?", op)
             }
             Some(ConditionType::ScoreThresholdCondition) => {
-                let op = condition.operator.as_deref().unwrap_or(">=");
-                format!("スコア{} {}?", op, condition.count.unwrap_or(1))
+                let op = condition.get_operator().unwrap_or(">=");
+                format!("スコア{} {}?", op, condition.get_count().unwrap_or(1))
             }
             Some(ConditionType::ResourceCondition) => {
-                format!("資源={}", condition.resource_type.as_deref().unwrap_or("?"))
+                format!("資源={}", condition.get_resource_type().unwrap_or("?"))
             }
             _ => String::new(),
         }
     }
 
     fn describe_appearance_actual(&self, condition: &Condition) -> String {
-        let target = condition.target.as_deref().unwrap_or("self");
+        let target = condition.get_target().unwrap_or("self");
         let player = self.resolve_condition_player(target);
-        let location = condition.location.as_deref().unwrap_or("");
+        let location = condition.get_location().unwrap_or("");
 
         // Check position constraints first
         let mut position_str = String::new();
-        if let Some(ref pos) = condition.position {
+        if let Some(ref pos) = condition.get_position() {
             position_str = format!("位置={}", pos.get_position().unwrap_or("?"));
-        } else if let Some(ref act_pos) = condition.activation_position {
+        } else if let Some(ref act_pos) = condition.get_activation_position() {
             let card_id = self.activating_card_id;
             let ok = act_pos.split(',').any(|p| {
                 let trimmed = p.trim();
@@ -852,7 +912,7 @@ impl<'a> ConditionContext<'a> {
                     })
                     .collect();
                 // Check character match
-                if let Some(ref chars) = condition.characters {
+                if let Some(chars) = condition.get_characters() {
                     for ch in chars {
                         let norm = crate::card::CardDatabase::normalize_name(ch);
                         let found = stage_names.iter().any(|n| n.contains(&norm));
@@ -861,7 +921,7 @@ impl<'a> ConditionContext<'a> {
                         }
                     }
                     // All matched — check cost_reference
-                    if let Some(ref ref_char) = condition.cost_reference_character {
+                    if let Some(ref ref_char) = condition.get_cost_reference_character() {
                         let subject = &chars[0];
                         let norm_sub = crate::card::CardDatabase::normalize_name(subject);
                         let norm_ref = crate::card::CardDatabase::normalize_name(ref_char);
@@ -889,7 +949,10 @@ impl<'a> ConditionContext<'a> {
                                 }
                             })
                             .next();
-                        let op = condition.cost_reference_operator.as_deref().unwrap_or(">");
+                        let op = condition
+                            .get_cost_reference_operator()
+                            .map(|o| o.as_str())
+                            .unwrap_or(">");
                         let cost_part = match (sub_cost, ref_cost) {
                             (Some(sc), Some(rc)) => format!(
                                 "{}コスト({}) {} {}コスト({})",
