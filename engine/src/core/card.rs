@@ -2047,57 +2047,6 @@ pub fn build_kind_from_action(action: &str, effect_json: &serde_json::Value) -> 
 
 /// Recursively re-populate EffectKind for a serialization-deserialized
 /// AbilityEffect that lost its `kind` (because kind is #[serde(skip)]).
-pub fn rekindle_effect(effect: &mut AbilityEffect, json_val: &serde_json::Value) {
-    let action = json_val
-        .get("action")
-        .or_else(|| json_val.get("type"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    if let Some(kind) = build_kind_from_action(action, json_val) {
-        effect.kind = Some(kind);
-    }
-    if let Some(ref mut actions) = effect.compound.actions {
-        if let Some(json_actions) = json_val.get("actions").and_then(|a| a.as_array()) {
-            for (i, action) in actions.iter_mut().enumerate() {
-                if i < json_actions.len() {
-                    rekindle_effect(action, &json_actions[i]);
-                }
-            }
-        }
-    }
-    for (field, key) in [
-        (&mut effect.compound.look_action, "look_action"),
-        (&mut effect.compound.select_action, "select_action"),
-        (&mut effect.compound.followup_action, "followup_action"),
-        (&mut effect.compound.optional_action, "optional_action"),
-        (
-            &mut effect.compound.conditional_action,
-            "conditional_action",
-        ),
-        (&mut effect.compound.primary_effect, "primary_effect"),
-    ] {
-        if let Some(ref mut sub) = field {
-            if let Some(sub_json) = json_val.get(key) {
-                rekindle_effect(sub, sub_json);
-            }
-        }
-    }
-    if let Some(EffectKind::SelectTarget {
-        ref mut options, ..
-    }) = effect.kind
-    {
-        if let Some(ref mut opts) = options {
-            if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
-                for (i, opt) in opts.iter_mut().enumerate() {
-                    if i < json_opts.len() {
-                        rekindle_effect(opt, &json_opts[i]);
-                    }
-                }
-            }
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct AbilityEffect {
     #[serde(default = "default_empty_string")]
@@ -2134,6 +2083,73 @@ pub struct AbilityEffect {
     pub effect_steps: Option<Vec<Box<AbilityEffect>>>,
 }
 
+// Macro-generated getters for EffectKind fields
+macro_rules! str_getter {
+    ($name:ident, [$($variant:ident => $field:ident),+]) => {
+        pub fn $name(&self) -> Option<&str> {
+            match &self.kind {
+                $(Some(EffectKind::$variant { $field, .. }) => $field.as_deref(),)+
+                _ => None,
+            }
+        }
+    };
+}
+
+macro_rules! u32_getter {
+    ($name:ident, [$($variant:ident => $field:ident),+]) => {
+        pub fn $name(&self) -> Option<u32> {
+            match &self.kind {
+                $(Some(EffectKind::$variant { $field, .. }) => *$field,)+
+                _ => None,
+            }
+        }
+    };
+}
+
+macro_rules! bool_getter {
+    ($name:ident, [$($variant:ident => $field:ident),+]) => {
+        pub fn $name(&self) -> Option<bool> {
+            match &self.kind {
+                $(Some(EffectKind::$variant { $field, .. }) => *$field,)+
+                _ => None,
+            }
+        }
+    };
+}
+
+macro_rules! vec_ref_getter {
+    ($name:ident, [$($variant:ident => $field:ident),+]) => {
+        pub fn $name(&self) -> Option<&Vec<String>> {
+            match &self.kind {
+                $(Some(EffectKind::$variant { $field, .. }) => $field.as_ref().map(|b| b.as_ref()),)+
+                _ => None,
+            }
+        }
+    };
+}
+
+macro_rules! vec_ref_getter_unboxed {
+    ($name:ident, [$($variant:ident => $field:ident),+]) => {
+        pub fn $name(&self) -> Option<&Vec<String>> {
+            match &self.kind {
+                $(Some(EffectKind::$variant { $field, .. }) => $field.as_ref(),)+
+                _ => None,
+            }
+        }
+    };
+}
+
+macro_rules! box_vec_ref_getter {
+    ($name:ident, [$($variant:ident => $field:ident),+]) => {
+        pub fn $name(&self) -> Option<&Vec<String>> {
+            match &self.kind {
+                $(Some(EffectKind::$variant { $field, .. }) => Some($field.as_ref()),)+
+                _ => None,
+            }
+        }
+    };
+}
+
 impl AbilityEffect {
     pub fn ability_filter_any(&self) -> Option<AbilityFilter> {
         match &self.kind {
@@ -2146,63 +2162,16 @@ impl AbilityEffect {
         }
     }
 
-    pub fn ability_filter_triggers_any(&self) -> Option<&Vec<String>> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                ability_filter_triggers,
-                ..
-            }) => ability_filter_triggers.as_ref(),
-            Some(EffectKind::SelectTarget {
-                ability_filter_triggers,
-                ..
-            }) => ability_filter_triggers.as_ref(),
-            Some(EffectKind::LookReveal {
-                ability_filter_triggers,
-                ..
-            }) => ability_filter_triggers.as_ref(),
-            Some(EffectKind::ChangeState {
-                ability_filter_triggers,
-                ..
-            }) => ability_filter_triggers.as_ref(),
-            _ => None,
-        }
-    }
+    // ability_filter_triggers is Option<Vec<String>> (unboxed)
+    vec_ref_getter_unboxed!(ability_filter_triggers_any, [MoveCards => ability_filter_triggers, SelectTarget => ability_filter_triggers, LookReveal => ability_filter_triggers, ChangeState => ability_filter_triggers]);
 
-    pub fn ability_gain_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::AbilityOp { ability_gain, .. }) => ability_gain.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(ability_gain_any, [AbilityOp => ability_gain]);
 
-    pub fn ability_gain_trigger_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::AbilityOp {
-                ability_gain_trigger,
-                ..
-            }) => ability_gain_trigger.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(ability_gain_trigger_any, [AbilityOp => ability_gain_trigger]);
 
-    pub fn ability_text_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::AbilityOp { ability_text, .. }) => ability_text.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(ability_text_any, [AbilityOp => ability_text]);
 
-    pub fn action_by_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::CustomOp { action_by, .. }) => action_by.as_deref(),
-            Some(EffectKind::SelectTarget { action_by, .. }) => action_by.as_deref(),
-            Some(EffectKind::MoveCards { action_by, .. }) => action_by.as_deref(),
-            Some(EffectKind::DrawCards { action_by, .. }) => action_by.as_deref(),
-            Some(EffectKind::ChangeState { action_by, .. }) => action_by.as_deref(),
-            Some(EffectKind::GainResource { action_by, .. }) => action_by.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(action_by_any, [CustomOp => action_by, SelectTarget => action_by, MoveCards => action_by, DrawCards => action_by, ChangeState => action_by, GainResource => action_by]);
 
     pub fn activation_condition_parsed_any(&self) -> Option<&Box<Condition>> {
         match &self.kind {
@@ -2234,97 +2203,15 @@ impl AbilityEffect {
         }
     }
 
-    pub fn activation_position_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                activation_position,
-                ..
-            }) => activation_position.as_deref(),
-            Some(EffectKind::SelectTarget {
-                activation_position,
-                ..
-            }) => activation_position.as_deref(),
-            Some(EffectKind::LookReveal {
-                activation_position,
-                ..
-            }) => activation_position.as_deref(),
-            Some(EffectKind::GainResource {
-                activation_position,
-                ..
-            }) => activation_position.as_deref(),
-            Some(EffectKind::CompoundEffect {
-                activation_position,
-                ..
-            }) => activation_position.as_deref(),
-            Some(EffectKind::ChangeState {
-                activation_position,
-                ..
-            }) => activation_position.as_deref(),
-            Some(EffectKind::AbilityOp {
-                activation_position,
-                ..
-            }) => activation_position.as_deref(),
-            Some(EffectKind::PositionOp {
-                activation_position,
-                ..
-            }) => activation_position.as_deref(),
-            Some(EffectKind::MiscOp {
-                activation_position,
-                ..
-            }) => activation_position.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(activation_position_any, [MoveCards => activation_position, SelectTarget => activation_position, LookReveal => activation_position, GainResource => activation_position, CompoundEffect => activation_position, ChangeState => activation_position, AbilityOp => activation_position, PositionOp => activation_position, MiscOp => activation_position]);
 
-    pub fn all_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { all, .. }) => *all,
-            Some(EffectKind::GainResource { all, .. }) => *all,
-            Some(EffectKind::ChangeState { all, .. }) => *all,
-            Some(EffectKind::CompoundEffect { all, .. }) => *all,
-            Some(EffectKind::MiscOp { all, .. }) => *all,
-            Some(EffectKind::AbilityOp { all, .. }) => *all,
-            Some(EffectKind::ModifyHearts { all, .. }) => *all,
-            _ => None,
-        }
-    }
+    bool_getter!(all_any, [MoveCards => all, GainResource => all, ChangeState => all, CompoundEffect => all, MiscOp => all, AbilityOp => all, ModifyHearts => all]);
 
-    pub fn all_regions_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::ChangeState { all_regions, .. }) => *all_regions,
-            Some(EffectKind::MiscOp { all_regions, .. }) => *all_regions,
-            Some(EffectKind::CustomOp { all_regions, .. }) => *all_regions,
-            _ => None,
-        }
-    }
+    bool_getter!(all_regions_any, [ChangeState => all_regions, MiscOp => all_regions, CustomOp => all_regions]);
 
-    pub fn allow_occupied_stage_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                allow_occupied_stage,
-                ..
-            }) => *allow_occupied_stage,
-            Some(EffectKind::PositionOp {
-                allow_occupied_stage,
-                ..
-            }) => *allow_occupied_stage,
-            _ => None,
-        }
-    }
+    bool_getter!(allow_occupied_stage_any, [MoveCards => allow_occupied_stage, PositionOp => allow_occupied_stage]);
 
-    pub fn alternative_count_type_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MiscOp {
-                alternative_count_type,
-                ..
-            }) => alternative_count_type.as_deref(),
-            Some(EffectKind::CompoundEffect {
-                alternative_count_type,
-                ..
-            }) => alternative_count_type.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(alternative_count_type_any, [MiscOp => alternative_count_type, CompoundEffect => alternative_count_type]);
 
     pub fn alternative_effect_any(&self) -> Option<&Box<AbilityEffect>> {
         match &self.kind {
@@ -2335,34 +2222,11 @@ impl AbilityEffect {
         }
     }
 
-    pub fn answers_any(&self) -> Option<&Vec<String>> {
-        match &self.kind {
-            Some(EffectKind::SelectTarget { answers, .. }) => answers.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::CompoundEffect { answers, .. }) => {
-                answers.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::CustomOp { answers, .. }) => answers.as_ref().map(|b| b.as_ref()),
-            _ => None,
-        }
-    }
+    vec_ref_getter!(answers_any, [SelectTarget => answers, CompoundEffect => answers, CustomOp => answers]);
 
-    pub fn any_number_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { any_number, .. }) => *any_number,
-            Some(EffectKind::GainResource { any_number, .. }) => *any_number,
-            Some(EffectKind::PositionOp { any_number, .. }) => *any_number,
-            Some(EffectKind::SelectTarget { any_number, .. }) => *any_number,
-            _ => None,
-        }
-    }
+    bool_getter!(any_number_any, [MoveCards => any_number, GainResource => any_number, PositionOp => any_number, SelectTarget => any_number]);
 
-    pub fn blade_limit_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::ChangeState { blade_limit, .. }) => *blade_limit,
-            Some(EffectKind::MiscOp { blade_limit, .. }) => *blade_limit,
-            _ => None,
-        }
-    }
+    u32_getter!(blade_limit_any, [ChangeState => blade_limit, MiscOp => blade_limit]);
 
     pub fn blade_limit_operator_any(&self) -> Option<Operator> {
         match &self.kind {
@@ -2378,72 +2242,17 @@ impl AbilityEffect {
         }
     }
 
-    pub fn blade_type_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MiscOp { blade_type, .. }) => blade_type.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(blade_type_any, [MiscOp => blade_type]);
 
-    pub fn blind_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MiscOp { blind, .. }) => *blind,
-            Some(EffectKind::LookReveal { blind, .. }) => *blind,
-            _ => None,
-        }
-    }
+    bool_getter!(blind_any, [MiscOp => blind, LookReveal => blind]);
 
-    pub fn is_reveal_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::LookReveal { is_reveal, .. }) => *is_reveal,
-            _ => None,
-        }
-    }
+    bool_getter!(is_reveal_any, [LookReveal => is_reveal]);
 
-    pub fn card_names_any(&self) -> Option<&Vec<String>> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { card_names, .. }) => Some(card_names.as_ref()),
-            Some(EffectKind::DrawCards { card_names, .. }) => Some(card_names.as_ref()),
-            Some(EffectKind::SelectTarget { card_names, .. }) => Some(card_names.as_ref()),
-            Some(EffectKind::LookReveal { card_names, .. }) => Some(card_names.as_ref()),
-            Some(EffectKind::ChangeState { card_names, .. }) => Some(card_names.as_ref()),
-            Some(EffectKind::MiscOp { card_names, .. }) => Some(card_names.as_ref()),
-            Some(EffectKind::ModifyScore { card_names, .. }) => Some(card_names.as_ref()),
-            _ => None,
-        }
-    }
+    box_vec_ref_getter!(card_names_any, [MoveCards => card_names, DrawCards => card_names, SelectTarget => card_names, LookReveal => card_names, ChangeState => card_names, MiscOp => card_names, ModifyScore => card_names]);
 
-    pub fn card_property_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { card_property, .. }) => card_property.as_deref(),
-            Some(EffectKind::SelectTarget { card_property, .. }) => card_property.as_deref(),
-            Some(EffectKind::LookReveal { card_property, .. }) => card_property.as_deref(),
-            Some(EffectKind::GainResource { card_property, .. }) => card_property.as_deref(),
-            Some(EffectKind::ChangeState { card_property, .. }) => card_property.as_deref(),
-            Some(EffectKind::ModifyScore { card_property, .. }) => card_property.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(card_property_any, [MoveCards => card_property, SelectTarget => card_property, LookReveal => card_property, GainResource => card_property, ChangeState => card_property, ModifyScore => card_property]);
 
-    pub fn card_type_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { card_type, .. }) => card_type.as_deref(),
-            Some(EffectKind::DrawCards { card_type, .. }) => card_type.as_deref(),
-            Some(EffectKind::SelectTarget { card_type, .. }) => card_type.as_deref(),
-            Some(EffectKind::LookReveal { card_type, .. }) => card_type.as_deref(),
-            Some(EffectKind::ModifyScore { card_type, .. }) => card_type.as_deref(),
-            Some(EffectKind::ModifyHearts { card_type, .. }) => card_type.as_deref(),
-            Some(EffectKind::GainResource { card_type, .. }) => card_type.as_deref(),
-            Some(EffectKind::ChangeState { card_type, .. }) => card_type.as_deref(),
-            Some(EffectKind::AbilityOp { card_type, .. }) => card_type.as_deref(),
-            Some(EffectKind::CompoundEffect { card_type, .. }) => card_type.as_deref(),
-            Some(EffectKind::RestrictionOp { card_type, .. }) => card_type.as_deref(),
-            Some(EffectKind::PositionOp { card_type, .. }) => card_type.as_deref(),
-            Some(EffectKind::MiscOp { card_type, .. }) => card_type.as_deref(),
-            Some(EffectKind::CustomOp { card_type, .. }) => card_type.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(card_type_any, [MoveCards => card_type, DrawCards => card_type, SelectTarget => card_type, LookReveal => card_type, ModifyScore => card_type, ModifyHearts => card_type, GainResource => card_type, ChangeState => card_type, AbilityOp => card_type, CompoundEffect => card_type, RestrictionOp => card_type, PositionOp => card_type, MiscOp => card_type, CustomOp => card_type]);
 
     pub fn character_effects_any(&self) -> Option<&Vec<serde_json::Value>> {
         match &self.kind {
@@ -2454,130 +2263,25 @@ impl AbilityEffect {
         }
     }
 
-    pub fn characters_any(&self) -> Option<&Vec<String>> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { characters, .. }) => {
-                characters.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::SelectTarget { characters, .. }) => {
-                characters.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::LookReveal { characters, .. }) => {
-                characters.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::GainResource { characters, .. }) => {
-                characters.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::ChangeState { characters, .. }) => {
-                characters.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::AbilityOp { characters, .. }) => {
-                characters.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::RestrictionOp { characters, .. }) => {
-                characters.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::PositionOp { characters, .. }) => {
-                characters.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::MiscOp { characters, .. }) => characters.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::CustomOp { characters, .. }) => {
-                characters.as_ref().map(|b| b.as_ref())
-            }
-            _ => None,
-        }
-    }
+    vec_ref_getter!(characters_any, [MoveCards => characters, SelectTarget => characters, LookReveal => characters, GainResource => characters, ChangeState => characters, AbilityOp => characters, RestrictionOp => characters, PositionOp => characters, MiscOp => characters, CustomOp => characters]);
 
-    pub fn choice_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MiscOp { choice, .. }) => *choice,
-            _ => None,
-        }
-    }
+    bool_getter!(choice_any, [MiscOp => choice]);
 
-    pub fn choice_based_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::RestrictionOp { choice_based, .. }) => *choice_based,
-            Some(EffectKind::CustomOp { choice_based, .. }) => *choice_based,
-            _ => None,
-        }
-    }
+    bool_getter!(choice_based_any, [RestrictionOp => choice_based, CustomOp => choice_based]);
 
-    pub fn choice_maker_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::SelectTarget { choice_maker, .. }) => choice_maker.as_deref(),
-            Some(EffectKind::CompoundEffect { choice_maker, .. }) => choice_maker.as_deref(),
-            Some(EffectKind::CustomOp { choice_maker, .. }) => choice_maker.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(choice_maker_any, [SelectTarget => choice_maker, CompoundEffect => choice_maker, CustomOp => choice_maker]);
 
-    pub fn choice_options_any(&self) -> Option<&Vec<String>> {
-        match &self.kind {
-            Some(EffectKind::SelectTarget { choice_options, .. }) => {
-                choice_options.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::CompoundEffect { choice_options, .. }) => {
-                choice_options.as_ref().map(|b| b.as_ref())
-            }
-            _ => None,
-        }
-    }
+    vec_ref_getter!(choice_options_any, [SelectTarget => choice_options, CompoundEffect => choice_options]);
 
-    pub fn choice_type_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::SelectTarget { choice_type, .. }) => choice_type.as_deref(),
-            Some(EffectKind::CompoundEffect { choice_type, .. }) => choice_type.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(choice_type_any, [SelectTarget => choice_type, CompoundEffect => choice_type]);
 
-    pub fn cost_from_revealed_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                cost_from_revealed, ..
-            }) => *cost_from_revealed,
-            Some(EffectKind::ChangeState {
-                cost_from_revealed, ..
-            }) => *cost_from_revealed,
-            Some(EffectKind::PositionOp {
-                cost_from_revealed, ..
-            }) => *cost_from_revealed,
-            _ => None,
-        }
-    }
+    bool_getter!(cost_from_revealed_any, [MoveCards => cost_from_revealed, ChangeState => cost_from_revealed, PositionOp => cost_from_revealed]);
 
-    pub fn cost_limit_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { cost_limit, .. }) => *cost_limit,
-            Some(EffectKind::SelectTarget { cost_limit, .. }) => *cost_limit,
-            Some(EffectKind::LookReveal { cost_limit, .. }) => *cost_limit,
-            Some(EffectKind::GainResource { cost_limit, .. }) => *cost_limit,
-            Some(EffectKind::ChangeState { cost_limit, .. }) => *cost_limit,
-            Some(EffectKind::AbilityOp { cost_limit, .. }) => *cost_limit,
-            Some(EffectKind::PositionOp { cost_limit, .. }) => *cost_limit,
-            Some(EffectKind::MiscOp { cost_limit, .. }) => *cost_limit,
-            _ => None,
-        }
-    }
+    u32_getter!(cost_limit_any, [MoveCards => cost_limit, SelectTarget => cost_limit, LookReveal => cost_limit, GainResource => cost_limit, ChangeState => cost_limit, AbilityOp => cost_limit, PositionOp => cost_limit, MiscOp => cost_limit]);
 
-    pub fn cost_limit_max_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { cost_limit_max, .. }) => *cost_limit_max,
-            Some(EffectKind::SelectTarget { cost_limit_max, .. }) => *cost_limit_max,
-            Some(EffectKind::LookReveal { cost_limit_max, .. }) => *cost_limit_max,
-            _ => None,
-        }
-    }
+    u32_getter!(cost_limit_max_any, [MoveCards => cost_limit_max, SelectTarget => cost_limit_max, LookReveal => cost_limit_max]);
 
-    pub fn cost_limit_min_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { cost_limit_min, .. }) => *cost_limit_min,
-            Some(EffectKind::SelectTarget { cost_limit_min, .. }) => *cost_limit_min,
-            Some(EffectKind::LookReveal { cost_limit_min, .. }) => *cost_limit_min,
-            _ => None,
-        }
-    }
+    u32_getter!(cost_limit_min_any, [MoveCards => cost_limit_min, SelectTarget => cost_limit_min, LookReveal => cost_limit_min]);
 
     pub fn cost_limit_operator_any(&self) -> Option<Operator> {
         match &self.kind {
@@ -2625,25 +2329,9 @@ impl AbilityEffect {
         }
     }
 
-    pub fn cost_reference_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { cost_reference, .. }) => cost_reference.as_deref(),
-            Some(EffectKind::MiscOp { cost_reference, .. }) => cost_reference.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(cost_reference_any, [MoveCards => cost_reference, MiscOp => cost_reference]);
 
-    pub fn cost_total_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { cost_total, .. }) => *cost_total,
-            Some(EffectKind::SelectTarget { cost_total, .. }) => *cost_total,
-            Some(EffectKind::ModifyScore { cost_total, .. }) => *cost_total,
-            Some(EffectKind::ModifyHearts { cost_total, .. }) => *cost_total,
-            Some(EffectKind::ChangeState { cost_total, .. }) => *cost_total,
-            Some(EffectKind::MiscOp { cost_total, .. }) => *cost_total,
-            _ => None,
-        }
-    }
+    u32_getter!(cost_total_any, [MoveCards => cost_total, SelectTarget => cost_total, ModifyScore => cost_total, ModifyHearts => cost_total, ChangeState => cost_total, MiscOp => cost_total]);
 
     pub fn cost_total_operator_any(&self) -> Option<Operator> {
         match &self.kind {
@@ -2675,24 +2363,9 @@ impl AbilityEffect {
         }
     }
 
-    pub fn delayed_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::RestrictionOp { delayed, .. }) => *delayed,
-            _ => None,
-        }
-    }
+    bool_getter!(delayed_any, [RestrictionOp => delayed]);
 
-    pub fn discard_remaining_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                discard_remaining, ..
-            }) => *discard_remaining,
-            Some(EffectKind::SelectTarget {
-                discard_remaining, ..
-            }) => *discard_remaining,
-            _ => None,
-        }
-    }
+    bool_getter!(discard_remaining_any, [MoveCards => discard_remaining, SelectTarget => discard_remaining]);
 
     pub fn distinct_any(&self) -> Option<DistinctType> {
         match &self.kind {
@@ -2708,19 +2381,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn duration_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::ModifyScore { duration, .. }) => duration.as_deref(),
-            Some(EffectKind::ModifyHearts { duration, .. }) => duration.as_deref(),
-            Some(EffectKind::GainResource { duration, .. }) => duration.as_deref(),
-            Some(EffectKind::AbilityOp { duration, .. }) => duration.as_deref(),
-            Some(EffectKind::RestrictionOp { duration, .. }) => duration.as_deref(),
-            Some(EffectKind::CompoundEffect { duration, .. }) => duration.as_deref(),
-            Some(EffectKind::MiscOp { duration, .. }) => duration.as_deref(),
-            Some(EffectKind::CustomOp { duration, .. }) => duration.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(duration_any, [ModifyScore => duration, ModifyHearts => duration, GainResource => duration, AbilityOp => duration, RestrictionOp => duration, CompoundEffect => duration, MiscOp => duration, CustomOp => duration]);
 
     pub fn dynamic_count_any(&self) -> Option<&DynamicCount> {
         match &self.kind {
@@ -2735,128 +2396,17 @@ impl AbilityEffect {
         }
     }
 
-    pub fn effect_constraint_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::ModifyScore {
-                effect_constraint, ..
-            }) => effect_constraint.as_deref(),
-            Some(EffectKind::MiscOp {
-                effect_constraint, ..
-            }) => effect_constraint.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(effect_constraint_any, [ModifyScore => effect_constraint, MiscOp => effect_constraint]);
 
-    pub fn effect_type_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::AbilityOp { effect_type, .. }) => effect_type.as_deref(),
-            Some(EffectKind::RestrictionOp { effect_type, .. }) => effect_type.as_deref(),
-            Some(EffectKind::CustomOp { effect_type, .. }) => effect_type.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(effect_type_any, [AbilityOp => effect_type, RestrictionOp => effect_type, CustomOp => effect_type]);
 
-    pub fn energy_count_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::GainResource { energy_count, .. }) => *energy_count,
-            Some(EffectKind::PositionOp { energy_count, .. }) => *energy_count,
-            Some(EffectKind::MiscOp { energy_count, .. }) => *energy_count,
-            Some(EffectKind::MoveCards { energy_count, .. }) => *energy_count,
-            _ => None,
-        }
-    }
+    u32_getter!(energy_count_any, [GainResource => energy_count, PositionOp => energy_count, MiscOp => energy_count, MoveCards => energy_count]);
 
-    pub fn exclude_by_name_source_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                exclude_by_name_source,
-                ..
-            }) => exclude_by_name_source.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(exclude_by_name_source_any, [MoveCards => exclude_by_name_source]);
 
-    pub fn exclude_characters_any(&self) -> Option<&Vec<String>> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                exclude_characters, ..
-            }) => exclude_characters.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::SelectTarget {
-                exclude_characters, ..
-            }) => exclude_characters.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::LookReveal {
-                exclude_characters, ..
-            }) => exclude_characters.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::GainResource {
-                exclude_characters, ..
-            }) => exclude_characters.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::ChangeState {
-                exclude_characters, ..
-            }) => exclude_characters.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::AbilityOp {
-                exclude_characters, ..
-            }) => exclude_characters.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::RestrictionOp {
-                exclude_characters, ..
-            }) => exclude_characters.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::PositionOp {
-                exclude_characters, ..
-            }) => exclude_characters.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::MiscOp {
-                exclude_characters, ..
-            }) => exclude_characters.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::CustomOp {
-                exclude_characters, ..
-            }) => exclude_characters.as_ref().map(|b| b.as_ref()),
-            _ => None,
-        }
-    }
+    vec_ref_getter!(exclude_characters_any, [MoveCards => exclude_characters, SelectTarget => exclude_characters, LookReveal => exclude_characters, GainResource => exclude_characters, ChangeState => exclude_characters, AbilityOp => exclude_characters, RestrictionOp => exclude_characters, PositionOp => exclude_characters, MiscOp => exclude_characters, CustomOp => exclude_characters]);
 
-    pub fn exclude_group_names_any(&self) -> Option<&Vec<String>> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                exclude_group_names,
-                ..
-            }) => exclude_group_names.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::SelectTarget {
-                exclude_group_names,
-                ..
-            }) => exclude_group_names.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::LookReveal {
-                exclude_group_names,
-                ..
-            }) => exclude_group_names.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::GainResource {
-                exclude_group_names,
-                ..
-            }) => exclude_group_names.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::ChangeState {
-                exclude_group_names,
-                ..
-            }) => exclude_group_names.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::AbilityOp {
-                exclude_group_names,
-                ..
-            }) => exclude_group_names.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::RestrictionOp {
-                exclude_group_names,
-                ..
-            }) => exclude_group_names.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::PositionOp {
-                exclude_group_names,
-                ..
-            }) => exclude_group_names.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::MiscOp {
-                exclude_group_names,
-                ..
-            }) => exclude_group_names.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::CustomOp {
-                exclude_group_names,
-                ..
-            }) => exclude_group_names.as_ref().map(|b| b.as_ref()),
-            _ => None,
-        }
-    }
+    vec_ref_getter!(exclude_group_names_any, [MoveCards => exclude_group_names, SelectTarget => exclude_group_names, LookReveal => exclude_group_names, GainResource => exclude_group_names, ChangeState => exclude_group_names, AbilityOp => exclude_group_names, RestrictionOp => exclude_group_names, PositionOp => exclude_group_names, MiscOp => exclude_group_names, CustomOp => exclude_group_names]);
 
     pub fn exclude_heart_colors_any(&self) -> &[String] {
         match &self.kind {
@@ -2897,71 +2447,11 @@ impl AbilityEffect {
         }
     }
 
-    pub fn exclude_selected_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                exclude_selected, ..
-            }) => *exclude_selected,
-            Some(EffectKind::SelectTarget {
-                exclude_selected, ..
-            }) => *exclude_selected,
-            _ => None,
-        }
-    }
+    bool_getter!(exclude_selected_any, [MoveCards => exclude_selected, SelectTarget => exclude_selected]);
 
-    pub fn exclude_self_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { exclude_self, .. }) => *exclude_self,
-            Some(EffectKind::DrawCards { exclude_self, .. }) => *exclude_self,
-            Some(EffectKind::SelectTarget { exclude_self, .. }) => *exclude_self,
-            Some(EffectKind::LookReveal { exclude_self, .. }) => *exclude_self,
-            Some(EffectKind::ModifyScore { exclude_self, .. }) => *exclude_self,
-            Some(EffectKind::ModifyHearts { exclude_self, .. }) => *exclude_self,
-            Some(EffectKind::GainResource { exclude_self, .. }) => *exclude_self,
-            Some(EffectKind::ChangeState { exclude_self, .. }) => *exclude_self,
-            Some(EffectKind::AbilityOp { exclude_self, .. }) => *exclude_self,
-            Some(EffectKind::RestrictionOp { exclude_self, .. }) => *exclude_self,
-            Some(EffectKind::PositionOp { exclude_self, .. }) => *exclude_self,
-            Some(EffectKind::CompoundEffect { exclude_self, .. }) => *exclude_self,
-            Some(EffectKind::MiscOp { exclude_self, .. }) => *exclude_self,
-            Some(EffectKind::CustomOp { exclude_self, .. }) => *exclude_self,
-            _ => None,
-        }
-    }
+    bool_getter!(exclude_self_any, [MoveCards => exclude_self, DrawCards => exclude_self, SelectTarget => exclude_self, LookReveal => exclude_self, ModifyScore => exclude_self, ModifyHearts => exclude_self, GainResource => exclude_self, ChangeState => exclude_self, AbilityOp => exclude_self, RestrictionOp => exclude_self, PositionOp => exclude_self, CompoundEffect => exclude_self, MiscOp => exclude_self, CustomOp => exclude_self]);
 
-    pub fn filter_targets_by_heart_colors_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                filter_targets_by_heart_colors,
-                ..
-            }) => *filter_targets_by_heart_colors,
-            Some(EffectKind::SelectTarget {
-                filter_targets_by_heart_colors,
-                ..
-            }) => *filter_targets_by_heart_colors,
-            Some(EffectKind::LookReveal {
-                filter_targets_by_heart_colors,
-                ..
-            }) => *filter_targets_by_heart_colors,
-            Some(EffectKind::ModifyScore {
-                filter_targets_by_heart_colors,
-                ..
-            }) => *filter_targets_by_heart_colors,
-            Some(EffectKind::ModifyHearts {
-                filter_targets_by_heart_colors,
-                ..
-            }) => *filter_targets_by_heart_colors,
-            Some(EffectKind::GainResource {
-                filter_targets_by_heart_colors,
-                ..
-            }) => *filter_targets_by_heart_colors,
-            Some(EffectKind::ChangeState {
-                filter_targets_by_heart_colors,
-                ..
-            }) => *filter_targets_by_heart_colors,
-            _ => None,
-        }
-    }
+    bool_getter!(filter_targets_by_heart_colors_any, [MoveCards => filter_targets_by_heart_colors, SelectTarget => filter_targets_by_heart_colors, LookReveal => filter_targets_by_heart_colors, ModifyScore => filter_targets_by_heart_colors, ModifyHearts => filter_targets_by_heart_colors, GainResource => filter_targets_by_heart_colors, ChangeState => filter_targets_by_heart_colors]);
 
     pub fn gained_effect_any(&self) -> Option<&Box<AbilityEffect>> {
         match &self.kind {
@@ -2970,98 +2460,11 @@ impl AbilityEffect {
         }
     }
 
-    pub fn group_names_any(&self) -> Option<&Vec<String>> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { group_names, .. }) => {
-                group_names.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::SelectTarget { group_names, .. }) => {
-                group_names.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::LookReveal { group_names, .. }) => {
-                group_names.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::ModifyScore { group_names, .. }) => {
-                group_names.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::ModifyHearts { group_names, .. }) => {
-                group_names.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::GainResource { group_names, .. }) => {
-                group_names.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::ChangeState { group_names, .. }) => {
-                group_names.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::AbilityOp { group_names, .. }) => {
-                group_names.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::CompoundEffect { group_names, .. }) => {
-                group_names.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::RestrictionOp { group_names, .. }) => {
-                group_names.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::PositionOp { group_names, .. }) => {
-                group_names.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::MiscOp { group_names, .. }) => {
-                group_names.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::CustomOp { group_names, .. }) => {
-                group_names.as_ref().map(|b| b.as_ref())
-            }
-            _ => None,
-        }
-    }
+    vec_ref_getter!(group_names_any, [MoveCards => group_names, SelectTarget => group_names, LookReveal => group_names, ModifyScore => group_names, ModifyHearts => group_names, GainResource => group_names, ChangeState => group_names, AbilityOp => group_names, CompoundEffect => group_names, RestrictionOp => group_names, PositionOp => group_names, MiscOp => group_names, CustomOp => group_names]);
 
-    pub fn group_reference_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                group_reference, ..
-            }) => group_reference.as_deref(),
-            Some(EffectKind::SelectTarget {
-                group_reference, ..
-            }) => group_reference.as_deref(),
-            Some(EffectKind::LookReveal {
-                group_reference, ..
-            }) => group_reference.as_deref(),
-            Some(EffectKind::ModifyHearts {
-                group_reference, ..
-            }) => group_reference.as_deref(),
-            Some(EffectKind::GainResource {
-                group_reference, ..
-            }) => group_reference.as_deref(),
-            Some(EffectKind::ChangeState {
-                group_reference, ..
-            }) => group_reference.as_deref(),
-            Some(EffectKind::MiscOp {
-                group_reference, ..
-            }) => group_reference.as_deref(),
-            Some(EffectKind::CompoundEffect {
-                group_reference, ..
-            }) => group_reference.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(group_reference_any, [MoveCards => group_reference, SelectTarget => group_reference, LookReveal => group_reference, ModifyHearts => group_reference, GainResource => group_reference, ChangeState => group_reference, MiscOp => group_reference, CompoundEffect => group_reference]);
 
-    pub fn heart_color_count_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::MiscOp {
-                heart_color_count, ..
-            }) => *heart_color_count,
-            Some(EffectKind::SelectTarget {
-                heart_color_count, ..
-            }) => *heart_color_count,
-            Some(EffectKind::LookReveal {
-                heart_color_count, ..
-            }) => *heart_color_count,
-            Some(EffectKind::GainResource {
-                heart_color_count, ..
-            }) => *heart_color_count,
-            _ => None,
-        }
-    }
+    u32_getter!(heart_color_count_any, [MiscOp => heart_color_count, SelectTarget => heart_color_count, LookReveal => heart_color_count, GainResource => heart_color_count]);
 
     pub fn heart_colors_any(&self) -> &[String] {
         match &self.kind {
@@ -3090,146 +2493,27 @@ impl AbilityEffect {
         }
     }
 
-    pub fn heart_color_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::GainResource { heart_color, .. }) => heart_color.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(heart_color_any, [GainResource => heart_color]);
 
-    pub fn heart_selection_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MiscOp {
-                heart_selection, ..
-            }) => *heart_selection,
-            _ => None,
-        }
-    }
+    bool_getter!(heart_selection_any, [MiscOp => heart_selection]);
 
-    pub fn heart_type_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::GainResource { heart_type, .. }) => heart_type.as_deref(),
-            Some(EffectKind::MiscOp { heart_type, .. }) => heart_type.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(heart_type_any, [GainResource => heart_type, MiscOp => heart_type]);
 
-    pub fn id_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MiscOp { id, .. }) => id.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(id_any, [MiscOp => id]);
 
-    pub fn identities_any(&self) -> Option<&Vec<String>> {
-        match &self.kind {
-            Some(EffectKind::ChangeState { identities, .. }) => {
-                identities.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::MiscOp { identities, .. }) => identities.as_ref().map(|b| b.as_ref()),
-            Some(EffectKind::CustomOp { identities, .. }) => {
-                identities.as_ref().map(|b| b.as_ref())
-            }
-            _ => None,
-        }
-    }
+    vec_ref_getter!(identities_any, [ChangeState => identities, MiscOp => identities, CustomOp => identities]);
 
-    pub fn location_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { location, .. }) => location.as_deref(),
-            Some(EffectKind::DrawCards { location, .. }) => location.as_deref(),
-            Some(EffectKind::SelectTarget { location, .. }) => location.as_deref(),
-            Some(EffectKind::LookReveal { location, .. }) => location.as_deref(),
-            Some(EffectKind::ModifyScore { location, .. }) => location.as_deref(),
-            Some(EffectKind::ModifyHearts { location, .. }) => location.as_deref(),
-            Some(EffectKind::GainResource { location, .. }) => location.as_deref(),
-            Some(EffectKind::ChangeState { location, .. }) => location.as_deref(),
-            Some(EffectKind::AbilityOp { location, .. }) => location.as_deref(),
-            Some(EffectKind::RestrictionOp { location, .. }) => location.as_deref(),
-            Some(EffectKind::MiscOp { location, .. }) => location.as_deref(),
-            Some(EffectKind::CustomOp { location, .. }) => location.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(location_any, [MoveCards => location, DrawCards => location, SelectTarget => location, LookReveal => location, ModifyScore => location, ModifyHearts => location, GainResource => location, ChangeState => location, AbilityOp => location, RestrictionOp => location, MiscOp => location, CustomOp => location]);
 
-    pub fn lose_blade_hearts_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MiscOp {
-                lose_blade_hearts, ..
-            }) => *lose_blade_hearts,
-            _ => None,
-        }
-    }
+    bool_getter!(lose_blade_hearts_any, [MiscOp => lose_blade_hearts]);
 
-    pub fn multiple_targets_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                multiple_targets, ..
-            }) => *multiple_targets,
-            Some(EffectKind::SelectTarget {
-                multiple_targets, ..
-            }) => *multiple_targets,
-            Some(EffectKind::PositionOp {
-                multiple_targets, ..
-            }) => *multiple_targets,
-            Some(EffectKind::LookReveal {
-                multiple_targets, ..
-            }) => *multiple_targets,
-            Some(EffectKind::GainResource {
-                multiple_targets, ..
-            }) => *multiple_targets,
-            _ => None,
-        }
-    }
+    bool_getter!(multiple_targets_any, [MoveCards => multiple_targets, SelectTarget => multiple_targets, PositionOp => multiple_targets, LookReveal => multiple_targets, GainResource => multiple_targets]);
 
-    pub fn name_constraint_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                name_constraint, ..
-            }) => name_constraint.as_deref(),
-            Some(EffectKind::SelectTarget {
-                name_constraint, ..
-            }) => name_constraint.as_deref(),
-            Some(EffectKind::LookReveal {
-                name_constraint, ..
-            }) => name_constraint.as_deref(),
-            Some(EffectKind::ChangeState {
-                name_constraint, ..
-            }) => name_constraint.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(name_constraint_any, [MoveCards => name_constraint, SelectTarget => name_constraint, LookReveal => name_constraint, ChangeState => name_constraint]);
 
-    pub fn name_constraint_source_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                name_constraint_source,
-                ..
-            }) => name_constraint_source.as_deref(),
-            Some(EffectKind::SelectTarget {
-                name_constraint_source,
-                ..
-            }) => name_constraint_source.as_deref(),
-            Some(EffectKind::LookReveal {
-                name_constraint_source,
-                ..
-            }) => name_constraint_source.as_deref(),
-            Some(EffectKind::ChangeState {
-                name_constraint_source,
-                ..
-            }) => name_constraint_source.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(name_constraint_source_any, [MoveCards => name_constraint_source, SelectTarget => name_constraint_source, LookReveal => name_constraint_source, ChangeState => name_constraint_source]);
 
-    pub fn need_heart_color_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                need_heart_color, ..
-            }) => need_heart_color.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(need_heart_color_any, [MoveCards => need_heart_color]);
 
     pub fn need_heart_operator_any(&self) -> Option<Operator> {
         match &self.kind {
@@ -3245,49 +2529,13 @@ impl AbilityEffect {
         }
     }
 
-    pub fn need_heart_total_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                need_heart_total, ..
-            }) => *need_heart_total,
-            Some(EffectKind::ModifyScore {
-                need_heart_total, ..
-            }) => *need_heart_total,
-            _ => None,
-        }
-    }
+    u32_getter!(need_heart_total_any, [MoveCards => need_heart_total, ModifyScore => need_heart_total]);
 
-    pub fn negation_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { negation, .. }) => *negation,
-            Some(EffectKind::SelectTarget { negation, .. }) => *negation,
-            Some(EffectKind::LookReveal { negation, .. }) => *negation,
-            Some(EffectKind::ModifyHearts { negation, .. }) => *negation,
-            Some(EffectKind::GainResource { negation, .. }) => *negation,
-            Some(EffectKind::ChangeState { negation, .. }) => *negation,
-            Some(EffectKind::MiscOp { negation, .. }) => *negation,
-            Some(EffectKind::ModifyScore { negation, .. }) => *negation,
-            _ => None,
-        }
-    }
+    bool_getter!(negation_any, [MoveCards => negation, SelectTarget => negation, LookReveal => negation, ModifyHearts => negation, GainResource => negation, ChangeState => negation, MiscOp => negation, ModifyScore => negation]);
 
-    pub fn non_stackable_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::RestrictionOp { non_stackable, .. }) => *non_stackable,
-            _ => None,
-        }
-    }
+    bool_getter!(non_stackable_any, [RestrictionOp => non_stackable]);
 
-    pub fn operation_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::ModifyScore { operation, .. }) => operation.as_deref(),
-            Some(EffectKind::ModifyHearts { operation, .. }) => operation.as_deref(),
-            Some(EffectKind::GainResource { operation, .. }) => operation.as_deref(),
-            Some(EffectKind::RestrictionOp { operation, .. }) => operation.as_deref(),
-            Some(EffectKind::MiscOp { operation, .. }) => operation.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(operation_any, [ModifyScore => operation, ModifyHearts => operation, GainResource => operation, RestrictionOp => operation, MiscOp => operation]);
 
     pub fn opponent_action_any(&self) -> Option<&Box<AbilityEffect>> {
         match &self.kind {
@@ -3298,24 +2546,9 @@ impl AbilityEffect {
         }
     }
 
-    pub fn option_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::AbilityOp { option, .. }) => option.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(option_any, [AbilityOp => option]);
 
-    pub fn optional_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::SelectTarget { optional, .. }) => *optional,
-            Some(EffectKind::LookReveal { optional, .. }) => *optional,
-            Some(EffectKind::GainResource { optional, .. }) => *optional,
-            Some(EffectKind::ChangeState { optional, .. }) => *optional,
-            Some(EffectKind::CompoundEffect { optional, .. }) => *optional,
-            Some(EffectKind::PositionOp { optional, .. }) => *optional,
-            _ => None,
-        }
-    }
+    bool_getter!(optional_any, [SelectTarget => optional, LookReveal => optional, GainResource => optional, ChangeState => optional, CompoundEffect => optional, PositionOp => optional]);
 
     pub fn options_any(&self) -> Option<&Vec<Box<AbilityEffect>>> {
         match &self.kind {
@@ -3346,35 +2579,11 @@ impl AbilityEffect {
         }
     }
 
-    pub fn or_card_types_any(&self) -> Option<&Vec<String>> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { or_card_types, .. }) => {
-                or_card_types.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::SelectTarget { or_card_types, .. }) => {
-                or_card_types.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::MiscOp { or_card_types, .. }) => {
-                or_card_types.as_ref().map(|b| b.as_ref())
-            }
-            _ => None,
-        }
-    }
+    vec_ref_getter!(or_card_types_any, [MoveCards => or_card_types, SelectTarget => or_card_types, MiscOp => or_card_types]);
 
-    pub fn original_cost_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::MiscOp { original_cost, .. }) => *original_cost,
-            _ => None,
-        }
-    }
+    u32_getter!(original_cost_any, [MiscOp => original_cost]);
 
-    pub fn original_count_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::ModifyHearts { original_count, .. }) => *original_count,
-            Some(EffectKind::MiscOp { original_count, .. }) => *original_count,
-            _ => None,
-        }
-    }
+    u32_getter!(original_count_any, [ModifyHearts => original_count, MiscOp => original_count]);
 
     pub fn original_operator_any(&self) -> Option<Operator> {
         match &self.kind {
@@ -3388,89 +2597,19 @@ impl AbilityEffect {
         }
     }
 
-    pub fn original_value_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { original_value, .. }) => *original_value,
-            Some(EffectKind::SelectTarget { original_value, .. }) => *original_value,
-            Some(EffectKind::LookReveal { original_value, .. }) => *original_value,
-            Some(EffectKind::ModifyHearts { original_value, .. }) => *original_value,
-            Some(EffectKind::GainResource { original_value, .. }) => *original_value,
-            Some(EffectKind::ChangeState { original_value, .. }) => *original_value,
-            Some(EffectKind::MiscOp { original_value, .. }) => *original_value,
-            Some(EffectKind::CustomOp { original_value, .. }) => *original_value,
-            Some(EffectKind::DrawCards { original_value, .. }) => *original_value,
-            Some(EffectKind::CompoundEffect { original_value, .. }) => *original_value,
-            _ => None,
-        }
-    }
+    bool_getter!(original_value_any, [MoveCards => original_value, SelectTarget => original_value, LookReveal => original_value, ModifyHearts => original_value, GainResource => original_value, ChangeState => original_value, MiscOp => original_value, CustomOp => original_value, DrawCards => original_value, CompoundEffect => original_value]);
 
-    pub fn replace_all_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::ModifyHearts { replace_all, .. }) => *replace_all,
-            _ => None,
-        }
-    }
+    bool_getter!(replace_all_any, [ModifyHearts => replace_all]);
 
-    pub fn parenthetical_any(&self) -> Option<&Vec<String>> {
-        match &self.kind {
-            Some(EffectKind::MiscOp { parenthetical, .. }) => parenthetical.as_ref(),
-            _ => None,
-        }
-    }
+    vec_ref_getter_unboxed!(parenthetical_any, [MiscOp => parenthetical]);
 
-    pub fn per_group_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { per_group, .. }) => *per_group,
-            Some(EffectKind::MiscOp { per_group, .. }) => *per_group,
-            Some(EffectKind::SelectTarget { per_group, .. }) => *per_group,
-            _ => None,
-        }
-    }
+    bool_getter!(per_group_any, [MoveCards => per_group, MiscOp => per_group, SelectTarget => per_group]);
 
-    pub fn per_group_count_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                per_group_count, ..
-            }) => *per_group_count,
-            Some(EffectKind::MiscOp {
-                per_group_count, ..
-            }) => *per_group_count,
-            Some(EffectKind::SelectTarget {
-                per_group_count, ..
-            }) => *per_group_count,
-            _ => None,
-        }
-    }
+    u32_getter!(per_group_count_any, [MoveCards => per_group_count, MiscOp => per_group_count, SelectTarget => per_group_count]);
 
-    pub fn per_unit_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::SelectTarget { per_unit, .. }) => *per_unit,
-            Some(EffectKind::LookReveal { per_unit, .. }) => *per_unit,
-            Some(EffectKind::ModifyScore { per_unit, .. }) => *per_unit,
-            Some(EffectKind::ModifyHearts { per_unit, .. }) => *per_unit,
-            Some(EffectKind::GainResource { per_unit, .. }) => *per_unit,
-            Some(EffectKind::ChangeState { per_unit, .. }) => *per_unit,
-            Some(EffectKind::DrawCards { per_unit, .. }) => *per_unit,
-            Some(EffectKind::MiscOp { per_unit, .. }) => *per_unit,
-            Some(EffectKind::CompoundEffect { per_unit, .. }) => *per_unit,
-            _ => None,
-        }
-    }
+    bool_getter!(per_unit_any, [SelectTarget => per_unit, LookReveal => per_unit, ModifyScore => per_unit, ModifyHearts => per_unit, GainResource => per_unit, ChangeState => per_unit, DrawCards => per_unit, MiscOp => per_unit, CompoundEffect => per_unit]);
 
-    pub fn per_unit_count_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::SelectTarget { per_unit_count, .. }) => *per_unit_count,
-            Some(EffectKind::DrawCards { per_unit_count, .. }) => *per_unit_count,
-            Some(EffectKind::LookReveal { per_unit_count, .. }) => *per_unit_count,
-            Some(EffectKind::ModifyScore { per_unit_count, .. }) => *per_unit_count,
-            Some(EffectKind::ModifyHearts { per_unit_count, .. }) => *per_unit_count,
-            Some(EffectKind::GainResource { per_unit_count, .. }) => *per_unit_count,
-            Some(EffectKind::ChangeState { per_unit_count, .. }) => *per_unit_count,
-            Some(EffectKind::MiscOp { per_unit_count, .. }) => *per_unit_count,
-            Some(EffectKind::CompoundEffect { per_unit_count, .. }) => *per_unit_count,
-            _ => None,
-        }
-    }
+    u32_getter!(per_unit_count_any, [SelectTarget => per_unit_count, DrawCards => per_unit_count, LookReveal => per_unit_count, ModifyScore => per_unit_count, ModifyHearts => per_unit_count, GainResource => per_unit_count, ChangeState => per_unit_count, MiscOp => per_unit_count, CompoundEffect => per_unit_count]);
 
     pub fn per_unit_heart_colors_any(&self) -> &[String] {
         match &self.kind {
@@ -3537,35 +2676,11 @@ impl AbilityEffect {
         }
     }
 
-    pub fn per_unit_type_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::SelectTarget { per_unit_type, .. }) => per_unit_type.as_deref(),
-            Some(EffectKind::LookReveal { per_unit_type, .. }) => per_unit_type.as_deref(),
-            Some(EffectKind::ModifyScore { per_unit_type, .. }) => per_unit_type.as_deref(),
-            Some(EffectKind::GainResource { per_unit_type, .. }) => per_unit_type.as_deref(),
-            Some(EffectKind::DrawCards { per_unit_type, .. }) => per_unit_type.as_deref(),
-            Some(EffectKind::ChangeState { per_unit_type, .. }) => per_unit_type.as_deref(),
-            Some(EffectKind::MiscOp { per_unit_type, .. }) => per_unit_type.as_deref(),
-            Some(EffectKind::CompoundEffect { per_unit_type, .. }) => per_unit_type.as_deref(),
-            Some(EffectKind::ModifyHearts { per_unit_type, .. }) => per_unit_type.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(per_unit_type_any, [SelectTarget => per_unit_type, LookReveal => per_unit_type, ModifyScore => per_unit_type, GainResource => per_unit_type, DrawCards => per_unit_type, ChangeState => per_unit_type, MiscOp => per_unit_type, CompoundEffect => per_unit_type, ModifyHearts => per_unit_type]);
 
-    pub fn phase_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::RestrictionOp { phase, .. }) => phase.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(phase_any, [RestrictionOp => phase]);
 
-    pub fn picker_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MiscOp { picker, .. }) => picker.as_deref(),
-            Some(EffectKind::LookReveal { picker, .. }) => picker.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(picker_any, [MiscOp => picker, LookReveal => picker]);
 
     pub fn placement_order_any(&self) -> Option<PlacementOrder> {
         match &self.kind {
@@ -3597,14 +2712,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn question_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::SelectTarget { question, .. }) => question.as_deref(),
-            Some(EffectKind::CompoundEffect { question, .. }) => question.as_deref(),
-            Some(EffectKind::CustomOp { question, .. }) => question.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(question_any, [SelectTarget => question, CompoundEffect => question, CustomOp => question]);
 
     pub fn quoted_text_any(&self) -> Option<&QuotedText> {
         match &self.kind {
@@ -3620,12 +2728,7 @@ impl AbilityEffect {
         }
     }
 
-    pub fn ref_value_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MiscOp { ref_value, .. }) => ref_value.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(ref_value_any, [MiscOp => ref_value]);
 
     pub fn repeat_limit_any(&self) -> Option<u32> {
         match &self.kind {
@@ -3642,52 +2745,13 @@ impl AbilityEffect {
         }
     }
 
-    pub fn replaces_event_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::RestrictionOp { replaces_event, .. }) => replaces_event.as_deref(),
-            Some(EffectKind::CustomOp { replaces_event, .. }) => replaces_event.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(replaces_event_any, [RestrictionOp => replaces_event, CustomOp => replaces_event]);
 
-    pub fn require_all_heart_colors_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MiscOp {
-                require_all_heart_colors,
-                ..
-            }) => *require_all_heart_colors,
-            Some(EffectKind::SelectTarget {
-                require_all_heart_colors,
-                ..
-            }) => *require_all_heart_colors,
-            Some(EffectKind::LookReveal {
-                require_all_heart_colors,
-                ..
-            }) => *require_all_heart_colors,
-            Some(EffectKind::GainResource {
-                require_all_heart_colors,
-                ..
-            }) => *require_all_heart_colors,
-            _ => None,
-        }
-    }
+    bool_getter!(require_all_heart_colors_any, [MiscOp => require_all_heart_colors, SelectTarget => require_all_heart_colors, LookReveal => require_all_heart_colors, GainResource => require_all_heart_colors]);
 
-    pub fn resource_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::GainResource { resource, .. }) => resource.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(resource_any, [GainResource => resource]);
 
-    pub fn resource_icon_count_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::MiscOp {
-                resource_icon_count,
-                ..
-            }) => *resource_icon_count,
-            _ => None,
-        }
-    }
+    u32_getter!(resource_icon_count_any, [MiscOp => resource_icon_count]);
 
     pub fn resource_on_select_any(&self) -> Option<&Box<AbilityEffect>> {
         match &self.kind {
@@ -3698,315 +2762,63 @@ impl AbilityEffect {
         }
     }
 
-    pub fn restricted_destination_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::RestrictionOp {
-                restricted_destination,
-                ..
-            }) => restricted_destination.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(restricted_destination_any, [RestrictionOp => restricted_destination]);
 
-    pub fn restriction_type_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::RestrictionOp {
-                restriction_type, ..
-            }) => restriction_type.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(restriction_type_any, [RestrictionOp => restriction_type]);
 
-    pub fn reveal_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::LookReveal { reveal, .. }) => *reveal,
-            Some(EffectKind::SelectTarget { reveal, .. }) => *reveal,
-            _ => None,
-        }
-    }
+    bool_getter!(reveal_any, [LookReveal => reveal, SelectTarget => reveal]);
 
-    pub fn same_unit_name_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MiscOp { same_unit_name, .. }) => *same_unit_name,
-            Some(EffectKind::MoveCards { same_unit_name, .. }) => *same_unit_name,
-            _ => None,
-        }
-    }
+    bool_getter!(same_unit_name_any, [MiscOp => same_unit_name, MoveCards => same_unit_name]);
 
-    pub fn self_cost_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::ChangeState { self_cost, .. }) => *self_cost,
-            Some(EffectKind::MoveCards { self_cost, .. }) => *self_cost,
-            _ => None,
-        }
-    }
+    bool_getter!(self_cost_any, [ChangeState => self_cost, MoveCards => self_cost]);
 
-    pub fn self_target_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { self_target, .. }) => *self_target,
-            Some(EffectKind::SelectTarget { self_target, .. }) => *self_target,
-            Some(EffectKind::LookReveal { self_target, .. }) => *self_target,
-            Some(EffectKind::ModifyScore { self_target, .. }) => *self_target,
-            Some(EffectKind::ModifyHearts { self_target, .. }) => *self_target,
-            Some(EffectKind::GainResource { self_target, .. }) => *self_target,
-            Some(EffectKind::ChangeState { self_target, .. }) => *self_target,
-            Some(EffectKind::AbilityOp { self_target, .. }) => *self_target,
-            Some(EffectKind::RestrictionOp { self_target, .. }) => *self_target,
-            Some(EffectKind::PositionOp { self_target, .. }) => *self_target,
-            Some(EffectKind::MiscOp { self_target, .. }) => *self_target,
-            Some(EffectKind::CustomOp { self_target, .. }) => *self_target,
-            _ => None,
-        }
-    }
+    bool_getter!(self_target_any, [MoveCards => self_target, SelectTarget => self_target, LookReveal => self_target, ModifyScore => self_target, ModifyHearts => self_target, GainResource => self_target, ChangeState => self_target, AbilityOp => self_target, RestrictionOp => self_target, PositionOp => self_target, MiscOp => self_target, CustomOp => self_target]);
 
-    pub fn shuffle_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { shuffle, .. }) => *shuffle,
-            Some(EffectKind::CompoundEffect { shuffle, .. }) => *shuffle,
-            _ => None,
-        }
-    }
+    bool_getter!(shuffle_any, [MoveCards => shuffle, CompoundEffect => shuffle]);
 
-    pub fn sign_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::GainResource { sign, .. }) => sign.as_deref(),
-            Some(EffectKind::MiscOp { sign, .. }) => sign.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(sign_any, [GainResource => sign, MiscOp => sign]);
 
-    pub fn source_card_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::AbilityOp { source_card, .. }) => source_card.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(source_card_any, [AbilityOp => source_card]);
 
-    pub fn source_position_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                source_position, ..
-            }) => source_position.as_deref(),
-            Some(EffectKind::PositionOp {
-                source_position, ..
-            }) => source_position.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(source_position_any, [MoveCards => source_position, PositionOp => source_position]);
 
-    pub fn source_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { source, .. }) => source.as_deref(),
-            Some(EffectKind::DrawCards { source, .. }) => source.as_deref(),
-            Some(EffectKind::SelectTarget { source, .. }) => source.as_deref(),
-            Some(EffectKind::LookReveal { source, .. }) => source.as_deref(),
-            Some(EffectKind::ChangeState { source, .. }) => source.as_deref(),
-            Some(EffectKind::PositionOp { source, .. }) => source.as_deref(),
-            Some(EffectKind::ModifyScore { source, .. }) => source.as_deref(),
-            Some(EffectKind::CompoundEffect { source, .. }) => source.as_deref(),
-            Some(EffectKind::AbilityOp { source, .. }) => source.as_deref(),
-            Some(EffectKind::MiscOp { source, .. }) => source.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(source_any, [MoveCards => source, DrawCards => source, SelectTarget => source, LookReveal => source, ChangeState => source, PositionOp => source, ModifyScore => source, CompoundEffect => source, AbilityOp => source, MiscOp => source]);
 
-    pub fn destination_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { destination, .. }) => destination.as_deref(),
-            Some(EffectKind::DrawCards { destination, .. }) => destination.as_deref(),
-            Some(EffectKind::SelectTarget { destination, .. }) => destination.as_deref(),
-            Some(EffectKind::LookReveal { destination, .. }) => destination.as_deref(),
-            Some(EffectKind::ChangeState { destination, .. }) => destination.as_deref(),
-            Some(EffectKind::PositionOp { destination, .. }) => destination.as_deref(),
-            Some(EffectKind::ModifyScore { destination, .. }) => destination.as_deref(),
-            Some(EffectKind::CompoundEffect { destination, .. }) => destination.as_deref(),
-            Some(EffectKind::AbilityOp { destination, .. }) => destination.as_deref(),
-            Some(EffectKind::MiscOp { destination, .. }) => destination.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(destination_any, [MoveCards => destination, DrawCards => destination, SelectTarget => destination, LookReveal => destination, ChangeState => destination, PositionOp => destination, ModifyScore => destination, CompoundEffect => destination, AbilityOp => destination, MiscOp => destination]);
 
-    pub fn count_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { count, .. }) => *count,
-            _ => None,
-        }
-    }
+    u32_getter!(count_any, [MoveCards => count]);
 
-    pub fn target_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { target, .. }) => target.as_deref(),
-            Some(EffectKind::DrawCards { target, .. }) => target.as_deref(),
-            Some(EffectKind::SelectTarget { target, .. }) => target.as_deref(),
-            Some(EffectKind::LookReveal { target, .. }) => target.as_deref(),
-            Some(EffectKind::ChangeState { target, .. }) => target.as_deref(),
-            Some(EffectKind::PositionOp { target, .. }) => target.as_deref(),
-            Some(EffectKind::ModifyScore { target, .. }) => target.as_deref(),
-            Some(EffectKind::CompoundEffect { target, .. }) => target.as_deref(),
-            Some(EffectKind::AbilityOp { target, .. }) => target.as_deref(),
-            Some(EffectKind::MiscOp { target, .. }) => target.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(target_any, [MoveCards => target, DrawCards => target, SelectTarget => target, LookReveal => target, ChangeState => target, PositionOp => target, ModifyScore => target, CompoundEffect => target, AbilityOp => target, MiscOp => target]);
 
-    pub fn state_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { state, .. }) => state.as_deref(),
-            Some(EffectKind::DrawCards { state, .. }) => state.as_deref(),
-            Some(EffectKind::LookReveal { state, .. }) => state.as_deref(),
-            Some(EffectKind::GainResource { state, .. }) => state.as_deref(),
-            Some(EffectKind::PositionOp { state, .. }) => state.as_deref(),
-            Some(EffectKind::ChangeState { state, .. }) => state.as_deref(),
-            Some(EffectKind::ModifyScore { state, .. }) => state.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(state_any, [MoveCards => state, DrawCards => state, LookReveal => state, GainResource => state, PositionOp => state, ChangeState => state, ModifyScore => state]);
 
-    pub fn state_change_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::ChangeState { state_change, .. }) => state_change.as_deref(),
-            Some(EffectKind::MoveCards { state_change, .. }) => state_change.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(state_change_any, [ChangeState => state_change, MoveCards => state_change]);
 
-    pub fn suppressed_trigger_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::AbilityOp {
-                suppressed_trigger, ..
-            }) => suppressed_trigger.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(suppressed_trigger_any, [AbilityOp => suppressed_trigger]);
 
-    pub fn target_count_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::MoveCards { target_count, .. }) => *target_count,
-            Some(EffectKind::DrawCards { target_count, .. }) => *target_count,
-            Some(EffectKind::SelectTarget { target_count, .. }) => *target_count,
-            Some(EffectKind::ModifyScore { target_count, .. }) => *target_count,
-            Some(EffectKind::ModifyHearts { target_count, .. }) => *target_count,
-            Some(EffectKind::GainResource { target_count, .. }) => *target_count,
-            Some(EffectKind::CompoundEffect { target_count, .. }) => *target_count,
-            Some(EffectKind::MiscOp { target_count, .. }) => *target_count,
-            _ => None,
-        }
-    }
+    u32_getter!(target_count_any, [MoveCards => target_count, DrawCards => target_count, SelectTarget => target_count, ModifyScore => target_count, ModifyHearts => target_count, GainResource => target_count, CompoundEffect => target_count, MiscOp => target_count]);
 
-    pub fn target_from_selection_any(&self) -> Option<bool> {
-        match &self.kind {
-            Some(EffectKind::MoveCards {
-                target_from_selection,
-                ..
-            }) => *target_from_selection,
-            Some(EffectKind::GainResource {
-                target_from_selection,
-                ..
-            }) => *target_from_selection,
-            _ => None,
-        }
-    }
+    bool_getter!(target_from_selection_any, [MoveCards => target_from_selection, GainResource => target_from_selection]);
 
-    pub fn target_member_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::PositionOp { target_member, .. }) => target_member.as_deref(),
-            Some(EffectKind::MoveCards { target_member, .. }) => target_member.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(target_member_any, [PositionOp => target_member, MoveCards => target_member]);
 
-    pub fn target_trigger_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::AbilityOp { target_trigger, .. }) => target_trigger.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(target_trigger_any, [AbilityOp => target_trigger]);
 
-    pub fn timing_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::RestrictionOp { timing, .. }) => timing.as_deref(),
-            Some(EffectKind::MiscOp { timing, .. }) => timing.as_deref(),
-            Some(EffectKind::CustomOp { timing, .. }) => timing.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(timing_any, [RestrictionOp => timing, MiscOp => timing, CustomOp => timing]);
 
-    pub fn timing_condition_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::ModifyHearts {
-                timing_condition, ..
-            }) => timing_condition.as_deref(),
-            Some(EffectKind::RestrictionOp {
-                timing_condition, ..
-            }) => timing_condition.as_deref(),
-            Some(EffectKind::GainResource {
-                timing_condition, ..
-            }) => timing_condition.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(timing_condition_any, [ModifyHearts => timing_condition, RestrictionOp => timing_condition, GainResource => timing_condition]);
 
-    pub fn treat_as_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::RestrictionOp { treat_as, .. }) => treat_as.as_deref(),
-            Some(EffectKind::MiscOp { treat_as, .. }) => treat_as.as_deref(),
-            Some(EffectKind::CustomOp { treat_as, .. }) => treat_as.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(treat_as_any, [RestrictionOp => treat_as, MiscOp => treat_as, CustomOp => treat_as]);
 
-    pub fn trigger_filter_any(&self) -> Option<&Vec<String>> {
-        match &self.kind {
-            Some(EffectKind::AbilityOp { trigger_filter, .. }) => {
-                trigger_filter.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::RestrictionOp { trigger_filter, .. }) => {
-                trigger_filter.as_ref().map(|b| b.as_ref())
-            }
-            Some(EffectKind::CustomOp { trigger_filter, .. }) => {
-                trigger_filter.as_ref().map(|b| b.as_ref())
-            }
-            _ => None,
-        }
-    }
+    vec_ref_getter!(trigger_filter_any, [AbilityOp => trigger_filter, RestrictionOp => trigger_filter, CustomOp => trigger_filter]);
 
-    pub fn trigger_type_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::DrawCards { trigger_type, .. }) => trigger_type.as_deref(),
-            Some(EffectKind::GainResource { trigger_type, .. }) => trigger_type.as_deref(),
-            Some(EffectKind::AbilityOp { trigger_type, .. }) => trigger_type.as_deref(),
-            Some(EffectKind::CompoundEffect { trigger_type, .. }) => trigger_type.as_deref(),
-            Some(EffectKind::RestrictionOp { trigger_type, .. }) => trigger_type.as_deref(),
-            Some(EffectKind::CustomOp { trigger_type, .. }) => trigger_type.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(trigger_type_any, [DrawCards => trigger_type, GainResource => trigger_type, AbilityOp => trigger_type, CompoundEffect => trigger_type, RestrictionOp => trigger_type, CustomOp => trigger_type]);
 
-    pub fn triggers_any(&self) -> Option<&str> {
-        match &self.kind {
-            Some(EffectKind::AbilityOp { triggers, .. }) => triggers.as_deref(),
-            Some(EffectKind::CustomOp { triggers, .. }) => triggers.as_deref(),
-            _ => None,
-        }
-    }
+    str_getter!(triggers_any, [AbilityOp => triggers, CustomOp => triggers]);
 
-    pub fn use_limit_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::AbilityOp { use_limit, .. }) => *use_limit,
-            Some(EffectKind::CustomOp { use_limit, .. }) => *use_limit,
-            _ => None,
-        }
-    }
+    u32_getter!(use_limit_any, [AbilityOp => use_limit, CustomOp => use_limit]);
 
-    pub fn value_any(&self) -> Option<u32> {
-        match &self.kind {
-            Some(EffectKind::ModifyScore { value, .. }) => *value,
-            Some(EffectKind::ModifyHearts { value, .. }) => *value,
-            Some(EffectKind::GainResource { value, .. }) => *value,
-            Some(EffectKind::MiscOp { value, .. }) => *value,
-            _ => None,
-        }
-    }
+    u32_getter!(value_any, [ModifyScore => value, ModifyHearts => value, GainResource => value, MiscOp => value]);
 }
 
 impl AbilityEffect {

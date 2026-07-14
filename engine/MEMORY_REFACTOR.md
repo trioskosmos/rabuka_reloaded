@@ -28,7 +28,23 @@ All `Vec<AbilityEffect>` → `Vec<Box<AbilityEffect>>` in CompoundBranch, Effect
 
 ---
 
-### Box EffectKind Vec fields (commit 4359ebb, amended)
+### Box EffectKind Vec fields ✅ DONE
+
+Boxed 14 `Vec<String>` filter fields across EffectKind, Condition, and TriggerEvent.
+
+---
+
+### Add flat field equivalents to EffectKind ✅ DONE
+
+Added `source`, `destination`, `count`, `target` as NEW fields to EffectKind variants (separate from existing `source_position`, `target_count`). Created corresponding `source_any()`, `destination_any()`, `count_any()`, `target_any()` getters. Migrated 20+ callers of `effect.source` → `effect.source_any()`.
+
+**EffectKind size:** 1248B → ~760B (14 Vec fields boxed + field additions).
+
+---
+
+### Feature-gate condition text + trigger_event ✅ DONE
+
+Added `debug_conditions` feature flag to Cargo.toml. `condition.text` and `condition.trigger_event` gated behind `#[cfg(feature = "debug_conditions")]`. Enabled by default; `cargo build --no-default-features` to omit.
 
 Boxed 14 `Vec<String>` filter fields across EffectKind, Condition, and TriggerEvent:
 `character_effects`, `card_names`, `heart_colors`, `per_unit_heart_colors`, `group_names`, `exclude_group_names`, `characters`, `exclude_characters`, `identities`, `answers`, `choice_options`, `exclude_heart_colors`, `or_card_types`, `trigger_filter`
@@ -126,11 +142,14 @@ Same for effects: `{"action": "draw_card", "count": 2}` maps to `EffectKind::Dra
 **Lesson from Condition refactor:** This is NOT a simple field removal. The field NAMES are inconsistent across EffectKind variants (`source_position` vs `source`, `target_count` vs `count`, etc.). Before removing flat fields, the EffectKind fields need to be RENAMED to a consistent convention that mirrors the JSON output (e.g., all variants use `source`, `count`, `target`). Then the flat fields can be removed from AbilityEffect and the getters collapse into single-match arms.
 
 **Progress:**
-1. ✅ Rename EffectKind fields to match JSON — **SKIPPED.** Analysis showed `source_position` (stage position) and `source` (zone) are DIFFERENT concepts with different JSON fields; same for `target_count` (target selection) vs `count` (card count). Straight rename conflates them and causes infinite loops in rotation handler. The correct approach is to ADD flat field equivalents (`source`, `destination`, `count`, `target`) to EffectKind as NEW fields, keeping existing `source_position`, `target_count` intact.
-2. 🔲 Remove flat fields from `AbilityEffect` (`action`, `source`, `destination`, `count`, `target`) — blocked on step 1
-3. 🔲 Simplify 137 `_any()` getters — blocked
-4. 🔲 Kill `rekindle_effect` — blocked  
-5. ✅ **Box filter sets** on large EffectKind variants — DONE. 14 Vec fields boxed (character_effects, card_names, heart_colors, per_unit_heart_colors, group_names, exclude_group_names, characters, exclude_characters, identities, answers, choice_options, exclude_heart_colors, or_card_types, trigger_filter)
+1. ✅ Added flat field equivalents (`source`, `destination`, `count`, `target`) to EffectKind as NEW fields — keeping existing `source_position` and `target_count` intact (they represent DIFFERENT concepts: zone vs stage position, card count vs target count). Created `source_any()`, `destination_any()`, `count_any()`, `target_any()` getters.
+2. 🔲 Remove flat fields from `AbilityEffect` (`action`, `source`, `destination`, `count`, `target`) — requires custom Deserialize for AbilityEffect to feed flat JSON fields into EffectKind during deserialization instead of storing them as struct fields
+3. 🔲 Simplify 137 `_any()` getters — no flat field fallback needed once flat fields are removed
+4. 🔲 Kill `rekindle_effect` — EffectKind becomes the single source of truth  
+5. ✅ **Box filter sets** on large EffectKind variants — DONE. 14 Vec fields boxed
+
+**Strategy for flat field removal:**
+Replace `#[serde(skip)]` on `kind: Option<EffectKind>` with a custom Deserialize impl that reads the raw JSON, extracts flat field keys (source, destination, count, target) into EffectKind during deserialization, and returns AbilityEffect without storing them separately. This eliminates the flat fields AND makes `rekindle_effect` unnecessary, naturally killing both code paths.
 
 **Savings:** 1536 + 1248 → ~400 bytes per effect (~700 KB for ~6000 effects).
 
