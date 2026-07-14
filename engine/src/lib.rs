@@ -1,4 +1,9 @@
 #![recursion_limit = "512"]
+#[cfg(feature = "alloc_tracker")]
+pub mod alloc_counter;
+#[cfg(feature = "alloc_tracker")]
+#[global_allocator]
+static ALLOC: alloc_counter::CountingAllocator = alloc_counter::CountingAllocator;
 
 // Core data types  Ere-exported at crate root so all existing imports still work
 pub mod core;

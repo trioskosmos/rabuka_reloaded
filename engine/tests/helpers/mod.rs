@@ -86,6 +86,8 @@ pub struct TestGame {
     debug_enabled: bool,
     pool_positions: RefCell<HashMap<i16, usize>>,
     internal_counter: Cell<i16>,
+    #[cfg(feature = "alloc_tracker")]
+    _alloc_guard: Option<rabuka_engine::alloc_counter::AllocGuard>,
 }
 
 impl Drop for TestGame {
@@ -151,6 +153,8 @@ impl TestGame {
             debug_enabled,
             pool_positions: RefCell::new(HashMap::new()),
             internal_counter: Cell::new(20000),
+            #[cfg(feature = "alloc_tracker")]
+            _alloc_guard: rabuka_engine::alloc_counter::start(),
         }
     }
 
