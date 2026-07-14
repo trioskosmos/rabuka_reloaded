@@ -712,7 +712,7 @@ impl<'de> serde::Deserialize<'de> for AbilityCost {
                     if let Some(kind) =
                         build_kind_from_action(&effect.action, &serde_json::Value::Object(extra))
                     {
-                        effect.kind = Some(kind);
+                        effect.kind = Some(Box::new(kind));
                     }
                 }
 
@@ -2065,8 +2065,7 @@ pub struct AbilityEffect {
     pub condition: Option<Box<Condition>>,
     #[serde(flatten)]
     pub compound: CompoundBranch,
-    #[serde(default)]
-    pub kind: Option<EffectKind>,
+    pub kind: Option<Box<EffectKind>>,
     #[serde(default)]
     pub non_stackable: Option<bool>,
     #[serde(default)]
@@ -2087,7 +2086,7 @@ pub struct AbilityEffect {
 macro_rules! str_getter {
     ($name:ident, [$($variant:ident => $field:ident),+]) => {
         pub fn $name(&self) -> Option<&str> {
-            match &self.kind {
+            match self.kind.as_deref() {
                 $(Some(EffectKind::$variant { $field, .. }) => $field.as_deref(),)+
                 _ => None,
             }
@@ -2098,7 +2097,7 @@ macro_rules! str_getter {
 macro_rules! u32_getter {
     ($name:ident, [$($variant:ident => $field:ident),+]) => {
         pub fn $name(&self) -> Option<u32> {
-            match &self.kind {
+            match self.kind.as_deref() {
                 $(Some(EffectKind::$variant { $field, .. }) => *$field,)+
                 _ => None,
             }
@@ -2109,7 +2108,7 @@ macro_rules! u32_getter {
 macro_rules! bool_getter {
     ($name:ident, [$($variant:ident => $field:ident),+]) => {
         pub fn $name(&self) -> Option<bool> {
-            match &self.kind {
+            match self.kind.as_deref() {
                 $(Some(EffectKind::$variant { $field, .. }) => *$field,)+
                 _ => None,
             }
@@ -2120,7 +2119,7 @@ macro_rules! bool_getter {
 macro_rules! vec_ref_getter {
     ($name:ident, [$($variant:ident => $field:ident),+]) => {
         pub fn $name(&self) -> Option<&Vec<String>> {
-            match &self.kind {
+            match self.kind.as_deref() {
                 $(Some(EffectKind::$variant { $field, .. }) => $field.as_ref().map(|b| b.as_ref()),)+
                 _ => None,
             }
@@ -2131,7 +2130,7 @@ macro_rules! vec_ref_getter {
 macro_rules! vec_ref_getter_unboxed {
     ($name:ident, [$($variant:ident => $field:ident),+]) => {
         pub fn $name(&self) -> Option<&Vec<String>> {
-            match &self.kind {
+            match self.kind.as_deref() {
                 $(Some(EffectKind::$variant { $field, .. }) => $field.as_ref(),)+
                 _ => None,
             }
@@ -2142,7 +2141,7 @@ macro_rules! vec_ref_getter_unboxed {
 macro_rules! box_vec_ref_getter {
     ($name:ident, [$($variant:ident => $field:ident),+]) => {
         pub fn $name(&self) -> Option<&Vec<String>> {
-            match &self.kind {
+            match self.kind.as_deref() {
                 $(Some(EffectKind::$variant { $field, .. }) => Some($field.as_ref()),)+
                 _ => None,
             }
@@ -2152,7 +2151,7 @@ macro_rules! box_vec_ref_getter {
 
 impl AbilityEffect {
     pub fn ability_filter_any(&self) -> Option<AbilityFilter> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::MoveCards { ability_filter, .. }) => *ability_filter,
             Some(EffectKind::SelectTarget { ability_filter, .. }) => *ability_filter,
             Some(EffectKind::LookReveal { ability_filter, .. }) => *ability_filter,
@@ -2174,7 +2173,7 @@ impl AbilityEffect {
     str_getter!(action_by_any, [CustomOp => action_by, SelectTarget => action_by, MoveCards => action_by, DrawCards => action_by, ChangeState => action_by, GainResource => action_by]);
 
     pub fn activation_condition_parsed_any(&self) -> Option<&Box<Condition>> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::AbilityOp {
                 activation_condition_parsed,
                 ..
@@ -2214,7 +2213,7 @@ impl AbilityEffect {
     str_getter!(alternative_count_type_any, [MiscOp => alternative_count_type, CompoundEffect => alternative_count_type]);
 
     pub fn alternative_effect_any(&self) -> Option<&Box<AbilityEffect>> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::CompoundEffect {
                 alternative_effect, ..
             }) => alternative_effect.as_ref(),
@@ -2229,7 +2228,7 @@ impl AbilityEffect {
     u32_getter!(blade_limit_any, [ChangeState => blade_limit, MiscOp => blade_limit]);
 
     pub fn blade_limit_operator_any(&self) -> Option<Operator> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::ChangeState {
                 blade_limit_operator,
                 ..
@@ -2255,7 +2254,7 @@ impl AbilityEffect {
     str_getter!(card_type_any, [MoveCards => card_type, DrawCards => card_type, SelectTarget => card_type, LookReveal => card_type, ModifyScore => card_type, ModifyHearts => card_type, GainResource => card_type, ChangeState => card_type, AbilityOp => card_type, CompoundEffect => card_type, RestrictionOp => card_type, PositionOp => card_type, MiscOp => card_type, CustomOp => card_type]);
 
     pub fn character_effects_any(&self) -> Option<&Vec<serde_json::Value>> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::MiscOp {
                 character_effects, ..
             }) => character_effects.as_ref().map(|b| b.as_ref()),
@@ -2284,7 +2283,7 @@ impl AbilityEffect {
     u32_getter!(cost_limit_min_any, [MoveCards => cost_limit_min, SelectTarget => cost_limit_min, LookReveal => cost_limit_min]);
 
     pub fn cost_limit_operator_any(&self) -> Option<Operator> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::MoveCards {
                 cost_limit_operator,
                 ..
@@ -2322,7 +2321,7 @@ impl AbilityEffect {
     }
 
     pub fn cost_offset_any(&self) -> Option<i32> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::MoveCards { cost_offset, .. }) => *cost_offset,
             Some(EffectKind::MiscOp { cost_offset, .. }) => *cost_offset,
             _ => None,
@@ -2334,7 +2333,7 @@ impl AbilityEffect {
     u32_getter!(cost_total_any, [MoveCards => cost_total, SelectTarget => cost_total, ModifyScore => cost_total, ModifyHearts => cost_total, ChangeState => cost_total, MiscOp => cost_total]);
 
     pub fn cost_total_operator_any(&self) -> Option<Operator> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::MoveCards {
                 cost_total_operator,
                 ..
@@ -2368,7 +2367,7 @@ impl AbilityEffect {
     bool_getter!(discard_remaining_any, [MoveCards => discard_remaining, SelectTarget => discard_remaining]);
 
     pub fn distinct_any(&self) -> Option<DistinctType> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::MoveCards { distinct, .. }) => *distinct,
             Some(EffectKind::SelectTarget { distinct, .. }) => *distinct,
             Some(EffectKind::LookReveal { distinct, .. }) => *distinct,
@@ -2384,7 +2383,7 @@ impl AbilityEffect {
     str_getter!(duration_any, [ModifyScore => duration, ModifyHearts => duration, GainResource => duration, AbilityOp => duration, RestrictionOp => duration, CompoundEffect => duration, MiscOp => duration, CustomOp => duration]);
 
     pub fn dynamic_count_any(&self) -> Option<&DynamicCount> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::DrawCards { dynamic_count, .. }) => dynamic_count.as_ref(),
             Some(EffectKind::LookReveal { dynamic_count, .. }) => dynamic_count.as_ref(),
             Some(EffectKind::GainResource { dynamic_count, .. }) => dynamic_count.as_ref(),
@@ -2409,7 +2408,7 @@ impl AbilityEffect {
     vec_ref_getter!(exclude_group_names_any, [MoveCards => exclude_group_names, SelectTarget => exclude_group_names, LookReveal => exclude_group_names, GainResource => exclude_group_names, ChangeState => exclude_group_names, AbilityOp => exclude_group_names, RestrictionOp => exclude_group_names, PositionOp => exclude_group_names, MiscOp => exclude_group_names, CustomOp => exclude_group_names]);
 
     pub fn exclude_heart_colors_any(&self) -> &[String] {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::MoveCards {
                 exclude_heart_colors,
                 ..
@@ -2436,7 +2435,7 @@ impl AbilityEffect {
     }
 
     pub fn exclude_position_any(&self) -> Option<&str> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::MoveCards {
                 exclude_position, ..
             }) => exclude_position.as_deref(),
@@ -2454,7 +2453,7 @@ impl AbilityEffect {
     bool_getter!(filter_targets_by_heart_colors_any, [MoveCards => filter_targets_by_heart_colors, SelectTarget => filter_targets_by_heart_colors, LookReveal => filter_targets_by_heart_colors, ModifyScore => filter_targets_by_heart_colors, ModifyHearts => filter_targets_by_heart_colors, GainResource => filter_targets_by_heart_colors, ChangeState => filter_targets_by_heart_colors]);
 
     pub fn gained_effect_any(&self) -> Option<&Box<AbilityEffect>> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::AbilityOp { gained_effect, .. }) => gained_effect.as_ref(),
             _ => None,
         }
@@ -2467,7 +2466,7 @@ impl AbilityEffect {
     u32_getter!(heart_color_count_any, [MiscOp => heart_color_count, SelectTarget => heart_color_count, LookReveal => heart_color_count, GainResource => heart_color_count]);
 
     pub fn heart_colors_any(&self) -> &[String] {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::DrawCards { heart_colors, .. }) => heart_colors.as_slice(),
             Some(EffectKind::SelectTarget { heart_colors, .. }) => heart_colors.as_slice(),
             Some(EffectKind::LookReveal { heart_colors, .. }) => heart_colors.as_slice(),
@@ -2484,7 +2483,7 @@ impl AbilityEffect {
     }
 
     pub fn heart_colors_from_selected_card_any(&self) -> Option<bool> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::GainResource {
                 heart_colors_from_selected_card,
                 ..
@@ -2516,7 +2515,7 @@ impl AbilityEffect {
     str_getter!(need_heart_color_any, [MoveCards => need_heart_color]);
 
     pub fn need_heart_operator_any(&self) -> Option<Operator> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::MoveCards {
                 need_heart_operator,
                 ..
@@ -2538,7 +2537,7 @@ impl AbilityEffect {
     str_getter!(operation_any, [ModifyScore => operation, ModifyHearts => operation, GainResource => operation, RestrictionOp => operation, MiscOp => operation]);
 
     pub fn opponent_action_any(&self) -> Option<&Box<AbilityEffect>> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::CustomOp {
                 opponent_action, ..
             }) => opponent_action.as_ref(),
@@ -2551,7 +2550,7 @@ impl AbilityEffect {
     bool_getter!(optional_any, [SelectTarget => optional, LookReveal => optional, GainResource => optional, ChangeState => optional, CompoundEffect => optional, PositionOp => optional]);
 
     pub fn options_any(&self) -> Option<&Vec<Box<AbilityEffect>>> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::LookReveal { options, .. }) => options.as_ref(),
             Some(EffectKind::CompoundEffect { options, .. }) => options.as_ref(),
             Some(EffectKind::MiscOp { options, .. }) => options.as_ref(),
@@ -2562,7 +2561,7 @@ impl AbilityEffect {
     }
 
     pub fn or_ability_filters_any(&self) -> Option<&Vec<AbilityFilterBranch>> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::MoveCards {
                 or_ability_filters, ..
             }) => or_ability_filters.as_ref(),
@@ -2586,7 +2585,7 @@ impl AbilityEffect {
     u32_getter!(original_count_any, [ModifyHearts => original_count, MiscOp => original_count]);
 
     pub fn original_operator_any(&self) -> Option<Operator> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::ModifyHearts {
                 original_operator, ..
             }) => *original_operator,
@@ -2612,7 +2611,7 @@ impl AbilityEffect {
     u32_getter!(per_unit_count_any, [SelectTarget => per_unit_count, DrawCards => per_unit_count, LookReveal => per_unit_count, ModifyScore => per_unit_count, ModifyHearts => per_unit_count, GainResource => per_unit_count, ChangeState => per_unit_count, MiscOp => per_unit_count, CompoundEffect => per_unit_count]);
 
     pub fn per_unit_heart_colors_any(&self) -> &[String] {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::SelectTarget {
                 per_unit_heart_colors,
                 ..
@@ -2650,7 +2649,7 @@ impl AbilityEffect {
     }
 
     pub fn per_unit_location_any(&self) -> Option<&str> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::SelectTarget {
                 per_unit_location, ..
             }) => per_unit_location.as_deref(),
@@ -2683,7 +2682,7 @@ impl AbilityEffect {
     str_getter!(picker_any, [MiscOp => picker, LookReveal => picker]);
 
     pub fn placement_order_any(&self) -> Option<PlacementOrder> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::MoveCards {
                 placement_order, ..
             }) => *placement_order,
@@ -2698,7 +2697,7 @@ impl AbilityEffect {
     }
 
     pub fn position_any(&self) -> Option<&PositionInfo> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::MoveCards { position, .. }) => position.as_ref(),
             Some(EffectKind::DrawCards { position, .. }) => position.as_ref(),
             Some(EffectKind::GainResource { position, .. }) => position.as_ref(),
@@ -2715,14 +2714,14 @@ impl AbilityEffect {
     str_getter!(question_any, [SelectTarget => question, CompoundEffect => question, CustomOp => question]);
 
     pub fn quoted_text_any(&self) -> Option<&QuotedText> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::MiscOp { quoted_text, .. }) => quoted_text.as_ref(),
             _ => None,
         }
     }
 
     pub fn ref_offset_any(&self) -> Option<i32> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::MiscOp { ref_offset, .. }) => *ref_offset,
             _ => None,
         }
@@ -2731,7 +2730,7 @@ impl AbilityEffect {
     str_getter!(ref_value_any, [MiscOp => ref_value]);
 
     pub fn repeat_limit_any(&self) -> Option<u32> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::ModifyScore {
                 repeat_limit,
                 max_repeats,
@@ -2754,7 +2753,7 @@ impl AbilityEffect {
     u32_getter!(resource_icon_count_any, [MiscOp => resource_icon_count]);
 
     pub fn resource_on_select_any(&self) -> Option<&Box<AbilityEffect>> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::LookReveal {
                 resource_on_select, ..
             }) => resource_on_select.as_ref(),
@@ -2823,7 +2822,7 @@ impl AbilityEffect {
 
 impl AbilityEffect {
     pub fn set_ability_filter(&mut self, val: Option<AbilityFilter>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut ability_filter,
                 ..
@@ -2845,7 +2844,7 @@ impl AbilityEffect {
     }
 
     pub fn set_ability_filter_triggers(&mut self, val: Option<Vec<String>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut ability_filter_triggers,
                 ..
@@ -2867,7 +2866,7 @@ impl AbilityEffect {
     }
 
     pub fn set_ability_gain(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut ability_gain,
                 ..
@@ -2877,7 +2876,7 @@ impl AbilityEffect {
     }
 
     pub fn set_ability_gain_trigger(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut ability_gain_trigger,
                 ..
@@ -2887,7 +2886,7 @@ impl AbilityEffect {
     }
 
     pub fn set_ability_text(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut ability_text,
                 ..
@@ -2897,7 +2896,7 @@ impl AbilityEffect {
     }
 
     pub fn set_action_by(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::CustomOp {
                 ref mut action_by, ..
             }) => *action_by = val,
@@ -2906,7 +2905,7 @@ impl AbilityEffect {
     }
 
     pub fn set_activation_position(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut activation_position,
                 ..
@@ -2940,14 +2939,14 @@ impl AbilityEffect {
     }
 
     pub fn set_all(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp { ref mut all, .. }) => *all = val,
             _ => {}
         }
     }
 
     pub fn set_all_regions(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::ChangeState {
                 ref mut all_regions,
                 ..
@@ -2965,7 +2964,7 @@ impl AbilityEffect {
     }
 
     pub fn set_allow_occupied_stage(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut allow_occupied_stage,
                 ..
@@ -2979,7 +2978,7 @@ impl AbilityEffect {
     }
 
     pub fn set_alternative_count_type(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut alternative_count_type,
                 ..
@@ -2989,7 +2988,7 @@ impl AbilityEffect {
     }
 
     pub fn set_answers(&mut self, val: Option<Vec<String>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::SelectTarget {
                 ref mut answers, ..
             }) => *answers = val.map(Box::new),
@@ -3004,7 +3003,7 @@ impl AbilityEffect {
     }
 
     pub fn set_any_number(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut any_number, ..
             }) => *any_number = val,
@@ -3022,7 +3021,7 @@ impl AbilityEffect {
     }
 
     pub fn set_blade_limit(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::ChangeState {
                 ref mut blade_limit,
                 ..
@@ -3036,7 +3035,7 @@ impl AbilityEffect {
     }
 
     pub fn set_blade_limit_operator(&mut self, val: Option<Operator>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::ChangeState {
                 ref mut blade_limit_operator,
                 ..
@@ -3050,7 +3049,7 @@ impl AbilityEffect {
     }
 
     pub fn set_blade_type(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut blade_type, ..
             }) => *blade_type = val,
@@ -3059,14 +3058,14 @@ impl AbilityEffect {
     }
 
     pub fn set_blind(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp { ref mut blind, .. }) => *blind = val,
             _ => {}
         }
     }
 
     pub fn set_card_names(&mut self, val: Vec<String>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut card_names, ..
             }) => *card_names = Box::new(val.clone()),
@@ -3090,7 +3089,7 @@ impl AbilityEffect {
     }
 
     pub fn set_card_property(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut card_property,
                 ..
@@ -3116,7 +3115,7 @@ impl AbilityEffect {
     }
 
     pub fn set_card_type(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut card_type, ..
             }) => *card_type = val,
@@ -3161,7 +3160,7 @@ impl AbilityEffect {
     }
 
     pub fn set_characters(&mut self, val: Option<Vec<String>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut characters, ..
             }) => *characters = val.map(Box::new),
@@ -3197,14 +3196,14 @@ impl AbilityEffect {
     }
 
     pub fn set_choice(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp { ref mut choice, .. }) => *choice = val,
             _ => {}
         }
     }
 
     pub fn set_choice_based(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::RestrictionOp {
                 ref mut choice_based,
                 ..
@@ -3218,7 +3217,7 @@ impl AbilityEffect {
     }
 
     pub fn set_choice_maker(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::SelectTarget {
                 ref mut choice_maker,
                 ..
@@ -3236,7 +3235,7 @@ impl AbilityEffect {
     }
 
     pub fn set_choice_options(&mut self, val: Option<Vec<String>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::SelectTarget {
                 ref mut choice_options,
                 ..
@@ -3250,7 +3249,7 @@ impl AbilityEffect {
     }
 
     pub fn set_choice_type(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::SelectTarget {
                 ref mut choice_type,
                 ..
@@ -3264,7 +3263,7 @@ impl AbilityEffect {
     }
 
     pub fn set_cost_from_revealed(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut cost_from_revealed,
                 ..
@@ -3282,7 +3281,7 @@ impl AbilityEffect {
     }
 
     pub fn set_cost_limit(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut cost_limit, ..
             }) => *cost_limit = val,
@@ -3312,7 +3311,7 @@ impl AbilityEffect {
     }
 
     pub fn set_cost_limit_max(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut cost_limit_max,
                 ..
@@ -3330,7 +3329,7 @@ impl AbilityEffect {
     }
 
     pub fn set_cost_limit_min(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut cost_limit_min,
                 ..
@@ -3348,7 +3347,7 @@ impl AbilityEffect {
     }
 
     pub fn set_cost_limit_operator(&mut self, val: Option<Operator>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut cost_limit_operator,
                 ..
@@ -3386,7 +3385,7 @@ impl AbilityEffect {
     }
 
     pub fn set_cost_offset(&mut self, val: Option<i32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut cost_offset,
                 ..
@@ -3396,7 +3395,7 @@ impl AbilityEffect {
     }
 
     pub fn set_cost_reference(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut cost_reference,
                 ..
@@ -3406,7 +3405,7 @@ impl AbilityEffect {
     }
 
     pub fn set_cost_total(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut cost_total, ..
             }) => *cost_total = val,
@@ -3430,7 +3429,7 @@ impl AbilityEffect {
     }
 
     pub fn set_cost_total_operator(&mut self, val: Option<Operator>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut cost_total_operator,
                 ..
@@ -3460,7 +3459,7 @@ impl AbilityEffect {
     }
 
     pub fn set_delayed(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::RestrictionOp {
                 ref mut delayed, ..
             }) => *delayed = val,
@@ -3469,7 +3468,7 @@ impl AbilityEffect {
     }
 
     pub fn set_discard_remaining(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut discard_remaining,
                 ..
@@ -3479,7 +3478,7 @@ impl AbilityEffect {
     }
 
     pub fn set_distinct(&mut self, val: Option<DistinctType>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut distinct, ..
             }) => *distinct = val,
@@ -3500,7 +3499,7 @@ impl AbilityEffect {
     }
 
     pub fn set_duration(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::ModifyScore {
                 ref mut duration, ..
             }) => *duration = val,
@@ -3527,7 +3526,7 @@ impl AbilityEffect {
     }
 
     pub fn set_effect_constraint(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::ModifyScore {
                 ref mut effect_constraint,
                 ..
@@ -3541,7 +3540,7 @@ impl AbilityEffect {
     }
 
     pub fn set_effect_type(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut effect_type,
                 ..
@@ -3559,7 +3558,7 @@ impl AbilityEffect {
     }
 
     pub fn set_energy_count(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::GainResource {
                 ref mut energy_count,
                 ..
@@ -3577,7 +3576,7 @@ impl AbilityEffect {
     }
 
     pub fn set_exclude_by_name_source(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut exclude_by_name_source,
                 ..
@@ -3587,7 +3586,7 @@ impl AbilityEffect {
     }
 
     pub fn set_exclude_characters(&mut self, val: Option<Vec<String>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut exclude_characters,
                 ..
@@ -3633,7 +3632,7 @@ impl AbilityEffect {
     }
 
     pub fn set_exclude_group_names(&mut self, val: Option<Vec<String>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut exclude_group_names,
                 ..
@@ -3679,7 +3678,7 @@ impl AbilityEffect {
     }
 
     pub fn set_exclude_heart_colors(&mut self, val: Option<Vec<String>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut exclude_heart_colors,
                 ..
@@ -3697,7 +3696,7 @@ impl AbilityEffect {
     }
 
     pub fn set_exclude_position(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut exclude_position,
                 ..
@@ -3711,7 +3710,7 @@ impl AbilityEffect {
     }
 
     pub fn set_exclude_selected(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut exclude_selected,
                 ..
@@ -3725,7 +3724,7 @@ impl AbilityEffect {
     }
 
     pub fn set_exclude_self(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut exclude_self,
                 ..
@@ -3775,7 +3774,7 @@ impl AbilityEffect {
     }
 
     pub fn set_filter_targets_by_heart_colors(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut filter_targets_by_heart_colors,
                 ..
@@ -3809,7 +3808,7 @@ impl AbilityEffect {
     }
 
     pub fn set_group_names(&mut self, val: Option<Vec<String>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut group_names,
                 ..
@@ -3863,7 +3862,7 @@ impl AbilityEffect {
     }
 
     pub fn set_group_reference(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut group_reference,
                 ..
@@ -3897,7 +3896,7 @@ impl AbilityEffect {
     }
 
     pub fn set_heart_color_count(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut heart_color_count,
                 ..
@@ -3907,7 +3906,7 @@ impl AbilityEffect {
     }
 
     pub fn set_heart_color(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::GainResource {
                 ref mut heart_color,
                 ..
@@ -3917,7 +3916,7 @@ impl AbilityEffect {
     }
 
     pub fn set_heart_colors_from_selected_card(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::GainResource {
                 ref mut heart_colors_from_selected_card,
                 ..
@@ -3927,7 +3926,7 @@ impl AbilityEffect {
     }
 
     pub fn set_heart_selection(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut heart_selection,
                 ..
@@ -3937,7 +3936,7 @@ impl AbilityEffect {
     }
 
     pub fn set_heart_type(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut heart_type, ..
             }) => *heart_type = val,
@@ -3946,14 +3945,14 @@ impl AbilityEffect {
     }
 
     pub fn set_id(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp { ref mut id, .. }) => *id = val,
             _ => {}
         }
     }
 
     pub fn set_identities(&mut self, val: Option<Vec<String>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::ChangeState {
                 ref mut identities, ..
             }) => *identities = val.map(Box::new),
@@ -3968,7 +3967,7 @@ impl AbilityEffect {
     }
 
     pub fn set_location(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut location, ..
             }) => *location = val,
@@ -4010,7 +4009,7 @@ impl AbilityEffect {
     }
 
     pub fn set_lose_blade_hearts(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut lose_blade_hearts,
                 ..
@@ -4020,7 +4019,7 @@ impl AbilityEffect {
     }
 
     pub fn set_multiple_targets(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut multiple_targets,
                 ..
@@ -4038,7 +4037,7 @@ impl AbilityEffect {
     }
 
     pub fn set_name_constraint(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut name_constraint,
                 ..
@@ -4060,7 +4059,7 @@ impl AbilityEffect {
     }
 
     pub fn set_name_constraint_source(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut name_constraint_source,
                 ..
@@ -4082,7 +4081,7 @@ impl AbilityEffect {
     }
 
     pub fn set_need_heart_color(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut need_heart_color,
                 ..
@@ -4092,7 +4091,7 @@ impl AbilityEffect {
     }
 
     pub fn set_need_heart_operator(&mut self, val: Option<Operator>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut need_heart_operator,
                 ..
@@ -4102,7 +4101,7 @@ impl AbilityEffect {
     }
 
     pub fn set_need_heart_total(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut need_heart_total,
                 ..
@@ -4112,7 +4111,7 @@ impl AbilityEffect {
     }
 
     pub fn set_negation(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut negation, ..
             }) => *negation = val,
@@ -4139,7 +4138,7 @@ impl AbilityEffect {
     }
 
     pub fn set_non_stackable(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::RestrictionOp {
                 ref mut non_stackable,
                 ..
@@ -4149,7 +4148,7 @@ impl AbilityEffect {
     }
 
     pub fn set_operation(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::ModifyScore {
                 ref mut operation, ..
             }) => *operation = val,
@@ -4170,7 +4169,7 @@ impl AbilityEffect {
     }
 
     pub fn set_option(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp { ref mut option, .. }) => *option = val,
             _ => {}
         }
@@ -4180,7 +4179,7 @@ impl AbilityEffect {
         // Also update the flat field — cost.rs and compound.rs read
         // effect.optional (the AbilityEffect field), not the EffectKind copy.
         self.optional = val;
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::SelectTarget {
                 ref mut optional, ..
             }) => *optional = val,
@@ -4203,7 +4202,7 @@ impl AbilityEffect {
         }
     }
     pub fn set_or_card_types(&mut self, val: Option<Vec<String>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut or_card_types,
                 ..
@@ -4221,7 +4220,7 @@ impl AbilityEffect {
     }
 
     pub fn set_original_cost(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut original_cost,
                 ..
@@ -4231,7 +4230,7 @@ impl AbilityEffect {
     }
 
     pub fn set_original_count(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::ModifyHearts {
                 ref mut original_count,
                 ..
@@ -4245,7 +4244,7 @@ impl AbilityEffect {
     }
 
     pub fn set_original_operator(&mut self, val: Option<Operator>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::ModifyHearts {
                 ref mut original_operator,
                 ..
@@ -4259,7 +4258,7 @@ impl AbilityEffect {
     }
 
     pub fn set_original_value(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut original_value,
                 ..
@@ -4297,7 +4296,7 @@ impl AbilityEffect {
     }
 
     pub fn set_parenthetical(&mut self, val: Option<Vec<String>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut parenthetical,
                 ..
@@ -4307,7 +4306,7 @@ impl AbilityEffect {
     }
 
     pub fn set_per_group(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut per_group, ..
             }) => *per_group = val,
@@ -4319,7 +4318,7 @@ impl AbilityEffect {
     }
 
     pub fn set_per_group_count(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut per_group_count,
                 ..
@@ -4333,7 +4332,7 @@ impl AbilityEffect {
     }
 
     pub fn set_per_unit(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::SelectTarget {
                 ref mut per_unit, ..
             }) => *per_unit = val,
@@ -4360,7 +4359,7 @@ impl AbilityEffect {
     }
 
     pub fn set_per_unit_count(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::SelectTarget {
                 ref mut per_unit_count,
                 ..
@@ -4394,7 +4393,7 @@ impl AbilityEffect {
     }
 
     pub fn set_per_unit_location(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::SelectTarget {
                 ref mut per_unit_location,
                 ..
@@ -4424,7 +4423,7 @@ impl AbilityEffect {
     }
 
     pub fn set_per_unit_type(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::SelectTarget {
                 ref mut per_unit_type,
                 ..
@@ -4454,21 +4453,21 @@ impl AbilityEffect {
     }
 
     pub fn set_phase(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::RestrictionOp { ref mut phase, .. }) => *phase = val,
             _ => {}
         }
     }
 
     pub fn set_picker(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp { ref mut picker, .. }) => *picker = val,
             _ => {}
         }
     }
 
     pub fn set_placement_order(&mut self, val: Option<PlacementOrder>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut placement_order,
                 ..
@@ -4486,7 +4485,7 @@ impl AbilityEffect {
     }
 
     pub fn set_question(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::SelectTarget {
                 ref mut question, ..
             }) => *question = val,
@@ -4501,7 +4500,7 @@ impl AbilityEffect {
     }
 
     pub fn set_ref_offset(&mut self, val: Option<i32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut ref_offset, ..
             }) => *ref_offset = val,
@@ -4510,7 +4509,7 @@ impl AbilityEffect {
     }
 
     pub fn set_ref_value(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut ref_value, ..
             }) => *ref_value = val,
@@ -4519,7 +4518,7 @@ impl AbilityEffect {
     }
 
     pub fn set_repeat_limit(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::ModifyScore {
                 ref mut repeat_limit,
                 ..
@@ -4541,7 +4540,7 @@ impl AbilityEffect {
     }
 
     pub fn set_replaces_event(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::RestrictionOp {
                 ref mut replaces_event,
                 ..
@@ -4555,7 +4554,7 @@ impl AbilityEffect {
     }
 
     pub fn set_replace_all(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::ModifyHearts {
                 ref mut replace_all,
                 ..
@@ -4565,7 +4564,7 @@ impl AbilityEffect {
     }
 
     pub fn set_require_all_heart_colors(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut require_all_heart_colors,
                 ..
@@ -4575,7 +4574,7 @@ impl AbilityEffect {
     }
 
     pub fn set_resource(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::GainResource {
                 ref mut resource, ..
             }) => *resource = val,
@@ -4584,7 +4583,7 @@ impl AbilityEffect {
     }
 
     pub fn set_resource_icon_count(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut resource_icon_count,
                 ..
@@ -4594,7 +4593,7 @@ impl AbilityEffect {
     }
 
     pub fn set_restricted_destination(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::RestrictionOp {
                 ref mut restricted_destination,
                 ..
@@ -4604,7 +4603,7 @@ impl AbilityEffect {
     }
 
     pub fn set_restriction_type(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::RestrictionOp {
                 ref mut restriction_type,
                 ..
@@ -4614,7 +4613,7 @@ impl AbilityEffect {
     }
 
     pub fn set_reveal(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::LookReveal { ref mut reveal, .. }) => *reveal = val,
             Some(EffectKind::SelectTarget { ref mut reveal, .. }) => *reveal = val,
             _ => {}
@@ -4622,7 +4621,7 @@ impl AbilityEffect {
     }
 
     pub fn set_same_unit_name(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MiscOp {
                 ref mut same_unit_name,
                 ..
@@ -4632,7 +4631,7 @@ impl AbilityEffect {
     }
 
     pub fn set_self_cost(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::ChangeState {
                 ref mut self_cost, ..
             }) => *self_cost = val,
@@ -4641,7 +4640,7 @@ impl AbilityEffect {
     }
 
     pub fn set_self_target(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut self_target,
                 ..
@@ -4695,7 +4694,7 @@ impl AbilityEffect {
     }
 
     pub fn set_shuffle(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut shuffle, ..
             }) => *shuffle = val,
@@ -4704,7 +4703,7 @@ impl AbilityEffect {
     }
 
     pub fn set_sign(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::GainResource { ref mut sign, .. }) => *sign = val,
             Some(EffectKind::MiscOp { ref mut sign, .. }) => *sign = val,
             _ => {}
@@ -4712,7 +4711,7 @@ impl AbilityEffect {
     }
 
     pub fn set_source_card(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut source_card,
                 ..
@@ -4722,7 +4721,7 @@ impl AbilityEffect {
     }
 
     pub fn set_source_position(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut source_position,
                 ..
@@ -4736,7 +4735,7 @@ impl AbilityEffect {
     }
 
     pub fn set_state(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards { ref mut state, .. }) => *state = val,
             Some(EffectKind::LookReveal { ref mut state, .. }) => *state = val,
             Some(EffectKind::GainResource { ref mut state, .. }) => *state = val,
@@ -4746,7 +4745,7 @@ impl AbilityEffect {
     }
 
     pub fn set_state_change(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::ChangeState {
                 ref mut state_change,
                 ..
@@ -4756,7 +4755,7 @@ impl AbilityEffect {
     }
 
     pub fn set_suppressed_trigger(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut suppressed_trigger,
                 ..
@@ -4766,7 +4765,7 @@ impl AbilityEffect {
     }
 
     pub fn set_target_count(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut target_count,
                 ..
@@ -4800,7 +4799,7 @@ impl AbilityEffect {
     }
 
     pub fn set_target_from_selection(&mut self, val: Option<bool>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut target_from_selection,
                 ..
@@ -4814,7 +4813,7 @@ impl AbilityEffect {
     }
 
     pub fn set_target_member(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::PositionOp {
                 ref mut target_member,
                 ..
@@ -4824,7 +4823,7 @@ impl AbilityEffect {
     }
 
     pub fn set_target_trigger(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut target_trigger,
                 ..
@@ -4834,7 +4833,7 @@ impl AbilityEffect {
     }
 
     pub fn set_timing(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::RestrictionOp { ref mut timing, .. }) => *timing = val,
             Some(EffectKind::MiscOp { ref mut timing, .. }) => *timing = val,
             Some(EffectKind::CustomOp { ref mut timing, .. }) => *timing = val,
@@ -4843,7 +4842,7 @@ impl AbilityEffect {
     }
 
     pub fn set_timing_condition(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::ModifyHearts {
                 ref mut timing_condition,
                 ..
@@ -4857,7 +4856,7 @@ impl AbilityEffect {
     }
 
     pub fn set_treat_as(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::RestrictionOp {
                 ref mut treat_as, ..
             }) => *treat_as = val,
@@ -4872,7 +4871,7 @@ impl AbilityEffect {
     }
 
     pub fn set_trigger_filter(&mut self, val: Option<Vec<String>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut trigger_filter,
                 ..
@@ -4890,7 +4889,7 @@ impl AbilityEffect {
     }
 
     pub fn set_trigger_type(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut trigger_type,
                 ..
@@ -4908,7 +4907,7 @@ impl AbilityEffect {
     }
 
     pub fn set_triggers(&mut self, val: Option<Box<str>>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut triggers, ..
             }) => *triggers = val,
@@ -4920,7 +4919,7 @@ impl AbilityEffect {
     }
 
     pub fn set_use_limit(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::AbilityOp {
                 ref mut use_limit, ..
             }) => *use_limit = val,
@@ -4932,7 +4931,7 @@ impl AbilityEffect {
     }
 
     pub fn set_value(&mut self, val: Option<u32>) {
-        match &mut self.kind {
+        match self.kind.as_deref_mut() {
             Some(EffectKind::ModifyScore { ref mut value, .. }) => *value = val,
             Some(EffectKind::ModifyHearts { ref mut value, .. }) => *value = val,
             Some(EffectKind::GainResource { ref mut value, .. }) => *value = val,
@@ -5113,7 +5112,7 @@ impl AbilityEffect {
     }
 
     pub fn action_by(&self) -> Option<&str> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::CustomOp { action_by, .. }) => action_by.as_deref(),
             Some(EffectKind::SelectTarget { action_by, .. }) => action_by.as_deref(),
             Some(EffectKind::MoveCards { action_by, .. }) => action_by.as_deref(),
@@ -5125,7 +5124,7 @@ impl AbilityEffect {
     }
 
     pub fn opponent_action(&self) -> Option<&AbilityEffect> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::CustomOp {
                 opponent_action, ..
             }) => opponent_action.as_deref(),
@@ -5134,7 +5133,7 @@ impl AbilityEffect {
     }
 
     pub fn effect_type(&self) -> Option<&str> {
-        match &self.kind {
+        match self.kind.as_deref() {
             Some(EffectKind::AbilityOp { effect_type, .. }) => effect_type.as_deref(),
             Some(EffectKind::RestrictionOp { effect_type, .. }) => effect_type.as_deref(),
             Some(EffectKind::CustomOp { effect_type, .. }) => effect_type.as_deref(),

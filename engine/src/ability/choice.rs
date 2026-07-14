@@ -2390,14 +2390,14 @@ impl super::resolver::AbilityResolver {
                         if let Some(EffectKind::MoveCards {
                             ref mut source_position,
                             ..
-                        }) = modified.kind
+                        }) = modified.kind.as_deref_mut()
                         {
                             *source_position = Some(selected.into());
                         }
                         if let Some(EffectKind::PositionOp {
                             ref mut source_position,
                             ..
-                        }) = modified.kind
+                        }) = modified.kind.as_deref_mut()
                         {
                             *source_position = Some(selected.into());
                         }
