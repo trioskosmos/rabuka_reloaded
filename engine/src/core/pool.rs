@@ -6,7 +6,11 @@ use std::sync::Mutex;
 
 use super::card::{Condition, EffectKind};
 
-/// Fixed-size pool for recycled allocations of type T.
+// ── Fixed-size object pool ─────────────────────────────────────────────
+// Pre-allocates N slots of size_of::<T>(). alloc() and free_idx() are O(1)
+// with a Mutex-guarded free list. Falls back to Box::new() when the pool
+// is exhausted. Used by EkBox and CondBox.
+
 pub struct Pool<T> {
     slots: Box<[UnsafeCell<MaybeUninit<T>>]>,
     free: Mutex<Vec<usize>>,
@@ -56,7 +60,10 @@ impl<T> Pool<T> {
 unsafe impl<T: Send> Send for Pool<T> {}
 unsafe impl<T: Sync> Sync for Pool<T> {}
 
-/// A pool-backed box. Falls back to Box when the pool is exhausted.
+// ── PoolBox macro ──────────────────────────────────────────────────────
+// Generates a pool-backed smart pointer that recycles T allocations.
+// Falls back to Box::new() when the pool is exhausted.
+
 macro_rules! make_pool_box {
     ($name:ident, $t:ty, $pool_name:ident, $getter:ident, $capacity:expr) => {
         static $pool_name: std::sync::OnceLock<Pool<$t>> = std::sync::OnceLock::new();
@@ -116,21 +123,17 @@ macro_rules! make_pool_box {
                 $name::new(Deref::deref(self).clone())
             }
         }
-
         impl Default for $name {
             fn default() -> Self {
                 $name::new(Default::default())
             }
         }
-
         impl PartialEq for $name {
             fn eq(&self, other: &Self) -> bool {
                 Deref::deref(self) == Deref::deref(other)
             }
         }
-
         impl Eq for $name {}
-
         impl AsRef<$t> for $name {
             fn as_ref(&self) -> &$t {
                 Deref::deref(self)
@@ -149,14 +152,13 @@ macro_rules! make_pool_box {
         }
 
         impl serde::Serialize for $name {
-            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-                Deref::deref(self).serialize(serializer)
+            fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+                Deref::deref(self).serialize(s)
             }
         }
 
         impl<'de> serde::Deserialize<'de> for $name {
             fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-                // defer to inner type's Deserialize (will fail for EffectKind → #[serde(default)] catches)
                 <$t>::deserialize(d).map($name::new)
             }
         }

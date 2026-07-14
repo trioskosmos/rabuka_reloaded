@@ -57,13 +57,14 @@ Each `Vec<String>` (24 bytes) → `Box<Vec<String>>` (8 bytes) saves 16 bytes pe
 
 | Type | Size (before) | Size (after) | Notes |
 |------|--------------|-------------|-------|
-| `Condition` | **1864** | **~120** | Flat struct → tagged enum, 94% reduction |
-| `EffectKind` | **1248** | **~1150** | 14 Vec fields boxed — further consolidation planned |
-| `AbilityEffect` | **1536** | **1536** | Not yet consolidated — next target |
+| `Condition` | **1864** | **536** | Flat struct → tagged enum, 71% reduction |
+| `EffectKind` | **1248** | **808** | 14 Vec fields boxed + field additions |
+| `AbilityEffect` | **1536** | **264** | Box\<EffectKind\> → Box, -800B stack |
 | `CompoundBranch` | **96** | **96** | Mostly boxed pointers now |
 | `AbilityQueueEntry` | **~600+** | **~600+** | Has condition_cache HashMap, snapshot Vecs, resolver, pending_actions |
 | `Option<String>` | 24 | 24 | No niche, always full size |
 | `Option<Box<str>>` | 16 | 16 | Box pointer niche = 8 bytes saved |
+| `Option<ArcStr>` | 16 | 16 | Arc pointer niche = 8 bytes saved |
 | `Vec<T>` | 24 | 24 | Pointer + len + cap |
 | `Box<Vec<T>>` | 8 | 8 | Pointer-only when boxed |
 | `HashMap<K,V>` | ~32+ | ~32+ | Empty map ~32 bytes, grows with entries |
@@ -497,6 +498,146 @@ Stack memory from EffectKind = 808B × 1451 effects = **1,171,208 bytes**. Boxin
 ### The real bottleneck: heap fragmentation
 
 Each Box<EffectKind> is an individual 808B heap allocation. 1451 of them. On a 3DS with 8KB block alignment, each allocation wastes 208-720B. A ROM-based compact representation (128B per effect, mmap'd) would both save 680B per effect AND eliminate the 1451 individual allocs. That's the next target.
+
+---
+
+## Arena allocator architecture
+
+### The problem: 15K allocs per trigger
+
+Every ability evaluation creates ~15,000 heap allocations (Vecs, Strings, Boxes) that are freed immediately after the trigger. The allocator churn costs **~150μs per trigger** on a 3DS (15K allocs × ~10ns each). For a game with 10 triggers per turn × 20 turns = 200 triggers, that's **30ms = 2 frames** spent just in malloc/free.
+
+The allocations come in three categories:
+
+| Category | Example | Allocs | Fate |
+|----------|---------|--------|------|
+| **Temporary** | Vecs for card lists, format! strings | ~14,900 | Freed before trigger end |
+| **Persistent** | Box\<EffectKind\>, Box\<Condition\> | ~100 | Survive across triggers |
+| **Setup** | Card database, ability JSON load | once | Never freed |
+
+The temporary ones are the majority. They don't need to survive past the trigger. An arena allocator can eliminate them entirely.
+
+### The solution: thread-local bump arena + per-type pool
+
+Two layers working together:
+
+```
+┌─────────────────────────────────────────────────┐
+│                 #[global_allocator]              │
+│                                                 │
+│  alloc(size):                                   │
+│    if arena.active → bump from thread-local slab │
+│    if size == 808 → pop from EffectKind pool     │
+│    if size == 536 → pop from Condition pool      │
+│    else → System.alloc(size)                     │
+│                                                 │
+│  dealloc(ptr, size):                             │
+│    if arena.active → no-op (arena reset reclaims)│
+│    if pool-owned → push to pool free list        │
+│    else → System.free(ptr)                       │
+└─────────────────────────────────────────────────┘
+```
+
+#### Layer 1: Bump arena (temporary allocations)
+
+```
+Trigger start:  arena.cursor = arena.base           (1 store)
+alloc:          ptr = arena.cursor; cursor += size   (1 add, 1 load)
+dealloc:        do nothing                           (0 ops)
+Trigger end:    arena.cursor = arena.base           (1 store)
+```
+
+- Pre-allocated 1MB slab per thread (64KB on 3DS, 8MB on desktop)
+- Reset is O(1) — just reposition cursor
+- No individual frees needed
+- Thread-local: no synchronization
+- The `CountingAllocator` runs on top: arena bumps increment the alloc counter (for measurement) but never call `System.alloc`/`free`
+
+**Impact:** The ~14,900 temporary allocs per trigger become 14,900 pointer bumps. Total cost: ~50ns instead of ~150μs.
+
+**Limitation:** Arena memory can't be freed individually. Everything is reclaimed at once when the arena resets. Any allocation that outlives the trigger (e.g., a cloned EffectKind moved to the pending queue) must be cloned out of the arena before reset.
+
+#### Layer 2: PoolBox (persistent per-type allocations)
+
+For types that DO survive across triggers (EffectKind, Condition), a fixed-size pool recycles blocks:
+
+```rust
+struct Pool<T> {
+    slots: Box<[UnsafeCell<MaybeUninit<T>>]>,   // pre-allocated at init
+    free: Mutex<Vec<usize>>,                     // free-list of slot indices
+    next: AtomicUsize,                           // bump counter for new slots
+}
+
+struct EkBox {
+    slot: Option<usize>,     // pool slot (preferred)
+    heap: Option<Box<T>>,    // fallback when pool exhausted
+}
+```
+
+- **Allocation**: pop from free-list → if empty, bump into next slot → if all full, `Box::new` fallback
+- **Deallocation**: drop value in slot → push slot index to free-list
+- **Clone**: allocate new slot, `T::clone` into it
+- **Cost**: `alloc` = Mutex lock + Vec::pop (~50ns) vs malloc(808) (~200ns). No system allocator call after warmup.
+
+Currently implemented for EffectKind (128 slots × 808B = 103 KB). Condition pool uses the same mechanism but is blocked by serde deserialization quirks (see "What doesn't work yet" below).
+
+**Impact:** The ~52 persistent EffectKind allocs per trigger become pool bumps. Zero system allocator traffic after the first trigger.
+
+#### Combined flow per trigger
+
+```
+1. Arena.enter()                          — cursor = base, enable arena mode
+2. Condition evaluation                    — all Vec<String>, Vec<i16> from arena
+3. Effect execution                       — temporary Strings, Boxes from arena
+4. EffectKind lookup/modify               — from EkBox pool (already live)
+5. Clone effect for pending queue         — EkBox::clone() takes from pool
+6. Arena.exit() → clone persistents out   — EkBox stays (pool-managed), arena resets
+```
+
+### Implementation status
+
+| Component | Status | Lines of code | Impact |
+|-----------|--------|---------------|--------|
+| `CountingAllocator` | ✅ Live | 130 | Measurement tool |
+| `Pool<T>` + `EkBox` | ✅ Live | 180 | 0.3% alloc reduction (52 allocs saved) |
+| `CondBox` (Condition pool) | 🔲 Blocked | ~50 | Same again (52 allocs) |
+| Bump arena in `#[global_allocator]` | 🔲 Not started | ~100 | **~99% alloc reduction** (~14,900 allocs saved) |
+| Arena reset in trigger boundary | 🔲 Not started | ~20 | Reset cursor after each trigger |
+
+The bump arena is the 99% solution. The pools are just insurance for the few allocations that outlive the trigger.
+
+### What doesn't work yet
+
+**CondBox serde issue:** Condition's deserialization uses `#[serde(tag = "type")]`. When wrapped in `CondBox`, serde needs to deserialize the inner enum. The naive approach of delegating to `Condition::deserialize(d)` should work — but testing showed 6 Kasumi test failures that need investigation.
+
+**Cloning out of arena:** When an effect is cloned for the pending queue, the clone currently copies the entire tree into a new `Box::new()` allocation. With the arena, pending-queued effects need to be cloned to the heap (or pool) before the arena resets. This is already handled naturally by `EkBox::clone()` (which uses the pool) and `Box::clone()` (which uses the system allocator). Arena-backed Vecs would need explicit draining before reset.
+
+**Thread safety:** The bump arena is thread-local (per-handler). The pool is shared with a Mutex (only hit during cloning, not during the hot path). The `#[global_allocator]` wrapper needs to detect whether the current thread has an active arena.
+
+### What it would take to finish
+
+1. **Add bump arena to `CountingAllocator`** — ~100 lines
+2. **Wire arena enable/disable into trigger boundaries** — ~20 lines in `execute_effect` / `resume_pending_actions`
+3. **Fix CondBox serde** — ~10 lines  
+4. **Add arena-backed Vec/Box type** — ~150 lines (or use `bumpalo` crate)
+
+Total: ~280 lines to eliminate ~99% of per-trigger allocs (15K → ~150).
+
+### The ultimate target: 10μs per trigger
+
+With the arena + pools in place:
+
+| Current per-trigger | With arena + pool |
+|---------------------|-------------------|
+| 15,000 alloc calls | ~150 (pooled EffectKind + Conditions only) |
+| 326 KB total allocated | ~3 KB (pool slots + a few system allocs) |
+| ~150μs alloc time | ~1μs (pointer bumps) |
+| Heap fragmentation | Zero (arena reset is O(1)) |
+
+This makes the engine viable for:
+- **AI training**: millions of game simulations with zero allocator pressure
+- **GBA/3DS**: peak heap = pool size + arena size (fixed, predictable)
+- **Web server**: lower-latency per-request game evaluation
 
 ## How to measure
 
