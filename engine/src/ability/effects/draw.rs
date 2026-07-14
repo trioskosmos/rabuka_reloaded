@@ -266,10 +266,10 @@ impl AbilityResolver {
             "[SELECT_EFFECT] heart_colors={:?} has_icons={} source={:?} card_type={:?}",
             effect.heart_colors_any(),
             has_heart_icons,
-            effect.source,
+            effect.source_any(),
             effect.card_type_any()
         );
-        if effect.source.is_none()
+        if effect.source_any().is_none()
             && effect.heart_colors_any().is_empty()
             && !has_heart_icons
             && effect.or_card_types_any().is_none()
@@ -278,7 +278,7 @@ impl AbilityResolver {
         {
             return self.execute_area_select(gs, effect);
         }
-        if effect.source.is_none()
+        if effect.source_any().is_none()
             && effect.card_type_any().is_none()
             && (has_heart_colors || has_heart_icons)
         {
@@ -306,7 +306,7 @@ impl AbilityResolver {
             }
         }
         let source = if effect.card_type_any().as_deref() == Some("member_card")
-            && effect.source.is_none()
+            && effect.source_any().is_none()
         {
             Zone::Stage.to_str()
         } else {

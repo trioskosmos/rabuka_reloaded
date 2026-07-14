@@ -1178,7 +1178,7 @@ impl AbilityResolver {
                             effect.target_name(),
                             effect.position_any(),
                             false,
-                            effect.source.as_deref(),
+                            effect.source_any(),
                             effect.any_number_any().unwrap_or(false),
                         );
                     } else if let Err(e) = self.execute_effect(gs, &effect) {
@@ -1201,7 +1201,7 @@ impl AbilityResolver {
                         effect.target_name(),
                         effect.position_any(),
                         false,
-                        effect.source.as_deref(),
+                        effect.source_any(),
                         effect.any_number_any().unwrap_or(false),
                     );
                 }

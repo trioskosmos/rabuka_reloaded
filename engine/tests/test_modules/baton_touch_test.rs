@@ -1,5 +1,5 @@
 use crate::helpers::*;
-use rabuka_engine::card::{ConditionCardType,};
+use rabuka_engine::card::ConditionCardType;
 use rabuka_engine::game_setup::{generate_possible_actions, ActionType};
 use rabuka_engine::zones::MemberArea;
 
@@ -310,7 +310,7 @@ fn card_count_condition_baton_touch_filter() {
         count: Some(2),
         operator: Some(Box::from(">=")),
         card_type: Some(ConditionCardType::MemberCard),
-        group_names: Some(vec!["蓮ノ空".to_string()]),
+        group_names: Some(Box::new(vec!["蓮ノ空".to_string()])),
         exclude_group_names: None,
         characters: None,
         exclude_characters: None,

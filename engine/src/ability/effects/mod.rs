@@ -323,7 +323,7 @@ impl AbilityResolver {
                     effect.optional.unwrap_or(false),
                     change_group,
                     effect.self_cost_any().unwrap_or(false),
-                    effect.source.as_deref(),
+                    effect.source_any(),
                     effect.destination.as_deref(),
                     effect.cost_limit_operator_any().map(|s| s.to_string()),
                     effect.characters_any(),
@@ -568,7 +568,7 @@ impl AbilityResolver {
                 // Special case: source="under_member" + destination="energy_zone" means
                 // count from under member, but move from energy_deck → energy_zone (wait).
                 // e.g. PL!N-bp5-012-R+ LiveSuccess: place (under_count + 1) from deck.
-                if effect.source.as_deref() == Some("under_member")
+                if effect.source_any() == Some("under_member")
                     && effect.destination.as_deref() == Some("energy_zone")
                 {
                     let player = gs.resolve_target_player_mut(effect.target_name());
@@ -580,7 +580,7 @@ impl AbilityResolver {
                             break;
                         }
                     }
-                } else if effect.source.as_deref() == Some("under_member")
+                } else if effect.source_any() == Some("under_member")
                     && effect.destination.as_deref() == Some("empty_area")
                 {
                     // Deploy from under_member to empty_area (e.g. PL!-bp6-003-R+ LiveSuccess)
@@ -626,7 +626,7 @@ impl AbilityResolver {
                     self.pending_choice = Some(b.build());
                     self.execution_context =
                         super::types::ExecutionContext::SingleEffect { effect_index: 0 };
-                } else if effect.source.as_deref() == Some("under_member")
+                } else if effect.source_any() == Some("under_member")
                     && effect.destination.as_deref() == Some("energy_deck")
                 {
                     // Awakening Promise case: move from under_member → energy_deck
@@ -636,7 +636,7 @@ impl AbilityResolver {
                         effect.target_name(),
                         effect.position_any(),
                         effect.optional.unwrap_or(false),
-                        effect.source.as_deref(),
+                        effect.source_any(),
                         effect.any_number_any().unwrap_or(false),
                     );
                 } else {
@@ -646,7 +646,7 @@ impl AbilityResolver {
                         effect.target_name(),
                         effect.position_any(),
                         effect.optional.unwrap_or(false),
-                        effect.source.as_deref(),
+                        effect.source_any(),
                         effect.any_number_any().unwrap_or(false),
                     );
                 }

@@ -270,7 +270,7 @@ impl AbDebug {
             "move_cards" => format!(
                 "move {} from {} → {} (type: {})",
                 effect.count.unwrap_or(1),
-                effect.source.as_deref().unwrap_or("?"),
+                effect.source_any().unwrap_or("?"),
                 effect.destination.as_deref().unwrap_or("?"),
                 effect.card_type_any().as_deref().unwrap_or("card")
             ),
@@ -300,7 +300,7 @@ impl AbDebug {
                 "select {} {} from {}{}",
                 effect.count.unwrap_or(1),
                 effect.card_type_any().as_deref().unwrap_or("card"),
-                effect.source.as_deref().unwrap_or("?"),
+                effect.source_any().unwrap_or("?"),
                 if effect.optional.unwrap_or(false) {
                     " (optional)"
                 } else {
@@ -317,7 +317,7 @@ impl AbDebug {
                     ""
                 }
             ),
-            "reveal" => format!("reveal {}", effect.source.as_deref().unwrap_or("?")),
+            "reveal" => format!("reveal {}", effect.source_any().unwrap_or("?")),
             "position_change" => "position change".to_string(),
             "gain_ability" => "gain ability".to_string(),
             "do_nothing" => String::new(),

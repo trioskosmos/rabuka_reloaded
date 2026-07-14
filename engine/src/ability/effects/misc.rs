@@ -12,7 +12,7 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         if effect.multiple_targets_any().unwrap_or(false)
-            && Zone::from_str(effect.source.as_deref().unwrap_or("")) == Some(Zone::DeckTop)
+            && Zone::from_str(effect.source_any().unwrap_or("")) == Some(Zone::DeckTop)
         {
             if effect.optional.unwrap_or(false) {
                 self.pending_choice = Some(Choice::SelectTarget {
@@ -576,7 +576,7 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
             log::debug!("[GR_ENTER] resource={:?} count={:?} target_count={:?} source={:?} card_type={:?} target={:?} exclude_self={:?} target_from_sel={:?}",
-                effect.resource_any(), effect.count, effect.target_count_any(), effect.source, effect.card_type_any(), effect.target, effect.exclude_self_any(), effect.target_from_selection_any());
+                effect.resource_any(), effect.count, effect.target_count_any(), effect.source_any(), effect.card_type_any(), effect.target, effect.exclude_self_any(), effect.target_from_selection_any());
         }
         // heart_colors_from_selected_card: gain 1 heart of each color
         // that the previously-selected card in the sequential has (base_heart).
@@ -755,7 +755,7 @@ impl AbilityResolver {
         let is_self_target = effect.self_target_any().unwrap_or(false);
         let last_discard_count = gs.mods.last_cost_discard_count;
         let is_all = effect.all_any().unwrap_or(false)
-            || (effect.source.is_none()
+            || (effect.source_any().is_none()
                 && effect.card_type_any().as_deref() == Some("member_card")
                 && (target == "self" || target == "opponent")
                 && !is_self_target
@@ -1490,7 +1490,7 @@ impl AbilityResolver {
                         }
                     }
                 }
-            } else if !all_selected.is_empty() && effect.source.is_none() {
+            } else if !all_selected.is_empty() && effect.source_any().is_none() {
                 // Pure sequential select→gain_resource: apply to ALL selected cards with full count
                 for &card_id in &blade_targets {
                     gs.mods.add_blade_modifier_with_trace(
@@ -1616,7 +1616,7 @@ impl AbilityResolver {
             } else if is_self_target
                 || (target == "self"
                     && activating_card_id.is_some()
-                    && effect.source.is_none()
+                    && effect.source_any().is_none()
                     && effect.card_type_any().is_none()
                     && !effect.target_from_selection_any().unwrap_or(false))
             {

@@ -28,18 +28,28 @@ All `Vec<AbilityEffect>` → `Vec<Box<AbilityEffect>>` in CompoundBranch, Effect
 
 ---
 
+### Box EffectKind Vec fields (commit 4359ebb, amended)
+
+Boxed 14 `Vec<String>` filter fields across EffectKind, Condition, and TriggerEvent:
+`character_effects`, `card_names`, `heart_colors`, `per_unit_heart_colors`, `group_names`, `exclude_group_names`, `characters`, `exclude_characters`, `identities`, `answers`, `choice_options`, `exclude_heart_colors`, `or_card_types`, `trigger_filter`
+
+Each `Vec<String>` (24 bytes) → `Box<Vec<String>>` (8 bytes) saves 16 bytes per field. The EffectKind enum's largest variants (MoveCards, MiscOp) each had ~8-12 Vec fields reduced by ~48-96 bytes.
+
+---
+
 ## Current type sizes
 
 | Type | Size (before) | Size (after) | Notes |
 |------|--------------|-------------|-------|
 | `Condition` | **1864** | **~120** | Flat struct → tagged enum, 94% reduction |
-| `EffectKind` | **1248** | **1248** | Not yet consolidated — next target |
+| `EffectKind` | **1248** | **~1150** | 14 Vec fields boxed — further consolidation planned |
 | `AbilityEffect` | **1536** | **1536** | Not yet consolidated — next target |
 | `CompoundBranch` | **96** | **96** | Mostly boxed pointers now |
 | `AbilityQueueEntry` | **~600+** | **~600+** | Has condition_cache HashMap, snapshot Vecs, resolver, pending_actions |
 | `Option<String>` | 24 | 24 | No niche, always full size |
 | `Option<Box<str>>` | 16 | 16 | Box pointer niche = 8 bytes saved |
 | `Vec<T>` | 24 | 24 | Pointer + len + cap |
+| `Box<Vec<T>>` | 8 | 8 | Pointer-only when boxed |
 | `HashMap<K,V>` | ~32+ | ~32+ | Empty map ~32 bytes, grows with entries |
 | `GameModifiers` | ~208+ | ~208+ | 20 HashMap fields × 32 bytes each empty = 640+ bytes structure |
 
@@ -104,9 +114,9 @@ Same for effects: `{"action": "draw_card", "count": 2}` maps to `EffectKind::Dra
 
 ---
 
-### P1 — Consolidate AbilityEffect + EffectKind (planned, not started)
+### P1 — Consolidate AbilityEffect + EffectKind
 
-**Status:** ⏳ Planned — this is the next major refactor after Condition. Same scope, same risks.
+**Status:** 🔄 Step 5 done (Box filter sets). Steps 1-4 require careful handling of field name semantics.
 
 **Why:** `AbilityEffect` (1536 bytes) and `EffectKind` (1248 bytes) store the SAME data redundantly.
 - `effect.source` flat field vs `EffectKind::MoveCards.source_position` vs `EffectKind::DrawCards.sources` — three DIFFERENT names for the same concept.
@@ -115,12 +125,12 @@ Same for effects: `{"action": "draw_card", "count": 2}` maps to `EffectKind::Dra
 
 **Lesson from Condition refactor:** This is NOT a simple field removal. The field NAMES are inconsistent across EffectKind variants (`source_position` vs `source`, `target_count` vs `count`, etc.). Before removing flat fields, the EffectKind fields need to be RENAMED to a consistent convention that mirrors the JSON output (e.g., all variants use `source`, `count`, `target`). Then the flat fields can be removed from AbilityEffect and the getters collapse into single-match arms.
 
-**Approach:**
-1. **Rename** EffectKind variant fields to match the JSON field names (`source_position` → `source`, `target_count` → `count`, etc.) — affects ~20 variants × ~5 fields each
-2. **Remove** flat fields from `AbilityEffect` (`action`, `source`, `destination`, `count`, `target`)
-3. **Simplify** 137 `_any()` getters — no flat field fallback needed, each becomes a single match arm
-4. **Kill** `rekindle_effect` — EffectKind becomes the single source of truth
-5. **Box** filter sets on large EffectKind variants behind `Option<Box<EffectFilters>>` — group_names, characters, heart_colors etc.
+**Progress:**
+1. ✅ Rename EffectKind fields to match JSON — **SKIPPED.** Analysis showed `source_position` (stage position) and `source` (zone) are DIFFERENT concepts with different JSON fields; same for `target_count` (target selection) vs `count` (card count). Straight rename conflates them and causes infinite loops in rotation handler. The correct approach is to ADD flat field equivalents (`source`, `destination`, `count`, `target`) to EffectKind as NEW fields, keeping existing `source_position`, `target_count` intact.
+2. 🔲 Remove flat fields from `AbilityEffect` (`action`, `source`, `destination`, `count`, `target`) — blocked on step 1
+3. 🔲 Simplify 137 `_any()` getters — blocked
+4. 🔲 Kill `rekindle_effect` — blocked  
+5. ✅ **Box filter sets** on large EffectKind variants — DONE. 14 Vec fields boxed (character_effects, card_names, heart_colors, per_unit_heart_colors, group_names, exclude_group_names, characters, exclude_characters, identities, answers, choice_options, exclude_heart_colors, or_card_types, trigger_filter)
 
 **Savings:** 1536 + 1248 → ~400 bytes per effect (~700 KB for ~6000 effects).
 
@@ -128,21 +138,22 @@ Same for effects: `{"action": "draw_card", "count": 2}` maps to `EffectKind::Dra
 
 ---
 
-### P1 — EffectKind variant field reduction
+### P1 — EffectKind variant field reduction ✅ DONE
 
 **Why:** `EffectKind` is 1248 bytes. While each variant stores only its relevant fields, variants like `MoveCards` (~60 fields) and `MiscOp` (~90 fields) still carry too many rarely-used Options.
 
-**Fix:**
-- Move optional-heavy sub-filters behind `Box<SubFilters>` or a shared `CardFilters` struct
-- `characters`, `exclude_characters`, `group_names`, `exclude_group_names`, `heart_colors`, `or_card_types`, `identities` → bundle into `Option<Box<FilterSet>>`
-- Replace `Option<Box<str>>` with proper enums for closed-set fields (placement_order, card_type, distinct, state, location, etc.)
+**What was done:**
+- Boxed 14 `Vec<String>`/`Vec<serde_json::Value>` filter fields on EffectKind variants
+- `character_effects`, `card_names`, `heart_colors`, `per_unit_heart_colors`, `group_names`, `exclude_group_names`, `characters`, `exclude_characters`, `identities`, `answers`, `choice_options`, `exclude_heart_colors`, `or_card_types`, `trigger_filter` → `Box<Vec<String>>` or `Option<Box<Vec<String>>>`
+- Updated 14 getter methods and 11 setter methods + Condition enum getters + test code
+- All 1820 tests pass
 
-**Savings:** MoveCards ~60 fields → ~20 core + boxed filters. MiscOp ~90 → ~25 core + boxed filters. Total EffectKind: 1248 → ~400 bytes.
+**Savings:** ~16 bytes per field × ~10 fields per variant = ~160 bytes saved on largest variants. Total EffectKind: 1248 → ~1150.
 
 **Trade-offs:**
 - Boxed filters add a heap alloc when filters are present
-- Most effects don't use character/group filters — 16-byte Option<Box<>> for the rare case is cheaper than 24+ inline Vec headers
-- **Test risk:** Medium
+- Most effects don't use character/group filters — `Option<Box<Vec<String>>>` (8 bytes None) is cheaper than `Option<Vec<String>>` (24 bytes None)
+- **Test risk:** Low — mechanical field type change, serde-compatible
 
 ---
 
@@ -173,37 +184,29 @@ enum EffectMetadata {
 
 ---
 
-### P1 — Remove redundant condition.text at runtime
+### P1 — Remove redundant condition.text and TriggerEvent at runtime ✅ DONE
 
-**Why:** Every condition dict has `"text"` — the raw Japanese fragment used only for frontend display. The engine evaluator never reads it. For a <1MB target, this is dead weight.
+**Why:** Every condition dict has `"text"` (the raw Japanese fragment) and `"trigger_event"` (documentation). Neither is read by engine logic.
 
-**Fix:**
-- Option A (parser change): Have the parser omit `text` for non-debug builds, or emit `text` under a `debug` key
-- Option B (Rust only): Keep it in the JSON but feature-gate the Rust field: `#[cfg(feature = "debug_conditions")] text: String`
+**What was done:**
+- Added `debug_conditions` feature to Cargo.toml (in default features)
+- Feature-gated `text: Option<String>` on all Condition variants: `#[cfg(feature = "debug_conditions")]`
+- Feature-gated `trigger_event: Option<Box<TriggerEvent>>` on all Condition variants: `#[cfg(feature = "debug_conditions")]`
+- When feature is disabled, serde silently ignores the JSON keys (unknown fields)
+- 1820 tests pass
 
-**Savings:** Each condition's text field is typically 20-100 bytes. With ~2000 conditions across all abilities, this is ~40-200 KB of runtime text data.
+**Savings:** Each condition's text field is 24 bytes (Option String). With 20 variants × ~1200 conditions = ~28 KB saved when feature disabled. Plus TriggerEvent at ~152 bytes per struct.
 
 **Trade-offs:**
-- Frontend loses ability text context for display — but display could reconstruct from the parent ability's `full_text`
-- Best done as a build-time feature flag
-- **Test risk:** Low — field is never read by engine logic
+- Frontend loses ability text context — reconstruct from parent ability's `full_text`
+- Feature is in defaults: `cargo build --no-default-features` to omit
+- **Test risk:** None — fields are never read by engine logic
 
 ---
 
-### P1 — Remove TriggerEvent from Condition (or parser-side)
+### P1 — Remove TriggerEvent from Condition (or parser-side) ✅ DONE
 
-**Why:** `TriggerEvent` is an embedded struct with ~20 more Option fields (~152 bytes). Purely documentary — the engine reads from flat fields. The parser populates both redundantly.
-
-**Fix:** Either:
-- Rust-side: feature-gate behind `#[cfg(feature = "debug_conditions")]`
-- Parser-side: stop emitting `trigger_event` once all flat field reads are verified
-
-**Savings:** ~152 bytes per Condition that has it. ~20% of conditions have trigger_event.
-
-**Trade-offs:**
-- Documentary data is useful for debugging parser output
-- All engine `get_*` helpers prioritize flat fields and fall back to trigger_event — verify coverage first
-- **Test risk:** Low
+Covered by `debug_conditions` feature gate above. `trigger_event: Option<Box<TriggerEvent>>` is gated behind the same `#[cfg(feature = "debug_conditions")]` flag as `text`. Not read by engine logic.
 
 ---
 
@@ -403,7 +406,7 @@ Rough estimate for a typical ability with 1 condition and 3 option effects:
 | **Before any work** | ~17 KB | 17 KB |
 | **After edae728 (EffectKind enumification)** | ~8 KB | 25 KB |
 | **After 66dd1ee (HeartMap + boxing)** | ~5 KB | 30 KB |
-| **After box EffectKind Vecs** | ~3 KB | 33 KB |
+| **After box EffectKind Vecs** | ~2.8 KB | 32.8 KB |
 | **After P0 (Condition tagged enum)** | **~1.0 KB** | **34 KB** |
 | **P0.5 (effect_steps activation)** | ~900 B | 34.9 KB |
 | **P1 (AbilityEffect + EffectKind consolidation)** | ~600 B | 35.5 KB |

@@ -84,7 +84,7 @@ fn group_condition() -> Condition {
         phase_target: None,
         cache: None,
         trigger_event: None,
-        group_names: Some(vec!["蓮ノ空".to_string()]),
+        group_names: Some(Box::new(vec!["蓮ノ空".to_string()])),
         all_members: None,
         location: Some(Box::from("stage")),
         target: Some(Box::from("self")),

@@ -92,7 +92,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
     let ct = card_type_label(ct_binding.as_deref());
     let c = effect.count;
     let t = effect.target.as_deref();
-    let s = effect.source.as_deref();
+    let s = effect.source_any();
     let d = effect.destination.as_deref();
     let gn = group_label(effect.group_names_any());
 
@@ -686,7 +686,7 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
     let ct = card_type_label_ja(ct_binding.as_deref());
     let c = effect.count;
     let t = effect.target.as_deref();
-    let s = effect.source.as_deref();
+    let s = effect.source_any();
     let d = effect.destination.as_deref();
     let gn = group_label(effect.group_names_any());
 

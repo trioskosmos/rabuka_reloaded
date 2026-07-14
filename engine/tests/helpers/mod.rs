@@ -136,17 +136,14 @@ impl TestGame {
         state.current_phase = Phase::Main;
         state.current_turn_phase = TurnPhase::FirstAttackerNormal;
         state.turn_number = 1;
-        if std::env::var("RUST_LOG").is_ok() {
+        // cargo test: all gates ON (loud). cargo t: detects --test-threads → all OFF.
+        let quiet = std::env::args().any(|a| a.starts_with("--test-threads"));
+        if !quiet {
             let _ = env_logger::try_init();
-        }
-        let debug_enabled = std::env::var("RABUKA_DEBUG").is_ok();
-        if debug_enabled {
             rabuka_engine::ability::debug::set_debug(true);
-        }
-        // Off by default. Set RABUKA_VERBOSE=1 for structured verdict items in rule_log.
-        if std::env::var("RABUKA_VERBOSE").is_ok() {
             rabuka_engine::ability::debug::set_rule_log_verbose(true);
         }
+        let debug_enabled = !quiet || std::env::var("RABUKA_DEBUG").is_ok();
 
         TestGame {
             db: state.card_database.clone(),

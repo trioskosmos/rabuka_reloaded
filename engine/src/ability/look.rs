@@ -594,7 +594,7 @@ impl AbilityResolver {
         let any_number = effect.any_number_any().unwrap_or(false);
         let count = effect.count.unwrap_or(1) as usize;
         let optional = effect.optional.unwrap_or(false);
-        let src = effect.source.as_deref().unwrap_or("");
+        let src = effect.source_any().unwrap_or("");
 
         // If source is revealed_cards, handle differently — no look_and_select pipeline
         if src == "revealed_cards" {

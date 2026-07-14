@@ -2295,7 +2295,7 @@ impl super::resolver::AbilityResolver {
     fn handle_draw_any_number(&mut self, gs: &mut GameState, selected: &str) -> Result<(), String> {
         let count: usize = selected.parse().unwrap_or(0);
         if let Some(effect) = gs.entry_effect().cloned() {
-            let source = effect.source.as_deref().unwrap_or(Zone::Deck.to_str());
+            let source = effect.source_any().unwrap_or(Zone::Deck.to_str());
             let destination = effect.destination.as_deref().unwrap_or(Zone::Hand.to_str());
             let ct_binding = effect.card_type_any();
             let card_type = ct_binding.as_deref();

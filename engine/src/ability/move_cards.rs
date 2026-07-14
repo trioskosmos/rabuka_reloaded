@@ -1352,7 +1352,10 @@ impl AbilityResolver {
         };
 
         let mut moved_cards: Vec<i16> = Vec::new();
-        let source = effect.source.clone().unwrap_or_default();
+        let source = effect
+            .source_any()
+            .map(|s| s.to_string())
+            .unwrap_or_default();
         let destination = effect.destination.clone().unwrap_or_default();
 
         let raw_target = tgt.as_deref().unwrap_or("self");
@@ -1373,7 +1376,7 @@ impl AbilityResolver {
         // (needed when the resolve creates a card selection choice and the destination
         // is not accessible via entry_destination, e.g. for sequential sub-actions).
         self.spawn_context.destination = effect.destination.clone().map(|s| s.to_string());
-        self.spawn_context.source = effect.source.clone().map(|s| s.to_string());
+        self.spawn_context.source = effect.source_any().map(|s| s.to_string());
         self.spawn_context.position = effect.position_any().and_then(|p| match p {
             crate::card::PositionInfo::String(s) => s.parse::<usize>().ok(),
             crate::card::PositionInfo::Struct { position, .. } => {
