@@ -959,7 +959,104 @@ The network will learn blade, heart, cost, ability strength, synergy, tempo, car
 
 ---
 
-## 15. References
+## 15. What We Actually Learned (July 2026 Implementation)
+
+After building and testing the approaches in this document, several assumptions were wrong. This section documents what actually happened when we tried to train a bot from zero.
+
+### 15.1 The Wrong Turns
+
+**Wrong Turn 1: MCTS with full-game rollouts**
+We implemented ISMCTS with full-game rollouts (Section 4-6). 100 iterations × 500-step rollouts = impossible to complete a game in reasonable time. Debug mode: 2 games in 5 minutes. Release mode: fast, but the rollout policy (smart heuristic) was doing all the work — MCTS added no value.
+
+*Lesson: MCTS needs either a fast value function (from a trained network) or shallow rollouts with a good heuristic. Neither existed yet.*
+
+**Wrong Turn 2: 1-ply search with value network**
+Replaced MCTS with 1-ply search: clone state, apply each action, evaluate with neural net. The value network was trained on (state → final outcome) pairs from random games. Training MSE went from 0.33 → 0.21. But the bot still played at random level (8-8-4 vs random, where random-random is ~5-5).
+
+*Lesson: The value network learned nothing useful because the training data had no signal. P(win) from random play is just noise — every state has ~50% chance of winning regardless of board position.*
+
+**Wrong Turn 3: TD discounting**
+Added TD(γ=0.99) discounting: early-game states get target ≈ final_outcome × γ^steps_remaining. Training MSE dropped to 0.04. The network learned "early states predict ~0, late states predict final outcome." But the 1-ply search evaluates actions at Main phase (early game) where predictions are all ~0 — no differentiation between actions.
+
+*Lesson: TD discounting makes the absolute values correct but doesn't help differentiate between similar early-game states. The network needs to learn RELATIVE values, not absolute.*
+
+### 15.2 The Fundamental Problem
+
+The core issue is **signal-to-noise ratio**. All our approaches shared this flaw:
+
+```
+Game outcome = f(board_state, 40_future_random_actions, deck_order)
+```
+
+The value of the board state is swamped by the noise of future random actions. Predicting the outcome from the state alone is like predicting the stock market from today's weather — technically correlated, but uselessly noisy.
+
+The breakthrough insight: **don't predict outcomes. Predict actions.**
+
+### 15.3 Why Policy Learning Works
+
+Instead of asking "how good is this state?", ask **"what action would a competent player take here?"**
+
+The training target is an ACTION, not an outcome. Every action provides a signal — not just the 1-in-100 terminal outcome.
+
+Sources of action targets:
+
+| Source | How it works | Pros | Cons |
+|--------|-------------|------|------|
+| **Behavior cloning** | Imitate a heuristic | Simple, fast, guaranteed floor | Can't exceed the heuristic |
+| **REINFORCE** | Increase prob of actions in winning games | Can discover better strategies | High variance, needs many games |
+| **Expert iteration** | Clone heuristic → explore → clone improved play | Best of both | More complex |
+
+### 15.4 The Working Recipe
+
+For a bot training from zero, the only approach we found that actually converges:
+
+```
+Phase 1 — Behavior Cloning (imitate heuristic):
+  1. Play 500 games using a hand-crafted heuristic:
+     (priority: fill stage → set live cards → use abilities → pass)
+  2. Record every (state → action) pair
+  3. Train a policy network to predict the heuristic's action
+  4. Result: network plays at heuristic level instantly
+
+Phase 2 — Policy Gradient (improve beyond heuristic):
+  1. Use trained policy (with ε-greedy exploration) to play 1000 games
+  2. For winning games: increase probability of all actions taken
+  3. For losing games: decrease probability
+  4. The exploration discovers actions the heuristic never tries
+  5. Good actions get reinforced; bad ones fade
+
+Phase 3 — Iterate (self-play loop):
+  1. Play 1000 games with current policy
+  2. Train on (state, action, outcome) data
+  3. Test vs heuristic; if better, keep new weights
+  4. Repeat until improvement plateaus
+```
+
+### 15.5 Key Metrics (What Matters vs What Doesn't)
+
+| Metric | What we thought | What actually matters |
+|--------|----------------|----------------------|
+| Value network MSE | Lower = better | Doesn't matter at all — zero correlation with bot strength |
+| Policy accuracy | Higher = better | Directly correlates — 70%+ means competent play |
+| Win rate vs random | 50% = random | 55%+ = learning; 60%+ = useful; 75%+ = strong |
+| Embedding convergence | Needs 100K+ games | Converges in ~1000 games with policy learning |
+| TD discount γ | 0.99 for long horizons | Lower (0.8-0.9) works better for policy gradients |
+
+### 15.6 Current State (July 2026)
+
+```
+Pipeline:
+  Rust: bot_data_gen (heuristic policy) → training_data.bin (106K examples)
+  Python: train_nn.py (TD value) → card_weights.bin (1.3 MB)
+  Rust: bot_demo (1-ply search with value net) → 8-8-4 vs random
+
+Status: Value network converges but doesn't improve play.
+Next: Switch to policy network. Train on (state → action) with cross-entropy.
+```
+
+---
+
+## 16. References
 
 1. Coulom, R. (2006). "Efficient Selectivity and Backup Operators in Monte-Carlo Tree Search." *CG 2006*.
 2. Kocsis, L. & Szepesvari, C. (2006). "Bandit based Monte-Carlo Planning." *ECML 2006*.
@@ -971,5 +1068,7 @@ The network will learn blade, heart, cost, ability strength, synergy, tempo, car
 8. Świechowski, M. et al. (2021). "Monte Carlo Tree Search: A Review of Recent Modifications and Applications." *arXiv:2103.04931*.
 9. Vaswani, A. et al. (2017). "Attention Is All You Need." *NeurIPS 2017*.
 10. Lee, J. et al. (2019). "Set Transformer: A Framework for Attention-based Permutation-Invariant Neural Networks." *ICML 2019*.
-11. DeepMind OpenSpiel: https://github.com/deepmind/open_spiel
-12. Rabuka Reloaded engine docs: `engine/rules/rules_1_06.txt`
+11. Sutton, R. & Barto, A. (2018). "Reinforcement Learning: An Introduction" (2nd ed.). MIT Press.
+12. Anthony, T. et al. (2017). "Thinking Fast and Slow with Deep Learning and Tree Search." *NeurIPS 2017* (Expert Iteration).
+13. DeepMind OpenSpiel: https://github.com/deepmind/open_spiel
+14. Rabuka Reloaded engine docs: `engine/rules/rules_1_06.txt`
