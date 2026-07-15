@@ -174,24 +174,6 @@ fn main() {
             p1_zone,
             p2_zone
         );
-        let margin = (p1_zone as f32 - p2_zone as f32) / 3.0;
-        bot.network.train(
-            &gs.player1
-                .stage
-                .stage
-                .iter()
-                .chain(gs.player1.hand.cards.iter())
-                .copied()
-                .collect::<Vec<_>>(),
-            &gs.player2
-                .stage
-                .stage
-                .iter()
-                .chain(gs.player2.hand.cards.iter())
-                .copied()
-                .collect::<Vec<_>>(),
-            margin,
-        );
         if p1_zone >= 3 && p2_zone <= 2 {
             p1_wins += 1;
         } else if p2_zone >= 3 && p1_zone <= 2 {

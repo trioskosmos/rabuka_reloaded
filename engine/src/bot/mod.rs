@@ -5,7 +5,7 @@ mod neural;
 mod observation;
 
 pub use ismcts::search_1ply;
-pub use neural::ValueNetwork;
+pub use neural::PolicyNet;
 pub use observation::PublicObservation;
 
 use crate::card::CardDatabase;
@@ -40,7 +40,7 @@ pub struct Bot {
     pub card_database: Arc<CardDatabase>,
     pub perspective_player: u8,
     pub sampler: DeterminizationSampler,
-    pub network: ValueNetwork,
+    pub network: PolicyNet,
 }
 
 impl Bot {
@@ -57,7 +57,7 @@ impl Bot {
             card_database,
             perspective_player,
             sampler,
-            network: ValueNetwork::new(num_cards),
+            network: PolicyNet::new(num_cards),
         }
     }
 
