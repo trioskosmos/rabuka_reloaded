@@ -226,6 +226,13 @@ impl PolicyNet {
         logit
     }
 
+    /// Q(s,a) — value of taking action a in state s.
+    pub fn q_value(&self, my_ids: &[i16], opp_ids: &[i16], act_type: u8, act_card: i16) -> f32 {
+        let state = self.state_embed(my_ids, opp_ids);
+        let (_, value) = self.forward(&state, act_type, act_card);
+        value
+    }
+
     /// State value without any action.
     pub fn state_value(&self, my_ids: &[i16], opp_ids: &[i16]) -> f32 {
         let state = self.state_embed(my_ids, opp_ids);

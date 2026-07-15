@@ -167,6 +167,14 @@ pub struct Room {
     pub cached_actions: Vec<ActionIndex>,
     #[serde(skip)]
     pub actions_dirty: bool,
+    #[serde(skip)]
+    pub recording: bool,
+    #[serde(skip)]
+    pub recording_data: Vec<u8>,
+    #[serde(skip)]
+    pub recording_before: Vec<u8>, // serialized state before pending action
+    #[serde(skip)]
+    pub recording_action: Option<(i16, u8)>, // pending action (card_id, type_idx)
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -816,6 +824,58 @@ pub async fn execute_action(
                         );
                         room.frame_history
                             .push(FrameSnapshot::capture(&game_state, frame, label));
+
+                        // Recording hook: buffer (state, action) for each step
+                        if room.recording && room.recording_before.is_empty() {
+                            // First action: just buffer the before-state
+                            room.recording_before = serialize_p1_state(&snapshot);
+                            room.recording_action = Some((
+                                req.card_id.unwrap_or(0),
+                                action_type_to_idx(req.action_type.as_deref()),
+                            ));
+                        } else if room.recording {
+                            // Subsequent action: write previous buffered pair + current before-state
+                            let state_bytes = serialize_p1_state(&snapshot);
+                            let (cid, aidx) = room.recording_action.unwrap_or((0, 0));
+                            room.recording_data.extend_from_slice(&room.recording_before);
+                            room.recording_data.extend_from_slice(&cid.to_le_bytes());
+                            room.recording_data.push(aidx);
+                            room.recording_data.extend_from_slice(&0f32.to_le_bytes()); // reward placeholder
+                            room.recording_data.extend_from_slice(&state_bytes);
+                            // Buffer current state+action for next write
+                            room.recording_before = state_bytes;
+                            room.recording_action = Some((
+                                req.card_id.unwrap_or(0),
+                                action_type_to_idx(req.action_type.as_deref()),
+                            ));
+                        }
+                        // Check game end — if over, flush recording to file
+                        if game_state.game_result != crate::game_state::GameResult::Ongoing && room.recording {
+                            let outcome = match game_state.game_result {
+                                crate::game_state::GameResult::FirstAttackerWins => 1.0f32,
+                                crate::game_state::GameResult::SecondAttackerWins => -1.0f32,
+                                _ => 0.0f32,
+                            };
+                            // Update reward for last buffered pair
+                            if let Some((cid, aidx)) = room.recording_action.take() {
+                                room.recording_data.extend_from_slice(&room.recording_before);
+                                room.recording_data.extend_from_slice(&cid.to_le_bytes());
+                                room.recording_data.push(aidx);
+                                room.recording_data.extend_from_slice(&outcome.to_le_bytes());
+                                // Last action: no next state, repeat current
+                                room.recording_data.extend_from_slice(&room.recording_before);
+                            }
+                            // Write to file
+                            let log_path = format!("../recording_{}.bin", rid);
+                            if let Ok(mut f) = std::fs::File::create(&log_path) {
+                                use std::io::Write;
+                                let _ = f.write_all(&room.recording_data);
+                                eprintln!("Recording saved to {}", log_path);
+                            }
+                            room.recording = false;
+                            room.recording_data.clear();
+                            room.recording_before.clear();
+                        }
                         room.last_active = SystemTime::now()
                             .duration_since(UNIX_EPOCH)
                             .unwrap()
@@ -2008,6 +2068,10 @@ pub async fn rooms_create(
         frame_history: Vec::new(),
         cached_actions: Vec::new(),
         actions_dirty: true,
+        recording: false,
+        recording_data: Vec::new(),
+        recording_before: Vec::new(),
+        recording_action: None,
     };
 
     println!("DEBUG: Inserting room with ID: {}", room_id);
@@ -2671,6 +2735,32 @@ async fn launch_ngrok(port: u16, auth_token: Option<String>) {
         }
     }
 }
+fn serialize_p1_state(gs: &GameState) -> Vec<u8> {
+    let mut buf = Vec::new();
+    let hand = &gs.player1.hand.cards;
+    buf.push(hand.len() as u8);
+    for &c in hand.iter() { buf.extend_from_slice(&c.to_le_bytes()); }
+    for &c in &gs.player1.stage.stage { buf.extend_from_slice(&c.to_le_bytes()); }
+    for &c in &gs.player2.stage.stage { buf.extend_from_slice(&c.to_le_bytes()); }
+    buf
+}
+fn action_type_to_idx(at: Option<&str>) -> u8 {
+    match at {
+        Some("pass") => 0, Some("rock_choice") => 1, Some("paper_choice") => 2,
+        Some("scissors_choice") => 3, Some("choose_first_attacker") => 4,
+        Some("choose_second_attacker") => 5, Some("mulligan_header") => 6,
+        Some("select_mulligan") => 7, Some("confirm_mulligan") => 8,
+        Some("skip_mulligan") => 9, Some("live_card_header") => 10,
+        Some("select_live_card") => 11, Some("confirm_live_card_set") => 12,
+        Some("skip_live_card_set") => 13, Some("play_member_to_stage") => 14,
+        Some("use_ability") => 15, Some("set_live_card") => 16,
+        Some("finish_live_card_set") => 17, Some("decision") => 18,
+        Some("select_card") => 19, Some("select_skip") => 20,
+        Some("choose_option") => 21, Some("select_position") => 22,
+        Some("energy_charge") => 23, Some("pass_remaining") => 24,
+        _ => 0,
+    }
+}
 
 pub async fn run_web_server() -> std::io::Result<()> {
     run_web_server_with_ngrok(None).await
@@ -2774,6 +2864,51 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
             }
         });
     }
+
+    // Recording helpers
+    fn serialize_p1_state(gs: &GameState) -> Vec<u8> {
+        let mut buf = Vec::new();
+        let hand = &gs.player1.hand.cards;
+        buf.push(hand.len() as u8);
+        for &c in hand.iter() { buf.extend_from_slice(&c.to_le_bytes()); }
+        for &c in &gs.player1.stage.stage { buf.extend_from_slice(&c.to_le_bytes()); }
+        for &c in &gs.player2.stage.stage { buf.extend_from_slice(&c.to_le_bytes()); }
+        buf
+    }
+
+    fn action_type_to_idx(at: Option<&str>) -> u8 {
+        match at {
+            Some("pass") => 0,
+            Some("rock_choice") => 1,
+            Some("paper_choice") => 2,
+            Some("scissors_choice") => 3,
+            Some("choose_first_attacker") => 4,
+            Some("choose_second_attacker") => 5,
+            Some("mulligan_header") => 6,
+            Some("select_mulligan") => 7,
+            Some("confirm_mulligan") => 8,
+            Some("skip_mulligan") => 9,
+            Some("live_card_header") => 10,
+            Some("select_live_card") => 11,
+            Some("confirm_live_card_set") => 12,
+            Some("skip_live_card_set") => 13,
+            Some("play_member_to_stage") => 14,
+            Some("use_ability") => 15,
+            Some("set_live_card") => 16,
+            Some("finish_live_card_set") => 17,
+            Some("decision") => 18,
+            Some("select_card") => 19,
+            Some("select_skip") => 20,
+            Some("choose_option") => 21,
+            Some("select_position") => 22,
+            Some("energy_charge") => 23,
+            Some("pass_remaining") => 24,
+            _ => 0,
+        }
+    }
+
+    // Need to also add recording fields to room construction
+    // and a way to enable recording
 
     HttpServer::new(move || {
         let cors = Cors::permissive();

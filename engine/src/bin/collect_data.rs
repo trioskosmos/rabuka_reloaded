@@ -49,6 +49,10 @@ fn main() {
     let mut out = File::create(&out_path).unwrap();
     let mut total: u64 = 0;
     let mut start = std::time::Instant::now();
+    let program_seed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos() as u64;
 
     for game_idx in 0..num_games {
         let mut d1 = t1.clone();
@@ -71,7 +75,8 @@ fn main() {
         let mut pending: Option<Example> = None;
         let mut last_turn = 0u32;
         let mut stuck = 0u32;
-        let mut rng_state: u64 = (game_idx as u64) * 0x9E3779B97F4A7C15;
+        let mut rng_state: u64 =
+            program_seed ^ ((game_idx as u64).wrapping_mul(0x9E3779B97F4A7C15));
 
         for _ in 0..500 {
             TurnEngine::check_victory_condition(&mut gs);
