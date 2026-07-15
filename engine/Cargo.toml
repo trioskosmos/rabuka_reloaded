@@ -92,3 +92,8 @@ test = false
 name = "bot_demo"
 path = "src/bin/bot_demo.rs"
 test = false
+
+[[bin]]
+name = "bot_data_gen"
+path = "src/bin/bot_data_gen.rs"
+test = false
