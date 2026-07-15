@@ -1052,11 +1052,129 @@ Pipeline:
 
 Status: Value network converges but doesn't improve play.
 Next: Switch to policy network. Train on (state → action) with cross-entropy.
+
+---
+
+## 16. The Game Mechanics the Bot Must Understand
+
+After studying the actual fade deck cards and tracing through the live phase engine code, here is what the bot actually needs to learn.
+
+### 16.1 The Scoring Pipeline
+
+```
+Energy → Play Members → Blade → Yell Draw → Hearts → Meet Live Card Requirements → Success Zone
+                 ↓
+           Base Hearts ────────────────────────────────────────────┘
+```
+
+Every decision in the game feeds into this pipeline. The bot needs to understand:
+
+1. **Blade** = number of cards drawn during yell (performance phase). More blade = more cards = more hearts = higher chance of meeting heart requirements.
+2. **Base hearts** = hearts contributed by stage members (from `base_heart` field). These are available EVERY turn, not just during yell.
+3. **Blade hearts** = hearts from yell-drawn cards (from `blade_heart` field). Each drawn card contributes hearts based on its blade color.
+4. **Need hearts** = requirements on live cards (from `need_heart` field). Must have enough of each color to succeed.
+5. **Heart00 (wildcard)** = `heart0` field which can fill deficits in ANY color.
+6. **All (icon_all)** = `heart7` which acts as any one color during allocation.
+
+### 16.2 The Fade Deck Resource Profile
+
+From the deck analysis:
+
+| Resource Type | Range | Key Cards |
+|--------------|-------|-----------|
+| Low-cost members | cost 2, blade 1 | Most of the deck — easy to play, low impact |
+| Mid-cost members | cost 4-11, blade 2-4 | CatChu! members — decent blade/cost ratio |
+| High-cost members | cost 13-22, blade 6 | A few power cards — game-winning potential |
+| Live cards | 5 total, varying need_heart | Heart02/03/06 most common; `heart0` wildcard |
+
+**Heart color distribution in the deck:**
+- heart02 (Red): appears on 6 members + live card requirements
+- heart03 (Yellow): appears on 9 members + heavy live card requirements (need 3-5)
+- heart06 (Purple): appears on 6 members + live card requirements
+- heart04 (Green): only 1 member (エマ・ヴェルデ)
+- heart0 (Wildcard): only on live card need_heart (never on members)
+
+### 16.3 What a Winning Game Looks Like
+
+A typical winning game with the fade deck:
+
+**Turn 1-2 (Setup):**
+- Play 1-2 cheap members (cost 2, blade 1 each)
+- Total blade: 1-2 → yell only 1-2 cards
+- Charge energy → now have 2-3 energy
+
+**Turn 3-5 (Building):**
+- Play more members, aim for blade 4-6
+- Set a live card that needs hearts matching your stage
+- Total blade 4-6 → yell 4-6 cards → more hearts
+
+**Turn 6-8 (Scoring):**
+- Should have blade 6+ 
+- Set live cards matching your heart distribution
+- Win yell → allocate enough hearts → card succeeds
+
+**Win condition:** 3 successful live cards.
+
+### 16.4 What the Neural Network Must Learn
+
+The network's job is NOT to learn the game from scratch. It's to learn these specific concepts:
+
+1. **Card utility by blade/cost ratio**: A card with blade 2, cost 2 (ratio 1.0) is excellent. Blade 1, cost 13 (ratio 0.08) is terrible unless you have spare energy.
+2. **Heart color matching**: Playing a member with heart03 is good IF your live card needs heart03. The network must learn which cards share colors.
+3. **Live card viability**: "I have hearts in colors {02, 03, 06} — which live card can I support?"
+4. **Timing**: When to play vs pass. If you can't afford anything useful, pass.
+
+These are ALL learnable from (state, action, outcome) data because:
+- Cards with similar blade/cost cluster in embedding space
+- Cards with similar heart colors cluster together
+- The correlation between "played card with heart03" and "live card with need_heart03 succeeded" is directly measurable
+
+### 16.5 The Correct Training Formulation
+
+**Input:** `(my_hand, my_stage, opp_stage)` — same as before
+**Output:** For each legal action `a`, predict Q(s,a) = expected final success zone advantage from taking this action
+
+**Architecture:**
+```
+my_card_ids → embedding → sum → [128] ─┐
+                                        ├─ concat → [256] → MLP → scalar Q(s,a)
+opp_card_ids → embedding → sum → [128] ─┘
+action_type + target_card_embed → [N] ──┘
+```
+
+**Training target:** `Q(s,a) = (actual_success_margin) — baseline`
+Where baseline = average success margin for this game turn.
+
+**Loss:** MSE between predicted Q(s,a) and actual advantage.
+
+**Key insight:** By subtracting the turn-level baseline, we remove the common noise (both players' random actions) and leave only the action-specific signal. This turns the problem from "predict outcome from state" into "predict which actions are better than average."
+
+### 16.6 Implementation Plan (Revised)
+
+```
+Phase 1 — Data Generation:
+  Play games with the smart heuristic (play members, set live cards, use abilities)
+  Record: (state_before, action_taken, state_after, success_margin)
+
+Phase 2 — Training:
+  Load (state, action, outcome) data
+  Compute: advantage = outcome - per_turn_baseline
+  Train Q(s,a) = f(state_embed, action_embed) to predict advantage
+  Action encoding: action_type + card_embedding[target_card]
+
+Phase 3 — Inference:
+  For each legal action: encode action → compute Q(s,a) → pick highest
+  No 1-ply search, no state clones
+
+Phase 4 — Iteration:
+  Play with Q-network (ε-greedy for exploration)
+  Record new data → train new Q-network → replace old
+  Repeat until improvement plateaus
 ```
 
 ---
 
-## 16. References
+## 17. References
 
 1. Coulom, R. (2006). "Efficient Selectivity and Backup Operators in Monte-Carlo Tree Search." *CG 2006*.
 2. Kocsis, L. & Szepesvari, C. (2006). "Bandit based Monte-Carlo Planning." *ECML 2006*.
