@@ -22,6 +22,10 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         let mut dbg = AbDebug::new();
+        eprintln!(
+            "[DEBUG_EXEC] execute_effect: action={} effect_ptr={:p}",
+            effect.action, effect
+        );
         dbg.effect(effect);
         log::debug!(
             "DEBUG: execute_effect - action: {}, source: {}, destination: {}",
@@ -217,6 +221,18 @@ impl AbilityResolver {
         if action_type == ActionType::Sequential || action_type == ActionType::LookAndSelect {
             let steps = effect.normalized_steps();
             if !steps.is_empty() {
+                if action_type == ActionType::Sequential {
+                    eprintln!(
+                        "[DEBUG_STEPS] sequential: n_steps={} actions=[{}] effect.action={}",
+                        steps.len(),
+                        steps
+                            .iter()
+                            .map(|s| s.action.as_str())
+                            .collect::<Vec<_>>()
+                            .join(","),
+                        effect.action
+                    );
+                }
                 let mut normalized = effect.clone();
                 normalized.effect_steps = None;
                 normalized.compound.actions = Some(steps);

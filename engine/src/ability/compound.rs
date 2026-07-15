@@ -40,11 +40,24 @@ impl AbilityResolver {
         conditional: bool,
         is_further: bool,
     ) -> Result<(), String> {
-        if ABILITY_DEBUG.load(Ordering::Relaxed) {
-            log::debug!("[SEQ_ENTRY] execute_sequential_effect: action={} conditional={} is_further={} actions={}",
-                effect.action, conditional, is_further, 
-                effect.compound.actions.as_ref().map(|a| a.len()).unwrap_or(0));
-        }
+        let actions_str = effect
+            .compound
+            .actions
+            .as_ref()
+            .map(|a| {
+                a.iter()
+                    .map(|s| s.action.as_str())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            })
+            .unwrap_or_default();
+        eprintln!(
+            "[DEBUG_SEQ] execute_sequential_effect called! action={} n_actions={} actions=[{}] effect_ptr={:p}",
+            effect.action,
+            effect.compound.actions.as_ref().map(|a| a.len()).unwrap_or(0),
+            actions_str,
+            effect
+        );
         // Trace sequential compound effect
         let seq_label = if conditional {
             "sequential_conditional".to_string()
@@ -124,6 +137,12 @@ impl AbilityResolver {
                 // cause the next iteration's actions to be skipped.
                 condition_failed = None;
                 'action_loop: for (i, action) in repeat_actions.iter().enumerate() {
+                    eprintln!(
+                        "[DEBUG_RA] i={} action={} len={}",
+                        i,
+                        action.action,
+                        repeat_actions.len()
+                    );
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
                         log::debug!(
                             "[SEQ_TRACE] _repeat={} i={} action={}",
