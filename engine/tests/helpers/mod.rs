@@ -38,6 +38,7 @@ static PRELOADED: OnceLock<PreloadedDb> = OnceLock::new();
 pub fn load_real_database() -> Arc<CardDatabase> {
     rabuka_engine::ability::debug::set_debug(true);
     PRELOADED.get_or_init(|| {
+        let t0 = std::time::Instant::now();
         let cards = CardLoader::load_cards_from_strs(CARDS_JSON, Some(ABILITIES_JSON))
             .expect("Failed to load embedded cards");
         let mut db = CardDatabase::load_or_create(cards);
@@ -50,6 +51,8 @@ pub fn load_real_database() -> Arc<CardDatabase> {
             }
             pool.insert(tid, v);
         }
+        let elapsed = t0.elapsed();
+        eprintln!("[timing] db load: {}ms", elapsed.as_millis());
         PreloadedDb { db, pool }
     });
     static DB: OnceLock<Arc<CardDatabase>> = OnceLock::new();
