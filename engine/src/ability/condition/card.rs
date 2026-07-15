@@ -7,6 +7,7 @@ use crate::ability::util::compare_counts;
 use crate::card::{
     AbilityFilter, CardProperty, CardState, ComparisonTarget, Condition, HeartColor,
 };
+use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HeartTotal {
@@ -157,10 +158,17 @@ impl<'a> ConditionContext<'a> {
                 let location = condition.get_location().unwrap_or("");
                 let target = condition.get_target().unwrap_or("self");
                 let player = self.resolve_condition_player(target);
-                let cards: Vec<i16> = match Zone::from_str(location) {
-                    Some(Zone::SuccessLiveZone) => player.success_live_card_zone.cards.to_vec(),
-                    Some(Zone::LiveCardZone) => player.live_card_zone.cards.to_vec(),
-                    _ => vec![],
+                let cards: SmallVec<[i16; 6]> = match Zone::from_str(location) {
+                    Some(Zone::SuccessLiveZone) => player
+                        .success_live_card_zone
+                        .cards
+                        .iter()
+                        .copied()
+                        .collect(),
+                    Some(Zone::LiveCardZone) => {
+                        player.live_card_zone.cards.iter().copied().collect()
+                    }
+                    _ => SmallVec::new(),
                 };
                 return cards.iter().any(|&cid| {
                     self.game_state
@@ -295,7 +303,7 @@ impl<'a> ConditionContext<'a> {
             } else {
                 let player = self.game_state.resolve_target_player(target);
                 let location = condition.get_location().unwrap_or(Zone::Stage.to_str());
-                let card_ids: Vec<i16> = match Zone::from_str(location) {
+                let card_ids: SmallVec<[i16; 8]> = match Zone::from_str(location) {
                     Some(Zone::Stage) => player
                         .stage
                         .stage
@@ -303,9 +311,11 @@ impl<'a> ConditionContext<'a> {
                         .filter(|&&id| id != -1)
                         .copied()
                         .collect(),
-                    Some(Zone::Hand) => player.hand.cards.to_vec(),
-                    Some(Zone::Discard) | Some(Zone::Waitroom) => player.waitroom.cards.to_vec(),
-                    _ => vec![],
+                    Some(Zone::Hand) => player.hand.cards.iter().copied().collect(),
+                    Some(Zone::Discard) | Some(Zone::Waitroom) => {
+                        player.waitroom.cards.iter().copied().collect()
+                    }
+                    _ => SmallVec::new(),
                 };
                 card_ids
                     .iter()
@@ -1905,32 +1915,23 @@ impl<'a> ConditionContext<'a> {
         // means no matching events for this player/zone — still correct).
         // Only fall back to the trigger-context card IDs when
         // turn_movements is completely empty (e.g. manual test setup).
-        let moved_source: Vec<i16> = if is_new_movement {
+        let moved_source: SmallVec<[i16; 8]> = if is_new_movement {
             let dest_zone = condition.get_destination().unwrap_or("");
             let target = condition.get_target().unwrap_or("self");
             let self_pl = self.resolve_condition_player(target);
             let target_id = self_pl.id.as_str();
-            let event_cards: Vec<i16> = if !self.moved_cards.is_empty() {
-                self.moved_cards.to_vec()
+            let event_cards: SmallVec<[i16; 8]> = if !self.moved_cards.is_empty() {
+                self.moved_cards.iter().copied().collect()
             } else if let Some(enq) = self.game_state.entry_trigger_moved_cards() {
-                enq
+                SmallVec::from(enq)
             } else if let Some(global) = self.game_state.recently_moved_cards.clone() {
-                global
+                SmallVec::from(global)
             } else {
-                Vec::new()
+                SmallVec::new()
             };
             if !event_cards.is_empty() {
-                // cause_player_id filter: for self_target, the card's own
-                // movement counts regardless of who caused it (unless
-                // self_effect_only restricts to own effects). For
-                // non-self_target, movements are scoped to the target
-                // player's cause_player_id for backward compatibility.
                 let require_self_effect = condition.get_self_effect_only().unwrap_or(false);
-                // Cross-reference event cards with turn_movements for zone-
-                // transition filtering. This ensures we only count cards
-                // whose movement matches the expected source → destination
-                // zones, not cards that moved through other paths.
-                let from_tm: Vec<i16> = self
+                let from_tm: SmallVec<[i16; 8]> = self
                     .game_state
                     .turn_movements
                     .iter()
@@ -1950,21 +1951,17 @@ impl<'a> ConditionContext<'a> {
                     })
                     .map(|m| m.moved_card_id)
                     .collect();
-                // For each event card, check if turn_movements has zone
-                // data for it.  If yes, apply the zone/player filter.  If
-                // no (movement path skipped push_movement_event), include
-                // the card directly.
-                let result: Vec<i16> = event_cards
+                let result: SmallVec<[i16; 8]> = event_cards
                     .iter()
                     .filter(|&&cid| {
-                        let tm: Vec<_> = self
+                        let tm: SmallVec<[&crate::types::MovementEvent; 2]> = self
                             .game_state
                             .turn_movements
                             .iter()
                             .filter(|m| m.moved_card_id == cid)
                             .collect();
                         if tm.is_empty() {
-                            return true; // no zone data → assume match
+                            return true;
                         }
                         tm.iter().any(|m| {
                             let src_ok = m.source_zone == source_zone
@@ -1988,7 +1985,6 @@ impl<'a> ConditionContext<'a> {
                     result
                 }
             } else if !self.game_state.turn_movements.is_empty() {
-                // No event data — use turn_movements directly (original behavior)
                 let require_self_effect = condition.get_self_effect_only().unwrap_or(false);
                 self.game_state
                     .turn_movements
@@ -2009,31 +2005,29 @@ impl<'a> ConditionContext<'a> {
                     .map(|m| m.moved_card_id)
                     .collect()
             } else {
-                Vec::new()
+                SmallVec::new()
             }
         } else if self.moved_cards.is_empty() {
             let enqueued = self.game_state.entry_trigger_moved_cards();
             let global = self.game_state.recently_moved_cards.clone();
-            // Prefer the enqueue-time snapshot — "those cards" per the card text.
-            // Fall back to the global flag only when there is no entry (TAS pre-filter).
             if let Some(ev) = &enqueued {
                 if !ev.is_empty() {
-                    ev.clone()
+                    ev.iter().copied().collect()
                 } else {
-                    global.unwrap_or_default()
+                    global.map_or_else(SmallVec::new, |g| g.iter().copied().collect())
                 }
             } else {
-                global.unwrap_or_default()
+                global.map_or_else(SmallVec::new, |g| g.iter().copied().collect())
             }
         } else {
-            self.moved_cards.to_vec()
+            self.moved_cards.iter().copied().collect()
         };
         // When self_target, restrict to the activating card only —
         // don't check ALL moved cards. Applies to all source formats.
         let moved_source = if condition.get_self_target().unwrap_or(false) {
             self.activating_card_id
                 .filter(|id| moved_source.contains(id))
-                .map_or(vec![], |id| vec![id])
+                .map_or(smallvec::SmallVec::new(), |id| smallvec::smallvec![id])
         } else {
             moved_source
         };
@@ -2276,16 +2270,18 @@ impl<'a> ConditionContext<'a> {
                 }
             }
             Some(Zone::Stage) => {
-                let stage_cards: Vec<i16> = if is_both {
+                let stage_cards: SmallVec<[i16; 6]> = if is_both {
                     let opp = self.resolve_condition_player("opponent");
-                    let mut combined = player.stage.stage.to_vec();
+                    let mut combined: SmallVec<[i16; 6]> =
+                        player.stage.stage.iter().copied().collect();
                     combined.extend_from_slice(&opp.stage.stage);
                     combined
                 } else {
-                    player.stage.stage.to_vec()
+                    player.stage.stage.iter().copied().collect()
                 };
                 // Filter by state (wait/active) if specified
-                let stage_cards: Vec<i16> = if let Some(ref state) = condition.get_state() {
+                let stage_cards: SmallVec<[i16; 6]> = if let Some(ref state) = condition.get_state()
+                {
                     stage_cards
                         .into_iter()
                         .filter(|&cid| {
@@ -2304,14 +2300,20 @@ impl<'a> ConditionContext<'a> {
                 // Baton touch filter: when baton_touch_trigger is set on a
                 // card_count_condition with location=stage, only count cards
                 // that arrived via baton touch this turn.
-                let stage_cards: Vec<i16> = if condition.get_baton_touch_trigger().unwrap_or(false)
-                {
-                    let player_id = player.id.as_str();
-                    let bt_ids = &self.game_state.baton_touch_arriving_card_ids;
-                    // Also gate on per-player baton touch count
-                    if let Some(min_count) = condition.get_min_baton_touch_count() {
-                        if self.game_state.get_baton_touch_count(player_id) < min_count {
-                            Vec::new()
+                let stage_cards: SmallVec<[i16; 6]> =
+                    if condition.get_baton_touch_trigger().unwrap_or(false) {
+                        let player_id = player.id.as_str();
+                        let bt_ids = &self.game_state.baton_touch_arriving_card_ids;
+                        // Also gate on per-player baton touch count
+                        if let Some(min_count) = condition.get_min_baton_touch_count() {
+                            if self.game_state.get_baton_touch_count(player_id) < min_count {
+                                SmallVec::new()
+                            } else {
+                                stage_cards
+                                    .into_iter()
+                                    .filter(|cid| bt_ids.contains(cid))
+                                    .collect()
+                            }
                         } else {
                             stage_cards
                                 .into_iter()
@@ -2320,13 +2322,7 @@ impl<'a> ConditionContext<'a> {
                         }
                     } else {
                         stage_cards
-                            .into_iter()
-                            .filter(|cid| bt_ids.contains(cid))
-                            .collect()
-                    }
-                } else {
-                    stage_cards
-                };
+                    };
                 let is_distinct_cost = condition.get_distinct().is_some_and(
                     |d| matches!(d, crate::core::card::DistinctInfo::String(s) if s == "cost"),
                 );
@@ -2603,16 +2599,16 @@ impl<'a> ConditionContext<'a> {
         let mut passed = compare_counts(count_op, actual, count);
         // Same-name constraint: if set, ensure at least 2 counted cards share a name
         if passed && condition.get_same_name().unwrap_or(false) {
-            let stage_cards: Vec<i16> = if is_both {
+            let stage_cards: SmallVec<[i16; 6]> = if is_both {
                 let opp = self.resolve_condition_player("opponent");
-                let mut combined = player.stage.stage.to_vec();
+                let mut combined: SmallVec<[i16; 6]> = player.stage.stage.iter().copied().collect();
                 combined.extend_from_slice(&opp.stage.stage);
                 combined
             } else {
-                player.stage.stage.to_vec()
+                player.stage.stage.iter().copied().collect()
             };
             // Apply state filter for same-name check if specified
-            let stage_cards: Vec<i16> = if let Some(ref state) = condition.get_state() {
+            let stage_cards: SmallVec<[i16; 6]> = if let Some(ref state) = condition.get_state() {
                 stage_cards
                     .into_iter()
                     .filter(|&cid| {
@@ -4192,15 +4188,15 @@ impl<'a> ConditionContext<'a> {
         if condition.get_source() == Some("preceding_moved")
             || condition.get_source() == Some("previous_moved_cards")
         {
-            let moved_source: Vec<i16> = if self.moved_cards.is_empty() {
+            let moved_source: SmallVec<[i16; 8]> = if self.moved_cards.is_empty() {
                 let enqueued = self.game_state.entry_trigger_moved_cards();
                 let global = self.game_state.recently_moved_cards.clone();
                 match (&enqueued, &global) {
-                    (Some(ev), None) if !ev.is_empty() => ev.clone(),
-                    _ => global.unwrap_or_default(),
+                    (Some(ev), None) if !ev.is_empty() => ev.iter().copied().collect(),
+                    _ => global.map_or_else(SmallVec::new, |g| g.iter().copied().collect()),
                 }
             } else {
-                self.moved_cards.to_vec()
+                self.moved_cards.iter().copied().collect()
             };
             return self.count_group_cards_in_cards(&moved_source, group_filter, ct, exc);
         }

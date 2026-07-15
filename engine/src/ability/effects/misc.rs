@@ -5,6 +5,7 @@ use super::super::util;
 use crate::card::{AbilityEffect, PlacementOrder, PositionInfo};
 use crate::core::types::ArcStr;
 use crate::game_state::GameState;
+use smallvec::SmallVec;
 
 impl AbilityResolver {
     pub(crate) fn execute_reveal_effect(
@@ -332,7 +333,7 @@ impl AbilityResolver {
             // Collect distinct heart colors from all recently discarded cards.
             // Member cards carry their heart colors in base_heart, not need_heart.
             let recently_moved = gs.recently_moved_cards.clone();
-            let mut distinct_colors: Vec<crate::card::HeartColor> = Vec::new();
+            let mut distinct_colors: SmallVec<[crate::card::HeartColor; 8]> = SmallVec::new();
             if let Some(ref moved) = recently_moved {
                 for &cid in moved {
                     if let Some(card) = card_db.get_card(cid) {
@@ -832,7 +833,7 @@ impl AbilityResolver {
         };
 
         // Extract accumulated selected card IDs from resolver
-        let all_selected: Vec<i16> = self.selected_cards.clone();
+        let all_selected: SmallVec<[i16; 8]> = self.selected_cards.iter().copied().collect();
 
         // Pre-filter selected_cards by current character/card_type to prevent
         // cross-character leakage in sequential (e.g. blade for char A leaks
@@ -847,10 +848,10 @@ impl AbilityResolver {
                     .copied()
                     .collect()
             } else {
-                all_selected.clone()
+                all_selected.iter().copied().collect()
             }
         } else {
-            vec![]
+            Vec::new()
         };
 
         let recently_moved = gs.recently_moved_cards.clone();
@@ -1084,13 +1085,14 @@ impl AbilityResolver {
                 effect.target_count_any().is_some() || effect.distinct_any().is_some();
             // When a distinct choice was saved (target_count cleared), exclude
             // only cards selected BEFORE the choice, not the card selected BY it.
-            let saved_exclude: Option<Vec<i16>> = if effect.target_count_any().is_none()
+            let saved_exclude: Option<SmallVec<[i16; 8]>> = if effect.target_count_any().is_none()
                 && effect.distinct_any().is_some()
                 && !all_selected.is_empty()
             {
                 if let Some(save_len) = self.selected_count_at_save {
                     if save_len < all_selected.len() {
-                        let prev: Vec<i16> = all_selected[..save_len].to_vec();
+                        let prev: SmallVec<[i16; 8]> =
+                            all_selected[..save_len].iter().copied().collect();
                         if !prev.is_empty() {
                             Some(prev)
                         } else {
@@ -1126,7 +1128,7 @@ impl AbilityResolver {
             let use_raw = !all_selected.is_empty()
                 && !has_selection_filter
                 && effect.distinct_any().is_none();
-            let mut all_candidates: Vec<i16> = if use_raw {
+            let mut all_candidates: SmallVec<[i16; 8]> = if use_raw {
                 all_selected.clone()
             } else if has_blade_filter || is_all {
                 util::matching_ids_filtered(
@@ -1142,8 +1144,9 @@ impl AbilityResolver {
                     },
                     exclude,
                 )
+                .into()
             } else {
-                vec![]
+                SmallVec::new()
             };
 
             // Filter by position if the effect specifies one (e.g. "center").
@@ -1151,7 +1154,7 @@ impl AbilityResolver {
                 if let Some(p) = pos.get_position() {
                     if let Some(stage_idx) = util::stage_position_index(p) {
                         let expected = player.stage.stage[stage_idx];
-                        all_candidates.retain(|&cid| cid == expected);
+                        all_candidates.retain(|cid| *cid == expected);
                     }
                 }
             }
@@ -1162,7 +1165,7 @@ impl AbilityResolver {
                 all_candidates
             );
             if effect.timing_condition_any().is_some() {
-                all_candidates.retain(|&cid| appeared_ids.contains(&cid));
+                all_candidates.retain(|cid| appeared_ids.contains(cid));
                 log::debug!("[APP_IDS] all_candidates after={:?}", all_candidates);
             }
 
@@ -1174,29 +1177,30 @@ impl AbilityResolver {
                 "[GAIN_RESOURCE] blade_targets computation starts ({} candidates)",
                 all_candidates.len()
             );
-            let blade_targets: Vec<i16> = if effect.target_from_selection_any().unwrap_or(false) {
-                selected_for_current.clone()
-            } else if let Some(tgt_count) = tc {
-                if !selected_for_current.is_empty() {
-                    selected_for_current
-                        .iter()
-                        .take(tgt_count as usize)
-                        .copied()
-                        .collect()
-                } else if (tgt_count as usize) < all_candidates.len() {
-                    // Multiple candidates — truncate to target_count for now
-                    // (future: create a SelectTarget choice for the player)
-                    all_candidates.truncate(tgt_count as usize);
-                    all_candidates
+            let blade_targets: SmallVec<[i16; 8]> =
+                if effect.target_from_selection_any().unwrap_or(false) {
+                    selected_for_current.iter().copied().collect()
+                } else if let Some(tgt_count) = tc {
+                    if !selected_for_current.is_empty() {
+                        selected_for_current
+                            .iter()
+                            .take(tgt_count as usize)
+                            .copied()
+                            .collect()
+                    } else if (tgt_count as usize) < all_candidates.len() {
+                        // Multiple candidates — truncate to target_count for now
+                        // (future: create a SelectTarget choice for the player)
+                        all_candidates.truncate(tgt_count as usize);
+                        all_candidates
+                    } else {
+                        all_candidates.truncate(tgt_count as usize);
+                        all_candidates
+                    }
+                } else if !selected_for_current.is_empty() && effect.distinct_any().is_none() {
+                    selected_for_current.iter().copied().collect()
                 } else {
-                    all_candidates.truncate(tgt_count as usize);
                     all_candidates
-                }
-            } else if !selected_for_current.is_empty() && effect.distinct_any().is_none() {
-                selected_for_current.clone()
-            } else {
-                all_candidates
-            };
+                };
 
             let heart_color_inner = single_fixed_heart
                 .clone()
@@ -1215,7 +1219,7 @@ impl AbilityResolver {
             {
                 selected_for_current
             } else if use_raw {
-                all_selected.clone()
+                all_selected.iter().copied().collect()
             } else if resource == "heart" || resource == "ハート" {
                 let mut h = if !selected_for_current.is_empty() && effect.distinct_any().is_none() {
                     selected_for_current
@@ -1295,7 +1299,7 @@ impl AbilityResolver {
         // polluting all_selected for blanket effects like "both players gain blade".
         if effect.target_count_any().is_some() || effect.distinct_any().is_some() {
             let selected_targets: Vec<i16> = if resource == "blade" || resource == "ブレード" {
-                blade_targets.clone()
+                blade_targets.to_vec()
             } else {
                 heart_targets.clone()
             };
@@ -1503,8 +1507,8 @@ impl AbilityResolver {
                     );
                 }
             } else {
-                let targets = if is_all {
-                    blade_targets.clone()
+                let targets: Vec<i16> = if is_all {
+                    blade_targets.iter().copied().collect()
                 } else {
                     blade_targets
                         .into_iter()
