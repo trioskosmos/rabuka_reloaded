@@ -232,9 +232,8 @@ impl super::TurnEngine {
 
     fn execute_performance_phase(game_state: &mut GameState, is_first: bool) {
         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
-        let card_db = game_state.card_database.clone();
-        let bm = game_state.mods.blade_modifiers.clone();
-        let ho = game_state.mods.heart_override.clone();
+        // Take snapshots of modifier state BEFORE auto-ability triggers
+        // (these are type-converted flat copies, not references — no borrow conflict)
         let hm: std::collections::HashMap<
             i16,
             std::collections::HashMap<crate::card::HeartColor, i32>,
@@ -248,8 +247,6 @@ impl super::TurnEngine {
                 (k, flat)
             })
             .collect();
-        let btm = game_state.mods.blade_type_modifiers.clone();
-        let om = game_state.mods.orientation_modifiers.clone();
         let nhm: std::collections::HashMap<
             i16,
             std::collections::HashMap<
@@ -268,36 +265,44 @@ impl super::TurnEngine {
                 (k, flat)
             })
             .collect();
-        let hcm = game_state.mods.heart_color_multiplier.clone();
         let player_id = if is_first {
-            game_state.first_attacker().id.clone()
+            game_state.player1.id.clone()
         } else {
-            game_state.second_attacker().id.clone()
+            game_state.player2.id.clone()
         };
         let cannot_live = game_state.cannot_live_players.contains(&player_id);
-        let player = if is_first {
-            game_state.first_attacker_mut()
-        } else {
-            game_state.second_attacker_mut()
-        };
-        let performer_id = player.id.clone();
+        let performer_id = player_id.clone();
+
         // Phase A: yell + blade heart (rules 8.3.10-8.3.12).
-        // Returns intermediate data; resolution_zone still has the yell cards.
-        let mut yell_data = Self::player_perform_live(
-            player,
-            &mut resolution_zone,
-            &performer_id,
-            &card_db,
-            &bm,
-            &ho,
-            &hm,
-            &btm,
-            &om,
-            &nhm,
-            &hcm,
-            cannot_live,
-        );
-        // player borrow ends here — free to use game_state for ability trigger
+        // Borrow game_state fields directly (no clones) within a scope so the
+        // borrows drop before later mutable game_state methods.
+        let mut yell_data = {
+            let card_db = &game_state.card_database;
+            let bm = &game_state.mods.blade_modifiers;
+            let ho = &game_state.mods.heart_override;
+            let btm = &game_state.mods.blade_type_modifiers;
+            let om = &game_state.mods.orientation_modifiers;
+            let hcm = &game_state.mods.heart_color_multiplier;
+            let player = if is_first {
+                &mut game_state.player1
+            } else {
+                &mut game_state.player2
+            };
+            Self::player_perform_live(
+                player,
+                &mut resolution_zone,
+                &performer_id,
+                card_db,
+                bm,
+                ho,
+                &hm,
+                btm,
+                om,
+                &nhm,
+                hcm,
+                cannot_live,
+            )
+        };
 
         let turn = game_state.turn_number;
         let note_icons = yell_data.note_icons;
@@ -391,8 +396,8 @@ impl super::TurnEngine {
         }
 
         // Capture current heart modifiers (includes ability-granted hearts from
-        // the 8.3.13 check timing) before re-borrowing player.
-        let current_ho = game_state.mods.heart_override.clone();
+        // the 8.3.13 check timing) for use during the live success check.
+        // Only heart_modifiers needs a flat copy (type conversion); others borrow directly.
         let current_hm: std::collections::HashMap<
             i16,
             std::collections::HashMap<crate::card::HeartColor, i32>,
@@ -402,32 +407,35 @@ impl super::TurnEngine {
             .iter()
             .map(|(&k, colors)| (k, colors.iter().map(|(&c, e)| (c, e.total())).collect()))
             .collect();
-        let current_hcm = game_state.mods.heart_color_multiplier.clone();
 
         // Rule 8.3.14-8.3.16: Heart calculation + live success check.
-        let player = if is_first {
-            game_state.first_attacker_mut()
-        } else {
-            game_state.second_attacker_mut()
+        let perf_data = {
+            let current_ho = &game_state.mods.heart_override;
+            let current_hcm = &game_state.mods.heart_color_multiplier;
+            let player = if is_first {
+                &mut game_state.player1
+            } else {
+                &mut game_state.player2
+            };
+            Self::check_live_success(
+                player,
+                &mut resolution_zone,
+                &game_state.card_database,
+                &nhm,
+                current_ho,
+                &current_hm,
+                current_hcm,
+                &yell_data.live_card_ids,
+                &yell_data.allocations,
+                &yell_data.yell_cards,
+                yell_data.yell_count,
+                yell_data.note_icons,
+                &yell_data.member_contributions,
+                &yell_data.total_hearts,
+                &yell_data.heart_sources,
+                &yell_data.blade_sources,
+            )
         };
-        let perf_data = Self::check_live_success(
-            player,
-            &mut resolution_zone,
-            &card_db,
-            &nhm,
-            &current_ho,
-            &current_hm,
-            &current_hcm,
-            &yell_data.live_card_ids,
-            &yell_data.allocations,
-            &yell_data.yell_cards,
-            yell_data.yell_count,
-            yell_data.note_icons,
-            &yell_data.member_contributions,
-            &yell_data.total_hearts,
-            &yell_data.heart_sources,
-            &yell_data.blade_sources,
-        );
         // player borrow ends here — game_state accessible again
 
         // If live cards moved to waitroom during the heart/live check
