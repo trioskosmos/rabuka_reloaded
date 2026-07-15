@@ -4,7 +4,7 @@ mod ismcts;
 mod neural;
 mod observation;
 
-pub use ismcts::search;
+pub use ismcts::search_1ply;
 pub use neural::ValueNetwork;
 pub use observation::PublicObservation;
 
@@ -75,7 +75,7 @@ impl Bot {
         }
 
         let obs = PublicObservation::from_state(state, self.perspective_player);
-        let best_idx = ismcts::search(&obs, &actions, &self.config, &self.sampler, &self.network);
+        let best_idx = search_1ply(&obs, &actions, &self.config, &self.sampler, &self.network);
         actions[best_idx].clone()
     }
 

@@ -44,12 +44,12 @@ fn main() {
 
     let mut bot = Bot::new(Arc::clone(&card_database), 0, &card_numbers, &card_numbers);
 
-    let num_games = 5;
+    const NUM_GAMES: u32 = 2;
     let mut p1_wins = 0u32;
     let mut p2_wins = 0u32;
     let mut draws = 0u32;
 
-    for game_idx in 0..num_games {
+    for game_idx in 0..NUM_GAMES {
         let mut p1_deck = p1_template.clone();
         let mut p2_deck = p2_template.clone();
         p1_deck.shuffle_main_deck();
@@ -184,7 +184,7 @@ fn main() {
 
     println!(
         "\n{} games — P1 {} P2 {} Draw {}",
-        num_games, p1_wins, p2_wins, draws
+        NUM_GAMES, p1_wins, p2_wins, draws
     );
 }
 
