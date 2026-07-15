@@ -801,7 +801,7 @@ pub async fn execute_action(
                         // as the choice-boundary snapshot from the previous call), so
                         // skip it to avoid duplicates.
                         if !had_choice_before {
-                            room.history.push(snapshot);
+                            room.history.push(snapshot.clone());
                         }
                         // If the ability engine created a new pending choice at a
                         // choice boundary, push the current state so undo can step
@@ -1505,11 +1505,7 @@ async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
                 if let Some(card) = card_db.get_card(card_id) {
                     for (ability_idx, ability) in card.abilities.iter().enumerate() {
                         if let Some(ref effect) = ability.effect {
-                            let condition_fields: [(&str, &Option<crate::card::Condition>); 4] = [
-                                (
-                                    "activation_condition_parsed",
-                                    &effect.activation_condition_parsed,
-                                ),
+                            let condition_fields: [(&str, &Option<Box<crate::card::Condition>>); 3] = [
                                 ("condition", &effect.condition),
                                 (
                                     "alternative_condition",
@@ -1557,8 +1553,8 @@ async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
                     "card_name": card_name,
                     "ability_index": ability_idx,
                     "field": field_name,
-                    "condition_type": condition.condition_type,
-                    "condition_text": condition.text,
+                    "condition_type": condition.condition_type().map(|ct| ct.to_str()),
+                    "condition_text": condition.get_text(),
                     "condition_data": serde_json::to_value(&condition).unwrap_or_default(),
                     "result": result,
                     "actual_value": actual_value,
@@ -2769,7 +2765,7 @@ pub async fn run_web_server() -> std::io::Result<()> {
 pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::io::Result<()> {
     // Enable structured verdict items in the in-game rule log when RABUKA_RULE_LOG=1
     if std::env::var("RABUKA_RULE_LOG").as_deref() == Ok("1") {
-        crate::ability::debug::set_rule_log_verbose(true);
+        crate::ability::debug::set_debug(true);
     }
 
     let rooms = Arc::new(Mutex::new(HashMap::new()));

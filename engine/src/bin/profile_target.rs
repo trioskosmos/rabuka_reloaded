@@ -163,7 +163,7 @@ fn main() {
 
         let mut gs = GameState::new(player1, player2, Arc::clone(&card_database));
         game_setup::setup_game(&mut gs);
-        total_actions += run_game_to_completion(&mut gs);
+        total_actions += run_game_to_completion(&mut gs, false);
         // Record who is first attacker at game end
         if gs.player1.is_first_attacker {
             p1_first_count += 1;
