@@ -561,8 +561,8 @@ pub fn card_to_display(
                 .collect()
         });
         CardDisplay {
-            card_no: card.card_no.clone(),
-            name: card.name.clone(),
+            card_no: card.card_no.to_string(),
+            name: card.name.to_string(),
             card_type: format!("{:?}", card.card_type),
             orientation: orientation.map(|o| format!("{:?}", o)),
             base_heart,
@@ -715,8 +715,8 @@ pub fn card_to_display_full(
             s.to_string()
         });
         CardDisplay {
-            card_no: card.card_no.clone(),
-            name: card.name.clone(),
+            card_no: card.card_no.to_string(),
+            name: card.name.to_string(),
             card_type: format!("{:?}", card.card_type),
             orientation: orientation.map(|o| format!("{:?}", o)),
             base_heart,
@@ -1094,14 +1094,14 @@ pub fn player_to_display(
         if let Some(card) = card_db.get_card(cid) {
             let base = card.score.unwrap_or(0);
             let bonus = score_modifiers.get(&cid).copied().unwrap_or(0);
-            live_card_scores.insert(card.card_no.clone(), (base as i32 + bonus).max(0) as u32);
+            live_card_scores.insert(card.card_no.to_string(), (base as i32 + bonus).max(0) as u32);
         }
     }
     for &cid in &player.success_live_card_zone.cards {
         if let Some(card) = card_db.get_card(cid) {
             let base = card.score.unwrap_or(0);
             let bonus = score_modifiers.get(&cid).copied().unwrap_or(0);
-            live_card_scores.insert(card.card_no.clone(), (base as i32 + bonus).max(0) as u32);
+            live_card_scores.insert(card.card_no.to_string(), (base as i32 + bonus).max(0) as u32);
         }
     }
 
@@ -1157,7 +1157,7 @@ pub fn player_to_display(
                     };
                     arr[idx] = val;
                 }
-                nh_mods.insert(card.card_no.clone(), arr);
+                nh_mods.insert(card.card_no.to_string(), arr);
             }
         }
     }
@@ -1362,7 +1362,7 @@ pub fn player_to_display(
         deployed_this_turn: player.deployed_this_turn.iter().copied().collect(),
         debut_count_this_turn: player.debut_count_this_turn,
         id: player.id.clone(),
-        name: player.name.clone(),
+        name: player.name.to_string(),
         is_first_attacker: player.is_first_attacker,
         exclusion_zone: zone_to_display(&player.exclusion_zone.cards, card_db),
         energy_active_count: player.energy_zone.active_count(),
@@ -1602,7 +1602,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         .map(|entry| {
             let trigger_str = format!("{:?}", entry.trigger_type);
             AbilityQueueEntryDisplay {
-                card_no: entry.card_no.clone(),
+                card_no: entry.card_no.to_string(),
                 player_id: entry.player_id.clone(),
                 trigger_type: trigger_str,
                 completed: entry.completed,

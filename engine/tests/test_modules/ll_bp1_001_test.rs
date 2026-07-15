@@ -25,7 +25,7 @@ fn trigger_live_start_ability(game: &mut TestGame, card_id: i16) {
         ability_id,
         rabuka_engine::core::types::AbilityTrigger::LiveStart,
         game.state.player1.id.clone(),
-        Some(card.card_no.clone()),
+        Some(card.card_no.to_string()),
         Some(card_id),
         None,
         None,

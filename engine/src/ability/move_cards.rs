@@ -69,7 +69,7 @@ impl AbilityResolver {
         let card_name = gs
             .card_database
             .get_card(referenced_id)
-            .map(|c| c.name.clone())
+            .map(|c| c.name.to_string())
             .unwrap_or_default();
         let base_cost = gs
             .card_database
@@ -210,19 +210,19 @@ impl AbilityResolver {
                         "Choose position for {}",
                         gs.card_database
                             .get_card(card_id)
-                            .map_or("card", |c| c.name.as_str())
+                            .map_or("card", |c| c.name.as_ref())
                     ),
                     description_en: Some(format!(
                         "Choose position for {}",
                         gs.card_database
                             .get_card(card_id)
-                            .map_or("card", |c| c.name.as_str())
+                            .map_or("card", |c| c.name.as_ref())
                     )),
                     description_ja: Some(format!(
                         "{}の配置位置を選択",
                         gs.card_database
                             .get_card(card_id)
-                            .map_or("カード", |c| c.name.as_str())
+                            .map_or("カード", |c| c.name.as_ref())
                     )),
                     allow_skip: false,
                 });
@@ -618,11 +618,11 @@ impl AbilityResolver {
                         let description = card_type_filter
                             .and_then(|_| group_name)
                             .map(|g| format!("Select 1 {g} card to place on deck"))
-                            .unwrap_or_else(|| "Select 1 card to place on deck".to_string());
+                            .unwrap_or_else(|| "Select 1 card to place on deck".to_string().into());
                         let description_ja = card_type_filter
                             .and_then(|_| group_name)
                             .map(|g| format!("{g}カードを山札に置く1枚を選択"))
-                            .unwrap_or_else(|| "山札に置く1枚を選択".to_string());
+                            .unwrap_or_else(|| "山札に置く1枚を選択".to_string().into());
                         self.pending_choice = Some(
                             Choice::select_cards(Zone::Discard.to_str(), 1, description, false)
                                 .description_ja(Some(description_ja))
@@ -656,11 +656,11 @@ impl AbilityResolver {
                         let description = card_type_filter
                             .and_then(|_| group_name)
                             .map(|g| format!("Select {count} {g} card(s)"))
-                            .unwrap_or_else(|| "Select card(s)".to_string());
+                            .unwrap_or_else(|| "Select card(s)".to_string().into());
                         let description_ja = card_type_filter
                             .and_then(|_| group_name)
                             .map(|g| format!("{g}カードを{count}枚選択"))
-                            .unwrap_or_else(|| "カードを選択".to_string());
+                            .unwrap_or_else(|| "カードを選択".to_string().into());
                         self.pending_choice = Some(
                             Choice::select_cards(
                                 Zone::Discard.to_str(),
@@ -1986,7 +1986,7 @@ impl AbilityResolver {
 
         let card = gs.card_database.get_card(card_id).cloned();
         if let Some(card) = card {
-            let card_no = card.card_no.clone();
+            let card_no = card.card_no.to_string();
 
             if player_id == gs.player1.id {
                 gs.player1.debut_count_this_turn += 1;
@@ -2108,7 +2108,7 @@ impl AbilityResolver {
                 gs.entry_effect()
                     .and_then(|e| e.target.clone().map(|s| s.to_string()))
             })
-            .unwrap_or_else(|| "self".to_string());
+            .unwrap_or_else(|| "self".to_string().into());
         let card_db = gs.card_database.clone();
         let vacated_area = gs.last_vacated_stage_area;
         log::debug!(
@@ -2446,7 +2446,7 @@ impl AbilityResolver {
                 gs.entry_effect()
                     .and_then(|e| e.target.clone().map(|s| s.to_string()))
             })
-            .unwrap_or_else(|| "self".to_string());
+            .unwrap_or_else(|| "self".to_string().into());
         let select_action = self
             .current_effect
             .as_ref()
@@ -2473,7 +2473,7 @@ impl AbilityResolver {
                 .and_then(|sa| sa.destination.clone().map(|s| s.to_string()))
                 .or_else(|| current.and_then(|c| c.destination.clone().map(|s| s.to_string())))
                 .or_else(|| ctx_destination)
-                .unwrap_or_else(|| Zone::Hand.to_str().to_string()),
+                .unwrap_or_else(|| Zone::Hand.to_str().to_string().into()),
             select_action
                 .as_ref()
                 .and_then(|sa| sa.discard_remaining_any())

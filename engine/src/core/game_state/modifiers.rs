@@ -83,7 +83,7 @@ impl GameState {
             let status_card_name = self
                 .card_database
                 .get_card(*card_id)
-                .map(|c| c.name.clone())
+                .map(|c| c.name.to_string())
                 .unwrap_or_default();
             let status_owner = if self.player1.stage.stage.contains(card_id) {
                 self.player1.id.clone()
@@ -271,7 +271,7 @@ impl GameState {
                                     let card_name = self
                                         .card_database
                                         .get_card(*card_id)
-                                        .map(|c| c.name.clone())
+                                        .map(|c| c.name.to_string())
                                         .unwrap_or_default();
                                     // Do NOT push `cannot_activate` to prohibition_effects:
                                     // the auto-activation blocking is already handled by

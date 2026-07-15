@@ -319,7 +319,7 @@ impl super::TurnEngine {
             ability_id,
             crate::game_state::AbilityTrigger::Activation,
             player_id.clone(),
-            Some(card.card_no.clone()),
+            Some(card.card_no.to_string()),
             Some(card_id),
             None,
             None,
@@ -366,7 +366,7 @@ impl super::TurnEngine {
             let player_id = game_state
                 .pending_success_replacement_player_id
                 .take()
-                .unwrap_or_else(|| "player1".to_string());
+                .unwrap_or_else(|| "player1".to_string().into());
             let result = Self::build_choice_result(&choice, card_id, ci, None)?;
             let player = if player_id == game_state.player1.id {
                 &mut game_state.player1
@@ -863,7 +863,7 @@ impl super::TurnEngine {
                 );
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
-                let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
+                let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string().into());
                 game_state.just_completed_ability_key = just_completed_key.clone();
                 game_state.process_pending_auto_abilities(&player_id);
                 game_state.just_completed_ability_key = None;
@@ -879,14 +879,14 @@ impl super::TurnEngine {
                         .ability_queue
                         .current_entry()
                         .map(|e| e.player_id.clone())
-                        .unwrap_or_else(|| "p1".to_string());
+                        .unwrap_or_else(|| "p1".to_string().into());
                     game_state.just_completed_ability_key = just_completed_key.clone();
                     game_state.process_pending_auto_abilities(&player_id);
                     game_state.just_completed_ability_key = None;
                 } else {
                     // Effect completed without sub-choice — process any newly
                     // enqueued watcher abilities (e.g. each_time triggers).
-                    let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
+                    let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string().into());
                     game_state.just_completed_ability_key = just_completed_key.clone();
                     game_state.process_pending_auto_abilities(&player_id);
                     game_state.just_completed_ability_key = None;
@@ -909,7 +909,7 @@ impl super::TurnEngine {
                 }
                 // Post-resolution each_time for LiveStart/LiveSuccess
                 if cost_entry_opt_result != Some(false) {
-                    let pid = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
+                    let pid = entry_player_id.clone().unwrap_or_else(|| "p1".to_string().into());
                     if let Some(crate::game_state::AbilityTrigger::LiveStart) = cost_entry_trigger {
                         if let Some(cid) = cost_entry_card_id {
                             game_state.trigger_each_time_for_member(
@@ -943,7 +943,7 @@ impl super::TurnEngine {
                 // Must run AFTER complete_current() to match process_current_ability ordering.
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
-                let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
+                let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string().into());
                 if game_state.recently_moved_cards.is_some()
                     || game_state.last_energy_placed_by_effect()
                     || !game_state.recently_appeared_cards.is_empty()
@@ -971,7 +971,7 @@ impl super::TurnEngine {
             } else {
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
-                let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
+                let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string().into());
                 if game_state.recently_moved_cards.is_some()
                     || game_state.last_energy_placed_by_effect()
                     || !game_state.recently_appeared_cards.is_empty()

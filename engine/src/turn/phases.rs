@@ -385,7 +385,7 @@ impl super::TurnEngine {
                         blade_hearts: bh,
                         note_icons: notes,
                         draw_icons: 0,
-                        card_no: card.card_no.clone().into(),
+                        card_no: card.card_no.to_string().into(),
                     });
                 }
             }
@@ -877,7 +877,7 @@ impl super::TurnEngine {
 
         let card_no = card_db
             .get_card(card_id)
-            .map(|c| c.card_no.clone())
+            .map(|c| c.card_no.to_string())
             .unwrap_or_default();
         let player_id = player.id.clone();
 
@@ -1113,7 +1113,7 @@ impl super::TurnEngine {
                             .map(|ability| {
                                 (
                                     format!("{}_{}", card.card_no, ability.full_text),
-                                    card.card_no.clone(),
+                                    card.card_no.to_string(),
                                     bt_card_id,
                                 )
                             })

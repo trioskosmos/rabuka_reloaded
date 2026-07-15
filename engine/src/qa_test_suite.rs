@@ -34,7 +34,7 @@ fn setup_player_with_energy(player: &mut Player, card_ids: Vec<i16>) {
 fn get_card_id(card: &Card, card_db: &CardDatabase) -> i16 {
     *card_db
         .card_no_to_id
-        .get(&card.card_no)
+        .get(card.card_no.as_ref())
         .unwrap_or_else(|| panic!("Card not in database: {}", card.card_no))
 }
 
@@ -2110,7 +2110,7 @@ fn test_ability_live_success_draw_then_discard() {
         ability_id,
         crate::game_state::AbilityTrigger::LiveSuccess,
         "p1".to_string(),
-        Some(member_card.card_no.clone()),
+        Some(member_card.card_no.to_string()),
         Some(member_id),
         None,
         None,

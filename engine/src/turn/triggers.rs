@@ -28,7 +28,7 @@ impl super::TurnEngine {
             for area in areas {
                 if let Some(card_id) = player.stage.get_area(area) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
-                        if card.card_no == card_no_clone {
+                        if card.card_no.as_ref() == card_no_clone {
                             found_cost = Some(card.cost);
                             break;
                         }
@@ -58,7 +58,7 @@ impl super::TurnEngine {
                             card.card_no,
                             card_no_clone
                         );
-                        if card.card_no == card_no_clone {
+                        if card.card_no.as_ref() == card_no_clone {
                             for (ability_index, ability) in card.abilities.iter().enumerate() {
                                 let trigger_match = ability.triggers.as_ref().is_some_and(|t| {
                                     t.contains(crate::triggers::DEBUT)
@@ -105,7 +105,7 @@ impl super::TurnEngine {
                                             turn: game_state.turn_number,
                                             player_label: pp,
                                             source_card_id: Some(card_id),
-                                            source_card_name: Some(card_name.to_owned()),
+                                            source_card_name: Some(card_name.to_string()),
                                             category: "trigger_evaluation".to_string(),
                                             metadata: Some(serde_json::json!({
                                                 "trigger": "debut",
@@ -293,7 +293,7 @@ impl super::TurnEngine {
                                         turn: game_state.turn_number,
                                         player_label: pp,
                                         source_card_id: Some(*card_id),
-                                        source_card_name: Some(card_name.to_owned()),
+                                        source_card_name: Some(card_name.to_string()),
                                         category: "trigger_evaluation".to_string(),
                                         metadata: Some(serde_json::json!({
                                             "trigger": "live_start",
@@ -307,7 +307,7 @@ impl super::TurnEngine {
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                                 abilities_to_trigger.push((
                                     ability_id,
-                                    card.card_no.clone(),
+                                    card.card_no.to_string(),
                                     Some(*card_id),
                                 ));
                             }
@@ -351,7 +351,7 @@ impl super::TurnEngine {
                                             turn: game_state.turn_number,
                                             player_label: pp,
                                             source_card_id: Some(card_id),
-                                            source_card_name: Some(card_name.to_owned()),
+                                            source_card_name: Some(card_name.to_string()),
                                             category: "trigger_evaluation".to_string(),
                                             metadata: Some(serde_json::json!({
                                                 "trigger": "live_start",
@@ -366,7 +366,7 @@ impl super::TurnEngine {
                                         format!("{}_{}", card.card_no, ability.full_text);
                                     abilities_to_trigger.push((
                                         ability_id,
-                                        card.card_no.clone(),
+                                        card.card_no.to_string(),
                                         Some(card_id),
                                     ));
                                 }
@@ -473,7 +473,7 @@ impl super::TurnEngine {
                 let card_id = player.stage.stage[index];
                 if card_id != -1 && !skip_negated(game_state, card_id) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
-                        let card_no = card.card_no.clone();
+                        let card_no = card.card_no.to_string();
                         for (aidx, ability) in card.abilities.iter().enumerate() {
                             if !crate::zones::check_effect_position(
                                 ability
@@ -504,7 +504,7 @@ impl super::TurnEngine {
                                         turn: game_state.turn_number,
                                         player_label: pp,
                                         source_card_id: Some(card_id),
-                                        source_card_name: Some(card_name.to_owned()),
+                                        source_card_name: Some(card_name.to_string()),
                                         category: "trigger_evaluation".to_string(),
                                         metadata: Some(serde_json::json!({
                                             "trigger": "live_success",
@@ -571,7 +571,7 @@ impl super::TurnEngine {
             }
             for card_id in &player.live_card_zone.cards {
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
-                    let card_no = card.card_no.clone();
+                    let card_no = card.card_no.to_string();
                     for (aidx, ability) in card.abilities.iter().enumerate() {
                         let trigger_match = ability.triggers.as_ref().is_some_and(|t| {
                             &**t == crate::triggers::LIVE_SUCCESS
@@ -595,7 +595,7 @@ impl super::TurnEngine {
                                 turn: game_state.turn_number,
                                 player_label: pp,
                                 source_card_id: Some(*card_id),
-                                source_card_name: Some(card_name.to_owned()),
+                                source_card_name: Some(card_name.to_string()),
                                 category: "trigger_evaluation".to_string(),
                                 metadata: Some(serde_json::json!({
                                     "trigger": "live_success",

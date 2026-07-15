@@ -30,7 +30,7 @@ fn trigger(game: &mut TestGame, card_id: i16, trigger_str: &str) {
             rabuka_engine::core::types::AbilityTrigger::Auto
         },
         pid.clone(),
-        Some(card.card_no.clone()),
+        Some(card.card_no.to_string()),
         Some(card_id),
         None,
         None,

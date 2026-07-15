@@ -569,7 +569,7 @@ impl GameState {
     ) {
         let source_name = source_card_id
             .and_then(|sid| self.card_database.get_card(sid))
-            .map(|c| c.name.clone());
+            .map(|c| c.name.to_string());
         self.revealed_cards.push(card_id);
         self.revealed_card_sources.push(source_card_id);
         self.revealed_card_source_names.push(source_name);
@@ -587,7 +587,7 @@ impl GameState {
     ) {
         let source_name = source_card_id
             .and_then(|sid| self.card_database.get_card(sid))
-            .map(|c| c.name.clone());
+            .map(|c| c.name.to_string());
         self.revealed_cost_cards.push(card_id);
         self.revealed_cost_card_sources.push(source_card_id);
         self.revealed_cost_card_source_names.push(source_name);
@@ -627,7 +627,7 @@ impl GameState {
         let act_name = self
             .activating_card
             .and_then(|id| self.card_database.get_card(id))
-            .map(|c| c.name.clone());
+            .map(|c| c.name.to_string());
         self.log_entry(text, &pp, self.activating_card, act_name, category);
     }
 

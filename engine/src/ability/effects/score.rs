@@ -226,7 +226,7 @@ impl AbilityResolver {
             let act_name = gs
                 .activating_card
                 .and_then(|id| gs.card_database.get_card(id))
-                .map(|c| c.name.clone())
+                .map(|c| c.name.to_string())
                 .unwrap_or_default();
             gs.rule_log.push(format!(
                 "{} {}: [[log_score_modify:op={},value={},applied={}]]",

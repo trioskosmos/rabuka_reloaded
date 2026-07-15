@@ -255,7 +255,7 @@ impl AbilityResolver {
                 let cn = gs
                     .activating_card
                     .and_then(|id| gs.card_database.get_card(id))
-                    .map(|c| c.name.clone())
+                    .map(|c| c.name.to_string())
                     .unwrap_or_default();
                 gs.rule_log.push(format!("{} {}: [[log_discard]]", pp, cn));
                 self.execute_move_cards(gs, effect)
@@ -265,7 +265,7 @@ impl AbilityResolver {
                 let cn = gs
                     .activating_card
                     .and_then(|id| gs.card_database.get_card(id))
-                    .map(|c| c.name.clone())
+                    .map(|c| c.name.to_string())
                     .unwrap_or_default();
                 gs.rule_log.push(format!("{} {}: [[log_move]]", pp, cn));
                 if effect.multiple_targets_any().unwrap_or(false)
@@ -504,7 +504,7 @@ impl AbilityResolver {
                 let cn = gs
                     .activating_card
                     .and_then(|id| gs.card_database.get_card(id))
-                    .map(|c| c.name.clone())
+                    .map(|c| c.name.to_string())
                     .unwrap_or_default();
                 gs.rule_log.push(format!("{} {}: [[log_select]]", pp, cn));
                 self.execute_select_effect(gs, effect)

@@ -57,7 +57,7 @@ impl AbilityResolver {
         let card_name = self
             .activating_card_id
             .and_then(|cid| gs.card_database.get_card(cid))
-            .map(|c| c.name.clone());
+            .map(|c| c.name.to_string());
 
         let seq_node = self.debug_trace.then(|| {
             AbilityTraceNode::new(seq_label)

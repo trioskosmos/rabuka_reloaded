@@ -420,7 +420,7 @@ impl GameState {
                             for _ in 0..trigger_multiplicity {
                                 abilities_to_trigger.push((
                                     ability_id.clone(),
-                                    card.card_no.clone(),
+                                    card.card_no.to_string(),
                                     card_id,
                                 ));
                             }
@@ -481,7 +481,7 @@ impl GameState {
                                 continue;
                             }
                             self.this_batch_triggered_ability_ids.insert(batch_key);
-                            abilities_to_trigger.push((ability_id, card.card_no.clone(), card_id));
+                            abilities_to_trigger.push((ability_id, card.card_no.to_string(), card_id));
                         }
                     }
                 }
@@ -560,7 +560,7 @@ impl GameState {
                             self.this_batch_triggered_ability_ids.insert(batch_key);
                             abilities_to_trigger.push((
                                 ability_id,
-                                card.card_no.clone(),
+                                card.card_no.to_string(),
                                 moved_card_id,
                             ));
                         }
@@ -865,7 +865,7 @@ impl GameState {
                         continue;
                     }
                     let aid = format!("{}_{}", card.card_no, ability.full_text);
-                    abilities.push((aid, card.card_no.clone(), card_id));
+                    abilities.push((aid, card.card_no.to_string(), card_id));
                 }
             }
         }
@@ -934,8 +934,8 @@ impl GameState {
                         let card_name = self
                             .card_database
                             .get_card(cid)
-                            .map(|c| c.name.clone())
-                            .unwrap_or_else(|| entry.card_no.clone());
+                            .map(|c| c.name.to_string())
+                            .unwrap_or_else(|| entry.card_no.to_string().into());
                         Some(crate::ability::types::AutoAbilityOption {
                             card_name,
                             ability_text: entry.ability.full_text.clone(),
@@ -973,7 +973,7 @@ impl GameState {
                     let card_name = entry
                         .card_id
                         .and_then(|id| self.card_database.get_card(id))
-                        .map(|c| c.name.clone())
+                        .map(|c| c.name.to_string())
                         .unwrap_or_default();
                     log::error!(
                         "[PCA_INFINITE_LOOP] card={} ({}) ability=\"{}\" processed {} times",
@@ -1160,7 +1160,7 @@ impl GameState {
             // Update the matching trigger_evaluation entry so it doesn't stay "pending"
             let card_name = card_id
                 .and_then(|id| self.card_database.get_card(id))
-                .map(|c| c.name.clone())
+                .map(|c| c.name.to_string())
                 .unwrap_or_default();
             let pp = self.player_prefix();
             let trigger_str = match ability.triggers.as_deref() {
@@ -1654,7 +1654,7 @@ impl GameState {
             if let Some(entry) = entry_ref {
                 obj.insert(
                     "card_no".into(),
-                    serde_json::Value::String(entry.card_no.clone()),
+                    serde_json::Value::String(entry.card_no.to_string()),
                 );
                 obj.insert(
                     "ability_text".into(),
@@ -1704,7 +1704,7 @@ impl GameState {
                     if let Some(card) = self.card_database.get_card(cid) {
                         obj.insert(
                             "card_name".into(),
-                            serde_json::Value::String(card.name.clone()),
+                            serde_json::Value::String(card.name.to_string()),
                         );
                     }
                 }
@@ -1822,8 +1822,8 @@ impl GameState {
                             let card_type_val = card_ref.map(|c| serde_json::to_value(&c.card_type).unwrap_or_default());
                             serde_json::json!({
                                 "id": cid,
-                                "card_no": card_ref.map(|c| c.card_no.clone()).unwrap_or_default(),
-                                "name": card_ref.map(|c| c.name.clone()).unwrap_or_default(),
+                                "card_no": card_ref.map(|c| c.card_no.to_string()).unwrap_or_default(),
+                                "name": card_ref.map(|c| c.name.to_string()).unwrap_or_default(),
                                 "type": card_type_val.unwrap_or_default()
                             })
                         }).collect();

@@ -16,7 +16,7 @@ fn trigger_live_start_kuroe(game: &mut TestGame, card_id: i16) {
         format!("{}_{}", card.card_no, ab.full_text),
         AbilityTrigger::LiveStart,
         pid.clone(),
-        Some(card.card_no.clone()),
+        Some(card.card_no.to_string()),
         Some(card_id),
         None,
         None,

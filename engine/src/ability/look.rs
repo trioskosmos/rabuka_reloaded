@@ -325,7 +325,7 @@ impl AbilityResolver {
             let names: Vec<String> = card_ids
                 .iter()
                 .filter_map(|id| card_db.get_card(*id))
-                .map(|c| c.name.clone())
+                .map(|c| c.name.to_string())
                 .collect();
             let turn = gs.turn_number;
             let master = gs.ability_master_id();
@@ -1083,7 +1083,7 @@ impl AbilityResolver {
             let names: Vec<String> = all_revealed
                 .iter()
                 .filter_map(|id| card_db.get_card(*id))
-                .map(|c| c.name.clone())
+                .map(|c| c.name.to_string())
                 .collect();
             gs.rule_log.push(format!(
                 "[Turn {}] {} [[log_reveal_deck_until:found={}]]: {}",

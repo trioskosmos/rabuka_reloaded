@@ -83,7 +83,7 @@ fn kotori_q208_multiname_and_single_coexist() {
         card.name,
         game.db
             .get_card(single_ayumu)
-            .map(|c| c.name.as_str())
+            .map(|c| c.name.as_ref())
             .unwrap_or("?")
     );
 }

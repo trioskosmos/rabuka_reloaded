@@ -2670,7 +2670,7 @@ impl<'a> ConditionContext<'a> {
             .map(|&cid| {
                 card_db
                     .get_card(cid)
-                    .map(|c| c.name.as_str())
+                    .map(|c| c.name.as_ref())
                     .unwrap_or("?")
                     .to_string()
             })
@@ -3158,7 +3158,7 @@ impl<'a> ConditionContext<'a> {
                                 self.game_state
                                     .card_database
                                     .get_card(cid)
-                                    .map(|c| c.name.clone())
+                                    .map(|c| c.name.to_string())
                             })
                             .collect::<Vec<_>>()
                             .join(", ");

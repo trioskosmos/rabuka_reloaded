@@ -121,7 +121,7 @@ fn trigger_emma_live_start(game: &mut TestGame, emma: i16) {
         format!("{}_{}", card.card_no, ab.full_text),
         rabuka_engine::core::types::AbilityTrigger::LiveStart,
         pid.clone(),
-        Some(card.card_no.clone()),
+        Some(card.card_no.to_string()),
         Some(emma),
         None,
         None,

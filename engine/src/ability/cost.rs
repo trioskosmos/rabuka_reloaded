@@ -310,7 +310,7 @@ impl AbilityResolver {
                         .iter()
                         .filter_map(|&i| {
                             if i < pl.hand.cards.len() {
-                                card_db.get_card(pl.hand.cards[i]).map(|c| c.name.clone())
+                                card_db.get_card(pl.hand.cards[i]).map(|c| c.name.to_string())
                             } else {
                                 None
                             }
@@ -930,7 +930,7 @@ impl AbilityResolver {
             let act_name = gs
                 .activating_card
                 .and_then(|id| gs.card_database.get_card(id))
-                .map(|c| c.name.clone());
+                .map(|c| c.name.to_string());
             let cost_desc = cost.text.split("}}").last().unwrap_or(&cost.text).trim();
             gs.log_entry(
                 format!(

@@ -221,9 +221,9 @@ pub struct BaseHeart {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Card {
-    pub card_no: String,
+    pub card_no: ArcStr,
     pub img: Option<ArcStr>,
-    pub name: String,
+    pub name: ArcStr,
     #[serde(default)]
     pub product: Box<str>,
     #[serde(rename = "type")]
@@ -298,11 +298,11 @@ impl CardDatabase {
         cards.sort_by(|a, b| a.card_no.cmp(&b.card_no));
 
         for card in cards {
-            if !db.card_no_to_id.contains_key(&card.card_no) {
-                db.card_no_to_id.insert(card.card_no.clone(), db.next_id);
+            if !db.card_no_to_id.contains_key(card.card_no.as_ref()) {
+                db.card_no_to_id.insert(card.card_no.to_string(), db.next_id);
                 db.next_id += 1;
             }
-            let card_id = db.card_no_to_id[&card.card_no];
+            let card_id = db.card_no_to_id[card.card_no.as_ref()];
             db.cards.insert(card_id, card);
         }
 
@@ -471,9 +471,9 @@ impl<'de> Deserialize<'de> for Card {
         let group = map_series_to_group(&helper.series);
 
         Ok(Card {
-            card_no: helper.card_no,
+            card_no: ArcStr::from(helper.card_no),
             img: helper.img,
-            name: helper.name,
+            name: ArcStr::from(helper.name),
             product: helper.product.into(),
             card_type: helper.card_type,
             series: helper.series.into(),

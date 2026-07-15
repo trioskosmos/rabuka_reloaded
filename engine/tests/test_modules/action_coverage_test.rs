@@ -68,7 +68,7 @@ fn all_action_types_fire_without_crash() {
                 continue;
             }
             if has_action(card, action) {
-                test_card_no = Some(card.card_no.clone());
+                test_card_no = Some(card.card_no.to_string());
                 break;
             }
         }

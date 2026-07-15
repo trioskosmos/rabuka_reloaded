@@ -68,7 +68,7 @@ impl CardLoader {
     pub fn attach_abilities(mut cards: Vec<Card>, abilities_data: &serde_json::Value) -> Vec<Card> {
         let ability_map = Self::build_abilities_map_shared(abilities_data);
         for card in &mut cards {
-            if let Some(card_abilities) = ability_map.get(&card.card_no) {
+            if let Some(card_abilities) = ability_map.get(card.card_no.as_ref()) {
                 card.abilities = card_abilities.clone();
             }
         }
@@ -830,7 +830,7 @@ impl CardLoader {
             .map(|a| Arc::new(a.clone()))
             .collect();
         for card in &mut cards {
-            if let Some(indices) = card_index.get(&card.card_no) {
+            if let Some(indices) = card_index.get(card.card_no.as_ref()) {
                 card.abilities = indices
                     .iter()
                     .filter_map(|&i| shared_pool.get(i))

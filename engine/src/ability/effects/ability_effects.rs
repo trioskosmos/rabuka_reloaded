@@ -73,7 +73,7 @@ impl AbilityResolver {
             let card_data = gs
                 .card_database
                 .get_card(cid)
-                .map(|c| (c.abilities.clone(), c.name.clone()));
+                .map(|c| (c.abilities.clone(), c.name.to_string()));
             if let Some((abilities, cn)) = card_data {
                 if let Some(ref trig) = trigger {
                     let matching: Vec<&crate::card::Ability> = abilities

@@ -704,7 +704,7 @@ impl<'a> ConditionContext<'a> {
                         self.game_state
                             .card_database
                             .get_card(cid)
-                            .map(|c| c.name.clone())
+                            .map(|c| c.name.to_string())
                     })
                     .collect();
                 if names.is_empty() {
@@ -734,7 +734,7 @@ impl<'a> ConditionContext<'a> {
                                 .game_state
                                 .card_database
                                 .get_card(id)
-                                .map(|c| c.name.clone())
+                                .map(|c| c.name.to_string())
                                 .unwrap_or_default();
                             format!("{}:{}", pos_names[*i], name)
                         })
@@ -978,7 +978,7 @@ impl<'a> ConditionContext<'a> {
                                 self.game_state
                                     .card_database
                                     .get_card(cid)
-                                    .map(|c| c.name.clone())
+                                    .map(|c| c.name.to_string())
                             })
                             .collect();
                         let base = format!("在籍=[{}]", names.join(", "));
@@ -995,7 +995,7 @@ impl<'a> ConditionContext<'a> {
                             self.game_state
                                 .card_database
                                 .get_card(cid)
-                                .map(|c| c.name.clone())
+                                .map(|c| c.name.to_string())
                         })
                         .collect();
                     let base = format!("在籍=[{}]", names.join(", "));

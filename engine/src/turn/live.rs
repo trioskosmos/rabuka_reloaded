@@ -285,7 +285,7 @@ impl super::TurnEngine {
                 let lc_id = snap.lives[i].card_id;
                 if let Some(card) = game_state.card_database.get_card(lc_id) {
                     snap.lives[i].card_id = lc_id;
-                    snap.lives[i].card_no = crate::types::ArcStr::from(card.card_no.as_str());
+                    snap.lives[i].card_no = crate::types::ArcStr::from(card.card_no.as_ref());
                     if let Some(ref nh) = card.need_heart {
                         let mut filled = EMPTY_H8;
                         // Build filled array from heart allocations targeting this live
@@ -771,7 +771,7 @@ impl super::TurnEngine {
                 card_name: game_state
                     .card_database
                     .get_card(cid)
-                    .map(|c| c.name.clone())
+                    .map(|c| c.name.to_string())
                     .unwrap_or_default(),
                 card_index: i,
             })
@@ -1000,7 +1000,7 @@ impl super::TurnEngine {
             entry.player_id = player_id.to_string();
             entry.choice_player_id = Some(player_id.to_string());
             if let Some(card) = game_state.card_database.get_card(card_id) {
-                entry.card_no = card.card_no.clone();
+                entry.card_no = card.card_no.to_string();
             }
         }
         true
@@ -1156,7 +1156,7 @@ impl super::TurnEngine {
                 ability_blade_bonuses,
                 card_no: card_db
                     .get_card(cid)
-                    .map(|c| crate::types::ArcStr::from(c.card_no.as_str()))
+                    .map(|c| crate::types::ArcStr::from(c.card_no.as_ref()))
                     .unwrap_or_default(),
                 is_wait,
             });
@@ -1339,7 +1339,7 @@ impl super::TurnEngine {
                     draw_icons,
                     card_no: card_db
                         .get_card(*card_id)
-                        .map(|c| crate::types::ArcStr::from(c.card_no.as_str()))
+                        .map(|c| crate::types::ArcStr::from(c.card_no.as_ref()))
                         .unwrap_or_default(),
                 });
             }
@@ -1516,7 +1516,7 @@ impl super::TurnEngine {
                     }
                 }
                 needs.push(CardNeed {
-                    name: crate::types::ArcStr::from(card.name.as_str()),
+                    name: crate::types::ArcStr::from(card.name.as_ref()),
                     need,
                 });
             }
@@ -2368,7 +2368,7 @@ pub fn enrich_from_applications(
                 "heart_bonus" => {
                     let source_name = card_db
                         .get_card(app.source_card_id)
-                        .map(|c| c.name.clone())
+                        .map(|c| c.name.to_string())
                         .unwrap_or_else(|| format!("#{}", app.source_card_id));
                     mc.ability_heart_bonuses.push(crate::types::AbilityBonus {
                         source: format!("Ability: {}", source_name).into(),
@@ -2380,7 +2380,7 @@ pub fn enrich_from_applications(
                 "blade_bonus" => {
                     let source_name = card_db
                         .get_card(app.source_card_id)
-                        .map(|c| c.name.clone())
+                        .map(|c| c.name.to_string())
                         .unwrap_or_else(|| format!("#{}", app.source_card_id));
                     mc.ability_blade_bonuses.push(crate::types::AbilityBonus {
                         source: format!("Ability: {}", source_name).into(),
@@ -2418,7 +2418,7 @@ pub fn enrich_from_applications(
                 source_card_id: app.source_card_id,
                 name: format!("Ability #{}", triggered_abilities.len() + 1),
                 card_name: card
-                    .map(|c| crate::types::ArcStr::from(c.name.as_str()))
+                    .map(|c| crate::types::ArcStr::from(c.name.as_ref()))
                     .unwrap_or_default(),
                 effect_text: app.ability_text.clone().into(),
                 condition_text: None,
@@ -2442,7 +2442,7 @@ pub fn build_snapshot(
         let score = card_db.get_card(lc_id).map(|c| c.get_score()).unwrap_or(0);
         let card_no = card_db
             .get_card(lc_id)
-            .map(|c| crate::types::ArcStr::from(c.card_no.as_str()))
+            .map(|c| crate::types::ArcStr::from(c.card_no.as_ref()))
             .unwrap_or_default();
         lives.push(crate::types::LiveCardResult {
             passed: false,
@@ -2493,7 +2493,7 @@ pub fn build_snapshot(
                         source_card_id: mc.source_id,
                         name: ab.source.to_string(),
                         card_name: card
-                            .map(|c| crate::types::ArcStr::from(c.name.as_str()))
+                            .map(|c| crate::types::ArcStr::from(c.name.as_ref()))
                             .unwrap_or_default(),
                         effect_text: ab.ability_text.clone(),
                         condition_text: None,
@@ -2527,8 +2527,8 @@ fn card_name_by_no(card_db: &CardDatabase, card_no: &str) -> String {
     }
     card_db
         .get_card_by_no(card_no)
-        .map(|c| c.name.clone())
-        .unwrap_or_else(|| card_no.to_string())
+        .map(|c| c.name.to_string())
+        .unwrap_or_else(|| card_no.to_string().into())
 }
 
 fn heart_color_debug_name(color: &HeartColor) -> &'static str {

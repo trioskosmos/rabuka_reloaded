@@ -110,7 +110,7 @@ impl AbilityResolver {
     pub fn activating_card_name(&self) -> &str {
         self.activating_card_id
             .and_then(|cid| self.card_database.get_card(cid))
-            .map(|c| c.name.as_str())
+            .map(|c| c.name.as_ref())
             .unwrap_or("<unknown>")
     }
 
@@ -510,7 +510,7 @@ impl AbilityResolver {
         let card_id = gs.activating_card;
         let card_name = card_id
             .and_then(|id| gs.card_database.get_card(id))
-            .map(|c| c.name.clone())
+            .map(|c| c.name.to_string())
             .unwrap_or_default();
         let raw_trigger = self
             .current_ability
@@ -634,8 +634,8 @@ impl AbilityResolver {
 
         // Card info for debug (owned Strings to avoid borrowing gs across mutation)
         let card_data = activating_card.and_then(|id| gs.card_database.get_card(id));
-        let card_name = card_data.map(|c| c.name.clone()).unwrap_or_default();
-        let card_no = card_data.map(|c| c.card_no.clone()).unwrap_or_default();
+        let card_name = card_data.map(|c| c.name.to_string()).unwrap_or_default();
+        let card_no = card_data.map(|c| c.card_no.to_string()).unwrap_or_default();
         let card_id_str = activating_card.map(|id| id.to_string()).unwrap_or_default();
 
         // Initialize root trace node with ability information
@@ -1092,7 +1092,7 @@ impl AbilityResolver {
     pub fn fmt_card(&self, cid: i16) -> String {
         self.card_database
             .get_card(cid)
-            .map(|c| c.name.as_str())
+            .map(|c| c.name.as_ref())
             .unwrap_or("?")
             .to_string()
     }

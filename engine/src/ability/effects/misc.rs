@@ -909,7 +909,7 @@ impl AbilityResolver {
                 .map(|moved| {
                     moved
                         .iter()
-                        .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.clone()))
+                        .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
                         .collect()
                 })
                 .unwrap_or_default();
@@ -947,7 +947,7 @@ impl AbilityResolver {
                     if let Some(stage_idx) = util::stage_position_index(p) {
                         let p = gs.resolve_target_player(&target);
                         let expected = p.stage.stage.get(stage_idx).copied().unwrap_or(-1);
-                        candidates.retain(|&cid| cid == expected);
+                        candidates.retain(|cid| *cid == expected);
                     }
                 }
             }
@@ -961,8 +961,8 @@ impl AbilityResolver {
                     .and_then(|cid| gs.card_database.get_card(*cid))
                     .map(|c| c.group.to_string());
                 if let Some(ref group) = ref_group {
-                    candidates.retain(|&cid| {
-                        util::card_matches_group_str(&gs.card_database, cid, Some(group.as_str()))
+                    candidates.retain(|cid| {
+                        util::card_matches_group_str(&gs.card_database, *cid, Some(group.as_str()))
                     });
                 }
             }
@@ -1056,7 +1056,7 @@ impl AbilityResolver {
                 .map(|moved| {
                     moved
                         .iter()
-                        .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.clone()))
+                        .filter_map(|&cid| card_db.get_card(cid).map(|c| c.name.to_string()))
                         .collect()
                 })
                 .unwrap_or_default();
@@ -1259,9 +1259,10 @@ impl AbilityResolver {
                         dn,
                         exclude,
                     )
+                    .to_vec()
                 };
                 if effect.timing_condition_any().is_some() {
-                    h.retain(|&cid| appeared_ids.contains(&cid));
+                    h.retain(|cid| appeared_ids.contains(cid));
                 }
                 h
             } else {
@@ -2196,8 +2197,8 @@ impl AbilityResolver {
                 };
                 let _first_card_name = card_db
                     .get_card(first_card_id)
-                    .map(|c| c.name.clone())
-                    .unwrap_or_else(|| "member".to_string());
+                    .map(|c| c.name.to_string())
+                    .unwrap_or_else(|| "member".to_string().into());
 
                 let valid_destinations =
                     self.compute_valid_position_destinations(gs, effect, target_m);
@@ -2217,7 +2218,7 @@ impl AbilityResolver {
                         "Choose destination for {} (currently at {})",
                         card_db
                             .get_card(first_card_id)
-                            .map(|c| c.name.as_str())
+                            .map(|c| c.name.as_ref())
                             .unwrap_or("member"),
                         pos_name
                     ),
@@ -2225,7 +2226,7 @@ impl AbilityResolver {
                         "Choose destination for {} (currently at {})",
                         card_db
                             .get_card(first_card_id)
-                            .map(|c| c.name.as_str())
+                            .map(|c| c.name.as_ref())
                             .unwrap_or("member"),
                         pos_name
                     )),
@@ -2233,7 +2234,7 @@ impl AbilityResolver {
                         "{}の移動先を選択（現在: {}）",
                         card_db
                             .get_card(first_card_id)
-                            .map(|c| c.name.as_str())
+                            .map(|c| c.name.as_ref())
                             .unwrap_or("member"),
                         pos_name
                     )),
@@ -2360,7 +2361,7 @@ impl AbilityResolver {
                         } else {
                             let cn = card_db
                                 .get_card(cid)
-                                .map(|c| c.card_no.clone())
+                                .map(|c| c.card_no.to_string())
                                 .unwrap_or_default();
                             Some((cid, cn))
                         }
@@ -2377,8 +2378,8 @@ impl AbilityResolver {
                 };
                 let card_name = card_db
                     .get_card(card_id)
-                    .map(|c| c.name.clone())
-                    .unwrap_or_else(|| "member".to_string());
+                    .map(|c| c.name.to_string())
+                    .unwrap_or_else(|| "member".to_string().into());
                 let valid_destinations =
                     self.compute_valid_position_destinations(gs, effect, &target_m);
                 if valid_destinations.is_empty() {
@@ -3573,7 +3574,7 @@ impl AbilityResolver {
     pub(crate) fn card_name<'a>(&self, card_id: i16) -> String {
         self.card_db()
             .get_card(card_id)
-            .map(|c| c.name.clone())
+            .map(|c| c.name.to_string())
             .unwrap_or_else(|| format!("Card#{}", card_id))
     }
 

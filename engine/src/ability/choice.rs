@@ -222,7 +222,7 @@ impl super::resolver::AbilityResolver {
             let names: Vec<String> = revealed_ids
                 .iter()
                 .filter_map(|id| card_db.get_card(*id))
-                .map(|c| c.name.clone())
+                .map(|c| c.name.to_string())
                 .collect();
             if !names.is_empty() {
                 let turn = gs.turn_number;
@@ -493,7 +493,7 @@ impl super::resolver::AbilityResolver {
             }
             let target = target_player_id
                 .clone()
-                .unwrap_or_else(|| "self".to_string());
+                .unwrap_or_else(|| "self".to_string().into());
             let hand_cards: Vec<i16> = {
                 let p = gs.resolve_target_player_mut(&target);
                 p.hand.cards.to_vec()
@@ -756,7 +756,7 @@ impl super::resolver::AbilityResolver {
                 let efi: Vec<usize> = (0..energy_left).collect();
                 let target = target_player_id
                     .clone()
-                    .unwrap_or_else(|| "self".to_string());
+                    .unwrap_or_else(|| "self".to_string().into());
                 self.pending_choice = Some(
                     common_re(
                         Zone::Energy.to_str(),
@@ -822,7 +822,7 @@ impl super::resolver::AbilityResolver {
                     .destination
                     .clone()
                     .or(edst)
-                    .unwrap_or_else(|| Zone::Discard.to_string());
+                    .unwrap_or_else(|| Zone::Discard.to_string().into());
                 self.handle_revealed_cards_selection(gs, &ctx, &mut validate_card, &dst_str)?;
             }
             Some(Zone::Energy) => {
@@ -855,7 +855,7 @@ impl super::resolver::AbilityResolver {
                 if is_select_action {
                     let target = target_player_id
                         .clone()
-                        .unwrap_or_else(|| "self".to_string());
+                        .unwrap_or_else(|| "self".to_string().into());
                     let player = gs.resolve_target_player_mut(&target);
                     let mapped_indices = mfi(indices);
                     let mut cards: Vec<i16> = Vec::new();
@@ -879,10 +879,10 @@ impl super::resolver::AbilityResolver {
                         .destination
                         .clone()
                         .or(edst)
-                        .unwrap_or_else(|| Zone::Discard.to_string());
+                        .unwrap_or_else(|| Zone::Discard.to_string().into());
                     let tgt = target_player_id
                         .clone()
-                        .unwrap_or_else(|| "self".to_string());
+                        .unwrap_or_else(|| "self".to_string().into());
                     let player = gs.resolve_target_player_mut(&tgt);
                     let card_ids: Vec<i16> = mfi(indices)
                         .iter()
@@ -917,10 +917,10 @@ impl super::resolver::AbilityResolver {
                     .destination
                     .clone()
                     .or(edst)
-                    .unwrap_or_else(|| Zone::EnergyDeck.to_str().to_string());
+                    .unwrap_or_else(|| Zone::EnergyDeck.to_str().to_string().into());
                 let tgt = target_player_id
                     .clone()
-                    .unwrap_or_else(|| "self".to_string());
+                    .unwrap_or_else(|| "self".to_string().into());
                 let moved = self.move_from_under_member(
                     gs,
                     &ctx.indices,
@@ -1232,7 +1232,7 @@ impl super::resolver::AbilityResolver {
         let target = ctx
             .target_player_id
             .clone()
-            .unwrap_or_else(|| "self".to_string());
+            .unwrap_or_else(|| "self".to_string().into());
 
         let hand_positions: Vec<usize> = if let Some(ref fi) = ctx.filtered_indices {
             if ctx.count == 0 {
@@ -1313,7 +1313,7 @@ impl super::resolver::AbilityResolver {
             let names: Vec<String> = revealed_card_ids
                 .iter()
                 .filter_map(|id| gs.card_database.get_card(*id))
-                .map(|c| c.name.clone())
+                .map(|c| c.name.to_string())
                 .collect();
             let player_label =
                 super::util::target_player_label(&target, gs.ability_master_id().as_deref());
@@ -1440,7 +1440,7 @@ impl super::resolver::AbilityResolver {
             .destination
             .clone()
             .or(edst)
-            .unwrap_or_else(|| Zone::Discard.to_string());
+            .unwrap_or_else(|| Zone::Discard.to_string().into());
         let target = ctx.target_player_id.as_deref().unwrap_or("self");
         let card_db = gs.card_database.clone();
         let player = gs.resolve_target_player_mut(target);
@@ -1525,7 +1525,7 @@ impl super::resolver::AbilityResolver {
             let names: Vec<String> = card_ids
                 .iter()
                 .filter_map(|id| card_db.get_card(*id))
-                .map(|c| c.name.clone())
+                .map(|c| c.name.to_string())
                 .collect();
             let turn = gs.turn_number;
             let player_num = if std::ptr::eq(gs.resolve_target_player("self"), &gs.player1) {
@@ -1734,7 +1734,7 @@ impl super::resolver::AbilityResolver {
                 .destination
                 .clone()
                 .or(edst)
-                .unwrap_or_else(|| Zone::Discard.to_string());
+                .unwrap_or_else(|| Zone::Discard.to_string().into());
             let card_db = gs.card_database.clone();
             let player =
                 gs.resolve_target_player_mut(ctx.target_player_id.as_deref().unwrap_or("self"));
@@ -2340,7 +2340,7 @@ impl super::resolver::AbilityResolver {
                             gs.entry_effect()
                                 .and_then(|e| e.target.clone().map(|s| s.to_string()))
                         })
-                        .unwrap_or_else(|| "self".to_string());
+                        .unwrap_or_else(|| "self".to_string().into());
                     let player = gs.resolve_target_player_mut(&target);
                     for card_id in card_ids {
                         player.main_deck.cards.insert(0, card_id);
@@ -2459,7 +2459,7 @@ impl super::resolver::AbilityResolver {
                     .target
                     .clone()
                     .map(|s| s.to_string())
-                    .unwrap_or_else(|| "self".to_string());
+                    .unwrap_or_else(|| "self".to_string().into());
                 self.clear_choice_meta(gs);
                 self.pending_choice = None;
                 // Compute destinations directly — all positions except source
@@ -2523,8 +2523,8 @@ impl super::resolver::AbilityResolver {
                         let next_cname = self
                             .card_database
                             .get_card(next_cid)
-                            .map(|c| c.name.clone())
-                            .unwrap_or_else(|| "member".to_string());
+                            .map(|c| c.name.to_string())
+                            .unwrap_or_else(|| "member".to_string().into());
                         let current_pos = {
                             let player = gs.resolve_target_player_mut(
                                 effect.target.as_deref().unwrap_or("self"),
@@ -3017,7 +3017,7 @@ impl super::resolver::AbilityResolver {
                 let act_name = gs
                     .activating_card
                     .and_then(|id| gs.card_database.get_card(id))
-                    .map(|c| c.name.clone());
+                    .map(|c| c.name.to_string());
                 gs.log_entry(
                     format!(
                         "{pp} {}: [choice] {} ✓",

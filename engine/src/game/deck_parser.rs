@@ -167,7 +167,7 @@ impl DeckParser {
 
         for entry in &deck.entries {
             for _ in 0..entry.quantity {
-                card_numbers.push(entry.card_no.clone());
+                card_numbers.push(entry.card_no.to_string());
             }
         }
 

@@ -360,7 +360,7 @@ fn debug_group_match(card_db: &CardDatabase, card_id: i16, group_name: Option<&s
         return;
     }
     let card = card_db.get_card(card_id);
-    let card_name = card.as_ref().map(|c| c.name.as_str()).unwrap_or("?");
+    let card_name = card.as_ref().map(|c| c.name.as_ref()).unwrap_or("?");
     let series = card.as_ref().map(|c| c.series.as_ref()).unwrap_or("?");
     let unit = card.as_ref().and_then(|c| c.unit.as_deref()).unwrap_or("?");
     let _group = group_name.unwrap_or("None");
@@ -1410,12 +1410,12 @@ pub fn matching_ids_filtered(
             if !ids.is_empty() {
                 let excluded_names: std::collections::HashSet<String> = ids
                     .iter()
-                    .filter_map(|id| db.get_card(*id).map(|c| c.name.clone()))
+                    .filter_map(|id| db.get_card(*id).map(|c| c.name.to_string()))
                     .collect();
                 if !excluded_names.is_empty() {
                     results.retain(|id| {
                         db.get_card(*id)
-                            .map_or(true, |c| !excluded_names.contains(&c.name))
+                            .map_or(true, |c| !excluded_names.contains(c.name.as_ref()))
                     });
                 }
             }

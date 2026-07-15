@@ -710,8 +710,8 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
 
             for (zone_index, card_id) in &card_ids {
                 let card = game_state.card_database.get_card(*card_id);
-                let card_name = card.map(|c| c.name.as_str()).unwrap_or("Unknown");
-                let real_card_no = card.map(|c| c.card_no.clone()).unwrap_or_default();
+                let card_name = card.map(|c| c.name.as_ref()).unwrap_or("Unknown");
+                let real_card_no = card.map(|c| c.card_no.to_string()).unwrap_or_default();
 
                 // Hard filter: card_type mismatch → hide entirely
                 // For looked_at zone (look abilities), skip this — show all cards,
@@ -960,7 +960,7 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
         let card_name = game_state
             .card_database
             .get_card(*card_id)
-            .map(|c| c.name.as_str())
+            .map(|c| c.name.as_ref())
             .unwrap_or("Unknown");
         actions.push(make_action_params(
             ActionType::SelectMulligan,
@@ -1079,7 +1079,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                             area_info.cost = cost_to_pay;
                                             area_info.is_baton_touch = true;
                                             area_info.existing_member_name =
-                                                Some(existing_member_card.name.clone());
+                                                Some(existing_member_card.name.to_string());
                                             has_any_available = true;
                                         }
                                     }
@@ -1216,14 +1216,14 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                     card_index: Some(hand_index),
                                     card_name: {
                                         if cfg!(not(feature = "profiling")) {
-                                            Some(card.name.clone())
+                                            Some(card.name.to_string())
                                         } else {
                                             None
                                         }
                                     },
                                     card_no: {
                                         if cfg!(not(feature = "profiling")) {
-                                            Some(card.card_no.clone())
+                                            Some(card.card_no.to_string())
                                         } else {
                                             None
                                         }
@@ -1260,8 +1260,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                     ActionParameters {
                                         card_id: Some(*card_id),
                                         card_index: Some(hand_index),
-                                        card_name: Some(card.name.clone()),
-                                        card_no: Some(card.card_no.clone()),
+                                        card_name: Some(card.name.to_string()),
+                                        card_no: Some(card.card_no.to_string()),
                                         base_cost: Some(card_cost),
                                         stage_area: Some(pair.placement.clone()),
                                         card_indices: Some(area_indices),
@@ -1351,8 +1351,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     ActionParameters {
                         card_id: Some(card_id),
                         stage_area: Some(area_name.to_string()),
-                        card_name: Some(card.name.clone()),
-                        card_no: Some(card.card_no.clone()),
+                        card_name: Some(card.name.to_string()),
+                        card_no: Some(card.card_no.to_string()),
                         ability_index: Some(ability_index),
                         source_ability: Some(ability.full_text.clone()),
                         base_cost: Some(ability_cost),
@@ -1418,8 +1418,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     ),
                     ActionParameters {
                         card_id: Some(card_id),
-                        card_name: Some(card.name.clone()),
-                        card_no: Some(card.card_no.clone()),
+                        card_name: Some(card.name.to_string()),
+                        card_no: Some(card.card_no.to_string()),
                         ability_index: Some(ability_index),
                         source_ability: Some(ability.full_text.clone()),
                         base_cost: Some(ability_cost),
@@ -1472,7 +1472,7 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
         let card_name = game_state
             .card_database
             .get_card(*card_id)
-            .map(|c| c.name.as_str())
+            .map(|c| c.name.as_ref())
             .unwrap_or("Unknown");
         actions.push(make_action_params(
             ActionType::SelectLiveCard,

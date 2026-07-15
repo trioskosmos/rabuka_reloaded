@@ -24,7 +24,7 @@ fn trigger_debut_for_card(game: &mut TestGame, card_id: i16) {
         format!("{}_{}", card.card_no, ab.full_text),
         rabuka_engine::core::types::AbilityTrigger::Debut,
         pid.clone(),
-        Some(card.card_no.clone()),
+        Some(card.card_no.to_string()),
         Some(card_id),
         None,
         None,

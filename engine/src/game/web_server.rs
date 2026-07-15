@@ -1464,7 +1464,7 @@ async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
                                         player_idx,
                                         zone_name,
                                         card_id,
-                                        card.name.clone(),
+                                        card.name.to_string(),
                                         ability_idx,
                                         field_name,
                                         condition.clone(),
@@ -1921,7 +1921,7 @@ pub async fn rooms_create(
         })
         .collect();
 
-    let mode = req.mode.clone().unwrap_or_else(|| "sandbox".to_string());
+    let mode = req.mode.clone().unwrap_or_else(|| "sandbox".to_string().into());
     // pve mode aliases to sandbox gameplay but preserves the mode string
     // so the frontend can distinguish vs AI from sandbox
 
@@ -2214,7 +2214,7 @@ pub async fn rooms_join(
         rooms
             .get(&room_id)
             .map(|r| r.mode.clone())
-            .unwrap_or_else(|| "sandbox".to_string())
+            .unwrap_or_else(|| "sandbox".to_string().into())
     };
 
     HttpResponse::Ok().json(serde_json::json!({
