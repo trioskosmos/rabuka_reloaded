@@ -87,3 +87,8 @@ test = false
 name = "gen_abilities_map"
 path = "src/bin/gen_abilities_map.rs"
 test = false
+
+[[bin]]
+name = "bot_demo"
+path = "src/bin/bot_demo.rs"
+test = false

@@ -200,48 +200,19 @@ pub fn settle_single_player_state(game_state: &mut GameState) {
         iters += 1;
         if iters > 500 {
             log::error!(
-                "[SETTLE] infinite-loop guard hit after 500 iters, phase={:?}",
+                "infinite-loop guard hit after 500 iters, phase={:?}",
                 game_state.current_phase
             );
-            eprintln!("[SETTLE] LOOP GUARD phase={:?}", game_state.current_phase);
             break;
         }
         if game_state.has_pending_choice() {
-            log::debug!(
-                "[SETTLE] break: has_pending_choice, phase={:?}",
-                game_state.current_phase
-            );
-            eprintln!("[SETTLE] pending_choice -> {:?}", game_state.current_phase);
             break;
         }
         if is_automatic_phase(game_state) {
-            let old = game_state.current_phase.clone();
-            log::debug!("[SETTLE] advance_phase from {:?}", old);
-            eprintln!("[SETTLE] adv {:?}", old);
             crate::turn::TurnEngine::advance_phase(game_state);
-            log::debug!(
-                "[SETTLE] advance_phase done -> {:?} pending={}",
-                game_state.current_phase,
-                game_state.has_pending_choice()
-            );
-            eprintln!(
-                "[SETTLE] adv done -> {:?} pend={}",
-                game_state.current_phase,
-                game_state.has_pending_choice()
-            );
         } else if is_live_card_set_phase(game_state) {
-            log::debug!(
-                "[SETTLE] break: live_card_set_phase {:?}",
-                game_state.current_phase
-            );
-            eprintln!("[SETTLE] break live {:?}", game_state.current_phase);
             break;
         } else {
-            log::debug!(
-                "[SETTLE] break: non-automatic phase {:?}",
-                game_state.current_phase
-            );
-            eprintln!("[SETTLE] break non-auto {:?}", game_state.current_phase);
             break;
         }
     }

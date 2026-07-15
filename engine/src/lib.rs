@@ -15,6 +15,9 @@ pub use core::player;
 pub use core::types;
 pub use core::zones;
 
+// Bot AI module
+pub mod bot;
+
 // Game logic modules
 pub mod game;
 pub use game::deck_builder;
