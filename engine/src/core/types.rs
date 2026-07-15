@@ -286,41 +286,74 @@ pub struct Breakdown {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HeartSource {
-    pub source_type: String,
+    pub source_type: SourceType,
     pub source: String,
     pub value: [u32; 8],
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BladeSource {
-    pub source_type: String,
+    pub source_type: SourceType,
     pub source: String,
     pub value: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum AllocPhase {
+    #[serde(rename = "1a_colored")]
+    Colored,
+    #[serde(rename = "1b_h00_wild")]
+    H00Wild,
+    #[serde(rename = "1c_all_wild")]
+    AllWild,
+    #[serde(rename = "2_wildcard")]
+    Wildcard,
+    #[serde(rename = "3c_all")]
+    CAll,
+    #[serde(rename = "3a_colored_surplus")]
+    ColoredSurplus,
+    #[serde(rename = "3b_h00")]
+    H00,
+    #[serde(rename = "4_all_cleanup")]
+    AllCleanup,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum SourceType {
+    #[serde(rename = "stage")]
+    Stage,
+    #[serde(rename = "yell")]
+    Yell,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum SourceName {
+    #[serde(rename = "Stage hearts")]
+    StageHearts,
+    #[serde(rename = "Wildcard (Heart00)")]
+    WildcardHeart00,
+    #[serde(rename = "All heart (icon_all)")]
+    AllHeartIconAll,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum AdjustmentType {
+    #[serde(rename = "requirement")]
+    Requirement,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Allocation {
     pub target_idx: usize,
-    pub target_name: String,
-    pub source_type: String,
-    pub source_name: String,
+    pub target_name: ArcStr,
+    pub source_type: SourceType,
+    pub source_name: SourceName,
     pub source_slot: Option<usize>,
     pub wildcard: bool,
     pub color: usize,
     pub amount: u32,
     pub is_bonus: bool,
-    /// Phase tag emitted by the engine's compute_allocations so the UI
-    /// can display steps without re-deriving allocation logic.
-    /// Values (current engine):
-    ///   "1a_colored"        — matching colored → specific color req
-    ///   "1b_h00_wild"       — Heart00 wildcard → remaining color deficit
-    ///   "2_wildcard"        — Heart00 wildcard → color deficit (second pass)
-    ///   "3a_colored_surplus" — colored surplus → Heart00 req (demand-aware)
-    ///   "3b_h00"            — Heart00 → remaining Heart00 req
-    ///   "4_all_cleanup"     — icon_all → ANY remaining deficit (color first)
-    /// Legacy values (old engine, kept for backward compat):
-    ///   "1c_all_wild", "3c_all"
-    pub phase: String,
+    pub phase: AllocPhase,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -406,7 +439,7 @@ pub struct TriggeredAbility {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Adjustment {
     #[serde(rename = "type")]
-    pub adjustment_type: String,
+    pub adjustment_type: AdjustmentType,
     pub desc: String,
     pub value: i32,
     pub color: usize,

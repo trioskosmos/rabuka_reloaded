@@ -3,7 +3,8 @@ use crate::card::{BaseHeart, BladeColor, CardDatabase, HeartColor, HeartMap};
 use crate::core::game_modifiers::ModifierEntry;
 use crate::game_state::GameState;
 use crate::types::{
-    Allocation, BladeSource, HeartSource, LivePerformanceData, MemberContribution, YellCardResult,
+    AdjustmentType, AllocPhase, Allocation, BladeSource, HeartSource, LivePerformanceData,
+    MemberContribution, SourceName, SourceType, YellCardResult,
 };
 use std::collections::HashMap;
 
@@ -11,7 +12,7 @@ const EMPTY_H8: [u32; 8] = [0u32; 8];
 
 /// Effective heart need for a live card during allocation.
 struct CardNeed {
-    name: String,
+    name: crate::types::ArcStr,
     need: [u32; 8],
 }
 
@@ -373,16 +374,16 @@ impl super::TurnEngine {
                             }
                             ok
                         };
-                        // Populate adjustments from need_heart_modifiers
+                        // Populate adjustments and requirements from need_heart_modifiers
                         let mut adjustments = Vec::new();
                         if let Some(color_mods) = game_state.mods.need_heart_modifiers.get(&lc_id) {
+                            let req_source = format!("{} req modifier", card.name);
                             for (color, entry) in color_mods {
                                 let total = entry.total();
                                 if total != 0 {
-                                    let card_name = card.name.clone();
-                                    let color_label = format!("{:?}", color);
+                                    let color_label = heart_color_debug_name(color);
                                     adjustments.push(crate::types::Adjustment {
-                                        adjustment_type: "requirement".to_string(),
+                                        adjustment_type: AdjustmentType::Requirement,
                                         desc: format!(
                                             "{} {}",
                                             if entry.set != 0 {
@@ -398,8 +399,21 @@ impl super::TurnEngine {
                                         color: color.index(),
                                         source: format!(
                                             "{} req modifier ({})",
-                                            card_name, color_label
+                                            card.name, color_label
                                         ),
+                                    });
+                                    let op_str = if entry.set != 0 {
+                                        format!("= {}", entry.set)
+                                    } else if entry.additive > 0 {
+                                        format!("+{}", entry.additive)
+                                    } else {
+                                        format!("{}", entry.additive)
+                                    };
+                                    let req_desc = format!("Requirement {}", op_str);
+                                    snap.breakdown.requirements.push(crate::types::EffectEntry {
+                                        source: req_source.clone(),
+                                        value: op_str,
+                                        desc: req_desc,
                                     });
                                 }
                             }
@@ -408,26 +422,6 @@ impl super::TurnEngine {
                         snap.lives[i].required = required_arr;
                         snap.lives[i].filled = filled;
                         snap.lives[i].passed = passed;
-                        // Populate breakdown.requirements for Step 7 display
-                        if let Some(color_mods) = game_state.mods.need_heart_modifiers.get(&lc_id) {
-                            for (_color, me) in color_mods {
-                                let total = me.total();
-                                if total != 0 {
-                                    let op_str = if me.set != 0 {
-                                        format!("= {}", me.set)
-                                    } else if me.additive > 0 {
-                                        format!("+{}", me.additive)
-                                    } else {
-                                        format!("{}", me.additive)
-                                    };
-                                    snap.breakdown.requirements.push(crate::types::EffectEntry {
-                                        source: format!("{} req modifier", card.name),
-                                        value: op_str.clone(),
-                                        desc: format!("Requirement {}", op_str),
-                                    });
-                                }
-                            }
-                        }
                     } else {
                         snap.lives[i].passed = true;
                     }
@@ -453,9 +447,12 @@ impl super::TurnEngine {
             for i in 0..snap.lives.len() {
                 for alloc in &snap.breakdown.allocations {
                     if alloc.target_idx == i {
-                        let source_idx = match alloc.phase.as_str() {
-                            "1b_h00_wild" | "2_wildcard" => 0,
-                            "1c_all_wild" | "3c_all" | "4_all_cleanup" => 7,
+                        let source_idx = match alloc.phase {
+                            crate::types::AllocPhase::H00Wild
+                            | crate::types::AllocPhase::Wildcard => 0,
+                            crate::types::AllocPhase::AllWild
+                            | crate::types::AllocPhase::CAll
+                            | crate::types::AllocPhase::AllCleanup => 7,
                             _ => alloc.color,
                         };
                         cumulative_used[source_idx] += alloc.amount;
@@ -557,8 +554,8 @@ impl super::TurnEngine {
         // so they weren't picked up yet.
         let late_apps = std::mem::take(&mut game_state.ability_applications);
         if !late_apps.is_empty() {
-            let p1_cards = game_state.player1.live_card_zone.cards.to_vec();
-            let p2_cards = game_state.player2.live_card_zone.cards.to_vec();
+            let p1_cards = &game_state.player1.live_card_zone.cards;
+            let p2_cards = &game_state.player2.live_card_zone.cards;
             for snap in game_state.performance_snapshots.iter_mut() {
                 let player_cards = if snap.player_id == player1_id {
                     &p1_cards
@@ -641,6 +638,7 @@ impl super::TurnEngine {
         }
 
         // Push performance summary to rule log
+
         let card_db = game_state.card_database.clone();
         for snap in &game_state.performance_snapshots {
             let player = fmt_player_id(&snap.player_id);
@@ -1258,7 +1256,7 @@ impl super::TurnEngine {
             }
         }
         heart_sources.push(HeartSource {
-            source_type: "stage".into(),
+            source_type: SourceType::Stage,
             source: stage_heart_str,
             value: stage_heart_arr,
         });
@@ -1271,7 +1269,7 @@ impl super::TurnEngine {
 
         // Add stage blade source
         blade_sources.push(BladeSource {
-            source_type: "stage".into(),
+            source_type: SourceType::Stage,
             source: "Stage members".into(),
             value: total_blade,
         });
@@ -1368,13 +1366,13 @@ impl super::TurnEngine {
         }
         if yell_heart_arr.iter().any(|&v| v > 0) {
             heart_sources.push(HeartSource {
-                source_type: "yell".into(),
+                source_type: SourceType::Yell,
                 source: "Yell cards".into(),
                 value: yell_heart_arr,
             });
         }
         blade_sources.push(BladeSource {
-            source_type: "yell".into(),
+            source_type: SourceType::Yell,
             source: format!("{} blades", total_blade),
             value: total_blade,
         });
@@ -1518,7 +1516,7 @@ impl super::TurnEngine {
                     }
                 }
                 needs.push(CardNeed {
-                    name: card.name.clone(),
+                    name: crate::types::ArcStr::from(card.name.as_str()),
                     need,
                 });
             }
@@ -1564,14 +1562,14 @@ impl super::TurnEngine {
                     allocs.push(Allocation {
                         target_idx: live_idx,
                         target_name: card_name.clone(),
-                        source_type: "stage".into(),
-                        source_name: "Stage hearts".into(),
+                        source_type: SourceType::Stage,
+                        source_name: SourceName::StageHearts,
                         source_slot: None,
                         wildcard: false,
                         color: c,
                         amount: take,
                         is_bonus: false,
-                        phase: "1a_colored".into(),
+                        phase: AllocPhase::Colored,
                     });
                     pool[c] -= take;
                     filled[c] += take;
@@ -1586,14 +1584,14 @@ impl super::TurnEngine {
                     allocs.push(Allocation {
                         target_idx: live_idx,
                         target_name: card_name.clone(),
-                        source_type: "stage".into(),
-                        source_name: "Wildcard (Heart00)".into(),
+                        source_type: SourceType::Stage,
+                        source_name: SourceName::WildcardHeart00,
                         source_slot: None,
                         wildcard: true,
                         color: c,
                         amount: take,
                         is_bonus: false,
-                        phase: "1b_h00_wild".into(),
+                        phase: AllocPhase::H00Wild,
                     });
                     pool[0] -= take;
                     filled[c] += take;
@@ -1608,14 +1606,14 @@ impl super::TurnEngine {
                     allocs.push(Allocation {
                         target_idx: live_idx,
                         target_name: card_name.clone(),
-                        source_type: "stage".into(),
-                        source_name: "Wildcard (Heart00)".into(),
+                        source_type: SourceType::Stage,
+                        source_name: SourceName::WildcardHeart00,
                         source_slot: None,
                         wildcard: true,
                         color: c,
                         amount: take,
                         is_bonus: false,
-                        phase: "2_wildcard".into(),
+                        phase: AllocPhase::Wildcard,
                     });
                     pool[0] -= take;
                     filled[c] += take;
@@ -1646,14 +1644,14 @@ impl super::TurnEngine {
                         allocs.push(Allocation {
                             target_idx: live_idx,
                             target_name: card_name.clone(),
-                            source_type: "stage".into(),
-                            source_name: "Stage hearts".into(),
+                            source_type: SourceType::Stage,
+                            source_name: SourceName::StageHearts,
                             source_slot: None,
                             wildcard: false,
                             color: c,
                             amount: take,
                             is_bonus: false,
-                            phase: "3a_colored_surplus".into(),
+                            phase: AllocPhase::ColoredSurplus,
                         });
                         pool[c] -= take;
                         filled_h00 += take;
@@ -1667,14 +1665,14 @@ impl super::TurnEngine {
                     allocs.push(Allocation {
                         target_idx: live_idx,
                         target_name: card_name.clone(),
-                        source_type: "stage".into(),
-                        source_name: "Stage hearts".into(),
+                        source_type: SourceType::Stage,
+                        source_name: SourceName::StageHearts,
                         source_slot: None,
                         wildcard: false,
                         color: 0,
                         amount: take,
                         is_bonus: false,
-                        phase: "3b_h00".into(),
+                        phase: AllocPhase::H00,
                     });
                     pool[0] -= take;
                     filled_h00 += take;
@@ -1692,14 +1690,14 @@ impl super::TurnEngine {
                         allocs.push(Allocation {
                             target_idx: live_idx,
                             target_name: card_name.clone(),
-                            source_type: "stage".into(),
-                            source_name: "All heart (icon_all)".into(),
+                            source_type: SourceType::Stage,
+                            source_name: SourceName::AllHeartIconAll,
                             source_slot: None,
                             wildcard: true,
                             color: c,
                             amount: take,
                             is_bonus: false,
-                            phase: "4_all_cleanup".into(),
+                            phase: AllocPhase::AllCleanup,
                         });
                         pool[7] -= take;
                         filled[c] += take;
@@ -1717,14 +1715,14 @@ impl super::TurnEngine {
                         allocs.push(Allocation {
                             target_idx: live_idx,
                             target_name: card_name.clone(),
-                            source_type: "stage".into(),
-                            source_name: "All heart (icon_all)".into(),
+                            source_type: SourceType::Stage,
+                            source_name: SourceName::AllHeartIconAll,
                             source_slot: None,
                             wildcard: false,
                             color: 7,
                             amount: take,
                             is_bonus: false,
-                            phase: "4_all_cleanup".into(),
+                            phase: AllocPhase::AllCleanup,
                         });
                         pool[7] -= take;
                         filled[0] += take;
@@ -1827,14 +1825,14 @@ impl super::TurnEngine {
                 allocs.push(Allocation {
                     target_idx: idx,
                     target_name: card_name.clone(),
-                    source_type: "stage".into(),
-                    source_name: "Stage hearts".into(),
+                    source_type: SourceType::Stage,
+                    source_name: SourceName::StageHearts,
                     source_slot: None,
                     wildcard: false,
                     color: c,
                     amount: take,
                     is_bonus: false,
-                    phase: "1a_colored".into(),
+                    phase: AllocPhase::Colored,
                 });
                 pool[c] -= take;
                 filled[c] += take;
@@ -1849,14 +1847,14 @@ impl super::TurnEngine {
                 allocs.push(Allocation {
                     target_idx: idx,
                     target_name: card_name.clone(),
-                    source_type: "stage".into(),
-                    source_name: "Wildcard (Heart00)".into(),
+                    source_type: SourceType::Stage,
+                    source_name: SourceName::WildcardHeart00,
                     source_slot: None,
                     wildcard: true,
                     color: c,
                     amount: take,
                     is_bonus: false,
-                    phase: "1b_h00_wild".into(),
+                    phase: AllocPhase::H00Wild,
                 });
                 pool[0] -= take;
                 filled[c] += take;
@@ -1871,14 +1869,14 @@ impl super::TurnEngine {
                 allocs.push(Allocation {
                     target_idx: idx,
                     target_name: card_name.clone(),
-                    source_type: "stage".into(),
-                    source_name: "Wildcard (Heart00)".into(),
+                    source_type: SourceType::Stage,
+                    source_name: SourceName::WildcardHeart00,
                     source_slot: None,
                     wildcard: true,
                     color: c,
                     amount: take,
                     is_bonus: false,
-                    phase: "2_wildcard".into(),
+                    phase: AllocPhase::Wildcard,
                 });
                 pool[0] -= take;
                 filled[c] += take;
@@ -1947,14 +1945,14 @@ impl super::TurnEngine {
                 allocs.push(Allocation {
                     target_idx: idx,
                     target_name: card_name.clone(),
-                    source_type: "stage".into(),
-                    source_name: "Stage hearts".into(),
+                    source_type: SourceType::Stage,
+                    source_name: SourceName::StageHearts,
                     source_slot: None,
                     wildcard: false,
                     color: c,
                     amount: take,
                     is_bonus: false,
-                    phase: "3a_colored_surplus".into(),
+                    phase: AllocPhase::ColoredSurplus,
                 });
                 pool[c] -= take;
                 new_filled[c] += take;
@@ -2007,14 +2005,14 @@ impl super::TurnEngine {
             allocs.push(Allocation {
                 target_idx: idx,
                 target_name: card_name.clone(),
-                source_type: "stage".into(),
-                source_name: "Stage hearts".into(),
+                source_type: SourceType::Stage,
+                source_name: SourceName::StageHearts,
                 source_slot: None,
                 wildcard: false,
                 color: 0,
                 amount: take,
                 is_bonus: false,
-                phase: "3b_h00".into(),
+                phase: AllocPhase::H00,
             });
             pool[0] -= take;
             filled[0] += take;
@@ -2120,14 +2118,14 @@ impl super::TurnEngine {
                 allocs.push(Allocation {
                     target_idx: idx,
                     target_name: card_name.clone(),
-                    source_type: "stage".into(),
-                    source_name: "All heart (icon_all)".into(),
+                    source_type: SourceType::Stage,
+                    source_name: SourceName::AllHeartIconAll,
                     source_slot: None,
                     wildcard: target_color == 0,
                     color: alloc_color,
                     amount: take,
                     is_bonus: false,
-                    phase: "4_all_cleanup".into(),
+                    phase: AllocPhase::AllCleanup,
                 });
                 pool[7] -= take;
                 if target_color == 0 {
@@ -2527,6 +2525,22 @@ fn card_name_by_no(card_db: &CardDatabase, card_no: &str) -> String {
         .get_card_by_no(card_no)
         .map(|c| c.name.clone())
         .unwrap_or_else(|| card_no.to_string())
+}
+
+fn heart_color_debug_name(color: &HeartColor) -> &'static str {
+    match color {
+        HeartColor::Heart00 => "heart00",
+        HeartColor::Heart01 => "heart01",
+        HeartColor::Heart02 => "heart02",
+        HeartColor::Heart03 => "heart03",
+        HeartColor::Heart04 => "heart04",
+        HeartColor::Heart05 => "heart05",
+        HeartColor::Heart06 => "heart06",
+        HeartColor::BAll => "b_all",
+        HeartColor::Draw => "draw",
+        HeartColor::Score => "score",
+        HeartColor::All => "all",
+    }
 }
 
 fn fmt_player_id(id: &str) -> String {
