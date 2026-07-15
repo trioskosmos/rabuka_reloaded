@@ -43,11 +43,25 @@ fn main() {
     );
 
     let mut bot = Bot::new(Arc::clone(&card_database), 0, &card_numbers, &card_numbers);
+    // Load trained weights if available
+    let weights_path = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "../card_weights.bin".into());
+    if std::path::Path::new(&weights_path).exists() {
+        bot.network
+            .load_weights(&weights_path)
+            .expect("load weights");
+        eprintln!("Loaded weights from {}", weights_path);
+    } else {
+        eprintln!("No weights file at {} — using random init", weights_path);
+    }
 
-    const NUM_GAMES: u32 = 2;
+    const NUM_GAMES: u32 = 20;
     let mut p1_wins = 0u32;
     let mut p2_wins = 0u32;
     let mut draws = 0u32;
+    let mut total_actions = 0u64;
+    let start = std::time::Instant::now();
 
     for game_idx in 0..NUM_GAMES {
         let mut p1_deck = p1_template.clone();
@@ -120,16 +134,11 @@ fn main() {
                 continue;
             }
 
-            let action = if gs.current_phase == Phase::RockPaperScissors
-                || gs.current_phase == Phase::ChooseFirstAttacker
-                || gs.current_phase == Phase::MulliganFirstAttacker
-                || gs.current_phase == Phase::MulliganSecondAttacker
-                || gs.current_phase == Phase::LiveCardSetFirstAttacker
-                || gs.current_phase == Phase::LiveCardSetSecondAttacker
-            {
-                actions[fastrand(0, actions.len())].clone()
-            } else {
+            let is_bot_move = gs.active_player().id == "player1" && gs.current_phase == Phase::Main;
+            let action = if is_bot_move {
                 bot.choose_action(&gs)
+            } else {
+                actions[fastrand(0, actions.len())].clone()
             };
 
             let params = action.parameters.clone();
@@ -144,6 +153,16 @@ fn main() {
                 params.as_ref().and_then(|p| p.use_baton_touch),
             );
             game_setup::settle_single_player_state(&mut gs);
+            total_actions += 1;
+            if total_actions % 50 == 0 {
+                let elapsed = start.elapsed().as_secs_f64();
+                eprintln!(
+                    "[{}s] {} actions ({:.0}/s)",
+                    elapsed as u64,
+                    total_actions,
+                    total_actions as f64 / elapsed.max(0.001)
+                );
+            }
         }
 
         let p1_zone = gs.player1.success_live_card_zone.cards.len();

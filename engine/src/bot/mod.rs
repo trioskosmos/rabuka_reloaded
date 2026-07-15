@@ -1,5 +1,5 @@
 mod determinization;
-mod evaluation;
+pub mod evaluation;
 mod ismcts;
 mod neural;
 mod observation;

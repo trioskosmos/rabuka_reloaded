@@ -1,5 +1,8 @@
 /// Learned 128-dim card embeddings + 2-layer MLP evaluation network.
 /// Trained from self-play: predicts final success margin from board state.
+use std::fs::File;
+use std::io::Read;
+
 use rand::Rng;
 
 const EMBED_DIM: usize = 128;
@@ -31,9 +34,10 @@ pub struct ValueNetwork {
 
 impl ValueNetwork {
     pub fn new(num_cards: usize) -> Self {
+        let table_size = num_cards.max(2400);
         let mut rng = rand::thread_rng();
         let scale = 0.02;
-        let embeddings = (0..num_cards)
+        let embeddings = (0..table_size)
             .map(|_| {
                 let mut e = [0.0f32; EMBED_DIM];
                 for i in 0..EMBED_DIM {
@@ -68,6 +72,79 @@ impl ValueNetwork {
 
     pub fn predict(&self, my_cards: &[i16], opp_cards: &[i16]) -> f32 {
         self.forward(my_cards, opp_cards).0
+    }
+
+    /// L2 norm of a card's embedding — proxy for learned card quality.
+    pub fn embedding_norm(&self, card_id: usize) -> f32 {
+        self.embeddings
+            .get(card_id)
+            .map_or(0.0, |e| e.iter().map(|x| x * x).sum::<f32>().sqrt())
+    }
+
+    /// Load pre-trained weights from flat binary format (PyTorch export).
+    /// Format: embeddings [2400×128], w1 [64×256], b1 [64], w2 [64], b2 [1]
+    pub fn load_weights(&mut self, path: &str) -> std::io::Result<()> {
+        let mut f = File::open(path)?;
+        let mut buf = Vec::new();
+        f.read_to_end(&mut buf)?;
+        let mut pos = 0usize;
+
+        let emb_count = 2400usize;
+        let w1_rows = HIDDEN; // 64
+        let w1_cols = EMBED_DIM * 2; // 256
+
+        // Embeddings: [emb_count × EMBED_DIM] f32
+        if buf.len() < pos + emb_count * EMBED_DIM * 4 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "weights too short",
+            ));
+        }
+        for i in 0..emb_count.min(self.embeddings.len()) {
+            for j in 0..EMBED_DIM {
+                let bytes: [u8; 4] = buf[pos..pos + 4].try_into().unwrap();
+                self.embeddings[i][j] = f32::from_le_bytes(bytes);
+                pos += 4;
+            }
+        }
+        // Skip extra embeddings if file has more than our table
+        let extra = emb_count.saturating_sub(self.embeddings.len());
+        pos += extra * EMBED_DIM * 4;
+
+        // w1: [w1_rows × w1_cols] f32
+        if buf.len() < pos + w1_rows * w1_cols * 4 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "weights too short for w1",
+            ));
+        }
+        for i in 0..w1_rows {
+            for j in 0..w1_cols {
+                let bytes: [u8; 4] = buf[pos..pos + 4].try_into().unwrap();
+                self.w1[i][j] = f32::from_le_bytes(bytes);
+                pos += 4;
+            }
+        }
+
+        // b1: [w1_rows] f32
+        for i in 0..w1_rows {
+            let bytes: [u8; 4] = buf[pos..pos + 4].try_into().unwrap();
+            self.b1[i] = f32::from_le_bytes(bytes);
+            pos += 4;
+        }
+
+        // w2: [w1_rows] f32
+        for i in 0..w1_rows {
+            let bytes: [u8; 4] = buf[pos..pos + 4].try_into().unwrap();
+            self.w2[i] = f32::from_le_bytes(bytes);
+            pos += 4;
+        }
+
+        // b2: [1] f32
+        let bytes: [u8; 4] = buf[pos..pos + 4].try_into().unwrap();
+        self.b2 = f32::from_le_bytes(bytes);
+
+        Ok(())
     }
 
     /// Forward pass. Returns (output, cached activations for backprop).

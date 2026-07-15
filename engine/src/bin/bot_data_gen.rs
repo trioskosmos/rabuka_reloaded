@@ -1,9 +1,9 @@
 use rand::Rng;
-/// Generate training data: runs random games, exports (state→outcome) pairs.
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
 
+use rabuka_engine::bot::Bot;
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader;
 use rabuka_engine::deck_builder;
@@ -47,7 +47,15 @@ fn main() {
     let out_path = std::env::args()
         .nth(2)
         .unwrap_or_else(|| "../training_data.bin".into());
+    let weights_path = std::env::args().nth(3);
     let mut out = File::create(&out_path).expect("create output file");
+
+    let bot = weights_path.as_ref().map(|wp| {
+        let mut b = Bot::new(Arc::clone(&card_database), 0, &card_numbers, &card_numbers);
+        b.network.load_weights(wp).expect("load weights");
+        eprintln!("Using bot with weights from {}", wp);
+        b
+    });
 
     let mut total_examples: u64 = 0;
     let mut p1_wins = 0u32;
@@ -73,7 +81,7 @@ fn main() {
         game_setup::setup_game(&mut gs);
 
         let mut examples: Vec<Example> = Vec::with_capacity(200);
-        let mut actions_taken = 0u32;
+        let mut step_count = 0u32;
         let mut last_turn = 0u32;
         let mut stuck = 0u32;
 
@@ -114,11 +122,23 @@ fn main() {
                 continue;
             }
 
+            step_count += 1;
             let ex = Example::capture(&gs);
             examples.push(ex);
 
-            let action = actions[rand::thread_rng().gen_range(0..actions.len())].clone();
-            actions_taken += 1;
+            let action = if let Some(ref b) = bot {
+                if gs.active_player().id == "player1" && gs.current_phase == Phase::Main {
+                    // Use the smart heuristic — no clones, no NN
+                    let heuristic =
+                        rabuka_engine::bot::evaluation::pick_rollout_action(&actions, &gs);
+                    // We record the state for training; the action choice is NOT random
+                    heuristic
+                } else {
+                    actions[rand::thread_rng().gen_range(0..actions.len())].clone()
+                }
+            } else {
+                actions[rand::thread_rng().gen_range(0..actions.len())].clone()
+            };
 
             let params = action.parameters.clone();
             let _ = TurnEngine::execute_main_phase_action(
@@ -146,8 +166,21 @@ fn main() {
             draws += 1;
         }
 
-        for ex in &examples {
-            ex.write(&mut out, margin).expect("write example");
+        for (i, ex) in examples.iter().enumerate() {
+            let steps_rem = (step_count - i as u32) as u16;
+            let hand_len = ex.my_hand.len() as u8;
+            let _ = out.write_all(&[hand_len]);
+            for &c in &ex.my_hand {
+                let _ = out.write_all(&c.to_le_bytes());
+            }
+            for &c in &ex.my_stage {
+                let _ = out.write_all(&c.to_le_bytes());
+            }
+            for &c in &ex.opp_stage {
+                let _ = out.write_all(&c.to_le_bytes());
+            }
+            let _ = out.write_all(&margin.to_le_bytes());
+            let _ = out.write_all(&steps_rem.to_le_bytes());
         }
         total_examples += examples.len() as u64;
 
@@ -181,22 +214,6 @@ impl Example {
             my_stage: gs.player1.stage.stage,
             opp_stage: gs.player2.stage.stage,
         }
-    }
-
-    fn write(&self, f: &mut File, target: f32) -> std::io::Result<()> {
-        let hand_len = self.my_hand.len() as u8;
-        f.write_all(&[hand_len])?;
-        for &c in &self.my_hand {
-            f.write_all(&c.to_le_bytes())?;
-        }
-        for &c in &self.my_stage {
-            f.write_all(&c.to_le_bytes())?;
-        }
-        for &c in &self.opp_stage {
-            f.write_all(&c.to_le_bytes())?;
-        }
-        f.write_all(&target.to_le_bytes())?;
-        Ok(())
     }
 }
 
