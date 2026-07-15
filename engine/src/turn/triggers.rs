@@ -539,8 +539,11 @@ impl super::TurnEngine {
                                     if !seen.insert((card_id, 10000 + gidx)) {
                                         continue;
                                     }
-                                    let pp = player_id_clone.clone();
-                                    game_state.structured_log.push(LogEntry {
+                                    if crate::ability::debug::ABILITY_DEBUG
+                                        .load(std::sync::atomic::Ordering::Relaxed)
+                                    {
+                                        let pp = player_id_clone.clone();
+                                        game_state.structured_log.push(LogEntry {
                                         text: format!(
                                             "{pp} card#{card_id} [ステージ/獲得]: 能力確認 [ライブ成功時]"
                                         ),
@@ -557,6 +560,7 @@ impl super::TurnEngine {
                                             "ability_text": gained_ability.full_text,
                                         })),
                                     });
+                                    }
                                     let ability_id = format!("{}_gained_{}", card_no, gidx);
                                     abilities_to_trigger.push((
                                         ability_id,
@@ -620,8 +624,11 @@ impl super::TurnEngine {
                                 if !seen.insert((*card_id, 10000 + gidx)) {
                                     continue;
                                 }
-                                let pp = player_id_clone.clone();
-                                game_state.structured_log.push(LogEntry {
+                                if crate::ability::debug::ABILITY_DEBUG
+                                    .load(std::sync::atomic::Ordering::Relaxed)
+                                {
+                                    let pp = player_id_clone.clone();
+                                    game_state.structured_log.push(LogEntry {
                                     text: format!(
                                         "{pp} card#{card_id} [ライブ置場/獲得]: 能力確認 [ライブ成功時]"
                                     ),
@@ -638,6 +645,7 @@ impl super::TurnEngine {
                                         "ability_text": gained_ability.full_text,
                                     })),
                                 });
+                                }
                                 let ability_id = format!("{}_gained_{}", card_no, gidx);
                                 abilities_to_trigger.push((ability_id, card_no.clone(), *card_id));
                             }

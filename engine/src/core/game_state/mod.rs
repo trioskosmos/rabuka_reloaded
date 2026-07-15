@@ -610,6 +610,9 @@ impl GameState {
         category: &str,
     ) {
         self.rule_log.push(text.clone());
+        if !crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            return;
+        }
         self.structured_log.push(LogEntry {
             text,
             turn: self.turn_number,

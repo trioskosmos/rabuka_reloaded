@@ -179,7 +179,9 @@ impl AbilityResolver {
             if let Some(ref activation_condition) = effect.activation_condition_parsed_any() {
                 let mut merged_cond = Box::clone(activation_condition);
                 // Merge the effect's position info into the condition so it's checked.
-                if merged_cond.get_position().is_none() && merged_cond.get_positions_characters().is_none() {
+                if merged_cond.get_position().is_none()
+                    && merged_cond.get_positions_characters().is_none()
+                {
                     if let Some(ref pos) = effect.position_any() {
                         merged_cond.set_position((*pos).clone());
                     } else if let Some(ref act_pos) = effect.activation_position_any() {
@@ -557,6 +559,9 @@ impl AbilityResolver {
             result
         );
         gs.rule_log.push(log_text.clone());
+        if !crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            return;
+        }
         gs.structured_log.push(LogEntry {
             text: log_text,
             turn: gs.turn_number,

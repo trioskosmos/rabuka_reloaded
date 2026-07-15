@@ -287,14 +287,14 @@ pub struct Breakdown {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HeartSource {
     pub source_type: SourceType,
-    pub source: String,
+    pub source: ArcStr,
     pub value: [u32; 8],
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BladeSource {
     pub source_type: SourceType,
-    pub source: String,
+    pub source: ArcStr,
     pub value: u32,
 }
 

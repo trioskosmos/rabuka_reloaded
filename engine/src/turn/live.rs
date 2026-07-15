@@ -1,3 +1,4 @@
+use crate::ability::debug::ABILITY_DEBUG;
 use crate::ability::enums::Zone;
 use crate::card::{BaseHeart, BladeColor, CardDatabase, HeartColor, HeartMap};
 use crate::core::game_modifiers::ModifierEntry;
@@ -7,6 +8,7 @@ use crate::types::{
     MemberContribution, SourceName, SourceType, YellCardResult,
 };
 use std::collections::HashMap;
+use std::sync::atomic::Ordering;
 
 const EMPTY_H8: [u32; 8] = [0u32; 8];
 
@@ -377,41 +379,53 @@ impl super::TurnEngine {
                         // Populate adjustments and requirements from need_heart_modifiers
                         let mut adjustments = Vec::new();
                         if let Some(color_mods) = game_state.mods.need_heart_modifiers.get(&lc_id) {
-                            let req_source = format!("{} req modifier", card.name);
+                            let verbose = ABILITY_DEBUG.load(Ordering::Relaxed);
+                            let req_source = verbose.then(|| format!("{} req modifier", card.name));
                             for (color, entry) in color_mods {
                                 let total = entry.total();
                                 if total != 0 {
                                     let color_label = heart_color_debug_name(color);
                                     adjustments.push(crate::types::Adjustment {
                                         adjustment_type: AdjustmentType::Requirement,
-                                        desc: format!(
-                                            "{} {}",
-                                            if entry.set != 0 {
-                                                "="
-                                            } else if total > 0 {
-                                                "+"
-                                            } else {
-                                                ""
-                                            },
-                                            total,
-                                        ),
+                                        desc: if verbose {
+                                            format!(
+                                                "{} {}",
+                                                if entry.set != 0 {
+                                                    "="
+                                                } else if total > 0 {
+                                                    "+"
+                                                } else {
+                                                    ""
+                                                },
+                                                total,
+                                            )
+                                        } else {
+                                            String::new()
+                                        },
                                         value: total,
                                         color: color.index(),
-                                        source: format!(
-                                            "{} req modifier ({})",
-                                            card.name, color_label
-                                        ),
+                                        source: if verbose {
+                                            format!("{} req modifier ({})", card.name, color_label)
+                                        } else {
+                                            String::new()
+                                        },
                                     });
-                                    let op_str = if entry.set != 0 {
+                                    let op_str = if verbose && entry.set != 0 {
                                         format!("= {}", entry.set)
-                                    } else if entry.additive > 0 {
+                                    } else if verbose && entry.additive > 0 {
                                         format!("+{}", entry.additive)
-                                    } else {
+                                    } else if verbose {
                                         format!("{}", entry.additive)
+                                    } else {
+                                        String::new()
                                     };
-                                    let req_desc = format!("Requirement {}", op_str);
+                                    let req_desc = if verbose {
+                                        format!("Requirement {}", op_str)
+                                    } else {
+                                        String::new()
+                                    };
                                     snap.breakdown.requirements.push(crate::types::EffectEntry {
-                                        source: req_source.clone(),
+                                        source: req_source.clone().unwrap_or_default(),
                                         value: op_str,
                                         desc: req_desc,
                                     });
@@ -641,29 +655,31 @@ impl super::TurnEngine {
         // Push performance summary to rule log
 
         let card_db = game_state.card_database.clone();
-        for snap in &game_state.performance_snapshots {
-            let player = fmt_player_id(&snap.player_id);
-            let mut live_details = String::new();
-            for (i, live) in snap.lives.iter().enumerate() {
-                let live_result = if live.passed { "PASS" } else { "FAIL" };
-                if i > 0 {
-                    live_details.push_str(", ");
+        if ABILITY_DEBUG.load(Ordering::Relaxed) {
+            for snap in &game_state.performance_snapshots {
+                let player = fmt_player_id(&snap.player_id);
+                let mut live_details = String::new();
+                for (i, live) in snap.lives.iter().enumerate() {
+                    let live_result = if live.passed { "PASS" } else { "FAIL" };
+                    if i > 0 {
+                        live_details.push_str(", ");
+                    }
+                    let _ = std::fmt::Write::write_fmt(
+                        &mut live_details,
+                        format_args!("live score+{} → {}", live.score, live_result),
+                    );
                 }
-                let _ = std::fmt::Write::write_fmt(
-                    &mut live_details,
-                    format_args!("live score+{} → {}", live.score, live_result),
-                );
+                let perf_result = if snap.success { "PASS" } else { "FAIL" };
+                let detail_str = if live_details.is_empty() {
+                    String::new()
+                } else {
+                    format!(" [{}]", live_details)
+                };
+                game_state.rule_log.push(format!(
+                    "[Turn {}] {} [[log_performance:score={},result={}]]{}",
+                    snap.turn, player, snap.total_score, perf_result, detail_str,
+                ));
             }
-            let perf_result = if snap.success { "PASS" } else { "FAIL" };
-            let detail_str = if live_details.is_empty() {
-                String::new()
-            } else {
-                format!(" [{}]", live_details)
-            };
-            game_state.rule_log.push(format!(
-                "[Turn {}] {} [[log_performance:score={},result={}]]{}",
-                snap.turn, player, snap.total_score, perf_result, detail_str,
-            ));
         }
 
         Self::move_restricted_cards_to_discard(&mut game_state.player1, &card_db);
@@ -1248,7 +1264,7 @@ impl super::TurnEngine {
         let mut total_hearts_arr = EMPTY_H8;
 
         // Stage hearts source
-        let stage_heart_str = "Stage (base)".to_string();
+        let stage_heart_str: crate::types::ArcStr = "Stage (base)".into();
         let mut stage_heart_arr = EMPTY_H8;
         for (color, count) in &owned_hearts.hearts {
             let idx = color.index();
@@ -1271,7 +1287,7 @@ impl super::TurnEngine {
         // Add stage blade source
         blade_sources.push(BladeSource {
             source_type: SourceType::Stage,
-            source: "Stage members".into(),
+            source: crate::types::ArcStr::from("Stage members"),
             value: total_blade,
         });
 
@@ -1368,13 +1384,13 @@ impl super::TurnEngine {
         if yell_heart_arr.iter().any(|&v| v > 0) {
             heart_sources.push(HeartSource {
                 source_type: SourceType::Yell,
-                source: "Yell cards".into(),
+                source: crate::types::ArcStr::from("Yell cards"),
                 value: yell_heart_arr,
             });
         }
         blade_sources.push(BladeSource {
             source_type: SourceType::Yell,
-            source: format!("{} blades", total_blade),
+            source: format!("{} blades", total_blade).into(),
             value: total_blade,
         });
 
@@ -2367,24 +2383,32 @@ pub fn enrich_from_applications(
         {
             match app.effect_type {
                 crate::types::EffectType::HeartBonus => {
-                    let source_name = card_db
-                        .get_card(app.source_card_id)
-                        .map(|c| c.name.to_string())
-                        .unwrap_or_else(|| format!("#{}", app.source_card_id));
                     mc.ability_heart_bonuses.push(crate::types::AbilityBonus {
-                        source: format!("Ability: {}", source_name).into(),
+                        source: if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                            let source_name = card_db
+                                .get_card(app.source_card_id)
+                                .map(|c| c.name.to_string())
+                                .unwrap_or_else(|| format!("#{}", app.source_card_id));
+                            format!("Ability: {}", source_name).into()
+                        } else {
+                            crate::types::ArcStr::default()
+                        },
                         amount: app.amount.unsigned_abs(),
                         color: app.heart_color,
                         ability_text: app.ability_text.clone().into(),
                     });
                 }
                 crate::types::EffectType::BladeBonus => {
-                    let source_name = card_db
-                        .get_card(app.source_card_id)
-                        .map(|c| c.name.to_string())
-                        .unwrap_or_else(|| format!("#{}", app.source_card_id));
                     mc.ability_blade_bonuses.push(crate::types::AbilityBonus {
-                        source: format!("Ability: {}", source_name).into(),
+                        source: if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                            let source_name = card_db
+                                .get_card(app.source_card_id)
+                                .map(|c| c.name.to_string())
+                                .unwrap_or_else(|| format!("#{}", app.source_card_id));
+                            format!("Ability: {}", source_name).into()
+                        } else {
+                            crate::types::ArcStr::default()
+                        },
                         amount: app.amount.unsigned_abs(),
                         color: app.heart_color,
                         ability_text: app.ability_text.clone().into(),
@@ -2396,17 +2420,29 @@ pub fn enrich_from_applications(
         match app.effect_type {
             crate::types::EffectType::ScoreBonus | crate::types::EffectType::ScoreSet => {
                 breakdown.scores.push(crate::types::ScoreLine {
-                    source: app.ability_text.to_string(),
+                    source: if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                        app.ability_text.to_string()
+                    } else {
+                        String::new()
+                    },
                     value: app.amount.unsigned_abs(),
                 });
             }
             crate::types::EffectType::Transform => {
                 breakdown.transforms.push(crate::types::EffectEntry {
-                    source: app.ability_text.to_string(),
-                    desc: format!(
-                        "All hearts become type {}",
-                        app.heart_color.map_or(0, |c| c)
-                    ),
+                    source: if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                        app.ability_text.to_string()
+                    } else {
+                        String::new()
+                    },
+                    desc: if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                        format!(
+                            "All hearts become type {}",
+                            app.heart_color.map_or(0, |c| c)
+                        )
+                    } else {
+                        String::new()
+                    },
                     value: String::new(),
                 });
             }
@@ -2417,7 +2453,11 @@ pub fn enrich_from_applications(
             let card = card_db.get_card(app.source_card_id);
             triggered_abilities.push(crate::types::TriggeredAbility {
                 source_card_id: app.source_card_id,
-                name: format!("Ability #{}", triggered_abilities.len() + 1),
+                name: if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                    format!("Ability #{}", triggered_abilities.len() + 1)
+                } else {
+                    String::new()
+                },
                 card_name: card
                     .map(|c| crate::types::ArcStr::from(c.name.as_ref()))
                     .unwrap_or_default(),

@@ -481,7 +481,11 @@ impl GameState {
                                 continue;
                             }
                             self.this_batch_triggered_ability_ids.insert(batch_key);
-                            abilities_to_trigger.push((ability_id, card.card_no.to_string(), card_id));
+                            abilities_to_trigger.push((
+                                ability_id,
+                                card.card_no.to_string(),
+                                card_id,
+                            ));
                         }
                     }
                 }
@@ -1203,6 +1207,9 @@ impl GameState {
                 "{pp} {card_name} [{zone}]: [[log_ability_result:trigger=trigger_{trigger_str},result=result_skipped_negated]]"
             );
             self.rule_log.push(log_text.clone());
+            if !crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                return;
+            }
             self.structured_log.push(crate::types::LogEntry {
                 text: log_text,
                 turn: self.turn_number,

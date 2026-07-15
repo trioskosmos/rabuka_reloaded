@@ -10,20 +10,9 @@ use std::sync::Mutex;
 /// Default OFF in production, ON in tests via test helpers.
 pub static ABILITY_DEBUG: AtomicBool = AtomicBool::new(false);
 
-/// Toggle structured verdict items in the in-game rule log.
-/// Default OFF — set via RABUKA_RULE_LOG env var or set_rule_log_verbose().
-/// This is SEPARATE from ABILITY_DEBUG: ABILITY_DEBUG controls terminal/eprintln
-/// output (causes lag), while this controls in-game structured log items only.
-pub static RULE_LOG_VERBOSE: AtomicBool = AtomicBool::new(false);
-
-/// Enable/disable ability debug.
+/// Enable/disable all verbose output (terminal + in-game rule log).
 pub fn set_debug(enabled: bool) {
     ABILITY_DEBUG.store(enabled, Ordering::SeqCst);
-}
-
-/// Enable/disable structured verdict items in in-game rule log.
-pub fn set_rule_log_verbose(enabled: bool) {
-    RULE_LOG_VERBOSE.store(enabled, Ordering::SeqCst);
 }
 
 // Global buffer to collect debug logs between game state updates

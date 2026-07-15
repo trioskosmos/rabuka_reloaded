@@ -36,7 +36,6 @@ static PRELOADED: OnceLock<PreloadedDb> = OnceLock::new();
 
 /// Load (once) and return a pre-seeded database.
 pub fn load_real_database() -> Arc<CardDatabase> {
-    rabuka_engine::ability::debug::set_debug(true);
     PRELOADED.get_or_init(|| {
         let t0 = std::time::Instant::now();
         let cards = CardLoader::load_cards_from_strs(CARDS_JSON, Some(ABILITIES_JSON))
@@ -146,7 +145,6 @@ impl TestGame {
         if !quiet {
             let _ = env_logger::try_init();
             rabuka_engine::ability::debug::set_debug(true);
-            rabuka_engine::ability::debug::set_rule_log_verbose(true);
         }
         let debug_enabled = !quiet || std::env::var("RABUKA_DEBUG").is_ok();
 
