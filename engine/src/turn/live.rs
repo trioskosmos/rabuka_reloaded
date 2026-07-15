@@ -563,11 +563,12 @@ impl super::TurnEngine {
                     &p2_cards
                 };
                 for app in &late_apps {
-                    if (app.effect_type == "score_bonus" || app.effect_type == "score_set")
+                    if (app.effect_type == crate::types::EffectType::ScoreBonus
+                        || app.effect_type == crate::types::EffectType::ScoreSet)
                         && player_cards.contains(&app.target_card_id)
                     {
                         snap.breakdown.scores.push(crate::types::ScoreLine {
-                            source: app.ability_text.clone(),
+                            source: app.ability_text.to_string(),
                             value: app.amount.unsigned_abs(),
                         });
                     }
@@ -2364,8 +2365,8 @@ pub fn enrich_from_applications(
             .iter_mut()
             .find(|m| m.source_id == app.target_card_id)
         {
-            match app.effect_type.as_str() {
-                "heart_bonus" => {
+            match app.effect_type {
+                crate::types::EffectType::HeartBonus => {
                     let source_name = card_db
                         .get_card(app.source_card_id)
                         .map(|c| c.name.to_string())
@@ -2377,7 +2378,7 @@ pub fn enrich_from_applications(
                         ability_text: app.ability_text.clone().into(),
                     });
                 }
-                "blade_bonus" => {
+                crate::types::EffectType::BladeBonus => {
                     let source_name = card_db
                         .get_card(app.source_card_id)
                         .map(|c| c.name.to_string())
@@ -2392,21 +2393,21 @@ pub fn enrich_from_applications(
                 _ => {}
             }
         }
-        match app.effect_type.as_str() {
-            "score_bonus" | "score_set" => {
+        match app.effect_type {
+            crate::types::EffectType::ScoreBonus | crate::types::EffectType::ScoreSet => {
                 breakdown.scores.push(crate::types::ScoreLine {
-                    source: app.ability_text.clone(),
+                    source: app.ability_text.to_string(),
                     value: app.amount.unsigned_abs(),
                 });
             }
-            "transform" => {
+            crate::types::EffectType::Transform => {
                 breakdown.transforms.push(crate::types::EffectEntry {
-                    source: app.ability_text.clone(),
-                    value: format!("→ color {}", app.heart_color.map_or(0, |c| c)),
+                    source: app.ability_text.to_string(),
                     desc: format!(
                         "All hearts become type {}",
                         app.heart_color.map_or(0, |c| c)
                     ),
+                    value: String::new(),
                 });
             }
             _ => {}

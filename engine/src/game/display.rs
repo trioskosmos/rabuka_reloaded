@@ -1094,14 +1094,20 @@ pub fn player_to_display(
         if let Some(card) = card_db.get_card(cid) {
             let base = card.score.unwrap_or(0);
             let bonus = score_modifiers.get(&cid).copied().unwrap_or(0);
-            live_card_scores.insert(card.card_no.to_string(), (base as i32 + bonus).max(0) as u32);
+            live_card_scores.insert(
+                card.card_no.to_string(),
+                (base as i32 + bonus).max(0) as u32,
+            );
         }
     }
     for &cid in &player.success_live_card_zone.cards {
         if let Some(card) = card_db.get_card(cid) {
             let base = card.score.unwrap_or(0);
             let bonus = score_modifiers.get(&cid).copied().unwrap_or(0);
-            live_card_scores.insert(card.card_no.to_string(), (base as i32 + bonus).max(0) as u32);
+            live_card_scores.insert(
+                card.card_no.to_string(),
+                (base as i32 + bonus).max(0) as u32,
+            );
         }
     }
 
@@ -1641,7 +1647,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         .iter()
         .map(|app| AbilityApplicationDisplay {
             source_card_id: app.source_card_id,
-            effect_type: app.effect_type.clone(),
+            effect_type: app.effect_type.as_str().to_string(),
             target_card_id: app.target_card_id,
             amount: app.amount,
         })

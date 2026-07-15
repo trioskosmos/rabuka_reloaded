@@ -129,8 +129,8 @@ impl GameModifiers {
         self.add_blade_modifier(card_id, delta);
         trace.push(AbilityApplication {
             source_card_id,
-            ability_text: ability_text.to_string(),
-            effect_type: "blade_bonus".to_string(),
+            ability_text: ability_text.into(),
+            effect_type: crate::types::EffectType::BladeBonus,
             target_card_id: card_id,
             heart_color: None,
             amount: delta,
@@ -199,8 +199,8 @@ impl GameModifiers {
         self.add_heart_modifier(card_id, color, delta);
         trace.push(AbilityApplication {
             source_card_id,
-            ability_text: ability_text.to_string(),
-            effect_type: "heart_bonus".to_string(),
+            ability_text: ability_text.into(),
+            effect_type: crate::types::EffectType::HeartBonus,
             target_card_id: card_id,
             heart_color: Some(color.index()),
             amount: delta,

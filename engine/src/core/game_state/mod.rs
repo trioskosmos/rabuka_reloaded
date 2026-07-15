@@ -721,8 +721,17 @@ impl GameState {
         self.ability_applications
             .push(crate::types::AbilityApplication {
                 source_card_id,
-                ability_text,
-                effect_type: effect_type.to_string(),
+                ability_text: ability_text.into(),
+                effect_type: match effect_type {
+                    "heart_bonus" => crate::types::EffectType::HeartBonus,
+                    "blade_bonus" => crate::types::EffectType::BladeBonus,
+                    "score_bonus" => crate::types::EffectType::ScoreBonus,
+                    "score_set" => crate::types::EffectType::ScoreSet,
+                    "transform" => crate::types::EffectType::Transform,
+                    "need_heart_mod" => crate::types::EffectType::NeedHeartMod,
+                    "heart_override" => crate::types::EffectType::HeartOverride,
+                    _ => crate::types::EffectType::HeartBonus,
+                },
                 target_card_id,
                 heart_color,
                 amount,

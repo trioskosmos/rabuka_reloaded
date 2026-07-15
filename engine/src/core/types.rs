@@ -416,11 +416,36 @@ pub struct PositionChangeEvent {
 /// Populated in effect handlers (execute_gain_resource etc.) and consumed
 /// by build_snapshot to fill ability_heart_bonuses, ability_blade_bonuses,
 /// Breakdown.scores, Breakdown.transforms, and TriggeredAbility.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EffectType {
+    HeartBonus,
+    BladeBonus,
+    ScoreBonus,
+    ScoreSet,
+    Transform,
+    NeedHeartMod,
+    HeartOverride,
+}
+
+impl EffectType {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            EffectType::HeartBonus => "heart_bonus",
+            EffectType::BladeBonus => "blade_bonus",
+            EffectType::ScoreBonus => "score_bonus",
+            EffectType::ScoreSet => "score_set",
+            EffectType::Transform => "transform",
+            EffectType::NeedHeartMod => "need_heart_mod",
+            EffectType::HeartOverride => "heart_override",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AbilityApplication {
     pub source_card_id: i16,
-    pub ability_text: String,
-    pub effect_type: String, // "heart_bonus", "blade_bonus", "score_bonus", "transform", "need_heart_mod"
+    pub ability_text: ArcStr,
+    pub effect_type: EffectType,
     pub target_card_id: i16,
     pub heart_color: Option<usize>,
     pub amount: i32,
