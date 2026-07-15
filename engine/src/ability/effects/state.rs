@@ -4,6 +4,7 @@ use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
 use super::super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
+use smallvec::SmallVec;
 
 impl AbilityResolver {
     pub(crate) fn execute_change_state(
@@ -761,7 +762,7 @@ impl AbilityResolver {
         let ct_binding = effect.card_type_any();
         let card_type = ct_binding.as_deref();
         let player = gs.resolve_target_player_mut(target);
-        let mut card_ids: Vec<i16> = if let Some("live_card") = card_type {
+        let mut card_ids: SmallVec<[i16; 8]> = if let Some("live_card") = card_type {
             player.live_card_zone.cards.iter().copied().collect()
         } else if let Some("member_card") = card_type {
             player
@@ -788,7 +789,8 @@ impl AbilityResolver {
                 None,
                 None,
                 None,
-            );
+            )
+            .into();
         }
         let pp = self.player_prefix(gs);
         let act_name = gs
@@ -876,7 +878,7 @@ impl AbilityResolver {
                     blade_type.unwrap_or(""),
                     card_db
                         .get_card(card_id)
-                        .map(|c| c.name.as_str())
+                        .map(|c| c.name.as_ref())
                         .unwrap_or("unknown")
                 ),
                 Some(ed),
@@ -1022,11 +1024,11 @@ impl AbilityResolver {
             "{} {}: [[log_set_blade_count:n={}]]",
             pp, act_name, value
         ));
-        let mut stage_cards: Vec<i16> = {
+        let mut stage_cards: SmallVec<[i16; 8]> = {
             let player = gs.resolve_target_player_mut(target);
-            player.stage.stage.to_vec()
+            player.stage.stage.iter().copied().collect()
         };
-        stage_cards.retain(|&id| id != -1);
+        stage_cards.retain(|id| *id != -1);
         if effect.group_names_any().is_some()
             || effect.exclude_group_names_any().is_some()
             || effect.characters_any().is_some()
@@ -1041,7 +1043,8 @@ impl AbilityResolver {
                 None,
                 None,
                 None,
-            );
+            )
+            .into();
         }
         if let Some(ref pos) = effect.position_any() {
             if let Some(p) = pos.get_position() {
@@ -1051,7 +1054,7 @@ impl AbilityResolver {
                     if expected == -1 {
                         stage_cards.clear();
                     } else {
-                        stage_cards.retain(|&cid| cid == expected);
+                        stage_cards.retain(|cid| *cid == expected);
                     }
                 }
             }
@@ -1200,7 +1203,7 @@ impl AbilityResolver {
             pp, act_name, operation, value
         ));
         let player = gs.resolve_target_player_mut(target);
-        let mut card_ids: Vec<i16> = if let Some("live_card") = card_type {
+        let mut card_ids: SmallVec<[i16; 8]> = if let Some("live_card") = card_type {
             player.live_card_zone.cards.iter().copied().collect()
         } else if let Some("member_card") = card_type {
             player
@@ -1230,13 +1233,14 @@ impl AbilityResolver {
                 None,
                 None,
                 None,
-            );
+            )
+            .into();
         }
         // When self_target is set, only the activating card receives the modifier
         // (e.g. "このメンバーのコストを+Nする" — only this member, not all matching).
         if effect.self_target_any().unwrap_or(false) {
             if let Some(cid) = gs.activating_card {
-                card_ids.retain(|&id| id == cid);
+                card_ids.retain(|id| *id == cid);
             }
         }
         let delta = match operation {

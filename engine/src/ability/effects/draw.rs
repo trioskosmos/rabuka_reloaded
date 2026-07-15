@@ -4,6 +4,7 @@ use super::super::types::{Choice, ExecutionContext};
 use super::super::util;
 use crate::card::{AbilityEffect, DistinctType};
 use crate::game_state::GameState;
+use smallvec::SmallVec;
 
 pub(crate) fn draw_cards_for_player(
     player: &mut crate::player::Player,
@@ -475,11 +476,11 @@ impl AbilityResolver {
                 }
             }
             Some(Zone::Discard) => {
-                let mut cards: Vec<i16> = (0..final_count as usize)
+                let mut cards: SmallVec<[i16; 8]> = (0..final_count as usize)
                     .filter_map(|_| player.waitroom.cards.pop())
                     .collect();
                 if let Some(distinct) = is_distinct {
-                    cards = util::apply_distinct_filter(&cards, Some(distinct), &card_db);
+                    cards = util::apply_distinct_filter(&cards, Some(distinct), &card_db).into();
                 }
                 for card in cards {
                     util::place_card_in_zone(player, card, destination, None, false, 1);

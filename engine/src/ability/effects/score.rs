@@ -3,6 +3,7 @@ use super::super::resolver::AbilityResolver;
 use super::super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
+use smallvec::SmallVec;
 
 impl AbilityResolver {
     pub(crate) fn execute_modify_score(
@@ -108,25 +109,23 @@ impl AbilityResolver {
                 value
             };
 
-            let candidate_ids: Vec<i16> = match card_type_filter.as_deref() {
+            let candidate_ids: SmallVec<[i16; 8]> = match card_type_filter.as_deref() {
                 Some("member_card") => util::matching_ids(
                     util::zone_cards(player, Zone::Stage.to_str()),
                     &card_db,
                     &filter,
                     true,
-                ),
+                )
+                .into(),
                 _ => {
-                    let mut ids: Vec<i16> = player
+                    let mut ids: SmallVec<[i16; 8]> = player
                         .live_card_zone
                         .cards
                         .iter()
                         .chain(player.success_live_card_zone.cards.iter())
                         .copied()
                         .collect();
-                    // Also include stage cards — modify_score from a live success
-                    // trigger targets a member on stage (effect fields don't
-                    // propagate condition fields like card_type/self_target).
-                    ids.extend(player.stage.stage.iter().filter(|&&id| id != -1));
+                    ids.extend(player.stage.stage.iter().filter(|&&id| id != -1).copied());
                     ids
                 }
             };
