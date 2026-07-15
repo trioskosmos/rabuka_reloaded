@@ -245,7 +245,7 @@ pub struct LiveCardResult {
     pub filled: [u32; 8],
     pub adjustments: Vec<Adjustment>,
     pub card_id: i16,
-    pub card_no: String,
+    pub card_no: ArcStr,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -261,7 +261,7 @@ pub struct MemberContribution {
     pub draw_icons: u32,
     pub ability_heart_bonuses: Vec<AbilityBonus>,
     pub ability_blade_bonuses: Vec<AbilityBonus>,
-    pub card_no: String,
+    pub card_no: ArcStr,
     pub is_wait: bool,
 }
 
@@ -271,7 +271,7 @@ pub struct YellCardResult {
     pub blade_hearts: [u32; 8],
     pub note_icons: u32,
     pub draw_icons: u32,
-    pub card_no: String,
+    pub card_no: ArcStr,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -430,8 +430,8 @@ pub struct AbilityApplication {
 pub struct TriggeredAbility {
     pub source_card_id: i16,
     pub name: String,
-    pub card_name: String,
-    pub effect_text: String,
+    pub card_name: ArcStr,
+    pub effect_text: ArcStr,
     pub condition_text: Option<String>,
     pub is_public: bool,
 }
@@ -448,10 +448,10 @@ pub struct Adjustment {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AbilityBonus {
-    pub source: String,
+    pub source: ArcStr,
     pub amount: u32,
     pub color: Option<usize>,
-    pub ability_text: String,
+    pub ability_text: ArcStr,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

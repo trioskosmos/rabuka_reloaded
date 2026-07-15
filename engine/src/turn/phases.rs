@@ -380,7 +380,7 @@ impl super::TurnEngine {
                         blade_hearts: bh,
                         note_icons: notes,
                         draw_icons: 0,
-                        card_no: card.card_no.clone(),
+                        card_no: card.card_no.clone().into(),
                     });
                 }
             }
@@ -513,8 +513,8 @@ impl super::TurnEngine {
             tas.push(crate::types::TriggeredAbility {
                 source_card_id: -1,
                 name: "Draw Effect".to_string(),
-                card_name: String::new(),
-                effect_text: "カードを引く効果が発動しました".to_string(),
+                card_name: crate::types::ArcStr::default(),
+                effect_text: "カードを引く効果が発動しました".to_string().into(),
                 condition_text: None,
                 is_public: true,
             });
@@ -930,7 +930,8 @@ impl super::TurnEngine {
                                             {
                                                 return false;
                                             }
-                                            if let Some(ref exclude_groups) = ef.exclude_group_names_any()
+                                            if let Some(ref exclude_groups) =
+                                                ef.exclude_group_names_any()
                                             {
                                                 if crate::ability::util::card_matches_any_group(
                                                     &card_db,

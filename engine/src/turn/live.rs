@@ -285,7 +285,7 @@ impl super::TurnEngine {
                 let lc_id = snap.lives[i].card_id;
                 if let Some(card) = game_state.card_database.get_card(lc_id) {
                     snap.lives[i].card_id = lc_id;
-                    snap.lives[i].card_no = card.card_no.clone();
+                    snap.lives[i].card_no = crate::types::ArcStr::from(card.card_no.as_str());
                     if let Some(ref nh) = card.need_heart {
                         let mut filled = EMPTY_H8;
                         // Build filled array from heart allocations targeting this live
@@ -1156,7 +1156,7 @@ impl super::TurnEngine {
                 ability_blade_bonuses,
                 card_no: card_db
                     .get_card(cid)
-                    .map(|c| c.card_no.clone())
+                    .map(|c| crate::types::ArcStr::from(c.card_no.as_str()))
                     .unwrap_or_default(),
                 is_wait,
             });
@@ -1339,7 +1339,7 @@ impl super::TurnEngine {
                     draw_icons,
                     card_no: card_db
                         .get_card(*card_id)
-                        .map(|c| c.card_no.clone())
+                        .map(|c| crate::types::ArcStr::from(c.card_no.as_str()))
                         .unwrap_or_default(),
                 });
             }
@@ -2371,10 +2371,10 @@ pub fn enrich_from_applications(
                         .map(|c| c.name.clone())
                         .unwrap_or_else(|| format!("#{}", app.source_card_id));
                     mc.ability_heart_bonuses.push(crate::types::AbilityBonus {
-                        source: format!("Ability: {}", source_name),
+                        source: format!("Ability: {}", source_name).into(),
                         amount: app.amount.unsigned_abs(),
                         color: app.heart_color,
-                        ability_text: app.ability_text.clone(),
+                        ability_text: app.ability_text.clone().into(),
                     });
                 }
                 "blade_bonus" => {
@@ -2383,10 +2383,10 @@ pub fn enrich_from_applications(
                         .map(|c| c.name.clone())
                         .unwrap_or_else(|| format!("#{}", app.source_card_id));
                     mc.ability_blade_bonuses.push(crate::types::AbilityBonus {
-                        source: format!("Ability: {}", source_name),
+                        source: format!("Ability: {}", source_name).into(),
                         amount: app.amount.unsigned_abs(),
                         color: app.heart_color,
-                        ability_text: app.ability_text.clone(),
+                        ability_text: app.ability_text.clone().into(),
                     });
                 }
                 _ => {}
@@ -2417,8 +2417,10 @@ pub fn enrich_from_applications(
             triggered_abilities.push(crate::types::TriggeredAbility {
                 source_card_id: app.source_card_id,
                 name: format!("Ability #{}", triggered_abilities.len() + 1),
-                card_name: card.map(|c| c.name.clone()).unwrap_or_default(),
-                effect_text: app.ability_text.clone(),
+                card_name: card
+                    .map(|c| crate::types::ArcStr::from(c.name.as_str()))
+                    .unwrap_or_default(),
+                effect_text: app.ability_text.clone().into(),
                 condition_text: None,
                 is_public: true,
             });
@@ -2440,7 +2442,7 @@ pub fn build_snapshot(
         let score = card_db.get_card(lc_id).map(|c| c.get_score()).unwrap_or(0);
         let card_no = card_db
             .get_card(lc_id)
-            .map(|c| c.card_no.clone())
+            .map(|c| crate::types::ArcStr::from(c.card_no.as_str()))
             .unwrap_or_default();
         lives.push(crate::types::LiveCardResult {
             passed: false,
@@ -2489,8 +2491,10 @@ pub fn build_snapshot(
                     let card = card_db.get_card(mc.source_id);
                     tas.push(crate::types::TriggeredAbility {
                         source_card_id: mc.source_id,
-                        name: ab.source.clone(),
-                        card_name: card.map(|c| c.name.clone()).unwrap_or_default(),
+                        name: ab.source.to_string(),
+                        card_name: card
+                            .map(|c| crate::types::ArcStr::from(c.name.as_str()))
+                            .unwrap_or_default(),
                         effect_text: ab.ability_text.clone(),
                         condition_text: None,
                         is_public: true,
@@ -2501,8 +2505,8 @@ pub fn build_snapshot(
                 tas.push(crate::types::TriggeredAbility {
                     source_card_id: -1,
                     name: "Draw Effect".to_string(),
-                    card_name: String::new(),
-                    effect_text: "カードを引く効果が発動しました".to_string(),
+                    card_name: crate::types::ArcStr::default(),
+                    effect_text: "カードを引く効果が発動しました".to_string().into(),
                     condition_text: None,
                     is_public: true,
                 });
