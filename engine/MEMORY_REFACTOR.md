@@ -665,3 +665,126 @@ Add `#[cfg(feature = "profiling")]` timing instrumentation for cycle measurement
 6. **Feature-gate debug-only data.** `text`, `TriggerEvent`, verbose metadata → only in dev/debug builds.
 7. **Do the P0 work first.** Condition tagged enum is the biggest single win and validates the core strategy. Everything else depends on it.
 8. **Profile before and after.** Use `std::mem::size_of` and runtime heap profiling to verify gains.
+
+## Session 2: ArcStr + enum optimization results (July 2026)
+
+### Alloc reduction (test `mymai_tonight_blade_disappears`)
+
+| Metric | Before | After | Δ |
+|--------|--------|-------|---|
+| alloc calls | 15,053 | 1,700 | -89% |
+| total allocated | 326 KB | 148 KB | -55% |
+| 16-31B bucket | 6,530 | 270 | -96% |
+| 8-15B bucket | 4,112 | 337 | -92% |
+| 1-7B bucket | 3,635 | 287 | -92% |
+| test runtime | 1.36s | 0.61s | -55% |
+
+### Changes made
+
+**Enums (serde-renamed, wire-compatible):**
+- `Allocation.source_type`, `source_name`, `phase` — String → enum
+- `Adjustment.adjustment_type` — String → enum
+- `HeartSource.source_type`, `BladeSource.source_type` — String → SourceType enum
+
+**ArcStr conversions (cheap clone via refcount):**
+- `Allocation.target_name`, `CardNeed.name`
+- `LiveCardResult.card_no`, `MemberContribution.card_no`, `YellCardResult.card_no`
+- `AbilityBonus.source`, `AbilityBonus.ability_text`
+- `TriggeredAbility.card_name`, `TriggeredAbility.effect_text`
+- `Card.name`, `Card.card_no` (the source — makes all `.clone()` cheap)
+
+**Other:**
+- phases.rs: replaced HashMap `.clone()` with `&` references via scope blocks
+- Merged duplicate color_mods iteration in snapshot loop
+- `format!("{:?}", color)` → static string
+- Removed `op_str.clone()` via reordering
+- `.to_vec()` → `.as_ref()`
+- SmallVec: 5 `Vec<i16>` return types → `SmallVec<[i16; 8]>`
+
+### Remaining alloc breakdown
+
+After optimization, a typical test has ~1,700 allocs:
+- **~290 (1-7B):** small enums, copied booleans, `bool` arrays
+- **~337 (8-15B):** card_no copies, small strings (`"= 3"`, `"+1"`, etc.)
+- **~270 (16-31B):** format strings (`"Ability: CardName"`, `"Requirement = 3"`, rule log entries) — these are *format!()* calls that inherently allocate
+- **~258 (32-63B):** rule log entries, ability text copies
+- **~317 (64-127B):** serde JSON serialization buffers, choice struct internals
+- **~69 (128-255):** snapshot breakdown allocation vecs
+- **~102 (256-511):** HashMap internal growth, larger serde buffers
+- **~49 (512-1K):** triggered-ability storage, larger choices
+- **~6 (1K-2K):** large log entries
+- **~2 (2K-4K), ~2 (4K-8K), ~1 (8K-16K):** `get_pending_choice_json()` serde output
+
+**Key takeaway:** The alloc count is now dominated by *necessary* format!/serde operations — there's no single hot function left. 96% of bucket-2 allocs eliminated.
+
+### What took 610 ms?
+
+- **~290 ms — binary startup.** Cargo test binary load, Rust runtime init, test- framework enumeration. Fixed overhead; cannot eliminate without changing test architecture.
+- **~200 ms — `OnceLock` database init (`CardLoader::load()`).** Parses `cards.json` (7400 cards) and `abilities.json` via `serde_json::from_str()`. Runs once per process. The JSON comes from `include_str!` (compiled into the binary) so no I/O; this is pure CPU for serde deserialization + HashMap insertions.
+- **~120 ms — running 1820 tests.** Average ~66 μs per test. Actual logic is: card lookups, phase transitions, choice resolution, ability condition evaluation, and assertions. No single test is slower than ~4 ms (with `--nocapture` overhead; without it, all are <1 ms).
+
+**Opportunities:**
+1. **Faster DB format:** Replace `serde_json` with `bincode` or `rkyv` for card loading. Would cut 200 ms → ~20-40 ms. Tradeoff: build script needed to pre-compile binary card data.
+2. **Bump arena global allocator:** Eliminates allocator overhead entirely (pointer bump instead of system malloc). 6-10 lines of `#[global_allocator]` + ~90 lines of bump arena + fallback. Tradeoff below.
+
+### Bump arena tradeoffs
+
+**What it is:** A thread-local bump arena registered as the global allocator. Every `alloc` bumps a cursor; every `dealloc` is a no-op (memory freed only when the arena is reset at trigger boundaries).
+
+**Cost:** ~3 CPU instructions per alloc (a single `add` + two loads/stores). Vs system allocator ~30-150 ns per alloc.
+
+**Why it helps the 3DS:** The 3DS has 128 MB total RAM, slow CPU, and a naive `malloc` implementation that fragments badly. A bump arena:
+- Bypasses the system allocator entirely for hot-path allocs
+- Eliminates fragmentation (sequential bump, sequential free on reset)
+- Reduces allocator CPU overhead from measurable to trace-level
+
+**Why it DOESN'T help on desktop:** The 0.61s test runtime is dominated by 290 ms binary startup + 200 ms db init. Allocator overhead is ~0.04% of wall time (1700 allocs × ~100 ns ≈ 170 μs). A bump arena saves 165 μs out of 610 ms — invisible.
+
+**Risks:**
+
+| Risk | Mitigation |
+|------|------------|
+| Large/long-lived allocs pin the arena (card database, persistent HashMaps) | Bypass to system allocator for allocs above 4 KB or marked `#[global_allocator]` arena-specific |
+| Wrong reset point → arena OOM → panic | Arena reset is explicit; CI catches misuse. Arena is reset at trigger boundaries (after each ability effect resolves) |
+| HashMap/vec growth inside the arena never frees until reset — worst case eats the entire arena | Set arena capacity to ~1 MB; overflow → system allocator fallback |
+| Compatibility: crates using `realloc` or `dealloc` assumptions (serde_json, `std::collections`) | Override `realloc` → bump for grow, system for shrink. Override `dealloc` → no-op for arena-owned, system otherwise |
+
+**Implementation sketch:**
+
+```rust
+use std::alloc::{GlobalAlloc, Layout, System};
+
+const ARENA_SIZE: usize = 1 << 20;  // 1 MB
+
+struct BumpArena {
+    buf: UnsafeCell<[u8; ARENA_SIZE]>,
+    cursor: AtomicUsize,
+}
+
+unsafe impl GlobalAlloc for BumpArena {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        if layout.size() > 4096 {
+            return System.alloc(layout);  // large → system
+        }
+        let offset = self.cursor.fetch_add(layout.size(), Ordering::Relaxed);
+        if offset + layout.size() > ARENA_SIZE {
+            System.alloc(layout)  // arena full → system
+        } else {
+            self.buf.get().cast::<u8>().add(offset)
+        }
+    }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        if ptr < self.buf.get().cast() as *mut u8
+            || ptr >= self.buf.get().cast::<u8>().add(ARENA_SIZE)
+        {
+            System.dealloc(ptr, layout);  // not arena-owned → system
+        }
+        // arena-owned: no-op
+    }
+}
+
+#[global_allocator]
+static ALLOCATOR: BumpArena = BumpArena { ... };
+```
+
+**Verdict:** Worth implementing for the 3DS build. Not worth the complexity for desktop (0.61s runtime can't be meaningfully improved further).
