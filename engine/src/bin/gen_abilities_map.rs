@@ -30,79 +30,35 @@ fn main() {
     let data = CardLoader::load_abilities_from_str(&abilities_json)
         .unwrap_or_else(|e| panic!("Could not parse abilities.json: {}", e));
 
-    // Build deduplicated index: each unique_ability entry is stored once.
-    // Cards reference abilities by index into the abilities array.
+    // Use the shared pipeline to build a card_no → abilities map.
+    // This handles trigger_condition merging, EffectKind population,
+    // and draw-count fixing — no need to reimplement any of that here.
+    let ability_map = CardLoader::build_abilities_map(&data);
+
+    // Build deduplicated index: each ability is stored once in `abilities`,
+    // and `cards` maps card_no to indices into that vec.
     let mut abilities: Vec<Ability> = Vec::new();
     let mut cards: HashMap<String, Vec<usize>> = HashMap::new();
 
-    if let Some(unique_abilities) = data.get("unique_abilities").and_then(|v| v.as_array()) {
-        for ability_entry in unique_abilities {
-            // Apply the same trigger_condition merging as the engine does
-            let mut entry = ability_entry.clone();
-            if let Some(obj) = entry.as_object_mut() {
-                if let Some(tc_val) = obj.remove("trigger_condition") {
-                    match obj.get_mut("condition") {
-                        Some(cond_val) => {
-                            let mut merged = serde_json::Map::new();
-                            merged.insert("type".into(), "compound".into());
-                            merged.insert("operator".into(), "and".into());
-                            merged.insert(
-                                "conditions".into(),
-                                serde_json::Value::Array(vec![cond_val.take(), tc_val]),
-                            );
-                            obj.insert("condition".into(), serde_json::Value::Object(merged));
-                        }
-                        None => {
-                            obj.insert("condition".into(), tc_val);
-                        }
-                    }
+    for (card_no, card_abilities) in &ability_map {
+        for ability in card_abilities {
+            let idx = abilities.iter().position(|a| a == ability);
+            let idx = match idx {
+                Some(i) => i,
+                None => {
+                    let i = abilities.len();
+                    abilities.push(ability.clone());
+                    i
                 }
-            }
-
-            let mut ability: Ability = match serde_json::from_value(entry) {
-                Ok(a) => a,
-                Err(_) => continue,
             };
-
-            // Fix draw actions missing count
-            if let Some(ref mut effect) = ability.effect {
-                if let Some(ref actions) = effect.compound.actions.clone() {
-                    let fixed: Vec<_> = actions
-                        .iter()
-                        .map(|a| {
-                            let mut fa = a.clone();
-                            if (fa.action == "draw" || fa.action == "draw_card")
-                                && fa.count.is_none()
-                                && fa.dynamic_count_any().is_none()
-                            {
-                                fa.count = Some(1);
-                            }
-                            fa
-                        })
-                        .collect();
-                    effect.compound.actions = Some(fixed);
-                }
-            }
-
-            // Strip display-only text — not needed for gameplay
-            ability.full_text = String::new();
-            ability.triggerless_text = String::new();
-
-            // Store this ability once and record its index
-            let idx = abilities.len();
-            abilities.push(ability);
-
-            // Map each card to this ability's index
-            if let Some(card_list) = ability_entry.get("cards").and_then(|v| v.as_array()) {
-                for card_entry in card_list {
-                    if let Some(card_str) = card_entry.as_str() {
-                        if let Some(card_no) = card_str.split(" | ").next() {
-                            cards.entry(card_no.to_string()).or_default().push(idx);
-                        }
-                    }
-                }
-            }
+            cards.entry(card_no.clone()).or_default().push(idx);
         }
+    }
+
+    // Strip display-only text — not needed for gameplay
+    for ability in &mut abilities {
+        ability.full_text = String::new();
+        ability.triggerless_text = String::new();
     }
 
     let file = AbilitiesMapFile { abilities, cards };

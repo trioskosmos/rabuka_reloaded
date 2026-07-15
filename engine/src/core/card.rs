@@ -299,7 +299,8 @@ impl CardDatabase {
 
         for card in cards {
             if !db.card_no_to_id.contains_key(card.card_no.as_ref()) {
-                db.card_no_to_id.insert(card.card_no.to_string(), db.next_id);
+                db.card_no_to_id
+                    .insert(card.card_no.to_string(), db.next_id);
                 db.next_id += 1;
             }
             let card_id = db.card_no_to_id[card.card_no.as_ref()];
@@ -678,41 +679,72 @@ impl<'de> serde::Deserialize<'de> for AbilityCost {
             }
             fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> Result<AbilityCost, M::Error> {
                 let mut effect = AbilityEffect::default();
-                let mut extra = serde_json::Map::new();
+                let mut all_fields = serde_json::Map::new();
                 while let Some(key) = map.next_key::<String>()? {
+                    let value: serde_json::Value = map.next_value()?;
+                    all_fields.insert(key.clone(), value.clone());
                     match key.as_str() {
-                        "text" => effect.text = map.next_value()?,
-                        "type" | "action" | "cost_type" => {
-                            effect.action = map.next_value()?;
-                        }
-                        "source" | "zone" => {
-                            effect.source = map.next_value()?;
-                        }
-                        "destination" => effect.destination = map.next_value()?,
-                        "count" => effect.count = map.next_value()?,
-                        "target" => effect.target = map.next_value()?,
-                        "optional" => effect.optional = map.next_value()?,
-                        "max" => effect.max = map.next_value()?,
-                        "options" | "costs" => {
-                            let sub: Option<Vec<AbilityCost>> = map.next_value()?;
-                            if let Some(sub) = sub {
-                                effect.compound.actions = Some(
-                                    sub.into_iter()
-                                        .map(|c| Box::new(AbilityCost::into_effect(c)))
-                                        .collect(),
-                                );
+                        "text" => {
+                            if let Some(s) = value.as_str() {
+                                effect.text = s.to_string();
                             }
                         }
-                        _ => {
-                            let value: serde_json::Value = map.next_value()?;
-                            extra.insert(key.to_string(), value);
+                        "type" | "action" | "cost_type" => {
+                            if let Some(s) = value.as_str() {
+                                effect.action = s.to_string();
+                            }
                         }
+                        "source" | "zone" => {
+                            if let Some(s) = value.as_str() {
+                                effect.source = Some(s.into());
+                            }
+                        }
+                        "destination" => {
+                            if let Some(s) = value.as_str() {
+                                effect.destination = Some(s.into());
+                            }
+                        }
+                        "count" => {
+                            if let Some(n) = value.as_u64() {
+                                effect.count = Some(n as u32);
+                            }
+                        }
+                        "target" => {
+                            if let Some(s) = value.as_str() {
+                                effect.target = Some(s.into());
+                            }
+                        }
+                        "optional" => {
+                            if let Some(b) = value.as_bool() {
+                                effect.optional = Some(b);
+                            }
+                        }
+                        "max" => {
+                            if let Some(b) = value.as_bool() {
+                                effect.max = Some(b);
+                            }
+                        }
+                        "options" | "costs" => {
+                            if let Ok(sub) =
+                                serde_json::from_value::<Option<Vec<AbilityCost>>>(value)
+                            {
+                                if let Some(sub) = sub {
+                                    effect.compound.actions = Some(
+                                        sub.into_iter()
+                                            .map(|c| Box::new(AbilityCost::into_effect(c)))
+                                            .collect(),
+                                    );
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 }
-                if !extra.is_empty() {
-                    if let Some(kind) =
-                        build_kind_from_action(&effect.action, &serde_json::Value::Object(extra))
-                    {
+                if !all_fields.is_empty() {
+                    if let Some(kind) = AbilityEffect::kind_from_action(
+                        &effect.action,
+                        &serde_json::Value::Object(all_fields),
+                    ) {
                         effect.kind = Some(crate::core::pool::EkBox::new(kind));
                     }
                 }
@@ -1983,69 +2015,6 @@ pub enum EffectKind {
     },
 }
 
-pub fn build_kind_from_action(action: &str, effect_json: &serde_json::Value) -> Option<EffectKind> {
-    let a = action.to_lowercase();
-    let tag = match a.as_str() {
-        "move_cards"
-        | "discard_card"
-        | "discard_until_count"
-        | "place_energy_under_member"
-        | "re_yell"
-        | "shuffle"
-        | "play_baton_touch"
-        | "double_baton_touch" => "MoveCards",
-        "draw" | "draw_card" | "draw_until_count" => "DrawCards",
-        "select" | "select_cards" | "select_number" | "choose_target_player" => "SelectTarget",
-        "look"
-        | "look_at"
-        | "reveal"
-        | "reveal_effect"
-        | "reveal_per_group"
-        | "reveal_until_live_card"
-        | "reveal_until_chosen_card"
-        | "look_and_select" => "LookReveal",
-        "modify_score" => "ModifyScore",
-        "modify_required_hearts"
-        | "modify_required_hearts_global"
-        | "modify_required_hearts_success" => "ModifyHearts",
-        "gain_resource" | "pay_energy" => "GainResource",
-        "change_state" | "set_card_identity" | "set_card_identity_all_regions" => "ChangeState",
-        "gain_ability"
-        | "gain_ability_from_source"
-        | "invalidate_ability"
-        | "suppress_ability_trigger"
-        | "activate_ability" => "AbilityOp",
-        "sequential"
-        | "choice"
-        | "repeat_procedure"
-        | "conditional_alternative"
-        | "conditional_on_optional"
-        | "conditional_on_result" => "CompoundEffect",
-        "restriction"
-        | "activation_restriction"
-        | "modify_limit"
-        | "all_blade_timing"
-        | "reduce_live_card_set_limit" => "RestrictionOp",
-        "position_change" | "rotation" => "PositionOp",
-        "set_cost"
-        | "set_cost_to_use"
-        | "modify_cost"
-        | "activation_cost"
-        | "set_blade_type"
-        | "set_blade_count"
-        | "set_heart_type"
-        | "specify_heart_color"
-        | "choose_required_hearts"
-        | "perform_yell"
-        | "modify_yell_count" => "MiscOp",
-        "custom" | "do_nothing" | "action_by" | "opponent_action" => "CustomOp",
-        "" => "SelectTarget", // filter-only options inside select_action.options
-        _ => return None,
-    };
-    let tagged = serde_json::json!({tag: effect_json});
-    serde_json::from_value(tagged).ok()
-}
-
 /// Recursively re-populate EffectKind for a serialization-deserialized
 /// AbilityEffect that lost its `kind` (because kind is #[serde(skip)]).
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
@@ -2081,6 +2050,280 @@ pub struct AbilityEffect {
     pub max: Option<bool>,
     #[serde(default)]
     pub effect_steps: Option<Vec<Box<AbilityEffect>>>,
+}
+
+impl AbilityEffect {
+    /// Build EffectKind from an action string and the matching effect JSON.
+    pub(crate) fn kind_from_action(
+        action: &str,
+        effect_json: &serde_json::Value,
+    ) -> Option<EffectKind> {
+        let a = action.to_lowercase();
+        let tag = match a.as_str() {
+            "move_cards"
+            | "discard_card"
+            | "discard_until_count"
+            | "place_energy_under_member"
+            | "re_yell"
+            | "shuffle"
+            | "play_baton_touch"
+            | "double_baton_touch" => "MoveCards",
+            "draw" | "draw_card" | "draw_until_count" => "DrawCards",
+            "select" | "select_cards" | "select_number" | "choose_target_player" => "SelectTarget",
+            "look"
+            | "look_at"
+            | "reveal"
+            | "reveal_effect"
+            | "reveal_per_group"
+            | "reveal_until_live_card"
+            | "reveal_until_chosen_card"
+            | "look_and_select" => "LookReveal",
+            "modify_score" => "ModifyScore",
+            "modify_required_hearts"
+            | "modify_required_hearts_global"
+            | "modify_required_hearts_success" => "ModifyHearts",
+            "gain_resource" | "pay_energy" => "GainResource",
+            "change_state" | "set_card_identity" | "set_card_identity_all_regions" => "ChangeState",
+            "gain_ability"
+            | "gain_ability_from_source"
+            | "invalidate_ability"
+            | "suppress_ability_trigger"
+            | "activate_ability" => "AbilityOp",
+            "sequential"
+            | "choice"
+            | "repeat_procedure"
+            | "conditional_alternative"
+            | "conditional_on_optional"
+            | "conditional_on_result" => "CompoundEffect",
+            "restriction"
+            | "activation_restriction"
+            | "modify_limit"
+            | "all_blade_timing"
+            | "reduce_live_card_set_limit" => "RestrictionOp",
+            "position_change" | "rotation" => "PositionOp",
+            "set_cost"
+            | "set_cost_to_use"
+            | "modify_cost"
+            | "activation_cost"
+            | "set_blade_type"
+            | "set_blade_count"
+            | "set_heart_type"
+            | "specify_heart_color"
+            | "choose_required_hearts"
+            | "perform_yell"
+            | "modify_yell_count" => "MiscOp",
+            "custom" | "do_nothing" | "action_by" | "opponent_action" => "CustomOp",
+            "" => "SelectTarget",
+            _ => return None,
+        };
+        let tagged = serde_json::json!({tag: effect_json});
+        serde_json::from_value(tagged).ok()
+    }
+
+    /// Populate `kind` from this effect's JSON value. Recurses into sub-effects.
+    pub fn populate_from_json(&mut self, json_val: &serde_json::Value) {
+        if let Some(kind) = Self::kind_from_action(&self.action, json_val) {
+            self.kind = Some(crate::core::pool::EkBox::new(kind));
+        }
+        if let Some(ref mut sub) = self.compound.look_action {
+            if let Some(sub_json) = json_val.get("look_action") {
+                sub.populate_from_json(sub_json);
+            }
+        }
+        if let Some(ref mut sub) = self.compound.select_action {
+            if let Some(sub_json) = json_val.get("select_action") {
+                sub.populate_from_json(sub_json);
+            }
+        }
+        if let Some(ref mut sub) = self.compound.followup_action {
+            if let Some(sub_json) = json_val.get("followup_action") {
+                sub.populate_from_json(sub_json);
+            }
+        }
+        if let Some(ref mut sub) = self.compound.primary_effect {
+            if let Some(sub_json) = json_val.get("primary_effect") {
+                sub.populate_from_json(sub_json);
+            }
+        }
+        if let Some(ref mut sub) = self.compound.optional_action {
+            if let Some(sub_json) = json_val.get("optional_action") {
+                sub.populate_from_json(sub_json);
+            }
+        }
+        if let Some(ref mut sub) = self.compound.conditional_action {
+            if let Some(sub_json) = json_val.get("conditional_action") {
+                sub.populate_from_json(sub_json);
+            }
+        }
+        if let Some(ref mut actions) = self.compound.actions {
+            if let Some(json_actions) = json_val.get("actions").and_then(|a| a.as_array()) {
+                for (i, action) in actions.iter_mut().enumerate() {
+                    if i < json_actions.len() {
+                        action.populate_from_json(&json_actions[i]);
+                    }
+                }
+            }
+        }
+        if let Some(ref mut steps) = self.effect_steps {
+            if let Some(json_steps) = json_val.get("effect_steps").and_then(|a| a.as_array()) {
+                for (i, step) in steps.iter_mut().enumerate() {
+                    if i < json_steps.len() {
+                        step.populate_from_json(&json_steps[i]);
+                    }
+                }
+            }
+        }
+        if let Some(ref mut cond) = self.condition {
+            if let Some(cond_json) = json_val.get("condition") {
+                condition_populate_from_json(cond, cond_json);
+            }
+        }
+        match self.kind.as_deref_mut() {
+            Some(EffectKind::LookReveal {
+                ref mut options,
+                ref mut resource_on_select,
+                ..
+            }) => {
+                if let Some(ref mut opts) = options {
+                    if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
+                        for (i, opt) in opts.iter_mut().enumerate() {
+                            if i < json_opts.len() {
+                                opt.populate_from_json(&json_opts[i]);
+                            }
+                        }
+                    }
+                }
+                if let Some(ref mut ros) = resource_on_select {
+                    if let Some(ros_json) = json_val.get("resource_on_select") {
+                        ros.populate_from_json(ros_json);
+                    }
+                }
+            }
+            Some(EffectKind::CompoundEffect {
+                ref mut options,
+                ref mut alternative_effect,
+                ..
+            }) => {
+                if let Some(ref mut opts) = options {
+                    if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
+                        for (i, opt) in opts.iter_mut().enumerate() {
+                            if i < json_opts.len() {
+                                opt.populate_from_json(&json_opts[i]);
+                            }
+                        }
+                    }
+                }
+                if let Some(ref mut ae) = alternative_effect {
+                    if let Some(ae_json) = json_val.get("alternative_effect") {
+                        ae.populate_from_json(ae_json);
+                    }
+                }
+            }
+            Some(EffectKind::AbilityOp {
+                ref mut gained_effect,
+                ..
+            }) => {
+                if let Some(ref mut ge) = gained_effect {
+                    if let Some(ge_json) = json_val.get("gained_effect") {
+                        ge.populate_from_json(ge_json);
+                    }
+                }
+            }
+            Some(EffectKind::CustomOp {
+                ref mut opponent_action,
+                ..
+            }) => {
+                if let Some(ref mut oa) = opponent_action {
+                    if let Some(oa_json) = json_val.get("opponent_action") {
+                        oa.populate_from_json(oa_json);
+                    }
+                }
+            }
+            Some(EffectKind::MiscOp {
+                ref mut options, ..
+            }) => {
+                if let Some(ref mut opts) = options {
+                    if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
+                        for (i, opt) in opts.iter_mut().enumerate() {
+                            if i < json_opts.len() {
+                                opt.populate_from_json(&json_opts[i]);
+                            }
+                        }
+                    }
+                }
+            }
+            Some(EffectKind::SelectTarget {
+                ref mut options, ..
+            }) => {
+                if let Some(ref mut opts) = options {
+                    if let Some(json_opts) = json_val.get("options").and_then(|a| a.as_array()) {
+                        for (i, opt) in opts.iter_mut().enumerate() {
+                            if i < json_opts.len() {
+                                opt.populate_from_json(&json_opts[i]);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Populate EffectKind for sub-effects inside Condition variants.
+pub fn condition_populate_from_json(cond: &mut Condition, cond_json: &serde_json::Value) {
+    if let Condition::Choice {
+        ref mut options, ..
+    } = cond
+    {
+        if let Some(ref mut opts) = options {
+            if let Some(json_opts) = cond_json.get("options").and_then(|a| a.as_array()) {
+                for (i, opt) in opts.iter_mut().enumerate() {
+                    if i < json_opts.len() {
+                        opt.populate_from_json(&json_opts[i]);
+                    }
+                }
+            }
+        }
+    }
+    if let Condition::Complex { ref mut effect, .. } = cond {
+        if let Some(ref mut eff) = effect {
+            if let Some(eff_json) = cond_json.get("effect") {
+                eff.populate_from_json(eff_json);
+            }
+        }
+    }
+    if let Condition::Compound {
+        ref mut conditions,
+        ref mut operator,
+        ..
+    } = cond
+    {
+        if operator.is_none()
+            && cond_json.get("type").and_then(|t| t.as_str()) == Some("or_condition")
+        {
+            *operator = Some("or".into());
+        }
+        if let Some(ref mut conditions) = conditions {
+            if let Some(json_conditions) = cond_json.get("conditions").and_then(|a| a.as_array()) {
+                for (i, sub_cond) in conditions.iter_mut().enumerate() {
+                    if i < json_conditions.len() {
+                        condition_populate_from_json(sub_cond, &json_conditions[i]);
+                    }
+                }
+            }
+        }
+    }
+    if let Condition::Temporal {
+        ref mut condition, ..
+    } = cond
+    {
+        if let Some(ref mut sub_cond) = condition {
+            if let Some(sub_cond_json) = cond_json.get("condition") {
+                condition_populate_from_json(sub_cond, sub_cond_json);
+            }
+        }
+    }
 }
 
 // Macro-generated getters for EffectKind fields
