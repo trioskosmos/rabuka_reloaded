@@ -11,7 +11,6 @@ use rabuka_engine::game_setup::{self, ActionType};
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
-use rabuka_engine::zones::MemberArea;
 
 fn main() {
     let cards_path = std::path::Path::new("../cards/cards.json");
@@ -49,12 +48,7 @@ fn main() {
 
     let mut out = File::create(&out_path).unwrap();
     let mut total: u64 = 0;
-    let mut wins = 0u32;
-    let mut losses = 0u32;
-    let mut draws = 0u32;
-    let mut rng: u64 = 0xDEAD_BEEF;
-    let mut total_actions: u64 = 0;
-    let start = std::time::Instant::now();
+    let mut start = std::time::Instant::now();
 
     for game_idx in 0..num_games {
         let mut d1 = t1.clone();
@@ -74,9 +68,10 @@ fn main() {
         let mut gs = GameState::new(p1, p2, Arc::clone(&db));
         game_setup::setup_game(&mut gs);
 
-        let mut examples: Vec<Example> = Vec::new();
+        let mut pending: Option<Example> = None;
         let mut last_turn = 0u32;
         let mut stuck = 0u32;
+        let mut rng_state: u64 = (game_idx as u64) * 0x9E3779B97F4A7C15;
 
         for _ in 0..500 {
             TurnEngine::check_victory_condition(&mut gs);
@@ -116,19 +111,35 @@ fn main() {
             }
 
             let is_p1 = gs.active_player().id == "p1";
-            let is_main = gs.current_phase == Phase::Main;
+            let record = is_p1 && !matches!(gs.current_phase, Phase::RockPaperScissors);
 
-            rng ^= rng << 13;
-            rng ^= rng >> 7;
-            rng ^= rng << 17;
-            let idx = (rng as usize) % actions.len();
+            // Random action
+            rng_state ^= rng_state << 13;
+            rng_state ^= rng_state >> 7;
+            rng_state ^= rng_state << 17;
+            let idx = (rng_state as usize) % actions.len();
             let action = actions[idx].clone();
 
-            // Record example if it's P1's main phase action
-            if is_p1 && is_main {
-                examples.push(Example::capture(&gs, &action));
+            if record {
+                let ex = Example::capture(&gs, &action);
+
+                // Write previous example with shaped reward
+                if let Some(prev) = pending.take() {
+                    let success = gs.player1.success_live_card_zone.cards.len() as f32;
+                    let base_reward = success - prev.success_before as f32;
+                    let shaped = match prev.action_type_idx {
+                        14 => 0.1f32,
+                        15 => 0.05f32,
+                        _ => 0.0f32,
+                    };
+                    let next_state = State::capture(&gs);
+                    write_example(&mut out, &prev, base_reward + shaped, Some(&next_state));
+                    total += 1;
+                }
+                pending = Some(ex);
             }
 
+            // Execute action
             let params = action.parameters.clone();
             let _ = TurnEngine::execute_main_phase_action(
                 &mut gs,
@@ -141,61 +152,59 @@ fn main() {
                 params.as_ref().and_then(|p| p.use_baton_touch),
             );
             game_setup::settle_single_player_state(&mut gs);
-            total_actions += 1;
         }
 
-        let p1_success = gs.player1.success_live_card_zone.cards.len();
-        let p2_success = gs.player2.success_live_card_zone.cards.len();
-        let outcome: f32 = if p1_success > p2_success {
-            1.0
-        } else if p1_success < p2_success {
-            -1.0
-        } else {
-            0.0
-        };
-
-        if outcome > 0.0 {
-            wins += 1;
-        } else if outcome < 0.0 {
-            losses += 1;
-        } else {
-            draws += 1;
+        // Write final example
+        if let Some(ex) = pending.take() {
+            let success = gs.player1.success_live_card_zone.cards.len();
+            let state = State::capture(&gs);
+            let shaped = get_shaped_reward(ex.action_type_idx);
+            write_example(&mut out, &ex, success as f32 + shaped, Some(&state));
+            total += 1;
         }
 
-        // Write all examples for this game with the outcome
-        for ex in &examples {
-            write_example(&mut out, ex, outcome);
-        }
-        total += examples.len() as u64;
-
-        if game_idx % 10 == 0 || game_idx == num_games - 1 {
+        if game_idx % 50 == 0 {
             let elapsed = start.elapsed().as_secs_f64();
-            let aps = total_actions as f64 / elapsed.max(0.001);
             eprintln!(
-                "Game {}/{}: outcome={:+.0} ex={} total={} {:.0} act/s",
+                "Game {}/{}: {} examples ({:.0}/s)",
                 game_idx + 1,
                 num_games,
-                outcome,
-                examples.len(),
                 total,
-                aps
+                total as f64 / elapsed.max(0.001)
             );
         }
     }
-
-    eprintln!(
-        "\nDone: {} games, {} examples, wins={} losses={} draws={}",
-        num_games, total, wins, losses, draws
-    );
+    eprintln!("\nDone: {} games, {} examples", num_games, total);
 }
 
-/// Per-example: hand card IDs, stage card IDs, action card_id, action_type, outcome
-struct Example {
-    my_hand: Vec<i16>,
-    my_stage: [i16; 3],
+fn get_shaped_reward(action_type_idx: u8) -> f32 {
+    match action_type_idx {
+        14 => 0.1,  // PlayMemberToStage
+        15 => 0.05, // UseAbility
+        _ => 0.0,
+    }
+}
+
+struct State {
+    hand: Vec<i16>,
+    stage: [i16; 3],
     opp_stage: [i16; 3],
+}
+impl State {
+    fn capture(gs: &GameState) -> Self {
+        Self {
+            hand: gs.player1.hand.cards.to_vec(),
+            stage: gs.player1.stage.stage,
+            opp_stage: gs.player2.stage.stage,
+        }
+    }
+}
+
+struct Example {
+    state: State,
     action_card_id: i16,
     action_type_idx: u8,
+    success_before: u32,
 }
 
 impl Example {
@@ -205,7 +214,7 @@ impl Example {
             .as_ref()
             .and_then(|p| p.card_id)
             .unwrap_or(0);
-        let action_type_idx = match action.action_type {
+        let at = match action.action_type {
             ActionType::Pass => 0,
             ActionType::RockChoice => 1,
             ActionType::PaperChoice => 2,
@@ -233,33 +242,38 @@ impl Example {
             ActionType::PassRemaining => 24,
         };
         Self {
-            my_hand: gs.player1.hand.cards.to_vec(),
-            my_stage: gs.player1.stage.stage,
-            opp_stage: gs.player2.stage.stage,
+            state: State::capture(gs),
             action_card_id,
-            action_type_idx,
+            action_type_idx: at,
+            success_before: gs.player1.success_live_card_zone.cards.len() as u32,
         }
     }
 }
 
-fn write_example(f: &mut File, ex: &Example, outcome: f32) {
-    // hand: u8 count + i16 cards
-    let hand_len = ex.my_hand.len() as u8;
-    let _ = f.write_all(&[hand_len]);
-    for &c in &ex.my_hand {
+fn write_example(f: &mut File, ex: &Example, reward: f32, next_state: Option<&State>) {
+    let s = &ex.state;
+    let _ = f.write_all(&[s.hand.len() as u8]);
+    for &c in &s.hand {
         let _ = f.write_all(&c.to_le_bytes());
     }
-    // stage: 3 x i16
-    for &c in &ex.my_stage {
+    for &c in &s.stage {
         let _ = f.write_all(&c.to_le_bytes());
     }
-    // opp_stage: 3 x i16
-    for &c in &ex.opp_stage {
+    for &c in &s.opp_stage {
         let _ = f.write_all(&c.to_le_bytes());
     }
-    // action: i16 card_id + u8 action_type
     let _ = f.write_all(&ex.action_card_id.to_le_bytes());
     let _ = f.write_all(&[ex.action_type_idx]);
-    // outcome: f32
-    let _ = f.write_all(&outcome.to_le_bytes());
+    let _ = f.write_all(&reward.to_le_bytes());
+    let ns = next_state.unwrap_or(s);
+    let _ = f.write_all(&[ns.hand.len() as u8]);
+    for &c in &ns.hand {
+        let _ = f.write_all(&c.to_le_bytes());
+    }
+    for &c in &ns.stage {
+        let _ = f.write_all(&c.to_le_bytes());
+    }
+    for &c in &ns.opp_stage {
+        let _ = f.write_all(&c.to_le_bytes());
+    }
 }

@@ -66,10 +66,10 @@ class PolicyValueNet(nn.Module):
         return self.value_head(h).squeeze(-1).tanh()
 
 
-def load_data(path):
+def load_data(path, max_examples=200000):
     data = Path(path).read_bytes()
     pos, examples = 0, []
-    while pos < len(data):
+    while pos < len(data) and len(examples) < max_examples:
         hand_len = data[pos]
         pos += 1
         hand = list(struct.unpack(f"<{hand_len}h", data[pos : pos + hand_len * 2]))
@@ -137,7 +137,7 @@ def main():
 
     split = int(len(examples) * 0.9)
     train, val = examples[:split], examples[split:]
-    batch_size = 512
+    batch_size = 2048
 
     for epoch in range(epochs):
         model.train()
