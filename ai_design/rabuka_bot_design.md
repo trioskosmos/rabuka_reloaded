@@ -1059,6 +1059,162 @@ Next: Switch to policy network. Train on (state → action) with cross-entropy.
 
 After studying the actual fade deck cards and tracing through the live phase engine code, here is what the bot actually needs to learn.
 
+### 16.0 Code Path Verification
+
+**All binaries (bot_demo, bot_data_gen, profile_target, web server) use identical core game logic:**
+- `game_setup::setup_game()` — same
+- `TurnEngine::execute_main_phase_action()` — same function, same parameters
+- `game_setup::settle_single_player_state()` — same (profile_target omits it but is functionally equivalent via manual advance)
+- `game_setup::generate_possible_actions()` — same
+
+The web server adds PVP plumbing (turn validation, display filtering, SSE) but these don't affect game state mutation. **Training data is safe — same engine, same rules.**
+
+---
+
+## 16A. The Fade Deck — Every Card Examined
+
+### Members (15 unique cards, 42 total in deck)
+
+#### Cost 2 Members (early game — the bread and butter)
+
+**嵐 千砂都 (Arashi Chisato)** — 2x
+- Cost 2, Blade **2**, Heart06:1, BladeHeart: b_heart02:1
+- **No ability.** Pure stat stick. Best blade/cost ratio in the deck at 1.0.
+- Role: Play this first every game if available. Blade 2 for 2 energy is unbeatable early.
+
+**米女メイ (Yoneme Mei)** — 4x
+- Cost 2, Blade 1, Heart02:1, BladeHeart: b_heart02:1
+- Ability: Activate — put this from stage to waitroom: add 1 live card from waitroom to hand
+- Role: Sac this to recycle a live card that failed. Heart02 provider.
+
+**ウィーン・マルガレーテ (Wien Margarete)** — 3x
+- Cost 2, Blade 1, Heart06:1, BladeHeart: b_heart06:1
+- Ability: Activate — put this from stage to waitroom: add 1 member card from waitroom to hand
+- Role: Sac this to recycle a member from waitroom. Heart06 provider.
+
+**若菜四季 (Wakana Shiki)** — 4x
+- Cost 2, Blade 1, Heart03:1, BladeHeart: b_heart03:1
+- Ability: Activate — put this from stage to waitroom: add 1 member card from waitroom to hand
+- Role: Same as Margarete but Heart03. Best heart color for this deck.
+
+**葉月 恋 (Hazuki Ren)** — 4x
+- Cost 2, Blade 1, Heart03:1, BladeHeart: b_heart03:1
+- Ability: On play — may discard 1 from hand: look at top 5 of deck, add 1 Liella! card, rest to waitroom
+- Role: Card selection/draw. Discarding 1 to dig 5 deep is powerful if you need a specific piece.
+
+**唐 可可 (Tang Keke) [SP-bp2-002-P]** — 4x
+- Cost 2, Blade 1, Heart06:1, BladeHeart: b_heart06:1
+- Ability: On play — look at top 3 of deck, add 1 cost≥11 card, rest to waitroom
+- Role: Searches big members (cost 11+ Kanon, cost 13 Kinako, cost 22 Sumire). Essential for finding your win condition.
+
+**唐 可可 (Tang Keke) [SP-bp4-002-R]** — 4x
+- Cost 2, Blade 1, Heart06:1, BladeHeart: b_heart06:1
+- Ability: On play — may wait this: look at top 4, add 1 Liella! live card with total need_heart≥8, rest to waitroom
+- Role: Searches live cards. "wait this" means the member goes to waitroom in wait orientation (can't use for yell that turn).
+
+**鬼塚冬毬 (Onizuka Touma)** — 2x
+- Cost 2, Blade 1, Heart03:1, BladeHeart: b_heart03:1
+- Ability: Activate — put this from stage to waitroom: add 1 live card from waitroom to hand
+- Role: Same as Mei (recycle live cards from waitroom) but Heart03.
+
+#### Cost 4 Member
+
+**澁谷かのん (Shibuya Kanon) [SP-bp4-001-P]** — 3x
+- Cost 4, Blade 2, Heart03:1, BladeHeart: b_heart03:1
+- Ability: On play — if ALL stage members are Liella! AND energy≥7: charge 1 energy from energy deck
+- Role: Energy ramp in mid-game. Blade 2 is solid. Needs 7+ energy to trigger, so not early.
+
+#### Cost 7 Members (the "big utility" slot)
+
+**矢澤にこ (Yazawa Niko)** — 3x
+- Cost 7, **Blade: -** (no blade!), Heart06:2
+- Ability: On play — both players each put 1 cost≤2 member from waitroom to empty stage slot as WAIT
+- Role: This is NOT a blade card. No blade means it contributes 0 to yell. But it:
+  - Fills both players' empty stage slots (can disrupt opponent's stage setup)
+  - Provides 2 Heart06 (good for live cards needing purple)
+  - The "wait" state means those members can't yell but CAN be sacced for activate abilities
+  - High cost makes it unplayable early
+
+**エマ・ヴェルデ (Emma Verde)** — 2x
+- Cost 7, Blade 1, Heart04:1
+- Ability: On play — activate 2 energy cards
+- Role: Energy ramp. The only Heart04 source in the deck (green). Blade 1 is terrible for cost 7.
+
+#### Cost 11 Member
+
+**澁谷かのん (Shibuya Kanon) [SP-pb1-001-R]** — 4x
+- Cost 11, Blade 4, Heart02:4+03:1+06:1, BladeHeart: b_heart02:1
+- Abilities:
+  - LiveStart: unless you pay EE, put 2 from hand to waitroom
+  - LiveSuccess: may pay EEEEEE: live score +1
+- Role: Blade 4 for cost 11 is decent. Massive Heart02:4 (the deck's main red heart source). The LiveSuccess score bonus is clutch for close games. The LiveStart cost (discarding 2 unless you pay 2 energy) is a real cost.
+
+#### Cost 13 Members (the late-game finishers)
+
+**鬼塚夏美 (Onizuka Natsumi)** — 3x
+- Cost 13, Blade **1**, Heart02:1+03:3+06:2, BladeHeart: b_heart03:1
+- Abilities:
+  - LiveStart: gain blade = (hand cards / 2) until live ends
+  - LiveSuccess: draw 2, put 1 from hand to waitroom
+- Role: Blade 1 on the card is misleading — the LiveStart ability adds blade from hand size. With 6 cards in hand, that's +3 blade = 4 total during live. Massive hearts: 03:3+06:2+02:1 = 6 hearts just from base. LiveSuccess draws 2 cards for momentum.
+
+**桜小路きな子 (Sakurakoji Kinako)** — 4x
+- Cost 13, Blade **6**, Heart02:1+03:2+06:1, BladeHeart: b_heart03:1
+- Ability: LiveSuccess — if 3+ different-named Liella! members among yell cards, add 1 Liella! live card from yell to hand
+- Role: Blade 6 for cost 13. The deck's primary beatstick. The LiveSuccess recycles live cards from yell — if you drew 3+ unique Liella! members during yell, you get a free live card to hand. This fuels the scoring engine.
+
+#### Cost 22 Member (the nuclear option)
+
+**平安名すみれ (Heanna Sumire)** — 2x
+- Cost 22, Blade 6, Heart02:3+03:3+06:2
+- Abilities:
+  - **Constant: may baton touch with 2 members when playing this card** (not just 1!)
+  - On play (center): if baton touched from 2 Liella! members, draw 2, then play 1 cost≤4 Liella! member from waitroom to empty stage slot
+- Role: Double baton touch. When you play this to center, you can replace BOTH side members simultaneously. If you baton touched from 2 Liella! members, you draw 2 AND play a free cost≤4 member from waitroom. This is the "swing turn" — replacing 2 weak members with this 8-heart monster while deploying another member for free.
+- Key interaction: baton touch sends the old members to waitroom, where they can be recycled by activate abilities (Shiki, Margarete, Touma, Mei all sac from stage to waitroom to get cards back).
+
+### Live Cards (5 unique, 12 total in deck)
+
+**未来予報ハレルヤ！ (Mirai Yoho Hallelujah!)** — 3x
+- Score 3, BladeHeart: b_all:1 (wildcard blade heart)
+- Need: 02:2, 03:2, 06:2, 0:2 (total 8 hearts)
+- LiveStart: if 5+ different-named Liella! in stage+waitroom, cost becomes 02:2+03:2+06:2 (drops the wildcard requirement)
+- Role: Easiest live card to score. Score 3 is low but it's consistent. The 5-member reduction makes it very achievable mid-game. BladeHeart b_all means the yell cards add wildcard hearts.
+
+**ビタミンSUMMER！ (Vitamin SUMMER!)** — 4x
+- Score 5, BladeHeart: b_heart03:1, special: draw:1
+- Need: 02:1, 03:4, 06:1, 0:6 (total 12 hearts)
+- LiveSuccess: if hand > opponent's hand, score +1
+- Role: High score (5-6 with bonus). The draw icon means 1 extra card to hand during yell. Heart03:4 requirement is heavy — needs lots of yellow hearts. The wildcard need (0:6) is also very high.
+
+**ノンフィクション!! (Nonfiction!!)** — 3x
+- Score 6, BladeHeart: b_heart03:1
+- Need: 02:3, 03:5, 0:7 (total 15 hearts)
+- LiveStart: if center member cost > opponent center member, score +1
+- LiveStart: if left-side Liella! member has ≥3 heart02, that member gains +2 blade until live ends
+- Role: Highest base score (6-7 with bonus). Extremely heavy requirements — 03:5 is nearly impossible without Kinako-level hearts. The +2 blade on a Heart02-heavy left member (like Cost11 Kanon with Heart02:4) is a significant bonus.
+
+**追いかける夢の先で (Oikakeru Yume no Saki de)** — 1x
+- Score 4, BladeHeart: b_heart06:1
+- Need: 03:3, 06:3, 0:4 (total 10 hearts)
+- No ability
+- Role: Simple mid-tier live card. Score 4, no complications. Needs balanced Heart03/Heart06.
+
+**Jump Into the New World** — 1x
+- Score 4, BladeHeart: b_heart06:1
+- Need: 02:3, 06:3, 0:4 (total 10 hearts)
+- No ability
+- Role: Mirror of the above but needs Heart02/Heart06 instead of Heart03/Heart06.
+
+### What I Still Don't Know
+
+I have read every card's stats and ability text, but I have not:
+- Traced through an actual game to see how the heart allocation algorithm handles a real yell
+- Played the web UI to see the turn flow visually
+- Verified exactly how baton touch interacts with the double-touch on Sumire
+- Tested whether the live card cost reduction (5+ Liella! members) actually works as I understand it
+- Seen how the yell draw + blade_heart allocation plays out in practice
+
 ### 16.1 The Scoring Pipeline
 
 ```
