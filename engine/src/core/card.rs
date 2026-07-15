@@ -5386,6 +5386,17 @@ impl AbilityEffect {
     }
 }
 
+macro_rules! impl_deref_str {
+    ($t:ty) => {
+        impl std::ops::Deref for $t {
+            type Target = str;
+            fn deref(&self) -> &str {
+                self.as_str()
+            }
+        }
+    };
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum PositionInfo {
@@ -5462,12 +5473,7 @@ impl CardState {
     }
 }
 
-impl std::ops::Deref for CardState {
-    type Target = str;
-    fn deref(&self) -> &str {
-        self.as_str()
-    }
-}
+impl_deref_str!(CardState);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ComparisonTarget {
@@ -5486,12 +5492,7 @@ impl ComparisonTarget {
     }
 }
 
-impl std::ops::Deref for ComparisonTarget {
-    type Target = str;
-    fn deref(&self) -> &str {
-        self.as_str()
-    }
-}
+impl_deref_str!(ComparisonTarget);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CardProperty {
@@ -5513,12 +5514,7 @@ impl CardProperty {
     }
 }
 
-impl std::ops::Deref for CardProperty {
-    type Target = str;
-    fn deref(&self) -> &str {
-        self.as_str()
-    }
-}
+impl_deref_str!(CardProperty);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PlacementOrder {
@@ -5534,12 +5530,7 @@ impl PlacementOrder {
     }
 }
 
-impl std::ops::Deref for PlacementOrder {
-    type Target = str;
-    fn deref(&self) -> &str {
-        self.as_str()
-    }
-}
+impl_deref_str!(PlacementOrder);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DistinctType {
@@ -5561,12 +5552,7 @@ impl DistinctType {
     }
 }
 
-impl std::ops::Deref for DistinctType {
-    type Target = str;
-    fn deref(&self) -> &str {
-        self.as_str()
-    }
-}
+impl_deref_str!(DistinctType);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Operator {
@@ -5594,12 +5580,7 @@ impl Operator {
     }
 }
 
-impl std::ops::Deref for Operator {
-    type Target = str;
-    fn deref(&self) -> &str {
-        self.as_str()
-    }
-}
+impl_deref_str!(Operator);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ComparisonType {
@@ -5624,12 +5605,7 @@ impl ComparisonType {
     }
 }
 
-impl std::ops::Deref for ComparisonType {
-    type Target = str;
-    fn deref(&self) -> &str {
-        self.as_str()
-    }
-}
+impl_deref_str!(ComparisonType);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AbilityFilter {
@@ -5654,12 +5630,7 @@ impl AbilityFilter {
     }
 }
 
-impl std::ops::Deref for AbilityFilter {
-    type Target = str;
-    fn deref(&self) -> &str {
-        self.as_str()
-    }
-}
+impl_deref_str!(AbilityFilter);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConditionTarget {
@@ -5684,12 +5655,7 @@ impl ConditionTarget {
     }
 }
 
-impl std::ops::Deref for ConditionTarget {
-    type Target = str;
-    fn deref(&self) -> &str {
-        self.as_str()
-    }
-}
+impl_deref_str!(ConditionTarget);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConditionCardType {
@@ -5711,12 +5677,7 @@ impl ConditionCardType {
     }
 }
 
-impl std::ops::Deref for ConditionCardType {
-    type Target = str;
-    fn deref(&self) -> &str {
-        self.as_str()
-    }
-}
+impl_deref_str!(ConditionCardType);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Location {
@@ -5759,12 +5720,7 @@ impl Location {
     }
 }
 
-impl std::ops::Deref for Location {
-    type Target = str;
-    fn deref(&self) -> &str {
-        self.as_str()
-    }
-}
+impl_deref_str!(Location);
 
 /// The distinct Condition type as a serde internally-tagged enum.
 /// The Python parser already emits `"type": "card_count_condition"` etc.
