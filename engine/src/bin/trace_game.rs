@@ -53,7 +53,7 @@ fn main() {
     let mut gs = GameState::new(p1, p2, Arc::clone(&card_database));
     game_setup::setup_game(&mut gs);
 
-    let mut printed_turns = std::collections::HashSet::new();
+    let mut printed_turns = std::collections::HashSet::<u32>::new();
     for _t in 0..500 {
         TurnEngine::check_victory_condition(&mut gs);
         if gs.game_result != GameResult::Ongoing {

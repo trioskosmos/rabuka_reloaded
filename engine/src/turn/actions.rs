@@ -3,6 +3,8 @@ use crate::ability::types::ChoiceRoute;
 use crate::card::CardDatabase;
 use crate::game_state::GameState;
 use crate::game_state::Phase;
+#[cfg(feature = "psp")]
+use alloc::{string::{String, ToString}, vec::Vec};
 #[cfg(feature = "3ds")]
 extern "C" {
     fn _3ds_tdbg(msg: *const u8);
@@ -30,6 +32,7 @@ impl super::TurnEngine {
         stage_area: Option<crate::zones::MemberArea>,
         use_baton_touch: Option<bool>,
     ) -> Result<(), String> {
+        #[cfg(not(feature = "psp"))]
         let _t = crate::timer::Timer::start("execute_main_phase_action");
         // UseAbility must check activation legality independently — never
         // route through resume_with_choice, even when another ability's choice
@@ -183,7 +186,7 @@ impl super::TurnEngine {
 
         struct AbilityActivation {
             idx: usize,
-            ability: std::sync::Arc<crate::card::Ability>,
+            ability: crate::Arc<crate::card::Ability>,
             loc: Zone,
         }
 
@@ -287,7 +290,7 @@ impl super::TurnEngine {
                 if player.stage.stage.iter().any(|&id| id == card_id) {
                     ability_to_activate = Some(AbilityActivation {
                         idx: 10000 + gained.0,
-                        ability: std::sync::Arc::new(gained.1),
+                        ability: crate::Arc::new(gained.1),
                         loc: Zone::Stage,
                     });
                 }
@@ -863,7 +866,9 @@ impl super::TurnEngine {
                 );
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
-                let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string().into());
+                let player_id = entry_player_id
+                    .clone()
+                    .unwrap_or_else(|| "p1".to_string().into());
                 game_state.just_completed_ability_key = just_completed_key.clone();
                 game_state.process_pending_auto_abilities(&player_id);
                 game_state.just_completed_ability_key = None;
@@ -886,7 +891,9 @@ impl super::TurnEngine {
                 } else {
                     // Effect completed without sub-choice — process any newly
                     // enqueued watcher abilities (e.g. each_time triggers).
-                    let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string().into());
+                    let player_id = entry_player_id
+                        .clone()
+                        .unwrap_or_else(|| "p1".to_string().into());
                     game_state.just_completed_ability_key = just_completed_key.clone();
                     game_state.process_pending_auto_abilities(&player_id);
                     game_state.just_completed_ability_key = None;
@@ -909,7 +916,9 @@ impl super::TurnEngine {
                 }
                 // Post-resolution each_time for LiveStart/LiveSuccess
                 if cost_entry_opt_result != Some(false) {
-                    let pid = entry_player_id.clone().unwrap_or_else(|| "p1".to_string().into());
+                    let pid = entry_player_id
+                        .clone()
+                        .unwrap_or_else(|| "p1".to_string().into());
                     if let Some(crate::game_state::AbilityTrigger::LiveStart) = cost_entry_trigger {
                         if let Some(cid) = cost_entry_card_id {
                             game_state.trigger_each_time_for_member(
@@ -943,7 +952,9 @@ impl super::TurnEngine {
                 // Must run AFTER complete_current() to match process_current_ability ordering.
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
-                let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string().into());
+                let player_id = entry_player_id
+                    .clone()
+                    .unwrap_or_else(|| "p1".to_string().into());
                 if game_state.recently_moved_cards.is_some()
                     || game_state.last_energy_placed_by_effect()
                     || !game_state.recently_appeared_cards.is_empty()
@@ -971,7 +982,9 @@ impl super::TurnEngine {
             } else {
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
-                let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string().into());
+                let player_id = entry_player_id
+                    .clone()
+                    .unwrap_or_else(|| "p1".to_string().into());
                 if game_state.recently_moved_cards.is_some()
                     || game_state.last_energy_placed_by_effect()
                     || !game_state.recently_appeared_cards.is_empty()
@@ -1002,6 +1015,7 @@ impl super::TurnEngine {
     }
 
     pub fn check_timing(game_state: &mut GameState) {
+        #[cfg(not(feature = "psp"))]
         let _t = crate::timer::Timer::start("check_timing");
         tdbg!("CHECK_TIMING:0");
         game_state.player1.refresh();
@@ -1013,7 +1027,7 @@ impl super::TurnEngine {
         let p2_needs_refresh = game_state.player2.main_deck.cards.is_empty()
             && !game_state.player2.waitroom.cards.is_empty();
         if p1_needs_refresh {
-            let waitroom = std::mem::take(&mut game_state.player1.waitroom.cards);
+            let waitroom = core::mem::take(&mut game_state.player1.waitroom.cards);
             game_state
                 .player1
                 .main_deck
@@ -1023,7 +1037,7 @@ impl super::TurnEngine {
             tdbg!("CHECK_TIMING:1b p1 refresh shuffled");
         }
         if p2_needs_refresh {
-            let waitroom = std::mem::take(&mut game_state.player2.waitroom.cards);
+            let waitroom = core::mem::take(&mut game_state.player2.waitroom.cards);
             game_state
                 .player2
                 .main_deck
@@ -1192,7 +1206,7 @@ impl super::TurnEngine {
         for area_idx in 0..3 {
             let top = player.stage.stage[area_idx];
             if top == -1 {
-                let under = std::mem::take(&mut player.stage.under_cards[area_idx]);
+                let under = core::mem::take(&mut player.stage.under_cards[area_idx]);
                 for cid in under {
                     if card_db.get_card(cid).is_some_and(|c| c.is_energy()) {
                         player.energy_deck.cards.push(cid);
@@ -1205,7 +1219,7 @@ impl super::TurnEngine {
     }
 
     fn check_invalid_resolution_zone(game_state: &mut GameState) {
-        let cards = std::mem::take(&mut game_state.resolution_zone.cards);
+        let cards = core::mem::take(&mut game_state.resolution_zone.cards);
         if cards.is_empty() {
             return;
         }

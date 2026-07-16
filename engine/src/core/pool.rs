@@ -1,10 +1,12 @@
-use std::cell::UnsafeCell;
+use core::cell::UnsafeCell;
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use super::card::{Condition, EffectKind};
+#[cfg(feature = "psp")]
+use alloc::{string::{String, ToString}, vec::Vec};
 
 // ── Fixed-size object pool ─────────────────────────────────────────────
 // Pre-allocates N slots of size_of::<T>(). alloc() and free_idx() are O(1)

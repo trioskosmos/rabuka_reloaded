@@ -38,7 +38,7 @@ fn main() {
     // Build deduplicated index: each ability is stored once in `abilities`,
     // and `cards` maps card_no to indices into that vec.
     let mut abilities: Vec<Ability> = Vec::new();
-    let mut cards: HashMap<String, Vec<usize>> = HashMap::new();
+    let mut cards: HashMap<String, Vec<usize>> = HashMap::default();
 
     for (card_no, card_abilities) in &ability_map {
         for ability in card_abilities {

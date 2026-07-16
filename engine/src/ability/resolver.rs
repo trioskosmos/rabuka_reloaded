@@ -1,31 +1,29 @@
-#[cfg(not(feature = "psp"))]
 use super::debug::AbDebug;
 #[cfg(not(feature = "psp"))]
 use super::log::{drain_verdicts, push_verdict, AbilityLogItem};
 
 // PSP stubs — no debug logging on console
 #[cfg(feature = "psp")]
-use alloc::vec::Vec;
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
 #[cfg(feature = "psp")]
-#[derive(Clone)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct AbilityLogItem;
 #[cfg(feature = "psp")]
+#[allow(dead_code)]
 fn drain_verdicts() -> Vec<AbilityLogItem> {
     Vec::new()
 }
 #[cfg(feature = "psp")]
+#[allow(dead_code)]
 fn push_verdict(_item: AbilityLogItem) {}
 #[cfg(feature = "psp")]
+#[allow(dead_code)]
 fn drain_verdicts_since(_snapshot: usize) -> Vec<AbilityLogItem> {
     Vec::new()
-}
-#[cfg(feature = "psp")]
-struct AbDebug;
-#[cfg(feature = "psp")]
-impl AbDebug {
-    fn new() -> Self {
-        AbDebug
-    }
 }
 
 use super::types::{
@@ -216,13 +214,18 @@ impl AbilityResolver {
                         merged_cond.set_activation_position((*act_pos).to_string());
                     }
                 }
+                #[cfg(not(feature = "psp"))]
                 let snapshot = crate::ability::log::buffer_len();
                 let result = ctx.evaluate_condition(&merged_cond);
                 // On success: drain pre-check verdicts (condition will be re-evaluated
                 // during effect execution, avoiding duplicates).
                 // On failure: keep verdicts (they're the only info for the failure path).
-                if result {
-                    let _pre_check_verdicts = crate::ability::log::drain_verdicts_since(snapshot);
+                #[cfg(not(feature = "psp"))]
+                {
+                    if result {
+                        let _pre_check_verdicts =
+                            crate::ability::log::drain_verdicts_since(snapshot);
+                    }
                 }
                 return result;
             }
@@ -282,13 +285,17 @@ impl AbilityResolver {
                 let gns_binding = effect.group_names_any();
                 let gns = gns_binding.as_ref();
                 merge_group_names(&mut cond, gns.map(|v| &**v));
+                #[cfg(not(feature = "psp"))]
                 let cond_snapshot = crate::ability::log::buffer_len();
                 let passed = ctx.evaluate_condition(&cond);
                 // On success: drain (will be re-evaluated during execution).
                 // On failure: keep verdicts.
-                if passed {
-                    let _pre_check_verdicts2 =
-                        crate::ability::log::drain_verdicts_since(cond_snapshot);
+                #[cfg(not(feature = "psp"))]
+                {
+                    if passed {
+                        let _pre_check_verdicts2 =
+                            crate::ability::log::drain_verdicts_since(cond_snapshot);
+                    }
                 }
                 // Cache the result if the condition asks for it
                 if condition.get_cache().unwrap_or(false) {
@@ -419,7 +426,7 @@ impl AbilityResolver {
         gs.ability_queue.snapshot_requested = true;
         if let Some(ref choice) = self.pending_choice {
             // Always-on debug: log every pending choice (ABILITY_DEBUG is set true in tests)
-            if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
                 match choice {
                     crate::ability::types::Choice::SelectCard {
                         zone,
@@ -587,7 +594,7 @@ impl AbilityResolver {
             result
         );
         gs.rule_log.push(log_text.clone());
-        if !crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if !crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             return;
         }
         gs.structured_log.push(LogEntry {
@@ -663,6 +670,7 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         let mut dbg = AbDebug::new();
         // Clear structured verdict buffer from any previous ability
+        #[cfg(not(feature = "psp"))]
         crate::ability::log::clear_verdicts();
 
         // Card info for debug (owned Strings to avoid borrowing gs across mutation)
@@ -745,6 +753,7 @@ impl AbilityResolver {
                     return Err(e);
                 }
                 dbg.p("RESULT", "cost paid ✓");
+                #[cfg(not(feature = "psp"))]
                 let cost_desc = format!(
                     "{}: {}→{} {}",
                     cost.action,
@@ -752,6 +761,7 @@ impl AbilityResolver {
                     cost.destination.as_deref().unwrap_or("?"),
                     cost.count.unwrap_or(cost.energy_count_any().unwrap_or(1))
                 );
+                #[cfg(not(feature = "psp"))]
                 push_verdict(AbilityLogItem::Cost {
                     text: cost.text.clone(),
                     expectation: cost_desc,
@@ -1091,7 +1101,7 @@ impl AbilityResolver {
                     // Count distinct group names on self's stage
                     let player = gs.resolve_target_player("self");
                     let card_db = &gs.card_database;
-                    let mut groups = HashSet::new();
+                    let mut groups = HashSet::<String>::default();
                     for &cid in &player.stage.stage {
                         if cid == -1 {
                             continue;

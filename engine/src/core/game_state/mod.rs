@@ -7,6 +7,11 @@ use crate::player::Player;
 use crate::zones::{MemberArea, ResolutionZone};
 use crate::Arc;
 use crate::{HashMap, HashSet};
+#[cfg(feature = "psp")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 pub use crate::types::{
     AbilityApplication, AbilityBonus, AbilityTrigger, Adjustment, Allocation, BladeSource,
@@ -236,30 +241,30 @@ impl GameState {
             max_state_history_size: DEFAULT_HISTORY_SIZE,
             rule_log: Vec::new(),
             structured_log: Vec::new(),
-            turn1_abilities_played: HashSet::new(),
-            turn2_abilities_played: HashMap::new(),
-            live_owned_hearts: HashMap::new(),
+            turn1_abilities_played: HashSet::default(),
+            turn2_abilities_played: HashMap::default(),
+            live_owned_hearts: HashMap::default(),
             temporary_effects: Vec::new(),
             prohibition_effects: Vec::new(),
             delayed_prohibition_effects: Vec::new(),
-            non_stackable_effects: HashSet::new(),
+            non_stackable_effects: HashSet::default(),
             cannot_activate_members: Vec::new(),
-            constant_cannot_activate_members: HashSet::new(),
+            constant_cannot_activate_members: HashSet::default(),
             cannot_live_players: Vec::new(),
-            turn_limited_abilities_used: HashMap::new(),
+            turn_limited_abilities_used: HashMap::default(),
             mulligan_selected_indices: Vec::new(),
             live_card_selected_indices: Vec::new(),
-            auto_ability_trigger_counts: HashMap::new(),
-            turn_limit_usage: HashMap::new(),
-            card_instance_mapping: HashMap::new(),
-            areas_placed_this_turn: HashSet::new(),
-            cards_appeared_this_turn: HashSet::new(),
-            card_appearance_source: HashMap::new(),
-            cards_moved_this_turn: HashSet::new(),
-            gained_abilities: HashMap::new(),
-            gained_card_abilities: HashMap::new(),
+            auto_ability_trigger_counts: HashMap::default(),
+            turn_limit_usage: HashMap::default(),
+            card_instance_mapping: HashMap::default(),
+            areas_placed_this_turn: HashSet::default(),
+            cards_appeared_this_turn: HashSet::default(),
+            card_appearance_source: HashMap::default(),
+            cards_moved_this_turn: HashSet::default(),
+            gained_abilities: HashMap::default(),
+            gained_card_abilities: HashMap::default(),
             delayed_gained_effects: Vec::new(),
-            negated_abilities: HashSet::new(),
+            negated_abilities: HashSet::default(),
             replacement_effects: Vec::new(),
             constant_ability_statuses: Vec::new(),
             revealed_cards: Vec::new(),
@@ -298,7 +303,7 @@ impl GameState {
             cheer_checks_required: 0,
             cheer_checks_done: 0,
             card_instance_counter: 0,
-            baton_touch_count: HashMap::new(),
+            baton_touch_count: HashMap::default(),
             baton_touch_arriving_card_ids: Vec::new(),
             effect_creation_counter: 0,
             last_state_change_wait_to_active_count: 0,
@@ -313,7 +318,7 @@ impl GameState {
             activating_card: None,
             activating_ability_index: None,
             just_completed_ability_key: None,
-            this_batch_triggered_ability_ids: HashSet::new(),
+            this_batch_triggered_ability_ids: HashSet::default(),
             depth_first_cutoff: None,
             // 1-byte aligned
             rps_winner: None,
@@ -454,7 +459,7 @@ impl GameState {
     }
 
     pub fn non_active_player(&self) -> &Player {
-        if std::ptr::eq(self.active_player(), &self.player1) {
+        if core::ptr::eq(self.active_player(), &self.player1) {
             &self.player2
         } else {
             &self.player1
@@ -462,7 +467,7 @@ impl GameState {
     }
 
     pub fn non_active_player_mut(&mut self) -> &mut Player {
-        if std::ptr::eq(self.active_player(), &self.player1) {
+        if core::ptr::eq(self.active_player(), &self.player1) {
             &mut self.player2
         } else {
             &mut self.player1
@@ -611,7 +616,7 @@ impl GameState {
         category: &str,
     ) {
         self.rule_log.push(text.clone());
-        if !crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if !crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             return;
         }
         self.structured_log.push(LogEntry {
@@ -664,7 +669,7 @@ impl GameState {
 
     /// Snapshot current zone sizes for delta tracking.
     pub fn zone_snapshot(&self) -> HashMap<String, usize> {
-        let mut m = HashMap::new();
+        let mut m = HashMap::default();
         for (prefix, p) in [("P1", &self.player1), ("P2", &self.player2)] {
             m.insert(format!("{}.hand", prefix), p.hand.len());
             m.insert(format!("{}.deck", prefix), p.main_deck.len());
@@ -738,6 +743,7 @@ impl GameState {
     }
 
     /// Print a human-readable execution trace of the last resolved ability.
+    #[cfg(not(feature = "psp"))]
     pub fn dump_last_trace(&self) {
         if let Some(ref trace) = self.last_ability_trace {
             println!("\n=== LAST RESOLVED ABILITY TRACE ===");
@@ -752,6 +758,7 @@ impl GameState {
         }
     }
 
+    #[cfg(not(feature = "psp"))]
     fn print_trace_node(node: &crate::ability::types::AbilityTraceNode, indent: usize) {
         let pad = "  ".repeat(indent);
         let card_str = node

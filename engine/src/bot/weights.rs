@@ -10,7 +10,7 @@ pub struct CardWeights {
 
 impl CardWeights {
     pub fn new(num_cards: usize) -> Self {
-        let weights = HashMap::with_capacity(num_cards);
+        let weights = HashMap::with_capacity_and_hasher(num_cards);
         // Initialize all weights to 0 — the model starts with no knowledge
         // and learns from each game's outcome.
         Self {

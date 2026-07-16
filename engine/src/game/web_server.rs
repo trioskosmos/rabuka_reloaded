@@ -1,3 +1,5 @@
+#[cfg(feature = "psp")]
+use alloc::{string::{String, ToString}, vec::Vec};
 use actix_cors::Cors;
 use actix_files as fs;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
@@ -1619,7 +1621,7 @@ fn parse_deck_text(content: &str) -> Vec<String> {
                     return Vec::new();
                 };
                 if card_no.contains('-') {
-                    return std::iter::repeat_n(card_no, quantity as usize).collect();
+                    return core::iter::repeat_n(card_no, quantity as usize).collect();
                 }
                 return Vec::new();
             }
@@ -1995,7 +1997,7 @@ pub async fn rooms_create(
     let mut custom_decks: Option<HashMap<i32, CustomDeck>> = None;
 
     if req.p0_deck.is_some() || req.p1_deck.is_some() {
-        let mut decks = HashMap::new();
+        let mut decks = HashMap::default();
 
         if let Some(p0_deck) = req.p0_deck.clone() {
             decks.insert(
@@ -2051,9 +2053,9 @@ pub async fn rooms_create(
 
         last_active: now,
 
-        sessions: HashMap::new(),
+        sessions: HashMap::default(),
 
-        usernames: HashMap::new(),
+        usernames: HashMap::default(),
 
         custom_decks,
 
@@ -2768,7 +2770,7 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
         crate::ability::debug::set_debug(true);
     }
 
-    let rooms = Arc::new(Mutex::new(HashMap::new()));
+    let rooms = Arc::new(Mutex::new(HashMap::default()));
 
     // Initialize card database (only loaded once at startup)
     let cards_path = PathBuf::from("../cards/cards.json");
@@ -2805,13 +2807,13 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
         card_registry: card_registry.clone(),
         history: Arc::new(Mutex::new(Vec::new())),
         future: Arc::new(Mutex::new(Vec::new())),
-        custom_decks: Arc::new(Mutex::new(HashMap::new())),
-        custom_energy_decks: Arc::new(Mutex::new(HashMap::new())),
+        custom_decks: Arc::new(Mutex::new(HashMap::default())),
+        custom_energy_decks: Arc::new(Mutex::new(HashMap::default())),
         frame_counter: Arc::new(Mutex::new(0)),
         frame_history: Arc::new(Mutex::new(Vec::new())),
         cached_actions: Arc::new(Mutex::new(Vec::new())),
         actions_dirty: Arc::new(Mutex::new(true)),
-        room_broadcasts: Arc::new(Mutex::new(HashMap::new())),
+        room_broadcasts: Arc::new(Mutex::new(HashMap::default())),
     });
 
     let port: u16 = std::env::var("PORT")

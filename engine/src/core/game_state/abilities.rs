@@ -55,7 +55,7 @@ impl GameState {
         &self,
         card_no: String,
         ability_index: usize,
-        ability: std::sync::Arc<crate::card::Ability>,
+        ability: crate::Arc<crate::card::Ability>,
         card_id: Option<i16>,
         player_id: String,
         trigger_type: AbilityTrigger,
@@ -93,7 +93,7 @@ impl GameState {
             snapshot_energy_placed_by_effect: false,
             snapshot_energy_placed_by_player: None,
             choice_effect_text: None,
-            condition_cache: HashMap::new(),
+            condition_cache: HashMap::default(),
         }
     }
 
@@ -275,7 +275,7 @@ impl GameState {
                             // is on stage (prevents premature triggering).
                             if let Some(ref effect) = ability.effect {
                                 if crate::ability::debug::ABILITY_DEBUG
-                                    .load(std::sync::atomic::Ordering::Relaxed)
+                                    .load(core::sync::atomic::Ordering::Relaxed)
                                 {
                                     log::debug!(
                                         "[TAS] scanning trigger={:?} cond={}",
@@ -332,7 +332,7 @@ impl GameState {
                                         let passes = ctx.evaluate_condition(condition);
                                         self.activating_card = saved_activating;
                                         if crate::ability::debug::ABILITY_DEBUG
-                                            .load(std::sync::atomic::Ordering::Relaxed)
+                                            .load(core::sync::atomic::Ordering::Relaxed)
                                         {
                                             log::debug!(
                                                 "[TAS_COND] card={} cond_type={:?} passes={}",
@@ -700,7 +700,7 @@ impl GameState {
                         entry.snapshot_energy_placed_by_player =
                             self.last_energy_placed_by_player().map(|s| s.to_string());
                         if crate::ability::debug::ABILITY_DEBUG
-                            .load(std::sync::atomic::Ordering::Relaxed)
+                            .load(core::sync::atomic::Ordering::Relaxed)
                         {
                             log::debug!(
                                 "[QUEUE_DIAG] enqueue player={} card_no={}",
@@ -728,7 +728,7 @@ impl GameState {
                                             let entry = self.build_ability_queue_entry(
                                                 card_no.clone(),
                                                 10000 + gidx,
-                                                std::sync::Arc::new(gained_ability.clone()),
+                                                crate::Arc::new(gained_ability.clone()),
                                                 Some(card_id_val),
                                                 player_id.clone(),
                                                 trigger_type,
@@ -765,7 +765,7 @@ impl GameState {
         } else {
             &self.player2
         };
-        let other = if std::ptr::eq(preferred, &self.player1) {
+        let other = if core::ptr::eq(preferred, &self.player1) {
             &self.player2
         } else {
             &self.player1
@@ -892,14 +892,14 @@ impl GameState {
             "player2" => "p2",
             other => other,
         };
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!(
                 "[QUEUE_DIAG] process_player_abilities player={} queue_len={}",
                 player_id,
                 self.ability_queue.len()
             );
         }
-        let mut reprocess_counts: HashMap<(i16, usize), u32> = HashMap::new();
+        let mut reprocess_counts: HashMap<(i16, usize), u32> = HashMap::default();
         loop {
             if !self.ability_queue.is_idle() {
                 break;
@@ -920,7 +920,7 @@ impl GameState {
                 })
                 .collect();
 
-            if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
                 log::debug!("[QUEUE_DIAG] available_indices={:?}", available_indices);
             }
 
@@ -986,7 +986,7 @@ impl GameState {
                         *count
                     );
                     if crate::ability::debug::ABILITY_DEBUG
-                        .load(std::sync::atomic::Ordering::Relaxed)
+                        .load(core::sync::atomic::Ordering::Relaxed)
                     {
                         log::debug!(
                             "[PCA_INFINITE_LOOP] card={} ({}) ability=\"{}\" processed {} times",
@@ -1135,7 +1135,7 @@ impl GameState {
     }
 
     pub(crate) fn process_current_ability(&mut self) {
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!(
                 "[PCA_ENTER] has_resolver={}",
                 self.ability_queue.has_resolver()
@@ -1206,7 +1206,7 @@ impl GameState {
                 "{pp} {card_name} [{zone}]: [[log_ability_result:trigger=trigger_{trigger_str},result=result_skipped_negated]]"
             );
             self.rule_log.push(log_text.clone());
-            if !crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            if !crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
                 return;
             }
             self.structured_log.push(crate::types::LogEntry {
@@ -1304,19 +1304,21 @@ impl GameState {
         };
 
         resolver.debug_trace =
-            crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed);
+            crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed);
 
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!("[PCA] resolve_ability start");
         }
         match resolver.resolve_ability(self, &ability, card_id, ability_index) {
             Ok(()) => {
-                if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
+                {
                     log::debug!("[PCA] resolve_ability OK");
                 }
             }
             Err(e) => {
-                if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
+                {
                     log::debug!("[PCA] resolve_ability FAILED: {}", e);
                 }
                 log::debug!("Failed to resolve ability: {}", e);
@@ -1325,7 +1327,7 @@ impl GameState {
                 return;
             }
         }
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!(
                 "[PCA] after resolve: pending={}",
                 resolver.pending_choice.is_some()
@@ -1391,7 +1393,7 @@ impl GameState {
                 }
                 _ => false,
             };
-            if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
                 log::debug!(
                     "[PCA_G1] targets={} spawn={:?}",
                     targets_opponent,
@@ -1404,7 +1406,7 @@ impl GameState {
                     let opponent_id = if current == "p1" { "p2" } else { "p1" };
                     entry.choice_player_id = Some(opponent_id.to_string());
                     if crate::ability::debug::ABILITY_DEBUG
-                        .load(std::sync::atomic::Ordering::Relaxed)
+                        .load(core::sync::atomic::Ordering::Relaxed)
                     {
                         log::debug!("[PCA_G1] SET choice_player_id={}", opponent_id);
                     }
@@ -1412,7 +1414,7 @@ impl GameState {
                 {
                     entry.choice_player_id = Some(entry.player_id.clone());
                     if crate::ability::debug::ABILITY_DEBUG
-                        .load(std::sync::atomic::Ordering::Relaxed)
+                        .load(core::sync::atomic::Ordering::Relaxed)
                     {
                         log::debug!(
                             "[PCA_G1] RESET choice_player_id to activator={}",
@@ -1468,7 +1470,8 @@ impl GameState {
                 || self.last_energy_placed_by_effect()
                 || !self.recently_appeared_cards.is_empty()
             {
-                if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
+                {
                     log::debug!(
                         "[PCA_TRIGGER] scanning stage watchers pid={} moved={:?}",
                         current_pid,
@@ -1886,7 +1889,7 @@ impl GameState {
     ) -> Option<&'a Player> {
         match target {
             "self" | "自分" => Some(perspective_player),
-            "opponent" | "相手" => Some(if std::ptr::eq(perspective_player, &self.player1) {
+            "opponent" | "相手" => Some(if core::ptr::eq(perspective_player, &self.player1) {
                 &self.player2
             } else {
                 &self.player1
@@ -1902,14 +1905,14 @@ impl GameState {
     ) -> Option<&'a mut Player> {
         match target {
             "self" | "自分" => {
-                if std::ptr::eq(perspective_player, &self.player1) {
+                if core::ptr::eq(perspective_player, &self.player1) {
                     Some(&mut self.player1)
                 } else {
                     Some(&mut self.player2)
                 }
             }
             "opponent" | "相手" => {
-                if std::ptr::eq(perspective_player, &self.player1) {
+                if core::ptr::eq(perspective_player, &self.player1) {
                     Some(&mut self.player2)
                 } else {
                     Some(&mut self.player1)
@@ -1962,7 +1965,7 @@ impl GameState {
                 vec![perspective_player]
             }
             "opponent" | "相手" => {
-                if std::ptr::eq(perspective_player, &self.player1) {
+                if core::ptr::eq(perspective_player, &self.player1) {
                     vec![&self.player2]
                 } else {
                     vec![&self.player1]

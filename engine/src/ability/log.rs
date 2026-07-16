@@ -114,3 +114,5 @@ mod inner {
 }
 
 pub use inner::*;
+#[cfg(feature = "psp")]
+use alloc::{string::{String, ToString}, vec::Vec};

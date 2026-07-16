@@ -2,6 +2,8 @@ use crate::constants::MAX_LIVE_CARDS;
 use crate::game_state::{GameState, Phase};
 use crate::types::LogEntry;
 use crate::HashMap;
+#[cfg(feature = "psp")]
+use alloc::{string::{String, ToString}, vec::Vec};
 #[cfg(feature = "3ds")]
 extern "C" {
     fn _3ds_tdbg(msg: *const u8);
@@ -54,6 +56,7 @@ impl super::TurnEngine {
     }
 
     pub fn advance_phase(game_state: &mut GameState) {
+        #[cfg(not(feature = "psp"))]
         let _t = crate::timer::Timer::start("advance_phase");
         debug_assert!(
             game_state.phase_invariant(),
@@ -232,7 +235,7 @@ impl super::TurnEngine {
     }
 
     fn execute_performance_phase(game_state: &mut GameState, is_first: bool) {
-        let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
+        let mut resolution_zone = core::mem::take(&mut game_state.resolution_zone);
         // Take snapshots of modifier state BEFORE auto-ability triggers
         // (these are type-converted flat copies, not references — no borrow conflict)
         let hm: HashMap<i16, HashMap<crate::card::HeartColor, i32>> = game_state
@@ -486,7 +489,7 @@ impl super::TurnEngine {
             }
             ids
         };
-        let all_apps = std::mem::take(&mut game_state.ability_applications);
+        let all_apps = core::mem::take(&mut game_state.ability_applications);
         let mut apps = Vec::new();
         let mut other_apps = Vec::new();
         for app in all_apps {
@@ -668,7 +671,7 @@ impl super::TurnEngine {
         card_id: Option<i16>,
     ) -> Result<(), String> {
         let cid = card_id.ok_or("No card selected for live card set")?;
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!(
                 "[SET_LIVE] phase={:?} cid={}",
                 game_state.current_phase,
@@ -676,7 +679,7 @@ impl super::TurnEngine {
             );
         }
         let player = game_state.active_player_mut();
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!(
                 "[SET_LIVE] hand.len={} live_zone_before={:?}",
                 player.hand.cards.len(),
@@ -693,7 +696,7 @@ impl super::TurnEngine {
                 return Err("Live card zone is full".to_string());
             }
             live_cards.push(card);
-            if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
                 log::debug!(
                     "[SET_LIVE] live_zone_after={:?}",
                     player.live_card_zone.cards

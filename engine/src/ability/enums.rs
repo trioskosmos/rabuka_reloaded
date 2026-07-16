@@ -1,5 +1,7 @@
 /// Strongly-typed zone identifiers to prevent stringly-typed bugs.
 /// Replaces error-prone zone == "hand" patterns with Zone::Hand.
+#[cfg(feature = "psp")]
+use alloc::{string::{String, ToString}};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Zone {
     Hand,
@@ -121,8 +123,8 @@ impl Zone {
     }
 }
 
-impl std::fmt::Display for Zone {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for Zone {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.to_str())
     }
 }
@@ -431,8 +433,8 @@ impl ActionType {
     }
 }
 
-impl std::fmt::Display for ActionType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for ActionType {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.to_str())
     }
 }

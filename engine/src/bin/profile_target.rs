@@ -143,7 +143,7 @@ fn main() {
     );
 
     let mut total_actions = 0u64;
-    let mut outcomes: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    let mut outcomes: std::collections::HashMap<String, u32> = std::collections::HashMap::default();
     let mut p1_first_count = 0u32;
     let num_games = 5000;
     for _ in 0..num_games {

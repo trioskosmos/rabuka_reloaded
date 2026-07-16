@@ -9,6 +9,8 @@ use crate::ability::debug::ABILITY_DEBUG;
 use crate::card::{AbilityEffect, EffectKind};
 use crate::game_state::GameState;
 use core::sync::atomic::Ordering;
+#[cfg(feature = "psp")]
+use alloc::{boxed::Box, string::{String, ToString}, vec::Vec};
 
 pub(crate) struct SelectionContext {
     #[allow(dead_code)]
@@ -79,10 +81,10 @@ impl super::resolver::AbilityResolver {
                     // re-evaluation against stale game state (e.g. revealed_cards
                     // mutated by select_cards filtering).
                     if let Some(ref cond) = effect.condition {
-                        let disc = std::mem::discriminant(cond.as_ref());
+                        let disc = core::mem::discriminant(cond.as_ref());
                         for a in &mut remaining {
                             if let Some(ref a_cond) = a.condition {
-                                if std::mem::discriminant(a_cond.as_ref()) == disc {
+                                if core::mem::discriminant(a_cond.as_ref()) == disc {
                                     a.condition = None;
                                 }
                             }
@@ -229,7 +231,7 @@ impl super::resolver::AbilityResolver {
                 gs.rule_log.push(format!(
                     "[Turn {}] P{} [[log_reveal_looked:n={}]]",
                     turn,
-                    if std::ptr::eq(gs.active_player(), &gs.player1) {
+                    if core::ptr::eq(gs.active_player(), &gs.player1) {
                         1
                     } else {
                         2
@@ -784,7 +786,7 @@ impl super::resolver::AbilityResolver {
             return self.resume_pending_actions(gs);
         }
 
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!(
                 "[OUTER_MATCH] zone={} effect_started={} pending_commands={}",
                 zone,
@@ -1528,7 +1530,7 @@ impl super::resolver::AbilityResolver {
                 .map(|c| c.name.to_string())
                 .collect();
             let turn = gs.turn_number;
-            let player_num = if std::ptr::eq(gs.resolve_target_player("self"), &gs.player1) {
+            let player_num = if core::ptr::eq(gs.resolve_target_player("self"), &gs.player1) {
                 1
             } else {
                 2
@@ -1543,7 +1545,7 @@ impl super::resolver::AbilityResolver {
             }
         }
         let cost_source = gs.current_ability_source_card_id();
-        let cost_owner: Option<u8> = if std::ptr::eq(gs.resolve_target_player("self"), &gs.player1)
+        let cost_owner: Option<u8> = if core::ptr::eq(gs.resolve_target_player("self"), &gs.player1)
         {
             Some(0)
         } else {
@@ -2729,7 +2731,7 @@ impl super::resolver::AbilityResolver {
         // Check if we have a saved MoveCardsPosition context (card was already taken from source zone).
         // If so, place the card directly instead of re-running the entire effect which would fail
         // because the card is no longer in the source zone.
-        let ctx = std::mem::replace(&mut self.execution_context, ExecutionContext::None);
+        let ctx = core::mem::replace(&mut self.execution_context, ExecutionContext::None);
         match ctx {
             ExecutionContext::MoveCardsPosition {
                 card_id,

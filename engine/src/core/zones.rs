@@ -30,8 +30,8 @@ impl MemberArea {
     }
 }
 
-impl std::fmt::Display for MemberArea {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl core::fmt::Display for MemberArea {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match self {
             MemberArea::LeftSide => write!(f, "left"),
             MemberArea::Center => write!(f, "center"),
@@ -40,7 +40,7 @@ impl std::fmt::Display for MemberArea {
     }
 }
 
-impl std::str::FromStr for MemberArea {
+impl core::str::FromStr for MemberArea {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -229,7 +229,7 @@ impl Stage {
             MemberArea::Center => 1,
             MemberArea::RightSide => 2,
         };
-        let cards = std::mem::take(&mut self.under_cards[index]);
+        let cards = core::mem::take(&mut self.under_cards[index]);
         let mut waitroom = SmallVec::new();
         let mut energy_deck = SmallVec::new();
         for card_id in cards {
@@ -295,8 +295,8 @@ impl Stage {
         }
 
         // Swap under-cards along with the members (Rule 4.5.5.3)
-        let from_under = std::mem::take(&mut self.under_cards[from_index]);
-        let to_under = std::mem::take(&mut self.under_cards[to_index]);
+        let from_under = core::mem::take(&mut self.under_cards[from_index]);
+        let to_under = core::mem::take(&mut self.under_cards[to_index]);
         self.under_cards[from_index] = to_under;
         self.under_cards[to_index] = from_under;
 
@@ -321,14 +321,14 @@ impl Stage {
     ) -> Result<(), String> {
         // Rule 11.11: Formation Change - move all members to specified areas
         // Rule 11.11.2: Cannot move multiple members to same area
-        let mut target_areas = HashSet::new();
+        let mut target_areas = HashSet::<&MemberArea>::default();
         for (_, target) in &assignments {
             if !target_areas.insert(target) {
                 return Err("Cannot move multiple members to same area".to_string());
             }
         }
 
-        for (from, to) in assignments {
+        for (from, to) in assignments.clone() {
             self.position_change(from, to)?;
         }
 
@@ -514,7 +514,7 @@ impl LiveCardZone {
     }
 
     pub fn clear(&mut self) -> SmallVec<[i16; 3]> {
-        std::mem::take(&mut self.cards)
+        core::mem::take(&mut self.cards)
     }
 
     pub fn len(&self) -> usize {
@@ -610,6 +610,11 @@ impl LiveCardZone {
 }
 
 use crate::constants::{MAX_ENERGY_CARDS, MAX_LIVE_CARDS};
+#[cfg(feature = "psp")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 #[derive(Debug, Clone)]
 pub struct EnergyZone {
@@ -863,7 +868,7 @@ impl Waitroom {
     }
 
     pub fn take_all(&mut self) -> SmallVec<[i16; 30]> {
-        std::mem::take(&mut self.cards)
+        core::mem::take(&mut self.cards)
     }
 
     pub fn shuffle(&mut self) {
@@ -951,7 +956,7 @@ impl ResolutionZone {
     }
 
     pub fn clear(&mut self) -> SmallVec<[i16; 10]> {
-        std::mem::take(&mut self.cards)
+        core::mem::take(&mut self.cards)
     }
 
     pub fn len(&self) -> usize {

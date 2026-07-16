@@ -907,6 +907,8 @@ impl EffectPipeline {
 // ====================================================================
 
 use crate::HashMap;
+#[cfg(feature = "psp")]
+use alloc::{string::{String, ToString}, vec::Vec};
 
 /// Owns the state required for one effect's steps to communicate with later
 /// steps. Created fresh for every `AbilityResolver` and reset at the start

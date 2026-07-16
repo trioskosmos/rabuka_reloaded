@@ -1,3 +1,5 @@
+#[cfg(feature = "psp")]
+use alloc::{string::{String, ToString}, vec::Vec};
 use crate::HashMap;
 use std::sync::Mutex;
 use std::time::Instant;
@@ -8,7 +10,7 @@ static CALL_STACK: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
 fn get_timers() -> std::sync::MutexGuard<'static, Option<HashMap<Vec<&'static str>, (u64, u128)>>> {
     let mut guard = TIMERS.lock().unwrap();
     if guard.is_none() {
-        *guard = Some(HashMap::new());
+        *guard = Some(HashMap::default());
     }
     guard
 }

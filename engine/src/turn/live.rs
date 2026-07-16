@@ -4,10 +4,15 @@ use crate::card::{BaseHeart, BladeColor, CardDatabase, HeartColor, HeartMap};
 use crate::core::game_modifiers::ModifierEntry;
 use crate::game_state::GameState;
 use crate::types::{
-    AdjustmentType, AllocPhase, Allocation, BladeSource, HeartSource, LivePerformanceData,
+    AdjustmentType, AllocPhase, Allocation, ArcStr, BladeSource, HeartSource, LivePerformanceData,
     MemberContribution, SourceName, SourceType, YellCardResult,
 };
 use crate::{HashMap, HashSet};
+#[cfg(feature = "psp")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::sync::atomic::Ordering;
 
 const EMPTY_H8: [u32; 8] = [0u32; 8];
@@ -44,7 +49,7 @@ impl super::TurnEngine {
         // from live_start triggers and other non-constant sources.
         // Deduplicate (cid,color) pairs to avoid double-counting when the same
         // global modifier is captured in multiple players' snapshots.
-        let mut restored: HashSet<(i16, crate::card::HeartColor)> = HashSet::new();
+        let mut restored: HashSet<(i16, crate::card::HeartColor)> = HashSet::default();
         for snap in &game_state.performance_snapshots {
             for (cid, colors) in &snap.performance_need_heart_modifiers {
                 for (color, entry) in colors {
@@ -521,12 +526,12 @@ impl super::TurnEngine {
         // These couldn't be evaluated at constant-evaluation time because the
         // yell result wasn't available yet.
         if !game_state.delayed_gained_effects.is_empty() {
-            let saved_revealed = std::mem::take(&mut game_state.revealed_cards);
+            let saved_revealed = core::mem::take(&mut game_state.revealed_cards);
             // Populate revealed_cards from the first snapshot's yell data.
             if let Some(snap) = game_state.performance_snapshots.first() {
                 game_state.revealed_cards = snap.yell_cards.iter().map(|yc| yc.card_id).collect();
             }
-            let delayed = std::mem::take(&mut game_state.delayed_gained_effects);
+            let delayed = core::mem::take(&mut game_state.delayed_gained_effects);
             for (card_id, gained) in &delayed {
                 use crate::ability::condition::ConditionContext;
                 use crate::ability::enums::ActionType;
@@ -565,7 +570,7 @@ impl super::TurnEngine {
         // Merge LiveSuccess-triggered ability applications into breakdown.scores.
         // These were recorded after enrich_from_applications ran (in execute_performance_phase),
         // so they weren't picked up yet.
-        let late_apps = std::mem::take(&mut game_state.ability_applications);
+        let late_apps = core::mem::take(&mut game_state.ability_applications);
         if !late_apps.is_empty() {
             let p1_cards = &game_state.player1.live_card_zone.cards;
             let p2_cards = &game_state.player2.live_card_zone.cards;
@@ -663,7 +668,7 @@ impl super::TurnEngine {
                     if i > 0 {
                         live_details.push_str(", ");
                     }
-                    let _ = std::fmt::Write::write_fmt(
+                    let _ = core::fmt::Write::write_fmt(
                         &mut live_details,
                         format_args!("live score+{} → {}", live.score, live_result),
                     );
@@ -2374,7 +2379,7 @@ pub fn enrich_from_applications(
     applications: &[crate::types::AbilityApplication],
     card_db: &crate::card::CardDatabase,
 ) {
-    let mut seen = HashSet::new();
+    let mut seen = HashSet::<(i16, &ArcStr)>::default();
     for app in applications {
         if let Some(mc) = member_contributions
             .iter_mut()
@@ -2517,7 +2522,7 @@ pub fn build_snapshot(
             scores: Vec::new(),
         },
         triggered_abilities: {
-            let mut seen = HashSet::new();
+            let mut seen = HashSet::<&ArcStr>::default();
             let mut tas = Vec::new();
             for mc in &perf.member_contributions {
                 for ab in mc

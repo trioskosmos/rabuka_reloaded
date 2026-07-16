@@ -2,6 +2,12 @@ use super::super::resolver::AbilityResolver;
 use super::super::util;
 use crate::card::{Ability, AbilityEffect};
 use crate::game_state::GameState;
+#[cfg(feature = "psp")]
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 impl AbilityResolver {
     pub(crate) fn execute_gain_ability_effect(

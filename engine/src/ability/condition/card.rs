@@ -8,6 +8,11 @@ use crate::card::{
     AbilityFilter, CardProperty, CardState, ComparisonTarget, Condition, HeartColor,
 };
 use crate::{HashMap, HashSet};
+#[cfg(feature = "psp")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -366,7 +371,9 @@ impl<'a> ConditionContext<'a> {
         } else {
             result
         };
+        #[cfg(not(feature = "psp"))]
         let op_str = condition.get_operator().unwrap_or(">=");
+        #[cfg(not(feature = "psp"))]
         super::push_cond_verdict(
             condition,
             &format!("実際={}, 期待={}{}", count, op_str, target_count),
@@ -1022,7 +1029,7 @@ impl<'a> ConditionContext<'a> {
 
         let pass = match distinct_type {
             "cost" => {
-                let mut seen_costs: HashSet<u32> = HashSet::new();
+                let mut seen_costs: HashSet<u32> = HashSet::default();
                 for &cid in cards.iter() {
                     if let Some(card) = card_db.get_card(cid) {
                         let cost = card.cost.unwrap_or(0);
@@ -1039,7 +1046,7 @@ impl<'a> ConditionContext<'a> {
                 }
             }
             "group_name" => {
-                let mut seen: HashSet<String> = HashSet::new();
+                let mut seen: HashSet<String> = HashSet::default();
                 for &cid in cards.iter() {
                     if let Some(card) = card_db.get_card(cid) {
                         if !card.group.is_empty() {
@@ -1613,7 +1620,7 @@ impl<'a> ConditionContext<'a> {
             };
             match distinct_type {
                 "cost" => {
-                    let mut distinct_costs: HashSet<u32> = HashSet::new();
+                    let mut distinct_costs: HashSet<u32> = HashSet::default();
                     for &cid in &combined {
                         if cid == -1 {
                             continue;
@@ -1640,7 +1647,7 @@ impl<'a> ConditionContext<'a> {
                     compare_counts(operator, count, count_threshold)
                 }
                 "group_name" => {
-                    let mut distinct_groups: HashSet<String> = HashSet::new();
+                    let mut distinct_groups: HashSet<String> = HashSet::default();
                     for &cid in &combined {
                         if cid == -1 {
                             continue;
@@ -1784,7 +1791,7 @@ impl<'a> ConditionContext<'a> {
                 .iter()
                 .map(|s| crate::zones::parse_heart_color(s))
                 .collect();
-            let mut present = HashSet::new();
+            let mut present = HashSet::<HeartColor>::default();
             for &cid in &source_cards {
                 if cid == -1 {
                     continue;
@@ -2229,7 +2236,7 @@ impl<'a> ConditionContext<'a> {
                         .iter()
                         .map(|s| crate::zones::parse_heart_color(s))
                         .collect();
-                    let mut present = HashSet::new();
+                    let mut present = HashSet::<HeartColor>::default();
                     let is_blade = condition.get_heart_source() == Some("blade");
                     for &cid in &self.game_state.revealed_cards {
                         if cid == -1 {
@@ -2325,7 +2332,7 @@ impl<'a> ConditionContext<'a> {
                     |d| matches!(d, crate::core::card::DistinctInfo::String(s) if s == "cost"),
                 );
                 if is_distinct_cost {
-                    let mut distinct_costs: HashSet<u32> = HashSet::new();
+                    let mut distinct_costs: HashSet<u32> = HashSet::default();
                     for &cid in &stage_cards {
                         if cid == -1 {
                             continue;
@@ -2346,7 +2353,7 @@ impl<'a> ConditionContext<'a> {
                         .iter()
                         .map(|s| crate::zones::parse_heart_color(s))
                         .collect();
-                    let mut present = HashSet::new();
+                    let mut present = HashSet::<HeartColor>::default();
                     let is_blade = condition.get_heart_source() == Some("blade");
                     for &cid in &stage_cards {
                         if cid == -1 {
@@ -2621,7 +2628,7 @@ impl<'a> ConditionContext<'a> {
             } else {
                 stage_cards
             };
-            let mut name_counts: HashMap<String, u32> = HashMap::new();
+            let mut name_counts: HashMap<String, u32> = HashMap::default();
             for &cid in &stage_cards {
                 if cid == -1 {
                     continue;
@@ -2636,6 +2643,7 @@ impl<'a> ConditionContext<'a> {
         }
         let mut dbg = AbDebug::new();
         dbg.condition(condition, actual, count, passed);
+        #[cfg(not(feature = "psp"))]
         super::push_cond_verdict(condition, &format!("{}枚", actual), passed, vec![]);
         passed
     }
@@ -2698,9 +2706,12 @@ impl<'a> ConditionContext<'a> {
         let player = self.resolve_condition_player(target);
 
         // Helper to push enriched verdict with character/cost data
+        #[cfg(not(feature = "psp"))]
         let push_rich = |actual: &str, ok: bool| {
             super::push_cond_verdict(condition, actual, ok, vec![]);
         };
+        #[cfg(feature = "psp")]
+        let push_rich = |_actual: &str, _ok: bool| {};
 
         if baton_touch_trigger {
             if let Some(ref _activating_card) = self.game_state.activating_card {
@@ -3535,7 +3546,7 @@ impl<'a> ConditionContext<'a> {
         };
         match distinct_type {
             "cost" => {
-                let mut seen: HashSet<u32> = HashSet::new();
+                let mut seen: HashSet<u32> = HashSet::default();
                 for &cid in &matching {
                     if let Some(card) = card_db.get_card(cid) {
                         let cost = card.cost.unwrap_or(0);
@@ -3547,7 +3558,7 @@ impl<'a> ConditionContext<'a> {
                 seen.len() as u32
             }
             "group_name" => {
-                let mut seen: HashSet<String> = HashSet::new();
+                let mut seen: HashSet<String> = HashSet::default();
                 for &cid in &matching {
                     if let Some(card) = card_db.get_card(cid) {
                         seen.insert(card.group.to_string());

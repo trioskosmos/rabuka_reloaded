@@ -5,6 +5,9 @@ use crate::HashMap;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
+#[cfg(feature = "psp")]
+use alloc::{boxed::Box, string::String, string::ToString, vec::Vec};
+
 #[cfg(not(feature = "psp"))]
 pub(crate) use crate::core::pool::EkBox;
 #[cfg(feature = "psp")]
@@ -162,14 +165,14 @@ impl HeartMap {
     }
 }
 
-impl std::ops::Index<&HeartColor> for HeartMap {
+impl core::ops::Index<&HeartColor> for HeartMap {
     type Output = u32;
     fn index(&self, color: &HeartColor) -> &u32 {
         self.get(color).unwrap_or(&0)
     }
 }
 
-impl std::ops::IndexMut<&HeartColor> for HeartMap {
+impl core::ops::IndexMut<&HeartColor> for HeartMap {
     fn index_mut(&mut self, color: &HeartColor) -> &mut u32 {
         self.entry_or_default(*color)
     }
@@ -177,7 +180,7 @@ impl std::ops::IndexMut<&HeartColor> for HeartMap {
 
 impl<'a> IntoIterator for &'a HeartMap {
     type Item = &'a (HeartColor, u32);
-    type IntoIter = std::slice::Iter<'a, (HeartColor, u32)>;
+    type IntoIter = core::slice::Iter<'a, (HeartColor, u32)>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
     }
@@ -287,8 +290,8 @@ impl Default for CardDatabase {
 impl CardDatabase {
     pub fn new() -> Self {
         Self {
-            cards: HashMap::new(),
-            card_no_to_id: HashMap::new(),
+            cards: HashMap::default(),
+            card_no_to_id: HashMap::default(),
             next_id: 0,
         }
     }
@@ -579,14 +582,14 @@ impl From<AbilityEffect> for AbilityCost {
     }
 }
 
-impl std::ops::Deref for AbilityCost {
+impl core::ops::Deref for AbilityCost {
     type Target = AbilityEffect;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl std::ops::DerefMut for AbilityCost {
+impl core::ops::DerefMut for AbilityCost {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -690,7 +693,7 @@ impl<'de> serde::Deserialize<'de> for AbilityCost {
         struct Visitor;
         impl<'de> serde::de::Visitor<'de> for Visitor {
             type Value = AbilityCost;
-            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn expecting(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
                 f.write_str("an ability cost object (legacy or unified form)")
             }
             fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> Result<AbilityCost, M::Error> {
@@ -3474,7 +3477,7 @@ impl AbilityEffect {
 
 macro_rules! impl_deref_str {
     ($t:ty) => {
-        impl std::ops::Deref for $t {
+        impl core::ops::Deref for $t {
             type Target = str;
             fn deref(&self) -> &str {
                 self.as_str()
@@ -5660,8 +5663,8 @@ pub fn check_heart_requirement(need: &BaseHeart, provided: &BaseHeart) -> bool {
     true
 }
 
-impl std::fmt::Display for HeartColor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for HeartColor {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             HeartColor::Heart00 => write!(f, "heart00"),
             HeartColor::Heart01 => write!(f, "heart01"),
@@ -5727,7 +5730,7 @@ impl HeartColor {
     }
 }
 
-impl std::str::FromStr for HeartColor {
+impl core::str::FromStr for HeartColor {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {

@@ -6,6 +6,15 @@ use crate::card::{AbilityEffect, CardDatabase, DistinctType, Operator, Placement
 use crate::game_state::GameState;
 use crate::player::Player;
 use crate::{HashMap, HashSet};
+#[cfg(feature = "psp")]
+use alloc::{
+    boxed::Box,
+    collections::BTreeSet,
+    string::{String, ToString},
+    vec::Vec,
+};
+#[cfg(not(feature = "psp"))]
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MoveCardsTarget {
@@ -557,7 +566,7 @@ impl AbilityResolver {
             {
                 if !trigger_cards.is_empty() {
                     if crate::ability::debug::ABILITY_DEBUG
-                        .load(std::sync::atomic::Ordering::Relaxed)
+                        .load(core::sync::atomic::Ordering::Relaxed)
                     {
                         log::debug!(
                             "[THOSE_CARDS] trigger_cards={:?} count={}",
@@ -989,8 +998,7 @@ impl AbilityResolver {
                     && effect.group_reference_any().as_deref() == Some("different_group_names")
                     && source_str == "discard"
                 {
-                    let mut stage_groups: std::collections::BTreeSet<String> =
-                        std::collections::BTreeSet::new();
+                    let mut stage_groups: BTreeSet<String> = BTreeSet::new();
                     for &cid in &player.stage.stage {
                         if cid == -1 {
                             continue;
@@ -1162,7 +1170,7 @@ impl AbilityResolver {
                 //  causing the returned cards to still exist in the source after move.)
                 // Use gs.revealed_cards as the primary source; drain cheer_buf in sync.
                 let cards: Vec<i16> = if !cheer_buf.is_empty() {
-                    let c = std::mem::take(cheer_buf);
+                    let c = core::mem::take(cheer_buf);
                     gs.revealed_cards.retain(|id| !c.contains(id));
                     c
                 } else {
@@ -1456,7 +1464,7 @@ impl AbilityResolver {
             || distinct == Some(DistinctType::True)
             || distinct == Some(DistinctType::Distinct)
         {
-            let mut seen: HashSet<String> = HashSet::new();
+            let mut seen: HashSet<String> = HashSet::default();
             taken.retain(|&id| {
                 card_db
                     .get_card(id)
@@ -1735,7 +1743,7 @@ impl AbilityResolver {
         // BEFORE resuming pending commands, so deferred cards get their
         // position choices before the re-prompt (if any).
         if !self.pending_stage_cards.is_empty() {
-            let remaining = std::mem::take(&mut self.pending_stage_cards);
+            let remaining = core::mem::take(&mut self.pending_stage_cards);
             for (i, (cid, tgt)) in remaining.iter().enumerate() {
                 let source = self.spawn_context.source.clone().unwrap_or_default();
                 match self.place_card_with_stage_choice(
@@ -2166,7 +2174,7 @@ impl AbilityResolver {
             } else {
                 Zone::Discard.to_str()
             });
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!(
                 "[EXEC_SEL_DEST] zone={:?} destination={:?} dest={}",
                 zone_enum,
@@ -2510,7 +2518,7 @@ impl AbilityResolver {
         // Validate per-group constraint before removing cards
         if let Some(mpg) = max_per_group {
             let card_db = &gs.card_database;
-            let mut group_counts: HashMap<String, u32> = HashMap::new();
+            let mut group_counts: HashMap<String, u32> = HashMap::default();
             for &idx in indices {
                 if idx < looked_at.len() {
                     let cid = looked_at[idx];
@@ -2552,7 +2560,7 @@ impl AbilityResolver {
             });
         }
 
-        let remaining_cards: Vec<i16> = std::mem::take(looked_at);
+        let remaining_cards: Vec<i16> = core::mem::take(looked_at);
 
         let is_deck_dest = Zone::from_str(&destination) == Some(Zone::DeckTop)
             || Zone::from_str(&destination) == Some(Zone::Deck);

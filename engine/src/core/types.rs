@@ -5,6 +5,8 @@ use crate::HashMap;
 use serde::de::Deserializer;
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "psp")]
+use alloc::{boxed::Box, string::{String, ToString}, vec::Vec};
 
 /// Like `Box<str>` but `Arc`-backed for cheap clone (refcount bump, no str copy).
 /// Used in `EffectKind` fields where the same string value may be accessed
@@ -12,7 +14,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct ArcStr(pub Arc<str>);
 
-impl std::ops::Deref for ArcStr {
+impl core::ops::Deref for ArcStr {
     type Target = str;
     fn deref(&self) -> &str {
         &self.0
@@ -37,8 +39,8 @@ impl From<Box<str>> for ArcStr {
     }
 }
 
-impl std::fmt::Display for ArcStr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for ArcStr {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         self.0.fmt(f)
     }
 }
@@ -97,8 +99,8 @@ pub enum TurnPhase {
     Live,
 }
 
-impl std::fmt::Display for TurnPhase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for TurnPhase {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             TurnPhase::FirstAttackerNormal => write!(f, "FirstAttackerNormal"),
             TurnPhase::SecondAttackerNormal => write!(f, "SecondAttackerNormal"),
@@ -124,8 +126,8 @@ pub enum Phase {
     LiveVictoryDetermination,
 }
 
-impl std::fmt::Display for Phase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for Phase {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Phase::RockPaperScissors => write!(f, "RockPaperScissors"),
             Phase::ChooseFirstAttacker => write!(f, "ChooseFirstAttacker"),

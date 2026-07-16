@@ -13,6 +13,11 @@ use super::types::Choice;
 use super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
+#[cfg(feature = "psp")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 impl AbilityResolver {
     // Q55: Effects resolve as much as possible; partial resolution required when full is impossible.
@@ -33,6 +38,7 @@ impl AbilityResolver {
             effect.source_or("none"),
             effect.destination.as_deref().unwrap_or("none")
         );
+        #[cfg(not(feature = "psp"))]
         let exec_snapshot = crate::ability::log::buffer_len();
         if !self.can_activate_effect(gs, effect) {
             log::debug!("DEBUG: cannot activate effect");
@@ -41,6 +47,7 @@ impl AbilityResolver {
         }
         // Drain condition verdicts from the can_activate_effect pre-check;
         // the effect execution will produce its own items and we don't want duplicates.
+        #[cfg(not(feature = "psp"))]
         {
             let _pre = crate::ability::log::drain_verdicts_since(exec_snapshot);
         }
@@ -201,7 +208,7 @@ impl AbilityResolver {
         // player responds. Legacy dedicated handlers remain as fallback
         // for the case where effect_steps is absent.
         let action_type = ActionType::from_str(&action_str).unwrap_or(ActionType::Custom);
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             eprintln!(
                 "[EXEC_ACTION] action_type={:?} has_steps={} has_actions={}",
                 action_type,
@@ -545,7 +552,7 @@ impl AbilityResolver {
                         &filter,
                         effect.heart_colors_any(),
                         None,
-                        &HashMap::new(),
+                        &HashMap::default(),
                     );
                     base_count * per_mult
                 } else {
@@ -913,16 +920,19 @@ impl AbilityResolver {
             "conditional_on_optional",
         ];
         if !SKIP.contains(&effect.action.as_str()) {
+            #[cfg(not(feature = "psp"))]
             let val = effect
                 .count
                 .or(effect.value_any())
                 .map(|v| v.to_string())
                 .unwrap_or_default();
+            #[cfg(not(feature = "psp"))]
             let details = if !val.is_empty() {
                 format!("{} {}", effect.action, val)
             } else {
                 effect.action.clone()
             };
+            #[cfg(not(feature = "psp"))]
             crate::ability::log::push_verdict(crate::ability::log::AbilityLogItem::Effect {
                 text: effect.text.clone(),
                 action: effect.action.clone(),

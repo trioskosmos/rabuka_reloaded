@@ -5,6 +5,8 @@ use crate::ability::util::compare_counts;
 use crate::card::{CardProperty, Condition};
 use crate::game_state::Phase;
 use crate::HashSet;
+#[cfg(feature = "psp")]
+use alloc::vec::Vec;
 
 impl<'a> ConditionContext<'a> {
     pub(crate) fn no_excess_heart_flag(&self, target: &str) -> bool {
@@ -164,7 +166,7 @@ impl<'a> ConditionContext<'a> {
                             _ => continue,
                         };
                         if crate::ability::debug::ABILITY_DEBUG
-                            .load(std::sync::atomic::Ordering::Relaxed)
+                            .load(core::sync::atomic::Ordering::Relaxed)
                         {
                             eprintln!(
                                 "[TEMP_DIAG] checking zone={} {} cards={:?}",
@@ -185,7 +187,7 @@ impl<'a> ConditionContext<'a> {
                                     })
                                 });
                                 if crate::ability::debug::ABILITY_DEBUG
-                                    .load(std::sync::atomic::Ordering::Relaxed)
+                                    .load(core::sync::atomic::Ordering::Relaxed)
                                 {
                                     eprintln!(
                                         "[TEMP_DIAG]   card={} name={} group_ok={} nh={:?}",
@@ -204,7 +206,7 @@ impl<'a> ConditionContext<'a> {
                                             nh.hearts.get(&color).copied().unwrap_or(0) >= threshold
                                         });
                                         if crate::ability::debug::ABILITY_DEBUG
-                                            .load(std::sync::atomic::Ordering::Relaxed)
+                                            .load(core::sync::atomic::Ordering::Relaxed)
                                         {
                                             eprintln!(
                                                 "[TEMP_DIAG]   all_hearts_present={}",
@@ -217,7 +219,7 @@ impl<'a> ConditionContext<'a> {
                                         }
                                     } else {
                                         if crate::ability::debug::ABILITY_DEBUG
-                                            .load(std::sync::atomic::Ordering::Relaxed)
+                                            .load(core::sync::atomic::Ordering::Relaxed)
                                         {
                                             eprintln!("[TEMP_DIAG]   no need_heart on card");
                                         }
@@ -231,14 +233,14 @@ impl<'a> ConditionContext<'a> {
                     }
                     if !found_match {
                         if crate::ability::debug::ABILITY_DEBUG
-                            .load(std::sync::atomic::Ordering::Relaxed)
+                            .load(core::sync::atomic::Ordering::Relaxed)
                         {
                             eprintln!("[TEMP_DIAG] CONDITION FAILED: no matching card in zones");
                         }
                         return false;
                     }
                     if crate::ability::debug::ABILITY_DEBUG
-                        .load(std::sync::atomic::Ordering::Relaxed)
+                        .load(core::sync::atomic::Ordering::Relaxed)
                     {
                         eprintln!("[TEMP_DIAG] CONDITION PASSED");
                     }

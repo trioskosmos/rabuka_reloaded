@@ -8,6 +8,8 @@ use crate::types::PerformanceSnapshot;
 use crate::zones::Orientation;
 use crate::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "psp")]
+use alloc::{string::{String, ToString}, vec::Vec};
 
 fn heart_color_index(color: &HeartColor) -> Option<usize> {
     Some(match color {
@@ -1066,7 +1068,7 @@ pub fn player_to_display(
     }
 
     // Compute live_card_scores: card_no -> total score
-    let mut live_card_scores = HashMap::new();
+    let mut live_card_scores = HashMap::default();
     for &cid in &player.live_card_zone.cards {
         if let Some(card) = card_db.get_card(cid) {
             let base = card.score.unwrap_or(0);
@@ -1120,7 +1122,7 @@ pub fn player_to_display(
     }
 
     // Collect need_heart_modifiers for live cards (card_no -> [h00..h06] modifiers)
-    let mut nh_mods = HashMap::new();
+    let mut nh_mods = HashMap::default();
     for (&cid, colors) in need_heart_modifiers {
         if player.live_card_zone.cards.contains(&cid)
             || player.success_live_card_zone.cards.contains(&cid)
@@ -1389,7 +1391,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     let perf_history = game_state.performance_snapshots.clone();
     let mut perf_results: Option<HashMap<String, PerformanceSnapshot>> = None;
     if !perf_history.is_empty() {
-        let mut map = HashMap::new();
+        let mut map = HashMap::default();
         for snap in &perf_history {
             map.insert(snap.player_id.clone(), snap.clone());
         }
@@ -1441,27 +1443,27 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         .then_some(game_state.live_card_selected_indices.as_slice());
 
     let mut blade_flat: HashMap<i16, i32> =
-        HashMap::with_capacity(game_state.mods.blade_modifiers.len());
+        HashMap::with_capacity_and_hasher(game_state.mods.blade_modifiers.len(), Default::default());
     let mut blade_set_flat: HashMap<i16, i32> =
-        HashMap::with_capacity(game_state.mods.blade_modifiers.len());
+        HashMap::with_capacity_and_hasher(game_state.mods.blade_modifiers.len(), Default::default());
     for (&k, v) in &game_state.mods.blade_modifiers {
         blade_flat.insert(k, v.total());
         blade_set_flat.insert(k, v.set);
     }
 
     let mut score_flat: HashMap<i16, i32> =
-        HashMap::with_capacity(game_state.mods.score_modifiers.len());
+        HashMap::with_capacity_and_hasher(game_state.mods.score_modifiers.len(), Default::default());
     let mut score_set_flat: HashMap<i16, i32> =
-        HashMap::with_capacity(game_state.mods.score_modifiers.len());
+        HashMap::with_capacity_and_hasher(game_state.mods.score_modifiers.len(), Default::default());
     for (&k, v) in &game_state.mods.score_modifiers {
         score_flat.insert(k, v.total());
         score_set_flat.insert(k, v.set);
     }
 
     let mut heart_flat: HashMap<i16, HashMap<crate::card::HeartColor, i32>> =
-        HashMap::with_capacity(game_state.mods.heart_modifiers.len());
+        HashMap::with_capacity_and_hasher(game_state.mods.heart_modifiers.len(), Default::default());
     let mut heart_set_flat: HashMap<i16, HashMap<crate::card::HeartColor, i32>> =
-        HashMap::with_capacity(game_state.mods.heart_modifiers.len());
+        HashMap::with_capacity_and_hasher(game_state.mods.heart_modifiers.len(), Default::default());
     for (&k, colors) in &game_state.mods.heart_modifiers {
         let total: HashMap<crate::card::HeartColor, i32> =
             colors.iter().map(|(&c, e)| (c, e.total())).collect();
@@ -1486,9 +1488,9 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     let score_flat2 = score_flat.clone();
     let score_set_flat2 = score_set_flat.clone();
     let mut cost_flat: HashMap<i16, i32> =
-        HashMap::with_capacity(game_state.mods.cost_modifiers.len());
+        HashMap::with_capacity_and_hasher(game_state.mods.cost_modifiers.len(), Default::default());
     let mut cost_set_flat: HashMap<i16, i32> =
-        HashMap::with_capacity(game_state.mods.cost_modifiers.len());
+        HashMap::with_capacity_and_hasher(game_state.mods.cost_modifiers.len(), Default::default());
     for (&k, v) in &game_state.mods.cost_modifiers {
         cost_flat.insert(k, v.total());
         cost_set_flat.insert(k, v.set);
@@ -1509,7 +1511,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     // Without this, gain_ability effects would leave NO visible indicator
     // that the card has a gained ability, even though the effect (e.g.
     // +1 score, extra blade) applies.
-    let mut bonus_triggers: HashMap<i16, Vec<String>> = HashMap::new();
+    let mut bonus_triggers: HashMap<i16, Vec<String>> = HashMap::default();
     // Also scan gained_abilities (flat strings, used by older code path)
     // for trigger keywords and record matching texticons.
     for (&card_id, texts) in &game_state.gained_abilities {
@@ -1752,7 +1754,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         position_change_occurred_this_turn: game_state.position_change_occurred_this_turn,
         position_changes: game_state.position_change_events.clone(),
         position_changes_by_card: {
-            let mut map = HashMap::new();
+            let mut map = HashMap::default();
             for event in &game_state.position_change_events {
                 map.entry(event.moved_card_id)
                     .or_insert_with(Vec::new)

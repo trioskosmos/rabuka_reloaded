@@ -7,6 +7,11 @@ use crate::game_state::GameState;
 use smallvec::SmallVec;
 
 use crate::HashMap;
+#[cfg(feature = "psp")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 impl AbilityResolver {
     pub(crate) fn execute_change_state(

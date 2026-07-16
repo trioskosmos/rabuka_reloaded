@@ -5,12 +5,20 @@ use super::types::{Choice, ChoiceRoute};
 use super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
+#[cfg(feature = "psp")]
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+    vec::Vec,
+};
+#[cfg(not(feature = "psp"))]
+use std::collections::BTreeMap;
 
 impl AbilityResolver {
     /// Pay all deferred costs that were stored during sequential_cost handler.
     /// Clears the list after paying. Returns error if any cost cannot be paid.
     pub fn pay_deferred_costs(&mut self, gs: &mut GameState) -> Result<(), String> {
-        let costs = std::mem::take(&mut self.pending_deferred_costs);
+        let costs = core::mem::take(&mut self.pending_deferred_costs);
         for cost in &costs {
             self.pay_cost(gs, cost)?;
         }
@@ -460,8 +468,7 @@ impl AbilityResolver {
                         let player_ref = gs.resolve_target_player(target);
                         let hand_cards = &player_ref.hand.cards;
                         // Group hand cards by unit name
-                        let mut unit_groups: std::collections::BTreeMap<String, Vec<i16>> =
-                            std::collections::BTreeMap::new();
+                        let mut unit_groups: BTreeMap<String, Vec<i16>> = BTreeMap::new();
                         for &cid in hand_cards {
                             if filter.matches(card_db, cid, false) {
                                 let unit = card_db

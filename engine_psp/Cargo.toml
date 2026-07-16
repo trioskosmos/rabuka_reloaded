@@ -5,21 +5,24 @@ edition = "2021"
 
 [dependencies]
 rabuka_engine = { path = "../engine", default-features = false, features = ["psp"] }
-psp = { version = "0.3", features = ["embedded-graphics"] }
-hashbrown = { version = "0.14", default-features = false, features = ["alloc"] }
+psp = { version = "0.3", features = ["embedded-graphics"], optional = true }
+hashbrown = { version = "0.14", default-features = false, features = ["serde"] }
 smallvec = { version = "1", default-features = false }
-serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
-serde_json = { version = "1", default-features = false, features = ["alloc"] }
-rmp-serde = { version = "1", default-features = false }
-embedded-graphics = "0.8"
+embedded-graphics = { version = "0.8", optional = true }
 log = { version = "0.4", default-features = false }
+serde = { version = "=1.0.197", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "=1.0.99", default-features = false, features = ["alloc"] }
 
 [features]
 default = []
+psp = ["dep:psp", "dep:embedded-graphics"]
 
 [[bin]]
 name = "rabuka_psp"
 path = "src/bin/rabuka_psp.rs"
+required-features = ["psp"]
+
+# bake_cards moved to tools/bake_cards/ (standalone crate for host builds)
 
 [profile.release]
 codegen-units = 16

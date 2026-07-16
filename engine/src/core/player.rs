@@ -8,6 +8,8 @@ use crate::card::CardDatabase;
 use crate::core::game_modifiers::{GameModifiers, ModifierEntry};
 
 use crate::{HashMap, HashSet, VecDeque};
+#[cfg(feature = "psp")]
+use alloc::{string::{String, ToString}, vec::Vec};
 
 #[derive(Debug, Clone)]
 
@@ -83,7 +85,7 @@ impl Player {
 
             exclusion_zone: ExclusionZone::new(),
 
-            deployed_this_turn: HashSet::new(),
+            deployed_this_turn: HashSet::default(),
 
             stage_hearts: None,
 

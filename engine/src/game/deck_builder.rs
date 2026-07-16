@@ -1,6 +1,8 @@
 use crate::card::CardDatabase;
 use crate::Arc;
 use crate::VecDeque;
+#[cfg(feature = "psp")]
+use alloc::{string::{String, ToString}, vec::Vec};
 
 #[derive(Debug, Clone)]
 pub struct Deck {

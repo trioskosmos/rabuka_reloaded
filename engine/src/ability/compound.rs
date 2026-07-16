@@ -4,6 +4,12 @@ use super::types::{AbilityTraceNode, Choice, ExecutionContext, StepOutput, ZoneS
 use crate::ability::debug::ABILITY_DEBUG;
 use crate::card::{AbilityEffect, Condition};
 use crate::game_state::GameState;
+#[cfg(feature = "psp")]
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::sync::atomic::Ordering;
 
 impl AbilityResolver {
@@ -40,6 +46,7 @@ impl AbilityResolver {
         conditional: bool,
         is_further: bool,
     ) -> Result<(), String> {
+        #[cfg(not(feature = "psp"))]
         let actions_str = effect
             .compound
             .actions
@@ -51,6 +58,7 @@ impl AbilityResolver {
                     .join(",")
             })
             .unwrap_or_default();
+        #[cfg(not(feature = "psp"))]
         eprintln!(
             "[DEBUG_SEQ] execute_sequential_effect called! action={} n_actions={} actions=[{}] effect_ptr={:p}",
             effect.action,
@@ -871,7 +879,7 @@ impl AbilityResolver {
             }
         }
 
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!(
                 "[COND_OPT] opt={:?} cond={:?}",
                 optional_action.is_some(),

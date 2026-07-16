@@ -1,3 +1,5 @@
+#[cfg(feature = "psp")]
+use alloc::{string::{String, ToString}, vec::Vec};
 use crate::card::{Ability, AbilityEffect, Card};
 use crate::Arc;
 use crate::HashMap;
@@ -74,7 +76,7 @@ impl CardLoader {
     fn build_abilities_map_inner(
         abilities_data: &serde_json::Value,
     ) -> HashMap<String, Vec<Ability>> {
-        let mut ability_map: HashMap<String, Vec<Ability>> = HashMap::new();
+        let mut ability_map: HashMap<String, Vec<Ability>> = HashMap::default();
 
         if let Some(unique_abilities) = abilities_data
             .get("unique_abilities")

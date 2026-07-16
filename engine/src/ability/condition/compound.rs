@@ -2,6 +2,8 @@ use super::stage_has_any_member;
 use super::ConditionContext;
 use crate::ability::debug::AbDebug;
 use crate::card::Condition;
+#[cfg(feature = "psp")]
+use alloc::boxed::Box;
 
 impl<'a> ConditionContext<'a> {
     pub(crate) fn evaluate_condition_list(
@@ -72,8 +74,10 @@ impl<'a> ConditionContext<'a> {
                 ),
             );
             let op = condition.get_operator().unwrap_or("and");
+            #[cfg(not(feature = "psp"))]
             let before = crate::ability::log::buffer_len();
             let (passed_count, result) = self.evaluate_condition_list(conditions, op);
+            #[cfg(not(feature = "psp"))]
             let children = crate::ability::log::drain_verdicts_since(before);
             dbg.p(
                 "COMPOUND",
@@ -84,6 +88,7 @@ impl<'a> ConditionContext<'a> {
                     if result { "PASS" } else { "FAIL" }
                 ),
             );
+            #[cfg(not(feature = "psp"))]
             super::push_cond_verdict(
                 condition,
                 &format!("{}/{}", passed_count, conditions.len()),
@@ -93,6 +98,7 @@ impl<'a> ConditionContext<'a> {
             result
         } else {
             log::debug!("[COMPOUND] no conditions array!");
+            #[cfg(not(feature = "psp"))]
             super::push_cond_verdict(condition, "no conditions", true, vec![]);
             true
         }
@@ -100,12 +106,15 @@ impl<'a> ConditionContext<'a> {
 
     pub(crate) fn evaluate_or_condition(&self, condition: &Condition) -> bool {
         if let Some(conditions) = condition.get_conditions() {
+            #[cfg(not(feature = "psp"))]
             let before = crate::ability::log::buffer_len();
-            let (passed_count, result) = self.evaluate_condition_list(conditions, "or");
+            let (cnt, result) = self.evaluate_condition_list(conditions, "or");
+            #[cfg(not(feature = "psp"))]
             let children = crate::ability::log::drain_verdicts_since(before);
+            #[cfg(not(feature = "psp"))]
             super::push_cond_verdict(
                 condition,
-                &format!("{}/{} any", passed_count, conditions.len()),
+                &format!("{}/{} any", cnt, conditions.len()),
                 result,
                 children,
             );

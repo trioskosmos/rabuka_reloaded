@@ -9,6 +9,8 @@ pub fn set_debug(enabled: bool) {
 #[cfg(not(feature = "psp"))]
 pub use inner::AbDebug;
 #[cfg(feature = "psp")]
+use alloc::{string::String, vec::Vec};
+#[cfg(feature = "psp")]
 pub struct AbDebug;
 
 #[cfg(feature = "psp")]

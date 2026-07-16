@@ -7,7 +7,7 @@ use crate::game_state::GameState;
 use crate::zones::MemberArea;
 use crate::HashSet;
 #[cfg(feature = "psp")]
-use alloc::vec::Vec;
+use alloc::{string::{String, ToString}, vec::Vec};
 use serde::{Deserialize, Serialize};
 #[cfg(not(feature = "psp"))]
 use std::vec::Vec;
@@ -42,8 +42,8 @@ pub enum ActionType {
     PassRemaining,
 }
 
-impl std::fmt::Display for ActionType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl core::fmt::Display for ActionType {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match self {
             ActionType::Pass => write!(f, "pass"),
             ActionType::RockChoice => write!(f, "rock_choice"),
@@ -74,7 +74,7 @@ impl std::fmt::Display for ActionType {
     }
 }
 
-impl std::str::FromStr for ActionType {
+impl core::str::FromStr for ActionType {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -262,6 +262,7 @@ fn make_params() -> ActionParameters {
 }
 
 pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
+    #[cfg(not(feature = "psp"))]
     let _timer = crate::timer::Timer::start("generate_possible_actions");
     if let Some(choice) = game_state.get_pending_choice() {
         return generate_pending_choice_actions(game_state, choice);
@@ -956,6 +957,7 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
 }
 
 fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
+    #[cfg(not(feature = "psp"))]
     let _timer = crate::timer::Timer::start("generate_main_phase_actions");
     let active_player = game_state.active_player();
     let mut actions = vec![make_action(ActionType::Pass, "Pass - End Main Phase")];

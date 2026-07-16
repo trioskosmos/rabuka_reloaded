@@ -1,13 +1,25 @@
 #![recursion_limit = "512"]
 #![cfg_attr(feature = "psp", no_std)]
-#![cfg_attr(feature = "psp", feature(alloc_prelude))]
 
 #[cfg(feature = "psp")]
+#[macro_use]
 extern crate alloc;
+
+// PSP stubs for std macros
+#[cfg(feature = "psp")]
+#[macro_export]
+macro_rules! println {
+    ($($arg:tt)*) => {};
+}
+#[cfg(feature = "psp")]
+#[macro_export]
+macro_rules! eprintln {
+    ($($arg:tt)*) => {};
+}
 
 // Platform compat: maps std types to no_std equivalents for PSP
 pub(crate) mod compat;
-pub(crate) use compat::{Arc, HashMap, HashSet, OnceLock, VecDeque};
+pub(crate) use compat::{Arc, HashMap, HashSet, VecDeque};
 
 #[cfg(feature = "alloc_tracker")]
 pub mod alloc_counter;

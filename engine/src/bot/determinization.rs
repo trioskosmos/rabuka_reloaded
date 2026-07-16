@@ -86,7 +86,7 @@ impl DeterminizationSampler {
 
         // Track HOW MANY of each card_no we've seen (not just whether seen).
         // The starting_pool may have multiple copies of the same card_no.
-        let mut seen_counts: HashMap<String, usize> = HashMap::new();
+        let mut seen_counts: HashMap<String, usize> = HashMap::default();
         let mut count_seen = |cid: i16| {
             if let Some(card) = self.card_database.get_card(cid) {
                 *seen_counts.entry(card.card_no.to_string()).or_insert(0) += 1;
@@ -119,7 +119,7 @@ impl DeterminizationSampler {
         }
 
         // Compute remaining pool: starting_pool minus seen_counts
-        let mut starting_counts: HashMap<String, usize> = HashMap::new();
+        let mut starting_counts: HashMap<String, usize> = HashMap::default();
         for cn in starting_pool {
             *starting_counts.entry(cn.clone()).or_insert(0) += 1;
         }

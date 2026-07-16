@@ -2,6 +2,14 @@ use super::enums::{ActionType, Zone};
 use crate::card::{parse_heart_color, AbilityFilter, CardDatabase, DistinctType, Operator};
 use crate::game_state::Duration;
 use crate::{HashMap, HashSet};
+#[cfg(feature = "psp")]
+use alloc::{
+    borrow::Cow,
+    string::{String, ToString},
+    vec::Vec,
+};
+#[cfg(not(feature = "psp"))]
+use std::borrow::Cow;
 
 // ============== MODIFY COST ==============
 
@@ -187,7 +195,7 @@ pub fn calculate_play_cost_reduction(
 /// requires `location == "hand"` are skipped (the aura card is on stage, not
 /// in hand, so the condition is not met).
 fn scan_abilities_for_cost_reduction(
-    abilities: &[std::sync::Arc<crate::card::Ability>],
+    abilities: &[crate::Arc<crate::card::Ability>],
     target_id: i16,
     target_card: &crate::card::Card,
     card_db: &CardDatabase,
@@ -355,17 +363,19 @@ pub fn card_matches_group(
 /// Like `card_matches_group_str` but returns a vec of (reason, result) pairs
 /// for each check so callers can log detailed diagnostics. Disabled by default;
 /// enable via `RABUKA_DEBUG_GROUP=1`.
+#[cfg(feature = "psp")]
+fn debug_group_match(
+    _card_db: &CardDatabase,
+    _card_id: i16,
+    _group_name: Option<&str>,
+    _result: bool,
+) {
+}
+
+#[cfg(not(feature = "psp"))]
 fn debug_group_match(card_db: &CardDatabase, card_id: i16, group_name: Option<&str>, result: bool) {
-    #[cfg(not(feature = "psp"))]
-    {
-        static DEBUG_GROUP: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-        if !*DEBUG_GROUP.get_or_init(|| std::env::var("RABUKA_DEBUG_GROUP").as_deref() == Ok("1")) {
-            return;
-        }
-    }
-    #[cfg(feature = "psp")]
-    {
-        let _ = (card_db, card_id, group_name, result);
+    static DEBUG_GROUP: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if !*DEBUG_GROUP.get_or_init(|| std::env::var("RABUKA_DEBUG_GROUP").as_deref() == Ok("1")) {
         return;
     }
     let card = card_db.get_card(card_id);
@@ -375,11 +385,11 @@ fn debug_group_match(card_db: &CardDatabase, card_id: i16, group_name: Option<&s
     let _group = group_name.unwrap_or("None");
     let checks = match group_name {
         Some(g) => {
-            fn norm(s: &str) -> std::borrow::Cow<'_, str> {
+            fn norm(s: &str) -> Cow<'_, str> {
                 if s.contains('\u{FF01}') {
-                    std::borrow::Cow::Owned(s.replace('\u{FF01}', "!"))
+                    Cow::Owned(s.replace('\u{FF01}', "!"))
                 } else {
-                    std::borrow::Cow::Borrowed(s)
+                    Cow::Borrowed(s)
                 }
             }
             let gn = norm(g);
@@ -424,7 +434,7 @@ pub fn card_matches_group_str(
             // either ！(U+FF01) or !(U+0021).
             // Also normalize µ (micro sign U+00B5) to μ (mu U+03BC) for
             // μ's group matching.
-            fn norm(s: &str) -> std::borrow::Cow<'_, str> {
+            fn norm(s: &str) -> Cow<'_, str> {
                 let has_ff01 = s.contains('\u{FF01}');
                 let has_mu = s.contains('\u{00B5}');
                 if has_ff01 || has_mu {
@@ -436,9 +446,9 @@ pub fn card_matches_group_str(
                     if has_mu {
                         r = r.replace('\u{00B5}', "\u{03BC}");
                     }
-                    std::borrow::Cow::Owned(r)
+                    Cow::Owned(r)
                 } else {
-                    std::borrow::Cow::Borrowed(s)
+                    Cow::Borrowed(s)
                 }
             }
             let gn = norm(g);
@@ -654,7 +664,7 @@ pub fn max_distinct_names(name_sets: &[Vec<String>]) -> DistinctNamesResult {
         // Exhaustive search — tries all combinations of picking one name per card.
         let mut best_distinct = 0usize;
         let mut found_no_collision = false;
-        let mut stack: Vec<(usize, HashSet<String>, bool)> = vec![(0, HashSet::new(), false)];
+        let mut stack: Vec<(usize, HashSet<String>, bool)> = vec![(0, HashSet::default(), false)];
         while let Some((idx, seen, collided)) = stack.pop() {
             if idx == name_sets.len() {
                 best_distinct = best_distinct.max(seen.len());
@@ -676,7 +686,7 @@ pub fn max_distinct_names(name_sets: &[Vec<String>]) -> DistinctNamesResult {
         }
     } else {
         // Greedy fallback: for each card pick the first name not yet used.
-        let mut seen: HashSet<String> = HashSet::new();
+        let mut seen: HashSet<String> = HashSet::default();
         let mut had_collision = false;
         for names in name_sets {
             let mut picked = false;
@@ -1487,7 +1497,7 @@ pub fn filter_distinct(
     if !distinct {
         return ids;
     }
-    let mut seen: HashSet<String> = HashSet::new();
+    let mut seen: HashSet<String> = HashSet::default();
     ids.into_iter()
         .filter(|&i| {
             db.get_card(cards[i])
@@ -1925,7 +1935,7 @@ pub fn resolve_per_unit_count(
     }
     // heart_colors: count unique heart colors across matching stage cards
     if per_unit_type == Some("heart_colors") {
-        let mut colors_found: HashSet<crate::card::HeartColor> = HashSet::new();
+        let mut colors_found: HashSet<crate::card::HeartColor> = HashSet::default();
         let stage_cards = zone_cards(player, Zone::Stage.to_str());
         for &cid in stage_cards {
             if filter.matches(card_db, cid, true) {
@@ -2029,7 +2039,7 @@ pub fn apply_distinct_filter(
     if !should {
         return cards.to_vec();
     }
-    let mut seen = HashSet::new();
+    let mut seen = HashSet::<String>::default();
     cards
         .iter()
         .filter(|&&id| {

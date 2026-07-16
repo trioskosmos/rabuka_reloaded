@@ -5,6 +5,8 @@ use super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 use crate::HashMap;
+#[cfg(feature = "psp")]
+use alloc::{string::{String, ToString}, vec::Vec};
 
 impl AbilityResolver {
     pub fn execute_look_and_select(
@@ -75,7 +77,7 @@ impl AbilityResolver {
 
             let matching_count = matching_indices.len();
             if matching_count == 0 {
-                let cards = std::mem::take(&mut gs.looked_at_cards);
+                let cards = core::mem::take(&mut gs.looked_at_cards);
                 let player_target = effect.target_name();
                 let player = gs.resolve_target_player_mut(player_target);
                 for &card_id in &cards {
@@ -92,9 +94,9 @@ impl AbilityResolver {
             let max_select = if any_number {
                 matching_count
             } else if is_max || optional {
-                std::cmp::min(count as usize, matching_count)
+                core::cmp::min(count as usize, matching_count)
             } else {
-                std::cmp::min(count as usize, matching_count)
+                core::cmp::min(count as usize, matching_count)
             };
 
             let description = if any_number {
@@ -761,7 +763,7 @@ impl AbilityResolver {
 
         let matching_count = matching_indices.len();
         if matching_count == 0 {
-            let cards = std::mem::take(&mut gs.looked_at_cards);
+            let cards = core::mem::take(&mut gs.looked_at_cards);
             let player_target = effect.target_name();
             let player = gs.resolve_target_player_mut(player_target);
             for &card_id in &cards {
@@ -773,9 +775,9 @@ impl AbilityResolver {
         let max_select = if any_number {
             matching_count
         } else if is_max || optional {
-            std::cmp::min(count, matching_count)
+            core::cmp::min(count, matching_count)
         } else {
-            std::cmp::min(count, matching_count)
+            core::cmp::min(count, matching_count)
         };
 
         let description = if any_number {
@@ -952,7 +954,7 @@ impl AbilityResolver {
             let remaining = count - looked.len();
             let player = gs.resolve_target_player_mut(target);
             if !player.main_deck.cards.is_empty() {
-                let more = std::cmp::min(remaining, player.main_deck.cards.len());
+                let more = core::cmp::min(remaining, player.main_deck.cards.len());
                 looked.extend(player.main_deck.draw_multiple(more));
             }
         }
@@ -987,7 +989,7 @@ impl AbilityResolver {
             }
         };
 
-        let mut by_group: HashMap<String, Vec<i16>> = HashMap::new();
+        let mut by_group: HashMap<String, Vec<i16>> = HashMap::default();
         for &card_id in &card_ids {
             let group_name = card_db
                 .get_card(card_id)
@@ -1145,7 +1147,7 @@ impl AbilityResolver {
 
         if let Some(idx) = matched_idx {
             let matched = all_revealed.remove(idx);
-            gs.looked_at_cards = std::iter::once(matched).chain(all_revealed).collect();
+            gs.looked_at_cards = core::iter::once(matched).chain(all_revealed).collect();
         } else {
             gs.looked_at_cards.clear();
         }

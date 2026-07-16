@@ -1,6 +1,8 @@
 use crate::card::{BladeColor, HeartColor};
 use crate::types::AbilityApplication;
 use crate::HashMap;
+#[cfg(feature = "psp")]
+use alloc::{string::{String, ToString}, vec::Vec};
 
 /// Stores both the additive delta and absolute set value for a modifier.
 /// Replaces the old dual-map pattern (`blade_modifiers` + `set_blade_modifiers`).
@@ -12,8 +14,8 @@ pub struct ModifierEntry {
     pub set: i32,
 }
 
-impl std::fmt::Display for ModifierEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for ModifierEntry {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.total())
     }
 }
@@ -83,31 +85,31 @@ impl Default for GameModifiers {
 impl GameModifiers {
     pub fn new() -> Self {
         GameModifiers {
-            blade_modifiers: HashMap::new(),
-            blade_type_modifiers: HashMap::new(),
-            heart_modifiers: HashMap::new(),
-            heart_override: HashMap::new(),
-            orientation_modifiers: HashMap::new(),
-            cost_modifiers: HashMap::new(),
-            score_modifiers: HashMap::new(),
-            need_heart_modifiers: HashMap::new(),
-            constant_blade_bonuses: HashMap::new(),
-            constant_cost_bonuses: HashMap::new(),
-            constant_score_bonuses: HashMap::new(),
-            constant_heart_bonuses: HashMap::new(),
+            blade_modifiers: HashMap::default(),
+            blade_type_modifiers: HashMap::default(),
+            heart_modifiers: HashMap::default(),
+            heart_override: HashMap::default(),
+            orientation_modifiers: HashMap::default(),
+            cost_modifiers: HashMap::default(),
+            score_modifiers: HashMap::default(),
+            need_heart_modifiers: HashMap::default(),
+            constant_blade_bonuses: HashMap::default(),
+            constant_cost_bonuses: HashMap::default(),
+            constant_score_bonuses: HashMap::default(),
+            constant_heart_bonuses: HashMap::default(),
             constant_global_need_heart: Vec::new(),
             p1_constant_total_score_bonus: 0,
             p2_constant_total_score_bonus: 0,
             constant_score_sources: Vec::new(),
-            heart_color_multiplier: HashMap::new(),
+            heart_color_multiplier: HashMap::default(),
             last_cost_discard_count: 0,
             last_cost_moved_card_ids: Vec::new(),
             last_cost_energy_count: 0,
-            delayed_cannot_active: HashMap::new(),
+            delayed_cannot_active: HashMap::default(),
             last_surplus_loss_count: 0,
-            success_zone_blade_bonuses: HashMap::new(),
-            success_zone_heart_bonuses: HashMap::new(),
-            success_zone_score_bonuses: HashMap::new(),
+            success_zone_blade_bonuses: HashMap::default(),
+            success_zone_heart_bonuses: HashMap::default(),
+            success_zone_score_bonuses: HashMap::default(),
         }
     }
 

@@ -50,23 +50,28 @@ mod inner {
 // ── PSP path ────────────────────────────────────────────────────────────────
 #[cfg(feature = "psp")]
 mod inner {
-    use core::sync::atomic::{AtomicU64, Ordering};
+    use core::cell::UnsafeCell;
 
-    static STATE: AtomicU64 = AtomicU64::new(0);
+    struct SyncUnsafeCell<T>(UnsafeCell<T>);
+    unsafe impl<T> Sync for SyncUnsafeCell<T> {}
+
+    static STATE: SyncUnsafeCell<u64> = SyncUnsafeCell(UnsafeCell::new(0));
 
     pub fn seed(seed: u64) {
-        STATE.store(seed, Ordering::Relaxed);
+        unsafe {
+            *STATE.0.get() = seed;
+        }
     }
 
     fn next_u64() -> u64 {
-        let mut s = STATE.load(Ordering::Relaxed);
-        if s == 0 {
-            s = 1;
+        let s = unsafe { *STATE.0.get() };
+        let s = if s == 0 { 1 } else { s };
+        let s = s ^ (s << 13);
+        let s = s ^ (s >> 7);
+        let s = s ^ (s << 17);
+        unsafe {
+            *STATE.0.get() = s;
         }
-        s ^= s << 13;
-        s ^= s >> 7;
-        s ^= s << 17;
-        STATE.store(s, Ordering::Relaxed);
         s
     }
 

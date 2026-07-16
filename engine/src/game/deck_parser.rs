@@ -1,3 +1,5 @@
+#[cfg(feature = "psp")]
+use alloc::{string::{String, ToString}, vec::Vec};
 use std::fs;
 use std::path::Path;
 use std::string::String;

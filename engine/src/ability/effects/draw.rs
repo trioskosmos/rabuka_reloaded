@@ -4,6 +4,11 @@ use super::super::types::{Choice, ExecutionContext};
 use super::super::util;
 use crate::card::{AbilityEffect, DistinctType};
 use crate::game_state::GameState;
+#[cfg(feature = "psp")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use smallvec::SmallVec;
 
 pub(crate) fn draw_cards_for_player(

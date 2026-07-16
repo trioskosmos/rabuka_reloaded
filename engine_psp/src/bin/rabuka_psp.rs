@@ -4,30 +4,25 @@
 extern crate alloc;
 
 use alloc::format;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, Ordering};
 
 use psp::sys::*;
 
 use rabuka_psp::display::Display;
 use rabuka_psp::input::{Button, Input};
 
-static RNG_STATE: AtomicU64 = AtomicU64::new(0);
-
-use rabuka_engine::card::CardDatabase;
-use rabuka_engine::card_loader::CardLoader;
-use rabuka_engine::deck_builder::DeckBuilder;
-use rabuka_engine::deck_parser::DeckParser;
+use rabuka_engine::card::{Card, CardDatabase};
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::player::Player;
+use rabuka_engine::rng;
 use rabuka_engine::turn::TurnEngine;
 
 psp::module!("rabuka", 1, 0);
 
-const CARDS_BIN: &[u8] = include_bytes!("../../baked/cards.bin");
-const DECKS_BIN: &[u8] = include_bytes!("../../baked/decks.bin");
+const CARDS_JSON: &str = include_str!("../../baked/cards.json");
+const DECKS_JSON: &str = include_str!("../../baked/decks.json");
 
 fn psp_main() {
     psp::enable_home_button();
@@ -39,16 +34,21 @@ fn psp_main() {
     display.println("Loading cards...");
     display.swap_buffers();
 
-    let cards =
-        rmp_serde::from_slice::<serde_json::Value>(CARDS_BIN).expect("Failed to deserialize cards");
-    let mut db = CardDatabase::load_or_create(
-        CardLoader::load_cards_from_value(&cards).expect("Failed to load cards"),
-    );
+    // cards.json is a JSON object mapping card_no -> Card
+    let cards_map: serde_json::Map<String, serde_json::Value> =
+        serde_json::from_str(CARDS_JSON).expect("Failed to parse card data");
+    let mut cards: Vec<Card> = Vec::new();
+    for (_key, value) in cards_map {
+        if let Ok(card) = serde_json::from_value(value) {
+            cards.push(card);
+        }
+    }
+    let db = CardDatabase::load_or_create(cards);
     let db = alloc::sync::Arc::new(db);
 
-    let decks_map: hashbrown::HashMap<String, String> =
-        rmp_serde::from_slice(DECKS_BIN).expect("Failed to deserialize decks");
-    let deck_names: Vec<&str> = decks_map.keys().map(|s| s.as_str()).collect();
+    let decks: Vec<DeckEntry> =
+        serde_json::from_str(DECKS_JSON).expect("Failed to parse deck data");
+    let deck_names: Vec<&str> = decks.iter().map(|d| d.name.as_str()).collect();
 
     let deck1_index = select_deck(
         &mut display,
@@ -63,22 +63,26 @@ fn psp_main() {
         "Select Player 2 Deck",
     );
 
-    let deck1_content = &decks_map[deck_names[deck1_index]];
-    let deck2_content = &decks_map[deck_names[deck2_index]];
-
     display.clear();
     display.println(&format!("P1: {}", deck_names[deck1_index]));
     display.println(&format!("P2: {}", deck_names[deck2_index]));
     display.println("Starting game...");
     display.swap_buffers();
 
-    let deck_lists = DeckParser::parse_all_decks_from_strs(&[
-        (deck_names[deck1_index], deck1_content),
-        (deck_names[deck2_index], deck2_content),
-    ])
-    .expect("Failed to parse decks");
+    run_game(
+        &mut display,
+        &mut input,
+        &mut db.clone(),
+        &decks,
+        deck1_index,
+        deck2_index,
+    );
+}
 
-    run_game(&mut display, &mut input, &mut db.clone(), &deck_lists);
+#[derive(serde::Deserialize)]
+struct DeckEntry {
+    name: String,
+    cards: Vec<String>,
 }
 
 fn select_deck(display: &mut Display, input: &mut Input, decks: &[&str], title: &str) -> usize {
@@ -104,35 +108,33 @@ fn run_game(
     display: &mut Display,
     input: &mut Input,
     db: &mut alloc::sync::Arc<CardDatabase>,
-    deck_lists: &[rabuka_engine::deck_parser::DeckList],
+    decks: &[DeckEntry],
+    deck1_idx: usize,
+    deck2_idx: usize,
 ) {
-    let d1 = deck_lists[0].clone();
-    let d2 = if deck_lists.len() > 1 {
-        deck_lists[1].clone()
-    } else {
-        d1.clone()
-    };
+    let d1 = &decks[deck1_idx];
+    let d2 = &decks[deck2_idx];
 
-    let nums1 = DeckParser::deck_list_to_card_numbers(&d1);
-    let nums2 = DeckParser::deck_list_to_card_numbers(&d2);
-
-    let mut pd1 = DeckBuilder::build_deck_from_database(db, nums1).expect("Failed to build deck1");
-    let mut pd2 = DeckBuilder::build_deck_from_database(db, nums2).expect("Failed to build deck2");
-
-    pd1.shuffle_main_deck();
-    pd1.shuffle_energy_deck();
-    pd2.shuffle_main_deck();
-    pd2.shuffle_energy_deck();
-
-    DeckBuilder::add_default_energy_cards_from_database(&mut pd1, db).ok();
-    DeckBuilder::add_default_energy_cards_from_database(&mut pd2, db).ok();
+    let nums1 = resolve_deck(d1, db);
+    let nums2 = resolve_deck(d2, db);
 
     let mut p1 = Player::new("p1".into(), "Player 1".into(), true);
     let mut p2 = Player::new("p2".into(), "Player 2".into(), false);
-    p1.set_main_deck(pd1.main_deck);
-    p1.set_energy_deck(pd1.energy_deck);
-    p2.set_main_deck(pd2.main_deck);
-    p2.set_energy_deck(pd2.energy_deck);
+
+    for &card_id in &nums1 {
+        p1.main_deck.cards.push(card_id);
+    }
+    for &card_id in &nums2 {
+        p2.main_deck.cards.push(card_id);
+    }
+
+    p1.main_deck.shuffle();
+    p2.main_deck.shuffle();
+
+    add_basic_energy(&mut p1, db);
+    add_basic_energy(&mut p2, db);
+    rng::shuffle_slice(&mut p1.energy_deck.cards);
+    rng::shuffle_slice(&mut p2.energy_deck.cards);
 
     let mut gs = GameState::new(p1, p2, db.clone());
     game_setup::setup_game(&mut gs);
@@ -170,6 +172,31 @@ fn run_game(
         }
 
         settle_auto(&mut gs);
+    }
+}
+
+fn resolve_deck(deck: &DeckEntry, db: &CardDatabase) -> Vec<i16> {
+    let mut ids = Vec::new();
+    for card_no in &deck.cards {
+        if let Some(id) = db.get_card_id(card_no) {
+            ids.push(id);
+        }
+    }
+    ids
+}
+
+fn add_basic_energy(player: &mut Player, db: &CardDatabase) {
+    let mut energy_count = 0u32;
+    for (&id, card) in &db.cards {
+        if matches!(card.card_type, rabuka_engine::card::CardType::Energy) {
+            for _ in 0..10 {
+                if energy_count >= 30 {
+                    return;
+                }
+                player.energy_deck.cards.push(id);
+                energy_count += 1;
+            }
+        }
     }
 }
 
@@ -342,18 +369,7 @@ fn init_rng() {
         sceRtcGetCurrentTick(&mut tick);
     }
     let seed = if tick == 0 { 1 } else { tick };
-    RNG_STATE.store(seed, Ordering::Relaxed);
-    // Patch the engine's RNG to use our seed
-    rabuka_engine::rng::set_seed(seed);
-}
-
-fn rand_u32() -> u32 {
-    let mut s = RNG_STATE.load(Ordering::Relaxed);
-    s ^= s << 13;
-    s ^= s >> 7;
-    s ^= s << 17;
-    RNG_STATE.store(s, Ordering::Relaxed);
-    s as u32
+    rng::seed(seed);
 }
 
 fn wait_frames(n: u32) {

@@ -3,6 +3,11 @@ use super::super::resolver::AbilityResolver;
 use super::super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
+#[cfg(feature = "psp")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use smallvec::SmallVec;
 
 impl AbilityResolver {
@@ -24,7 +29,7 @@ impl AbilityResolver {
         self_target: bool,
         heart_colors: &[String],
     ) -> Result<(), String> {
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             eprintln!(
                 "[SCORE_DIAG] execute_modify_score called: value={} target={} op={} condition={:?}",
                 value,

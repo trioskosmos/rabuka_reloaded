@@ -1,6 +1,11 @@
 use crate::game_state::{AbilityTrigger, GameState};
 use crate::types::LogEntry;
 use crate::HashSet;
+#[cfg(feature = "psp")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 impl super::TurnEngine {
     pub(crate) fn trigger_debut_abilities(
@@ -95,7 +100,7 @@ impl super::TurnEngine {
                                         continue;
                                     }
                                     if crate::ability::debug::ABILITY_DEBUG
-                                        .load(std::sync::atomic::Ordering::Relaxed)
+                                        .load(core::sync::atomic::Ordering::Relaxed)
                                     {
                                         let card_name = &card.name;
                                         let pp = player_id_clone.clone();
@@ -216,7 +221,7 @@ impl super::TurnEngine {
     }
 
     pub fn trigger_live_start_abilities(game_state: &mut GameState, player_id: &str) {
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             eprintln!(
                 "[TLS_ENTER] player={} phase={:?} turn_phase={:?}",
                 player_id, game_state.current_phase, game_state.current_turn_phase
@@ -234,7 +239,7 @@ impl super::TurnEngine {
         let mut abilities_to_trigger: Vec<(String, String, Option<i16>)> = Vec::new();
         // Track (card_id, ability_idx) to prevent the same card's ability from
         // firing twice when the card is both a stage member AND a live card.
-        let mut seen: HashSet<(i16, usize)> = HashSet::new();
+        let mut seen: HashSet<(i16, usize)> = HashSet::default();
 
         {
             let player = if player_id_clone == game_state.player1.id {
@@ -242,14 +247,15 @@ impl super::TurnEngine {
             } else {
                 &game_state.player2
             };
-            if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
                 eprintln!(
                     "[TLS_LIVE] player={} live_zone_cards={:?} stage={:?}",
                     player_id, player.live_card_zone.cards, player.stage.stage
                 );
             }
             for card_id in &player.live_card_zone.cards {
-                if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
+                {
                     eprintln!(
                         "[TLS_LIVE] checking card={} negated={}",
                         card_id,
@@ -261,7 +267,7 @@ impl super::TurnEngine {
                 }
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
                     if crate::ability::debug::ABILITY_DEBUG
-                        .load(std::sync::atomic::Ordering::Relaxed)
+                        .load(core::sync::atomic::Ordering::Relaxed)
                     {
                         eprintln!(
                             "[TLS_LIVE] card_id={} card_no={} abilities={}",
@@ -272,7 +278,7 @@ impl super::TurnEngine {
                     }
                     for (aidx, ability) in card.abilities.iter().enumerate() {
                         if crate::ability::debug::ABILITY_DEBUG
-                            .load(std::sync::atomic::Ordering::Relaxed)
+                            .load(core::sync::atomic::Ordering::Relaxed)
                         {
                             eprintln!("[TLS_LIVE]   aidx={} triggers={:?}", aidx, ability.triggers);
                         }
@@ -283,7 +289,7 @@ impl super::TurnEngine {
                         {
                             if seen.insert((*card_id, aidx)) {
                                 if crate::ability::debug::ABILITY_DEBUG
-                                    .load(std::sync::atomic::Ordering::Relaxed)
+                                    .load(core::sync::atomic::Ordering::Relaxed)
                                 {
                                     let card_name = &card.name;
                                     let pp = player_id_clone.clone();
@@ -341,7 +347,7 @@ impl super::TurnEngine {
                             {
                                 if seen.insert((card_id, aidx)) {
                                     if crate::ability::debug::ABILITY_DEBUG
-                                        .load(std::sync::atomic::Ordering::Relaxed)
+                                        .load(core::sync::atomic::Ordering::Relaxed)
                                     {
                                         let card_name = &card.name;
                                         let pp = player_id_clone.clone();
@@ -422,7 +428,7 @@ impl super::TurnEngine {
         // sources, ensuring should_trigger_live_success uses the correct requirements.
         // IMPORTANT: use a set to deduplicate (cid,color) pairs — the same global
         // modifier may appear in multiple players' snapshots, causing double-counting.
-        let mut restored: HashSet<(i16, crate::card::HeartColor)> = HashSet::new();
+        let mut restored: HashSet<(i16, crate::card::HeartColor)> = HashSet::default();
         for snap in &game_state.performance_snapshots {
             for (cid, colors) in &snap.performance_need_heart_modifiers {
                 for (color, entry) in colors {
@@ -446,7 +452,7 @@ impl super::TurnEngine {
 
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();
-        let mut seen: HashSet<(i16, usize)> = HashSet::new();
+        let mut seen: HashSet<(i16, usize)> = HashSet::default();
 
         // LiveSuccess only triggers when the live card's need_heart is satisfied
         if !game_state.should_trigger_live_success(if player_id_clone == game_state.player1.id {
@@ -493,7 +499,7 @@ impl super::TurnEngine {
                                     continue;
                                 }
                                 if crate::ability::debug::ABILITY_DEBUG
-                                    .load(std::sync::atomic::Ordering::Relaxed)
+                                    .load(core::sync::atomic::Ordering::Relaxed)
                                 {
                                     let card_name = &card.name;
                                     let pp = player_id_clone.clone();
@@ -540,7 +546,7 @@ impl super::TurnEngine {
                                         continue;
                                     }
                                     if crate::ability::debug::ABILITY_DEBUG
-                                        .load(std::sync::atomic::Ordering::Relaxed)
+                                        .load(core::sync::atomic::Ordering::Relaxed)
                                     {
                                         let pp = player_id_clone.clone();
                                         game_state.structured_log.push(LogEntry {
@@ -588,7 +594,7 @@ impl super::TurnEngine {
                             continue;
                         }
                         if crate::ability::debug::ABILITY_DEBUG
-                            .load(std::sync::atomic::Ordering::Relaxed)
+                            .load(core::sync::atomic::Ordering::Relaxed)
                         {
                             let card_name = &card.name;
                             let pp = player_id_clone.clone();
@@ -625,7 +631,7 @@ impl super::TurnEngine {
                                     continue;
                                 }
                                 if crate::ability::debug::ABILITY_DEBUG
-                                    .load(std::sync::atomic::Ordering::Relaxed)
+                                    .load(core::sync::atomic::Ordering::Relaxed)
                                 {
                                     let pp = player_id_clone.clone();
                                     game_state.structured_log.push(LogEntry {

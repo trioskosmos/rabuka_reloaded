@@ -1,4 +1,5 @@
 pub mod card;
+#[cfg(not(feature = "psp"))]
 pub mod card_loader;
 pub mod constants;
 pub mod game_modifiers;

@@ -1,4 +1,3 @@
-#[cfg(feature = "3ds")]
 extern "C" {
     // Outputs to both debug console (svcOutputDebugString) AND top screen (consoleSelect+printf)
     fn _3ds_tdbg(msg: *const u8);
@@ -27,7 +26,7 @@ impl GameState {
         // that may deadlock via Mutex fallback. Use a plain bool on GameState
         // OR skip the debug check entirely on 3DS.
         #[cfg(not(feature = "3ds"))]
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!("[SZ_DEBUG] recalculate_constants ENTERED");
         }
         tdbg!("RC:1 ATOMIC_LOAD_OK");
@@ -35,10 +34,10 @@ impl GameState {
         tdbg!("RC:2 COLLECT_EFFECTS_OK len={}", entries.len());
         self.mods.constant_score_sources.clear();
 
-        let mut exp_blade: HashMap<i16, i32> = HashMap::new();
-        let mut exp_cost: HashMap<i16, i32> = HashMap::new();
-        let mut exp_score: HashMap<i16, i32> = HashMap::new();
-        let mut exp_heart: HashMap<i16, HashMap<String, i32>> = HashMap::new();
+        let mut exp_blade: HashMap<i16, i32> = HashMap::default();
+        let mut exp_cost: HashMap<i16, i32> = HashMap::default();
+        let mut exp_score: HashMap<i16, i32> = HashMap::default();
+        let mut exp_heart: HashMap<i16, HashMap<String, i32>> = HashMap::default();
         let mut exp_prohibition: Vec<String> = Vec::new();
         self.constant_cannot_activate_members.clear();
         let mut exp_global_need_heart: Vec<(i16, String, i32)> = Vec::new();
@@ -48,7 +47,7 @@ impl GameState {
         tdbg!("RC:3 VEC_HASHMAP_INIT_OK");
 
         // Compute stage positions for all entries before creating resolver
-        let mut entry_positions: HashMap<i16, Option<usize>> = HashMap::new();
+        let mut entry_positions: HashMap<i16, Option<usize>> = HashMap::default();
         for &cid in self
             .player1
             .stage
@@ -492,7 +491,7 @@ impl GameState {
 
         // Blade
         tdbg!("RC:7 BLADE");
-        let old_blade = std::mem::take(&mut self.mods.constant_blade_bonuses);
+        let old_blade = core::mem::take(&mut self.mods.constant_blade_bonuses);
         for (cid, val) in &old_blade {
             self.mods.remove_blade_modifier(*cid, *val);
         }
@@ -503,7 +502,7 @@ impl GameState {
 
         // Cost
         tdbg!("RC:8 COST");
-        let old_cost = std::mem::take(&mut self.mods.constant_cost_bonuses);
+        let old_cost = core::mem::take(&mut self.mods.constant_cost_bonuses);
         for (cid, val) in &old_cost {
             self.mods.remove_cost_modifier(*cid, *val);
         }
@@ -514,7 +513,7 @@ impl GameState {
 
         // Score
         tdbg!("RC:9 SCORE");
-        let old_score = std::mem::take(&mut self.mods.constant_score_bonuses);
+        let old_score = core::mem::take(&mut self.mods.constant_score_bonuses);
         for (cid, val) in &old_score {
             self.mods.remove_score_modifier(*cid, *val);
         }
@@ -530,7 +529,7 @@ impl GameState {
         // Heart — clear old constant heart modifiers first, then re-apply new ones.
         tdbg!("RC:10 HEART");
         // Must drain the OLD map so bonuses from cards that left the stage are removed.
-        let old_heart = std::mem::take(&mut self.mods.constant_heart_bonuses);
+        let old_heart = core::mem::take(&mut self.mods.constant_heart_bonuses);
         for (cid, cols) in &old_heart {
             for (color_str, &delta) in cols {
                 let hc = crate::card::parse_heart_color(color_str);
@@ -557,7 +556,7 @@ impl GameState {
 
         tdbg!("RC:12 GLOBAL_NEED_HEART");
         // Clear old constant global need_heart modifiers, then re-apply new ones.
-        let old_global_nh = std::mem::take(&mut self.mods.constant_global_need_heart);
+        let old_global_nh = core::mem::take(&mut self.mods.constant_global_need_heart);
         for (card_id, color_str, delta) in &old_global_nh {
             let hc = crate::card::parse_heart_color(color_str);
             self.mods.add_need_heart_modifier(*card_id, hc, -*delta);
@@ -595,7 +594,7 @@ impl GameState {
             })
             .collect();
 
-        let mut expected: HashMap<i16, i32> = HashMap::new();
+        let mut expected: HashMap<i16, i32> = HashMap::default();
         {
             let ctx = crate::ability::condition::ConditionContext::new(self);
             for &(cid, ref effect) in &blade_abilities {
@@ -654,7 +653,7 @@ impl GameState {
             }
         }
 
-        let old_bonuses = std::mem::take(&mut self.mods.constant_blade_bonuses);
+        let old_bonuses = core::mem::take(&mut self.mods.constant_blade_bonuses);
         for (cid, old) in &old_bonuses {
             self.mods.remove_blade_modifier(*cid, *old);
         }
@@ -663,7 +662,7 @@ impl GameState {
         }
         self.mods.constant_blade_bonuses = expected;
         self.recalculate_constant_cost_modifiers();
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!("[SZ_DEBUG] about to call evaluate_success_zone_constant_modifiers from recalculate_constants");
         }
         self.evaluate_success_zone_constant_modifiers();
@@ -695,7 +694,7 @@ impl GameState {
                 });
         cost_abilities.extend(hand_cost_abilities);
 
-        let mut expected: HashMap<i16, i32> = HashMap::new();
+        let mut expected: HashMap<i16, i32> = HashMap::default();
         {
             let ctx = crate::ability::condition::ConditionContext::new(self);
             for &(cid, ref effect) in &cost_abilities {
@@ -784,7 +783,7 @@ impl GameState {
             }
         }
 
-        let old_bonuses = std::mem::take(&mut self.mods.constant_cost_bonuses);
+        let old_bonuses = core::mem::take(&mut self.mods.constant_cost_bonuses);
         for (cid, old) in &old_bonuses {
             self.mods.remove_cost_modifier(*cid, *old);
         }
@@ -1143,7 +1142,7 @@ impl GameState {
     }
 
     pub fn remove_from_source_hands(&mut self, card_ids: &[i16]) {
-        let mut seen = HashSet::new();
+        let mut seen = HashSet::<i16>::default();
         for &cid in card_ids {
             if !seen.insert(cid) {
                 continue;
@@ -1210,7 +1209,7 @@ impl GameState {
     pub fn evaluate_success_zone_constant_modifiers(&mut self) {
         use crate::ability::condition::ConditionContext;
 
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!("[SZ_DEBUG] evaluate_success_zone_constant_modifiers called");
             log::debug!(
                 "[SZ_DEBUG] p1 success zone = {:?}",
@@ -1223,24 +1222,24 @@ impl GameState {
         }
 
         // ── Clear previously-applied success zone bonuses ──
-        let old_sz_blade = std::mem::take(&mut self.mods.success_zone_blade_bonuses);
+        let old_sz_blade = core::mem::take(&mut self.mods.success_zone_blade_bonuses);
         for (cid, val) in &old_sz_blade {
             self.mods.remove_blade_modifier(*cid, *val);
         }
-        let old_sz_heart = std::mem::take(&mut self.mods.success_zone_heart_bonuses);
+        let old_sz_heart = core::mem::take(&mut self.mods.success_zone_heart_bonuses);
         for (cid, cols) in &old_sz_heart {
             for (color_str, delta) in cols {
                 let hc = crate::card::parse_heart_color(color_str);
                 self.mods.remove_heart_modifier(*cid, hc, *delta);
             }
         }
-        let old_sz_score = std::mem::take(&mut self.mods.success_zone_score_bonuses);
+        let old_sz_score = core::mem::take(&mut self.mods.success_zone_score_bonuses);
         for (cid, val) in &old_sz_score {
             self.mods.remove_score_modifier(*cid, *val);
         }
 
         // Track non-stackable effects locally so they are reset each evaluation
-        let mut local_non_stackable: HashSet<String> = HashSet::new();
+        let mut local_non_stackable: HashSet<String> = HashSet::default();
 
         let zone_cards_p1 = self.player1.success_live_card_zone.cards.clone();
         let zone_cards_p2 = self.player2.success_live_card_zone.cards.clone();
@@ -1277,14 +1276,14 @@ impl GameState {
                 _ => None,
             };
             let ctx = ConditionContext::new_with_self(self, self_player);
-            if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
                 log::debug!("[SZ_DEBUG] cid={} effect={}", cid, effect.action);
             }
             let cond_met = effect
                 .condition
                 .as_ref()
                 .is_none_or(|c| ctx.evaluate_condition(c));
-            if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
                 log::debug!("[SZ_DEBUG] cond_met={}", cond_met);
             }
             if !cond_met {
@@ -1377,7 +1376,8 @@ impl GameState {
                     },
                     _ => owner_player,
                 };
-                if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
+                {
                     log::debug!(
                         "[SZ_DEBUG] GainResource resource={} amount={} target={} position={:?}",
                         resource,
@@ -1423,7 +1423,8 @@ impl GameState {
                     .map(|(_, &id)| id)
                     .collect();
 
-                if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
+                {
                     log::debug!(
                         "[SZ_DEBUG] GainResource resource={} amount={}",
                         resource,
@@ -1439,7 +1440,7 @@ impl GameState {
                     "blade" | "ブレード" => {
                         for &target_id in &candidates {
                             if crate::ability::debug::ABILITY_DEBUG
-                                .load(std::sync::atomic::Ordering::Relaxed)
+                                .load(core::sync::atomic::Ordering::Relaxed)
                             {
                                 log::debug!(
                                     "[SZ_DEBUG] ADDING blade {} to target {}",

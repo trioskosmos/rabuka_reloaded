@@ -5,6 +5,8 @@ use crate::ability::resolver::AbilityResolver;
 use crate::ability::types::Choice;
 use crate::card::{Ability, AbilityEffect};
 use crate::game_state::AbilityTrigger;
+#[cfg(feature = "psp")]
+use alloc::{string::{String, ToString}, vec::Vec};
 
 /// Unique identifier for an ability instance in the queue
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -285,7 +287,7 @@ impl AbilityQueue {
                     snapshot_energy_placed_by_effect: false,
                     snapshot_energy_placed_by_player: None,
                     choice_effect_text: None,
-                    condition_cache: HashMap::new(),
+                    condition_cache: HashMap::default(),
                 };
                 self.entries.push(dummy_entry);
                 self.state = QueueState::WaitingForChoice {
@@ -387,7 +389,7 @@ impl AbilityQueue {
             snapshot_energy_placed_by_effect: false,
             snapshot_energy_placed_by_player: None,
             choice_effect_text: None,
-            condition_cache: HashMap::new(),
+            condition_cache: HashMap::default(),
         });
         self.state = QueueState::ExecutingEffect { entry_index: idx };
     }
@@ -429,7 +431,7 @@ impl AbilityQueue {
     /// Drain and return pending actions from the current entry.
     pub fn take_pending_actions(&mut self) -> Vec<AbilityEffect> {
         if let Some(entry) = self.current_entry_mut() {
-            std::mem::take(&mut entry.pending_actions)
+            core::mem::take(&mut entry.pending_actions)
         } else {
             Vec::new()
         }

@@ -6,7 +6,16 @@ use crate::card::{AbilityEffect, PlacementOrder, PositionInfo};
 use crate::core::types::ArcStr;
 use crate::game_state::GameState;
 use crate::{HashMap, HashSet};
+#[cfg(feature = "psp")]
+use alloc::{
+    borrow::Cow,
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
 use smallvec::SmallVec;
+#[cfg(not(feature = "psp"))]
+use std::borrow::Cow;
 
 impl AbilityResolver {
     pub(crate) fn execute_reveal_effect(
@@ -577,7 +586,7 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+        if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!("[GR_ENTER] resource={:?} count={:?} target_count={:?} source={:?} card_type={:?} target={:?} exclude_self={:?} target_from_sel={:?}",
                 effect.resource_any(), effect.count, effect.target_count_any(), effect.source_any(), effect.card_type_any(), effect.target, effect.exclude_self_any(), effect.target_from_selection_any());
         }
@@ -606,14 +615,14 @@ impl AbilityResolver {
                 })
                 .collect();
             let _ = player;
-            if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
                 eprintln!("[GR_SELECTED_CARD] entering branch. selected_cards={:?} target_ids={:?} gs.activating={:?}",
                     self.selected_cards, target_ids, gs.activating_card);
             }
             if let Some(&selected_id) = self.selected_cards.first() {
                 if let Some(selected_card) = card_db.get_card(selected_id) {
                     if crate::ability::debug::ABILITY_DEBUG
-                        .load(std::sync::atomic::Ordering::Relaxed)
+                        .load(core::sync::atomic::Ordering::Relaxed)
                     {
                         eprintln!(
                             "[GR_SELECTED_BH] selected_id={} has_base_heart={} hearts_count={}",
@@ -630,7 +639,7 @@ impl AbilityResolver {
                         for &(color, _) in &base_heart.hearts {
                             for &target_id in &target_ids {
                                 if crate::ability::debug::ABILITY_DEBUG
-                                    .load(std::sync::atomic::Ordering::Relaxed)
+                                    .load(core::sync::atomic::Ordering::Relaxed)
                                 {
                                     eprintln!(
                                         "[GR_APPLY] target={} color={:?} before={}",
@@ -648,7 +657,7 @@ impl AbilityResolver {
                                     &effect.text,
                                 );
                                 if crate::ability::debug::ABILITY_DEBUG
-                                    .load(std::sync::atomic::Ordering::Relaxed)
+                                    .load(core::sync::atomic::Ordering::Relaxed)
                                 {
                                     eprintln!(
                                         "[GR_APPLY] target={} color={:?} after={}",
@@ -1044,7 +1053,7 @@ impl AbilityResolver {
                     .copied()
                     .collect()
             } else {
-                HashSet::new()
+                HashSet::default()
             };
         let (blade_targets, mut heart_targets, heart_color_str, final_count) = {
             let mut filter = effect.filter_subset();
@@ -1517,7 +1526,8 @@ impl AbilityResolver {
                         .take(final_count as usize)
                         .collect()
                 };
-                if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
+                {
                     log::debug!(
                         "[BLADE_APPLY] targets={:?} is_all={} final_count={} blades_to_add={}",
                         targets,
@@ -2606,7 +2616,7 @@ impl AbilityResolver {
         // (c) evicted card from a position that was taken by another planned move.
         let player = gs.resolve_target_player_mut(target);
         let old_stage = player.stage.stage;
-        let old_under = std::mem::take(&mut player.stage.under_cards);
+        let old_under = core::mem::take(&mut player.stage.under_cards);
         let mut new_stage = [-1i16; 3];
         let mut new_under = [
             smallvec::SmallVec::new(),
@@ -2772,7 +2782,7 @@ impl AbilityResolver {
 
         // destination "front" means the area in front of the activating member
         // (mirrored position on opponent's stage per Rule 4.5.7).
-        let dest_owned: std::borrow::Cow<'_, str> = if destination == "front" {
+        let dest_owned: Cow<'_, str> = if destination == "front" {
             let front_pos = gs.activating_card.and_then(|cid| {
                 let player = gs.resolve_target_player("self");
                 let idx = player.stage.stage.iter().position(|&id| id == cid)?;
@@ -2788,9 +2798,9 @@ impl AbilityResolver {
                     crate::zones::MemberArea::RightSide => Some("right"),
                 }
             });
-            std::borrow::Cow::Owned(front_pos.unwrap_or("left").to_string())
+            Cow::Owned(front_pos.unwrap_or("left").to_string())
         } else {
-            std::borrow::Cow::Borrowed(destination)
+            Cow::Borrowed(destination)
         };
         let destination = dest_owned.as_ref();
 

@@ -2,6 +2,8 @@
 // These correspond to the trigger text embedded in card abilities in abilities.json.
 
 /// Ability activation trigger: "起動" — player-initiated, once per turn
+#[cfg(feature = "psp")]
+use alloc::string::{String, ToString};
 pub const ACTIVATION: &str = "起動";
 /// Auto trigger: "自動" — fires automatically when its condition is met.
 /// Sub-types are distinguished by condition.text keywords and
