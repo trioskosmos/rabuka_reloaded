@@ -4,7 +4,7 @@ use super::types::{AbilityTraceNode, Choice, ExecutionContext, StepOutput, ZoneS
 use crate::ability::debug::ABILITY_DEBUG;
 use crate::card::{AbilityEffect, Condition};
 use crate::game_state::GameState;
-use std::sync::atomic::Ordering;
+use core::sync::atomic::Ordering;
 
 impl AbilityResolver {
     // Rule 9.2.1.1 / Q94 / Q107 / Q217: Sequential effect execution

@@ -1,11 +1,11 @@
 use crate::card::{Ability, AbilityEffect, Card};
+use crate::Arc;
+use crate::HashMap;
 use serde_json;
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::string::String;
-use std::sync::Arc;
 use std::vec::Vec;
 
 pub struct CardLoader;

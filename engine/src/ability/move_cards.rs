@@ -5,6 +5,7 @@ use super::util;
 use crate::card::{AbilityEffect, CardDatabase, DistinctType, Operator, PlacementOrder};
 use crate::game_state::GameState;
 use crate::player::Player;
+use crate::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MoveCardsTarget {
@@ -1455,7 +1456,7 @@ impl AbilityResolver {
             || distinct == Some(DistinctType::True)
             || distinct == Some(DistinctType::Distinct)
         {
-            let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+            let mut seen: HashSet<String> = HashSet::new();
             taken.retain(|&id| {
                 card_db
                     .get_card(id)
@@ -2509,8 +2510,7 @@ impl AbilityResolver {
         // Validate per-group constraint before removing cards
         if let Some(mpg) = max_per_group {
             let card_db = &gs.card_database;
-            let mut group_counts: std::collections::HashMap<String, u32> =
-                std::collections::HashMap::new();
+            let mut group_counts: HashMap<String, u32> = HashMap::new();
             for &idx in indices {
                 if idx < looked_at.len() {
                     let cid = looked_at[idx];

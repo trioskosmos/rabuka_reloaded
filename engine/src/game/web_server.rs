@@ -3,7 +3,7 @@ use actix_files as fs;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use crate::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -1804,7 +1804,7 @@ async fn sse_events(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::UnboundedReceiverStream;
 
-    let room_id = actix_web::web::Query::<std::collections::HashMap<String, String>>::from_query(
+    let room_id = actix_web::web::Query::<HashMap<String, String>>::from_query(
         req.query_string(),
     )
     .ok()
@@ -2217,7 +2217,7 @@ pub async fn rooms_join(
 
             // Assign new player
 
-            let taken_pids: std::collections::HashSet<i32> =
+            let taken_pids: HashSet<i32> =
                 room.sessions.values().map(|s| s.player_id).collect();
 
             if !taken_pids.contains(&0) {
@@ -2359,7 +2359,7 @@ async fn init_game(
 
     // Map frontend deck names to deck file names
 
-    let deck_name_mapping = std::collections::HashMap::from([
+    let deck_name_mapping = HashMap::from([
         ("Aqours Cup", "aqours_cup"),
         ("Muse Cup", "muse_cup"),
         ("Nijigaku Cup", "nijigaku_cup"),

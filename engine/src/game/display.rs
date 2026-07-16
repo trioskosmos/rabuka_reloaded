@@ -6,8 +6,8 @@ use crate::game_state::GameState;
 use crate::player::Player;
 use crate::types::PerformanceSnapshot;
 use crate::zones::Orientation;
+use crate::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 fn heart_color_index(color: &HeartColor) -> Option<usize> {
     Some(match color {
@@ -189,7 +189,7 @@ pub struct PlayerDisplay {
     #[serde(default)]
     pub last_resolution_cards: Vec<CardDisplay>,
     #[serde(default)]
-    pub score_modifiers: std::collections::HashMap<i16, i32>,
+    pub score_modifiers: HashMap<i16, i32>,
     #[serde(default)]
     pub total_hearts: Vec<u32>,
     #[serde(default)]
@@ -199,13 +199,13 @@ pub struct PlayerDisplay {
     #[serde(default)]
     pub current_score: u32,
     #[serde(default)]
-    pub live_card_scores: std::collections::HashMap<String, u32>,
+    pub live_card_scores: HashMap<String, u32>,
     #[serde(default)]
     pub gained_abilities: Vec<String>,
     #[serde(default)]
     pub active_restrictions: Vec<String>,
     #[serde(default)]
-    pub need_heart_modifiers: std::collections::HashMap<String, Vec<i32>>,
+    pub need_heart_modifiers: HashMap<String, Vec<i32>>,
     #[serde(default)]
     pub mulligan_selection: Option<Vec<usize>>,
     #[serde(default)]
@@ -280,7 +280,7 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub structured_log: Vec<crate::types::LogEntry>,
     #[serde(default)]
-    pub performance_results: Option<std::collections::HashMap<String, PerformanceSnapshot>>,
+    pub performance_results: Option<HashMap<String, PerformanceSnapshot>>,
     #[serde(default)]
     pub performance_history: Vec<PerformanceSnapshot>,
     #[serde(default)]
@@ -358,8 +358,7 @@ pub struct GameStateDisplay {
     /// highlight it as "moved this batch". The Vec length tells you how
     /// many times it moved (usually 1, up to 3 for a full rotation).
     #[serde(default)]
-    pub position_changes_by_card:
-        std::collections::HashMap<i16, Vec<crate::types::PositionChangeEvent>>,
+    pub position_changes_by_card: HashMap<i16, Vec<crate::types::PositionChangeEvent>>,
     #[serde(default)]
     pub formation_change_occurred_this_turn: bool,
     #[serde(default)]
@@ -383,9 +382,9 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub turn_limited_abilities_used: Vec<String>,
     #[serde(default)]
-    pub auto_ability_trigger_counts: std::collections::HashMap<String, u32>,
+    pub auto_ability_trigger_counts: HashMap<String, u32>,
     #[serde(default)]
-    pub turn_limit_usage: std::collections::HashMap<String, u32>,
+    pub turn_limit_usage: HashMap<String, u32>,
     #[serde(default)]
     pub non_stackable_effects: Vec<String>,
     #[serde(default)]
@@ -438,9 +437,9 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub turn1_abilities_played: Vec<String>,
     #[serde(default)]
-    pub turn2_abilities_played: std::collections::HashMap<String, u32>,
+    pub turn2_abilities_played: HashMap<String, u32>,
     #[serde(default)]
-    pub card_instance_mapping: std::collections::HashMap<String, u32>,
+    pub card_instance_mapping: HashMap<String, u32>,
     #[serde(default)]
     pub card_instance_counter: u32,
 
@@ -480,7 +479,7 @@ pub struct GameStateDisplay {
     #[serde(default)]
     pub heart_color_decision_phase: String,
     #[serde(default)]
-    pub live_owned_hearts: std::collections::HashMap<String, Vec<[String; 2]>>,
+    pub live_owned_hearts: HashMap<String, Vec<[String; 2]>>,
     #[serde(default)]
     pub opponent_choice_declined: bool,
     #[serde(default)]
@@ -502,24 +501,23 @@ pub struct GameStateDisplay {
 
     // GameModifiers constant* breakdown
     #[serde(default)]
-    pub constant_blade_bonuses: std::collections::HashMap<i16, i32>,
+    pub constant_blade_bonuses: HashMap<i16, i32>,
     #[serde(default)]
-    pub constant_cost_bonuses: std::collections::HashMap<i16, i32>,
+    pub constant_cost_bonuses: HashMap<i16, i32>,
     #[serde(default)]
-    pub constant_score_bonuses: std::collections::HashMap<i16, i32>,
+    pub constant_score_bonuses: HashMap<i16, i32>,
     #[serde(default)]
-    pub constant_heart_bonuses:
-        std::collections::HashMap<i16, std::collections::HashMap<String, i32>>,
+    pub constant_heart_bonuses: HashMap<i16, HashMap<String, i32>>,
     #[serde(default)]
     pub constant_global_need_heart: Vec<[String; 3]>,
     #[serde(default)]
     pub constant_score_sources: Vec<[String; 3]>,
     #[serde(default)]
-    pub blade_type_modifiers: std::collections::HashMap<i16, String>,
+    pub blade_type_modifiers: HashMap<i16, String>,
     #[serde(default)]
-    pub heart_override: std::collections::HashMap<i16, [String; 2]>,
+    pub heart_override: HashMap<i16, [String; 2]>,
     #[serde(default)]
-    pub delayed_cannot_active: std::collections::HashMap<i16, u32>,
+    pub delayed_cannot_active: HashMap<i16, u32>,
     #[serde(default)]
     pub last_cost_discard_count: u32,
     #[serde(default)]
@@ -630,11 +628,11 @@ pub fn card_to_display_full(
     // Additive modifiers (accumulated via add_* / +=) — shown with +/- prefix
     blade_additive: i32,
     score_additive: i32,
-    heart_additive: &std::collections::HashMap<crate::card::HeartColor, i32>,
+    heart_additive: &HashMap<crate::card::HeartColor, i32>,
     // Absolute set/override modifiers (set via set_*) — shown without +/- prefix
     blade_set: i32,
     score_set: i32,
-    heart_set: &std::collections::HashMap<crate::card::HeartColor, i32>,
+    heart_set: &HashMap<crate::card::HeartColor, i32>,
     cost_additive: i32,
     cost_set: i32,
     heart_transform: Option<crate::card::HeartColor>,
@@ -772,22 +770,16 @@ pub fn zone_to_display(card_ids: &[i16], card_db: &CardDatabase) -> ZoneDisplay 
 pub fn zone_to_display_full(
     card_ids: &[i16],
     card_db: &CardDatabase,
-    blade_additive: &std::collections::HashMap<i16, i32>,
-    blade_set: &std::collections::HashMap<i16, i32>,
-    score_additive: &std::collections::HashMap<i16, i32>,
-    score_set: &std::collections::HashMap<i16, i32>,
-    heart_additive: &std::collections::HashMap<
-        i16,
-        std::collections::HashMap<crate::card::HeartColor, i32>,
-    >,
-    heart_set: &std::collections::HashMap<
-        i16,
-        std::collections::HashMap<crate::card::HeartColor, i32>,
-    >,
-    heart_color_multiplier: &std::collections::HashMap<i16, crate::card::HeartColor>,
-    cost_additive: &std::collections::HashMap<i16, i32>,
-    cost_set: &std::collections::HashMap<i16, i32>,
-    bonus_triggers: &std::collections::HashMap<i16, Vec<String>>,
+    blade_additive: &HashMap<i16, i32>,
+    blade_set: &HashMap<i16, i32>,
+    score_additive: &HashMap<i16, i32>,
+    score_set: &HashMap<i16, i32>,
+    heart_additive: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    heart_set: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    heart_color_multiplier: &HashMap<i16, crate::card::HeartColor>,
+    cost_additive: &HashMap<i16, i32>,
+    cost_set: &HashMap<i16, i32>,
+    bonus_triggers: &HashMap<i16, Vec<String>>,
 ) -> ZoneDisplay {
     ZoneDisplay {
         cards: card_ids
@@ -818,23 +810,17 @@ pub fn zone_to_display_full(
 pub fn stage_to_display(
     stage: &crate::zones::Stage,
     card_db: &CardDatabase,
-    blade_additive: &std::collections::HashMap<i16, i32>,
-    blade_set: &std::collections::HashMap<i16, i32>,
-    orientation_modifiers: &std::collections::HashMap<i16, String>,
-    heart_additive: &std::collections::HashMap<
-        i16,
-        std::collections::HashMap<crate::card::HeartColor, i32>,
-    >,
-    heart_set: &std::collections::HashMap<
-        i16,
-        std::collections::HashMap<crate::card::HeartColor, i32>,
-    >,
-    score_additive: &std::collections::HashMap<i16, i32>,
-    score_set: &std::collections::HashMap<i16, i32>,
-    heart_color_multiplier: &std::collections::HashMap<i16, crate::card::HeartColor>,
-    cost_additive: &std::collections::HashMap<i16, i32>,
-    cost_set: &std::collections::HashMap<i16, i32>,
-    bonus_triggers: &std::collections::HashMap<i16, Vec<String>>,
+    blade_additive: &HashMap<i16, i32>,
+    blade_set: &HashMap<i16, i32>,
+    orientation_modifiers: &HashMap<i16, String>,
+    heart_additive: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    heart_set: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    score_additive: &HashMap<i16, i32>,
+    score_set: &HashMap<i16, i32>,
+    heart_color_multiplier: &HashMap<i16, crate::card::HeartColor>,
+    cost_additive: &HashMap<i16, i32>,
+    cost_set: &HashMap<i16, i32>,
+    bonus_triggers: &HashMap<i16, Vec<String>>,
 ) -> StageDisplay {
     let blade_add = |cid: i16| blade_additive.get(&cid).copied().unwrap_or(0);
     let blade_set_fn = |cid: i16| blade_set.get(&cid).copied().unwrap_or(0);
@@ -933,41 +919,32 @@ pub fn player_to_display(
     player: &Player,
     card_db: &CardDatabase,
     // Combined modifier totals (additive + set) — used for score/stat computations
-    blade_modifiers: &std::collections::HashMap<i16, i32>,
-    score_modifiers: &std::collections::HashMap<i16, i32>,
-    heart_modifiers: &std::collections::HashMap<
-        i16,
-        std::collections::HashMap<crate::card::HeartColor, i32>,
-    >,
+    blade_modifiers: &HashMap<i16, i32>,
+    score_modifiers: &HashMap<i16, i32>,
+    heart_modifiers: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
     // ── Set/override maps ──────────────────────────────────────────
     // These hold the "set" portion of ModifierEntry (absolute overrides).
     // Extracted separately so card badges can display them without +/-.
     // See CardDisplay doc for the full additive-vs-set breakdown.
-    blade_set: &std::collections::HashMap<i16, i32>,
-    score_set: &std::collections::HashMap<i16, i32>,
-    heart_set: &std::collections::HashMap<
-        i16,
-        std::collections::HashMap<crate::card::HeartColor, i32>,
-    >,
-    orientation_modifiers: &std::collections::HashMap<i16, String>,
-    gained_abilities: &std::collections::HashMap<i16, Vec<String>>,
-    need_heart_modifiers: &std::collections::HashMap<
-        i16,
-        std::collections::HashMap<crate::card::HeartColor, i32>,
-    >,
+    blade_set: &HashMap<i16, i32>,
+    score_set: &HashMap<i16, i32>,
+    heart_set: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    orientation_modifiers: &HashMap<i16, String>,
+    gained_abilities: &HashMap<i16, Vec<String>>,
+    need_heart_modifiers: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
     prohibition_effects: &[String],
     cannot_activate_members: &[String],
     mulligan_selection: Option<&[usize]>,
     live_card_selection: Option<&[usize]>,
-    heart_color_multiplier: &std::collections::HashMap<i16, crate::card::HeartColor>,
+    heart_color_multiplier: &HashMap<i16, crate::card::HeartColor>,
     // Cost modifier totals (additive + set)
-    cost_modifiers: &std::collections::HashMap<i16, i32>,
-    cost_set: &std::collections::HashMap<i16, i32>,
+    cost_modifiers: &HashMap<i16, i32>,
+    cost_set: &HashMap<i16, i32>,
     // ── Gained ability trigger texticon badges ─────────────────────
     // Populated from gained_card_abilities in game_state_to_display.
     // Each entry is a trigger type name → frontend renders texticon.
     // gain_ability without this would leave no icon on the card.
-    bonus_triggers: &std::collections::HashMap<i16, Vec<String>>,
+    bonus_triggers: &HashMap<i16, Vec<String>>,
 ) -> PlayerDisplay {
     let energy_cards: Vec<(i16, Option<Orientation>)> = player
         .energy_zone
@@ -1089,7 +1066,7 @@ pub fn player_to_display(
     }
 
     // Compute live_card_scores: card_no -> total score
-    let mut live_card_scores = std::collections::HashMap::new();
+    let mut live_card_scores = HashMap::new();
     for &cid in &player.live_card_zone.cards {
         if let Some(card) = card_db.get_card(cid) {
             let base = card.score.unwrap_or(0);
@@ -1123,7 +1100,7 @@ pub fn player_to_display(
     }
 
     // Collect gained abilities for this player's cards
-    let player_card_ids: std::collections::HashSet<i16> = player
+    let player_card_ids: HashSet<i16> = player
         .stage
         .stage
         .iter()
@@ -1143,7 +1120,7 @@ pub fn player_to_display(
     }
 
     // Collect need_heart_modifiers for live cards (card_no -> [h00..h06] modifiers)
-    let mut nh_mods = std::collections::HashMap::new();
+    let mut nh_mods = HashMap::new();
     for (&cid, colors) in need_heart_modifiers {
         if player.live_card_zone.cards.contains(&cid)
             || player.success_live_card_zone.cards.contains(&cid)
@@ -1203,29 +1180,26 @@ pub fn player_to_display(
     });
 
     // Compute additive maps = total - set (for bonus_* display)
-    let blade_additive: std::collections::HashMap<i16, i32> = blade_modifiers
+    let blade_additive: HashMap<i16, i32> = blade_modifiers
         .iter()
         .map(|(&k, &total)| (k, total - blade_set.get(&k).copied().unwrap_or(0)))
         .collect();
-    let score_additive: std::collections::HashMap<i16, i32> = score_modifiers
+    let score_additive: HashMap<i16, i32> = score_modifiers
         .iter()
         .map(|(&k, &total)| (k, total - score_set.get(&k).copied().unwrap_or(0)))
         .collect();
-    let heart_additive: std::collections::HashMap<
-        i16,
-        std::collections::HashMap<crate::card::HeartColor, i32>,
-    > = heart_modifiers
+    let heart_additive: HashMap<i16, HashMap<crate::card::HeartColor, i32>> = heart_modifiers
         .iter()
         .map(|(&k, colors)| {
             let set_colors = heart_set.get(&k).cloned().unwrap_or_default();
-            let add: std::collections::HashMap<crate::card::HeartColor, i32> = colors
+            let add: HashMap<crate::card::HeartColor, i32> = colors
                 .iter()
                 .map(|(&c, &total)| (c, total - set_colors.get(&c).copied().unwrap_or(0)))
                 .collect();
             (k, add)
         })
         .collect();
-    let cost_additive: std::collections::HashMap<i16, i32> = cost_modifiers
+    let cost_additive: HashMap<i16, i32> = cost_modifiers
         .iter()
         .map(|(&k, &total)| (k, total - cost_set.get(&k).copied().unwrap_or(0)))
         .collect();
@@ -1413,9 +1387,9 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
 
     // Build performance results (grouped by player_id)
     let perf_history = game_state.performance_snapshots.clone();
-    let mut perf_results: Option<std::collections::HashMap<String, PerformanceSnapshot>> = None;
+    let mut perf_results: Option<HashMap<String, PerformanceSnapshot>> = None;
     if !perf_history.is_empty() {
-        let mut map = std::collections::HashMap::new();
+        let mut map = HashMap::new();
         for snap in &perf_history {
             map.insert(snap.player_id.clone(), snap.clone());
         }
@@ -1466,49 +1440,42 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         .is_some_and(|id| *id == game_state.player2.id)
         .then_some(game_state.live_card_selected_indices.as_slice());
 
-    let mut blade_flat: std::collections::HashMap<i16, i32> =
-        std::collections::HashMap::with_capacity(game_state.mods.blade_modifiers.len());
-    let mut blade_set_flat: std::collections::HashMap<i16, i32> =
-        std::collections::HashMap::with_capacity(game_state.mods.blade_modifiers.len());
+    let mut blade_flat: HashMap<i16, i32> =
+        HashMap::with_capacity(game_state.mods.blade_modifiers.len());
+    let mut blade_set_flat: HashMap<i16, i32> =
+        HashMap::with_capacity(game_state.mods.blade_modifiers.len());
     for (&k, v) in &game_state.mods.blade_modifiers {
         blade_flat.insert(k, v.total());
         blade_set_flat.insert(k, v.set);
     }
 
-    let mut score_flat: std::collections::HashMap<i16, i32> =
-        std::collections::HashMap::with_capacity(game_state.mods.score_modifiers.len());
-    let mut score_set_flat: std::collections::HashMap<i16, i32> =
-        std::collections::HashMap::with_capacity(game_state.mods.score_modifiers.len());
+    let mut score_flat: HashMap<i16, i32> =
+        HashMap::with_capacity(game_state.mods.score_modifiers.len());
+    let mut score_set_flat: HashMap<i16, i32> =
+        HashMap::with_capacity(game_state.mods.score_modifiers.len());
     for (&k, v) in &game_state.mods.score_modifiers {
         score_flat.insert(k, v.total());
         score_set_flat.insert(k, v.set);
     }
 
-    let mut heart_flat: std::collections::HashMap<
-        i16,
-        std::collections::HashMap<crate::card::HeartColor, i32>,
-    > = std::collections::HashMap::with_capacity(game_state.mods.heart_modifiers.len());
-    let mut heart_set_flat: std::collections::HashMap<
-        i16,
-        std::collections::HashMap<crate::card::HeartColor, i32>,
-    > = std::collections::HashMap::with_capacity(game_state.mods.heart_modifiers.len());
+    let mut heart_flat: HashMap<i16, HashMap<crate::card::HeartColor, i32>> =
+        HashMap::with_capacity(game_state.mods.heart_modifiers.len());
+    let mut heart_set_flat: HashMap<i16, HashMap<crate::card::HeartColor, i32>> =
+        HashMap::with_capacity(game_state.mods.heart_modifiers.len());
     for (&k, colors) in &game_state.mods.heart_modifiers {
-        let total: std::collections::HashMap<crate::card::HeartColor, i32> =
+        let total: HashMap<crate::card::HeartColor, i32> =
             colors.iter().map(|(&c, e)| (c, e.total())).collect();
-        let set: std::collections::HashMap<crate::card::HeartColor, i32> =
+        let set: HashMap<crate::card::HeartColor, i32> =
             colors.iter().map(|(&c, e)| (c, e.set)).collect();
         heart_flat.insert(k, total);
         heart_set_flat.insert(k, set);
     }
-    let need_heart_flat: std::collections::HashMap<
-        i16,
-        std::collections::HashMap<crate::card::HeartColor, i32>,
-    > = game_state
+    let need_heart_flat: HashMap<i16, HashMap<crate::card::HeartColor, i32>> = game_state
         .mods
         .need_heart_modifiers
         .iter()
         .map(|(&k, colors)| {
-            let flat: std::collections::HashMap<crate::card::HeartColor, i32> =
+            let flat: HashMap<crate::card::HeartColor, i32> =
                 colors.iter().map(|(&c, e)| (c, e.total())).collect();
             (k, flat)
         })
@@ -1518,10 +1485,10 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     let blade_set_flat2 = blade_set_flat.clone();
     let score_flat2 = score_flat.clone();
     let score_set_flat2 = score_set_flat.clone();
-    let mut cost_flat: std::collections::HashMap<i16, i32> =
-        std::collections::HashMap::with_capacity(game_state.mods.cost_modifiers.len());
-    let mut cost_set_flat: std::collections::HashMap<i16, i32> =
-        std::collections::HashMap::with_capacity(game_state.mods.cost_modifiers.len());
+    let mut cost_flat: HashMap<i16, i32> =
+        HashMap::with_capacity(game_state.mods.cost_modifiers.len());
+    let mut cost_set_flat: HashMap<i16, i32> =
+        HashMap::with_capacity(game_state.mods.cost_modifiers.len());
     for (&k, v) in &game_state.mods.cost_modifiers {
         cost_flat.insert(k, v.total());
         cost_set_flat.insert(k, v.set);
@@ -1542,8 +1509,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     // Without this, gain_ability effects would leave NO visible indicator
     // that the card has a gained ability, even though the effect (e.g.
     // +1 score, extra blade) applies.
-    let mut bonus_triggers: std::collections::HashMap<i16, Vec<String>> =
-        std::collections::HashMap::new();
+    let mut bonus_triggers: HashMap<i16, Vec<String>> = HashMap::new();
     // Also scan gained_abilities (flat strings, used by older code path)
     // for trigger keywords and record matching texticons.
     for (&card_id, texts) in &game_state.gained_abilities {
@@ -1786,7 +1752,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         position_change_occurred_this_turn: game_state.position_change_occurred_this_turn,
         position_changes: game_state.position_change_events.clone(),
         position_changes_by_card: {
-            let mut map = std::collections::HashMap::new();
+            let mut map = HashMap::new();
             for event in &game_state.position_change_events {
                 map.entry(event.moved_card_id)
                     .or_insert_with(Vec::new)

@@ -4,6 +4,7 @@ use super::types::{Choice, ChoiceRoute, ExecutionContext, LookAndSelectStep};
 use super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
+use crate::HashMap;
 
 impl AbilityResolver {
     pub fn execute_look_and_select(
@@ -986,8 +987,7 @@ impl AbilityResolver {
             }
         };
 
-        let mut by_group: std::collections::HashMap<String, Vec<i16>> =
-            std::collections::HashMap::new();
+        let mut by_group: HashMap<String, Vec<i16>> = HashMap::new();
         for &card_id in &card_ids {
             let group_name = card_db
                 .get_card(card_id)

@@ -16,7 +16,6 @@ macro_rules! tdbg {
 macro_rules! tdbg {
     ($($arg:tt)*) => {};
 }
-
 impl GameState {
     /// Re-evaluate all constant (常時) abilities on all stage members.
     /// Handles gain_resource(blade, heart), modify_score, modify_cost.
@@ -36,11 +35,10 @@ impl GameState {
         tdbg!("RC:2 COLLECT_EFFECTS_OK len={}", entries.len());
         self.mods.constant_score_sources.clear();
 
-        let mut exp_blade: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
-        let mut exp_cost: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
-        let mut exp_score: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
-        let mut exp_heart: std::collections::HashMap<i16, std::collections::HashMap<String, i32>> =
-            std::collections::HashMap::new();
+        let mut exp_blade: HashMap<i16, i32> = HashMap::new();
+        let mut exp_cost: HashMap<i16, i32> = HashMap::new();
+        let mut exp_score: HashMap<i16, i32> = HashMap::new();
+        let mut exp_heart: HashMap<i16, HashMap<String, i32>> = HashMap::new();
         let mut exp_prohibition: Vec<String> = Vec::new();
         self.constant_cannot_activate_members.clear();
         let mut exp_global_need_heart: Vec<(i16, String, i32)> = Vec::new();
@@ -50,8 +48,7 @@ impl GameState {
         tdbg!("RC:3 VEC_HASHMAP_INIT_OK");
 
         // Compute stage positions for all entries before creating resolver
-        let mut entry_positions: std::collections::HashMap<i16, Option<usize>> =
-            std::collections::HashMap::new();
+        let mut entry_positions: HashMap<i16, Option<usize>> = HashMap::new();
         for &cid in self
             .player1
             .stage
@@ -598,7 +595,7 @@ impl GameState {
             })
             .collect();
 
-        let mut expected: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
+        let mut expected: HashMap<i16, i32> = HashMap::new();
         {
             let ctx = crate::ability::condition::ConditionContext::new(self);
             for &(cid, ref effect) in &blade_abilities {
@@ -698,7 +695,7 @@ impl GameState {
                 });
         cost_abilities.extend(hand_cost_abilities);
 
-        let mut expected: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
+        let mut expected: HashMap<i16, i32> = HashMap::new();
         {
             let ctx = crate::ability::condition::ConditionContext::new(self);
             for &(cid, ref effect) in &cost_abilities {
@@ -1146,7 +1143,7 @@ impl GameState {
     }
 
     pub fn remove_from_source_hands(&mut self, card_ids: &[i16]) {
-        let mut seen = std::collections::HashSet::new();
+        let mut seen = HashSet::new();
         for &cid in card_ids {
             if !seen.insert(cid) {
                 continue;
@@ -1243,8 +1240,7 @@ impl GameState {
         }
 
         // Track non-stackable effects locally so they are reset each evaluation
-        let mut local_non_stackable: std::collections::HashSet<String> =
-            std::collections::HashSet::new();
+        let mut local_non_stackable: HashSet<String> = HashSet::new();
 
         let zone_cards_p1 = self.player1.success_live_card_zone.cards.clone();
         let zone_cards_p2 = self.player2.success_live_card_zone.cards.clone();

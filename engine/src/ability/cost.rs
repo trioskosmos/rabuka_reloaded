@@ -310,7 +310,9 @@ impl AbilityResolver {
                         .iter()
                         .filter_map(|&i| {
                             if i < pl.hand.cards.len() {
-                                card_db.get_card(pl.hand.cards[i]).map(|c| c.name.to_string())
+                                card_db
+                                    .get_card(pl.hand.cards[i])
+                                    .map(|c| c.name.to_string())
                             } else {
                                 None
                             }

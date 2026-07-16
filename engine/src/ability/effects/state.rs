@@ -6,6 +6,8 @@ use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 use smallvec::SmallVec;
 
+use crate::HashMap;
+
 impl AbilityResolver {
     pub(crate) fn execute_change_state(
         &mut self,
@@ -412,7 +414,7 @@ impl AbilityResolver {
 
             // Snapshot orientations BEFORE applying any changes (for active→wait
             // and wait→active transition detection).
-            let snapshots: std::collections::HashMap<i16, Option<String>> = actual_targets
+            let snapshots: HashMap<i16, Option<String>> = actual_targets
                 .iter()
                 .map(|(_, card_id)| {
                     (

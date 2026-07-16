@@ -8,7 +8,7 @@ use super::util;
 use crate::ability::debug::ABILITY_DEBUG;
 use crate::card::{AbilityEffect, EffectKind};
 use crate::game_state::GameState;
-use std::sync::atomic::Ordering;
+use core::sync::atomic::Ordering;
 
 pub(crate) struct SelectionContext {
     #[allow(dead_code)]

@@ -1,6 +1,6 @@
 use crate::card::{BladeColor, HeartColor};
 use crate::types::AbilityApplication;
-use std::collections::HashMap;
+use crate::HashMap;
 
 /// Stores both the additive delta and absolute set value for a modifier.
 /// Replaces the old dual-map pattern (`blade_modifiers` + `set_blade_modifiers`).

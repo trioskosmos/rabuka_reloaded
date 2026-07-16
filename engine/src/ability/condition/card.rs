@@ -7,6 +7,7 @@ use crate::ability::util::compare_counts;
 use crate::card::{
     AbilityFilter, CardProperty, CardState, ComparisonTarget, Condition, HeartColor,
 };
+use crate::{HashMap, HashSet};
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1021,8 +1022,7 @@ impl<'a> ConditionContext<'a> {
 
         let pass = match distinct_type {
             "cost" => {
-                let mut seen_costs: std::collections::HashSet<u32> =
-                    std::collections::HashSet::new();
+                let mut seen_costs: HashSet<u32> = HashSet::new();
                 for &cid in cards.iter() {
                     if let Some(card) = card_db.get_card(cid) {
                         let cost = card.cost.unwrap_or(0);
@@ -1039,7 +1039,7 @@ impl<'a> ConditionContext<'a> {
                 }
             }
             "group_name" => {
-                let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+                let mut seen: HashSet<String> = HashSet::new();
                 for &cid in cards.iter() {
                     if let Some(card) = card_db.get_card(cid) {
                         if !card.group.is_empty() {
@@ -1613,8 +1613,7 @@ impl<'a> ConditionContext<'a> {
             };
             match distinct_type {
                 "cost" => {
-                    let mut distinct_costs: std::collections::HashSet<u32> =
-                        std::collections::HashSet::new();
+                    let mut distinct_costs: HashSet<u32> = HashSet::new();
                     for &cid in &combined {
                         if cid == -1 {
                             continue;
@@ -1641,8 +1640,7 @@ impl<'a> ConditionContext<'a> {
                     compare_counts(operator, count, count_threshold)
                 }
                 "group_name" => {
-                    let mut distinct_groups: std::collections::HashSet<String> =
-                        std::collections::HashSet::new();
+                    let mut distinct_groups: HashSet<String> = HashSet::new();
                     for &cid in &combined {
                         if cid == -1 {
                             continue;
@@ -1786,7 +1784,7 @@ impl<'a> ConditionContext<'a> {
                 .iter()
                 .map(|s| crate::zones::parse_heart_color(s))
                 .collect();
-            let mut present = std::collections::HashSet::new();
+            let mut present = HashSet::new();
             for &cid in &source_cards {
                 if cid == -1 {
                     continue;
@@ -2231,7 +2229,7 @@ impl<'a> ConditionContext<'a> {
                         .iter()
                         .map(|s| crate::zones::parse_heart_color(s))
                         .collect();
-                    let mut present = std::collections::HashSet::new();
+                    let mut present = HashSet::new();
                     let is_blade = condition.get_heart_source() == Some("blade");
                     for &cid in &self.game_state.revealed_cards {
                         if cid == -1 {
@@ -2327,8 +2325,7 @@ impl<'a> ConditionContext<'a> {
                     |d| matches!(d, crate::core::card::DistinctInfo::String(s) if s == "cost"),
                 );
                 if is_distinct_cost {
-                    let mut distinct_costs: std::collections::HashSet<u32> =
-                        std::collections::HashSet::new();
+                    let mut distinct_costs: HashSet<u32> = HashSet::new();
                     for &cid in &stage_cards {
                         if cid == -1 {
                             continue;
@@ -2349,7 +2346,7 @@ impl<'a> ConditionContext<'a> {
                         .iter()
                         .map(|s| crate::zones::parse_heart_color(s))
                         .collect();
-                    let mut present = std::collections::HashSet::new();
+                    let mut present = HashSet::new();
                     let is_blade = condition.get_heart_source() == Some("blade");
                     for &cid in &stage_cards {
                         if cid == -1 {
@@ -2624,8 +2621,7 @@ impl<'a> ConditionContext<'a> {
             } else {
                 stage_cards
             };
-            let mut name_counts: std::collections::HashMap<String, u32> =
-                std::collections::HashMap::new();
+            let mut name_counts: HashMap<String, u32> = HashMap::new();
             for &cid in &stage_cards {
                 if cid == -1 {
                     continue;
@@ -3539,7 +3535,7 @@ impl<'a> ConditionContext<'a> {
         };
         match distinct_type {
             "cost" => {
-                let mut seen: std::collections::HashSet<u32> = std::collections::HashSet::new();
+                let mut seen: HashSet<u32> = HashSet::new();
                 for &cid in &matching {
                     if let Some(card) = card_db.get_card(cid) {
                         let cost = card.cost.unwrap_or(0);
@@ -3551,7 +3547,7 @@ impl<'a> ConditionContext<'a> {
                 seen.len() as u32
             }
             "group_name" => {
-                let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+                let mut seen: HashSet<String> = HashSet::new();
                 for &cid in &matching {
                     if let Some(card) = card_db.get_card(cid) {
                         seen.insert(card.group.to_string());
@@ -3671,7 +3667,7 @@ impl<'a> ConditionContext<'a> {
                         self.game_state.mods.p2_constant_total_score_bonus
                     };
 
-                    let score_flat: std::collections::HashMap<i16, i32> = self
+                    let score_flat: HashMap<i16, i32> = self
                         .game_state
                         .mods
                         .score_modifiers
@@ -4272,7 +4268,7 @@ impl<'a> ConditionContext<'a> {
                         .collect(),
                     _ => vec![],
                 };
-                let bm_flat: std::collections::HashMap<i16, i32> = self
+                let bm_flat: HashMap<i16, i32> = self
                     .game_state
                     .mods
                     .blade_modifiers

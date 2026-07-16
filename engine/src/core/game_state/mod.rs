@@ -5,7 +5,8 @@ use crate::constants::DEFAULT_HISTORY_SIZE;
 use crate::core::game_modifiers::GameModifiers;
 use crate::player::Player;
 use crate::zones::{MemberArea, ResolutionZone};
-use std::sync::Arc;
+use crate::Arc;
+use crate::{HashMap, HashSet};
 
 pub use crate::types::{
     AbilityApplication, AbilityBonus, AbilityTrigger, Adjustment, Allocation, BladeSource,
@@ -28,36 +29,36 @@ pub struct GameState {
     pub max_state_history_size: usize,
     pub rule_log: Vec<String>,
     pub structured_log: Vec<LogEntry>,
-    pub turn1_abilities_played: std::collections::HashSet<String>,
-    pub turn2_abilities_played: std::collections::HashMap<String, u32>,
-    pub live_owned_hearts: std::collections::HashMap<String, Vec<(String, u32)>>,
+    pub turn1_abilities_played: HashSet<String>,
+    pub turn2_abilities_played: HashMap<String, u32>,
+    pub live_owned_hearts: HashMap<String, Vec<(String, u32)>>,
     pub temporary_effects: Vec<TemporaryEffect>,
     pub prohibition_effects: Vec<String>,
     pub delayed_prohibition_effects: Vec<String>,
-    pub non_stackable_effects: std::collections::HashSet<String>,
+    pub non_stackable_effects: HashSet<String>,
     pub cannot_activate_members: Vec<String>,
-    pub constant_cannot_activate_members: std::collections::HashSet<String>,
+    pub constant_cannot_activate_members: HashSet<String>,
     pub cannot_live_players: Vec<String>,
-    pub turn_limited_abilities_used: std::collections::HashMap<(i16, usize, u32), u8>,
+    pub turn_limited_abilities_used: HashMap<(i16, usize, u32), u8>,
     pub mulligan_selected_indices: Vec<usize>,
     pub live_card_selected_indices: Vec<usize>,
-    pub auto_ability_trigger_counts: std::collections::HashMap<String, u32>,
-    pub turn_limit_usage: std::collections::HashMap<String, u32>,
-    pub card_instance_mapping: std::collections::HashMap<i16, u32>,
-    pub areas_placed_this_turn: std::collections::HashSet<String>,
-    pub cards_appeared_this_turn: std::collections::HashSet<i16>,
-    pub card_appearance_source: std::collections::HashMap<i16, String>,
-    pub cards_moved_this_turn: std::collections::HashSet<i16>,
-    pub gained_abilities: std::collections::HashMap<i16, Vec<String>>,
+    pub auto_ability_trigger_counts: HashMap<String, u32>,
+    pub turn_limit_usage: HashMap<String, u32>,
+    pub card_instance_mapping: HashMap<i16, u32>,
+    pub areas_placed_this_turn: HashSet<String>,
+    pub cards_appeared_this_turn: HashSet<i16>,
+    pub card_appearance_source: HashMap<i16, String>,
+    pub cards_moved_this_turn: HashSet<i16>,
+    pub gained_abilities: HashMap<i16, Vec<String>>,
     /// Full Ability structs dynamically added to cards via gain_ability.
     /// These are scanned by the trigger pipeline alongside original card abilities.
-    pub gained_card_abilities: std::collections::HashMap<i16, Vec<crate::card::Ability>>,
+    pub gained_card_abilities: HashMap<i16, Vec<crate::card::Ability>>,
     /// Gained effects that couldn't be evaluated at constant time (e.g. because
     /// they depend on revealed_cards from the yell).  Stored as `(card_id, effect)`
     /// and evaluated during `execute_live_victory_determination` when the yell
     /// results are available.
     pub delayed_gained_effects: Vec<(i16, crate::card::AbilityEffect)>,
-    pub negated_abilities: std::collections::HashSet<i16>,
+    pub negated_abilities: HashSet<i16>,
     pub replacement_effects: Vec<ReplacementEffect>,
     pub constant_ability_statuses: Vec<crate::types::ConstantAbilityStatus>,
     pub revealed_cards: Vec<i16>,
@@ -106,7 +107,7 @@ pub struct GameState {
     /// Snapshot of target cards' orientations taken before a change_state
     /// effect executes. Compared after the effect to detect actual transitions.
     /// None = no snapshot active.
-    pub state_snapshot_before_change: Option<std::collections::HashMap<i16, Option<String>>>,
+    pub state_snapshot_before_change: Option<HashMap<i16, Option<String>>>,
     /// After a change_state effect executes, records what actually changed:
     /// (card_id, from_state, to_state). Cleared after post-resolution TAS scan.
     pub recently_state_changed: Vec<(i16, String, String)>,
@@ -120,7 +121,7 @@ pub struct GameState {
     pub cheer_checks_required: u32,
     pub cheer_checks_done: u32,
     pub card_instance_counter: u32,
-    pub baton_touch_count: std::collections::HashMap<String, u32>,
+    pub baton_touch_count: HashMap<String, u32>,
     pub baton_touch_arriving_card_ids: Vec<i16>,
     pub effect_creation_counter: u32,
     pub last_state_change_wait_to_active_count: u32,
@@ -146,7 +147,7 @@ pub struct GameState {
     /// Batch-scoped set of ability IDs already enqueued during the current movement batch.
     /// Prevents each_time/movement abilities from being re-enqueued across multiple
     /// post-resolution TAS scans within the same batch. Cleared at post-loop batch scan.
-    pub this_batch_triggered_ability_ids: std::collections::HashSet<String>,
+    pub this_batch_triggered_ability_ids: HashSet<String>,
     /// Cutoff index for depth-first each_time drain. Entries enqueued at >= this index
     /// are newly-triggered (each_time watchers) and must be force-resolved before
     /// stale entries are offered to the player. Set by process_player_abilities and
@@ -235,30 +236,30 @@ impl GameState {
             max_state_history_size: DEFAULT_HISTORY_SIZE,
             rule_log: Vec::new(),
             structured_log: Vec::new(),
-            turn1_abilities_played: std::collections::HashSet::new(),
-            turn2_abilities_played: std::collections::HashMap::new(),
-            live_owned_hearts: std::collections::HashMap::new(),
+            turn1_abilities_played: HashSet::new(),
+            turn2_abilities_played: HashMap::new(),
+            live_owned_hearts: HashMap::new(),
             temporary_effects: Vec::new(),
             prohibition_effects: Vec::new(),
             delayed_prohibition_effects: Vec::new(),
-            non_stackable_effects: std::collections::HashSet::new(),
+            non_stackable_effects: HashSet::new(),
             cannot_activate_members: Vec::new(),
-            constant_cannot_activate_members: std::collections::HashSet::new(),
+            constant_cannot_activate_members: HashSet::new(),
             cannot_live_players: Vec::new(),
-            turn_limited_abilities_used: std::collections::HashMap::new(),
+            turn_limited_abilities_used: HashMap::new(),
             mulligan_selected_indices: Vec::new(),
             live_card_selected_indices: Vec::new(),
-            auto_ability_trigger_counts: std::collections::HashMap::new(),
-            turn_limit_usage: std::collections::HashMap::new(),
-            card_instance_mapping: std::collections::HashMap::new(),
-            areas_placed_this_turn: std::collections::HashSet::new(),
-            cards_appeared_this_turn: std::collections::HashSet::new(),
-            card_appearance_source: std::collections::HashMap::new(),
-            cards_moved_this_turn: std::collections::HashSet::new(),
-            gained_abilities: std::collections::HashMap::new(),
-            gained_card_abilities: std::collections::HashMap::new(),
+            auto_ability_trigger_counts: HashMap::new(),
+            turn_limit_usage: HashMap::new(),
+            card_instance_mapping: HashMap::new(),
+            areas_placed_this_turn: HashSet::new(),
+            cards_appeared_this_turn: HashSet::new(),
+            card_appearance_source: HashMap::new(),
+            cards_moved_this_turn: HashSet::new(),
+            gained_abilities: HashMap::new(),
+            gained_card_abilities: HashMap::new(),
             delayed_gained_effects: Vec::new(),
-            negated_abilities: std::collections::HashSet::new(),
+            negated_abilities: HashSet::new(),
             replacement_effects: Vec::new(),
             constant_ability_statuses: Vec::new(),
             revealed_cards: Vec::new(),
@@ -297,7 +298,7 @@ impl GameState {
             cheer_checks_required: 0,
             cheer_checks_done: 0,
             card_instance_counter: 0,
-            baton_touch_count: std::collections::HashMap::new(),
+            baton_touch_count: HashMap::new(),
             baton_touch_arriving_card_ids: Vec::new(),
             effect_creation_counter: 0,
             last_state_change_wait_to_active_count: 0,
@@ -312,7 +313,7 @@ impl GameState {
             activating_card: None,
             activating_ability_index: None,
             just_completed_ability_key: None,
-            this_batch_triggered_ability_ids: std::collections::HashSet::new(),
+            this_batch_triggered_ability_ids: HashSet::new(),
             depth_first_cutoff: None,
             // 1-byte aligned
             rps_winner: None,
@@ -662,8 +663,8 @@ impl GameState {
     }
 
     /// Snapshot current zone sizes for delta tracking.
-    pub fn zone_snapshot(&self) -> std::collections::HashMap<String, usize> {
-        let mut m = std::collections::HashMap::new();
+    pub fn zone_snapshot(&self) -> HashMap<String, usize> {
+        let mut m = HashMap::new();
         for (prefix, p) in [("P1", &self.player1), ("P2", &self.player2)] {
             m.insert(format!("{}.hand", prefix), p.hand.len());
             m.insert(format!("{}.deck", prefix), p.main_deck.len());
@@ -680,15 +681,10 @@ impl GameState {
     }
 
     /// Log zone deltas from before/after snapshots.
-    pub fn log_zone_delta(
-        &mut self,
-        before: &std::collections::HashMap<String, usize>,
-        category: &str,
-    ) {
+    pub fn log_zone_delta(&mut self, before: &HashMap<String, usize>, category: &str) {
         let after = self.zone_snapshot();
         let mut parts: Vec<String> = Vec::new();
-        let all_keys: std::collections::HashSet<String> =
-            before.keys().chain(after.keys()).cloned().collect();
+        let all_keys: HashSet<String> = before.keys().chain(after.keys()).cloned().collect();
         let mut sorted: Vec<&String> = all_keys.iter().collect();
         sorted.sort();
         for key in sorted {

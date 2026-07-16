@@ -7,7 +7,7 @@ use crate::zones::{
 use crate::card::CardDatabase;
 use crate::core::game_modifiers::{GameModifiers, ModifierEntry};
 
-use std::collections::VecDeque;
+use crate::{HashMap, HashSet, VecDeque};
 
 #[derive(Debug, Clone)]
 
@@ -43,7 +43,7 @@ pub struct Player {
     //   - R4 (11.10) may position-change the card to a different area
     //   - R3 (4.1.4 exclusion) confirms member-area movement preserves card identity
     //   - R1 checks "メンバーカードのあるエリア" = current location of the card
-    pub deployed_this_turn: std::collections::HashSet<i16>,
+    pub deployed_this_turn: HashSet<i16>,
 
     pub stage_hearts: Option<crate::card::BaseHeart>,
 
@@ -83,7 +83,7 @@ impl Player {
 
             exclusion_zone: ExclusionZone::new(),
 
-            deployed_this_turn: std::collections::HashSet::new(),
+            deployed_this_turn: HashSet::new(),
 
             stage_hearts: None,
 
@@ -456,12 +456,9 @@ impl Player {
     pub fn calculate_stage_hearts(
         &self,
         card_db: &CardDatabase,
-        heart_color_multiplier: &std::collections::HashMap<i16, crate::card::HeartColor>,
-        heart_override: &std::collections::HashMap<i16, (crate::card::HeartColor, u32)>,
-        heart_modifiers: &std::collections::HashMap<
-            i16,
-            std::collections::HashMap<crate::card::HeartColor, ModifierEntry>,
-        >,
+        heart_color_multiplier: &HashMap<i16, crate::card::HeartColor>,
+        heart_override: &HashMap<i16, (crate::card::HeartColor, u32)>,
+        heart_modifiers: &HashMap<i16, HashMap<crate::card::HeartColor, ModifierEntry>>,
     ) -> crate::card::BaseHeart {
         let mut total_hearts = crate::card::HeartMap::new();
 

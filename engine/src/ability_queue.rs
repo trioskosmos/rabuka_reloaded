@@ -1,5 +1,5 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+use crate::Arc;
+use crate::HashMap;
 
 use crate::ability::resolver::AbilityResolver;
 use crate::ability::types::Choice;

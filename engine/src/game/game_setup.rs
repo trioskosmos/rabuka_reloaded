@@ -5,7 +5,11 @@ use crate::ability::enums::Zone;
 use crate::ability::types::Choice;
 use crate::game_state::GameState;
 use crate::zones::MemberArea;
+use crate::HashSet;
+#[cfg(feature = "psp")]
+use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
+#[cfg(not(feature = "psp"))]
 use std::vec::Vec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -672,7 +676,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 }
             };
             // filtered_indices (if set) narrows selectable set; otherwise all cards are candidates
-            let fi_set: Option<std::collections::HashSet<usize>> = match filtered_indices {
+            let fi_set: Option<HashSet<usize>> = match filtered_indices {
                 Some(fi) if !fi.is_empty() => Some(fi.iter().copied().collect()),
                 _ => None,
             };

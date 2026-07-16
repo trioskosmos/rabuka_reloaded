@@ -9,8 +9,8 @@ use crate::player::Player;
 use crate::triggers;
 use crate::turn::TurnEngine;
 use crate::zones::MemberArea;
+use crate::Arc;
 use std::path::Path;
-use std::sync::Arc;
 
 fn load_all_cards() -> Vec<Card> {
     let cards_path = Path::new("../cards/cards.json");

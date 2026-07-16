@@ -11,7 +11,7 @@ pub use observation::PublicObservation;
 use crate::card::CardDatabase;
 use crate::game_setup::{Action, ActionType};
 use crate::game_state::GameState;
-use std::sync::Arc;
+use crate::Arc;
 
 use determinization::DeterminizationSampler;
 

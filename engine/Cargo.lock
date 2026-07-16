@@ -1015,6 +1015,9 @@ name = "hashbrown"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
+dependencies = [
+ "rustc-std-workspace-alloc",
+]
 
 [[package]]
 name = "hashbrown"
@@ -1664,9 +1667,11 @@ dependencies = [
  "bytes",
  "criterion",
  "env_logger",
+ "hashbrown 0.14.5",
  "inferno",
  "local-ip-address",
  "log",
+ "once_cell",
  "rand 0.8.6",
  "rand_chacha",
  "rayon",
@@ -1817,6 +1822,12 @@ dependencies = [
  "rmp",
  "serde",
 ]
+
+[[package]]
+name = "rustc-std-workspace-alloc"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9d441c3b2ebf55cebf796bfdc265d67fa09db17b7bb6bd4be75c509e1e8fec3"
 
 [[package]]
 name = "rustc_version"

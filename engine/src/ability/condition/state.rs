@@ -4,6 +4,7 @@ use crate::ability::util;
 use crate::ability::util::compare_counts;
 use crate::card::{CardProperty, Condition};
 use crate::game_state::Phase;
+use crate::HashSet;
 
 impl<'a> ConditionContext<'a> {
     pub(crate) fn no_excess_heart_flag(&self, target: &str) -> bool {
@@ -953,8 +954,7 @@ impl<'a> ConditionContext<'a> {
             } else {
                 self.resolve_condition_player("self")
             };
-            let stage_set: std::collections::HashSet<i16> =
-                target_player.stage.stage.iter().copied().collect();
+            let stage_set: HashSet<i16> = target_player.stage.stage.iter().copied().collect();
             for (cid, cfrom, cto) in &self.game_state.recently_state_changed {
                 if !stage_set.contains(cid) {
                     continue;

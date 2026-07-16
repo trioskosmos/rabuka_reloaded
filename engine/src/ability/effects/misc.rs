@@ -5,6 +5,7 @@ use super::super::util;
 use crate::card::{AbilityEffect, PlacementOrder, PositionInfo};
 use crate::core::types::ArcStr;
 use crate::game_state::GameState;
+use crate::{HashMap, HashSet};
 use smallvec::SmallVec;
 
 impl AbilityResolver {
@@ -482,7 +483,7 @@ impl AbilityResolver {
         entry_snapshot: &Option<Vec<i16>>,
         last_energy: u32,
         last_discard_count: u32,
-        orientation_modifiers: &std::collections::HashMap<i16, String>,
+        orientation_modifiers: &HashMap<i16, String>,
         filter: &crate::ability::util::CardFilter,
     ) -> u32 {
         if !per_unit {
@@ -1009,7 +1010,7 @@ impl AbilityResolver {
         let orientation_modifiers = gs.mods.orientation_modifiers.clone();
         let last_energy = gs.mods.last_cost_energy_count;
         // Issue 6: Pre-compute appeared/moved-this-turn sets before mutable borrow
-        let appeared_ids: std::collections::HashSet<i16> =
+        let appeared_ids: HashSet<i16> =
             if effect.timing_condition_any().as_deref() == Some("appeared_this_turn") {
                 let p = gs.resolve_target_player(&target);
                 p.stage
@@ -1019,7 +1020,7 @@ impl AbilityResolver {
                     .copied()
                     .collect()
             } else if effect.timing_condition_any().as_deref() == Some("moved_this_turn") {
-                let area_moved_ids: std::collections::HashSet<i16> = gs
+                let area_moved_ids: HashSet<i16> = gs
                     .turn_area_movements
                     .iter()
                     .map(|m| m.moved_card_id)
@@ -1043,7 +1044,7 @@ impl AbilityResolver {
                     .copied()
                     .collect()
             } else {
-                std::collections::HashSet::new()
+                HashSet::new()
             };
         let (blade_targets, mut heart_targets, heart_color_str, final_count) = {
             let mut filter = effect.filter_subset();
@@ -3528,12 +3529,10 @@ impl AbilityResolver {
         let player = gs.resolve_target_player_mut(target);
         match Zone::from_str(source) {
             Some(Zone::Deck) => {
-                use rand::seq::SliceRandom;
-                player.main_deck.cards.shuffle(&mut rand::thread_rng());
+                crate::rng::shuffle_slice(&mut player.main_deck.cards);
             }
             Some(Zone::EnergyDeck) => {
-                use rand::seq::SliceRandom;
-                player.energy_deck.cards.shuffle(&mut rand::thread_rng());
+                crate::rng::shuffle_slice(&mut player.energy_deck.cards);
             }
             _ => {
                 log::debug!("Unknown shuffle zone: {}", source);
@@ -3587,7 +3586,7 @@ impl AbilityResolver {
     pub(crate) fn execute_perform_yell(&mut self, gs: &mut GameState, count: u32, target: &str) {
         let card_db = gs.card_database.clone();
         let bm = gs.mods.blade_modifiers.clone();
-        let om: std::collections::HashMap<i16, String> = gs
+        let om: HashMap<i16, String> = gs
             .mods
             .orientation_modifiers
             .iter()

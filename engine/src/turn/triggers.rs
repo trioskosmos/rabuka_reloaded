@@ -1,5 +1,6 @@
 use crate::game_state::{AbilityTrigger, GameState};
 use crate::types::LogEntry;
+use crate::HashSet;
 
 impl super::TurnEngine {
     pub(crate) fn trigger_debut_abilities(
@@ -233,7 +234,7 @@ impl super::TurnEngine {
         let mut abilities_to_trigger: Vec<(String, String, Option<i16>)> = Vec::new();
         // Track (card_id, ability_idx) to prevent the same card's ability from
         // firing twice when the card is both a stage member AND a live card.
-        let mut seen: std::collections::HashSet<(i16, usize)> = std::collections::HashSet::new();
+        let mut seen: HashSet<(i16, usize)> = HashSet::new();
 
         {
             let player = if player_id_clone == game_state.player1.id {
@@ -421,8 +422,7 @@ impl super::TurnEngine {
         // sources, ensuring should_trigger_live_success uses the correct requirements.
         // IMPORTANT: use a set to deduplicate (cid,color) pairs — the same global
         // modifier may appear in multiple players' snapshots, causing double-counting.
-        let mut restored: std::collections::HashSet<(i16, crate::card::HeartColor)> =
-            std::collections::HashSet::new();
+        let mut restored: HashSet<(i16, crate::card::HeartColor)> = HashSet::new();
         for snap in &game_state.performance_snapshots {
             for (cid, colors) in &snap.performance_need_heart_modifiers {
                 for (color, entry) in colors {
@@ -446,7 +446,7 @@ impl super::TurnEngine {
 
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();
-        let mut seen: std::collections::HashSet<(i16, usize)> = std::collections::HashSet::new();
+        let mut seen: HashSet<(i16, usize)> = HashSet::new();
 
         // LiveSuccess only triggers when the live card's need_heart is satisfied
         if !game_state.should_trigger_live_success(if player_id_clone == game_state.player1.id {

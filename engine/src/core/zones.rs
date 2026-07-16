@@ -1,8 +1,8 @@
 use crate::card::{BaseHeart, CardDatabase, HeartColor, HeartIcon, HeartMap, Keyword};
 use crate::core::game_modifiers::ModifierEntry;
+use crate::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Orientation {
@@ -321,7 +321,7 @@ impl Stage {
     ) -> Result<(), String> {
         // Rule 11.11: Formation Change - move all members to specified areas
         // Rule 11.11.2: Cannot move multiple members to same area
-        let mut target_areas = std::collections::HashSet::new();
+        let mut target_areas = HashSet::new();
         for (_, target) in &assignments {
             if !target_areas.insert(target) {
                 return Err("Cannot move multiple members to same area".to_string());
@@ -527,12 +527,9 @@ impl LiveCardZone {
         cheer_blade_heart_count: u32,
         stage_hearts: Option<&crate::card::BaseHeart>,
         need_heart_modifiers: Option<
-            &std::collections::HashMap<
-                i16,
-                std::collections::HashMap<crate::card::HeartColor, ModifierEntry>,
-            >,
+            &HashMap<i16, HashMap<crate::card::HeartColor, ModifierEntry>>,
         >,
-        score_modifiers: Option<&std::collections::HashMap<i16, i32>>,
+        score_modifiers: Option<&HashMap<i16, i32>>,
         constant_total_score_bonus: i32,
     ) -> u32 {
         let mut total_score = 0;

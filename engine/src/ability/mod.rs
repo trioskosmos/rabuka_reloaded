@@ -6,6 +6,7 @@ pub mod debug;
 pub mod describe;
 pub mod effects;
 pub mod enums;
+#[cfg(not(feature = "psp"))]
 pub mod log;
 pub mod look;
 pub mod move_cards;

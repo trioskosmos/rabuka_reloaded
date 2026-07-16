@@ -1,6 +1,7 @@
 use crate::constants::MAX_LIVE_CARDS;
 use crate::game_state::{GameState, Phase};
 use crate::types::LogEntry;
+use crate::HashMap;
 #[cfg(feature = "3ds")]
 extern "C" {
     fn _3ds_tdbg(msg: *const u8);
@@ -234,31 +235,25 @@ impl super::TurnEngine {
         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
         // Take snapshots of modifier state BEFORE auto-ability triggers
         // (these are type-converted flat copies, not references — no borrow conflict)
-        let hm: std::collections::HashMap<
-            i16,
-            std::collections::HashMap<crate::card::HeartColor, i32>,
-        > = game_state
+        let hm: HashMap<i16, HashMap<crate::card::HeartColor, i32>> = game_state
             .mods
             .heart_modifiers
             .iter()
             .map(|(&k, colors)| {
-                let flat: std::collections::HashMap<crate::card::HeartColor, i32> =
+                let flat: HashMap<crate::card::HeartColor, i32> =
                     colors.iter().map(|(&c, e)| (c, e.total())).collect();
                 (k, flat)
             })
             .collect();
-        let nhm: std::collections::HashMap<
+        let nhm: HashMap<
             i16,
-            std::collections::HashMap<
-                crate::card::HeartColor,
-                crate::core::game_modifiers::ModifierEntry,
-            >,
+            HashMap<crate::card::HeartColor, crate::core::game_modifiers::ModifierEntry>,
         > = game_state
             .mods
             .need_heart_modifiers
             .iter()
             .map(|(&k, colors)| {
-                let flat: std::collections::HashMap<
+                let flat: HashMap<
                     crate::card::HeartColor,
                     crate::core::game_modifiers::ModifierEntry,
                 > = colors.iter().map(|(&c, e)| (c, *e)).collect();
@@ -398,10 +393,7 @@ impl super::TurnEngine {
         // Capture current heart modifiers (includes ability-granted hearts from
         // the 8.3.13 check timing) for use during the live success check.
         // Only heart_modifiers needs a flat copy (type conversion); others borrow directly.
-        let current_hm: std::collections::HashMap<
-            i16,
-            std::collections::HashMap<crate::card::HeartColor, i32>,
-        > = game_state
+        let current_hm: HashMap<i16, HashMap<crate::card::HeartColor, i32>> = game_state
             .mods
             .heart_modifiers
             .iter()

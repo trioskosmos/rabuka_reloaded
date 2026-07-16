@@ -1,9 +1,25 @@
 use crate::ability::enums::{ActionType, ConditionType, Zone};
 use crate::core::types::ArcStr;
+use crate::Arc;
+use crate::HashMap;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
-use std::collections::HashMap;
-use std::sync::Arc;
+
+#[cfg(not(feature = "psp"))]
+pub(crate) use crate::core::pool::EkBox;
+#[cfg(feature = "psp")]
+pub(crate) type EkBox = alloc::boxed::Box<EffectKind>;
+
+pub(crate) fn ek_box_new(val: EffectKind) -> EkBox {
+    #[cfg(not(feature = "psp"))]
+    {
+        crate::core::pool::EkBox::new(val)
+    }
+    #[cfg(feature = "psp")]
+    {
+        alloc::boxed::Box::new(val)
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum CardType {
@@ -745,7 +761,7 @@ impl<'de> serde::Deserialize<'de> for AbilityCost {
                         &effect.action,
                         &serde_json::Value::Object(all_fields),
                     ) {
-                        effect.kind = Some(crate::core::pool::EkBox::new(kind));
+                        effect.kind = Some(crate::card::ek_box_new(kind));
                     }
                 }
 
@@ -2036,7 +2052,7 @@ pub struct AbilityEffect {
     #[serde(flatten)]
     pub compound: CompoundBranch,
     #[serde(default)]
-    pub kind: Option<crate::core::pool::EkBox>,
+    pub kind: Option<EkBox>,
     pub non_stackable: Option<bool>,
     #[serde(default)]
     pub conditional: Option<bool>,
@@ -2123,7 +2139,7 @@ impl AbilityEffect {
     /// Populate `kind` from this effect's JSON value. Recurses into sub-effects.
     pub fn populate_from_json(&mut self, json_val: &serde_json::Value) {
         if let Some(kind) = Self::kind_from_action(&self.action, json_val) {
-            self.kind = Some(crate::core::pool::EkBox::new(kind));
+            self.kind = Some(ek_box_new(kind));
         }
         if let Some(ref mut sub) = self.compound.look_action {
             if let Some(sub_json) = json_val.get("look_action") {
@@ -3347,7 +3363,7 @@ impl AbilityEffect {
     /// the supplied step_results to a value the referenced step produced.
     pub fn value_or_count_resolved(
         &self,
-        step_results: &std::collections::HashMap<String, crate::ability::types::StepOutput>,
+        step_results: &HashMap<String, crate::ability::types::StepOutput>,
         default: u32,
     ) -> i32 {
         if let Some(id) = self.ref_value_any() {

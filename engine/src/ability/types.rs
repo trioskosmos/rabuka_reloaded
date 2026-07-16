@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 
 use serde_json::Value;
 
@@ -789,11 +789,7 @@ pub enum ValueRef {
 impl ValueRef {
     /// Resolve to a concrete i32 against the step_results map.
     /// If `step_id` is not present, returns `fallback`.
-    pub fn resolve(
-        &self,
-        step_results: &std::collections::HashMap<String, StepOutput>,
-        fallback: i32,
-    ) -> i32 {
+    pub fn resolve(&self, step_results: &HashMap<String, StepOutput>, fallback: i32) -> i32 {
         match self {
             ValueRef::Literal(v) => *v,
             ValueRef::StepValue(id) => step_results
@@ -910,7 +906,7 @@ impl EffectPipeline {
 // AbilityResolver so the resolver struct stays focused on dispatch.
 // ====================================================================
 
-use std::collections::HashMap;
+use crate::HashMap;
 
 /// Owns the state required for one effect's steps to communicate with later
 /// steps. Created fresh for every `AbilityResolver` and reset at the start

@@ -7,8 +7,8 @@ use crate::types::{
     AdjustmentType, AllocPhase, Allocation, BladeSource, HeartSource, LivePerformanceData,
     MemberContribution, SourceName, SourceType, YellCardResult,
 };
-use std::collections::HashMap;
-use std::sync::atomic::Ordering;
+use crate::{HashMap, HashSet};
+use core::sync::atomic::Ordering;
 
 const EMPTY_H8: [u32; 8] = [0u32; 8];
 
@@ -44,8 +44,7 @@ impl super::TurnEngine {
         // from live_start triggers and other non-constant sources.
         // Deduplicate (cid,color) pairs to avoid double-counting when the same
         // global modifier is captured in multiple players' snapshots.
-        let mut restored: std::collections::HashSet<(i16, crate::card::HeartColor)> =
-            std::collections::HashSet::new();
+        let mut restored: HashSet<(i16, crate::card::HeartColor)> = HashSet::new();
         for snap in &game_state.performance_snapshots {
             for (cid, colors) in &snap.performance_need_heart_modifiers {
                 for (color, entry) in colors {
@@ -2375,7 +2374,7 @@ pub fn enrich_from_applications(
     applications: &[crate::types::AbilityApplication],
     card_db: &crate::card::CardDatabase,
 ) {
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
     for app in applications {
         if let Some(mc) = member_contributions
             .iter_mut()
@@ -2518,7 +2517,7 @@ pub fn build_snapshot(
             scores: Vec::new(),
         },
         triggered_abilities: {
-            let mut seen = std::collections::HashSet::new();
+            let mut seen = HashSet::new();
             let mut tas = Vec::new();
             for mc in &perf.member_contributions {
                 for ab in mc

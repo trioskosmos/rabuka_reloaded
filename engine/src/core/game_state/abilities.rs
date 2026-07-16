@@ -93,7 +93,7 @@ impl GameState {
             snapshot_energy_placed_by_effect: false,
             snapshot_energy_placed_by_player: None,
             choice_effect_text: None,
-            condition_cache: std::collections::HashMap::new(),
+            condition_cache: HashMap::new(),
         }
     }
 
@@ -899,8 +899,7 @@ impl GameState {
                 self.ability_queue.len()
             );
         }
-        let mut reprocess_counts: std::collections::HashMap<(i16, usize), u32> =
-            std::collections::HashMap::new();
+        let mut reprocess_counts: HashMap<(i16, usize), u32> = HashMap::new();
         loop {
             if !self.ability_queue.is_idle() {
                 break;
@@ -2659,8 +2658,19 @@ impl GameState {
     }
 
     fn generate_state_hash(&self) -> u64 {
-        use std::hash::{Hash, Hasher};
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        use core::hash::{Hash, Hasher};
+        struct SimpleHasher(u64);
+        impl Hasher for SimpleHasher {
+            fn write(&mut self, bytes: &[u8]) {
+                for &b in bytes {
+                    self.0 = self.0.wrapping_mul(31).wrapping_add(b as u64);
+                }
+            }
+            fn finish(&self) -> u64 {
+                self.0
+            }
+        }
+        let mut hasher = SimpleHasher(0);
         self.turn_number.hash(&mut hasher);
         self.current_phase.hash(&mut hasher);
         self.current_turn_phase.hash(&mut hasher);

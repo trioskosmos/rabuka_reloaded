@@ -47,8 +47,43 @@ mod inner {
     }
 }
 
+// ── PSP path ────────────────────────────────────────────────────────────────
+#[cfg(feature = "psp")]
+mod inner {
+    use core::sync::atomic::{AtomicU64, Ordering};
+
+    static STATE: AtomicU64 = AtomicU64::new(0);
+
+    pub fn seed(seed: u64) {
+        STATE.store(seed, Ordering::Relaxed);
+    }
+
+    fn next_u64() -> u64 {
+        let mut s = STATE.load(Ordering::Relaxed);
+        if s == 0 {
+            s = 1;
+        }
+        s ^= s << 13;
+        s ^= s >> 7;
+        s ^= s << 17;
+        STATE.store(s, Ordering::Relaxed);
+        s
+    }
+
+    pub fn shuffle_slice<T>(slice: &mut [T]) {
+        let n = slice.len();
+        if n <= 1 {
+            return;
+        }
+        for i in (1..n).rev() {
+            let j = (next_u64() as usize) % (i + 1);
+            slice.swap(i, j);
+        }
+    }
+}
+
 // ── desktop path ─────────────────────────────────────────────────────────────
-#[cfg(not(feature = "3ds"))]
+#[cfg(not(any(feature = "3ds", feature = "psp")))]
 mod inner {
     use rand::seq::SliceRandom;
 
@@ -58,4 +93,6 @@ mod inner {
 }
 
 // Public surface
+#[cfg(feature = "psp")]
+pub use inner::seed;
 pub use inner::shuffle_slice;

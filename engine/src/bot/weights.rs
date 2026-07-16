@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use crate::HashMap;
 
 /// Learned scalar weight per card. After each game, weights are updated
 /// based on which cards the winner had vs the loser had.

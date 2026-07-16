@@ -1,6 +1,33 @@
+#[cfg(not(feature = "psp"))]
 use super::debug::AbDebug;
-
+#[cfg(not(feature = "psp"))]
 use super::log::{drain_verdicts, push_verdict, AbilityLogItem};
+
+// PSP stubs — no debug logging on console
+#[cfg(feature = "psp")]
+use alloc::vec::Vec;
+#[cfg(feature = "psp")]
+#[derive(Clone)]
+pub struct AbilityLogItem;
+#[cfg(feature = "psp")]
+fn drain_verdicts() -> Vec<AbilityLogItem> {
+    Vec::new()
+}
+#[cfg(feature = "psp")]
+fn push_verdict(_item: AbilityLogItem) {}
+#[cfg(feature = "psp")]
+fn drain_verdicts_since(_snapshot: usize) -> Vec<AbilityLogItem> {
+    Vec::new()
+}
+#[cfg(feature = "psp")]
+struct AbDebug;
+#[cfg(feature = "psp")]
+impl AbDebug {
+    fn new() -> Self {
+        AbDebug
+    }
+}
+
 use super::types::{
     AbilityTraceNode, Choice, EffectPipeline, EffectSpawnContext, ExecutionContext, StepState,
     ZoneSnapshot,
@@ -10,7 +37,8 @@ use crate::card::{Ability, AbilityEffect, CardDatabase, Condition, Keyword};
 use crate::game_state::{GameState, Phase};
 use crate::types::LogEntry;
 use crate::zones::MemberArea;
-use std::sync::Arc;
+use crate::Arc;
+use crate::HashSet;
 
 #[derive(Clone, Debug)]
 pub struct AbilityResolver {
@@ -1063,7 +1091,7 @@ impl AbilityResolver {
                     // Count distinct group names on self's stage
                     let player = gs.resolve_target_player("self");
                     let card_db = &gs.card_database;
-                    let mut groups = std::collections::HashSet::new();
+                    let mut groups = HashSet::new();
                     for &cid in &player.stage.stage {
                         if cid == -1 {
                             continue;

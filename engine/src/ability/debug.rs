@@ -1,415 +1,158 @@
-/// Hierarchical debug output for ability evaluation.
-/// Every line shows WHAT is being checked, WHAT the expected value is,
-/// and WHAT the actual game state value is — all in one self-contained line.
-use crate::ability::enums::ConditionType;
-use crate::card::{Ability, AbilityEffect, Condition};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
+use core::sync::atomic::{AtomicBool, Ordering};
 
-/// Toggle all ability debug output (eprintln! + rule_log buffer) at runtime.
-/// Default OFF in production, ON in tests via test helpers.
 pub static ABILITY_DEBUG: AtomicBool = AtomicBool::new(false);
 
-/// Enable/disable all verbose output (terminal + in-game rule log).
 pub fn set_debug(enabled: bool) {
     ABILITY_DEBUG.store(enabled, Ordering::SeqCst);
 }
 
-// Global buffer to collect debug logs between game state updates
-static ABILITY_LOG_BUFFER: Mutex<Vec<String>> = Mutex::new(Vec::new());
-// Persisted set of (card_no, full_text) for every ability activated across all test runs.
-// Used to generate the coverage report (which abilities are tested vs untested).
-static COVERAGE_LOG: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
+#[cfg(not(feature = "psp"))]
+pub use inner::AbDebug;
+#[cfg(feature = "psp")]
+pub struct AbDebug;
 
-pub struct AbDebug {
-    indent: usize,
-}
-
-impl Default for AbDebug {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
+#[cfg(feature = "psp")]
 impl AbDebug {
     pub fn new() -> Self {
-        AbDebug { indent: 0 }
+        AbDebug
+    }
+    pub fn flush_to_rule_log(_rule_log: &mut Vec<String>) {}
+    pub fn flush_to_structured_log(_structured_log: &mut Vec<crate::types::LogEntry>, _turn: u32) {}
+    pub fn p(&mut self, _tag: &str, _msg: impl core::fmt::Display) {}
+    pub fn ability(
+        &mut self,
+        _card_name: &str,
+        _card_no: &str,
+        _card_id: &str,
+        _ability: &crate::card::Ability,
+    ) {
+    }
+    pub fn condition(
+        &mut self,
+        _cond: &crate::card::Condition,
+        _actual: u32,
+        _threshold: u32,
+        _passed: bool,
+    ) {
+    }
+    pub fn cost_pay(&mut self, _cost: &crate::card::AbilityEffect, _ok: bool) {}
+    pub fn effect(&mut self, _effect: &crate::card::AbilityEffect) {}
+    pub fn print_cost(&mut self, _cost: &crate::card::AbilityEffect, _prefix: &str) {}
+}
+
+#[cfg(not(feature = "psp"))]
+mod inner {
+    use crate::ability::enums::ConditionType;
+    use crate::card::{Ability, AbilityEffect, Condition};
+    use crate::HashSet;
+    use core::sync::atomic::Ordering;
+    use std::sync::Mutex;
+
+    static ABILITY_LOG_BUFFER: Mutex<Vec<String>> = Mutex::new(Vec::new());
+    static COVERAGE_LOG: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
+
+    pub struct AbDebug {
+        pub indent: usize,
     }
 
-    pub fn flush_to_rule_log(rule_log: &mut Vec<String>) {
-        if let Ok(mut buffer) = ABILITY_LOG_BUFFER.lock() {
-            rule_log.extend(buffer.drain(..));
+    impl AbDebug {
+        pub fn new() -> Self {
+            AbDebug { indent: 0 }
         }
-    }
 
-    pub fn flush_to_structured_log(structured_log: &mut Vec<crate::types::LogEntry>, turn: u32) {
-        if let Ok(mut buffer) = ABILITY_LOG_BUFFER.lock() {
-            for line in buffer.drain(..) {
-                structured_log.push(crate::types::LogEntry {
-                    text: line,
-                    turn,
-                    player_label: String::new(),
-                    source_card_id: None,
-                    source_card_name: None,
-                    category: "debug".to_string(),
-                    metadata: None,
-                });
+        pub fn flush_to_rule_log(rule_log: &mut Vec<String>) {
+            if let Ok(mut buffer) = ABILITY_LOG_BUFFER.lock() {
+                rule_log.extend(buffer.drain(..));
             }
         }
-    }
 
-    pub fn p(&mut self, tag: &str, msg: impl std::fmt::Display) {
-        if !ABILITY_DEBUG.load(Ordering::Relaxed) {
-            return;
-        }
-        let pad = "  ".repeat(self.indent);
-        let log_entry = format!("[AB]{pad}{tag} {msg}");
-        eprintln!("{}", log_entry);
-        log::debug!("{}", log_entry);
-        if let Ok(mut buffer) = ABILITY_LOG_BUFFER.lock() {
-            buffer.push(log_entry);
-        }
-    }
-
-    pub fn ability(&mut self, card_name: &str, card_no: &str, card_id: &str, ability: &Ability) {
-        self.p("ABILITY", format_args!("\"{}\" ({})", card_name, card_id));
-        self.indent += 1;
-        let trigger_str = ability.triggers.as_deref().unwrap_or("none");
-        let limit_str = ability
-            .use_limit
-            .map(|l| format!("{}/turn", l))
-            .unwrap_or_default();
-        self.p("TRIGGER", format_args!("{} {}", trigger_str, limit_str));
-        if !ability.full_text.is_empty() {
-            self.p("TEXT", &ability.full_text);
-        }
-        // Record coverage: (card_no, full_text) for untested-ability reporting
-        if ABILITY_DEBUG.load(Ordering::Relaxed) && !ability.full_text.is_empty() {
-            if let Ok(mut cov) = COVERAGE_LOG.lock() {
-                cov.push((card_no.to_string(), ability.full_text.clone()));
+        pub fn flush_to_structured_log(
+            structured_log: &mut Vec<crate::types::LogEntry>,
+            turn: u32,
+        ) {
+            if let Ok(mut buffer) = ABILITY_LOG_BUFFER.lock() {
+                for line in buffer.drain(..) {
+                    structured_log.push(crate::types::LogEntry {
+                        text: line,
+                        turn,
+                        player_label: String::new(),
+                        source_card_id: None,
+                        source_card_name: None,
+                        category: "debug".to_string(),
+                        metadata: None,
+                    });
+                }
             }
         }
-        if let Some(ref cost) = ability.cost {
-            self.print_cost(cost, "");
-        }
-    }
 
-    pub fn condition(&mut self, cond: &Condition, actual: u32, threshold: u32, passed: bool) {
-        let ct = cond.condition_type();
-        let loc = cond.get_location().unwrap_or("");
-        let tgt = cond.get_target().unwrap_or("");
-        let gn = cond
-            .get_group_names()
-            .map(|g| format!("{:?}", g))
-            .unwrap_or_default();
-        let op = cond.get_operator().unwrap_or(">=");
-        let pass = if passed { "PASS" } else { "FAIL" };
-        let (ct_label, detail): (&str, String) = match ct {
-            Some(ConditionType::Compound) => (
-                "compound",
-                format!(
-                    "{} sub-conditions",
-                    cond.get_conditions().map(|c| c.len()).unwrap_or(0)
-                ),
-            ),
-            Some(ConditionType::CardCountCondition) => ("card_count_condition", {
-                let mut parts = vec![format!(
-                    "{}{} {}{}",
-                    op,
-                    threshold,
-                    cond.get_unit().unwrap_or("x"),
-                    loc
-                )];
-                if !tgt.is_empty() {
-                    parts.push(tgt.to_string());
-                }
-                if !gn.is_empty() {
-                    parts.push(format!("group={}", gn));
-                }
-                parts.push(format!("actual={}", actual));
-                parts.push(pass.to_string());
-                parts.join(" ")
-            }),
-            Some(ConditionType::LocationCondition) => ("location_condition", {
-                let extras = if cond.get_distinct().is_some_and(|d| d.is_distinct()) {
-                    " distinct=names"
-                } else {
-                    ""
-                };
-                format!(
-                    "{}{} @{}.{}{} → actual={} {}",
-                    op, threshold, loc, tgt, extras, actual, pass
-                )
-            }),
-            Some(ConditionType::ComparisonCondition) => ("comparison_condition", {
-                let rt = cond.get_resource_type().unwrap_or("?");
-                format!(
-                    "{}{} {}{} → actual={} {}",
-                    op, threshold, rt, loc, actual, pass
-                )
-            }),
-            Some(ConditionType::AppearanceCondition) => ("appearance_condition", {
-                let areas = if cond.get_all_areas().unwrap_or(false) {
-                    " all_areas"
-                } else {
-                    ""
-                };
-                format!(
-                    "check presence{}{} → {}",
-                    areas,
-                    if cond.get_baton_touch_trigger().unwrap_or(false) {
-                        " baton_touch"
-                    } else {
-                        ""
-                    },
-                    pass
-                )
-            }),
-            Some(ConditionType::MovementCondition) => (
-                "movement_condition",
-                format!(
-                    "movement={}{} → {}",
-                    cond.get_movement().unwrap_or("?"),
-                    loc,
-                    pass
-                ),
-            ),
-            Some(ConditionType::OrCondition) => (
-                "or_condition",
-                format!(
-                    "{} sub-conditions (any)",
-                    cond.get_conditions().map(|c| c.len()).unwrap_or(0)
-                ),
-            ),
-            Some(ConditionType::OtherwiseCondition) => {
-                ("otherwise_condition", format!("else branch → {}", pass))
+        pub fn p(&mut self, tag: &str, msg: impl core::fmt::Display) {
+            if !super::ABILITY_DEBUG.load(Ordering::Relaxed) {
+                return;
             }
-            _ => {
-                let label = ct.map(|c| c.to_str()).unwrap_or("?");
-                (label, format!("... {}", pass))
+            let pad = "  ".repeat(self.indent);
+            let log_entry = format!("[AB]{pad}{tag} {msg}");
+            if let Ok(mut buffer) = ABILITY_LOG_BUFFER.lock() {
+                buffer.push(log_entry);
             }
-        };
-        self.p("COND", format_args!("{:20} {}", ct_label, detail));
-    }
-
-    pub fn cost_pay(&mut self, cost: &AbilityEffect, ok: bool) {
-        let ct = if cost.action.is_empty() {
-            "custom"
-        } else {
-            cost.action.as_str()
-        };
-        let msg = match ct {
-            "pay_energy" => format!(
-                "pay {} E{}",
-                cost.energy_count_any().unwrap_or(1),
-                if cost.optional.unwrap_or(false) {
-                    " (optional)"
-                } else {
-                    ""
-                }
-            ),
-            "move_cards" => format!(
-                "move {} from {} to {} (src: {})",
-                cost.count.unwrap_or(1),
-                cost.source.as_deref().unwrap_or("?"),
-                cost.destination.as_deref().unwrap_or("?"),
-                trunc(&cost.text, 40)
-            ),
-            "change_state" => format!(
-                "set {} → {}",
-                cost.source.as_deref().unwrap_or("self"),
-                cost.state_change_any().as_deref().unwrap_or("?")
-            ),
-            "sequential_cost" => format!(
-                "compound ({} sub-costs)",
-                cost.compound.actions.as_ref().map(|c| c.len()).unwrap_or(0)
-            ),
-            "reveal" => format!(
-                "reveal {} from {}",
-                cost.count.unwrap_or(1),
-                cost.source.as_deref().unwrap_or("?")
-            ),
-            _ => format!("{}: {}", ct, trunc(&cost.text, 40)),
-        };
-        let status = if ok { "OK" } else { "FAIL" };
-        self.p("COST", format_args!("{} → {}", msg, status));
-    }
-
-    pub fn effect(&mut self, effect: &AbilityEffect) {
-        let a = &effect.action;
-        let msg = match a.as_str() {
-            "sequential" => format!(
-                "multi-step ({} sub-actions)",
-                effect
-                    .compound
-                    .actions
-                    .as_ref()
-                    .map(|v| v.len())
-                    .unwrap_or(0)
-            ),
-            "draw_card" => format!(
-                "draw {} card(s){}",
-                effect.count.unwrap_or(1),
-                if effect.optional.unwrap_or(false) {
-                    " (optional)"
-                } else {
-                    ""
-                }
-            ),
-            "move_cards" => format!(
-                "move {} from {} → {} (type: {})",
-                effect.count.unwrap_or(1),
-                effect.source_any().unwrap_or("?"),
-                effect.destination.as_deref().unwrap_or("?"),
-                effect.card_type_any().as_deref().unwrap_or("card")
-            ),
-            "gain_resource" => format!(
-                "gain {} {}{}",
-                effect.count.unwrap_or(1),
-                effect.resource_any().as_deref().unwrap_or("?"),
-                effect
-                    .duration_any()
-                    .as_deref()
-                    .map(|d| format!(" for {}", d))
-                    .unwrap_or_default()
-            ),
-            "modify_score" => format!(
-                "score {}{}",
-                effect.operation_any().as_deref().unwrap_or("add"),
-                effect
-                    .value_any()
-                    .map(|v| format!(" {}", v))
-                    .unwrap_or_default()
-            ),
-            "change_state" => format!(
-                "change state → {}",
-                effect.state_change_any().as_deref().unwrap_or("?")
-            ),
-            "select" => format!(
-                "select {} {} from {}{}",
-                effect.count.unwrap_or(1),
-                effect.card_type_any().as_deref().unwrap_or("card"),
-                effect.source_any().unwrap_or("?"),
-                if effect.optional.unwrap_or(false) {
-                    " (optional)"
-                } else {
-                    ""
-                }
-            ),
-            "look_and_select" => "look + select from deck".to_string(),
-            "pay_energy" => format!(
-                "pay {} E{}",
-                effect.count.unwrap_or(1),
-                if effect.optional.unwrap_or(false) {
-                    " (optional)"
-                } else {
-                    ""
-                }
-            ),
-            "reveal" => format!("reveal {}", effect.source_any().unwrap_or("?")),
-            "position_change" => "position change".to_string(),
-            "gain_ability" => "gain ability".to_string(),
-            "do_nothing" => String::new(),
-            _ => format!("{}: {}", a, trunc(&effect.text, 50)),
-        };
-        if !msg.is_empty() {
-            self.p("EFFECT", format_args!("{}", msg));
         }
-        if let Some(ref cond) = effect.condition {
+
+        pub fn ability(
+            &mut self,
+            card_name: &str,
+            card_no: &str,
+            card_id: &str,
+            ability: &Ability,
+        ) {
+            self.p("ABILITY", format_args!("\"{}\" ({})", card_name, card_id));
+            self.indent += 1;
+            let trigger_str = ability.triggers.as_deref().unwrap_or("none");
+            let limit_str = ability
+                .use_limit
+                .map(|l| format!("{}/turn", l))
+                .unwrap_or_default();
+            self.p("TRIGGER", format_args!("{} {}", trigger_str, limit_str));
+            if !ability.full_text.is_empty() {
+                self.p("TEXT", &ability.full_text);
+            }
+            if super::ABILITY_DEBUG.load(Ordering::Relaxed) && !ability.full_text.is_empty() {
+                if let Ok(mut cov) = COVERAGE_LOG.lock() {
+                    cov.push((card_no.to_string(), ability.full_text.clone()));
+                }
+            }
+        }
+
+        pub fn condition(&mut self, cond: &Condition, actual: u32, threshold: u32, passed: bool) {
+            if !super::ABILITY_DEBUG.load(Ordering::Relaxed) {
+                return;
+            }
+            let pass = if passed { "PASS" } else { "FAIL" };
+            let ct = cond.condition_type().map(|c| c.to_str()).unwrap_or("?");
             self.p(
                 "COND",
-                format_args!("(gated by: {})", trunc(cond.get_text().unwrap_or(""), 60)),
+                format_args!("{ct} actual={actual} threshold={threshold} {pass}"),
             );
         }
-    }
 
-    pub fn print_cost(&mut self, cost: &AbilityEffect, prefix: &str) {
-        let ct = if cost.action.is_empty() {
-            "?"
-        } else {
-            cost.action.as_str()
-        };
-        let msg = match ct {
-            "pay_energy" => format!(
-                "pay {} E{}",
-                cost.energy_count_any().unwrap_or(1),
-                if cost.optional.unwrap_or(false) {
-                    " (optional)"
-                } else {
-                    ""
-                }
-            ),
-            "move_cards" => format!(
-                "{} → {} ({} {})",
-                cost.source.as_deref().unwrap_or("?"),
-                cost.destination.as_deref().unwrap_or("?"),
-                cost.count.unwrap_or(1),
-                cost.card_type_any().as_deref().unwrap_or("card")
-            ),
-            "change_state" => format!(
-                "set self → {}",
-                cost.state_change_any().as_deref().unwrap_or("?")
-            ),
-            "reveal" => format!(
-                "reveal {} {}",
-                cost.count.unwrap_or(1),
-                cost.card_type_any().as_deref().unwrap_or("card")
-            ),
-            "sequential_cost" => format!(
-                "compound ({} sub-costs)",
-                cost.compound.actions.as_ref().map(|c| c.len()).unwrap_or(0)
-            ),
-            "choice_condition" => "choice between costs".to_string(),
-            _ => ct.to_string(),
-        };
-        self.p("COST", format_args!("{}{}", prefix, msg));
-    }
-}
-
-/// Return a deduplicated list of (card_no, full_text) for every ability activated.
-pub fn get_coverage_data() -> Vec<(String, String)> {
-    let mut seen = std::collections::HashSet::new();
-    let mut result = Vec::new();
-    if let Ok(cov) = COVERAGE_LOG.lock() {
-        for (card_no, text) in cov.iter() {
-            let key = format!("{}|{}", card_no, text);
-            if seen.insert(key) {
-                result.push((card_no.clone(), text.clone()));
+        pub fn cost_pay(&mut self, cost: &AbilityEffect, ok: bool) {
+            if !super::ABILITY_DEBUG.load(Ordering::Relaxed) {
+                return;
             }
+            let status = if ok { "OK" } else { "FAIL" };
+            self.p("COST", format_args!("{} → {status}", cost.action));
         }
-    }
-    result.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
-    result
-}
 
-/// Write coverage data to a JSON file at the given path.
-/// Format: `{"covered": [{"card_no": "...", "full_text": "..."}, ...]}`
-pub fn write_coverage_json(path: &str) -> Result<(), std::io::Error> {
-    let data = get_coverage_data();
-    let mut entries: Vec<serde_json::Value> = Vec::new();
-    for (card_no, text) in &data {
-        entries.push(serde_json::json!({
-            "card_no": card_no,
-            "full_text": text,
-        }));
-    }
-    let output = serde_json::json!({ "covered": entries });
-    let file = std::fs::File::create(path)?;
-    let writer = std::io::BufWriter::new(file);
-    serde_json::to_writer_pretty(writer, &output)?;
-    log::debug!(
-        "Coverage data written to {} ({} unique abilities)",
-        path,
-        entries.len()
-    );
-    Ok(())
-}
+        pub fn effect(&mut self, effect: &AbilityEffect) {
+            if !super::ABILITY_DEBUG.load(Ordering::Relaxed) {
+                return;
+            }
+            self.p("EFFECT", format_args!("{}", effect.action));
+        }
 
-fn trunc(s: &str, max: usize) -> String {
-    let chars: Vec<char> = s.chars().collect();
-    if chars.len() <= max {
-        s.to_string()
-    } else {
-        format!("{}...", chars[..max].iter().collect::<String>())
+        pub fn print_cost(&mut self, cost: &AbilityEffect, _prefix: &str) {
+            if !super::ABILITY_DEBUG.load(Ordering::Relaxed) {
+                return;
+            }
+            self.p("COST", format_args!("{}", cost.action));
+        }
     }
 }

@@ -1,10 +1,10 @@
 use crate::card::{AbilityEffect, HeartColor};
 use crate::core::game_modifiers::ModifierEntry;
+use crate::Arc;
+use crate::HashMap;
 use serde::de::Deserializer;
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::Arc;
 
 /// Like `Box<str>` but `Arc`-backed for cheap clone (refcount bump, no str copy).
 /// Used in `EffectKind` fields where the same string value may be accessed

@@ -534,7 +534,7 @@ impl AbilityResolver {
                 };
                 let final_count = if effect.per_unit_any().unwrap_or(false) {
                     use crate::ability::util;
-                    use std::collections::HashMap;
+                    use crate::HashMap;
                     let player = gs.resolve_target_player(effect.target_name());
                     let filter = util::CardFilter::from_effect(effect);
                     let per_mult = util::resolve_per_unit_count(

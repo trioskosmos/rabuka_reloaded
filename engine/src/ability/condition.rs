@@ -1,5 +1,6 @@
-use std::sync::atomic::Ordering;
+use core::sync::atomic::Ordering;
 
+#[cfg(not(feature = "psp"))]
 use super::debug::AbDebug;
 use crate::ability::debug::ABILITY_DEBUG;
 use crate::ability::enums::{ConditionType, Zone};

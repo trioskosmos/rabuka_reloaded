@@ -1,6 +1,6 @@
 use crate::card::CardDatabase;
-use std::collections::VecDeque;
-use std::sync::Arc;
+use crate::Arc;
+use crate::VecDeque;
 
 #[derive(Debug, Clone)]
 pub struct Deck {

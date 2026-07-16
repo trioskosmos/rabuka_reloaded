@@ -1,3 +1,4 @@
+#[cfg(not(feature = "psp"))]
 use rand::Rng;
 
 use crate::game_setup::{Action, ActionType};
@@ -72,8 +73,16 @@ fn action_type_idx(t: &ActionType) -> u8 {
 }
 
 pub(super) fn fastrand(lo: usize, hi: usize) -> usize {
-    if hi <= lo {
+    if lo >= hi {
         return lo;
     }
-    rand::thread_rng().gen_range(lo..hi)
+    #[cfg(not(feature = "psp"))]
+    {
+        rand::thread_rng().gen_range(lo..hi)
+    }
+    #[cfg(feature = "psp")]
+    {
+        use crate::rng::rand_range;
+        rand_range(lo, hi)
+    }
 }

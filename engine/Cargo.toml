@@ -20,25 +20,27 @@ test = false
 doctest = false
 
 [dependencies]
-log = "0.4"
+log = { version = "0.4", default-features = false }
 env_logger = { version = "0.11", optional = true }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-rand = "0.8"
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+rand = { version = "0.8", optional = true }
 actix-web = { version = "4.4", optional = true }
 actix-cors = { version = "0.6", optional = true }
 actix-files = { version = "0.6", optional = true }
 tokio = { version = "1.35", features = ["full"], optional = true }
 smallvec = "1.11"
+hashbrown = { version = "0.14", default-features = false, features = ["alloc"] }
 uuid = { version = "1.6", features = ["v4", "serde"], optional = true }
 local-ip-address = { version = "0.6", optional = true }
 tokio-stream = { version = "0.1", optional = true }
 bytes = { version = "1", optional = true }
 rmp-serde = "1.3.1"
+once_cell = { version = "1", default-features = false, features = ["alloc"], optional = true }
 inferno = "0.12"
 
 [features]
-default = ["env_logger", "debug_conditions", "alloc_tracker"]
+default = ["env_logger", "debug_conditions", "alloc_tracker", "rand"]
 debug_conditions = []
 # Optional server feature: enables the web server and async runtime
 server = ["actix-web", "actix-cors", "actix-files", "tokio", "tokio-stream", "local-ip-address", "uuid", "bytes"]
@@ -48,6 +50,8 @@ server = ["actix-web", "actix-cors", "actix-files", "tokio", "tokio-stream", "lo
 profiling = []
 # Alloc tracker: counts every malloc/free, reports via RABUKA_ALLOC_TRACK env var
 alloc_tracker = []
+# PSP target: no_std + alloc mode for mipsel-sony-psp
+psp = ["once_cell"]
 
 [dev-dependencies]
 criterion = "0.5"

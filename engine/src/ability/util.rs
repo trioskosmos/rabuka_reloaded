@@ -1,6 +1,7 @@
 use super::enums::{ActionType, Zone};
 use crate::card::{parse_heart_color, AbilityFilter, CardDatabase, DistinctType, Operator};
 use crate::game_state::Duration;
+use crate::{HashMap, HashSet};
 
 // ============== MODIFY COST ==============
 
@@ -355,8 +356,16 @@ pub fn card_matches_group(
 /// for each check so callers can log detailed diagnostics. Disabled by default;
 /// enable via `RABUKA_DEBUG_GROUP=1`.
 fn debug_group_match(card_db: &CardDatabase, card_id: i16, group_name: Option<&str>, result: bool) {
-    static DEBUG_GROUP: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    if !*DEBUG_GROUP.get_or_init(|| std::env::var("RABUKA_DEBUG_GROUP").as_deref() == Ok("1")) {
+    #[cfg(not(feature = "psp"))]
+    {
+        static DEBUG_GROUP: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        if !*DEBUG_GROUP.get_or_init(|| std::env::var("RABUKA_DEBUG_GROUP").as_deref() == Ok("1")) {
+            return;
+        }
+    }
+    #[cfg(feature = "psp")]
+    {
+        let _ = (card_db, card_id, group_name, result);
         return;
     }
     let card = card_db.get_card(card_id);
@@ -645,8 +654,7 @@ pub fn max_distinct_names(name_sets: &[Vec<String>]) -> DistinctNamesResult {
         // Exhaustive search — tries all combinations of picking one name per card.
         let mut best_distinct = 0usize;
         let mut found_no_collision = false;
-        let mut stack: Vec<(usize, std::collections::HashSet<String>, bool)> =
-            vec![(0, std::collections::HashSet::new(), false)];
+        let mut stack: Vec<(usize, HashSet<String>, bool)> = vec![(0, HashSet::new(), false)];
         while let Some((idx, seen, collided)) = stack.pop() {
             if idx == name_sets.len() {
                 best_distinct = best_distinct.max(seen.len());
@@ -668,7 +676,7 @@ pub fn max_distinct_names(name_sets: &[Vec<String>]) -> DistinctNamesResult {
         }
     } else {
         // Greedy fallback: for each card pick the first name not yet used.
-        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut seen: HashSet<String> = HashSet::new();
         let mut had_collision = false;
         for names in name_sets {
             let mut picked = false;
@@ -1408,7 +1416,7 @@ pub fn matching_ids_filtered(
         // excluded card's name (e.g. "different name from that member").
         if let Some(ids) = exclude_ids {
             if !ids.is_empty() {
-                let excluded_names: std::collections::HashSet<String> = ids
+                let excluded_names: HashSet<String> = ids
                     .iter()
                     .filter_map(|id| db.get_card(*id).map(|c| c.name.to_string()))
                     .collect();
@@ -1479,7 +1487,7 @@ pub fn filter_distinct(
     if !distinct {
         return ids;
     }
-    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut seen: HashSet<String> = HashSet::new();
     ids.into_iter()
         .filter(|&i| {
             db.get_card(cards[i])
@@ -1864,7 +1872,7 @@ pub fn calculate_per_unit_multiplier(
     per_unit: bool,
     per_unit_type: Option<&str>,
     player: &crate::player::Player,
-    orientation_modifiers: &std::collections::HashMap<i16, String>,
+    orientation_modifiers: &HashMap<i16, String>,
     state_filter: Option<&str>,
 ) -> u32 {
     if !per_unit {
@@ -1910,15 +1918,14 @@ pub fn resolve_per_unit_count(
     filter: &CardFilter,
     heart_colors: &[String],
     state_filter: Option<&str>,
-    orientation_modifiers: &std::collections::HashMap<i16, String>,
+    orientation_modifiers: &HashMap<i16, String>,
 ) -> u32 {
     if !per_unit {
         return 1;
     }
     // heart_colors: count unique heart colors across matching stage cards
     if per_unit_type == Some("heart_colors") {
-        let mut colors_found: std::collections::HashSet<crate::card::HeartColor> =
-            std::collections::HashSet::new();
+        let mut colors_found: HashSet<crate::card::HeartColor> = HashSet::new();
         let stage_cards = zone_cards(player, Zone::Stage.to_str());
         for &cid in stage_cards {
             if filter.matches(card_db, cid, true) {
@@ -2022,7 +2029,7 @@ pub fn apply_distinct_filter(
     if !should {
         return cards.to_vec();
     }
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
     cards
         .iter()
         .filter(|&&id| {
