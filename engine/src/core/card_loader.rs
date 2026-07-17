@@ -100,7 +100,32 @@ impl CardLoader {
         {
             for (idx, ability_entry) in unique_abilities.iter().enumerate() {
                 #[cfg(feature = "bytecode_abilities")]
-                let ability = crate::ability::vm::get_ability(idx);
+                let ability = {
+                    let mut ability = crate::ability::vm::get_ability(idx);
+                    if let Some(ref mut ab) = ability {
+                        // Patch metadata from JSON that bytecode doesn't encode
+                        if let Some(triggers) =
+                            ability_entry.get("triggers").and_then(|v| v.as_str())
+                        {
+                            ab.triggers = Some(triggers.into());
+                        }
+                        if let Some(text) = ability_entry.get("full_text").and_then(|v| v.as_str())
+                        {
+                            ab.full_text = text.to_string();
+                        }
+                        if let Some(text) = ability_entry
+                            .get("triggerless_text")
+                            .and_then(|v| v.as_str())
+                        {
+                            ab.triggerless_text = text.to_string();
+                        }
+                        if let Some(limit) = ability_entry.get("use_limit").and_then(|v| v.as_u64())
+                        {
+                            ab.use_limit = Some(limit as u32);
+                        }
+                    }
+                    ability
+                };
 
                 #[cfg(not(feature = "bytecode_abilities"))]
                 let ability = {

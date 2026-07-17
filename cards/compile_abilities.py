@@ -990,8 +990,64 @@ pub const DEBUG_DISASM: &[&str] = &[
 # ─────────────────────────────────────────────────────────────
 # EffectKind variant field lists — ALL fields, for codegen
 # Fields not provided by bytecode get Default::default()
-# Fields with Box<Vec<String>> need Box::default()
 # ─────────────────────────────────────────────────────────────
+
+_EFFECTKIND_FIELD_TYPES_CACHE = {}
+
+
+def _get_effectkind_field_types():
+    if _EFFECTKIND_FIELD_TYPES_CACHE:
+        return _EFFECTKIND_FIELD_TYPES_CACHE
+    import re
+
+    root = Path(__file__).parent.parent / "engine/src/core"
+    with open(root / "card.rs", encoding="utf-8") as f:
+        content = f.read()
+    idx = content.find("pub enum EffectKind")
+    end = content.find("};", idx) + 2
+    block = content[idx:end]
+    current_var = None
+    for line in block.split("\n"):
+        m = re.match(r"    (\w+) \{", line)
+        if m:
+            current_var = m.group(1)
+            _EFFECTKIND_FIELD_TYPES_CACHE[current_var] = {}
+            continue
+        if current_var:
+            m = re.match(r"        (\w+): (.+),", line)
+            if m:
+                fname = m.group(1)
+                ftype = m.group(2).strip()
+                _EFFECTKIND_FIELD_TYPES_CACHE[current_var][fname] = ftype
+            if line.strip() == "},":
+                current_var = None
+    return _EFFECTKIND_FIELD_TYPES_CACHE
+
+
+def _effect_assign_expr(field_type, src_var, optype):
+    """Generate assignment expression for an EffectKind field based on its type."""
+    is_option = field_type.startswith("Option<")
+    inner = field_type[7:-1] if is_option else field_type
+    if inner == "ArcStr":
+        val = f"Some({src_var}.into())" if is_option else f"{src_var}.into()"
+        return val
+    if inner == "u32":
+        val = f"Some({src_var} as u32)" if is_option else f"{src_var} as u32"
+        return val
+    if inner == "bool":
+        val = f"Some({src_var})" if is_option else f"{src_var}"
+        return val
+    if inner == "String":
+        val = f"Some({src_var}.to_string())" if is_option else f"{src_var}.to_string()"
+        return val
+    if inner.startswith("Box<Vec<") and "String" in inner:
+        val = f"Box::new(vec![{src_var}.to_string()])"
+        return f"Some({val})" if is_option else val
+    if inner.startswith("Vec<") and "String" in inner:
+        val = f"vec![{src_var}.to_string()]"
+        return f"Some({val})" if is_option else val
+    return None
+
 
 # Parse card.rs for Condition variant fields (used for default constructors)
 _CONDITION_FIELDS_CACHE = None
@@ -1655,10 +1711,10 @@ EFFECT_DECODE_MAP = {
         "GainResource",
         "gain_resource",
         [
-            ("resource", "_resource", "_resource"),
+            ("resource", "resource", "resource"),
             ("u8", "count", "value"),
-            ("heart", "_heart_color", "_heart_color"),
-            ("duration", "_duration", "_duration"),
+            ("heart", "heart_color", "heart_colors"),
+            ("duration", "duration", "duration"),
             ("str_idx", "_char", "_char"),
         ],
     ),
@@ -2033,12 +2089,15 @@ def generate_vm_rs(build_dir):
             # Always read all operands to advance cursor, even discarded ones
             lines.append("            " + _read_expr(optype, var_name) + ";")
         lines.append(f"            let mut ek = {fn_name}();")
+        ek_types = _get_effectkind_field_types().get(variant, {})
         field_assigns = []
         for optype, var_name, ek_field in ek_fields:
             if not ek_field.startswith("_"):
-                field_assigns.append(
-                    (ek_field, _assign_expr(optype, var_name, ek_field))
-                )
+                field_type = ek_types.get(ek_field, "ArcStr")
+                expr = _effect_assign_expr(field_type, var_name, optype)
+                if expr is None:
+                    expr = _assign_expr(optype, var_name, ek_field)
+                field_assigns.append((ek_field, expr))
         # Use if let to set variant-specific fields
         # Use `field: ref mut alias` to avoid shadowing local variables
         fields_list = ", ".join(f"{f}: ref mut _bc_{f}" for f, _ in field_assigns)

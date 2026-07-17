@@ -1026,14 +1026,17 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             Some(Box::new(ek))
         }
         Opcode::GainResource => {
-            let _resource = decode_resource(read_u8(cursor));
+            let resource = decode_resource(read_u8(cursor));
             let count = read_u8(cursor);
-            let _heart_color = decode_heart(read_u8(cursor));
-            let _duration = decode_duration(read_u8(cursor));
+            let heart_color = decode_heart(read_u8(cursor));
+            let duration = decode_duration(read_u8(cursor));
             let _char = read_str(cursor);
             let mut ek = default_gainResource();
-            if let EffectKind::GainResource { value: ref mut _bc_value, .. } = &mut ek {
+            if let EffectKind::GainResource { resource: ref mut _bc_resource, value: ref mut _bc_value, heart_colors: ref mut _bc_heart_colors, duration: ref mut _bc_duration, .. } = &mut ek {
+                *_bc_resource = Some(resource.into());
                 *_bc_value = Some(count as u32);
+                *_bc_heart_colors = Box::new(vec![heart_color.to_string()]);
+                *_bc_duration = Some(duration.into());
             }
             Some(Box::new(ek))
         }
@@ -1192,10 +1195,10 @@ fn decode_simple_effect(op: Opcode, cursor: &mut &[u8]) -> &'static str {
             "gain_ability_from_source"
         }
         Opcode::GainResource => {
-            let __resource = decode_resource(read_u8(cursor));
+            let _resource = decode_resource(read_u8(cursor));
             let _count = read_u8(cursor);
-            let __heart_color = decode_heart(read_u8(cursor));
-            let __duration = decode_duration(read_u8(cursor));
+            let _heart_color = decode_heart(read_u8(cursor));
+            let _duration = decode_duration(read_u8(cursor));
             let __char = read_str(cursor);
             "gain_resource"
         }
