@@ -554,3 +554,66 @@ fn decode_player(v: u8) -> &'static str {
         _ => "self",
     }
 }
+fn decode_card_type(v: u8) -> &'static str {
+    match v {
+        0 => "card",
+        1 => "member_card",
+        2 => "live_card",
+        3 => "energy_card",
+        4 => "event_card",
+        5 => "character_card",
+        6 => "baton_touch_card",
+        7 => "climax_card",
+        _ => "card",
+    }
+}
+fn decode_resource(v: u8) -> &'static str {
+    match v {
+        0 => "heart",
+        1 => "blade",
+        2 => "yell",
+        3 => "shield",
+        _ => "heart",
+    }
+}
+fn decode_heart(v: u8) -> &'static str {
+    match v {
+        0 => "smile",
+        1 => "pure",
+        2 => "cool",
+        3 => "active",
+        4 => "natural",
+        5 => "elegant",
+        _ => "smile",
+    }
+}
+fn decode_state(v: u8) -> &'static str {
+    match v {
+        0 => "rest",
+        1 => "stand",
+        2 => "reverse",
+        3 => "wait",
+        _ => "rest",
+    }
+}
+fn decode_duration(v: u8) -> &'static str {
+    match v {
+        0 => "this_turn",
+        1 => "until_end_of_live",
+        2 => "permanent",
+        3 => "until_used",
+        4 => "next_turn",
+        _ => "this_turn",
+    }
+}
+fn decode_operator(v: u8) -> &'static str {
+    match v {
+        0 => "=",
+        1 => "!=",
+        2 => ">",
+        3 => ">=",
+        4 => "<",
+        5 => "<=",
+        _ => ">=",
+    }
+}
