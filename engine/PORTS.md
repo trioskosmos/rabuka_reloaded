@@ -18,7 +18,7 @@ overhead. This is what drives the ~4MB minimum.
 
 A **bytecode-compiled** approach shrinks that to:
 - Card stats: ~27KB (packed binary structs, ~12B per card × 2280)
-- Ability bytecode: ~7KB (variable-length opcodes, ~4B avg per unique ability × 800)
+- Ability bytecode: ~11KB (variable-length opcodes, ~14B avg per unique ability × 800)
 - Ability lookup table: ~3KB (index per card × 2280)
 - **Total: ~40KB** — a 100× reduction from the JSON-inflated ~4MB
 
