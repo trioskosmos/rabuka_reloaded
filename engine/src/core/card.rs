@@ -1023,6 +1023,8 @@ pub enum EffectKind {
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
+        count: Option<u32>,
+        #[serde(default)]
         card_type: Option<ArcStr>,
         #[serde(default)]
         dynamic_count: Option<DynamicCount>,
@@ -3081,7 +3083,7 @@ impl AbilityEffect {
 
     str_getter!(destination_any, [MoveCards => destination, DrawCards => destination, SelectTarget => destination, LookReveal => destination, ChangeState => destination, PositionOp => destination, ModifyScore => destination, CompoundEffect => destination, AbilityOp => destination, MiscOp => destination]);
 
-    u32_getter!(count_any, [MoveCards => count]);
+    u32_getter!(count_any, [MoveCards => count, DrawCards => count]);
 
     str_getter!(target_any, [MoveCards => target, DrawCards => target, SelectTarget => target, LookReveal => target, ChangeState => target, PositionOp => target, ModifyScore => target, CompoundEffect => target, AbilityOp => target, MiscOp => target]);
 
