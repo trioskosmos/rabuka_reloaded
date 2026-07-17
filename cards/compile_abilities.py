@@ -844,6 +844,88 @@ def generate_vm_gen(build_dir, field_map):
         if line.strip() == "}," and ev:
             ev = None
 
+    FIELD_ALIAS = {
+        "DrawCards": {
+            "count": "target_count",
+            "baton_touch_trigger": "_skip",
+            "parenthetical": "_skip",
+        },
+        "DrawUntilCount": {"count": "target_count"},
+        "SelectTarget": {"count": "target_count"},
+        "GainResource": {
+            "count": "value",
+            "baton_touch_trigger": "_skip",
+            "conditional": "_skip",
+            "max": "_skip",
+            "max_repeats": "repeat_limit",
+            "parenthetical": "_skip",
+            "per_unit_source": "_skip",
+            "target": "_skip",
+        },
+        "ModifyScore": {
+            "count": "value",
+            "conditional": "_skip",
+            "parenthetical": "_skip",
+        },
+        "ModifyHearts": {
+            "count": "value",
+            "baton_touch_trigger": "_skip",
+            "conditional": "_skip",
+            "max": "_skip",
+            "max_repeats": "repeat_limit",
+            "non_stackable": "_skip",
+            "parenthetical": "_skip",
+            "target": "_skip",
+        },
+        "CustomOp": {
+            "count": "value",
+            "ability_filter": "_skip",
+            "conditional": "_skip",
+            "cost_limit": "_skip",
+            "cost_limit_operator": "_skip",
+            "destination": "_skip",
+            "non_stackable": "_skip",
+            "operation": "_skip",
+            "original_count": "_skip",
+            "original_operator": "_skip",
+            "per_unit": "_skip",
+            "per_unit_count": "_skip",
+            "per_unit_location": "_skip",
+            "per_unit_type": "_skip",
+            "source": "_skip",
+            "target": "_skip",
+            "value": "_skip",
+            "blade_type": "_skip",
+            "duration": "_skip",
+        },
+        "MiscOp": {"count": "value"},
+        "LookReveal": {"count": "count"},
+        "ChangeState": {
+            "count": "_skip",
+            "max": "_skip",
+            "parenthetical": "_skip",
+            "position_compare": "_skip",
+        },
+        "AbilityOp": {
+            "count": "_skip",
+            "max": "_skip",
+            "parenthetical": "_skip",
+            "source_location": "location",
+        },
+        "RestrictionOp": {"count": "_skip", "destination": "_skip", "target": "_skip"},
+        "PositionOp": {
+            "count": "_skip",
+            "parenthetical": "_skip",
+            "position_compare": "_skip",
+        },
+        "ModifyScore": {"count": "value", "parenthetical": "_skip"},
+        "ModifyHearts": {
+            "count": "value",
+            "parenthetical": "_skip",
+            "max_repeats": "repeat_limit",
+        },
+    }
+
     lines = ["// Auto-generated"]
 
     # Default condition constructors
@@ -924,7 +1006,8 @@ def generate_vm_gen(build_dir, field_map):
         lines.append("}")
         lines.append("")
 
-    # decode_effect_kind
+    # decode_ability_effect — builds AbilityEffect directly from bytecode,
+    # setting both EffectKind type tag AND convenience fields
     lines.append(
         "fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>> {"
     )
@@ -943,19 +1026,26 @@ def generate_vm_gen(build_dir, field_map):
             lines.append("            " + _read_expr(ftype, vname) + ";")
             vars_read.append((ftype, vname, fname))
         lines.append(f"            let mut ek = {fn}();")
-        assigns = []
+        used = set()
+        ek_assigns = []
         for ftype, vname, fname in vars_read:
-            ft = ekf.get(variant, {}).get(fname)
+            sfname = FIELD_ALIAS.get(variant, {}).get(fname, fname)
+            if sfname == "_skip":
+                continue
+            if sfname in used:
+                continue
+            used.add(sfname)
+            ft = ekf.get(variant, {}).get(sfname)
             if ft:
                 expr = _assign(ft, vname, ftype)
                 if expr:
-                    assigns.append((fname, expr))
-        if assigns:
-            fl = ", ".join(f"{f}: ref mut _bc_{f}" for f, _ in assigns)
+                    ek_assigns.append((sfname, expr))
+        if ek_assigns:
+            fl = ", ".join(f"{f}: ref mut _bc_{f}" for f, _ in ek_assigns)
             lines.append(
                 f"            if let EffectKind::{variant} {{ {fl}, .. }} = &mut ek {{"
             )
-            for f, e in assigns:
+            for f, e in ek_assigns:
                 lines.append(f"                *_bc_{f} = {e};")
             lines.append("            }")
         lines.append("            Some(Box::new(ek))")

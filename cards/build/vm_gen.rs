@@ -1214,9 +1214,10 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             let target = decode_player(read_u8(cursor));
             let trigger_type = read_str(cursor);
             let mut ek = default_drawCards();
-            if let EffectKind::DrawCards { action_by: ref mut _bc_action_by, card_type: ref mut _bc_card_type, destination: ref mut _bc_destination, exclude_self: ref mut _bc_exclude_self, heart_colors: ref mut _bc_heart_colors, location: ref mut _bc_location, original_value: ref mut _bc_original_value, per_unit: ref mut _bc_per_unit, per_unit_count: ref mut _bc_per_unit_count, per_unit_type: ref mut _bc_per_unit_type, source: ref mut _bc_source, state: ref mut _bc_state, target: ref mut _bc_target, trigger_type: ref mut _bc_trigger_type, .. } = &mut ek {
+            if let EffectKind::DrawCards { action_by: ref mut _bc_action_by, card_type: ref mut _bc_card_type, target_count: ref mut _bc_target_count, destination: ref mut _bc_destination, exclude_self: ref mut _bc_exclude_self, heart_colors: ref mut _bc_heart_colors, location: ref mut _bc_location, original_value: ref mut _bc_original_value, per_unit: ref mut _bc_per_unit, per_unit_count: ref mut _bc_per_unit_count, per_unit_type: ref mut _bc_per_unit_type, source: ref mut _bc_source, state: ref mut _bc_state, target: ref mut _bc_target, trigger_type: ref mut _bc_trigger_type, .. } = &mut ek {
                 *_bc_action_by = Some(action_by.into());
                 *_bc_card_type = Some(card_type.into());
+                *_bc_target_count = Some(count as u32);
                 *_bc_destination = Some(destination.into());
                 *_bc_exclude_self = Some(exclude_self);
                 *_bc_heart_colors = Box::new(vec![heart_colors.to_string()]);
@@ -1239,11 +1240,11 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             let target = decode_player(read_u8(cursor));
             let target_count = read_u8(cursor);
             let mut ek = default_drawCards();
-            if let EffectKind::DrawCards { destination: ref mut _bc_destination, source: ref mut _bc_source, target: ref mut _bc_target, target_count: ref mut _bc_target_count, .. } = &mut ek {
+            if let EffectKind::DrawCards { target_count: ref mut _bc_target_count, destination: ref mut _bc_destination, source: ref mut _bc_source, target: ref mut _bc_target, .. } = &mut ek {
+                *_bc_target_count = Some(count as u32);
                 *_bc_destination = Some(destination.into());
                 *_bc_source = Some(source.into());
                 *_bc_target = Some(target.into());
-                *_bc_target_count = Some(target_count as u32);
             }
             Some(Box::new(ek))
         }
@@ -1285,12 +1286,13 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             let source_location = decode_zone(read_u8(cursor));
             let trigger_filter = read_str(cursor);
             let mut ek = default_abilityOp();
-            if let EffectKind::AbilityOp { all: ref mut _bc_all, card_type: ref mut _bc_card_type, cost_limit: ref mut _bc_cost_limit, cost_limit_operator: ref mut _bc_cost_limit_operator, group_names: ref mut _bc_group_names, trigger_filter: ref mut _bc_trigger_filter, .. } = &mut ek {
+            if let EffectKind::AbilityOp { all: ref mut _bc_all, card_type: ref mut _bc_card_type, cost_limit: ref mut _bc_cost_limit, cost_limit_operator: ref mut _bc_cost_limit_operator, group_names: ref mut _bc_group_names, location: ref mut _bc_location, trigger_filter: ref mut _bc_trigger_filter, .. } = &mut ek {
                 *_bc_all = Some(all);
                 *_bc_card_type = Some(card_type.into());
                 *_bc_cost_limit = Some(cost_limit as u32);
                 *_bc_cost_limit_operator = Some(decode_operator_from_str(cost_limit_operator));
                 *_bc_group_names = group_names.map(|s| Box::new(vec![s.to_string()]));
+                *_bc_location = Some(source_location.into());
                 *_bc_trigger_filter = trigger_filter.map(|s| Box::new(vec![s.to_string()]));
             }
             Some(Box::new(ek))
@@ -1343,7 +1345,7 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             let timing_condition = read_str(cursor);
             let trigger_type = read_str(cursor);
             let mut ek = default_gainResource();
-            if let EffectKind::GainResource { action_by: ref mut _bc_action_by, activation_position: ref mut _bc_activation_position, all: ref mut _bc_all, card_property: ref mut _bc_card_property, card_type: ref mut _bc_card_type, characters: ref mut _bc_characters, cost_limit: ref mut _bc_cost_limit, cost_limit_operator: ref mut _bc_cost_limit_operator, duration: ref mut _bc_duration, exclude_group_names: ref mut _bc_exclude_group_names, exclude_self: ref mut _bc_exclude_self, filter_targets_by_heart_colors: ref mut _bc_filter_targets_by_heart_colors, group_names: ref mut _bc_group_names, group_reference: ref mut _bc_group_reference, heart_color: ref mut _bc_heart_color, heart_colors: ref mut _bc_heart_colors, heart_colors_from_selected_card: ref mut _bc_heart_colors_from_selected_card, heart_type: ref mut _bc_heart_type, location: ref mut _bc_location, multiple_targets: ref mut _bc_multiple_targets, negation: ref mut _bc_negation, original_value: ref mut _bc_original_value, per_unit: ref mut _bc_per_unit, per_unit_count: ref mut _bc_per_unit_count, per_unit_type: ref mut _bc_per_unit_type, require_all_heart_colors: ref mut _bc_require_all_heart_colors, resource: ref mut _bc_resource, same_name: ref mut _bc_same_name, self_target: ref mut _bc_self_target, sign: ref mut _bc_sign, state: ref mut _bc_state, target_count: ref mut _bc_target_count, target_from_selection: ref mut _bc_target_from_selection, timing_condition: ref mut _bc_timing_condition, trigger_type: ref mut _bc_trigger_type, .. } = &mut ek {
+            if let EffectKind::GainResource { action_by: ref mut _bc_action_by, activation_position: ref mut _bc_activation_position, all: ref mut _bc_all, card_property: ref mut _bc_card_property, card_type: ref mut _bc_card_type, characters: ref mut _bc_characters, cost_limit: ref mut _bc_cost_limit, cost_limit_operator: ref mut _bc_cost_limit_operator, value: ref mut _bc_value, duration: ref mut _bc_duration, exclude_group_names: ref mut _bc_exclude_group_names, exclude_self: ref mut _bc_exclude_self, filter_targets_by_heart_colors: ref mut _bc_filter_targets_by_heart_colors, group_names: ref mut _bc_group_names, group_reference: ref mut _bc_group_reference, heart_color: ref mut _bc_heart_color, heart_colors: ref mut _bc_heart_colors, heart_colors_from_selected_card: ref mut _bc_heart_colors_from_selected_card, heart_type: ref mut _bc_heart_type, location: ref mut _bc_location, repeat_limit: ref mut _bc_repeat_limit, multiple_targets: ref mut _bc_multiple_targets, negation: ref mut _bc_negation, original_value: ref mut _bc_original_value, per_unit: ref mut _bc_per_unit, per_unit_count: ref mut _bc_per_unit_count, per_unit_type: ref mut _bc_per_unit_type, require_all_heart_colors: ref mut _bc_require_all_heart_colors, resource: ref mut _bc_resource, same_name: ref mut _bc_same_name, self_target: ref mut _bc_self_target, sign: ref mut _bc_sign, state: ref mut _bc_state, target_count: ref mut _bc_target_count, target_from_selection: ref mut _bc_target_from_selection, timing_condition: ref mut _bc_timing_condition, trigger_type: ref mut _bc_trigger_type, .. } = &mut ek {
                 *_bc_action_by = Some(action_by.into());
                 *_bc_activation_position = Some(activation_position.into());
                 *_bc_all = Some(all);
@@ -1352,6 +1354,7 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
                 *_bc_characters = characters.map(|s| Box::new(vec![s.to_string()]));
                 *_bc_cost_limit = Some(cost_limit as u32);
                 *_bc_cost_limit_operator = Some(decode_operator_from_str(cost_limit_operator));
+                *_bc_value = Some(count as u32);
                 *_bc_duration = duration.map(|s| s.into());
                 *_bc_exclude_group_names = exclude_group_names.map(|s| Box::new(vec![s.to_string()]));
                 *_bc_exclude_self = Some(exclude_self);
@@ -1363,6 +1366,7 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
                 *_bc_heart_colors_from_selected_card = Some(heart_colors_from_selected_card);
                 *_bc_heart_type = heart_type.map(|s| s.into());
                 *_bc_location = Some(location.into());
+                *_bc_repeat_limit = Some(max_repeats as u32);
                 *_bc_multiple_targets = Some(multiple_targets);
                 *_bc_negation = Some(negation);
                 *_bc_original_value = Some(original_value);
@@ -1455,9 +1459,8 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             let target = decode_player(read_u8(cursor));
             let value = read_u8(cursor);
             let mut ek = default_customOp();
-            if let EffectKind::CustomOp { card_type: ref mut _bc_card_type, duration: ref mut _bc_duration, exclude_self: ref mut _bc_exclude_self, group_names: ref mut _bc_group_names, location: ref mut _bc_location, original_value: ref mut _bc_original_value, self_target: ref mut _bc_self_target, .. } = &mut ek {
+            if let EffectKind::CustomOp { card_type: ref mut _bc_card_type, exclude_self: ref mut _bc_exclude_self, group_names: ref mut _bc_group_names, location: ref mut _bc_location, original_value: ref mut _bc_original_value, self_target: ref mut _bc_self_target, .. } = &mut ek {
                 *_bc_card_type = Some(card_type.into());
-                *_bc_duration = duration.map(|s| s.into());
                 *_bc_exclude_self = Some(exclude_self);
                 *_bc_group_names = group_names.map(|s| Box::new(vec![s.to_string()]));
                 *_bc_location = Some(location.into());
@@ -1497,14 +1500,16 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             let timing_condition = read_str(cursor);
             let value = read_u8(cursor);
             let mut ek = default_modifyHearts();
-            if let EffectKind::ModifyHearts { card_type: ref mut _bc_card_type, duration: ref mut _bc_duration, exclude_heart_colors: ref mut _bc_exclude_heart_colors, exclude_self: ref mut _bc_exclude_self, group_names: ref mut _bc_group_names, heart_colors: ref mut _bc_heart_colors, location: ref mut _bc_location, operation: ref mut _bc_operation, original_count: ref mut _bc_original_count, original_operator: ref mut _bc_original_operator, original_value: ref mut _bc_original_value, per_unit: ref mut _bc_per_unit, per_unit_count: ref mut _bc_per_unit_count, per_unit_heart_colors: ref mut _bc_per_unit_heart_colors, per_unit_type: ref mut _bc_per_unit_type, replace_all: ref mut _bc_replace_all, self_target: ref mut _bc_self_target, timing_condition: ref mut _bc_timing_condition, value: ref mut _bc_value, .. } = &mut ek {
+            if let EffectKind::ModifyHearts { card_type: ref mut _bc_card_type, value: ref mut _bc_value, duration: ref mut _bc_duration, exclude_heart_colors: ref mut _bc_exclude_heart_colors, exclude_self: ref mut _bc_exclude_self, group_names: ref mut _bc_group_names, heart_colors: ref mut _bc_heart_colors, location: ref mut _bc_location, repeat_limit: ref mut _bc_repeat_limit, operation: ref mut _bc_operation, original_count: ref mut _bc_original_count, original_operator: ref mut _bc_original_operator, original_value: ref mut _bc_original_value, per_unit: ref mut _bc_per_unit, per_unit_count: ref mut _bc_per_unit_count, per_unit_heart_colors: ref mut _bc_per_unit_heart_colors, per_unit_type: ref mut _bc_per_unit_type, replace_all: ref mut _bc_replace_all, self_target: ref mut _bc_self_target, timing_condition: ref mut _bc_timing_condition, .. } = &mut ek {
                 *_bc_card_type = Some(card_type.into());
+                *_bc_value = Some(count as u32);
                 *_bc_duration = duration.map(|s| s.into());
                 *_bc_exclude_heart_colors = Some(Box::new(vec![exclude_heart_colors.to_string()]));
                 *_bc_exclude_self = Some(exclude_self);
                 *_bc_group_names = group_names.map(|s| Box::new(vec![s.to_string()]));
                 *_bc_heart_colors = heart_colors.map_or(Default::default(), |s| Box::new(vec![s.to_string()]));
                 *_bc_location = Some(location.into());
+                *_bc_repeat_limit = Some(max_repeats as u32);
                 *_bc_operation = operation.map(|s| s.into());
                 *_bc_original_count = Some(original_count as u32);
                 *_bc_original_operator = Some(decode_operator_from_str(original_operator));
@@ -1516,7 +1521,6 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
                 *_bc_replace_all = Some(replace_all);
                 *_bc_self_target = Some(self_target);
                 *_bc_timing_condition = timing_condition.map(|s| s.into());
-                *_bc_value = Some(value as u32);
             }
             Some(Box::new(ek))
         }
@@ -1597,7 +1601,8 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             let group_names = read_str(cursor);
             let operation = read_str(cursor);
             let mut ek = default_modifyScore();
-            if let EffectKind::ModifyScore { duration: ref mut _bc_duration, exclude_self: ref mut _bc_exclude_self, group_names: ref mut _bc_group_names, operation: ref mut _bc_operation, .. } = &mut ek {
+            if let EffectKind::ModifyScore { value: ref mut _bc_value, duration: ref mut _bc_duration, exclude_self: ref mut _bc_exclude_self, group_names: ref mut _bc_group_names, operation: ref mut _bc_operation, .. } = &mut ek {
+                *_bc_value = Some(count as u32);
                 *_bc_duration = Some(duration.into());
                 *_bc_exclude_self = Some(exclude_self);
                 *_bc_group_names = group_names.map(|s| Box::new(vec![s.to_string()]));
@@ -1703,7 +1708,8 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             let optional = read_u8(cursor) != 0;
             let target = decode_player(read_u8(cursor));
             let mut ek = default_gainResource();
-            if let EffectKind::GainResource { location: ref mut _bc_location, optional: ref mut _bc_optional, .. } = &mut ek {
+            if let EffectKind::GainResource { value: ref mut _bc_value, location: ref mut _bc_location, optional: ref mut _bc_optional, .. } = &mut ek {
+                *_bc_value = Some(count as u32);
                 *_bc_location = Some(location.into());
                 *_bc_optional = Some(optional);
             }
@@ -1719,7 +1725,8 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             let per_unit_source = read_str(cursor);
             let target = decode_player(read_u8(cursor));
             let mut ek = default_miscOp();
-            if let EffectKind::MiscOp { group_names: ref mut _bc_group_names, per_unit: ref mut _bc_per_unit, per_unit_count: ref mut _bc_per_unit_count, target: ref mut _bc_target, .. } = &mut ek {
+            if let EffectKind::MiscOp { value: ref mut _bc_value, group_names: ref mut _bc_group_names, per_unit: ref mut _bc_per_unit, per_unit_count: ref mut _bc_per_unit_count, target: ref mut _bc_target, .. } = &mut ek {
+                *_bc_value = Some(count as u32);
                 *_bc_group_names = group_names.map(|s| Box::new(vec![s.to_string()]));
                 *_bc_per_unit = Some(per_unit);
                 *_bc_per_unit_count = Some(per_unit_count as u32);
@@ -1927,7 +1934,7 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             let source = decode_zone(read_u8(cursor));
             let target = decode_player(read_u8(cursor));
             let mut ek = default_selectTarget();
-            if let EffectKind::SelectTarget { ability_filter_triggers: ref mut _bc_ability_filter_triggers, action_by: ref mut _bc_action_by, activation_position: ref mut _bc_activation_position, card_type: ref mut _bc_card_type, characters: ref mut _bc_characters, cost_limit: ref mut _bc_cost_limit, cost_limit_operator: ref mut _bc_cost_limit_operator, exclude_selected: ref mut _bc_exclude_selected, exclude_self: ref mut _bc_exclude_self, group_names: ref mut _bc_group_names, heart_colors: ref mut _bc_heart_colors, optional: ref mut _bc_optional, or_card_types: ref mut _bc_or_card_types, source: ref mut _bc_source, target: ref mut _bc_target, .. } = &mut ek {
+            if let EffectKind::SelectTarget { ability_filter_triggers: ref mut _bc_ability_filter_triggers, action_by: ref mut _bc_action_by, activation_position: ref mut _bc_activation_position, card_type: ref mut _bc_card_type, characters: ref mut _bc_characters, cost_limit: ref mut _bc_cost_limit, cost_limit_operator: ref mut _bc_cost_limit_operator, target_count: ref mut _bc_target_count, exclude_selected: ref mut _bc_exclude_selected, exclude_self: ref mut _bc_exclude_self, group_names: ref mut _bc_group_names, heart_colors: ref mut _bc_heart_colors, optional: ref mut _bc_optional, or_card_types: ref mut _bc_or_card_types, source: ref mut _bc_source, target: ref mut _bc_target, .. } = &mut ek {
                 *_bc_ability_filter_triggers = ability_filter_triggers.map(|s| vec![s.to_string()]);
                 *_bc_action_by = Some(action_by.into());
                 *_bc_activation_position = Some(activation_position.into());
@@ -1935,6 +1942,7 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
                 *_bc_characters = characters.map(|s| Box::new(vec![s.to_string()]));
                 *_bc_cost_limit = Some(cost_limit as u32);
                 *_bc_cost_limit_operator = Some(decode_operator_from_str(cost_limit_operator));
+                *_bc_target_count = Some(count as u32);
                 *_bc_exclude_selected = Some(exclude_selected);
                 *_bc_exclude_self = Some(exclude_self);
                 *_bc_group_names = group_names.map(|s| Box::new(vec![s.to_string()]));
@@ -1971,12 +1979,13 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             let reveal = read_u8(cursor) != 0;
             let source = decode_zone(read_u8(cursor));
             let mut ek = default_selectTarget();
-            if let EffectKind::SelectTarget { any_number: ref mut _bc_any_number, card_type: ref mut _bc_card_type, characters: ref mut _bc_characters, cost_limit: ref mut _bc_cost_limit, cost_limit_operator: ref mut _bc_cost_limit_operator, destination: ref mut _bc_destination, discard_remaining: ref mut _bc_discard_remaining, exclude_self: ref mut _bc_exclude_self, group_names: ref mut _bc_group_names, heart_color_count: ref mut _bc_heart_color_count, heart_colors: ref mut _bc_heart_colors, optional: ref mut _bc_optional, or_card_types: ref mut _bc_or_card_types, original_value: ref mut _bc_original_value, per_group: ref mut _bc_per_group, per_group_count: ref mut _bc_per_group_count, require_all_heart_colors: ref mut _bc_require_all_heart_colors, reveal: ref mut _bc_reveal, source: ref mut _bc_source, .. } = &mut ek {
+            if let EffectKind::SelectTarget { any_number: ref mut _bc_any_number, card_type: ref mut _bc_card_type, characters: ref mut _bc_characters, cost_limit: ref mut _bc_cost_limit, cost_limit_operator: ref mut _bc_cost_limit_operator, target_count: ref mut _bc_target_count, destination: ref mut _bc_destination, discard_remaining: ref mut _bc_discard_remaining, exclude_self: ref mut _bc_exclude_self, group_names: ref mut _bc_group_names, heart_color_count: ref mut _bc_heart_color_count, heart_colors: ref mut _bc_heart_colors, optional: ref mut _bc_optional, or_card_types: ref mut _bc_or_card_types, original_value: ref mut _bc_original_value, per_group: ref mut _bc_per_group, per_group_count: ref mut _bc_per_group_count, require_all_heart_colors: ref mut _bc_require_all_heart_colors, reveal: ref mut _bc_reveal, source: ref mut _bc_source, .. } = &mut ek {
                 *_bc_any_number = Some(any_number);
                 *_bc_card_type = Some(card_type.into());
                 *_bc_characters = characters.map(|s| Box::new(vec![s.to_string()]));
                 *_bc_cost_limit = Some(cost_limit as u32);
                 *_bc_cost_limit_operator = Some(decode_operator_from_str(cost_limit_operator));
+                *_bc_target_count = Some(count as u32);
                 *_bc_destination = Some(destination.into());
                 *_bc_discard_remaining = Some(discard_remaining);
                 *_bc_exclude_self = Some(exclude_self);
@@ -1997,6 +2006,9 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
         Opcode::SelectNumber => {
             let count = read_u8(cursor);
             let mut ek = default_selectTarget();
+            if let EffectKind::SelectTarget { target_count: ref mut _bc_target_count, .. } = &mut ek {
+                *_bc_target_count = Some(count as u32);
+            }
             Some(Box::new(ek))
         }
         Opcode::SetBladeCount => {
@@ -2008,8 +2020,9 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             let position = decode_zone(read_u8(cursor));
             let target = decode_player(read_u8(cursor));
             let mut ek = default_miscOp();
-            if let EffectKind::MiscOp { card_type: ref mut _bc_card_type, duration: ref mut _bc_duration, group_names: ref mut _bc_group_names, original_value: ref mut _bc_original_value, target: ref mut _bc_target, .. } = &mut ek {
+            if let EffectKind::MiscOp { card_type: ref mut _bc_card_type, value: ref mut _bc_value, duration: ref mut _bc_duration, group_names: ref mut _bc_group_names, original_value: ref mut _bc_original_value, target: ref mut _bc_target, .. } = &mut ek {
                 *_bc_card_type = Some(card_type.into());
+                *_bc_value = Some(count as u32);
                 *_bc_duration = Some(duration.into());
                 *_bc_group_names = group_names.map(|s| Box::new(vec![s.to_string()]));
                 *_bc_original_value = Some(original_value);
@@ -2021,9 +2034,6 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             let blade_type = read_str(cursor);
             let duration = decode_duration(read_u8(cursor));
             let mut ek = default_customOp();
-            if let EffectKind::CustomOp { duration: ref mut _bc_duration, .. } = &mut ek {
-                *_bc_duration = Some(duration.into());
-            }
             Some(Box::new(ek))
         }
         Opcode::SetCardIdentity => {
@@ -2054,8 +2064,9 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             let source = decode_zone(read_u8(cursor));
             let target = decode_player(read_u8(cursor));
             let mut ek = default_miscOp();
-            if let EffectKind::MiscOp { card_type: ref mut _bc_card_type, duration: ref mut _bc_duration, group_names: ref mut _bc_group_names, heart_colors: ref mut _bc_heart_colors, heart_type: ref mut _bc_heart_type, original_value: ref mut _bc_original_value, self_target: ref mut _bc_self_target, source: ref mut _bc_source, target: ref mut _bc_target, .. } = &mut ek {
+            if let EffectKind::MiscOp { card_type: ref mut _bc_card_type, value: ref mut _bc_value, duration: ref mut _bc_duration, group_names: ref mut _bc_group_names, heart_colors: ref mut _bc_heart_colors, heart_type: ref mut _bc_heart_type, original_value: ref mut _bc_original_value, self_target: ref mut _bc_self_target, source: ref mut _bc_source, target: ref mut _bc_target, .. } = &mut ek {
                 *_bc_card_type = Some(card_type.into());
+                *_bc_value = Some(count as u32);
                 *_bc_duration = Some(duration.into());
                 *_bc_group_names = group_names.map(|s| Box::new(vec![s.to_string()]));
                 *_bc_heart_colors = Box::new(vec![heart_colors.to_string()]);
@@ -2074,9 +2085,10 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             let position = decode_zone(read_u8(cursor));
             let target = decode_player(read_u8(cursor));
             let mut ek = default_miscOp();
-            if let EffectKind::MiscOp { activation_position: ref mut _bc_activation_position, choice: ref mut _bc_choice, target: ref mut _bc_target, .. } = &mut ek {
+            if let EffectKind::MiscOp { activation_position: ref mut _bc_activation_position, choice: ref mut _bc_choice, value: ref mut _bc_value, target: ref mut _bc_target, .. } = &mut ek {
                 *_bc_activation_position = Some(activation_position.into());
                 *_bc_choice = Some(choice);
+                *_bc_value = Some(count as u32);
                 *_bc_target = Some(target.into());
             }
             Some(Box::new(ek))
