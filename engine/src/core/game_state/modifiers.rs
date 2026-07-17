@@ -640,7 +640,8 @@ impl GameState {
                     } else {
                         effect
                             .resource_icon_count_any()
-                            .unwrap_or(effect.count_any().unwrap_or(1)) as i32
+                            .unwrap_or(effect.count_any().unwrap_or(1))
+                            as i32
                     };
                     *expected.entry(cid).or_insert(0) += count;
                 }

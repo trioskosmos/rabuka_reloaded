@@ -1975,6 +1975,7 @@ impl AbilityResolver {
                 util::place_card_in_zone(player, *card_id, dst, None, false, 1);
             }
         }
+        gs.mark_constants_dirty();
         gs.recalculate_constants();
         // Don't save energy card IDs in selected_cards — they would leak
         // into downstream sequential actions (e.g. gain_resource heart targets).

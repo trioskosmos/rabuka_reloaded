@@ -28,6 +28,41 @@ All `Vec<AbilityEffect>` → `Vec<Box<AbilityEffect>>` in CompoundBranch, Effect
 
 ---
 
+### ActionType enum: `action: String` → `ActionType` ✅ DONE
+
+**What:** Replaced `AbilityEffect.action: String` with `#[serde(rename_all = "snake_case")] ActionType` enum. All 60+ action variants are serde-compatible with the existing JSON format.
+
+**Key changes:**
+- `ActionType` now implements `Serialize`/`Deserialize` via derive, handling all action strings from `abilities.json` correctly
+- All string comparisons (`effect.action == "draw"`) replaced with enum matching (`effect.action == ActionType::Draw`)
+- All string assignments (`effect.action = "sequential".to_string()`) replaced with enum variants (`effect.action = ActionType::Sequential`)
+- 10 internal/procedural action types added (`SequentialCost`, `Tap`, `Rest`, `Discard`, `CompoundAction`, `OpponentAction`, `ActionBy`, `ConditionalOptional`, `ChoiceCondition`, `EnergyCondition`)
+- Custom serde avoided — derive macro handles all variants including internal ones
+
+**Dispatch simplification:**
+Before:
+```rust
+let action_type = ActionType::from_str(&effect.action).unwrap_or(ActionType::Custom);
+match action_type { ... }
+```
+
+After:
+```rust
+let action_type = effect.action;
+match action_type { ... }
+```
+
+**Eliminates:**
+- All `ActionType::from_str()` calls at dispatch time (replaced with direct field access)
+- All `ActionType::to_str()` calls in handler dispatch (replaced with `match effect.action`)
+- String-to-enum conversion overhead per effect execution
+
+**Test impact:** 1 test needed adjustment (`action_coverage_test.rs` — string set → ActionType set). All 1820 tests pass.
+
+**Bytecode impact:** The `ActionType` enum is now the opcode set for the bytecode VM. Each variant maps 1:1 to a bytecode opcode, enabling direct `match action_type { ActionType::DrawCard => ... }` dispatch without string indirection.
+
+---
+
 ### Box EffectKind Vec fields ✅ DONE
 
 Boxed 14 `Vec<String>` filter fields across EffectKind, Condition, and TriggerEvent.
@@ -59,7 +94,8 @@ Each `Vec<String>` (24 bytes) → `Box<Vec<String>>` (8 bytes) saves 16 bytes pe
 |------|--------------|-------------|-------|
 | `Condition` | **1864** | **536** | Flat struct → tagged enum, 71% reduction |
 | `EffectKind` | **1248** | **808** | 14 Vec fields boxed + field additions |
-| `AbilityEffect` | **1536** | **264** | Box\<EffectKind\> → Box, -800B stack |
+| `AbilityEffect` | **1536** | **264** | Box\<EffectKind\> → Box, -800B stack. `action: String (24B)` → `ActionType (1B+padding=2B)`, stack effect minimal |
+| `ActionType` | **String (24B)** | **1B (enum)** | serde-compatible via `rename_all = "snake_case"`. Discriminant fits in 1 byte, padding takes it to 2 |
 | `CompoundBranch` | **96** | **96** | Mostly boxed pointers now |
 | `AbilityQueueEntry` | **~600+** | **~600+** | Has condition_cache HashMap, snapshot Vecs, resolver, pending_actions |
 | `Option<String>` | 24 | 24 | No niche, always full size |
@@ -154,6 +190,11 @@ Replace `#[serde(skip)]` on `kind: Option<EffectKind>` with a custom Deserialize
 
 **Savings:** 1536 + 1248 → ~400 bytes per effect (~700 KB for ~6000 effects).
 
+**Strategy for flat field removal:**
+Keep `#[serde(default)]` on `kind: Option<EffectKind>` (NOT `#[serde(skip)]` — skip + flatten interaction breaks sub-effect deserialization). Implement a custom Deserialize impl that reads the raw JSON via `serde_json::Value` intermediary, feeds flat field keys (source, destination, count, target) into EffectKind during deserialization, and returns AbilityEffect without storing them separately. This eliminates the flat fields AND makes `rekindle_effect` unnecessary, naturally killing both code paths.
+
+**Key lesson:** `#[serde(skip)]` on `kind` combined with `#[serde(flatten)]` on `compound` causes serde to mishandle sub-effect fields during `populate_from_json`. Use `#[serde(default)]` instead — behaviorally identical for `Option<T>` (defaults to `None` when missing from JSON), but avoids the flatten conflict.
+
 **Estimated effort:** Similar to P0 (Condition refactor) — ~50-100 files touched, careful serialization compatibility needed, `#[serde(flatten)]` catch-all to prevent silent drops.
 
 ---
@@ -240,6 +281,46 @@ Covered by `debug_conditions` feature gate above. `trigger_event: Option<Box<Tri
 - Only matters if AbilityEffect still has flat fields. If P1 consolidates to EffectKind-only, rekindle naturally dies.
 - **Clock cycle win:** Thousands of recursive JSON traversals eliminated
 - **Test risk:** Medium — serialization format changes
+
+---
+
+### P1.5 — ActionType dispatch enum ✅ DONE
+
+**What:** Replaced `AbilityEffect.action: String` (24 bytes, heap-allocated) with `ActionType` enum (1 byte + padding = 2 bytes, stack-local). All string comparisons eliminated.
+
+**Why:** Enables direct enum dispatch in the bytecode VM. Each `ActionType` variant maps 1:1 to a bytecode opcode. No string parsing at execution time.
+
+**Key findings:**
+- Using `#[serde(rename_all = "snake_case")]` derive handles ALL action strings (including internal ones like `sequential_cost`, `conditional_optional`). No `#[serde(skip)]` needed on any variant.
+- Custom `Serialize`/`Deserialize` impls that delegate to `from_str()`/`to_str()` are unnecessary — the derive handles everything.
+- `ActionType::from_str()` and `ActionType::to_str()` kept for backward compat but no longer called on the hot path.
+
+**Files touched:** `enums.rs`, `card.rs`, `cost.rs`, `effects/mod.rs`, `compound.rs`, `choice.rs`, `resolver.rs`, `util.rs`, `move_cards.rs`, `live.rs`, `triggers.rs`, `modifiers.rs`, `player.rs`, `game_setup.rs`, `card_loader.rs`, `abilities.rs`, `misc.rs`, `state.rs`, `describe.rs`, + 3 test files.
+
+**Savings:** ~22 bytes per effect field (String → enum). Elimination of ~50 `from_str()` calls per ability execution.
+
+**Test impact:** 3 test files updated. All 1820 tests pass.
+
+---
+
+### P1.6 — Build bytecode VM
+
+**Why:** The current engine decodes `abilities.json` into full `AbilityEffect` structs at load time (~4 MB JSON → ~2.8 MB in-memory structs). For PS1, N64, DS, Dreamcast targets with <1 MB RAM, this is too expensive. A bytecode format stores abilities as compact opcodes (~14B per ability vs ~400B per AbilityEffect).
+
+**Current state:**
+- `vm.rs` + `vm_gen.rs` already exist behind `#[cfg(feature = "bytecode_abilities")]` feature flag
+- The existing VM inflates bytecode back into `AbilityEffect` structs — it does NOT execute directly
+- `ActionType` enum now matches 1:1 with bytecode opcodes, making direct execution possible
+
+**What remains:**
+1. Rewrite `compile_abilities.py` to emit a binary bytecode format (not inflated JSON)
+2. Rewrite `vm.rs` as a true opcode dispatch VM (match on `ActionType`, read operands inline)
+3. Remove the inflation step — decode straight from bytecode slice
+4. Card storage: embed bytecode offset in Card struct instead of `Vec<Arc<Ability>>`
+
+**Savings:** ~40 KB card data vs ~4 MB JSON-inflated. 100x reduction.
+
+**Estimated effort:** ~300 lines Python compiler + ~500 lines Rust VM. Coexists with JSON path behind feature flag.
 
 ---
 

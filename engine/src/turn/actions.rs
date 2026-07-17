@@ -1034,6 +1034,7 @@ impl super::TurnEngine {
                 .cards
                 .extend(waitroom.iter().copied());
             game_state.player1.main_deck.shuffle();
+            game_state.mark_constants_dirty();
             tdbg!("CHECK_TIMING:1b p1 refresh shuffled");
         }
         if p2_needs_refresh {
@@ -1044,6 +1045,7 @@ impl super::TurnEngine {
                 .cards
                 .extend(waitroom.iter().copied());
             game_state.player2.main_deck.shuffle();
+            game_state.mark_constants_dirty();
             tdbg!("CHECK_TIMING:2b p2 refresh shuffled");
         }
         tdbg!("CHECK_TIMING:3 refresh done");
@@ -1055,11 +1057,17 @@ impl super::TurnEngine {
         tdbg!("CHECK_TIMING:5 invalid live p1 OK");
         Self::check_invalid_live_cards(game_state, &p2_id);
         tdbg!("CHECK_TIMING:6 invalid live p2 OK");
-        Self::check_invalid_energy_cards(&mut game_state.player1, &game_state.card_database);
-        Self::check_invalid_energy_cards(&mut game_state.player2, &game_state.card_database);
+        let _e1 = Self::check_invalid_energy_cards(&mut game_state.player1, &game_state.card_database);
+        let _e2 = Self::check_invalid_energy_cards(&mut game_state.player2, &game_state.card_database);
+        if _e2 > 0 || _e1 > 0 {
+            game_state.mark_constants_dirty();
+        }
         tdbg!("CHECK_TIMING:7 invalid energy OK");
-        Self::check_orphaned_under_cards(&mut game_state.player1, &game_state.card_database);
-        Self::check_orphaned_under_cards(&mut game_state.player2, &game_state.card_database);
+        let _o1 = Self::check_orphaned_under_cards(&mut game_state.player1, &game_state.card_database);
+        let _o2 = Self::check_orphaned_under_cards(&mut game_state.player2, &game_state.card_database);
+        if _o1 > 0 || _o2 > 0 {
+            game_state.mark_constants_dirty();
+        }
         tdbg!("CHECK_TIMING:8 orphaned under OK");
         game_state.recalculate_constants();
         tdbg!("CHECK_TIMING:9 recalc_constants OK");
@@ -1153,6 +1161,8 @@ impl super::TurnEngine {
         if invalids.is_empty() {
             return;
         }
+        // Live-zone membership changed → constant outputs may differ.
+        game_state.mark_constants_dirty();
         let mut moved = Vec::new();
         for &(i, card_id, is_energy) in invalids.iter().rev() {
             let player = if player_id == p1_id {
@@ -1184,25 +1194,29 @@ impl super::TurnEngine {
     }
 
     /// Rule 10.5.2: Non-energy cards in energy zone → moved to discard.
-    fn check_invalid_energy_cards(player: &mut crate::player::Player, card_db: &CardDatabase) {
+    fn check_invalid_energy_cards(player: &mut crate::player::Player, card_db: &CardDatabase) -> usize {
         let mut invalid_indices = Vec::new();
         for (i, card_id) in player.energy_zone.cards.iter().enumerate() {
             if !card_db.get_card(*card_id).is_some_and(|c| c.is_energy()) {
                 invalid_indices.push(i);
             }
         }
+        let mut moved = 0;
         for &i in invalid_indices.iter().rev() {
             if i < player.energy_zone.cards.len() {
                 let card_id = player.energy_zone.cards.remove(i);
                 player.waitroom.add_card(card_id);
+                moved += 1;
             }
         }
+        moved
     }
 
     /// Rule 10.5.3-4: Orphaned cards under members.
     /// When a member leaves its area, any member cards under it go to discard (10.5.3)
     /// and any energy cards under it go to energy deck (10.5.4).
-    fn check_orphaned_under_cards(player: &mut crate::player::Player, card_db: &CardDatabase) {
+    fn check_orphaned_under_cards(player: &mut crate::player::Player, card_db: &CardDatabase) -> usize {
+        let mut moved = 0;
         for area_idx in 0..3 {
             let top = player.stage.stage[area_idx];
             if top == -1 {
@@ -1213,9 +1227,11 @@ impl super::TurnEngine {
                     } else {
                         player.waitroom.cards.push(cid);
                     }
+                    moved += 1;
                 }
             }
         }
+        moved
     }
 
     fn check_invalid_resolution_zone(game_state: &mut GameState) {

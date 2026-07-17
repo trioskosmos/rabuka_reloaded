@@ -3,7 +3,10 @@ use crate::game_state::{GameState, Phase};
 use crate::types::LogEntry;
 use crate::HashMap;
 #[cfg(feature = "psp")]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 #[cfg(feature = "3ds")]
 extern "C" {
     fn _3ds_tdbg(msg: *const u8);
@@ -125,6 +128,8 @@ impl super::TurnEngine {
                     tdbg!("PHASE_ACTIVE:5 tick_delayed OK");
                     game_state.active_player_mut().activate_all_energy();
                     tdbg!("PHASE_ACTIVE:6 activate_all_energy OK");
+                    // Orientation + energy activation changed → constant outputs stale.
+                    game_state.mark_constants_dirty();
                     Self::check_timing(game_state);
                     tdbg!("PHASE_ACTIVE:7 check_timing OK");
                     Self::log_phase(game_state, "phase_energy");
@@ -135,6 +140,7 @@ impl super::TurnEngine {
                 Phase::Energy => {
                     tdbg!("PHASE_ENERGY:0");
                     let _drawn_card = game_state.active_player_mut().draw_energy();
+                    game_state.mark_constants_dirty();
                     Self::check_timing(game_state);
                     Self::log_phase(game_state, "phase_draw");
                     game_state.current_phase = Phase::Draw;
@@ -143,6 +149,7 @@ impl super::TurnEngine {
                     Self::check_timing(game_state);
                     let _drawn = game_state.active_player_mut().draw_card();
                     // recalculate_constants skipped — check_timing below calls it
+                    game_state.mark_constants_dirty();
                     Self::check_timing(game_state);
                     Self::log_phase(game_state, "phase_main");
                     game_state.current_phase = Phase::Main;
@@ -815,6 +822,7 @@ impl super::TurnEngine {
         // Recalculate constant cost modifiers (hand-based cost reductions, etc.)
         // BEFORE paying cost, so the modifiers are in effect.
         tdbg!("PHASE_EXEC:0 recalc");
+        game_state.mark_constants_dirty();
         game_state.recalculate_constants();
         tdbg!("PHASE_EXEC:1 recalc OK");
         let mods = game_state.mods.clone();
@@ -1019,6 +1027,7 @@ impl super::TurnEngine {
             Self::trigger_auto_abilities_for_player(game_state, &db_opponent_id);
             game_state.process_pending_auto_abilities(&player_id);
             tdbg!("PHASE_AUTO:0 recalc");
+            game_state.mark_constants_dirty();
             game_state.recalculate_constants();
             tdbg!("PHASE_AUTO:1 recalc OK");
 
@@ -1084,6 +1093,7 @@ impl super::TurnEngine {
         // are ahead of appearance-triggered in the queue, so they resolve first.
         game_state.process_pending_auto_abilities(&player_id);
         tdbg!("PHASE_AUTO2:0 recalc");
+        game_state.mark_constants_dirty();
         game_state.recalculate_constants();
         tdbg!("PHASE_AUTO2:1 recalc OK");
 

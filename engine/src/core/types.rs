@@ -96,7 +96,7 @@ pub enum AbilityTrigger {
     Auto,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TurnPhase {
     FirstAttackerNormal,
     SecondAttackerNormal,
@@ -113,7 +113,7 @@ impl core::fmt::Display for TurnPhase {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Phase {
     RockPaperScissors,
     ChooseFirstAttacker,

@@ -1,0 +1,7 @@
+advance_phase 2114725100
+advance_phase;check_timing 725779500
+execute_main_phase_action 683508900
+execute_main_phase_action;advance_phase 494360200
+execute_main_phase_action;advance_phase;check_timing 295597400
+generate_possible_actions 1395439300
+generate_possible_actions;generate_main_phase_actions 132730100

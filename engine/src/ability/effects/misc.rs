@@ -1981,6 +1981,7 @@ impl AbilityResolver {
         for card in energy_cards {
             player.stage.place_under_card(area, card);
         }
+        gs.mark_constants_dirty();
         gs.recalculate_constants();
         let pp = self.player_prefix(gs);
         let act_name = gs
@@ -2515,6 +2516,7 @@ impl AbilityResolver {
                 ..Default::default()
             },
         );
+        gs.mark_constants_dirty();
         gs.recalculate_constants();
         Ok(())
     }
@@ -2718,6 +2720,7 @@ impl AbilityResolver {
         }
 
         gs.position_change_occurred_this_turn = true;
+        gs.mark_constants_dirty();
         gs.recalculate_constants();
         self.formation_plan.clear();
         Ok(())
@@ -2902,6 +2905,7 @@ impl AbilityResolver {
                     ..Default::default()
                 },
             );
+            gs.mark_constants_dirty();
             gs.recalculate_constants();
             return Ok(());
         }
@@ -2999,6 +3003,7 @@ impl AbilityResolver {
                             ..Default::default()
                         },
                     );
+                    gs.mark_constants_dirty();
                     gs.recalculate_constants();
                     return Ok(());
                 }
@@ -3113,6 +3118,7 @@ impl AbilityResolver {
                 ..Default::default()
             },
         );
+        gs.mark_constants_dirty();
         gs.recalculate_constants();
         Ok(())
     }
@@ -3175,6 +3181,7 @@ impl AbilityResolver {
         }
 
         gs.position_change_occurred_this_turn = true;
+        gs.mark_constants_dirty();
         gs.recalculate_constants();
         let pid = gs
             .ability_queue
