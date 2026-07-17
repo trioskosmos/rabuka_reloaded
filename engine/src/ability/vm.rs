@@ -1,8 +1,10 @@
 use super::abilities_gen::{Opcode, BYTECODE, NUM_ABILITIES, OFFSETS, STRINGS};
+use crate::ability::enums::EffectState;
 use crate::card::{
     ek_box_new, Ability, AbilityCost, AbilityEffect, Condition, ConditionCardType, EffectKind,
     Operator,
 };
+use crate::core::types::ArcStr;
 
 fn read_u8(c: &mut &[u8]) -> u8 {
     let b = c[0];
@@ -338,7 +340,7 @@ fn decode_cost_op(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
                 ..
             } = &mut ek
             {
-                *s = Some("rest".into());
+                *s = Some(EffectState::Other(ArcStr::from("rest")));
             }
             AbilityEffect {
                 action: "rest".into(),
@@ -429,7 +431,7 @@ fn decode_cost_op(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
                 ..
             } = &mut ek
             {
-                *st = Some(s.into());
+                *st = Some(s);
             }
             AbilityEffect {
                 action: "change_state".into(),
@@ -561,13 +563,13 @@ fn decode_heart(v: u8) -> &'static str {
         _ => "smile",
     }
 }
-fn decode_state(v: u8) -> &'static str {
+fn decode_state(v: u8) -> EffectState {
     match v {
-        0 => "rest",
-        1 => "stand",
-        2 => "reverse",
-        3 => "wait",
-        _ => "rest",
+        0 => EffectState::Other(ArcStr::from("rest")),
+        1 => EffectState::Other(ArcStr::from("stand")),
+        2 => EffectState::Other(ArcStr::from("reverse")),
+        3 => EffectState::Wait,
+        _ => EffectState::Other(ArcStr::from("rest")),
     }
 }
 fn decode_duration(v: u8) -> &'static str {

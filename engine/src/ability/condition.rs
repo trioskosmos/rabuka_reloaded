@@ -278,7 +278,7 @@ pub fn push_cond_verdict(
                     .unwrap_or("エネルギー状態")
                     .to_string()
             } else {
-                let st = state.as_deref().unwrap_or("状態");
+                let st = state.as_ref().map(|s| s.as_str()).unwrap_or("状態");
                 let loc = condition.get_location().unwrap_or("stage");
                 format!("{}状態を{}で確認", st, loc)
             }

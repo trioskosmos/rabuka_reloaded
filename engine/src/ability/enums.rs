@@ -769,3 +769,76 @@ impl core::fmt::Display for EffectCardType {
         write!(f, "{}", self.as_str())
     }
 }
+
+// ============== EFFECT STATE ==============
+//
+// Typed replacement for the raw `state` / `state_change` string fields on
+// effect kinds. Known values are `active` / `wait`; any unrecognized value
+// is preserved verbatim in `Other(ArcStr)` so legacy JSON keeps loading.
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum EffectState {
+    Active,
+    Wait,
+    Other(ArcStr),
+}
+
+impl EffectState {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "active" => EffectState::Active,
+            "wait" => EffectState::Wait,
+            other => EffectState::Other(ArcStr::from(other)),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            EffectState::Active => "active",
+            EffectState::Wait => "wait",
+            EffectState::Other(s) => s.as_ref(),
+        }
+    }
+}
+
+#[cfg(not(feature = "psp"))]
+impl serde::Serialize for EffectState {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+#[cfg(not(feature = "psp"))]
+impl<'de> serde::Deserialize<'de> for EffectState {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = <ArcStr as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(EffectState::from_str(&s))
+    }
+}
+
+#[cfg(feature = "psp")]
+impl serde::Serialize for EffectState {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+#[cfg(feature = "psp")]
+impl<'de> serde::Deserialize<'de> for EffectState {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(EffectState::from_str(&s))
+    }
+}
+
+impl Default for EffectState {
+    fn default() -> Self {
+        EffectState::Other(ArcStr::from(""))
+    }
+}
+
+impl core::fmt::Display for EffectState {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}

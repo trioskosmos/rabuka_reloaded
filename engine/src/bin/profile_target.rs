@@ -207,5 +207,6 @@ fn main() {
     }
     if cfg!(feature = "profiling") {
         rabuka_engine::timer::print_results();
+        rabuka_engine::timer::print_folded();
     }
 }

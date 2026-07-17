@@ -112,6 +112,23 @@ pub fn print_results() {
     }
 }
 
+/// Emit timer data in inferno "folded stack" format for flamegraph generation.
+///
+/// Each call path is written as `frame1;frame2;...;<leaf> <nanoseconds>`, where
+/// the count is the total nanoseconds spent in that exact call path. This can be
+/// piped into `inferno`'s `FlameGraph` to produce an SVG.
+pub fn print_folded() {
+    let guard = get_timers();
+    if let Some(ref map) = *guard {
+        let mut results: Vec<_> = map.iter().collect();
+        results.sort_by(|a, b| a.0.cmp(b.0));
+        for (path, (_count, total_ns)) in &results {
+            let folded = path.join(";");
+            println!("{} {}", folded, total_ns);
+        }
+    }
+}
+
 pub fn reset() {
     let mut guard = get_timers();
     if let Some(ref mut map) = *guard {

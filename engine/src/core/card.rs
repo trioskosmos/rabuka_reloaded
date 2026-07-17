@@ -1,4 +1,4 @@
-use crate::ability::enums::{ActionType, ConditionType, EffectCardType, Zone};
+use crate::ability::enums::{ActionType, ConditionType, EffectCardType, EffectState, Zone};
 use crate::core::types::ArcStr;
 use crate::Arc;
 use crate::HashMap;
@@ -956,7 +956,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_group_count: Option<u32>,
         #[serde(default)]
-        state: Option<ArcStr>,
+        state: Option<EffectState>,
         #[serde(default)]
         negation: Option<bool>,
         #[serde(default)]
@@ -980,7 +980,7 @@ pub enum EffectKind {
         #[serde(default)]
         distinct: Option<DistinctType>,
         #[serde(default)]
-        state_change: Option<ArcStr>,
+        state_change: Option<EffectState>,
         #[serde(default)]
         self_cost: Option<bool>,
         #[serde(default)]
@@ -1047,7 +1047,7 @@ pub enum EffectKind {
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
-        state: Option<ArcStr>,
+        state: Option<EffectState>,
         #[serde(default)]
         heart_colors: Box<Vec<String>>,
         #[serde(default)]
@@ -1128,7 +1128,7 @@ pub enum EffectKind {
         #[serde(default)]
         location: Option<ArcStr>,
         #[serde(default)]
-        state: Option<ArcStr>,
+        state: Option<EffectState>,
         #[serde(default)]
         activation_position: Option<ArcStr>,
         #[serde(default)]
@@ -1249,7 +1249,7 @@ pub enum EffectKind {
         #[serde(default)]
         activation_position: Option<ArcStr>,
         #[serde(default)]
-        state: Option<ArcStr>,
+        state: Option<EffectState>,
         #[serde(default)]
         optional: Option<bool>,
         #[serde(default)]
@@ -1328,7 +1328,7 @@ pub enum EffectKind {
         #[serde(default)]
         card_property: Option<ArcStr>,
         #[serde(default)]
-        state: Option<ArcStr>,
+        state: Option<EffectState>,
         #[serde(default)]
         negation: Option<bool>,
         #[serde(default)]
@@ -1466,7 +1466,7 @@ pub enum EffectKind {
         #[serde(default)]
         activation_position: Option<ArcStr>,
         #[serde(default)]
-        state: Option<ArcStr>,
+        state: Option<EffectState>,
         #[serde(default)]
         heart_type: Option<ArcStr>,
         #[serde(default)]
@@ -1509,7 +1509,7 @@ pub enum EffectKind {
         #[serde(default)]
         destination: Option<ArcStr>,
         #[serde(default)]
-        state_change: Option<ArcStr>,
+        state_change: Option<EffectState>,
         #[serde(default)]
         card_type: Option<EffectCardType>,
         #[serde(default)]
@@ -1593,7 +1593,7 @@ pub enum EffectKind {
         #[serde(default)]
         position: Option<PositionInfo>,
         #[serde(default)]
-        state: Option<ArcStr>,
+        state: Option<EffectState>,
         #[serde(default)]
         action_by: Option<ArcStr>,
         #[serde(default)]
@@ -1833,7 +1833,7 @@ pub enum EffectKind {
         #[serde(default)]
         self_target: Option<bool>,
         #[serde(default)]
-        state: Option<ArcStr>,
+        state: Option<EffectState>,
         #[serde(default)]
         activation_position: Option<ArcStr>,
         #[serde(default)]
@@ -3129,9 +3129,30 @@ impl AbilityEffect {
         variant_target.or_else(|| self.target.as_deref())
     }
 
-    str_getter!(state_any, [MoveCards => state, DrawCards => state, LookReveal => state, GainResource => state, PositionOp => state, ChangeState => state, ModifyScore => state]);
+    pub fn state_any(&self) -> Option<&str> {
+        match self.kind.as_deref() {
+            Some(EffectKind::MoveCards { state, .. }) => state.as_ref().map(|s| s.as_str()),
+            Some(EffectKind::DrawCards { state, .. }) => state.as_ref().map(|s| s.as_str()),
+            Some(EffectKind::LookReveal { state, .. }) => state.as_ref().map(|s| s.as_str()),
+            Some(EffectKind::GainResource { state, .. }) => state.as_ref().map(|s| s.as_str()),
+            Some(EffectKind::PositionOp { state, .. }) => state.as_ref().map(|s| s.as_str()),
+            Some(EffectKind::ChangeState { state, .. }) => state.as_ref().map(|s| s.as_str()),
+            Some(EffectKind::ModifyScore { state, .. }) => state.as_ref().map(|s| s.as_str()),
+            _ => None,
+        }
+    }
 
-    str_getter!(state_change_any, [ChangeState => state_change, MoveCards => state_change]);
+    pub fn state_change_any(&self) -> Option<&str> {
+        match self.kind.as_deref() {
+            Some(EffectKind::ChangeState { state_change, .. }) => {
+                state_change.as_ref().map(|s| s.as_str())
+            }
+            Some(EffectKind::MoveCards { state_change, .. }) => {
+                state_change.as_ref().map(|s| s.as_str())
+            }
+            _ => None,
+        }
+    }
 
     str_getter!(suppressed_trigger_any, [AbilityOp => suppressed_trigger]);
 
@@ -3331,8 +3352,24 @@ impl AbilityEffect {
     setter!(set_sign, sign: ArcStr => [GainResource, MiscOp]);
     setter!(set_source_card, source_card: ArcStr => [AbilityOp]);
     setter!(set_source_position, source_position: ArcStr => [MoveCards, PositionOp]);
-    setter!(set_state, state: ArcStr => [MoveCards, LookReveal, GainResource, PositionOp]);
-    setter!(set_state_change, state_change: ArcStr => [ChangeState]);
+    pub fn set_state(&mut self, val: Option<ArcStr>) {
+        let parsed = val.map(|s| EffectState::from_str(&s));
+        match self.kind.as_deref_mut() {
+            Some(EffectKind::MoveCards { ref mut state, .. }) => *state = parsed,
+            Some(EffectKind::LookReveal { ref mut state, .. }) => *state = parsed,
+            Some(EffectKind::GainResource { ref mut state, .. }) => *state = parsed,
+            Some(EffectKind::PositionOp { ref mut state, .. }) => *state = parsed,
+            _ => {}
+        }
+    }
+
+    pub fn set_state_change(&mut self, val: Option<ArcStr>) {
+        let parsed = val.map(|s| EffectState::from_str(&s));
+        match self.kind.as_deref_mut() {
+            Some(EffectKind::ChangeState { ref mut state_change, .. }) => *state_change = parsed,
+            _ => {}
+        }
+    }
     setter!(set_suppressed_trigger, suppressed_trigger: ArcStr => [AbilityOp]);
     setter!(set_target_count, target_count: u32 => [MoveCards, DrawCards, SelectTarget, ModifyScore, ModifyHearts, CompoundEffect, MiscOp]);
     setter!(set_target_from_selection, target_from_selection: bool => [MoveCards, GainResource]);
@@ -4228,7 +4265,7 @@ pub enum Condition {
         cache: Option<bool>,
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
-        state: Option<ArcStr>,
+        state: Option<EffectState>,
         energy_state: Option<ArcStr>,
         target: Option<ArcStr>,
         resource_type: Option<ArcStr>,
@@ -4758,7 +4795,7 @@ impl Condition {
     pub fn get_state(&self) -> Option<CardState> {
         match self {
             Condition::Location { state, .. } => *state,
-            Condition::State { state, .. } => state.as_deref().and_then(|s| match s {
+            Condition::State { state, .. } => state.as_ref().and_then(|s| match s.as_str() {
                 "active" => Some(CardState::Active),
                 "wait" => Some(CardState::Wait),
                 _ => None,

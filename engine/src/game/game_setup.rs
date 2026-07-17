@@ -959,6 +959,30 @@ fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
     actions
 }
 
+/// Returns true if `existing_card` prevents a baton touch from `card_id`
+/// (i.e. it has a `cannot_baton_touch` restriction that is not excluded by
+/// `card_id`'s groups). Extracted from the action-generation hot path so the
+/// per-hand-card, per-area scan runs only once per area.
+fn has_cannot_baton_touch(
+    card_db: &crate::card::CardDatabase,
+    card_id: i16,
+    existing_card: &crate::card::Card,
+) -> bool {
+    existing_card.abilities.iter().any(|a| {
+        a.effect.as_ref().is_some_and(|ef| {
+            if ef.restriction_type_any().as_deref() != Some("cannot_baton_touch") {
+                return false;
+            }
+            if let Some(ref exclude_groups) = ef.exclude_group_names_any() {
+                if crate::ability::util::card_matches_any_group(card_db, card_id, exclude_groups) {
+                    return false;
+                }
+            }
+            true
+        })
+    })
+}
+
 fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
     #[cfg(not(feature = "psp"))]
     let _timer = crate::timer::Timer::start("generate_main_phase_actions");
@@ -1003,6 +1027,44 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         (crate::zones::MemberArea::RightSide, "right"),
                     ];
 
+                    // Precompute per-area baton-touch protection once per hand card
+                    // instead of re-scanning the stage member's abilities for every area.
+                    let baton_touch_protected: [bool; 3] = [
+                        stage_card_ids[0] != -1
+                            && stage_cards[0].is_some_and(|existing_card| {
+                                !active_player
+                                    .deployed_this_turn
+                                    .contains(&stage_card_ids[0])
+                                    && has_cannot_baton_touch(
+                                        &game_state.card_database,
+                                        *card_id,
+                                        existing_card,
+                                    )
+                            }),
+                        stage_card_ids[1] != -1
+                            && stage_cards[1].is_some_and(|existing_card| {
+                                !active_player
+                                    .deployed_this_turn
+                                    .contains(&stage_card_ids[1])
+                                    && has_cannot_baton_touch(
+                                        &game_state.card_database,
+                                        *card_id,
+                                        existing_card,
+                                    )
+                            }),
+                        stage_card_ids[2] != -1
+                            && stage_cards[2].is_some_and(|existing_card| {
+                                !active_player
+                                    .deployed_this_turn
+                                    .contains(&stage_card_ids[2])
+                                    && has_cannot_baton_touch(
+                                        &game_state.card_database,
+                                        *card_id,
+                                        existing_card,
+                                    )
+                            }),
+                    ];
+
                     let mut available_areas = Vec::with_capacity(3);
                     let mut has_any_available = false;
 
@@ -1024,30 +1086,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                 .contains(&existing_member_id)
                             {
                                 // Check if existing member has cannot_baton_touch restriction
-                                let has_baton_touch_protection =
-                                    stage_cards[area_idx].is_some_and(|existing_card| {
-                                        existing_card.abilities.iter().any(|a| {
-                                            a.effect.as_ref().is_some_and(|ef| {
-                                                if ef.restriction_type_any().as_deref()
-                                                    != Some("cannot_baton_touch")
-                                                {
-                                                    return false;
-                                                }
-                                                if let Some(ref exclude_groups) =
-                                                    ef.exclude_group_names_any()
-                                                {
-                                                    if crate::ability::util::card_matches_any_group(
-                                                        &game_state.card_database,
-                                                        *card_id,
-                                                        exclude_groups,
-                                                    ) {
-                                                        return false;
-                                                    }
-                                                }
-                                                true
-                                            })
-                                        })
-                                    });
+                                let has_baton_touch_protection = baton_touch_protected[area_idx];
 
                                 if !has_baton_touch_protection {
                                     if let Some(existing_member_card) = stage_cards[area_idx] {
@@ -1082,38 +1121,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     });
 
                     let (double_baton_pairs, any_double_baton_available) = if has_double_baton {
-                        // Pre-compute which occupied areas have cannot_baton_touch protection
-                        let cannot_baton_touch_protected: Vec<bool> = (0..3)
-                            .map(|idx| {
-                                let member_id = stage_card_ids[idx];
-                                if member_id == -1 {
-                                    return false;
-                                }
-                                stage_cards[idx].is_some_and(|card| {
-                                    card.abilities.iter().any(|a| {
-                                        a.effect.as_ref().is_some_and(|ef| {
-                                            if ef.restriction_type_any().as_deref()
-                                                != Some("cannot_baton_touch")
-                                            {
-                                                return false;
-                                            }
-                                            if let Some(ref exclude_groups) =
-                                                ef.exclude_group_names_any()
-                                            {
-                                                if crate::ability::util::card_matches_any_group(
-                                                    &game_state.card_database,
-                                                    *card_id,
-                                                    exclude_groups,
-                                                ) {
-                                                    return false;
-                                                }
-                                            }
-                                            true
-                                        })
-                                    })
-                                })
-                            })
-                            .collect();
+                        // Reuse the per-area protection computed above.
+                        let cannot_baton_touch_protected = &baton_touch_protected;
                         let occupied: Vec<(usize, &str, i16)> = [0, 1, 2]
                             .iter()
                             .filter(|&&idx| stage_card_ids[idx] != -1)
