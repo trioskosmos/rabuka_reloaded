@@ -108,6 +108,7 @@ impl<'a> ConditionContext<'a> {
         if let Some(conditions) = condition.get_conditions() {
             #[cfg(not(feature = "psp"))]
             let before = crate::ability::log::buffer_len();
+            #[cfg_attr(feature = "psp", allow(unused_variables))]
             let (cnt, result) = self.evaluate_condition_list(conditions, "or");
             #[cfg(not(feature = "psp"))]
             let children = crate::ability::log::drain_verdicts_since(before);

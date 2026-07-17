@@ -2,7 +2,10 @@ use crate::card::{BladeColor, HeartColor};
 use crate::types::AbilityApplication;
 use crate::HashMap;
 #[cfg(feature = "psp")]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 /// Stores both the additive delta and absolute set value for a modifier.
 /// Replaces the old dual-map pattern (`blade_modifiers` + `set_blade_modifiers`).

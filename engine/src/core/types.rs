@@ -2,11 +2,15 @@ use crate::card::{AbilityEffect, HeartColor};
 use crate::core::game_modifiers::ModifierEntry;
 use crate::Arc;
 use crate::HashMap;
+#[cfg(feature = "psp")]
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
 use serde::de::Deserializer;
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "psp")]
-use alloc::{boxed::Box, string::{String, ToString}, vec::Vec};
 
 /// Like `Box<str>` but `Arc`-backed for cheap clone (refcount bump, no str copy).
 /// Used in `EffectKind` fields where the same string value may be accessed

@@ -1,8 +1,16 @@
-#[cfg(feature = "psp")]
-use alloc::{string::{String, ToString}, vec::Vec};
+#[cfg(not(feature = "psp"))]
 use std::fs;
+#[cfg(not(feature = "psp"))]
 use std::path::Path;
+
+#[cfg(feature = "psp")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+#[cfg(not(feature = "psp"))]
 use std::string::String;
+#[cfg(not(feature = "psp"))]
 use std::vec::Vec;
 
 #[derive(Debug, Clone)]
@@ -20,6 +28,7 @@ pub struct DeckList {
 pub struct DeckParser;
 
 impl DeckParser {
+    #[cfg(not(feature = "psp"))]
     pub fn parse_deck_file(path: &Path) -> Result<DeckList, String> {
         let content =
             fs::read_to_string(path).map_err(|e| format!("Failed to read deck file: {}", e))?;
@@ -64,6 +73,7 @@ impl DeckParser {
         Ok(DeckList { name, entries })
     }
 
+    #[cfg(not(feature = "psp"))]
     pub fn parse_all_decks_from_directory(dir_path: &Path) -> Result<Vec<DeckList>, String> {
         let mut decks = Vec::new();
 
@@ -83,6 +93,7 @@ impl DeckParser {
         Ok(decks)
     }
 
+    #[cfg(not(feature = "psp"))]
     pub fn parse_all_decks() -> Result<Vec<DeckList>, String> {
         let decks_path = Path::new("../web_ui/decks");
         Self::parse_all_decks_from_directory(decks_path)

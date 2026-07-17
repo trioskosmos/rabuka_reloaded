@@ -9,7 +9,10 @@ use crate::core::game_modifiers::{GameModifiers, ModifierEntry};
 
 use crate::{HashMap, HashSet, VecDeque};
 #[cfg(feature = "psp")]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 #[derive(Debug, Clone)]
 

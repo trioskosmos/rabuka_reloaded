@@ -30,7 +30,6 @@ static ALLOC: alloc_counter::CountingAllocator = alloc_counter::CountingAllocato
 // Core data types — re-exported at crate root so all existing imports still work
 pub mod core;
 pub use core::card;
-#[cfg(not(feature = "psp"))]
 pub use core::card_loader;
 pub use core::constants;
 pub use core::game_state;
