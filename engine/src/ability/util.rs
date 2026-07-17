@@ -18,13 +18,13 @@ pub fn find_modify_cost<'a>(
     op: Option<&str>,
     loc: Option<&str>,
 ) -> Option<&'a crate::card::AbilityEffect> {
-    if effect.action == "modify_cost"
+    if effect.action == crate::ability::enums::ActionType::ModifyCost
         && op.is_none_or(|o| effect.operation_any().as_deref() == Some(o))
         && loc.is_none_or(|l| effect.location_any().as_deref() == Some(l))
     {
         return Some(effect);
     }
-    if ActionType::from_str(&effect.action) == Some(ActionType::Sequential) {
+    if effect.action == ActionType::Sequential {
         if let Some(ref actions) = effect.compound.actions {
             for sub in actions {
                 if let Some(found) = find_modify_cost(sub, op, loc) {
@@ -205,7 +205,7 @@ fn scan_abilities_for_cost_reduction(
 ) -> Option<u32> {
     for ability in abilities {
         if let Some(ref effect) = ability.effect {
-            if ActionType::from_str(&effect.action) != Some(ActionType::ModifyCost)
+            if effect.action != ActionType::ModifyCost
                 || effect.operation_any().as_deref() != Some("subtract")
                 || effect.location_any().as_deref().and_then(Zone::from_str) != Some(Zone::Hand)
             {
@@ -472,7 +472,7 @@ pub fn card_matches_group_str(
                 //   "DOLLCHESTRA" / "みらくらぱーく！" everywhere.
                 || c.abilities.iter().any(|ab| {
                     ab.effect.as_ref().is_some_and(|eff| {
-                        eff.action == "set_card_identity"
+                        eff.action == ActionType::SetCardIdentity
                             && eff.identities_any().as_ref().is_some_and(|ids| {
                                 ids.iter().any(|id| id == gn.as_ref() || ((id.contains('\u{FF01}') || id.contains('\u{00B5}')) && norm(id).as_ref() == gn.as_ref()))
                             })

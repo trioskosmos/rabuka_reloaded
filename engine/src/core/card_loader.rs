@@ -16,6 +16,7 @@ use std::string::String;
 use std::vec::Vec;
 
 #[cfg(not(feature = "bytecode_abilities"))]
+use crate::ability::enums::ActionType;
 use crate::card::AbilityEffect;
 use crate::card::{Ability, Card};
 use crate::Arc;
@@ -146,8 +147,8 @@ impl CardLoader {
                                     .iter()
                                     .map(|action| {
                                         let mut fixed_action = action.clone();
-                                        if (fixed_action.action == "draw"
-                                            || fixed_action.action == "draw_card")
+                                        if (fixed_action.action == ActionType::Draw
+                                            || fixed_action.action == ActionType::DrawCard)
                                             && fixed_action.count.is_none()
                                             && fixed_action.dynamic_count_any().is_none()
                                         {

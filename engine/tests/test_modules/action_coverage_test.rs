@@ -1,20 +1,21 @@
 /// Integration test that tries to fire every unique action type from abilities.json
 /// through the engine's ability resolver, reporting which actions fail to resolve.
 use crate::helpers::*;
-use rabuka_engine::game_setup::ActionType;
+use rabuka_engine::ability::enums::ActionType;
+use rabuka_engine::game_setup::ActionType as GameAction;
 use rabuka_engine::turn::TurnEngine;
 
 use std::collections::HashSet;
 
-fn has_action(card: &rabuka_engine::card::Card, target: &str) -> bool {
+fn has_action(card: &rabuka_engine::card::Card, target: &ActionType) -> bool {
     for ab in &card.abilities {
         if let Some(ref eff) = ab.effect {
-            if eff.action == target {
+            if eff.action == *target {
                 return true;
             }
             if let Some(ref actions) = eff.compound.actions {
                 for sub in actions {
-                    if sub.action == target {
+                    if sub.action == *target {
                         return true;
                     }
                 }
@@ -29,29 +30,25 @@ fn all_action_types_fire_without_crash() {
     let db = load_real_database();
 
     // Collect all unique action types found on member cards
-    let mut action_types: HashSet<String> = HashSet::new();
+    let mut action_types: HashSet<ActionType> = HashSet::new();
     for (_tid, card) in db.cards.iter() {
         if !matches!(card.card_type, rabuka_engine::card::CardType::Member) {
             continue;
         }
         for ab in &card.abilities {
             if let Some(ref eff) = ab.effect {
-                if !eff.action.is_empty() {
-                    action_types.insert(eff.action.clone());
-                }
+                action_types.insert(eff.action);
                 if let Some(ref actions) = eff.compound.actions {
                     for sub in actions {
-                        if !sub.action.is_empty() {
-                            action_types.insert(sub.action.clone());
-                        }
+                        action_types.insert(sub.action);
                     }
                 }
             }
         }
     }
 
-    let mut action_list: Vec<&String> = action_types.iter().collect();
-    action_list.sort();
+    let mut action_list: Vec<&ActionType> = action_types.iter().collect();
+    action_list.sort_by_key(|a| a.to_str());
 
     eprintln!(
         "\n=== Testing {} unique action types ===\n",
@@ -89,7 +86,7 @@ fn all_action_types_fire_without_crash() {
 
         let result = TurnEngine::execute_main_phase_action(
             &mut game.state,
-            &ActionType::UseAbility,
+            &GameAction::UseAbility,
             Some(cid),
             None,
             None,

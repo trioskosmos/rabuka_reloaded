@@ -135,8 +135,8 @@ impl GameState {
                                 passed: cond_met,
                             }],
                         });
-                        match crate::ability::enums::ActionType::from_str(&effect.action) {
-                            Some(crate::ability::enums::ActionType::GainResource) => {
+                        match effect.action {
+                            crate::ability::enums::ActionType::GainResource => {
                                 match effect.resource_any().as_deref().unwrap_or("") {
                                     "blade" | "ブレード" => {
                                         let n = if effect.per_unit_any().unwrap_or(false) {
@@ -247,7 +247,7 @@ impl GameState {
                                     _ => {}
                                 }
                             }
-                            Some(crate::ability::enums::ActionType::ModifyScore) => {
+                            crate::ability::enums::ActionType::ModifyScore => {
                                 let sv = effect.value_any().unwrap_or(0) as i32;
                                 *exp_score.entry(*card_id).or_insert(0) += sv;
                                 if sv != 0 {
@@ -258,11 +258,11 @@ impl GameState {
                                     ));
                                 }
                             }
-                            Some(crate::ability::enums::ActionType::ModifyCost) => {
+                            crate::ability::enums::ActionType::ModifyCost => {
                                 *exp_cost.entry(*card_id).or_insert(0) +=
                                     effect.value_any().unwrap_or(0) as i32;
                             }
-                            Some(crate::ability::enums::ActionType::Restriction) => {
+                            crate::ability::enums::ActionType::Restriction => {
                                 if let Some(rt) = effect.restriction_type_any() {
                                     let card_name = self
                                         .card_database
@@ -320,7 +320,7 @@ impl GameState {
                             //   - ConditionalAlternative: deferred, no immediate texticon
                             //   - Legacy text parse: bonus_score → icon_score.png badge
                             //     PLUS bonus_triggers → trigger texticon
-                            Some(crate::ability::enums::ActionType::GainAbility) => {
+                            crate::ability::enums::ActionType::GainAbility => {
                                 if effect.ability_gain_any().as_deref()
                                     == Some("{{icon_all.png|ハート}}")
                                     || effect
@@ -353,11 +353,9 @@ impl GameState {
 
                                     // Use gained_effect if available (structured data from parser)
                                     if let Some(ref gained) = effect.gained_effect_any() {
-                                        let action = crate::ability::enums::ActionType::from_str(
-                                            &gained.action,
-                                        );
+                                        let action = gained.action;
                                         if action
-                                            == Some(crate::ability::enums::ActionType::ModifyScore)
+                                            == crate::ability::enums::ActionType::ModifyScore
                                         {
                                             let val = gained.value_any().unwrap_or(0) as i32;
                                             *bonus_target += val;
@@ -369,9 +367,7 @@ impl GameState {
                                                 ));
                                             }
                                         } else if action
-                                            == Some(
-                                                crate::ability::enums::ActionType::ConditionalAlternative,
-                                            )
+                                            == crate::ability::enums::ActionType::ConditionalAlternative
                                         {
                                             // Conditional gained effects (e.g. live_success score
                                             // based on revealed card count) can't be evaluated at
@@ -403,14 +399,14 @@ impl GameState {
                                     }
                                 }
                             }
-                            Some(crate::ability::enums::ActionType::GainAbilityFromSource) => {
+                            crate::ability::enums::ActionType::GainAbilityFromSource => {
                                 let mut resolver = crate::ability::resolver::AbilityResolver::new(
                                     self.card_database.clone(),
                                     self.activating_card,
                                 );
                                 let _ = resolver.execute_gain_ability_from_source(self, effect);
                             }
-                            Some(crate::ability::enums::ActionType::ModifyRequiredHeartsGlobal) => {
+                            crate::ability::enums::ActionType::ModifyRequiredHeartsGlobal => {
                                 let target_name = effect.target_name();
                                 let target_player = self.resolve_target_player(target_name);
                                 let target_cards: Vec<i16> =
@@ -438,7 +434,7 @@ impl GameState {
                                     }
                                 }
                             }
-                            Some(crate::ability::enums::ActionType::Sequential) => {
+                            crate::ability::enums::ActionType::Sequential => {
                                 if let Some(ref actions) = effect.compound.actions {
                                     for sub in actions {
                                         let sub_cond = sub
@@ -448,10 +444,8 @@ impl GameState {
                                         if !sub_cond {
                                             continue;
                                         }
-                                        if let Some(
-                                            crate::ability::enums::ActionType::GainResource,
-                                        ) =
-                                            crate::ability::enums::ActionType::from_str(&sub.action)
+                                        if sub.action
+                                            == crate::ability::enums::ActionType::GainResource
                                         {
                                             match sub.resource_any().as_deref().unwrap_or("") {
                                                 "blade" | "ブレード" => {
@@ -586,8 +580,7 @@ impl GameState {
             .collect_constant_stage_effects()
             .into_iter()
             .filter(|(_, effect)| {
-                crate::ability::enums::ActionType::from_str(&effect.action)
-                    == Some(crate::ability::enums::ActionType::GainResource)
+                effect.action == crate::ability::enums::ActionType::GainResource
                     && matches!(
                         effect.resource_any().as_deref(),
                         Some("blade") | Some("ブレード")
@@ -681,18 +674,12 @@ impl GameState {
         let mut cost_abilities: Vec<(i16, crate::card::AbilityEffect)> = stage_entries
             .iter()
             .cloned()
-            .filter(|(_, effect)| {
-                crate::ability::enums::ActionType::from_str(&effect.action)
-                    == Some(crate::ability::enums::ActionType::ModifyCost)
-            })
+            .filter(|(_, effect)| effect.action == crate::ability::enums::ActionType::ModifyCost)
             .collect();
-        let hand_cost_abilities =
-            self.collect_constant_hand_effects()
-                .into_iter()
-                .filter(|(_, effect)| {
-                    crate::ability::enums::ActionType::from_str(&effect.action)
-                        == Some(crate::ability::enums::ActionType::ModifyCost)
-                });
+        let hand_cost_abilities = self
+            .collect_constant_hand_effects()
+            .into_iter()
+            .filter(|(_, effect)| effect.action == crate::ability::enums::ActionType::ModifyCost);
         cost_abilities.extend(hand_cost_abilities);
 
         let mut expected: HashMap<i16, i32> = HashMap::default();
@@ -1323,8 +1310,8 @@ impl GameState {
             _ => return,
         };
 
-        match ActionType::from_str(&effect.action) {
-            Some(ActionType::ModifyRequiredHearts) => {
+        match effect.action {
+            ActionType::ModifyRequiredHearts => {
                 let prev = self.activating_card;
                 self.activating_card = Some(cid);
                 // Set queue context so resolve_target_player("self") targets
@@ -1361,7 +1348,7 @@ impl GameState {
                 self.ability_queue.pop_constant_context();
                 self.activating_card = prev;
             }
-            Some(ActionType::GainResource) => {
+            ActionType::GainResource => {
                 let resource_binding = effect.resource_any();
                 let resource = resource_binding.unwrap_or("");
                 let amount = effect
@@ -1480,7 +1467,7 @@ impl GameState {
                     _ => {}
                 }
             }
-            Some(ActionType::ModifyScore) => {
+            ActionType::ModifyScore => {
                 let player = match effect.target_name() {
                     "self" | "自分" => owner_player,
                     "opponent" | "相手" => match player_idx {
@@ -1520,7 +1507,7 @@ impl GameState {
                     }
                 }
             }
-            Some(ActionType::Sequential) => {
+            ActionType::Sequential => {
                 if let Some(ref actions) = effect.compound.actions {
                     for sub in actions {
                         self.apply_success_zone_effect(cid, player_idx, sub);

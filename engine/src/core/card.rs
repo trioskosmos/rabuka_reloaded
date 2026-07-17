@@ -680,8 +680,8 @@ impl serde::Serialize for AbilityCost {
         if let Some(v) = inner.alternative_effect_any() {
             map.serialize_entry("alternative_effect", v)?;
         }
-        if !inner.action.is_empty() {
-            map.serialize_entry("type", &inner.action)?;
+        if inner.action != ActionType::Custom {
+            map.serialize_entry("type", inner.action.to_str())?;
         }
         // sub-costs: emit as both "options" and "costs" (legacy treated them
         // as the same field)
@@ -717,7 +717,7 @@ impl<'de> serde::Deserialize<'de> for AbilityCost {
                         }
                         "type" | "action" | "cost_type" => {
                             if let Some(s) = value.as_str() {
-                                effect.action = s.to_string();
+                                effect.action = ActionType::from_str(s).unwrap_or_default();
                             }
                         }
                         "source" | "zone" => {
@@ -768,7 +768,7 @@ impl<'de> serde::Deserialize<'de> for AbilityCost {
                 }
                 if !all_fields.is_empty() {
                     if let Some(kind) = AbilityEffect::kind_from_action(
-                        &effect.action,
+                        effect.action.to_str(),
                         &serde_json::Value::Object(all_fields),
                     ) {
                         effect.kind = Some(crate::card::ek_box_new(kind));
@@ -2021,6 +2021,8 @@ pub enum EffectKind {
         #[serde(default)]
         options: Option<Vec<Box<AbilityEffect>>>,
         #[serde(default)]
+        card_property: Option<ArcStr>,
+        #[serde(default)]
         location: Option<ArcStr>,
         #[serde(default)]
         duration: Option<ArcStr>,
@@ -2053,8 +2055,8 @@ pub enum EffectKind {
 pub struct AbilityEffect {
     #[serde(default = "default_empty_string")]
     pub text: String,
-    #[serde(default = "default_empty_string")]
-    pub action: String,
+    #[serde(default)]
+    pub action: ActionType,
     #[serde(default)]
     pub source: Option<ArcStr>,
     #[serde(default)]
@@ -2154,7 +2156,7 @@ impl AbilityEffect {
 
     /// Populate `kind` from this effect's JSON value. Recurses into sub-effects.
     pub fn populate_from_json(&mut self, json_val: &serde_json::Value) {
-        if let Some(kind) = Self::kind_from_action(&self.action, json_val) {
+        if let Some(kind) = Self::kind_from_action(self.action.to_str(), json_val) {
             self.kind = Some(ek_box_new(kind));
         }
         if let Some(ref mut sub) = self.compound.look_action {
@@ -2547,7 +2549,7 @@ impl AbilityEffect {
 
     box_vec_ref_getter!(card_names_any, [MoveCards => card_names, DrawCards => card_names, SelectTarget => card_names, LookReveal => card_names, ChangeState => card_names, MiscOp => card_names, ModifyScore => card_names]);
 
-    str_getter!(card_property_any, [MoveCards => card_property, SelectTarget => card_property, LookReveal => card_property, GainResource => card_property, ChangeState => card_property, ModifyScore => card_property]);
+    str_getter!(card_property_any, [MoveCards => card_property, SelectTarget => card_property, LookReveal => card_property, GainResource => card_property, ChangeState => card_property, ModifyScore => card_property, CustomOp => card_property]);
 
     str_getter!(card_type_any, [MoveCards => card_type, DrawCards => card_type, SelectTarget => card_type, LookReveal => card_type, ModifyScore => card_type, ModifyHearts => card_type, GainResource => card_type, ChangeState => card_type, AbilityOp => card_type, CompoundEffect => card_type, RestrictionOp => card_type, PositionOp => card_type, MiscOp => card_type, CustomOp => card_type]);
 
@@ -3360,14 +3362,14 @@ impl AbilityEffect {
             .unwrap_or(default)
     }
 
-    /// Parses the action string into a typed ActionType for type-safe matching.
-    pub fn action_type(&self) -> Option<ActionType> {
-        ActionType::from_str(&self.action)
+    /// Returns the typed ActionType for this effect.
+    pub fn action_type(&self) -> ActionType {
+        self.action
     }
 
     /// Returns true if the action matches the given ActionType variant.
     pub fn is_action(&self, at: ActionType) -> bool {
-        self.action_type() == Some(at)
+        self.action == at
     }
 
     /// Returns the numeric value from `value` or `count`, in that priority.
@@ -3397,9 +3399,9 @@ impl AbilityEffect {
         if let Some(ref steps) = self.effect_steps {
             return steps.clone();
         }
-        match self.action.as_ref() {
-            "sequential" => self.compound.actions.clone().unwrap_or_default(),
-            "look_and_select" => {
+        match self.action {
+            ActionType::Sequential => self.compound.actions.clone().unwrap_or_default(),
+            ActionType::LookAndSelect => {
                 let mut out: Vec<Box<AbilityEffect>> = Vec::new();
                 if let Some(ref la) = self.compound.look_action {
                     out.push(la.clone());
@@ -3412,7 +3414,7 @@ impl AbilityEffect {
                 }
                 out
             }
-            "conditional_alternative" => {
+            ActionType::ConditionalAlternative => {
                 let mut out: Vec<Box<AbilityEffect>> = Vec::new();
                 let mut primary = self.compound.primary_effect.clone();
                 let mut alternative = self.alternative_effect_any().cloned();
@@ -3428,7 +3430,7 @@ impl AbilityEffect {
                 }
                 out
             }
-            "conditional_on_result" => {
+            ActionType::ConditionalOnResult => {
                 let mut out: Vec<Box<AbilityEffect>> = Vec::new();
                 if let Some(ref pri) = self.compound.primary_effect {
                     out.push(pri.clone());
@@ -3442,9 +3444,9 @@ impl AbilityEffect {
                 }
                 out
             }
-            "conditional_on_optional" => {
+            ActionType::ConditionalOnOptional => {
                 let mut step = AbilityEffect::default();
-                step.action = "conditional_optional".to_string();
+                step.action = ActionType::ConditionalOptional;
                 if let Some(ref oa) = self.compound.optional_action {
                     step.text = oa.text.clone();
                 }
@@ -5864,8 +5866,7 @@ impl Card {
     pub fn get_hand_cost_reduction(&self, hand_size: usize) -> u32 {
         for ability in &self.abilities {
             if let Some(ref effect) = ability.effect {
-                if crate::ability::enums::ActionType::from_str(&effect.action)
-                    == Some(crate::ability::enums::ActionType::ModifyCost)
+                if effect.action == crate::ability::enums::ActionType::ModifyCost
                     && effect.operation_any() == Some("subtract")
                     && Zone::from_str(effect.location_any().unwrap_or("")) == Some(Zone::Hand)
                     && effect.cost_limit_any().is_none()

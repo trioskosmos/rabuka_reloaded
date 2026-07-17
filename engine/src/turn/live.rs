@@ -537,8 +537,7 @@ impl super::TurnEngine {
                 use crate::ability::enums::ActionType;
                 use crate::ability::resolver::AbilityResolver;
                 let ctx = ConditionContext::new(game_state);
-                if ActionType::from_str(&gained.action) == Some(ActionType::ConditionalAlternative)
-                {
+                if gained.action == ActionType::ConditionalAlternative {
                     // Evaluate the conditional_alternative: check alternative
                     // condition first, then base condition.
                     let alt_cond = gained.compound.alternative_condition.as_ref();
@@ -723,8 +722,7 @@ impl super::TurnEngine {
                         let rd_binding = effect.restricted_destination_any();
                         let dest_binding = effect.destination.as_deref();
                         let restricted_dest = rd_binding.or(dest_binding);
-                        crate::ability::enums::ActionType::from_str(&effect.action)
-                            == Some(crate::ability::enums::ActionType::Restriction)
+                        effect.action == crate::ability::enums::ActionType::Restriction
                             && effect.restriction_type_any().as_deref() == Some("cannot_place")
                             && matches!(
                                 restricted_dest.and_then(Zone::from_str),
@@ -934,7 +932,7 @@ impl super::TurnEngine {
                 Some(e) => e,
                 None => continue,
             };
-            if effect.action != "conditional_alternative" {
+            if effect.action != crate::ability::enums::ActionType::ConditionalAlternative {
                 continue;
             }
             let cond_matches = effect.condition.as_ref().is_some_and(|c| {
@@ -949,7 +947,7 @@ impl super::TurnEngine {
                 Some(a) => a,
                 None => continue,
             };
-            if alt.action != "move_cards" {
+            if alt.action != crate::ability::enums::ActionType::MoveCards {
                 continue;
             }
             let alt_source = alt.source.as_deref().unwrap_or("");

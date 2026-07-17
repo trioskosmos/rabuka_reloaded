@@ -203,7 +203,10 @@ fn evaluate_delayed_mari(game: &mut TestGame, card_id: i16) -> bool {
         .position(|(cid, _)| *cid == card_id)
         .expect("Mari should have a delayed gained effect");
     let (_, gained) = game.state.delayed_gained_effects.remove(idx);
-    assert_eq!(gained.action, "conditional_alternative");
+    assert_eq!(
+        gained.action,
+        rabuka_engine::ability::enums::ActionType::ConditionalAlternative
+    );
     let ctx = ConditionContext::new(&game.state);
     let alt_cond = gained.compound.alternative_condition.as_ref();
     let base_cond = gained.condition.as_ref();

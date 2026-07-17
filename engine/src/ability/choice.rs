@@ -1,5 +1,5 @@
 use super::condition::ConditionContext;
-use super::enums::Zone;
+use super::enums::{ActionType, Zone};
 use super::types::{
     Choice, ChoiceBuilder, ChoiceResult, ChoiceRoute, ExecutionContext, LookAndSelectStep,
     TriggerEvent,
@@ -446,7 +446,11 @@ impl super::resolver::AbilityResolver {
             return self.handle_reveal_selection(gs, &ctx);
         }
 
-        if !effect_started && gs.entry_cost().map(|c| c.action.as_str()) == Some("reveal") {
+        if !effect_started
+            && gs
+                .entry_cost()
+                .is_some_and(|c| c.action == ActionType::Reveal)
+        {
             return self.handle_entry_cost_reveal(gs, &ctx, &context);
         }
 
@@ -1591,7 +1595,7 @@ impl super::resolver::AbilityResolver {
             .and_then(|ef| ef.compound.select_action.clone())
             .or_else(|| {
                 self.current_effect.as_ref().and_then(|ef| {
-                    if ef.action == "select_cards" {
+                    if ef.action == ActionType::SelectCards {
                         Some(Box::new(ef.clone()))
                     } else {
                         None
@@ -1600,7 +1604,7 @@ impl super::resolver::AbilityResolver {
             });
         let is_select_cards = select_action_entry
             .as_ref()
-            .map(|sa| sa.action == "select_cards")
+            .map(|sa| sa.action == ActionType::SelectCards)
             .unwrap_or(false);
 
         if select_action_entry
@@ -3099,8 +3103,10 @@ impl super::resolver::AbilityResolver {
     /// Excludes draw/draw_card actions (always target self) and select_cards (handled
     /// via spawn_context.target fallback in handle_select_card_internal).
     fn set_chosen_target(effect: &mut AbilityEffect, target: &str) {
-        let skip_actions = ["draw", "draw_card", "select_cards"];
-        if skip_actions.contains(&effect.action.as_str()) {
+        if matches!(
+            effect.action,
+            ActionType::Draw | ActionType::DrawCard | ActionType::SelectCards
+        ) {
             return;
         }
         if effect.target.is_none() || effect.target.as_deref() == Some("self") {

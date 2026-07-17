@@ -2468,7 +2468,7 @@ impl AbilityResolver {
             })
             .or_else(|| {
                 self.current_effect.as_ref().and_then(|ef| {
-                    if ef.action == "select_cards" {
+                    if ef.action == crate::ability::enums::ActionType::SelectCards {
                         Some(Box::new(ef.clone()))
                     } else {
                         None

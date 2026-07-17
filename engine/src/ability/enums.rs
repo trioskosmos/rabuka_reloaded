@@ -131,8 +131,9 @@ impl core::fmt::Display for Zone {
 
 /// Strongly-typed ability effect action types to prevent stringly-typed dispatch bugs.
 /// Replaces error-prone action == "draw" patterns with ActionType::Draw.
-/// ~50 variants cover all effect actions in the game.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// ~60 variants cover all effect actions in the game.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ActionType {
     // Card movement
     Draw,
@@ -221,6 +222,18 @@ pub enum ActionType {
     ModifyYellCount,
     ActivationCost,
     PerformYell,
+
+    // Internal/procedural action types (used within the engine, not from JSON)
+    ConditionalOptional,
+    CompoundAction,
+    OpponentAction,
+    ActionBy,
+    SequentialCost,
+    Tap,
+    Rest,
+    Discard,
+    ChoiceCondition,
+    EnergyCondition,
 }
 
 impl ActionType {
@@ -286,12 +299,21 @@ impl ActionType {
             "set_card_identity_all_regions" => Some(ActionType::SetCardIdentityAllRegions),
             "reduce_live_card_set_limit" => Some(ActionType::ReduceLiveCardSetLimit),
 
-            // Legacy string mappings
             "play_baton_touch" => Some(ActionType::PlayBatonTouch),
             "modify_required_hearts_global" => Some(ActionType::ModifyRequiredHeartsGlobal),
             "modify_yell_count" => Some(ActionType::ModifyYellCount),
             "activation_cost" => Some(ActionType::ActivationCost),
             "perform_yell" => Some(ActionType::PerformYell),
+            "conditional_optional" => Some(ActionType::ConditionalOptional),
+            "compound_action" => Some(ActionType::CompoundAction),
+            "opponent_action" => Some(ActionType::OpponentAction),
+            "action_by" => Some(ActionType::ActionBy),
+            "sequential_cost" => Some(ActionType::SequentialCost),
+            "tap" => Some(ActionType::Tap),
+            "rest" => Some(ActionType::Rest),
+            "discard" => Some(ActionType::Discard),
+            "choice_condition" => Some(ActionType::ChoiceCondition),
+            "energy_condition" => Some(ActionType::EnergyCondition),
             _ => None,
         }
     }
@@ -361,6 +383,16 @@ impl ActionType {
             ActionType::ModifyYellCount => "modify_yell_count",
             ActionType::ActivationCost => "activation_cost",
             ActionType::PerformYell => "perform_yell",
+            ActionType::ConditionalOptional => "conditional_optional",
+            ActionType::CompoundAction => "compound_action",
+            ActionType::OpponentAction => "opponent_action",
+            ActionType::ActionBy => "action_by",
+            ActionType::SequentialCost => "sequential_cost",
+            ActionType::Tap => "tap",
+            ActionType::Rest => "rest",
+            ActionType::Discard => "discard",
+            ActionType::ChoiceCondition => "choice_condition",
+            ActionType::EnergyCondition => "energy_condition",
         }
     }
 
@@ -429,7 +461,23 @@ impl ActionType {
             ActionType::ModifyYellCount => "Modify Yell Count",
             ActionType::ActivationCost => "Activation Cost",
             ActionType::PerformYell => "Perform Yell",
+            ActionType::ConditionalOptional => "Conditional Optional",
+            ActionType::CompoundAction => "Compound Action",
+            ActionType::OpponentAction => "Opponent Action",
+            ActionType::ActionBy => "Action By",
+            ActionType::SequentialCost => "Sequential Cost",
+            ActionType::Tap => "Tap",
+            ActionType::Rest => "Rest",
+            ActionType::Discard => "Discard",
+            ActionType::ChoiceCondition => "Choice Condition",
+            ActionType::EnergyCondition => "Energy Condition",
         }
+    }
+}
+
+impl Default for ActionType {
+    fn default() -> Self {
+        ActionType::Custom
     }
 }
 

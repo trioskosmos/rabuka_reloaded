@@ -2,6 +2,7 @@ use super::condition::ConditionContext;
 use super::resolver::AbilityResolver;
 use super::types::{AbilityTraceNode, Choice, ExecutionContext, StepOutput, ZoneSnapshot};
 use crate::ability::debug::ABILITY_DEBUG;
+use crate::ability::enums::ActionType;
 use crate::card::{AbilityEffect, Condition};
 use crate::game_state::GameState;
 #[cfg(feature = "psp")]
@@ -53,7 +54,7 @@ impl AbilityResolver {
             .as_ref()
             .map(|a| {
                 a.iter()
-                    .map(|s| s.action.as_str())
+                    .map(|s| s.action.to_str())
                     .collect::<Vec<_>>()
                     .join(",")
             })
@@ -108,7 +109,7 @@ impl AbilityResolver {
         if let Some(ref actions) = effect.compound.actions {
             let has_repeat = actions
                 .last()
-                .is_some_and(|a| a.action == "repeat_procedure");
+                .is_some_and(|a| a.action == ActionType::RepeatProcedure);
             let repeat_max = if has_repeat {
                 // repeat_limit = max additional iterations (e.g. 4 = 4 more times)
                 // Total iterations = initial + max_repeats
@@ -264,16 +265,16 @@ impl AbilityResolver {
                     // Only inherit per_unit properties for actions that support them
                     // Discard/move_cards actions should not inherit per_unit multipliers
                     let supports_per_unit = matches!(
-                        crate::ability::enums::ActionType::from_str(&action.action),
-                        Some(crate::ability::enums::ActionType::Draw)
-                            | Some(crate::ability::enums::ActionType::DrawCard)
-                            | Some(crate::ability::enums::ActionType::GainResource)
-                            | Some(crate::ability::enums::ActionType::ModifyScore)
-                            | Some(crate::ability::enums::ActionType::ModifyRequiredHearts)
-                            | Some(crate::ability::enums::ActionType::GainAbility)
-                            | Some(crate::ability::enums::ActionType::SetBladeCount)
-                            | Some(crate::ability::enums::ActionType::Look)
-                            | Some(crate::ability::enums::ActionType::LookAt)
+                        action.action,
+                        ActionType::Draw
+                            | ActionType::DrawCard
+                            | ActionType::GainResource
+                            | ActionType::ModifyScore
+                            | ActionType::ModifyRequiredHearts
+                            | ActionType::GainAbility
+                            | ActionType::SetBladeCount
+                            | ActionType::Look
+                            | ActionType::LookAt
                     );
                     if supports_per_unit {
                         if action_to_execute.per_unit_any().is_none()
@@ -322,13 +323,12 @@ impl AbilityResolver {
                             // applies to score/heart modifiers, not to generic draw or
                             // move actions. Prevent cascading into nested sequentials
                             // (draw+move inside would inherit from the nested container).
-                            let at = crate::ability::enums::ActionType::from_str(&action.action);
                             let supports_self = matches!(
-                                at,
-                                Some(crate::ability::enums::ActionType::ModifyScore)
-                                    | Some(crate::ability::enums::ActionType::ModifyRequiredHearts)
-                                    | Some(crate::ability::enums::ActionType::GainResource)
-                                    | Some(crate::ability::enums::ActionType::ChangeState)
+                                action.action,
+                                ActionType::ModifyScore
+                                    | ActionType::ModifyRequiredHearts
+                                    | ActionType::GainResource
+                                    | ActionType::ChangeState
                             );
                             if effect.self_target_any().is_some() && supports_self {
                                 action_to_execute.set_self_target(effect.self_target_any());
@@ -370,7 +370,7 @@ impl AbilityResolver {
 
                     // G3: before executing an opponent-action sub-action, tag the spawn
                     // context so that any choice created inside is routed to the opponent.
-                    if action.action == "opponent_action"
+                    if action.action == ActionType::OpponentAction
                         || action.action_by().as_deref() == Some("opponent")
                     {
                         self.spawn_context.target = Some("opponent".to_string());
@@ -427,7 +427,8 @@ impl AbilityResolver {
                             }
                             if self.pending_choice.is_some() {
                                 let current_was_optional = action.optional.unwrap_or(false);
-                                let is_opponent_action = action.action == "opponent_action"
+                                let is_opponent_action = action.action
+                                    == ActionType::OpponentAction
                                     || action.action_by().as_deref() == Some("opponent");
                                 // When an optional action creates a SelectCard choice (card
                                 // selection from a zone), the effect was already fully
@@ -491,7 +492,7 @@ impl AbilityResolver {
                                 // causes duplication with RPC's merge logic.
                                 if repeats_remaining > 0 && has_repeat {
                                     if let Some(ref repeat_action) = actions.last() {
-                                        if repeat_action.action == "repeat_procedure"
+                                        if repeat_action.action == ActionType::RepeatProcedure
                                             && repeat_action.optional.unwrap_or(false)
                                         {
                                             for _ in 0..repeats_remaining {
@@ -512,7 +513,7 @@ impl AbilityResolver {
                                 }
                                 return Ok(());
                             } else if action.optional.unwrap_or(false) {
-                                if action.action == "change_state" {
+                                if action.action == ActionType::ChangeState {
                                     // Optional change_state completed without creating a choice
                                     // (no valid targets). Skip remaining actions (そうした場合).
                                     return Ok(());
@@ -560,7 +561,7 @@ impl AbilityResolver {
                 // and we have remaining repeats — ask player whether to continue.
                 if repeats_remaining > 0 {
                     if let Some(ref repeat_action) = actions.last() {
-                        if repeat_action.action == "repeat_procedure"
+                        if repeat_action.action == ActionType::RepeatProcedure
                             && repeat_action.optional.unwrap_or(false)
                         {
                             for _ in 0..repeats_remaining {
@@ -854,7 +855,7 @@ impl AbilityResolver {
         // Q92: if the optional action requires energy and player can't afford it,
         // skip the choice and execute the conditional action directly
         if let (Some(opt), Some(cond)) = (optional_action, conditional_action) {
-            if opt.action == "pay_energy" {
+            if opt.action == ActionType::PayEnergy {
                 let need = opt.energy_count_any().unwrap_or(0) as usize;
                 if need > 0 {
                     let pp = gs.player_prefix();
@@ -870,7 +871,7 @@ impl AbilityResolver {
                         let cmd = if is_negation {
                             *cond.clone()
                         } else {
-                            effect.clone()
+                            *cond.clone()
                         };
                         gs.ability_queue.set_pending_actions(vec![cmd]);
                         return self.resume_pending_actions(gs);

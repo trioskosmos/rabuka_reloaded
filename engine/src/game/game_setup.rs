@@ -7,7 +7,10 @@ use crate::game_state::GameState;
 use crate::zones::MemberArea;
 use crate::HashSet;
 #[cfg(feature = "psp")]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use serde::{Deserialize, Serialize};
 #[cfg(not(feature = "psp"))]
 use std::vec::Vec;
@@ -1073,7 +1076,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     // Check if this card has play_baton_touch with count > 1 (double baton)
                     let has_double_baton = card.abilities.iter().any(|a| {
                         a.effect.as_ref().is_some_and(|ef| {
-                            ef.action == "play_baton_touch" && ef.count.unwrap_or(1) > 1
+                            ef.action == crate::ability::enums::ActionType::PlayBatonTouch
+                                && ef.count.unwrap_or(1) > 1
                         })
                     });
 

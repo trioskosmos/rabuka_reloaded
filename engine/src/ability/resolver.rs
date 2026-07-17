@@ -231,9 +231,7 @@ impl AbilityResolver {
             }
         }
         if let Some(ref condition) = effect.condition {
-            if crate::ability::enums::ActionType::from_str(&effect.action)
-                == Some(crate::ability::enums::ActionType::ConditionalAlternative)
-            {
+            if effect.action == crate::ability::enums::ActionType::ConditionalAlternative {
                 // skip — condition is a branch selector, not a gate
             } else {
                 // Check cache first — avoids re-evaluation against stale state
@@ -780,7 +778,7 @@ impl AbilityResolver {
         let is_conditional_optional = ability
             .effect
             .as_ref()
-            .is_some_and(|e| e.action == "conditional_on_optional");
+            .is_some_and(|e| e.action == crate::ability::enums::ActionType::ConditionalOnOptional);
         let is_optional_effect = ability
             .effect
             .as_ref()
@@ -924,7 +922,7 @@ impl AbilityResolver {
             log::debug!(
                 "[AFTER_EXEC] pending={:?} action={:?}",
                 self.pending_choice.is_some(),
-                &effect.action[..20.min(effect.action.len())]
+                effect.action
             );
             if self.pending_choice.is_some() {
                 if !cost_already_paid {
@@ -997,10 +995,9 @@ impl AbilityResolver {
                 // the condition can spuriously fail and the key never gets inserted.
                 // Skip the can_activate_effect guard when cost is already paid AND the
                 // ability is a conditional_on_optional (the player already accepted).
-                let is_cond_opt = ability
-                    .effect
-                    .as_ref()
-                    .is_some_and(|e| e.action == "conditional_on_optional");
+                let is_cond_opt = ability.effect.as_ref().is_some_and(|e| {
+                    e.action == crate::ability::enums::ActionType::ConditionalOnOptional
+                });
                 if (cost_already_paid && is_cond_opt)
                     || ability
                         .effect
@@ -1115,7 +1112,7 @@ impl AbilityResolver {
                     let per_unit_count = mod_cost.per_unit_count_any().unwrap_or(1);
                     let reduction =
                         (groups.len() as u32 / per_unit_count) * mod_cost.count.unwrap_or(1);
-                    if cost.action == "pay_energy" {
+                    if cost.action == crate::ability::enums::ActionType::PayEnergy {
                         let new_energy = cost
                             .energy_count_any()
                             .unwrap_or(0)

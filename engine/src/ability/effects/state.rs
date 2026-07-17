@@ -379,7 +379,7 @@ impl AbilityResolver {
                 // change to the selected target after the choice is resolved.
                 gs.ability_queue
                     .set_pending_actions(vec![crate::card::AbilityEffect {
-                        action: "change_state".to_string(),
+                        action: crate::ability::enums::ActionType::ChangeState,
                         target: Some(target.clone().into()),
                         count: Some(count),
                         kind: effect.kind.clone(),

@@ -97,7 +97,7 @@ impl AbilityResolver {
         // 1) Deck reordering: placement_order=any_order → route as move_cards looked_at→deck_top
         if effect.placement_order_any() == Some(PlacementOrder::AnyOrder) {
             let mut routed = effect.clone();
-            routed.action = "move_cards".into();
+            routed.action = crate::ability::enums::ActionType::MoveCards;
             if routed.source.is_none() {
                 routed.source = Some(Zone::LookedAt.to_str().into());
             }
@@ -237,9 +237,8 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<bool, String> {
         // Skip if not "both" or if this is position_change (handles "both" internally)
-        if effect.target_any() != Some("both")
-            || crate::ability::enums::ActionType::from_str(&effect.action)
-                == Some(crate::ability::enums::ActionType::PositionChange)
+        if effect.target.as_deref() != Some("both")
+            || effect.action == crate::ability::enums::ActionType::PositionChange
         {
             return Ok(false);
         }
@@ -1489,8 +1488,7 @@ impl AbilityResolver {
                         }
                     }
                 } else if effect.target_count_any().is_none()
-                    && (effect.exclude_self_any().is_none()
-                        || effect.target_any() == Some("self"))
+                    && (effect.exclude_self_any().is_none() || effect.target_any() == Some("self"))
                 {
                     if let Some(card_id) = activating_card_id {
                         gs.mods.add_blade_modifier_with_trace(
@@ -1613,8 +1611,7 @@ impl AbilityResolver {
                         }
                     }
                 } else if effect.target_count_any().is_none()
-                    && (effect.exclude_self_any().is_none()
-                        || effect.target_any() == Some("self"))
+                    && (effect.exclude_self_any().is_none() || effect.target_any() == Some("self"))
                 {
                     if let Some(card_id) = activating_card_id {
                         self.apply_heart_to_card(

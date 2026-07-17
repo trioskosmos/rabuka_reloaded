@@ -197,7 +197,9 @@ impl super::TurnEngine {
             if let Some(card) = game_state.card_database.get_card(card_id) {
                 for ability in &card.abilities {
                     if let Some(ref effect) = ability.effect {
-                        if effect.action == "suppress_ability_trigger" {
+                        if effect.action
+                            == crate::ability::enums::ActionType::SuppressAbilityTrigger
+                        {
                             if effect.suppressed_trigger_any().as_deref() == Some(trigger_name) {
                                 return true;
                             }

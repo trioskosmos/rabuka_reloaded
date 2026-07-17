@@ -1,3 +1,4 @@
+use crate::ability::enums::ActionType;
 use crate::card::AbilityEffect;
 #[cfg(feature = "psp")]
 use alloc::{
@@ -93,7 +94,7 @@ fn group_label(gn: Option<&Vec<String>>) -> String {
 }
 
 pub fn describe_effect_en(effect: &AbilityEffect) -> String {
-    let action = effect.action.as_str();
+    let action = effect.action.to_str();
     let ct_binding = effect.card_type_any();
     let ct = card_type_label(ct_binding.as_deref());
     let c = effect.count_any();
@@ -506,12 +507,12 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
 
 /// Describe a single cost item in English (used for combined cost prompts).
 pub fn describe_cost_en(cost: &AbilityEffect) -> String {
-    match cost.action.as_str() {
-        "pay_energy" => {
+    match cost.action {
+        ActionType::PayEnergy => {
             let count = cost.energy_count_any().unwrap_or(1);
             format!("Pay {} energy", count)
         }
-        "change_state" => {
+        ActionType::ChangeState => {
             if cost.self_cost_any() == Some(true) {
                 let state_binding = cost.state_change_any();
                 let state = state_binding.unwrap_or("wait");
@@ -523,7 +524,7 @@ pub fn describe_cost_en(cost: &AbilityEffect) -> String {
                 describe_effect_en(cost)
             }
         }
-        "move_cards" => {
+        ActionType::MoveCards => {
             let src = zone_label(cost.source.as_deref());
             let dest = zone_label(cost.destination.as_deref());
             let card_type_binding = cost.card_type_any();
@@ -535,7 +536,7 @@ pub fn describe_cost_en(cost: &AbilityEffect) -> String {
                 format!("Place {} {} from {} to {}", count, card_type, src, dest)
             }
         }
-        "reveal" => {
+        ActionType::Reveal => {
             let count = cost.count.unwrap_or(1);
             let source = cost.source.as_deref().unwrap_or("hand");
             format!("Reveal {} card(s) from {}", count, zone_label(Some(source)))
@@ -546,12 +547,12 @@ pub fn describe_cost_en(cost: &AbilityEffect) -> String {
 
 /// Describe a single cost item in Japanese.
 pub fn describe_cost_ja(cost: &AbilityEffect) -> String {
-    match cost.action.as_str() {
-        "pay_energy" => {
+    match cost.action {
+        ActionType::PayEnergy => {
             let count = cost.energy_count_any().unwrap_or(1);
             format!("{{{{icon_energy.png|E}}}}を{}払う", count)
         }
-        "change_state" => {
+        ActionType::ChangeState => {
             if cost.self_cost_any() == Some(true) {
                 let state_binding = cost.state_change_any();
                 let state = state_binding.unwrap_or("wait");
@@ -563,7 +564,7 @@ pub fn describe_cost_ja(cost: &AbilityEffect) -> String {
                 describe_effect_ja(cost)
             }
         }
-        "move_cards" => {
+        ActionType::MoveCards => {
             let src = zone_label_ja(cost.source.as_deref());
             let dest = zone_label_ja(cost.destination.as_deref());
             let ct_binding = cost.card_type_any();
@@ -580,7 +581,7 @@ pub fn describe_cost_ja(cost: &AbilityEffect) -> String {
                 format!("{}を{}から{}に置く", count_str, src, dest)
             }
         }
-        "reveal" => {
+        ActionType::Reveal => {
             let count = cost.count.unwrap_or(1);
             let source = cost.source.as_deref().unwrap_or("hand");
             let count_str = if count == 1 {
@@ -687,7 +688,7 @@ fn duration_label_ja(d: Option<&str>) -> &str {
 }
 
 pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
-    let action = effect.action.as_str();
+    let action = effect.action.to_str();
     let ct_binding = effect.card_type_any();
     let ct = card_type_label_ja(ct_binding.as_deref());
     let c = effect.count_any();

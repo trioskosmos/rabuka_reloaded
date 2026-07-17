@@ -1,0 +1,43 @@
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0277]: the trait bound `enums::ActionType: From<&str>` is not satisfied
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0599]: no method named `len` found for enum `enums::ActionType` in the current scope
+error[E0608]: cannot index into a value of type `enums::ActionType`
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0308]: mismatched types
+error[E0004]: non-exhaustive patterns: `enums::ActionType::ConditionalOptional`, `enums::ActionType::CompoundAction`, `enums::ActionType::OpponentAction` and 5 more not covered

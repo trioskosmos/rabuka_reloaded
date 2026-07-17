@@ -1224,7 +1224,8 @@ fn riko_bp6_has_heart_type_all() {
 
     let effect = ab.effect.as_ref().expect("Should have an effect");
     assert_eq!(
-        effect.action, "gain_resource",
+        effect.action,
+        rabuka_engine::ability::enums::ActionType::GainResource,
         "Action should be gain_resource"
     );
     assert_eq!(

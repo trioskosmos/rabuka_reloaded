@@ -70,13 +70,13 @@ impl AbilityResolver {
         // whose sub-actions log individually, to avoid duplicates).
         if !effect.text.is_empty()
             && !matches!(
-                effect.action.as_str(),
-                "compound_action"
-                    | "sequential"
-                    | "choice"
-                    | "conditional_alternative"
-                    | "conditional_on_result"
-                    | "conditional_on_optional"
+                effect.action,
+                ActionType::CompoundAction
+                    | ActionType::Sequential
+                    | ActionType::Choice
+                    | ActionType::ConditionalAlternative
+                    | ActionType::ConditionalOnResult
+                    | ActionType::ConditionalOnOptional
             )
         {
             // Effect details are captured in the structured ability_resolution entry
@@ -85,7 +85,7 @@ impl AbilityResolver {
 
         // Legacy opponent_action wrapper (pre-parser-flatten). Flat effects
         // carry target="opponent" directly and dispatch via ActionType.
-        if effect.action == "opponent_action" {
+        if effect.action == ActionType::OpponentAction {
             if let Some(ref opponent_action) = effect.opponent_action() {
                 // G3: tag spawn context so choices created for this
                 // opponent action are routed to the opponent player.
@@ -100,10 +100,10 @@ impl AbilityResolver {
         }
 
         gs.reset_replacement_effect_flags();
-        let action_str = effect.action.as_str();
+        let action_str = effect.action.to_str();
 
-        // Empty action with opponent_action means it was entirely handled by opponent
-        if action_str.is_empty() && effect.action_by().is_some() {
+        // Empty action (default) with action_by means it was entirely handled by opponent
+        if effect.action == ActionType::Custom && effect.action_by().is_some() {
             return Ok(());
         }
 
@@ -207,7 +207,7 @@ impl AbilityResolver {
         // choice on the select_cards step and resuming naturally when the
         // player responds. Legacy dedicated handlers remain as fallback
         // for the case where effect_steps is absent.
-        let action_type = ActionType::from_str(&action_str).unwrap_or(ActionType::Custom);
+        let action_type = effect.action;
         if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             eprintln!(
                 "[EXEC_ACTION] action_type={:?} has_steps={} has_actions={}",
@@ -234,7 +234,7 @@ impl AbilityResolver {
                         steps.len(),
                         steps
                             .iter()
-                            .map(|s| s.action.as_str())
+                            .map(|s| s.action.to_str())
                             .collect::<Vec<_>>()
                             .join(","),
                         effect.action
@@ -243,7 +243,7 @@ impl AbilityResolver {
                 let mut normalized = effect.clone();
                 normalized.effect_steps = None;
                 normalized.compound.actions = Some(steps);
-                normalized.action = "sequential".to_string();
+                normalized.action = ActionType::Sequential;
                 return self.execute_sequential_effect(
                     gs,
                     &normalized,
@@ -782,7 +782,7 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            ActionType::Custom => self.execute_custom(gs, effect, &action_str),
+            ActionType::Custom => self.execute_custom(gs, effect, action_str),
             ActionType::DoNothing => Ok(()),
 
             ActionType::SpecifyHeartColor => {
@@ -909,17 +909,35 @@ impl AbilityResolver {
                 self.execute_perform_yell(gs, count, effect.target_name());
                 Ok(())
             }
+            // Dispatch-only internal variants — these are routed via separate code paths
+            ActionType::CompoundAction
+            | ActionType::OpponentAction
+            | ActionType::ActionBy
+            | ActionType::SequentialCost
+            | ActionType::Tap
+            | ActionType::Rest
+            | ActionType::Discard
+            | ActionType::ChoiceCondition
+            | ActionType::EnergyCondition => {
+                log::warn!(
+                    "Unexpected internal action type in execute_effect: {:?}",
+                    effect.action
+                );
+                Ok(())
+            }
+            ActionType::ConditionalOptional => self.execute_conditional_on_optional(gs, effect),
         };
         // Push effect verdict for non-structural action types
-        const SKIP: &[&str] = &[
-            "compound_action",
-            "sequential",
-            "choice",
-            "conditional_alternative",
-            "conditional_on_result",
-            "conditional_on_optional",
-        ];
-        if !SKIP.contains(&effect.action.as_str()) {
+        let is_structural = matches!(
+            effect.action,
+            ActionType::CompoundAction
+                | ActionType::Sequential
+                | ActionType::Choice
+                | ActionType::ConditionalAlternative
+                | ActionType::ConditionalOnResult
+                | ActionType::ConditionalOnOptional
+        );
+        if !is_structural {
             #[cfg(not(feature = "psp"))]
             let val = effect
                 .count
@@ -930,12 +948,12 @@ impl AbilityResolver {
             let details = if !val.is_empty() {
                 format!("{} {}", effect.action, val)
             } else {
-                effect.action.clone()
+                effect.action.to_string()
             };
             #[cfg(not(feature = "psp"))]
             crate::ability::log::push_verdict(crate::ability::log::AbilityLogItem::Effect {
                 text: effect.text.clone(),
-                action: effect.action.clone(),
+                action: effect.action.to_string(),
                 details,
             });
         }

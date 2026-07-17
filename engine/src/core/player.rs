@@ -240,8 +240,7 @@ impl Player {
             let mut cost_increase: u32 = 0;
             for ability in &card.abilities {
                 if let Some(ref effect) = ability.effect {
-                    if crate::ability::enums::ActionType::from_str(&effect.action)
-                        == Some(crate::ability::enums::ActionType::ModifyCost)
+                    if effect.action == crate::ability::enums::ActionType::ModifyCost
                         && matches!(
                             effect.operation_any().as_deref(),
                             Some("increase") | Some("add")

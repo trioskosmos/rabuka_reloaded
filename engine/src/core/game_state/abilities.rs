@@ -2141,7 +2141,7 @@ impl GameState {
                         let res_dest = effect.restricted_destination_any();
                         let dest = effect.destination.as_deref();
                         let restricted_to = res_dest.or(dest);
-                        if effect.action == "restriction"
+                        if effect.action == crate::ability::enums::ActionType::Restriction
                             && effect.restriction_type_any().as_deref() == Some("cannot_place")
                             && {
                                 let rz = restricted_to.and_then(Zone::from_str);

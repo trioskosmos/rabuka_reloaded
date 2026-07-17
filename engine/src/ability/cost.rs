@@ -1,5 +1,5 @@
 use super::debug::AbDebug;
-use super::enums::Zone;
+use super::enums::{ActionType, Zone};
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ChoiceRoute};
 use super::util;
@@ -32,9 +32,9 @@ impl AbilityResolver {
 /// In sequential_cost, prompt-less costs before a choice-based cost are
 /// auto-paid without a "pay or skip" prompt.
 fn has_skip_prompt(cost: &AbilityEffect) -> bool {
-    match cost.action.as_str() {
-        "pay_energy" => !cost.any_number_any().unwrap_or(false),
-        "change_state" => cost.self_cost_any() == Some(true),
+    match cost.action {
+        ActionType::PayEnergy => !cost.any_number_any().unwrap_or(false),
+        ActionType::ChangeState => cost.self_cost_any() == Some(true),
         _ => false,
     }
 }
@@ -92,8 +92,8 @@ fn get_change_state_candidates(
 
 impl AbilityResolver {
     pub fn validate_cost(&self, gs: &mut GameState, cost: &AbilityEffect) -> Result<(), String> {
-        match cost.action.as_str() {
-            "sequential_cost" => {
+        match cost.action {
+            ActionType::SequentialCost => {
                 if let Some(ref costs) = cost.compound.actions {
                     for sub_cost in costs {
                         self.validate_cost(gs, sub_cost)?;
@@ -101,8 +101,8 @@ impl AbilityResolver {
                 }
                 Ok(())
             }
-            "choice_condition" => Ok(()),
-            "move_cards" => {
+            ActionType::ChoiceCondition => Ok(()),
+            ActionType::MoveCards => {
                 let count = cost.count.unwrap_or(1) as usize;
                 let source = cost.source.as_deref().unwrap_or("");
                 let target_str = cost.target.as_deref().unwrap_or("self");
@@ -125,7 +125,7 @@ impl AbilityResolver {
                 }
                 Ok(())
             }
-            "energy_condition" => {
+            ActionType::EnergyCondition => {
                 let count = cost.count.unwrap_or(1) as usize;
                 let player = gs.resolve_target_player("self");
                 if player.energy_zone.cards.len() < count {
@@ -140,7 +140,7 @@ impl AbilityResolver {
             // Q137: 「ウェイトにする」はアクティブ状態のメンバーをウェイト状態にすること
             // を意味します。既にウェイト状態のメンバーをコストで「ウェイトにする」ことは
             // できません。対象がいない場合、そのコストは支払えません。
-            "change_state" => {
+            ActionType::ChangeState => {
                 let state_change_binding = cost.state_change_any();
                 let state_change = state_change_binding.unwrap_or("");
                 if state_change == "wait" {
@@ -169,7 +169,7 @@ impl AbilityResolver {
     fn pay_cost_inner(&mut self, gs: &mut GameState, cost: &AbilityEffect) -> Result<(), String> {
         let mut dbg = AbDebug::new();
         dbg.cost_pay(cost, true);
-        match cost.action.as_str() {
+        match cost.action {
             // Rule 9.4.2 / Q234: Sequential cost — each sub-cost is paid in order.
             // Sub-costs are validated first (ALL must be payable), then paid one
             // by one. If any sub-cost creates a pending_choice, we yield and resume
@@ -178,7 +178,7 @@ impl AbilityResolver {
             // Q234: "Deck has only 2 cards, can I pay this cost?" → No.
             //   The cost requires drawing 3+ cards from deck. If the resource
             //   is insufficient, validate_cost rejects the entire cost.
-            "sequential_cost" => {
+            ActionType::SequentialCost => {
                 if let Some(ref costs) = cost.compound.actions {
                     let start_idx = gs
                         .ability_queue
@@ -234,7 +234,7 @@ impl AbilityResolver {
                 }
                 Ok(())
             }
-            "choice_condition" => {
+            ActionType::ChoiceCondition => {
                 let texts: Vec<String> = cost
                     .compound
                     .actions
@@ -257,7 +257,7 @@ impl AbilityResolver {
                 }
                 Ok(())
             }
-            "move_cards" => {
+            ActionType::MoveCards => {
                 let source = cost.source.as_deref().unwrap_or("");
                 // any_number means player chooses 0..N
                 let is_any_number = cost.any_number_any().unwrap_or(false);
@@ -583,7 +583,7 @@ impl AbilityResolver {
             // Q257: "Do I have to wait the member even if target is gone?"
             //   → Yes, if the cost is mandatory. Costs are paid regardless
             //   of whether the effect can resolve (Rule 9.4.2).
-            "change_state" => {
+            ActionType::ChangeState => {
                 let state_change_binding = cost.state_change_any();
                 let state_change = state_change_binding.unwrap_or("");
                 let target = cost.target.as_deref().unwrap_or("self");
@@ -710,7 +710,7 @@ impl AbilityResolver {
             // Q215: "Can I place wait-state energy under a member as cost?"
             //   → Yes, energy state (active/wait) doesn't restrict placement.
             //   However, pay_energy specifically only taps ACTIVE energy.
-            "pay_energy" => {
+            ActionType::PayEnergy => {
                 let energy = cost.energy_count_any().unwrap_or(0);
                 let target = cost.target.as_deref().unwrap_or("self");
                 let optional = cost.optional.unwrap_or(false);
@@ -807,7 +807,7 @@ impl AbilityResolver {
                 }
                 Ok(())
             }
-            "energy_condition" => {
+            ActionType::EnergyCondition => {
                 let count = cost.count.unwrap_or(1) as usize;
                 let target = cost.target.as_deref().unwrap_or("self");
                 let player = gs.resolve_target_player_mut(target);
@@ -826,7 +826,7 @@ impl AbilityResolver {
                 player.energy_zone.sub_active(count);
                 Ok(())
             }
-            "reveal" => {
+            ActionType::Reveal => {
                 let source = cost.source.as_deref().unwrap_or(Zone::Hand.to_str());
                 let target = cost.target.as_deref().unwrap_or("self");
                 let card_type = cost.card_type_any().map(|s| s.to_string());
@@ -902,7 +902,7 @@ impl AbilityResolver {
                     Ok(())
                 }
             }
-            "place_energy_under_member" => {
+            ActionType::PlaceEnergyUnderMember => {
                 self.execute_place_energy_under_member(
                     gs,
                     cost.count.unwrap_or(1),
@@ -914,7 +914,7 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            "custom" => {
+            ActionType::Custom => {
                 if cost.destination.as_deref().and_then(Zone::from_str) == Some(Zone::UnderMember) {
                     self.execute_place_energy_under_member(
                         gs,
@@ -1140,7 +1140,7 @@ impl AbilityResolver {
                 log::debug!("[OPT_COST] checking cost_type: {:?}, entry_cost: {:?}, entry_effect_action: {:?}",
                     cost.action, gs.entry_cost().is_some(),
                     gs.entry_effect().map(|e| e.action.clone()));
-                if cost.action == "place_energy_under_member" {
+                if cost.action == ActionType::PlaceEnergyUnderMember {
                     self.execute_place_energy_under_member(
                         gs,
                         cost.count.unwrap_or(1),
@@ -1180,7 +1180,7 @@ impl AbilityResolver {
                     );
                     // For PlaceEnergyUnderMember, call directly with optional=false
                     // to avoid re-creating the optional cost choice (infinite loop).
-                    if effect.action == "place_energy_under_member" {
+                    if effect.action == ActionType::PlaceEnergyUnderMember {
                         self.execute_place_energy_under_member(
                             gs,
                             effect.energy_count_any().unwrap_or(effect.count_or(1)),
