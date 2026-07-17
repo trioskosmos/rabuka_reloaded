@@ -1,3 +1,8 @@
+#[cfg(not(feature = "psp"))]
+use crate::core::types::ArcStr;
+#[cfg(not(feature = "psp"))]
+use serde::ser::Serializer;
+
 /// Strongly-typed zone identifiers to prevent stringly-typed bugs.
 /// Replaces error-prone zone == "hand" patterns with Zone::Hand.
 #[cfg(feature = "psp")]
@@ -683,5 +688,84 @@ impl TryFrom<String> for ActionType {
 impl From<ActionType> for String {
     fn from(at: ActionType) -> String {
         at.to_str().to_string()
+    }
+}
+
+// ============== EFFECT CARD TYPE ==============
+//
+// Typed replacement for the raw `card_type` string field found on effect
+// kinds. The known values (`member_card`, `live_card`, `energy_card`) become
+// variants; any unrecognized value is preserved verbatim in `Other(ArcStr)`
+// so existing JSON / bytecode assets keep loading without regeneration.
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum EffectCardType {
+    MemberCard,
+    LiveCard,
+    EnergyCard,
+    /// Catch-all for values not part of the known set. Preserves round-trip
+    /// fidelity for legacy / unexpected `card_type` strings.
+    Other(ArcStr),
+}
+
+impl EffectCardType {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "member_card" => EffectCardType::MemberCard,
+            "live_card" => EffectCardType::LiveCard,
+            "energy_card" => EffectCardType::EnergyCard,
+            other => EffectCardType::Other(ArcStr::from(other)),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            EffectCardType::MemberCard => "member_card",
+            EffectCardType::LiveCard => "live_card",
+            EffectCardType::EnergyCard => "energy_card",
+            EffectCardType::Other(s) => s.as_ref(),
+        }
+    }
+}
+
+#[cfg(not(feature = "psp"))]
+impl serde::Serialize for EffectCardType {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+#[cfg(not(feature = "psp"))]
+impl<'de> serde::Deserialize<'de> for EffectCardType {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = <ArcStr as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(EffectCardType::from_str(&s))
+    }
+}
+
+#[cfg(feature = "psp")]
+impl serde::Serialize for EffectCardType {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+#[cfg(feature = "psp")]
+impl<'de> serde::Deserialize<'de> for EffectCardType {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(EffectCardType::from_str(&s))
+    }
+}
+
+impl Default for EffectCardType {
+    fn default() -> Self {
+        EffectCardType::Other(ArcStr::from(""))
+    }
+}
+
+impl core::fmt::Display for EffectCardType {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.as_str())
     }
 }

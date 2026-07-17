@@ -1,4 +1,4 @@
-use crate::ability::enums::{ActionType, ConditionType, Zone};
+use crate::ability::enums::{ActionType, ConditionType, EffectCardType, Zone};
 use crate::core::types::ArcStr;
 use crate::Arc;
 use crate::HashMap;
@@ -886,7 +886,7 @@ pub enum EffectKind {
         #[serde(default)]
         count: Option<u32>,
         #[serde(default)]
-        card_type: Option<ArcStr>,
+        card_type: Option<EffectCardType>,
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
@@ -1025,7 +1025,7 @@ pub enum EffectKind {
         #[serde(default)]
         count: Option<u32>,
         #[serde(default)]
-        card_type: Option<ArcStr>,
+        card_type: Option<EffectCardType>,
         #[serde(default)]
         dynamic_count: Option<DynamicCount>,
         #[serde(default)]
@@ -1068,7 +1068,7 @@ pub enum EffectKind {
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
-        card_type: Option<ArcStr>,
+        card_type: Option<EffectCardType>,
         #[serde(default)]
         characters: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1183,7 +1183,7 @@ pub enum EffectKind {
         #[serde(default)]
         destination: Option<ArcStr>,
         #[serde(default)]
-        card_type: Option<ArcStr>,
+        card_type: Option<EffectCardType>,
         #[serde(default)]
         characters: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1284,7 +1284,7 @@ pub enum EffectKind {
         #[serde(default)]
         duration: Option<ArcStr>,
         #[serde(default)]
-        card_type: Option<ArcStr>,
+        card_type: Option<EffectCardType>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1375,7 +1375,7 @@ pub enum EffectKind {
         #[serde(default)]
         repeat_limit: Option<u32>,
         #[serde(default)]
-        card_type: Option<ArcStr>,
+        card_type: Option<EffectCardType>,
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
@@ -1440,7 +1440,7 @@ pub enum EffectKind {
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
-        card_type: Option<ArcStr>,
+        card_type: Option<EffectCardType>,
         #[serde(default)]
         cost_limit: Option<u32>,
         #[serde(default)]
@@ -1511,7 +1511,7 @@ pub enum EffectKind {
         #[serde(default)]
         state_change: Option<ArcStr>,
         #[serde(default)]
-        card_type: Option<ArcStr>,
+        card_type: Option<EffectCardType>,
         #[serde(default)]
         cost_limit: Option<u32>,
         #[serde(default)]
@@ -1622,7 +1622,7 @@ pub enum EffectKind {
         #[serde(default)]
         suppressed_trigger: Option<ArcStr>,
         #[serde(default)]
-        card_type: Option<ArcStr>,
+        card_type: Option<EffectCardType>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1709,7 +1709,7 @@ pub enum EffectKind {
         #[serde(default)]
         activation_position: Option<ArcStr>,
         #[serde(default)]
-        card_type: Option<ArcStr>,
+        card_type: Option<EffectCardType>,
         #[serde(default)]
         trigger_type: Option<ArcStr>,
         #[serde(default)]
@@ -1756,7 +1756,7 @@ pub enum EffectKind {
         #[serde(default)]
         operation: Option<ArcStr>,
         #[serde(default)]
-        card_type: Option<ArcStr>,
+        card_type: Option<EffectCardType>,
         #[serde(default)]
         location: Option<ArcStr>,
         #[serde(default)]
@@ -1805,7 +1805,7 @@ pub enum EffectKind {
         #[serde(default)]
         optional: Option<bool>,
         #[serde(default)]
-        card_type: Option<ArcStr>,
+        card_type: Option<EffectCardType>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1852,7 +1852,7 @@ pub enum EffectKind {
         #[serde(default)]
         value: Option<u32>,
         #[serde(default)]
-        card_type: Option<ArcStr>,
+        card_type: Option<EffectCardType>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1999,7 +1999,7 @@ pub enum EffectKind {
         #[serde(default)]
         choice_based: Option<bool>,
         #[serde(default)]
-        card_type: Option<ArcStr>,
+        card_type: Option<EffectCardType>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -2551,7 +2551,25 @@ impl AbilityEffect {
 
     str_getter!(card_property_any, [MoveCards => card_property, SelectTarget => card_property, LookReveal => card_property, GainResource => card_property, ChangeState => card_property, ModifyScore => card_property, CustomOp => card_property]);
 
-    str_getter!(card_type_any, [MoveCards => card_type, DrawCards => card_type, SelectTarget => card_type, LookReveal => card_type, ModifyScore => card_type, ModifyHearts => card_type, GainResource => card_type, ChangeState => card_type, AbilityOp => card_type, CompoundEffect => card_type, RestrictionOp => card_type, PositionOp => card_type, MiscOp => card_type, CustomOp => card_type]);
+    pub fn card_type_any(&self) -> Option<&str> {
+        match self.kind.as_deref() {
+            Some(EffectKind::MoveCards { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            Some(EffectKind::DrawCards { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            Some(EffectKind::SelectTarget { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            Some(EffectKind::LookReveal { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            Some(EffectKind::ModifyScore { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            Some(EffectKind::ModifyHearts { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            Some(EffectKind::GainResource { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            Some(EffectKind::ChangeState { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            Some(EffectKind::AbilityOp { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            Some(EffectKind::CompoundEffect { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            Some(EffectKind::RestrictionOp { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            Some(EffectKind::PositionOp { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            Some(EffectKind::MiscOp { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            Some(EffectKind::CustomOp { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            _ => None,
+        }
+    }
 
     pub fn character_effects_any(&self) -> Option<&Vec<serde_json::Value>> {
         match self.kind.as_deref() {
@@ -3162,7 +3180,26 @@ impl AbilityEffect {
         }
     }
     setter!(set_card_property, card_property: ArcStr => [MoveCards, SelectTarget, LookReveal, GainResource, ChangeState]);
-    setter!(set_card_type, card_type: ArcStr => [MoveCards, DrawCards, SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, AbilityOp, RestrictionOp, PositionOp, MiscOp, CustomOp]);
+    pub fn set_card_type(&mut self, val: Option<ArcStr>) {
+        let parsed = val.map(|s| EffectCardType::from_str(&s));
+        match self.kind.as_deref_mut() {
+            Some(EffectKind::MoveCards { ref mut card_type, .. }) => *card_type = parsed,
+            Some(EffectKind::DrawCards { ref mut card_type, .. }) => *card_type = parsed,
+            Some(EffectKind::SelectTarget { ref mut card_type, .. }) => *card_type = parsed,
+            Some(EffectKind::LookReveal { ref mut card_type, .. }) => *card_type = parsed,
+            Some(EffectKind::ModifyScore { ref mut card_type, .. }) => *card_type = parsed,
+            Some(EffectKind::ModifyHearts { ref mut card_type, .. }) => *card_type = parsed,
+            Some(EffectKind::GainResource { ref mut card_type, .. }) => *card_type = parsed,
+            Some(EffectKind::ChangeState { ref mut card_type, .. }) => *card_type = parsed,
+            Some(EffectKind::AbilityOp { ref mut card_type, .. }) => *card_type = parsed,
+            Some(EffectKind::CompoundEffect { ref mut card_type, .. }) => *card_type = parsed,
+            Some(EffectKind::RestrictionOp { ref mut card_type, .. }) => *card_type = parsed,
+            Some(EffectKind::PositionOp { ref mut card_type, .. }) => *card_type = parsed,
+            Some(EffectKind::MiscOp { ref mut card_type, .. }) => *card_type = parsed,
+            Some(EffectKind::CustomOp { ref mut card_type, .. }) => *card_type = parsed,
+            _ => {}
+        }
+    }
     box_setter!(set_characters, characters: Vec<String> => [MoveCards, SelectTarget, LookReveal, GainResource, ChangeState, AbilityOp, RestrictionOp, PositionOp, MiscOp, CustomOp]);
     setter!(set_choice, choice: bool => [MiscOp]);
     setter!(set_choice_based, choice_based: bool => [RestrictionOp, CustomOp]);
