@@ -1728,6 +1728,10 @@ pub enum EffectKind {
         per_unit_type: Option<ArcStr>,
         #[serde(default)]
         alternative_count_type: Option<ArcStr>,
+        #[serde(default)]
+        choice_condition: Option<Box<Condition>>,
+        #[serde(default)]
+        alternative_condition: Option<Box<Condition>>,
     },
     /// RestrictionOp effect fields
     RestrictionOp {

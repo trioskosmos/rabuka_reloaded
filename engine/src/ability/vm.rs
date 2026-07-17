@@ -134,6 +134,8 @@ pub fn get_ability(idx: usize) -> Option<Ability> {
                 options: ref mut bc_o,
                 alternative_count_type: ref mut bc_act,
                 group_names: ref mut bc_gn,
+                choice_condition: ref mut bc_cc,
+                alternative_condition: ref mut bc_ac,
                 ..
             } = &mut ek
             {
@@ -142,6 +144,8 @@ pub fn get_ability(idx: usize) -> Option<Ability> {
                 if let Some(s) = group_names {
                     *bc_gn = Some(Box::new(vec![s.to_string()]));
                 }
+                *bc_cc = choice_cond;
+                *bc_ac = alt_cond;
             }
             effect = Some(AbilityEffect {
                 action: "choice".into(),

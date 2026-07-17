@@ -509,7 +509,7 @@ impl AbilityResolver {
                     gs,
                     effect.ability_text_any().as_deref().unwrap_or(""),
                     effect.target_trigger_any().as_deref(),
-                    effect.count,
+                    effect.count_any(),
                     effect.source_card_any().as_deref(),
                 );
                 Ok(())

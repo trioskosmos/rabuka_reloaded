@@ -117,7 +117,7 @@ impl AbilityResolver {
             return self.execute_gain_ability(
                 gs,
                 text,
-                effect.target.as_deref().unwrap_or("self"),
+                effect.target_any().unwrap_or("self"),
                 effect.duration_any().as_deref(),
                 effect.gained_effect_any().cloned(),
                 effect.ability_gain_trigger_any().as_deref(),
@@ -237,7 +237,7 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<bool, String> {
         // Skip if not "both" or if this is position_change (handles "both" internally)
-        if effect.target.as_deref() != Some("both")
+        if effect.target_any() != Some("both")
             || crate::ability::enums::ActionType::from_str(&effect.action)
                 == Some(crate::ability::enums::ActionType::PositionChange)
         {
@@ -562,7 +562,7 @@ impl AbilityResolver {
         let per_unit_count_val = effect.per_unit_count_any().unwrap_or(1);
         let mut units = matching_count / per_unit_count_val;
         if effect.max.unwrap_or(false) {
-            if let Some(cap) = effect.count {
+            if let Some(cap) = effect.count_any() {
                 units = units.min(cap);
             }
         }
@@ -588,7 +588,7 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!("[GR_ENTER] resource={:?} count={:?} target_count={:?} source={:?} card_type={:?} target={:?} exclude_self={:?} target_from_sel={:?}",
-                effect.resource_any(), effect.count, effect.target_count_any(), effect.source_any(), effect.card_type_any(), effect.target, effect.exclude_self_any(), effect.target_from_selection_any());
+                effect.resource_any(), effect.count_any(), effect.target_count_any(), effect.source_any(), effect.card_type_any(), effect.target_any(), effect.exclude_self_any(), effect.target_from_selection_any());
         }
         // heart_colors_from_selected_card: gain 1 heart of each color
         // that the previously-selected card in the sequential has (base_heart).
@@ -699,7 +699,7 @@ impl AbilityResolver {
                 .current_entry()
                 .and_then(|e| e.triggering_member_id);
             let activating = gs.activating_card;
-            let has_explicit_target = effect.target.is_some();
+            let has_explicit_target = effect.target_any().is_some();
             let player = gs.resolve_target_player_mut(&target_str);
             let card_id = triggering_member.or_else(|| {
                 if let Some(ref pos) = effect.position_any() {
@@ -1490,7 +1490,7 @@ impl AbilityResolver {
                     }
                 } else if effect.target_count_any().is_none()
                     && (effect.exclude_self_any().is_none()
-                        || effect.target.as_deref() == Some("self"))
+                        || effect.target_any() == Some("self"))
                 {
                     if let Some(card_id) = activating_card_id {
                         gs.mods.add_blade_modifier_with_trace(
@@ -1614,7 +1614,7 @@ impl AbilityResolver {
                     }
                 } else if effect.target_count_any().is_none()
                     && (effect.exclude_self_any().is_none()
-                        || effect.target.as_deref() == Some("self"))
+                        || effect.target_any() == Some("self"))
                 {
                     if let Some(card_id) = activating_card_id {
                         self.apply_heart_to_card(
@@ -1751,7 +1751,7 @@ impl AbilityResolver {
             "{} {}: [[log_gain_resource:n={},type={}]]",
             pp,
             act_name,
-            effect.count.unwrap_or(1),
+            effect.count_any().unwrap_or(1),
             effect.resource_any().as_deref().unwrap_or("?")
         ));
         Ok(())
@@ -2021,7 +2021,7 @@ impl AbilityResolver {
         // If destination is already specified (from conditional position_change or area_select),
         // route directly to execute_position_change_with_destination.
         // EXCEPTION: "front" destination for opponent needs source selection first.
-        if let Some(ref dest) = effect.destination {
+        if let Some(ref dest) = effect.destination_any() {
             if &**dest == "front" && target == "opponent" {
                 // "front" destination for opponent: the destination is fixed (front area of
                 // activating card). Create a choice to select which OPPONENT member to move.
@@ -2069,7 +2069,7 @@ impl AbilityResolver {
                 let group_names = gns_binding.as_ref();
                 let exclude_self = effect.exclude_self_any().unwrap_or(false);
                 let activating_card_id = gs.activating_card;
-                let has_explicit_target = effect.target.is_some();
+                let has_explicit_target = effect.target_any().is_some();
 
                 // When target is null (no "自分の" qualifier in card text),
                 // the ability can target ANY member on either player's stage.
@@ -2170,7 +2170,7 @@ impl AbilityResolver {
                     return self.execute_rotation(gs, effect, target);
                 }
 
-                let target_m = effect.target.as_deref().unwrap_or("self");
+                let target_m = effect.target_any().unwrap_or("self");
                 let card_db = self.card_db();
                 let mut card_ids: Vec<i16> = Vec::new();
                 {
@@ -2732,7 +2732,7 @@ impl AbilityResolver {
         effect: &AbilityEffect,
         destination: &str,
     ) -> Result<(), String> {
-        let raw_target = effect.target.as_deref().unwrap_or("self");
+        let raw_target = effect.target_any().unwrap_or("self");
         let target = if raw_target == "both" {
             "self"
         } else {

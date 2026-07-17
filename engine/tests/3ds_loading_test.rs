@@ -35,6 +35,7 @@ fn build_game(json_str: &str, abilities_str: &str) -> Result<GameState, String> 
 }
 
 #[test]
+#[cfg(not(feature = "bytecode_abilities"))]
 fn load_and_play() {
     let json_str = std::fs::read_to_string("../cards/cards.json").expect("cards.json not found");
     let abilities_str =

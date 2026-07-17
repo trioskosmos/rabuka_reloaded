@@ -170,13 +170,13 @@ impl GameState {
                                             } else {
                                                 effect
                                                     .resource_icon_count_any()
-                                                    .unwrap_or(effect.count.unwrap_or(1))
+                                                    .unwrap_or(effect.count_any().unwrap_or(1))
                                             };
                                             let mut units = per_count as i32
                                                 / effect.per_unit_count_any().unwrap_or(1).max(1)
                                                     as i32;
                                             if effect.max.unwrap_or(false) {
-                                                if let Some(cap) = effect.count {
+                                                if let Some(cap) = effect.count_any() {
                                                     units = units.min(cap as i32);
                                                 }
                                             }
@@ -184,7 +184,7 @@ impl GameState {
                                         } else {
                                             effect
                                                 .resource_icon_count_any()
-                                                .unwrap_or(effect.count.unwrap_or(1))
+                                                .unwrap_or(effect.count_any().unwrap_or(1))
                                                 as i32
                                         };
                                         *exp_blade.entry(*card_id).or_insert(0) += n;
@@ -220,13 +220,13 @@ impl GameState {
                                                 / effect.per_unit_count_any().unwrap_or(1).max(1)
                                                     as i32;
                                             if effect.max.unwrap_or(false) {
-                                                if let Some(cap) = effect.count {
+                                                if let Some(cap) = effect.count_any() {
                                                     units = units.min(cap as i32);
                                                 }
                                             }
                                             units
                                         } else {
-                                            effect.count.unwrap_or(1) as i32
+                                            effect.count_any().unwrap_or(1) as i32
                                         };
                                         if effect.heart_type_any().as_deref() == Some("all") {
                                             *exp_heart
@@ -280,7 +280,8 @@ impl GameState {
                                             rt, card_id, card_name
                                         ));
                                     }
-                                    let tgt = effect.target.as_deref().unwrap_or("self");
+                                    let tgt_opt = effect.target_any();
+                                    let tgt = tgt_opt.unwrap_or("self");
                                     if rt == "cannot_activate_by_effect" {
                                         let resolved = self.resolve_target_player(tgt).id.clone();
                                         if !self.cannot_activate_members.contains(&resolved) {
@@ -633,12 +634,12 @@ impl GameState {
                         } else {
                             effect
                                 .resource_icon_count_any()
-                                .unwrap_or(effect.count.unwrap_or(1))
+                                .unwrap_or(effect.count_any().unwrap_or(1))
                         };
                         let mut units = per_count as i32
                             / effect.per_unit_count_any().unwrap_or(1).max(1) as i32;
                         if effect.max.unwrap_or(false) {
-                            if let Some(cap) = effect.count {
+                            if let Some(cap) = effect.count_any() {
                                 units = units.min(cap as i32);
                             }
                         }
@@ -646,7 +647,7 @@ impl GameState {
                     } else {
                         effect
                             .resource_icon_count_any()
-                            .unwrap_or(effect.count.unwrap_or(1)) as i32
+                            .unwrap_or(effect.count_any().unwrap_or(1)) as i32
                     };
                     *expected.entry(cid).or_insert(0) += count;
                 }

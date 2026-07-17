@@ -227,7 +227,7 @@ impl AbilityResolver {
         }
         let draw_count = if let Some(ref dc) = effect.dynamic_count_any() {
             self.resolve_dynamic_count(gs, dc)
-        } else if effect.count == Some(0) {
+        } else if effect.count_any() == Some(0) {
             log::debug!("[DRAW_ZERO] self.moved_cards={:?}", self.moved_cards);
             log::debug!(
                 "[DRAW_ZERO] gs.recently_moved_cards={:?}",
