@@ -50,6 +50,9 @@ profiling = []
 alloc_tracker = []
 # PSP target: no_std + alloc mode for mipsel-sony-psp
 psp = ["once_cell", "debug_conditions"]
+# Bytecode abilities: use pre-compiled bytecode instead of JSON serde
+# for ability loading. Dramatically reduces memory footprint (~7KB vs 1.4MB).
+bytecode_abilities = []
 
 [dev-dependencies]
 criterion = "0.5"
