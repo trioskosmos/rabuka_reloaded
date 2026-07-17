@@ -44,6 +44,7 @@ impl PolicyNet {
         f.read_to_end(&mut buf)?;
         let mut pos = 0usize;
 
+        #[allow(unused_macros)]
         macro_rules! read {
             ($dst:expr) => {{
                 let n = std::mem::size_of_val(&$dst);

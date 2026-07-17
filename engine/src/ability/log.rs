@@ -1,5 +1,4 @@
 use crate::ability::debug::ABILITY_DEBUG;
-use core::sync::atomic::Ordering;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
@@ -113,6 +112,9 @@ mod inner {
     }
 }
 
-pub use inner::*;
 #[cfg(feature = "psp")]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+pub use inner::*;

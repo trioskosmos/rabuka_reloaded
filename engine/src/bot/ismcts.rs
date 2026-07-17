@@ -72,6 +72,7 @@ fn action_type_idx(t: &ActionType) -> u8 {
     }
 }
 
+#[allow(dead_code)]
 pub(super) fn fastrand(lo: usize, hi: usize) -> usize {
     if lo >= hi {
         return lo;

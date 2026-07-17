@@ -6,10 +6,10 @@ pub fn set_debug(enabled: bool) {
     ABILITY_DEBUG.store(enabled, Ordering::SeqCst);
 }
 
-#[cfg(not(feature = "psp"))]
-pub use inner::AbDebug;
 #[cfg(feature = "psp")]
 use alloc::{string::String, vec::Vec};
+#[cfg(not(feature = "psp"))]
+pub use inner::AbDebug;
 #[cfg(feature = "psp")]
 pub struct AbDebug;
 
@@ -44,9 +44,7 @@ impl AbDebug {
 
 #[cfg(not(feature = "psp"))]
 mod inner {
-    use crate::ability::enums::ConditionType;
     use crate::card::{Ability, AbilityEffect, Condition};
-    use crate::HashSet;
     use core::sync::atomic::Ordering;
     use std::sync::Mutex;
 

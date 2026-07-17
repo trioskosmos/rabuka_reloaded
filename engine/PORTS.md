@@ -5,9 +5,26 @@
 The engine is a card game. No physics, no 3D, no real-time constraints.
 Portability is limited by three hard gates:
 
-1. **LLVM must support the CPU** (Rust can't target unsupported architectures)
-2. **Enough RAM** (~4MB minimum: 2MB card data + 1MB code + 1MB state/stack)
+1. **CPU support** (Rust needs either LLVM or GCC codegen for the CPU)
+2. **Enough RAM** (varies wildly by engine architecture — see below)
 3. **Someone writes ~200 lines of platform glue** (display, input, allocator)
+
+## The Real RAM Picture
+
+The current engine uses a **JSON-based ability interpreter**: card abilities are
+stored as serde-deserialized JSON structs (~4.5MB raw), then inflated further at
+runtime by Vec (24B), String (24B), Arc<str> (16B + alloc), and Option<T>
+overhead. This is what drives the ~4MB minimum.
+
+A **bytecode-compiled** approach shrinks that to:
+- Card stats: ~27KB (packed binary structs, ~12B per card × 2280)
+- Ability bytecode: ~7KB (variable-length opcodes, ~4B avg per unique ability × 800)
+- Ability lookup table: ~3KB (index per card × 2280)
+- **Total: ~40KB** — a 100× reduction from the JSON-inflated ~4MB
+
+The real minimum RAM for the engine depends entirely on how the card data
+is stored. With JSON: ~4MB. With bytecode: **~1MB** (40KB data + 600KB code +
+300KB state/stack). This changes which consoles are reachable.
 
 Everything below is sorted oldest-first within each tier.
 
@@ -42,18 +59,24 @@ NES (6502), and all Z80-based machines are dead on arrival.
 
 ### Gate 2: RAM
 
-The engine needs roughly:
-- **Card database**: ~2MB (baked binary format, not JSON)
-- **Code**: ~500KB-1MB
-- **Game state + heap + stack**: ~1MB
-- **Realistic minimum**: ~4MB
+With the **bytecode-compiled** approach, the engine needs roughly:
+- **Card data**: ~40KB (packed binary — no serde, no heap allocations)
+- **Code**: ~600KB-1MB (ability VM is ~500 LOC instead of 179k LOC of serde structs)
+- **Game state + heap + stack**: ~300KB
+- **Realistic minimum** (bytecode): **~1MB**
+- **Realistic minimum** (current JSON interpreter): **~4MB**
 
-Consoles that fail:
-- **PS1** (2MB) — not viable despite having an official Rust target
+Consoles that fail either way:
 - **GBA** (288KB) — not even close
-- **DS** (4MB) — borderline, would need extreme trimming
 - **Genesis / Neo Geo** (64KB) — laughable
-- **N64** (4-8MB) — borderline, could barely work with expansion pak
+
+Consoles that become viable with bytecode:
+- **PS1** (2MB) — from "hard block" to **comfortable**
+- **DS** (4MB) — from "borderline" to **comfortable**
+- **N64** (4MB base / 8MB expansion) — **comfortable even without expansion**
+
+Consoles that remain borderline:
+- **Saturn** (2MB main + 1.5MB video) — tight but possible if video RAM is shared
 
 ---
 
@@ -120,18 +143,17 @@ Consoles that fail:
 - Target: `mipsel-sony-psx` (official, Tier 3)
 - Std: **No** — no_std + alloc
 - SDK: `psx-sdk-rs` (experimental, single developer)
-- Engine changes: **need no_std migration**
-- **Hard block: 2MB RAM is insufficient.** Card database alone
-  overflows this. Requires either streaming from CD-ROM (slow) or
-  gutting the card pool to a tiny subset.
+- Engine changes: **need bytecode VM migration + no_std**
+- **Viable with bytecode** (40KB card data + 600KB code + 300KB state
+  = ~940KB, well within 2MB). Current JSON interpreter overflows it.
 
 ### Nintendo 64 (1996)
 - CPU: MIPS VR4300 @ 93MHz
 - RAM: 4MB (8MB with Expansion Pak)
 - Target: None (would need custom `mipsel-n64-none-eabi` JSON)
 - Std: **No**
-- Engine changes: **need no_std migration**
-- Borderline even at 8MB — RAM constraint is the limiter
+- Engine changes: **need bytecode VM migration + no_std**
+- **Comfortable even at 4MB** with bytecode approach
 
 ### Nintendo DS (2004)
 - CPU: ARM9 @ 67MHz + ARM7 @ 33MHz
@@ -139,8 +161,8 @@ Consoles that fail:
 - Target: None (`armv5te-none-eabi` + custom JSON)
 - Std: **No** — no_std + alloc
 - SDK: `nds-rs` (very early, 10 stars)
-- Engine changes: **need no_std migration + extreme memory trimming**
-- 4MB is borderline for Rust + alloy + card data
+- Engine changes: **need bytecode VM migration + no_std**
+- **Comfortable with bytecode** — 4MB is plenty for 1MB engine
 
 ---
 
@@ -173,18 +195,45 @@ Consoles that fail:
 
 ## Tier 6: CPU Not Supported by LLVM
 
-| Console | CPU | Year | Why |
-|---|---|---|---|
-| Sega Dreamcast | SH-4 | 1998 | No LLVM backend for SuperH |
-| Sega Saturn | SH-2 | 1994 | No LLVM backend for SuperH |
-| SNES | 65816 | 1990 | Not in LLVM |
-| NES | 6502 | 1983 | Not in LLVM |
-| Master System / Game Gear | Z80 | 1985 | Not in LLVM |
-| TurboGrafx-16 | HuC6280 | 1987 | Not in LLVM |
-| WonderSwan | V30MZ (x86-16) | 1999 | LLVM has no 16-bit x86 mode |
-| Neo Geo Pocket | TLCS-900 | 1999 | Not in LLVM |
-| Commodore 64 | 6510 | 1982 | Not in LLVM |
-| MSX | Z80 | 1983 | Not in LLVM |
+| Console | CPU | Year | LLVM? | GCC? | RAM | Verdict |
+|---|---|---|---|---|---|---|
+| Sega Dreamcast | SH-4 | 1998 | No | **Yes** (SH-4 in GCC) | 16MB | **Unlocked by bytecode + rustc_codegen_gcc** |
+| Sega Saturn | SH-2 | 1994 | No | **Yes** (SH-2 in GCC) | 2MB+1.5MB | RAM-tight, but CPU is reachable via same path |
+| SNES | 65816 | 1990 | No | Yes (cc65) | 128KB | **CPU + RAM both kill it** |
+| NES | 6502 | 1983 | No | Yes (cc65) | 2KB | Not a real computer |
+| Master System / Game Gear | Z80 | 1985 | No | Yes (SDCC/Z88DK) | 8KB | Same |
+| TurboGrafx-16 | HuC6280 | 1987 | No | Partial | 8KB | Same |
+| WonderSwan | V30MZ | 1999 | No | Partial | 16KB | Same |
+| Neo Geo Pocket | TLCS-900 | 1999 | No | Partial | 12KB | Same |
+| Commodore 64 | 6510 | 1982 | No | Yes (cc65) | 64KB | Too small |
+| MSX | Z80 | 1983 | No | Yes (SDCC) | 8-64KB | Too small |
+
+### Actually reachable via bytecode + rustc_codegen_gcc
+
+Two consoles in Tier 6 become feasible with the right approach:
+
+**Dreamcast (16MB RAM, SH-4 CPU):**
+- `rustc_codegen_gcc` (GCC backend for rustc) replaces LLVM — SH-4 is a first-class GCC target
+- Proven: Falco Girgis (KallistiOS lead) demoed Rust 3D on Dreamcast via `rustc_codegen_gcc` in 2023
+- 16MB RAM is comfortable for the bytecode-compiled engine (~40KB data + ~600KB code)
+- Requires: the bytecode VM (replaces JSON interpreter) + ~200 lines of KallistiOS glue
+
+**Saturn (2MB + 1.5MB VRAM, SH-2 CPU):**
+- Same `rustc_codegen_gcc` approach (SH-2 is also a GCC target)
+- 2MB main RAM is tight but feasible with bytecode (40KB data + 600KB code + 300KB state = ~940KB)
+- Video RAM (1.5MB) can store card art — Saturn has no texture cache issue
+- Harder than Dreamcast: SH-2 is dual-core (master + slave), Saturn's SDK is less mature
+
+### Still impossible
+
+Everything with <256KB RAM (SNES, NES, Z80 machines, WonderSwan, Neo Geo Pocket) is
+dead regardless of language — the bytecode engine alone (~600KB code + 40KB data)
+overflows them before the first card is dealt. No amount of compiler cleverness
+solves: a 16-bit address space cannot hold a ~600KB program.
+
+The 8/16-bit consoles that remain (Genesis, Neo Geo, Jaguar) have m68k CPUs that
+LLVM actually supports, but their 64KB-2MB RAM is too small even for the
+bytecode-compiled engine. 64KB is a microcontroller, not a card game platform.
 
 ---
 
@@ -231,9 +280,15 @@ Each platform binary is ~200 lines of glue plus the platform SDK.
 
 3. **LLVM's architecture coverage** — ARM, MIPS, PowerPC, x86, RISC-V
    are all first-class. If the console has one of these, Rust can
-   target it.
+   target it. For others, **`rustc_codegen_gcc`** swaps LLVM for GCC's
+   libgccjit, unlocking SH-4 (Dreamcast), SH-2 (Saturn), and m68k
+   (Genesis) without changing a line of Rust source.
 
-4. **The engine doesn't use `unsafe` much** — no inline assembly,
+4. **`include_bytes!`** — embed the compiled bytecode (~7KB for all
+   800 abilities) directly into the binary at compile time. No filesystem,
+   no loader, no runtime initialization. The data is in the .text section.
+
+5. **The engine doesn't use `unsafe` much** — no inline assembly,
    no platform-specific intrinsics in core logic. The `rng.rs`
    abstraction proves this: swap `thread_rng()` for `xorshift64`
    with a single `#[cfg]`.
@@ -261,6 +316,10 @@ ABI details. The SDK is a `cargo add` away.
 
 ### Realistic port effort
 
+Two paths depending on RAM budget:
+
+**Path A: Target has ≥4MB RAM (PC, 3DS, Vita, PSP, Wii, GameCube)**
+No bytecode VM needed — the current JSON interpreter works fine.
 ```
 Engine no_std migration:       ~500 line changes (imports + feature gates)
 Platform binary (display,      ~200 lines
@@ -269,6 +328,22 @@ Build script (.bat / Makefile) ~50 lines
 Target JSON (if not official)  ~20 lines
 ──────────────────────────────────────
 Total:                          ~770 lines
+```
+
+**Path B: Target has 1-4MB RAM (PS1, N64, DS, Dreamcast)**
+Bytecode VM required (replaces JSON interpreter, eliminates serde).
+The VM itself is ~500 LOC — a one-time cost that then unlocks every
+low-RAM target.
+```
+Build-time compiler:            ~300 lines (compile_abilities.py)
+Ability VM runtime:             ~500 lines (vm.rs)
+Platform binary (display,       ~200 lines
+  input, allocator, RNG)
+Engine no_std migration:        ~200 lines (remove serde gates)
+Build script + Target JSON:      ~70 lines
+──────────────────────────────────────
+Total (first low-RAM port):     ~1270 lines
+Each subsequent low-RAM port:   ~270 lines (platform glue only)
 ```
 
 And zero of those are logic changes — it's all mechanical
@@ -282,12 +357,24 @@ The cards are the same.
 The 3DS (2011) is proven. The Vita (2011) would be the easiest
 next port — same era, more RAM, official target, full std.
 
+The **bytecode VM** is the key unlock: it's a one-time ~800 line
+investment that takes PS1 from impossible to comfortable, N64 and DS
+from borderline to comfortable, and Dreamcast from unreachable to
+reachable (via `rustc_codegen_gcc`).
+
 For older:
 
-| Console | Year | Port effort | Std? | Cool factor |
+| Console | Year | Port effort | Path | Cool factor |
 |---|---|---|---|---|
-| **GameCube** | 2001 | ~250 lines | Yes | Very cool — PowerPC, tiny box |
-| **Wii** | 2006 | ~250 lines | Yes | Same chip as GC, double RAM |
-| **PSP** | 2004 | ~750 lines | No | Most portable PlayStation |
-| **PS1** | 1994 | ~750 lines | No | Hardcore, but 2MB kills it |
+| **GameCube** | 2001 | ~250 lines | A (JSON) | PowerPC, tiny box |
+| **Wii** | 2006 | ~250 lines | A (JSON) | Same chip, double RAM |
+| **PSP** | 2004 | ~750 lines | A (JSON) | Most portable PlayStation |
+| **PS1** | 1994 | ~1270 lines | B (bytecode) | First PlayStation — hardcore |
+| **N64** | 1996 | ~1270 lines | B (bytecode) | Retro Mario machine |
+| **DS** | 2004 | ~1270 lines | B (bytecode) | Dual screen card game |
+| **Dreamcast** | 1998 | ~1270 lines | B (bytecode + GCC backend) | VMU memory card saves |
+
+Everything below N64/DS (GBA, Genesis, SNES, etc.) is still dead —
+their RAM is measured in kilobytes, not megabytes. No amount of
+bytecode cleverness fits a card game engine in 64KB.
 

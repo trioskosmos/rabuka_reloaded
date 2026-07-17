@@ -41,9 +41,6 @@ pub(crate) use alloc::sync::Arc;
 #[cfg(not(feature = "psp"))]
 pub(crate) use std::sync::Arc;
 
-#[cfg(not(feature = "psp"))]
-pub(crate) use std::sync::OnceLock;
-
 #[cfg(feature = "psp")]
 pub(crate) use alloc::collections::VecDeque;
 #[cfg(not(feature = "psp"))]

@@ -100,6 +100,7 @@ mod inner {
         slice.shuffle(&mut rand::thread_rng());
     }
 
+    #[allow(dead_code)]
     pub fn rand_range(max: usize) -> usize {
         use rand::Rng;
         rand::thread_rng().gen_range(0..max)

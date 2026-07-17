@@ -1,3 +1,4 @@
+use core::ffi::c_void;
 use psp::sys;
 
 pub const WIDTH: u32 = 480;
@@ -6,6 +7,25 @@ pub const BUF_WIDTH: u32 = 512;
 
 const FONT_W: i32 = 8;
 const FONT_H: i32 = 16;
+
+// Static pool for sceFont internal allocations (avoids bump allocator interaction)
+static mut FONT_POOL: [u8; 131072] = [0u8; 131072];
+static mut FONT_POOL_POS: usize = 0;
+
+extern "C" fn font_alloc(_user: *mut c_void, size: usize) -> *mut c_void {
+    unsafe {
+        let pos = FONT_POOL_POS;
+        let aligned = (pos + 3) & !3;
+        let new_pos = aligned + size;
+        if new_pos <= FONT_POOL.len() {
+            FONT_POOL_POS = new_pos;
+            return FONT_POOL.as_mut_ptr().add(aligned) as *mut c_void;
+        }
+        core::ptr::null_mut()
+    }
+}
+
+extern "C" fn font_free(_user: *mut c_void, _ptr: *mut c_void) {}
 
 pub struct Display {
     front: &'static mut [u32],
@@ -39,13 +59,18 @@ impl Display {
             );
         }
 
+        let line_height = FONT_H + 2;
+
+        // Try to initialize sceFont with a dedicated static pool
+        let mut font = 0u32;
+        let mut use_bitmap = true;
         let mut error = sys::SceFontErrorCode::Success;
         let params = sys::SceFontNewLibParams {
             user_data_addr: 0,
             num_fonts: 1,
             cache_data: 0,
-            alloc_func: None,
-            free_func: None,
+            alloc_func: Some(font_alloc),
+            free_func: Some(font_free),
             open_func: None,
             close_func: None,
             read_func: None,
@@ -53,21 +78,14 @@ impl Display {
             error_func: None,
             io_finish_func: None,
         };
-
         let font_lib = unsafe { sys::sceFontNewLib(&params, &mut error) };
-        let font = unsafe { sys::sceFontOpen(font_lib, 0, 0, &mut error) };
-
-        let (line_height, use_bitmap) = if font != 0 {
-            let mut char_info = sys::SceFontCharInfo::default();
-            let ret = unsafe { sys::sceFontGetCharInfo(font, 'A' as u32, &mut char_info) };
-            if ret == 0 {
-                (FONT_H + 2, false)
-            } else {
-                (FONT_H + 2, true)
+        if font_lib != 0 {
+            let f = unsafe { sys::sceFontOpen(font_lib, 0, 0, &mut error) };
+            if f != 0 {
+                font = f;
+                use_bitmap = false;
             }
-        } else {
-            (FONT_H + 2, true)
-        };
+        }
 
         let mut disp = Display {
             front: front_buf,
@@ -78,6 +96,7 @@ impl Display {
             line_height,
             use_bitmap,
         };
+
         disp.clear();
         disp.swap_buffers();
         disp.clear();
@@ -181,7 +200,7 @@ impl Display {
         let bw = char_info.bitmap_width as usize;
         let bh = char_info.bitmap_height as usize;
         if bw == 0 || bh == 0 {
-            self.cursor_x = x + (char_info.sfp26_advance_h >> 6);
+            self.draw_bitmap_glyph(ch, x, y);
             return;
         }
 
@@ -235,8 +254,10 @@ impl Display {
         let code = ch as usize;
         let glyph = if (0x20..=0x7e).contains(&code) {
             &ASCII_BITMAPS[code - 0x20]
-        } else {
+        } else if ch.is_ascii() || code == 0x3000 {
             &ASCII_BITMAPS[0]
+        } else {
+            &ASCII_BITMAPS[0x3f - 0x20]
         };
 
         let white = 0xFF_FF_FF_FFu32;

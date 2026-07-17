@@ -12,12 +12,13 @@ abilities defined in `abilities.json`.
 4. [Effect Actions](#effect-actions)
 5. [Condition Types](#condition-types)
 6. [Compound / Wrapper Effects](#compound--wrapper-effects)
-7. [Zones Reference](#zones-reference)
-8. [Triggers Reference](#triggers-reference)
-9. [Card Types Reference](#card-types-reference)
-10. [Common Fields](#common-fields)
-11. [Additional Parser Fields](#additional-parser-fields)
-12. [Edge Cases & Special Behaviors](#edge-cases--special-behaviors)
+7. [Bytecode Compilation](#bytecode-compilation)
+8. [Zones Reference](#zones-reference)
+9. [Triggers Reference](#triggers-reference)
+10. [Card Types Reference](#card-types-reference)
+11. [Common Fields](#common-fields)
+12. [Additional Parser Fields](#additional-parser-fields)
+13. [Edge Cases & Special Behaviors](#edge-cases--special-behaviors)
 
 ---
 
@@ -1134,7 +1135,121 @@ Checks predefined categories:
 
 ---
 
-## Zones Reference
+## Bytecode Compilation
+
+The JSON schema above is the **source of truth** for ability data. At build
+time, `compile_abilities.py` reads `abilities.json` and compiles it into a
+compact bytecode binary. Nothing changes in how abilities are authored — the
+JSON is still the human-editable format.
+
+### Why compile to bytecode?
+
+The JSON interpreter costs ~4.5MB of RAM at runtime (serde-deserialized structs
+with String, Vec, Option overhead on every field). The same data in bytecode
+is ~7KB — a **200× reduction** — with zero heap allocation during ability
+resolution. This is what makes RAM-constrained consoles (PS1, N64, DS)
+reachable and is required for any `no_std` target without serde.
+
+### Build-time pipeline
+
+```
+abilities.json  ──►  compile_abilities.py  ──►  abilities.bin  (~7KB)
+                                                    abilities_gen.rs
+                                                    abilities_disassembly.txt
+```
+
+- `abilities.bin` — raw bytecode, embedded via `include_bytes!`
+- `abilities_gen.rs` — auto-generated Rust source (offset table, debug names)
+- `abilities_disassembly.txt` — human-readable dump (debug builds only)
+
+### How JSON fields map to bytecode
+
+Each JSON field maps directly to bytecode opcodes with the **same names**
+the schema already uses. No naming convention translation needed:
+
+| JSON field | Bytecode opcode | Same name? |
+|---|---|---|
+| `"action": "draw_card"` | `draw_card` | Same |
+| `"action": "move_cards"` | `move_cards` | Same |
+| `"action": "gain_resource"` | `gain_resource` | Same |
+| `"type": "card_count_condition"` | `card_count_condition` | Same |
+| `"type": "location_condition"` | `location_condition` | Same |
+| `"operator": ">="` | `>=` | Same |
+
+The opcodes **are** the JSON field values. No `COND_CARD_COUNT` aliases,
+no `0x42` magic numbers. The disassembly output reads:
+
+```
+Ability #042: Draw 1, then discard 1
+  [0x00] draw_card { count: 1, source: deck }
+  [0x02] move_cards { count: 1, source: hand, dest: discard, card_type: card, target: self }
+```
+
+This keeps the mental model simple: the bytecode is just the JSON schema
+repacked into compact form. You debug using the same names you author with.
+
+### The naming rule
+
+**One name per concept, and it's the JSON name.**
+
+If the JSON field is `"type": "card_count_condition"`, the bytecode instruction
+is `card_count_condition`. Not `COND_CARD_COUNT`, not `0x40`, not `CountCondition`.
+This means:
+
+- The schema docs double as the bytecode docs — no separate reference to maintain
+- Grepping for `card_count_condition` finds both schema and bytecode references
+- The disassembler is trivial: JSON field name → byte opcode → same name back
+- Anyone who knows the JSON format already knows the bytecode format
+
+### What gets encoded
+
+**Effects** are encoded as a sequence of bytecode instructions:
+
+| Action | Fields encoded |
+|---|---|
+| `draw_card` | count, source |
+| `move_cards` | count, source, destination, card_type, target |
+| `gain_resource` | resource, count, heart_color, duration, characters |
+| `modify_score` | delta, per_unit, per_unit_type, target |
+| `change_state` | state, target |
+| `sequential` | sub-action count + sub-actions inline |
+| `look_and_select` | look count/source, select count/dest/discard_remaining |
+
+**Conditions** are encoded inline within their owning effect:
+
+| Condition type | Fields encoded (same as JSON keys) |
+|---|---|
+| `card_count_condition` | location, operator, count, card_type, group_names, target |
+| `location_condition` | location, card_type, exclude_self, target |
+| `comparison_condition` | location, comparison_type, aggregate, operator, count |
+| `compound` | operator (`and`/`or`) + sub-conditions |
+| `movement_condition` | location, card_type, count, operator |
+| `temporal_condition` | count, operator |
+| `appearance_condition` | location, count |
+| `state_condition` | state, operator, value |
+| `energy_state_condition` | operator, count |
+| `position_condition` | location |
+
+**Costs** are encoded as prefix instructions before the effect:
+
+| Cost type | Fields encoded |
+|---|---|
+| `move_cards` | source, destination, card_type, self_cost |
+| `tap` | (none) |
+| `rest` | count |
+| `energy` | count, color |
+| `discard` | count, card_type |
+
+### What doesn't change
+
+The bytecode format is a **serialization detail**. It doesn't change:
+- How abilities are authored (still JSON in `abilities.json`)
+- How the game logic resolves abilities (still match opcode → apply effect)
+- How debugging works (disassembly maps directly back to JSON names)
+
+The only difference: abilities are decoded from a static byte slice at runtime
+instead of deserialized from JSON via serde. No heap allocations, no serde
+dependency, no Vec<String> overhead per ability.
 
 | Key | Engine Zone | Description |
 | :--- | :--- | :--- |

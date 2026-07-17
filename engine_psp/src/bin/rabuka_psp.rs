@@ -5,9 +5,10 @@
 extern crate alloc;
 
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::hash::{BuildHasher, Hasher};
 
 use psp::sys::*;
 
@@ -15,7 +16,6 @@ use rabuka_psp::display::Display;
 use rabuka_psp::input::{Button, Input};
 
 use rabuka_engine::card::{Card, CardDatabase};
-use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::game::deck_builder;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
@@ -23,11 +23,67 @@ use rabuka_engine::player::Player;
 use rabuka_engine::rng;
 use rabuka_engine::turn::TurnEngine;
 
+#[derive(Default, Clone, Copy)]
+struct PspHasher(u64);
+
+impl Hasher for PspHasher {
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.0 = self.0.wrapping_mul(131).wrapping_add(b as u64);
+        }
+    }
+    fn finish(&self) -> u64 {
+        self.0
+    }
+}
+
+impl BuildHasher for PspHasher {
+    type Hasher = PspHasher;
+    fn build_hasher(&self) -> PspHasher {
+        PspHasher(0)
+    }
+}
+
 psp::module!("rabuka", 1, 0);
 
-const CARDS_JSON: &str = include_str!("../../baked/cards.json");
+macro_rules! deck_cards {
+    ($n:literal) => {
+        include_str!(concat!("../../baked/deck_", $n, "_cards.json"))
+    };
+}
+
+const DECK_CARDS: &[&str] = &[
+    deck_cards!("0"),
+    deck_cards!("1"),
+    deck_cards!("2"),
+    deck_cards!("3"),
+    deck_cards!("4"),
+    deck_cards!("5"),
+    deck_cards!("6"),
+    deck_cards!("7"),
+    deck_cards!("8"),
+    deck_cards!("9"),
+    deck_cards!("10"),
+    deck_cards!("11"),
+    deck_cards!("12"),
+    deck_cards!("13"),
+    deck_cards!("14"),
+    deck_cards!("15"),
+];
 const DECKS_JSON: &str = include_str!("../../baked/decks.json");
-const ABILITIES_JSON: &str = include_str!("../../baked/abilities.json");
+
+/// Truncate string to at most `max_chars` characters (not bytes).
+/// Avoids panicking on multi-byte UTF-8 like Japanese text.
+fn truncate_chars(s: &str, max_chars: usize) -> &str {
+    let mut char_count = 0;
+    for (i, _) in s.char_indices() {
+        if char_count >= max_chars {
+            return &s[..i];
+        }
+        char_count += 1;
+    }
+    s
+}
 
 fn psp_main() {
     psp::enable_home_button();
@@ -36,17 +92,9 @@ fn psp_main() {
     let mut input = Input::new();
     init_rng();
 
-    display.println("Loading cards...");
+    display.println("Loading...");
     display.swap_buffers();
 
-    let mut cards: Vec<Card> = serde_json::from_str(CARDS_JSON).expect("Failed to parse cards");
-
-    // Attach abilities
-    if let Ok(abilities_data) = serde_json::from_str::<serde_json::Value>(ABILITIES_JSON) {
-        cards = CardLoader::attach_abilities(cards, &abilities_data);
-    }
-
-    let mut db = Arc::new(CardDatabase::load_or_create(cards));
     let decks: Vec<DeckEntry> = serde_json::from_str(DECKS_JSON).expect("Failed to parse decks");
     let deck_names: Vec<&str> = decks.iter().map(|d| d.name.as_str()).collect();
 
@@ -63,17 +111,46 @@ fn psp_main() {
     };
 
     display.clear();
-    display.println(&format!("You: {}", deck_names[deck1_idx]));
-    if vs_ai {
-        display.println(&format!("AI: {}", deck_names[deck2_idx]));
-    } else {
-        display.println(&format!("P2: {}", deck_names[deck2_idx]));
-    }
-    display.println("Starting...");
+    display.println("Loading...");
     display.swap_buffers();
-    wait_frames(20);
 
-    // Build decks using DeckBuilder (like 3DS)
+    display.println("Parsing deck 1 cards...");
+    display.swap_buffers();
+    let cards1: Vec<Card> =
+        serde_json::from_str(DECK_CARDS[deck1_idx]).expect("Failed to parse deck cards");
+
+    display.println("Parsing deck 2 cards...");
+    display.swap_buffers();
+    let cards2: Vec<Card> =
+        serde_json::from_str(DECK_CARDS[deck2_idx]).expect("Failed to parse deck cards");
+
+    // Merge and deduplicate by card_no, converting baked_abilities to abilities
+    display.println("Merging cards...");
+    display.swap_buffers();
+    let mut card_map: hashbrown::HashMap<String, Card, PspHasher> =
+        hashbrown::HashMap::with_hasher(PspHasher(0));
+    for c in cards1.into_iter().chain(cards2.into_iter()) {
+        let key = c.card_no.to_string();
+        if !card_map.contains_key(&key) {
+            let mut card = c;
+            if let Some(baked) = card.baked_abilities.take() {
+                card.abilities = baked
+                    .into_iter()
+                    .map(|a| alloc::sync::Arc::new(a))
+                    .collect();
+            }
+            card_map.insert(key, card);
+        }
+    }
+
+    display.println("Building database...");
+    display.swap_buffers();
+    let cards: Vec<Card> = card_map.into_values().collect();
+    let mut db = Arc::new(CardDatabase::load_or_create(cards));
+
+    // Build decks using DeckBuilder
+    display.println("Building decks...");
+    display.swap_buffers();
     let nums1: Vec<String> = decks[deck1_idx].cards.clone();
     let nums2: Vec<String> = decks[deck2_idx].cards.clone();
 
@@ -159,18 +236,8 @@ fn select(display: &mut Display, input: &mut Input, items: &[&str], title: &str)
     }
 }
 
-fn ai_turn(display: &mut Display, gs: &mut GameState, actions: &[game_setup::Action]) -> bool {
+fn ai_turn(_display: &mut Display, gs: &mut GameState, actions: &[game_setup::Action]) -> bool {
     let idx = rng::rand_range(actions.len());
-    let action = &actions[idx];
-    display.clear();
-    display.println("AI thinking...");
-    display.println(&format!(
-        "> {}",
-        action.description.lines().next().unwrap_or("")
-    ));
-    display.swap_buffers();
-    wait_frames(15);
-
     execute_action(gs, &actions[idx])
 }
 
@@ -181,6 +248,8 @@ fn human_turn(
     actions: &[game_setup::Action],
 ) -> bool {
     let mut sel = 0usize;
+    let mut scroll_offset = 0usize;
+    const VISIBLE_ACTIONS: usize = 10;
     loop {
         display.clear();
         display.println(&format!("Turn {} | {:?}", gs.turn_number, gs.current_phase));
@@ -205,16 +274,32 @@ fn human_turn(
         ));
         display.println("");
 
-        let max = 16;
-        let n = actions.len().min(max);
-        for i in 0..n {
+        // Clamp scroll offset so selection stays visible
+        if sel < scroll_offset {
+            scroll_offset = sel;
+        }
+        if sel >= scroll_offset + VISIBLE_ACTIONS {
+            scroll_offset = sel + 1 - VISIBLE_ACTIONS;
+        }
+
+        let end = (scroll_offset + VISIBLE_ACTIONS).min(actions.len());
+        for i in scroll_offset..end {
             let p = if i == sel { " >" } else { "  " };
             let line = actions[i].description.lines().next().unwrap_or("");
-            let truncated = if line.len() > 65 { &line[..65] } else { line };
-            display.println(&format!("{p}[{i}] {truncated}"));
+            let card_tag = match &actions[i].parameters {
+                Some(params) => params
+                    .card_no
+                    .as_ref()
+                    .map(|no| alloc::format!(" [{}]", no))
+                    .unwrap_or_default(),
+                None => alloc::string::String::new(),
+            };
+            let desc_max = 50usize.saturating_sub(card_tag.len());
+            let truncated = truncate_chars(line, desc_max);
+            display.println(&format!("{p}[{i}] {truncated}{card_tag}"));
         }
-        if actions.len() > max {
-            display.println(&format!("  +{} more", actions.len() - max));
+        if actions.len() > end {
+            display.println(&format!("  .. {} more", actions.len() - end));
         }
         display.swap_buffers();
         wait_frames(2);

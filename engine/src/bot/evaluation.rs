@@ -1,6 +1,5 @@
 use crate::game_setup::{Action, ActionType};
 use crate::game_state::GameState;
-use crate::zones::MemberArea;
 
 /// Rollout policy — picks the BEST action by blade/cost ratio.
 pub fn pick_rollout_action(actions: &[Action], state: &GameState) -> Action {

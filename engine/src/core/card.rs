@@ -272,6 +272,10 @@ pub struct Card {
     // Parsed abilities from abilities.json
     #[serde(skip)]
     pub abilities: Vec<Arc<Ability>>,
+    /// Pre-baked ability data (populated by bake tool for PSP).
+    /// Serialized so that PSP can avoid parsing abilities.json at runtime.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baked_abilities: Option<Vec<Ability>>,
 }
 
 #[derive(Debug, Clone)]
@@ -485,6 +489,8 @@ impl<'de> Deserialize<'de> for Card {
             pub score: Option<u32>,
             pub need_heart: Option<BaseHeart>,
             pub special_heart: Option<SpecialHeart>,
+            #[serde(default)]
+            pub baked_abilities: Option<Vec<Ability>>,
         }
 
         let helper = CardHelper::deserialize(deserializer)?;
@@ -511,6 +517,7 @@ impl<'de> Deserialize<'de> for Card {
             need_heart: helper.need_heart,
             special_heart: helper.special_heart,
             abilities: Vec::new(),
+            baked_abilities: helper.baked_abilities,
         })
     }
 }
