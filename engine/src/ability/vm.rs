@@ -1,5 +1,5 @@
 use super::abilities_gen::{Opcode, BYTECODE, NUM_ABILITIES, OFFSETS, STRINGS};
-use crate::card::{Ability, AbilityCost, AbilityEffect, Condition, EffectKind};
+use crate::card::{ek_box_new, Ability, AbilityCost, AbilityEffect, Condition, EffectKind};
 
 fn read_u8(cursor: &mut &[u8]) -> u8 {
     let b = cursor[0];
@@ -401,13 +401,66 @@ fn decode_cost_op(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
         Opcode::MoveCardsCost => {
             let src = decode_zone(read_u8(cursor));
             let dest = decode_zone(read_u8(cursor));
-            let _ct = read_u8(cursor);
+            let ct = decode_card_type(read_u8(cursor));
             let _sc = read_u8(cursor);
             let count = read_u8(cursor);
+            let mut ek = default_moveCards();
+            if let EffectKind::MoveCards {
+                source: ref mut _bc_source,
+                destination: ref mut _bc_destination,
+                count: ref mut _bc_count,
+                card_type: ref mut _bc_card_type,
+                ..
+            } = &mut ek
+            {
+                *_bc_source = Some(src.into());
+                *_bc_destination = Some(dest.into());
+                *_bc_count = Some(count as u32);
+                *_bc_card_type = Some(ct.into());
+            }
             AbilityEffect {
                 action: "move_cards".into(),
                 source: Some(src.into()),
                 destination: Some(dest.into()),
+                count: Some(count as u32),
+                kind: Some(ek_box_new(ek)),
+                ..Default::default()
+            }
+        }
+        Opcode::Tap => AbilityEffect {
+            action: "tap".into(),
+            ..Default::default()
+        },
+        Opcode::Rest => {
+            let count = read_u8(cursor);
+            AbilityEffect {
+                action: "rest".into(),
+                count: Some(count as u32),
+                ..Default::default()
+            }
+        }
+        Opcode::Energy => {
+            let amt = read_u8(cursor);
+            let _color = read_u8(cursor);
+            AbilityEffect {
+                action: "pay_energy".into(),
+                count: Some(amt as u32),
+                ..Default::default()
+            }
+        }
+        Opcode::Discard => {
+            let count = read_u8(cursor);
+            let _ct = decode_card_type(read_u8(cursor));
+            AbilityEffect {
+                action: "discard".into(),
+                count: Some(count as u32),
+                ..Default::default()
+            }
+        }
+        Opcode::PlaceEnergyUnderMemberCost => {
+            let count = read_u8(cursor);
+            AbilityEffect {
+                action: "place_energy_under_member".into(),
                 count: Some(count as u32),
                 ..Default::default()
             }
@@ -422,11 +475,68 @@ fn decode_cost_op(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
             }
         }
         Opcode::ChangeStateCost => {
-            let _state = read_u8(cursor);
+            let state = decode_state(read_u8(cursor));
             let _opt = read_u8(cursor);
             let _self = read_u8(cursor);
+            let mut ek = default_changeState();
+            if let EffectKind::ChangeState {
+                state_change: ref mut _bc_state_change,
+                ..
+            } = &mut ek
+            {
+                *_bc_state_change = Some(state.into());
+            }
             AbilityEffect {
                 action: "change_state".into(),
+                kind: Some(ek_box_new(ek)),
+                ..Default::default()
+            }
+        }
+        Opcode::Tap => AbilityEffect {
+            action: "tap".into(),
+            ..Default::default()
+        },
+        Opcode::Rest => {
+            let count = read_u8(cursor);
+            AbilityEffect {
+                action: "rest".into(),
+                count: Some(count as u32),
+                ..Default::default()
+            }
+        }
+        Opcode::Energy => {
+            let amt = read_u8(cursor);
+            let _color = read_u8(cursor);
+            AbilityEffect {
+                action: "pay_energy".into(),
+                count: Some(amt as u32),
+                ..Default::default()
+            }
+        }
+        Opcode::Discard => {
+            let count = read_u8(cursor);
+            let ct = decode_card_type(read_u8(cursor));
+            AbilityEffect {
+                action: "discard".into(),
+                count: Some(count as u32),
+                kind: Some(ek_box_new(default_moveCards())),
+                ..Default::default()
+            }
+        }
+        Opcode::PlaceEnergyUnderMemberCost => {
+            let count = read_u8(cursor);
+            AbilityEffect {
+                action: "place_energy_under_member".into(),
+                count: Some(count as u32),
+                ..Default::default()
+            }
+        }
+        Opcode::PayEnergy => {
+            let amt = read_u8(cursor);
+            let _opt = read_u8(cursor);
+            AbilityEffect {
+                action: "pay_energy".into(),
+                count: Some(amt as u32),
                 ..Default::default()
             }
         }
@@ -450,9 +560,25 @@ fn decode_cost_op(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
                 ..Default::default()
             }
         }
+        Opcode::Reveal => {
+            let _src = decode_zone(read_u8(cursor));
+            let _ct = decode_card_type(read_u8(cursor));
+            let _count = read_u8(cursor);
+            AbilityEffect {
+                action: "reveal".into(),
+                ..Default::default()
+            }
+        }
+        Opcode::ChoiceCondition => {
+            let _n = read_u8(cursor);
+            AbilityEffect {
+                action: "choice".into(),
+                ..Default::default()
+            }
+        }
         _ => {
-            let action = cost_action_for_op(op);
             decode_simple_cost(op, cursor);
+            let action = cost_action_for_op(op);
             AbilityEffect {
                 action: action.into(),
                 ..Default::default()

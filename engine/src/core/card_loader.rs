@@ -15,7 +15,9 @@ use std::string::String;
 #[cfg(not(feature = "psp"))]
 use std::vec::Vec;
 
-use crate::card::{Ability, AbilityEffect, Card};
+#[cfg(not(feature = "bytecode_abilities"))]
+use crate::card::AbilityEffect;
+use crate::card::{Ability, Card};
 use crate::Arc;
 use crate::HashMap;
 #[cfg(feature = "psp")]

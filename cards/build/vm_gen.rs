@@ -724,22 +724,22 @@ fn decode_simple_effect(op: Opcode, cursor: &mut &[u8]) -> &'static str {
             "activate_ability"
         }
         Opcode::ChangeState => {
-            let state_change = decode_state(read_u8(cursor));
-            let target = decode_player(read_u8(cursor));
+            let _state_change = decode_state(read_u8(cursor));
+            let _target = decode_player(read_u8(cursor));
             "change_state"
         }
         Opcode::ChooseTargetPlayer => {
-            let target = decode_player(read_u8(cursor));
+            let _target = decode_player(read_u8(cursor));
             "choose_target_player"
         }
         Opcode::DrawCard => {
-            let target_count = read_u8(cursor);
-            let source = decode_zone(read_u8(cursor));
+            let _target_count = read_u8(cursor);
+            let _source = decode_zone(read_u8(cursor));
             "draw_card"
         }
         Opcode::DrawUntilCount => {
-            let target_count = read_u8(cursor);
-            let source = decode_zone(read_u8(cursor));
+            let _target_count = read_u8(cursor);
+            let _source = decode_zone(read_u8(cursor));
             "draw_until_count"
         }
         Opcode::GainAbility => {
@@ -749,57 +749,57 @@ fn decode_simple_effect(op: Opcode, cursor: &mut &[u8]) -> &'static str {
             "gain_ability_from_source"
         }
         Opcode::GainResource => {
-            let count = read_u8(cursor);
+            let _count = read_u8(cursor);
             "gain_resource"
         }
         Opcode::InvalidateAbility => {
             "invalidate_ability"
         }
         Opcode::ModifyCost => {
-            let value = read_i8(cursor);
-            let target = decode_player(read_u8(cursor));
+            let _value = read_i8(cursor);
+            let _target = decode_player(read_u8(cursor));
             "modify_cost"
         }
         Opcode::ModifyRequiredHearts => {
-            let value = read_i8(cursor);
+            let _value = read_i8(cursor);
             "modify_required_hearts"
         }
         Opcode::ModifyRequiredHeartsGlobal => {
-            let value = read_i8(cursor);
+            let _value = read_i8(cursor);
             "modify_required_hearts_global"
         }
         Opcode::ModifyScore => {
-            let value = read_i8(cursor);
-            let per_unit = read_u8(cursor) != 0;
-            let target = decode_player(read_u8(cursor));
+            let _value = read_i8(cursor);
+            let _per_unit = read_u8(cursor) != 0;
+            let _target = decode_player(read_u8(cursor));
             "modify_score"
         }
         Opcode::ModifyYellCount => {
-            let value = read_i8(cursor);
+            let _value = read_i8(cursor);
             "modify_yell_count"
         }
         Opcode::MoveCards => {
-            let count = read_u8(cursor);
-            let source = decode_zone(read_u8(cursor));
-            let destination = decode_zone(read_u8(cursor));
+            let _count = read_u8(cursor);
+            let _source = decode_zone(read_u8(cursor));
+            let _destination = decode_zone(read_u8(cursor));
             "move_cards"
         }
         Opcode::PlaceEnergyUnderMember => {
-            let count = read_u8(cursor);
+            let _count = read_u8(cursor);
             "place_energy_under_member"
         }
         Opcode::PlayBatonTouch => {
             "play_baton_touch"
         }
         Opcode::PositionChange => {
-            let target = decode_player(read_u8(cursor));
+            let _target = decode_player(read_u8(cursor));
             "position_change"
         }
         Opcode::Restriction => {
             "restriction"
         }
         Opcode::SetBladeCount => {
-            let value = read_u8(cursor);
+            let _value = read_u8(cursor);
             "set_blade_count"
         }
         Opcode::SetBladeType => {
@@ -809,7 +809,7 @@ fn decode_simple_effect(op: Opcode, cursor: &mut &[u8]) -> &'static str {
             "set_card_identity"
         }
         Opcode::SetHeartType => {
-            let value = decode_heart(read_u8(cursor));
+            let _value = decode_heart(read_u8(cursor));
             "set_heart_type"
         }
         Opcode::SuppressAbilityTrigger => {

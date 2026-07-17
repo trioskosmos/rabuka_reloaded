@@ -1783,7 +1783,7 @@ def generate_vm_rs(build_dir):
                     (ek_field, _assign_expr(optype, var_name, ek_field))
                 )
         # Use if let to set variant-specific fields
-        # Prefix with `_bc_` to avoid shadowing local variables that have the same names
+        # Use `field: ref mut alias` to avoid shadowing local variables
         fields_list = ", ".join(f"{f}: ref mut _bc_{f}" for f, _ in field_assigns)
         if field_assigns:
             lines.append(
@@ -1808,7 +1808,8 @@ def generate_vm_rs(build_dir):
         op = rust_name(json_name)
         lines.append(f"        Opcode::{op} => {{")
         for optype, var_name, ek_field in ek_fields:
-            lines.append("            " + _read_expr(optype, var_name) + ";")
+            # In decode_simple_effect, we advance cursor but don't use values
+            lines.append("            " + _read_expr(optype, "_" + var_name) + ";")
         lines.append(f'            "{action}"')
         lines.append("        }")
     lines.append('        _ => "",')
