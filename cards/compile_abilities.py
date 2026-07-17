@@ -1,66 +1,396 @@
-"""
-compile_abilities.py
+"""Auto-compiler: scans abilities.json, discovers field types, generates bytecode + Rust decoder."""
 
-Build-time compiler: reads abilities.json, outputs:
-  build/abilities.bin         — raw bytecode (~7KB)
-  build/abilities_gen.rs      — generated Rust source (opcode enum, offsets, bytecode blob)
-  build/vm_gen.rs             — generated Rust VM decoder
-  build/abilities_disasm.txt  — human-readable disassembly (debug builds)
-
-Usage: python compile_abilities.py
-"""
-
-import json, struct, sys
+import json, struct, re
 from pathlib import Path
-import textwrap
+from collections import defaultdict
 
-# ─────────────────────────────────────────────────────────────
-# Opcode table — hex values live HERE, not in generated Rust
-# Mapping: JSON action/condition name -> byte opcode
-# The Python build script is the ONLY place these mappings exist.
-# The generated Rust source uses named constants derived from
-# JSON names (e.g., Opcode::DrawCard for "draw_card").
-# ─────────────────────────────────────────────────────────────
+# ── Value vocabulary tables for type inference ──
+ZONES = {
+    "hand",
+    "stage",
+    "center",
+    "left",
+    "right",
+    "discard",
+    "waitroom",
+    "energy",
+    "energy_zone",
+    "deck",
+    "deck_top",
+    "deck_bottom",
+    "success_zone",
+    "live_card_zone",
+    "success_live_zone",
+    "energy_deck",
+    "empty_area",
+    "same_area",
+    "under_member",
+    "looked_at",
+    "revealed_cards",
+    "selected_cards",
+    "resolution",
+    "exclusion_zone",
+    "deck_or_discard",
+}
+PLAYERS = {"self", "opponent", "both", "owner"}
+CARD_TYPES = {
+    "card",
+    "any",
+    "member_card",
+    "member",
+    "live_card",
+    "live",
+    "energy_card",
+    "energy",
+    "event_card",
+    "event",
+    "character_card",
+    "character",
+    "baton_touch_card",
+    "baton_touch",
+    "climax_card",
+    "climax",
+}
+RESOURCES = {
+    "heart",
+    "blade",
+    "yell",
+    "shield",
+    "energy",
+    "hearts",
+    "blades",
+    "heart_icon",
+    "blade_icon",
+}
+HEARTS = {
+    "heart01",
+    "smile",
+    "pink",
+    "heart02",
+    "pure",
+    "green",
+    "heart03",
+    "cool",
+    "blue",
+    "heart04",
+    "active",
+    "orange",
+    "heart05",
+    "natural",
+    "purple",
+    "heart06",
+    "elegant",
+    "red",
+}
+STATES = {
+    "rest",
+    "rested",
+    "stand",
+    "stood",
+    "stand_up",
+    "reverse",
+    "reversed",
+    "wait",
+    "waited",
+}
+DURATIONS = {
+    "turn_end",
+    "this_turn",
+    "live_end",
+    "until_end_of_live",
+    "permanent",
+    "always",
+    "until_used",
+    "next_turn",
+}
+OPERATORS = {"=", "==", "!=", ">", ">=", "<", "<="}
 
-# Effect action -> opcode
-EFFECT_OPCODES = {
-    "draw_card": 0x01,
-    "move_cards": 0x02,
-    "gain_resource": 0x03,
-    "modify_score": 0x04,
-    "change_state": 0x05,
-    "position_change": 0x06,
-    "modify_required_hearts": 0x07,
-    "modify_cost": 0x08,
-    "set_blade_type": 0x09,
-    "set_blade_count": 0x0A,
-    "set_heart_type": 0x0B,
-    "gain_ability": 0x0C,
-    "restriction": 0x0D,
-    "choose_target_player": 0x0E,
-    "place_energy_under_member": 0x0F,
-    "draw_until_count": 0x10,
-    "modify_yell_count": 0x11,
-    "invalidate_ability": 0x12,
-    "suppress_ability_trigger": 0x13,
-    "activate_ability": 0x14,
-    "play_baton_touch": 0x15,
-    "modify_required_hearts_global": 0x16,
-    "gain_ability_from_source": 0x17,
-    "set_card_identity": 0x18,
-    # Compound effects
-    "sequential": 0x60,
-    "conditional": 0x61,
-    "conditional_alternative": 0x62,
-    "conditional_on_optional": 0x63,
-    "conditional_on_result": 0x64,
-    # Sub-effects
-    "look_at": 0x70,
-    "select_cards": 0x71,
+VOCAB = {
+    "zone": ZONES,
+    "player": PLAYERS,
+    "card_type": CARD_TYPES,
+    "resource": RESOURCES,
+    "heart": HEARTS,
+    "state": STATES,
+    "duration": DURATIONS,
+    "operator": OPERATORS,
 }
 
-# Condition type -> opcode
-CONDITION_OPCODES = {
+# ── Encoding tables ──
+ZONE_ENCODE = {
+    v: i
+    for i, v in enumerate(
+        [
+            "hand",
+            "stage",
+            "center",
+            "left",
+            "right",
+            "discard",
+            "waitroom",
+            "energy",
+            "energy_zone",
+            "deck",
+            "deck_top",
+            "deck_bottom",
+            "success_zone",
+            "live_card_zone",
+            "success_live_zone",
+            "energy_deck",
+            "empty_area",
+            "same_area",
+            "under_member",
+            "looked_at",
+            "revealed_cards",
+            "selected_cards",
+            "resolution",
+            "exclusion_zone",
+            "deck_or_discard",
+        ]
+    )
+}
+PLAYER_ENCODE = {"self": 0, "opponent": 1, "both": 2, "owner": 3}
+CARD_TYPE_ENCODE = {
+    v: i
+    for i, v in enumerate(
+        [
+            "card",
+            "member_card",
+            "live_card",
+            "energy_card",
+            "event_card",
+            "character_card",
+            "baton_touch_card",
+            "climax_card",
+        ]
+    )
+}
+RESOURCE_ENCODE = {"heart": 0, "blade": 1, "yell": 2, "shield": 3, "energy": 4}
+HEART_ENCODE = {
+    v: i
+    for i, v in enumerate(["smile", "pure", "cool", "active", "natural", "elegant"])
+}
+STATE_ENCODE = {"rest": 0, "stand": 1, "reverse": 2, "wait": 3}
+DURATION_ENCODE = {
+    "this_turn": 0,
+    "turn_end": 0,
+    "until_end_of_live": 1,
+    "live_end": 1,
+    "permanent": 2,
+    "always": 2,
+    "until_used": 3,
+    "next_turn": 4,
+}
+OPERATOR_ENCODE = {"=": 0, "==": 0, "!=": 1, ">": 2, ">=": 3, "<": 4, "<=": 5}
+
+
+def norm(v):
+    if v is None:
+        return ""
+    return str(v).strip().lower().replace(" ", "_").replace("-", "_")
+
+
+def encode(val, ftype, strs):
+    if val is None:
+        if ftype == "str_idx":
+            return struct.pack("<H", 0xFFFF)
+        if ftype == "u16":
+            return struct.pack("<H", 0)
+        return b"\x00"
+    if isinstance(val, list):
+        if not val:
+            return struct.pack("<H", 0xFFFF) if ftype == "str_idx" else b"\x00"
+        val = val[0]
+    s = norm(val)
+    if ftype == "u8":
+        if isinstance(val, str):
+            ct = CARD_TYPE_ENCODE.get(s)
+            if ct is not None:
+                return bytes([ct])
+        return bytes([int(val) & 0xFF])
+    if ftype == "i8":
+        return struct.pack("<b", int(val))
+    if ftype == "u16":
+        return struct.pack("<H", int(val))
+    if ftype == "bool":
+        return bytes([1 if val else 0])
+    if ftype == "zone":
+        return bytes([ZONE_ENCODE.get(s, 0)])
+    if ftype == "player":
+        return bytes([PLAYER_ENCODE.get(s, 0)])
+    if ftype == "card_type":
+        return bytes([CARD_TYPE_ENCODE.get(s, 0)])
+    if ftype == "resource":
+        return bytes([RESOURCE_ENCODE.get(s, 0)])
+    if ftype == "heart":
+        return bytes([HEART_ENCODE.get(s, 0)])
+    if ftype == "state":
+        return bytes([STATE_ENCODE.get(s, 0)])
+    if ftype == "duration":
+        return bytes([DURATION_ENCODE.get(s, 0)])
+    if ftype == "operator":
+        return bytes([OPERATOR_ENCODE.get(s, 3)])
+    if ftype == "str_idx":
+        return struct.pack("<H", strs.idx(val))
+    return b"\x00"
+
+
+class BC:
+    def __init__(self):
+        self.data = bytearray()
+
+    def u8(self, v):
+        self.data.append(v & 0xFF)
+
+    def u16(self, v):
+        self.data.extend(struct.pack("<H", v))
+
+    def __len__(self):
+        return len(self.data)
+
+    def __bytes__(self):
+        return bytes(self.data)
+
+
+class StringTable:
+    def __init__(self):
+        self._strings, self._index = [], {}
+
+    def idx(self, s):
+        if not s:
+            return 0xFFFF
+        if isinstance(s, list):
+            s = s[0] if s else ""
+        s = str(s).strip()
+        if not s:
+            return 0xFFFF
+        if s not in self._index:
+            self._index[s] = len(self._strings)
+            self._strings.append(s)
+        return self._index[s]
+
+    def __iter__(self):
+        return iter(self._strings)
+
+    def __len__(self):
+        return len(self._strings)
+
+
+# ── Field type inference ──
+def infer_type(name, values):
+    ints = [v for v in values if isinstance(v, int) and not isinstance(v, bool)]
+    if ints and all(v == 0 or v == 1 for v in ints):
+        bools = [v for v in values if isinstance(v, bool)]
+        if len(bools) > len(ints):
+            return "bool"
+    if any(isinstance(v, bool) for v in values):
+        return "bool"
+    if ints:
+        return "u16" if any(v > 255 for v in ints) else "u8"
+    strs = [norm(v) for v in values if isinstance(v, str) and v]
+    if strs:
+        for vtype, vocab in VOCAB.items():
+            if all(s in vocab for s in strs):
+                return vtype
+        for s in strs:
+            if s in ZONES:
+                return "zone"
+    return "str_idx"
+
+
+# ── Scan abilities.json ──
+def scan_abilities(abilities):
+    action_fields = defaultdict(lambda: defaultdict(set))
+    compound_actions = {
+        "sequential",
+        "choice",
+        "conditional",
+        "conditional_alternative",
+        "conditional_on_optional",
+        "conditional_on_result",
+        "look_and_select",
+    }
+
+    def scan(eff, is_sub=False):
+        if not isinstance(eff, dict):
+            return
+        a = eff.get("action", "")
+        if not a:
+            return
+        if a in compound_actions:
+            for k, v in eff.items():
+                if k in (
+                    "action",
+                    "condition",
+                    "alternative",
+                    "actions",
+                    "look_action",
+                    "select_action",
+                    "options",
+                    "choice_condition",
+                    "alternative_condition",
+                    "choice_modifier",
+                    "primary_effect",
+                    "alternative_effect",
+                    "optional_action",
+                    "conditional_action",
+                    "followup_action",
+                    "result_condition",
+                    "gained_effect",
+                    "trigger_event",
+                    "text",
+                    "activation_condition_parsed",
+                    "quoted_text",
+                ):
+                    continue
+                if isinstance(v, (dict, list)):
+                    if isinstance(v, list) and v and isinstance(v[0], str):
+                        action_fields[a][k].add(v[0])
+                    continue
+                action_fields[a][k].add(v)
+            for sk in ("actions", "options"):
+                for sub in eff.get(sk, []):
+                    scan(sub, True)
+            for sk in (
+                "look_action",
+                "select_action",
+                "primary_effect",
+                "alternative_effect",
+                "optional_action",
+                "conditional_action",
+                "followup_action",
+                "result_condition",
+                "gained_effect",
+            ):
+                sub = eff.get(sk)
+                if isinstance(sub, dict):
+                    scan(sub, True)
+            return
+        for k, v in eff.items():
+            if k in ("action", "condition", "alternative", "text", "continuation"):
+                continue
+            if isinstance(v, (dict, list)):
+                if isinstance(v, list) and v and isinstance(v[0], str):
+                    action_fields[a][k].add(v[0])
+                continue
+            action_fields[a][k].add(v)
+
+    for entry in abilities:
+        eff = entry.get("effect")
+        if isinstance(eff, dict):
+            scan(eff)
+
+    result = {}
+    for a, fields in action_fields.items():
+        field_list = [
+            (infer_type(fn, list(vals)), fn) for fn, vals in sorted(fields.items())
+        ]
+        result[a] = field_list
+    return result
+
+
+# ── Condition compiler ──
+COND_OPCODES = {
     "card_count_condition": 0x40,
     "location_condition": 0x41,
     "comparison_condition": 0x42,
@@ -84,2029 +414,549 @@ CONDITION_OPCODES = {
     "opponent_live_success": 0x54,
     "no_excess_heart": 0x55,
 }
+COND_FIELDS = {
+    "card_count_condition": [
+        ("zone", "location"),
+        ("operator", "operator"),
+        ("u8", "count"),
+        ("u8", "card_type"),
+        ("str_idx", "group_names"),
+        ("player", "target"),
+    ],
+    "location_condition": [
+        ("zone", "location"),
+        ("u8", "card_type"),
+        ("bool", "exclude_self"),
+        ("player", "target"),
+    ],
+    "comparison_condition": [
+        ("zone", "location"),
+        ("str_idx", "comparison_type"),
+        ("str_idx", "aggregate"),
+        ("operator", "operator"),
+        ("u16", "count"),
+        ("player", "target"),
+        ("resource", "resource_type"),
+        ("u8", "card_type"),
+        ("str_idx", "group_names"),
+    ],
+    "group_condition": [
+        ("str_idx", "group_names"),
+        ("u8", "count"),
+        ("operator", "operator"),
+    ],
+    "movement_condition": [
+        ("zone", "location"),
+        ("u8", "card_type"),
+        ("u8", "count"),
+        ("operator", "operator"),
+    ],
+    "temporal_condition": [("u8", "count"), ("operator", "operator")],
+    "appearance_condition": [("zone", "location"), ("u8", "count")],
+    "state_condition": [
+        ("state", "state"),
+        ("operator", "operator"),
+        ("bool", "value"),
+    ],
+    "energy_state_condition": [("operator", "operator"), ("u8", "count")],
+    "position_condition": [("zone", "location")],
+    "highest_cost_on_stage_condition": [],
+    "state_change_condition": [("state", "state_change")],
+    "card_blade_condition": [("operator", "operator"), ("u8", "count")],
+    "card_count_condition": [
+        ("zone", "location"),
+        ("operator", "operator"),
+        ("u8", "count"),
+        ("u8", "card_type"),
+        ("str_idx", "group_names"),
+        ("player", "target"),
+    ],
+    "all_cost_comparison_condition": [("operator", "operator"), ("u16", "count")],
+    "ability_filter_condition": [("str_idx", "text")],
+    "has_moved": [("zone", "position"), ("str_idx", "group_names")],
+    "not_moved": [],
+    "opponent_live_success": [("bool", "no_excess_heart")],
+    "no_excess_heart": [],
+}
+COND_COMPARISON_TYPE = {"cost": 0, "power": 1, "count": 2, "level": 3, "hand_count": 4}
+COND_AGGREGATE = {"total": 0, "average": 1, "max": 2, "min": 3}
 
-# Cost type -> opcode
+
+def compile_condition(cond, bc, strs):
+    if not isinstance(cond, dict):
+        return
+    t = cond.get("type", "")
+    if t in ("compound", "or_condition"):
+        opc = (
+            COND_OPCODES["or_condition"]
+            if cond.get("operator", "and") == "or" or t == "or_condition"
+            else COND_OPCODES["and_condition"]
+        )
+        bc.u8(opc)
+        for sc in cond.get("conditions", []):
+            compile_condition(sc, bc, strs)
+        bc.u8(COND_OPCODES["end_condition"])
+        return
+    fields = COND_FIELDS.get(t)
+    if fields is None:
+        return
+    bc.u8(COND_OPCODES[t])
+    for ftype, fname in fields:
+        val = cond.get(fname)
+        bc.data.extend(encode(val, ftype, strs))
+
+
+# ── Cost compiler ──
 COST_OPCODES = {
     "move_cards_cost": 0x80,
     "tap": 0x81,
     "rest": 0x82,
-    "energy": 0x83,
-    "discard": 0x84,
+    "energy_cost": 0x83,
+    "discard_cost": 0x84,
     "place_energy_under_member_cost": 0x85,
-    "pay_energy": 0x86,
+    "pay_energy_cost": 0x86,
     "change_state_cost": 0x87,
     "sequential_cost": 0x88,
-    "reveal": 0x89,
+    "reveal_cost": 0x89,
     "choice_condition": 0x8A,
 }
 
-# All opcodes combined for the reverse map
-ALL_OPCODES = {}
-ALL_OPCODES.update(EFFECT_OPCODES)
-ALL_OPCODES.update(CONDITION_OPCODES)
-ALL_OPCODES.update(COST_OPCODES)
-OPCODE_TO_NAME = {v: k for k, v in ALL_OPCODES.items()}
 
-# ─────────────────────────────────────────────────────────────
-# Zone/type/color encoding tables
-# These map JSON string values to compact u8 representations.
-# ─────────────────────────────────────────────────────────────
-
-ZONE = {
-    "hand": 0,
-    "hand_cards": 0,
-    "stage": 1,
-    "center": 2,
-    "stage_center": 2,
-    "left": 3,
-    "left_side": 3,
-    "stage_left": 3,
-    "right": 4,
-    "right_side": 4,
-    "stage_right": 4,
-    "discard": 5,
-    "discard_pile": 5,
-    "waitroom": 6,
-    "energy": 7,
-    "energy_zone": 8,
-    "deck": 9,
-    "deck_top": 10,
-    "deck_bottom": 11,
-    "success_zone": 12,
-    "live_card_zone": 13,
-    "success_live_zone": 14,
-    "success_live_card_zone": 14,
-    "energy_deck": 15,
-    "empty_area": 16,
-    "same_area": 17,
-    "under_member": 18,
-    "under": 18,
-    "looked_at": 19,
-    "revealed_cards": 20,
-    "selected_cards": 21,
-    "resolution": 22,
-    "resolution_zone": 22,
-    "exclusion_zone": 23,
-    "deck_or_discard": 24,
-}
-
-RESOURCE = {
-    "heart": 0,
-    "hearts": 0,
-    "heart_icon": 0,
-    "blade": 1,
-    "blades": 1,
-    "blade_icon": 1,
-    "yell": 2,
-    "shield": 3,
-    "energy": 4,
-}
-
-HEART = {
-    "heart01": 0,
-    "smile": 0,
-    "pink": 0,
-    "heart02": 1,
-    "pure": 1,
-    "green": 1,
-    "heart03": 2,
-    "cool": 2,
-    "blue": 2,
-    "heart04": 3,
-    "active": 3,
-    "orange": 3,
-    "heart05": 4,
-    "natural": 4,
-    "purple": 4,
-    "heart06": 5,
-    "elegant": 5,
-    "red": 5,
-}
-
-CARD_TYPE = {
-    "card": 0,
-    "any": 0,
-    "member_card": 1,
-    "member": 1,
-    "live_card": 2,
-    "live": 2,
-    "energy_card": 3,
-    "energy": 3,
-    "event_card": 4,
-    "event": 4,
-    "character_card": 5,
-    "character": 5,
-    "baton_touch_card": 6,
-    "baton_touch": 6,
-    "climax_card": 7,
-    "climax": 7,
-}
-
-PLAYER = {"self": 0, "opponent": 1, "both": 2, "owner": 3}
-COMPARE = {"=": 0, "==": 0, "!=": 1, ">": 2, ">=": 3, "<": 4, "<=": 5}
-DURATION = {
-    "turn_end": 0,
-    "this_turn": 0,
-    "live_end": 1,
-    "until_end_of_live": 1,
-    "permanent": 2,
-    "always": 2,
-    "until_used": 3,
-    "next_turn": 4,
-}
-STATE = {
-    "rest": 0,
-    "rested": 0,
-    "stand": 1,
-    "stood": 1,
-    "stand_up": 1,
-    "reverse": 2,
-    "reversed": 2,
-    "wait": 3,
-    "waited": 3,
-}
-
-
-def _encode(v, table, default=0):
-    if v is None:
-        return default
-    if isinstance(v, str):
-        return table.get(v.strip().lower().replace(" ", "_").replace("-", "_"), default)
-    return int(v) & 0xFF
-
-
-def z(v):
-    return _encode(v, ZONE, 9)
-
-
-def r(v):
-    return _encode(v, RESOURCE)
-
-
-def h(v):
-    return _encode(v, HEART)
-
-
-def ct(v):
-    return _encode(v, CARD_TYPE)
-
-
-def p(v):
-    return _encode(v, PLAYER)
-
-
-def op(v):
-    return _encode(v, COMPARE)
-
-
-def dur(v):
-    return _encode(v, DURATION)
-
-
-def st(v):
-    return _encode(v, STATE)
-
-
-def normalize_group_names(v):
-    if v is None:
-        return None
-    if isinstance(v, list):
-        return v[0] if v else None
-    if isinstance(v, str):
-        return v
-    return None
-
-
-# ─────────────────────────────────────────────────────────────
-# Bytecode writer
-# ─────────────────────────────────────────────────────────────
-
-
-class BC:
-    """Bytecode accumulator — produces an instruction stream."""
-
-    def __init__(self):
-        self.data = bytearray()
-
-    def u8(self, v):
-        self.data.append(v & 0xFF)
-
-    def u16(self, v):
-        self.data.extend(struct.pack("<H", v))
-
-    def i8(self, v):
-        self.data.extend(struct.pack("<b", v))
-
-    def __len__(self):
-        return len(self.data)
-
-    def __bytes__(self):
-        return bytes(self.data)
-
-
-# ─────────────────────────────────────────────────────────────
-# String table — shared across all abilities
-# ─────────────────────────────────────────────────────────────
-
-
-class StringTable:
-    """Compact string table for group names, character names, etc."""
-
-    def __init__(self):
-        self._strings = []
-        self._index = {}
-
-    def idx(self, s):
-        if s is None or s == "":
-            return 0xFFFF
-        s = s.strip()
-        if s not in self._index:
-            self._index[s] = len(self._strings)
-            self._strings.append(s)
-        return self._index[s]
-
-    def get(self, i):
-        return self._strings[i] if i < len(self._strings) else None
-
-    def __len__(self):
-        return len(self._strings)
-
-    def __iter__(self):
-        return iter(self._strings)
-
-
-# ─────────────────────────────────────────────────────────────
-# Condition compiler
-# ─────────────────────────────────────────────────────────────
-
-
-def compile_condition(cond, bc: BC, strs: StringTable):
-    if not isinstance(cond, dict):
-        return
-
-    t = cond.get("type", "")
-
-    if t == "compound":
-        op_type = cond.get("operator", "and")
-        sub = cond.get("conditions", [])
-        if op_type == "or":
-            bc.u8(CONDITION_OPCODES["or_condition"])
-        else:
-            bc.u8(CONDITION_OPCODES["and_condition"])
-        for sc in sub:
-            if isinstance(sc, dict):
-                compile_condition(sc, bc, strs)
-        bc.u8(CONDITION_OPCODES["end_condition"])
-        return
-
-    if t == "or_condition":
-        bc.u8(CONDITION_OPCODES["or_condition"])
-        for sc in cond.get("conditions", []):
-            if isinstance(sc, dict):
-                compile_condition(sc, bc, strs)
-        bc.u8(CONDITION_OPCODES["end_condition"])
-        return
-
-    if t == "card_count_condition":
-        bc.u8(CONDITION_OPCODES["card_count_condition"])
-        bc.u8(z(cond.get("location", "stage")))
-        bc.u8(op(cond.get("operator", ">=")))
-        bc.u8(int(cond.get("count", 1)))
-        bc.u8(ct(cond.get("card_type", "card")))
-        bc.u16(strs.idx(normalize_group_names(cond.get("group_names"))))
-        bc.u8(p(cond.get("target", "self")))
-        return
-
-    if t == "location_condition":
-        bc.u8(CONDITION_OPCODES["location_condition"])
-        bc.u8(z(cond.get("location", "stage")))
-        bc.u8(ct(cond.get("card_type", "card")))
-        bc.u8(1 if cond.get("exclude_self") else 0)
-        bc.u8(p(cond.get("target", "self")))
-        return
-
-    if t == "comparison_condition":
-        bc.u8(CONDITION_OPCODES["comparison_condition"])
-        bc.u8(z(cond.get("location", "hand")))
-        ct_map = {"cost": 0, "power": 1, "count": 2, "level": 3, "hand_count": 4}
-        bc.u8(ct_map.get(cond.get("comparison_type", "cost"), 0))
-        agg_map = {"total": 0, "average": 1, "max": 2, "min": 3}
-        bc.u8(agg_map.get(cond.get("aggregate", "total"), 0))
-        bc.u8(op(cond.get("operator", "=")))
-        bc.u16(int(cond.get("count", cond.get("cost_total", 0))))
-        bc.u8(p(cond.get("target", "self")))
-        bc.u8(r(cond.get("resource_type", "")))
-        bc.u8(ct(cond.get("card_type", "card")))
-        bc.u16(strs.idx(normalize_group_names(cond.get("group_names"))))
-        return
-
-    if t == "group_condition":
-        bc.u8(CONDITION_OPCODES["group_condition"])
-        bc.u16(strs.idx(normalize_group_names(cond.get("group_names"))))
-        bc.u8(int(cond.get("count", 1)))
-        bc.u8(op(cond.get("operator", ">=")))
-        return
-
-    if t == "movement_condition":
-        bc.u8(CONDITION_OPCODES["movement_condition"])
-        bc.u8(z(cond.get("location", "stage")))
-        bc.u8(ct(cond.get("card_type", "card")))
-        bc.u8(int(cond.get("count", 1)))
-        bc.u8(op(cond.get("operator", ">=")))
-        return
-
-    if t == "temporal_condition":
-        bc.u8(CONDITION_OPCODES["temporal_condition"])
-        bc.u8(int(cond.get("count", 1)))
-        bc.u8(op(cond.get("operator", ">=")))
-        return
-
-    if t == "appearance_condition":
-        bc.u8(CONDITION_OPCODES["appearance_condition"])
-        bc.u8(z(cond.get("location", "stage")))
-        bc.u8(int(cond.get("count", 1)))
-        return
-
-    if t == "state_condition":
-        bc.u8(CONDITION_OPCODES["state_condition"])
-        bc.u8(st(cond.get("state", "rest")))
-        bc.u8(op(cond.get("operator", "==")))
-        bc.u8(1 if cond.get("value", True) else 0)
-        return
-
-    if t == "energy_state_condition":
-        bc.u8(CONDITION_OPCODES["energy_state_condition"])
-        bc.u8(op(cond.get("operator", ">=")))
-        bc.u8(int(cond.get("count", 1)))
-        return
-
-    if t == "position_condition":
-        bc.u8(CONDITION_OPCODES["position_condition"])
-        bc.u8(z(cond.get("location", "stage")))
-        return
-
-    if t == "highest_cost_on_stage_condition":
-        bc.u8(CONDITION_OPCODES["highest_cost_on_stage_condition"])
-        return
-
-    if t == "state_change_condition":
-        bc.u8(CONDITION_OPCODES["state_change_condition"])
-        bc.u8(st(cond.get("state_change", "rest")))
-        return
-
-    if t == "card_blade_condition":
-        bc.u8(CONDITION_OPCODES["card_blade_condition"])
-        bc.u8(op(cond.get("operator", ">=")))
-        bc.u8(int(cond.get("count", 1)))
-        return
-
-    if t == "all_cost_comparison_condition":
-        bc.u8(CONDITION_OPCODES["all_cost_comparison_condition"])
-        bc.u8(op(cond.get("operator", ">=")))
-        bc.u16(int(cond.get("count", 0)))
-        return
-
-    if t == "ability_filter_condition":
-        bc.u8(CONDITION_OPCODES["ability_filter_condition"])
-        bc.u16(strs.idx(cond.get("text", "")))
-        return
-
-    if t == "has_moved":
-        bc.u8(CONDITION_OPCODES["has_moved"])
-        bc.u8(z(cond.get("position", "center")))
-        bc.u16(strs.idx(normalize_group_names(cond.get("group_names"))))
-        return
-
-    if t == "not_moved":
-        bc.u8(CONDITION_OPCODES["not_moved"])
-        return
-
-    if t == "opponent_live_success":
-        bc.u8(CONDITION_OPCODES["opponent_live_success"])
-        bc.u8(1 if cond.get("no_excess_heart") else 0)
-        return
-
-    if t == "no_excess_heart":
-        bc.u8(CONDITION_OPCODES["no_excess_heart"])
-        return
-
-
-# ─────────────────────────────────────────────────────────────
-# Cost compiler
-# ─────────────────────────────────────────────────────────────
-
-
-def compile_cost(cost, bc: BC, strs: StringTable):
-    if not cost:
-        return
+def compile_cost(cost, bc, strs):
     if isinstance(cost, list):
         for c in cost:
             compile_cost(c, bc, strs)
         return
     if not isinstance(cost, dict):
         return
-
-    t = cost.get("type", "move_cards")
-
+    t = cost.get("type", "")
     if t == "move_cards":
-        bc.u8(COST_OPCODES["move_cards_cost"])
-        bc.u8(z(cost.get("source", "stage")))
-        bc.u8(z(cost.get("destination", "discard")))
-        bc.u8(ct(cost.get("card_type", "member_card")))
+        bc.u8(0x80)
+        bc.data.extend(encode(cost.get("source", "stage"), "zone", strs))
+        bc.data.extend(encode(cost.get("destination", "discard"), "zone", strs))
+        bc.data.extend(encode(cost.get("card_type", "member_card"), "card_type", strs))
         bc.u8(1 if cost.get("self_cost") else 0)
-        bc.u8(int(cost.get("count", 1)))
-        return
-
-    if t == "tap":
-        bc.u8(COST_OPCODES["tap"])
-        return
-
-    if t == "rest":
-        bc.u8(COST_OPCODES["rest"])
-        bc.u8(int(cost.get("count", 1)))
-        return
-
-    if t == "energy":
-        bc.u8(COST_OPCODES["energy"])
-        bc.u8(int(cost.get("energy", cost.get("count", 1))))
+        bc.data.extend(encode(cost.get("count", 1), "u8", strs))
+    elif t == "tap":
+        bc.u8(0x81)
+    elif t == "rest":
+        bc.u8(0x82)
+        bc.data.extend(encode(cost.get("count", 1), "u8", strs))
+    elif t == "energy":
+        bc.u8(0x83)
+        bc.data.extend(encode(cost.get("energy", cost.get("count", 1)), "u8", strs))
         bc.u8(0)
-        return
-
-    if t == "discard":
-        bc.u8(COST_OPCODES["discard"])
-        bc.u8(int(cost.get("count", 1)))
-        bc.u8(ct(cost.get("card_type", "card")))
-        return
-
-    if t == "place_energy_under_member":
-        bc.u8(COST_OPCODES["place_energy_under_member_cost"])
-        bc.u8(int(cost.get("count", 1)))
-        return
-
-    if t == "pay_energy":
-        bc.u8(COST_OPCODES["pay_energy"])
-        bc.u8(int(cost.get("energy", cost.get("count", 1))))
+    elif t == "discard":
+        bc.u8(0x84)
+        bc.data.extend(encode(cost.get("count", 1), "u8", strs))
+        bc.data.extend(encode(cost.get("card_type", "card"), "card_type", strs))
+    elif t == "place_energy_under_member":
+        bc.u8(0x85)
+        bc.data.extend(encode(cost.get("count", 1), "u8", strs))
+    elif t == "pay_energy":
+        bc.u8(0x86)
+        bc.data.extend(encode(cost.get("energy", cost.get("count", 1)), "u8", strs))
         bc.u8(1 if cost.get("optional") else 0)
-        return
-
-    if t == "change_state":
-        bc.u8(COST_OPCODES["change_state_cost"])
-        bc.u8(st(cost.get("state_change", "rest")))
+    elif t == "change_state":
+        bc.u8(0x87)
+        bc.data.extend(encode(cost.get("state_change", "rest"), "state", strs))
         bc.u8(1 if cost.get("optional") else 0)
         bc.u8(1 if cost.get("self_cost") else 0)
-        return
-
-    if t == "sequential_cost":
+    elif t == "sequential_cost":
         costs = cost.get("costs", [])
-        bc.u8(COST_OPCODES["sequential_cost"])
+        bc.u8(0x88)
         bc.u8(len(costs))
         for sc in costs:
-            if isinstance(sc, dict):
-                compile_cost(sc, bc, strs)
-        return
-
-    if t == "reveal":
-        bc.u8(COST_OPCODES["reveal"])
-        bc.u8(z(cost.get("source", "hand")))
-        bc.u8(ct(cost.get("card_type", "card")))
-        bc.u8(int(cost.get("count", 1)))
-        return
-
-    if t == "choice_condition":
-        options = cost.get("options", [])
-        bc.u8(COST_OPCODES["choice_condition"])
-        bc.u8(len(options))
-        for opt in options:
-            if isinstance(opt, dict):
-                compile_cost(opt, bc, strs)
-        return
+            compile_cost(sc, bc, strs)
+    elif t == "reveal":
+        bc.u8(0x89)
+        bc.data.extend(encode(cost.get("source", "hand"), "zone", strs))
+        bc.data.extend(encode(cost.get("card_type", "card"), "card_type", strs))
+        bc.data.extend(encode(cost.get("count", 1), "u8", strs))
+    elif t == "choice_condition":
+        opts = cost.get("options", [])
+        bc.u8(0x8A)
+        bc.u8(len(opts))
+        for opt in opts:
+            compile_cost(opt, bc, strs)
 
 
-# ─────────────────────────────────────────────────────────────
-# Effect compiler
-# ─────────────────────────────────────────────────────────────
+# ── Opaque string prefix for condition comparison_type/aggregate ──
+def first_str(v):
+    if v is None:
+        return None
+    if isinstance(v, list):
+        return v[0] if v else None
+    return v
 
 
-def compile_effect(eff, bc: BC, strs: StringTable, is_sub=False):
+# ── Main compiler ──
+EFFECT_OPCODES = {
+    s: i + 1
+    for i, s in enumerate(
+        [
+            "activate_ability",
+            "change_state",
+            "choose_target_player",
+            "conditional_on_optional",
+            "conditional_on_result",
+            "discard_until_count",
+            "do_nothing",
+            "draw_card",
+            "draw_until_count",
+            "gain_ability",
+            "gain_ability_from_source",
+            "gain_resource",
+            "invalidate_ability",
+            "look_at",
+            "modify_cost",
+            "modify_required_hearts",
+            "modify_required_hearts_global",
+            "modify_score",
+            "modify_yell_count",
+            "move_cards",
+            "pay_energy",
+            "perform_yell",
+            "place_energy_under_member",
+            "play_baton_touch",
+            "position_change",
+            "re_yell",
+            "reduce_live_card_set_limit",
+            "repeat_procedure",
+            "restriction",
+            "reveal",
+            "reveal_until_live_card",
+            "select",
+            "select_cards",
+            "select_number",
+            "set_blade_count",
+            "set_blade_type",
+            "set_card_identity",
+            "set_heart_type",
+            "specify_heart_color",
+            "suppress_ability_trigger",
+            "conditional_alternative",
+        ]
+    )
+}
+
+
+def compile_one(eff, bc, strs, field_map, is_sub=False):
     if not isinstance(eff, dict):
         return
+    a = eff.get("action", "")
 
-    action = eff.get("action", "")
-
-    # ── Wrapper effects (conditions around other effects) ──
+    # Conditional wrapper
     cond = eff.get("condition")
-    if isinstance(cond, dict) and not is_sub:
-        bc.u8(EFFECT_OPCODES["conditional"])
-        # Emit condition length prefix so the VM can skip conditions
-        cond_bytes = BC()
-        compile_condition(cond, cond_bytes, strs)
-        bc.u16(len(cond_bytes))
-        bc.data.extend(cond_bytes.data)
+    if (
+        isinstance(cond, dict)
+        and not is_sub
+        and a
+        not in (
+            "conditional_alternative",
+            "conditional_on_optional",
+            "conditional_on_result",
+        )
+    ):
+        bc.u8(0x61)
+        cb = BC()
+        compile_condition(cond, cb, strs)
+        bc.u16(len(cb))
+        bc.data.extend(cb.data)
         body = BC()
-        compile_effect(eff, body, strs, is_sub=True)
+        compile_one(eff, body, strs, field_map, True)
         bc.u16(len(body))
         bc.data.extend(body.data)
         alt = eff.get("alternative")
         if isinstance(alt, dict):
-            alt_body = BC()
-            compile_effect(alt, alt_body, strs, is_sub=True)
-            bc.u16(len(alt_body))
-            bc.data.extend(alt_body.data)
+            ab = BC()
+            compile_one(alt, ab, strs, field_map, True)
+            bc.u16(len(ab))
+            bc.data.extend(ab.data)
         else:
             bc.u16(0)
         return
 
-    if action == "conditional_alternative":
-        cond = eff.get("condition")
-        if isinstance(cond, dict):
-            bc.u8(EFFECT_OPCODES["conditional_alternative"])
-            compile_condition(cond, bc, strs)
-            primary = eff.get("primary_effect") or eff.get("effect")
-            if isinstance(primary, dict):
-                body = BC()
-                compile_effect(primary, body, strs, is_sub=True)
-                bc.u16(len(body))
-                bc.data.extend(body.data)
-            else:
-                bc.u16(0)
-            alt = eff.get("alternative_effect")
-            if isinstance(alt, dict):
-                alt_body = BC()
-                compile_effect(alt, alt_body, strs, is_sub=True)
-                bc.u16(len(alt_body))
-                bc.data.extend(alt_body.data)
-            else:
-                bc.u16(0)
-        return
-
-    if action == "conditional_on_optional":
-        bc.u8(EFFECT_OPCODES["conditional_on_optional"])
+    if a == "conditional_on_optional":
+        bc.u8(0x63)
         bc.u8(1 if eff.get("optional") else 0)
         return
-
-    if action == "conditional_on_result":
-        bc.u8(EFFECT_OPCODES["conditional_on_result"])
+    if a == "conditional_on_result":
+        bc.u8(0x64)
         return
-
-    # ── Sequential (list of sub-effects) ──
-    if action == "sequential":
+    if a == "choice":
+        bc.u8(0x65)
+        bc.data.extend(encode(eff.get("count", 1), "u8", strs))
+        bc.u16(strs.idx(first_str(eff.get("group_names"))))
+        for ck in ("choice_condition", "alternative_condition"):
+            c = eff.get(ck)
+            if isinstance(c, dict):
+                cb = BC()
+                compile_condition(c, cb, strs)
+                bc.u16(len(cb))
+                bc.data.extend(cb.data)
+            else:
+                bc.u16(0)
+        bc.u8(1 if eff.get("alternative_count_type") == "any_number" else 0)
+        opts = eff.get("options", [])
+        bc.u8(len(opts))
+        for opt in opts:
+            compile_one(opt, bc, strs, field_map, True)
+        return
+    if a == "sequential":
         actions = eff.get("actions", [])
-        bc.u8(EFFECT_OPCODES["sequential"])
+        bc.u8(0x60)
         bc.u8(len(actions))
         for act in actions:
-            compile_effect(act, bc, strs, is_sub=True)
+            compile_one(act, bc, strs, field_map, True)
         return
-
-    # ── Look and select ──
-    if action == "look_and_select":
+    if a == "look_and_select":
         look = eff.get("look_action", {})
         select = eff.get("select_action", {})
-        bc.u8(EFFECT_OPCODES["look_at"])
-        bc.u8(int(look.get("count", 1)))
-        bc.u8(z(look.get("source", "deck_top")))
-        bc.u8(p(look.get("target", "self")))
-        bc.u8(EFFECT_OPCODES["select_cards"])
-        bc.u8(int(select.get("count", 1)))
-        bc.u8(z(select.get("destination", "hand")))
+        bc.u8(0x70)
+        bc.data.extend(encode(look.get("count", 1), "u8", strs))
+        bc.data.extend(encode(look.get("source", "deck_top"), "zone", strs))
+        bc.data.extend(encode(look.get("target", "self"), "player", strs))
+        bc.u8(0x71)
+        bc.data.extend(encode(select.get("count", 1), "u8", strs))
+        bc.data.extend(encode(select.get("destination", "hand"), "zone", strs))
         bc.u8(1 if select.get("discard_remaining") else 0)
         return
-
-    # ── Simple effects ──
-    if action == "draw_card":
-        bc.u8(EFFECT_OPCODES["draw_card"])
-        bc.u8(int(eff.get("count", 1)))
-        bc.u8(z(eff.get("source", "deck")))
+    if a == "conditional_alternative":
+        bc.u8(0x62)
         return
 
-    if action == "move_cards":
-        bc.u8(EFFECT_OPCODES["move_cards"])
-        bc.u8(int(eff.get("count", 1)))
-        bc.u8(z(eff.get("source", "hand")))
-        bc.u8(z(eff.get("destination", "hand")))
-        bc.u8(ct(eff.get("card_type", "card")))
-        bc.u8(p(eff.get("target", "self")))
+    opcode = EFFECT_OPCODES.get(a)
+    if opcode is None:
         return
-
-    if action == "gain_resource":
-        bc.u8(EFFECT_OPCODES["gain_resource"])
-        bc.u8(r(eff.get("resource", "heart")))
-        bc.u8(int(eff.get("count", 1)))
-        heart = (
-            eff.get("heart_color") or (eff.get("heart_colors") or [None])[0]
-            if isinstance(eff.get("heart_colors"), list) and eff.get("heart_colors")
-            else None
-        )
-        bc.u8(h(heart) if heart else 0)
-        bc.u8(dur(eff.get("duration", "turn_end")))
-        bc.u16(
-            strs.idx(
-                str(eff.get("characters", [""])[0])
-                if isinstance(eff.get("characters"), list) and eff.get("characters")
-                else None
-            )
-        )
-        return
-
-    if action == "modify_score":
-        bc.u8(EFFECT_OPCODES["modify_score"])
-        bc.i8(int(eff.get("value", eff.get("count", 0))))
-        bc.u8(1 if eff.get("per_unit") else 0)
-        bc.u8(p(eff.get("target", "self")))
-        return
-
-    if action == "change_state":
-        bc.u8(EFFECT_OPCODES["change_state"])
-        bc.u8(st(eff.get("state_change", "rest")))
-        bc.u8(p(eff.get("target", "self")))
-        return
-
-    if action == "position_change":
-        bc.u8(EFFECT_OPCODES["position_change"])
-        bc.u8(p(eff.get("target", "self")))
-        return
-
-    if action == "modify_required_hearts":
-        bc.u8(EFFECT_OPCODES["modify_required_hearts"])
-        bc.i8(int(eff.get("value", eff.get("count", 0))))
-        bc.u8(p(eff.get("target", "self")))
-        return
-
-    if action == "modify_required_hearts_global":
-        bc.u8(EFFECT_OPCODES["modify_required_hearts_global"])
-        bc.i8(int(eff.get("value", eff.get("count", 0))))
-        return
-
-    if action == "modify_cost":
-        bc.u8(EFFECT_OPCODES["modify_cost"])
-        bc.i8(int(eff.get("value", eff.get("count", 0))))
-        bc.u8(p(eff.get("target", "self")))
-        return
-
-    if action in ("set_blade_type",):
-        bc.u8(EFFECT_OPCODES["set_blade_type"])
-        bc.u8(0)
-        return
-
-    if action == "set_blade_count":
-        bc.u8(EFFECT_OPCODES["set_blade_count"])
-        bc.u8(int(eff.get("value", eff.get("count", 0))))
-        return
-
-    if action == "set_heart_type":
-        bc.u8(EFFECT_OPCODES["set_heart_type"])
-        bc.u8(h(eff.get("value", "smile")))
-        return
-
-    if action == "gain_ability":
-        bc.u8(EFFECT_OPCODES["gain_ability"])
-        bc.u16(int(eff.get("value", 0)))
-        bc.u8(dur(eff.get("duration", "turn_end")))
-        return
-
-    if action == "gain_ability_from_source":
-        bc.u8(EFFECT_OPCODES["gain_ability_from_source"])
-        bc.u16(int(eff.get("value", 0)))
-        return
-
-    if action == "restriction":
-        bc.u8(EFFECT_OPCODES["restriction"])
-        return
-
-    if action == "choose_target_player":
-        bc.u8(EFFECT_OPCODES["choose_target_player"])
-        bc.u8(p(eff.get("target", "self")))
-        return
-
-    if action == "place_energy_under_member":
-        bc.u8(EFFECT_OPCODES["place_energy_under_member"])
-        bc.u8(int(eff.get("count", 1)))
-        return
-
-    if action == "draw_until_count":
-        bc.u8(EFFECT_OPCODES["draw_until_count"])
-        bc.u8(int(eff.get("count", 1)))
-        bc.u8(z(eff.get("source", "deck")))
-        return
-
-    if action == "modify_yell_count":
-        bc.u8(EFFECT_OPCODES["modify_yell_count"])
-        bc.i8(int(eff.get("value", eff.get("count", 0))))
-        return
-
-    if action == "invalidate_ability":
-        bc.u8(EFFECT_OPCODES["invalidate_ability"])
-        return
-
-    if action == "suppress_ability_trigger":
-        bc.u8(EFFECT_OPCODES["suppress_ability_trigger"])
-        return
-
-    if action == "activate_ability":
-        bc.u8(EFFECT_OPCODES["activate_ability"])
-        return
-
-    if action == "play_baton_touch":
-        bc.u8(EFFECT_OPCODES["play_baton_touch"])
-        return
-
-    if action == "set_card_identity":
-        bc.u8(EFFECT_OPCODES["set_card_identity"])
-        bc.u16(strs.idx(eff.get("value", "")))
-        return
-
-    if action == "choice":
-        return
+    bc.u8(opcode)
+    for ftype, fname in field_map.get(a, []):
+        bc.data.extend(encode(eff.get(fname), ftype, strs))
 
 
-# ─────────────────────────────────────────────────────────────
-# Main compilation
-# ─────────────────────────────────────────────────────────────
-
-
-def compile_all(abilities):
+def compile_all(abilities, field_map):
     strs = StringTable()
-    offsets = []
-    bytecode = bytearray()
-    disasm = []
-    debug_names = []
-
-    for i, entry in enumerate(abilities):
+    offsets, bytecode = [], bytearray()
+    for entry in abilities:
         offsets.append(len(bytecode))
-        eff = entry.get("effect", {})
-        cost = entry.get("cost")
-
+        eff, cost = entry.get("effect", {}), entry.get("cost")
         w = BC()
         if cost:
             compile_cost(cost, w, strs)
         if isinstance(eff, dict):
-            compile_effect(eff, w, strs)
+            compile_one(eff, w, strs, field_map)
         bytecode.extend(w.data)
-
-        name = entry.get("triggerless_text", "") or entry.get("full_text", "")
-        name = (
-            name.replace("{{", "")
-            .replace("}}", " ")
-            .replace("|", ": ")
-            .replace("  ", " ")
-            .strip()[:80]
-        )
-        debug_names.append(name)
-        disasm.append(disassemble_one(entry, len(w.data)))
-
     offsets.append(len(bytecode))
-    return bytes(bytecode), offsets, disasm, debug_names, strs
+    return bytes(bytecode), offsets, strs
 
 
-def disassemble_one(entry, byte_len):
-    eff = entry.get("effect", {})
-    parts = []
-    if isinstance(eff, dict):
-        parts.append(eff.get("action", "?"))
-        for k in ("count", "source", "destination", "card_type", "resource", "target"):
-            if eff.get(k):
-                parts.append(f"{k}={eff[k]}")
-        if isinstance(eff.get("action"), list):
-            parts.append(f"actions={len(eff['action'])}")
-        if eff.get("action") == "sequential":
-            parts.append(f"sub={len(eff.get('actions', []))}")
-        if isinstance(eff.get("condition"), dict):
-            parts.append(f"cond={eff['condition'].get('type', '?')}")
-    cost = entry.get("cost")
-    if cost:
-        if isinstance(cost, dict):
-            parts.append(f"cost={cost.get('type', '?')}")
-        elif isinstance(cost, list):
-            parts.append(f"cost=[{len(cost)}]")
-    parts.append(f"({byte_len}B)")
-    return ", ".join(parts)
+# ── Rust code generation ──
+def rust_name(s):
+    return "".join(w.capitalize() for w in s.split("_"))
 
 
-# ─────────────────────────────────────────────────────────────
-# Rust code generation
-# ─────────────────────────────────────────────────────────────
+def generate_abilities_gen(bytecode, offsets, strs, build_dir, field_map):
+    all_ops = [(a, EFFECT_OPCODES[a], "effect") for a in sorted(EFFECT_OPCODES.keys())]
+    seen = set()
+    for ctype, code in COND_OPCODES.items():
+        if code not in seen:
+            all_ops.append((ctype, code, "condition"))
+            seen.add(code)
+    for ctype, code in COST_OPCODES.items():
+        if code not in seen:
+            all_ops.append((ctype, code, "cost"))
+            seen.add(code)
+    all_ops.sort(key=lambda x: x[1])
 
-
-def rust_name(json_name):
-    return "".join(word.capitalize() for word in json_name.split("_"))
-
-
-def generate_rust(bytecode, offsets, disasm, names, strs, build_dir):
-    build_dir.mkdir(parents=True, exist_ok=True)
-
-    all_ops = sorted(ALL_OPCODES.items(), key=lambda x: x[1])
-    enum_variants = []
-    variant_to_json = {}
-    for json_name, code in all_ops:
-        variant = rust_name(json_name)
-        enum_variants.append(f"    {variant} = {code},")
-        variant_to_json[variant] = json_name
-
-    hex_chunks = []
+    hex_lines = []
     for i in range(0, len(bytecode), 24):
         chunk = bytecode[i : i + 24]
-        hex_chunks.append("    " + ", ".join(f"0x{b:02x}" for b in chunk) + ",")
+        hex_lines.append("    " + ", ".join(f"0x{b:02x}" for b in chunk) + ",")
 
-    offset_list = ", ".join(str(o) for o in offsets)
-
-    disasm_lines = []
-    for i, (n, d) in enumerate(zip(names, disasm)):
-        disasm_lines.append(f"    /// [{i:03d}] {n}")
-        disasm_lines.append(f"    /// {d}")
-
-    tryfrom_arms = []
-    for json_name, code in all_ops:
-        variant = rust_name(json_name)
-        tryfrom_arms.append(f"            {code} => Ok(Self::{variant}),")
-
-    string_table = ", ".join(f'"{s}"' for s in strs)
-
-    rust_source = f"""// Auto-generated by compile_abilities.py — DO NOT EDIT
-// Source: cards/abilities.json
-// Built: {len(bytecode)} bytes of bytecode, {len(offsets) - 1} unique abilities, {len(strs)} string table entries
-
+    src = f"""// Auto-generated
 pub const NUM_ABILITIES: usize = {len(offsets) - 1};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Opcode {{
-{chr(10).join(enum_variants)}
+{chr(10).join(f"    {rust_name(n)} = {c}," for n, c, _ in all_ops)}
 }}
 
 impl TryFrom<u8> for Opcode {{
     type Error = UnknownOpcode;
-
     fn try_from(v: u8) -> Result<Self, Self::Error> {{
         match v {{
-{chr(10).join(tryfrom_arms)}
+{chr(10).join(f"            {c} => Ok(Self::{rust_name(n)})," for n, c, _ in all_ops)}
             _ => Err(UnknownOpcode(v)),
         }}
     }}
 }}
 
-impl Opcode {{
-    pub const fn json_name(self) -> &'static str {{
-        match self {{
-{chr(10).join(f'            Self::{rust_name(jn)} => "{jn}",' for jn, _ in all_ops)}
-        }}
-    }}
-}}
-
-#[derive(Debug)]
 pub struct UnknownOpcode(pub u8);
 
-impl core::fmt::Display for UnknownOpcode {{
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {{
-        write!(f, "unknown opcode: 0x{{:02x}}", self.0)
-    }}
-}}
-
 pub const BYTECODE: &[u8] = &[
-{chr(10).join(hex_chunks)}
+{chr(10).join(hex_lines)}
 ];
 
-pub const OFFSETS: &[u16] = &[{offset_list}];
+pub const OFFSETS: &[u16] = &[{", ".join(str(o) for o in offsets)}];
 
-pub const STRINGS: &[&str] = &[{string_table}];
-
-#[cfg(debug_assertions)]
-pub const DEBUG_NAMES: &[&str] = &[
-{chr(10).join(f'    r#"{e}"#,' for e in names)}
-];
-
-#[cfg(debug_assertions)]
-pub const DEBUG_DISASM: &[&str] = &[
-{chr(10).join(f'    r#"{e}"#,' for e in disasm)}
-];
+pub const STRINGS: &[&str] = &[{", ".join(f'"{s}"' for s in strs)}];
 """
-    (build_dir / "abilities_gen.rs").write_text(rust_source, encoding="utf-8")
+    (build_dir / "abilities_gen.rs").write_text(src, encoding="utf-8")
 
 
-# ─────────────────────────────────────────────────────────────
-# VM decoder generation — maps opcodes to decode functions
-# The generated code is included directly into vm.rs, so it
-# shares the same scope (read_u8, etc.).
-# ─────────────────────────────────────────────────────────────
-
-# ─────────────────────────────────────────────────────────────
-# EffectKind variant field lists — ALL fields, for codegen
-# Fields not provided by bytecode get Default::default()
-# ─────────────────────────────────────────────────────────────
-
-_EFFECTKIND_FIELD_TYPES_CACHE = {}
-
-
-def _get_effectkind_field_types():
-    if _EFFECTKIND_FIELD_TYPES_CACHE:
-        return _EFFECTKIND_FIELD_TYPES_CACHE
+def generate_vm_gen(build_dir, field_map):
     import re
 
-    root = Path(__file__).parent.parent / "engine/src/core"
-    with open(root / "card.rs", encoding="utf-8") as f:
+    card_rs = Path(__file__).parent.parent / "engine/src/core/card.rs"
+    with open(card_rs, encoding="utf-8") as f:
         content = f.read()
-    idx = content.find("pub enum EffectKind")
-    end = content.find("};", idx) + 2
-    block = content[idx:end]
-    current_var = None
-    for line in block.split("\n"):
+
+    # Parse Condition enum fields
+    ci = content.find("pub enum Condition")
+    ce = content.find("};", ci) + 2
+    cf = {}
+    cv = None
+    for line in content[ci:ce].split("\n"):
         m = re.match(r"    (\w+) \{", line)
         if m:
-            current_var = m.group(1)
-            _EFFECTKIND_FIELD_TYPES_CACHE[current_var] = {}
-            continue
-        if current_var:
-            m = re.match(r"        (\w+): (.+),", line)
-            if m:
-                fname = m.group(1)
-                ftype = m.group(2).strip()
-                _EFFECTKIND_FIELD_TYPES_CACHE[current_var][fname] = ftype
-            if line.strip() == "},":
-                current_var = None
-    return _EFFECTKIND_FIELD_TYPES_CACHE
+            cv = m.group(1)
+            cf[cv] = {}
+        m2 = re.match(r"        (\w+): (.+),", line)
+        if m2 and cv:
+            cf[cv][m2.group(1)] = m2.group(2).strip()
+        if line.strip() == "}," and cv:
+            cv = None
 
-
-def _effect_assign_expr(field_type, src_var, optype):
-    """Generate assignment expression for an EffectKind field based on its type."""
-    is_option = field_type.startswith("Option<")
-    inner = field_type[7:-1] if is_option else field_type
-    if inner == "ArcStr":
-        val = f"Some({src_var}.into())" if is_option else f"{src_var}.into()"
-        return val
-    if inner == "u32":
-        val = f"Some({src_var} as u32)" if is_option else f"{src_var} as u32"
-        return val
-    if inner == "bool":
-        val = f"Some({src_var})" if is_option else f"{src_var}"
-        return val
-    if inner == "String":
-        val = f"Some({src_var}.to_string())" if is_option else f"{src_var}.to_string()"
-        return val
-    if inner.startswith("Box<Vec<") and "String" in inner:
-        val = f"Box::new(vec![{src_var}.to_string()])"
-        return f"Some({val})" if is_option else val
-    if inner.startswith("Vec<") and "String" in inner:
-        val = f"vec![{src_var}.to_string()]"
-        return f"Some({val})" if is_option else val
-    return None
-
-
-# Parse card.rs for Condition variant fields (used for default constructors)
-_CONDITION_FIELDS_CACHE = None
-
-
-def _get_condition_fields():
-    global _CONDITION_FIELDS_CACHE
-    if _CONDITION_FIELDS_CACHE is not None:
-        return _CONDITION_FIELDS_CACHE
-    import re
-
-    root = Path(__file__).parent.parent / "engine/src/core"
-    with open(root / "card.rs", encoding="utf-8") as f:
-        content = f.read()
-    idx = content.find("pub enum Condition")
-    end = content.find("};", idx) + 2
-    block = content[idx:end]
-    variants = {}
-    current_var = None
-    for line in block.split("\n"):
+    # Parse EffectKind enum fields
+    ei = content.find("pub enum EffectKind")
+    ee = content.find("};", ei) + 2
+    ekf = {}
+    ev = None
+    for line in content[ei:ee].split("\n"):
         m = re.match(r"    (\w+) \{", line)
         if m:
-            current_var = m.group(1)
-            variants[current_var] = []
-            continue
-        m = re.match(r"        (\w+): (.+),", line)
-        if m and current_var:
-            field_name = m.group(1)
-            field_type = m.group(2).strip()
-            inner = re.match(r"Option<(.+)>", field_type)
-            variants[current_var].append(
-                (field_name, inner.group(1) if inner else field_type)
-            )
-        if line.strip() == "}," and current_var:
-            current_var = None
-    _CONDITION_FIELDS_CACHE = variants
-    return variants
+            ev = m.group(1)
+            ekf[ev] = {}
+        m2 = re.match(r"        (\w+): (.+),", line)
+        if m2 and ev:
+            ekf[ev][m2.group(1)] = m2.group(2).strip()
+        if line.strip() == "}," and ev:
+            ev = None
 
+    lines = ["// Auto-generated"]
 
-# For each EffectKind variant, list ALL its field names.
-# Fields that are Box<Vec<String>> are marked with "boxvec".
-# This is used by the vm_gen.rs generator to produce constructors.
-EFFECTKIND_ALL_FIELDS = {
-    "DrawCards": [
-        "source",
-        "target",
-        "destination",
-        "target_count",
-        "card_type",
-        "dynamic_count",
-        "card_names",
-        "location",
-        "exclude_self",
-        "per_unit",
-        "per_unit_count",
-        "per_unit_type",
-        "per_unit_heart_colors",
-        "per_unit_location",
-        "position",
-        "state",
-        "heart_colors",
-        "trigger_type",
-        "original_value",
-        "action_by",
-    ],
-    "MoveCards": [
-        "source",
-        "target",
-        "destination",
-        "count",
-        "card_type",
-        "target_count",
-        "characters",
-        "exclude_characters",
-        "group_names",
-        "exclude_group_names",
-        "cost_limit",
-        "cost_limit_operator",
-        "cost_limit_min",
-        "cost_limit_max",
-        "card_names",
-        "placement_order",
-        "shuffle",
-        "any_number",
-        "discard_remaining",
-        "multiple_targets",
-        "exclude_self",
-        "exclude_selected",
-        "exclude_by_name_source",
-        "name_constraint",
-        "name_constraint_source",
-        "ability_filter",
-        "ability_filter_triggers",
-        "or_ability_filters",
-        "card_property",
-        "original_value",
-        "source_position",
-        "exclude_position",
-        "allow_occupied_stage",
-        "target_from_selection",
-        "group_reference",
-        "cost_from_revealed",
-        "self_target",
-        "per_group",
-        "per_group_count",
-        "state",
-        "negation",
-        "location",
-        "activation_position",
-        "exclude_heart_colors",
-        "filter_targets_by_heart_colors",
-        "cost_total",
-        "cost_total_operator",
-        "need_heart_total",
-        "need_heart_operator",
-        "need_heart_color",
-        "distinct",
-        "state_change",
-        "self_cost",
-        "dynamic_count",
-        "or_card_types",
-        "position",
-        "cost_reference",
-        "cost_offset",
-        "all",
-        "energy_count",
-        "heart_colors",
-        "baton_touch_trigger",
-        "target_member",
-        "same_unit_name",
-        "action_by",
-        "activation_condition_parsed",
-        "quoted_text",
-    ],
-    "SelectTarget": [
-        "source",
-        "target",
-        "destination",
-        "target_count",
-        "card_type",
-        "characters",
-        "exclude_characters",
-        "group_names",
-        "exclude_group_names",
-        "cost_limit",
-        "cost_limit_operator",
-        "cost_limit_min",
-        "cost_limit_max",
-        "card_names",
-        "exclude_self",
-        "exclude_selected",
-        "placement_order",
-        "distinct",
-        "name_constraint",
-        "name_constraint_source",
-        "ability_filter",
-        "ability_filter_triggers",
-        "or_ability_filters",
-        "card_property",
-        "original_value",
-        "negation",
-        "self_target",
-        "per_unit",
-        "per_unit_count",
-        "per_unit_type",
-        "per_unit_heart_colors",
-        "per_unit_location",
-        "optional",
-        "location",
-        "state",
-        "activation_position",
-        "group_reference",
-        "multiple_targets",
-        "question",
-        "answers",
-        "choice_maker",
-        "choice_type",
-        "choice_options",
-        "filter_targets_by_heart_colors",
-        "heart_colors",
-        "cost_total",
-        "cost_total_operator",
-        "or_card_types",
-        "action_by",
-        "require_all_heart_colors",
-        "heart_color_count",
-        "options",
-        "per_group",
-        "per_group_count",
-        "reveal",
-        "any_number",
-        "discard_remaining",
-    ],
-    "LookReveal": [
-        "source",
-        "target",
-        "destination",
-        "card_type",
-        "characters",
-        "exclude_characters",
-        "group_names",
-        "exclude_group_names",
-        "cost_limit",
-        "cost_limit_operator",
-        "cost_limit_min",
-        "cost_limit_max",
-        "card_names",
-        "exclude_self",
-        "distinct",
-        "name_constraint",
-        "name_constraint_source",
-        "ability_filter",
-        "ability_filter_triggers",
-        "or_ability_filters",
-        "card_property",
-        "original_value",
-        "negation",
-        "self_target",
-        "per_unit",
-        "per_unit_count",
-        "per_unit_type",
-        "per_unit_heart_colors",
-        "per_unit_location",
-        "location",
-        "group_reference",
-        "dynamic_count",
-        "heart_colors",
-        "reveal",
-        "filter_targets_by_heart_colors",
-        "activation_position",
-        "state",
-        "optional",
-        "blind",
-        "is_reveal",
-        "picker",
-        "multiple_targets",
-        "options",
-        "resource_on_select",
-        "require_all_heart_colors",
-        "heart_color_count",
-    ],
-    "ModifyScore": [
-        "source",
-        "target",
-        "destination",
-        "operation",
-        "value",
-        "duration",
-        "card_type",
-        "group_names",
-        "per_unit",
-        "per_unit_count",
-        "per_unit_type",
-        "per_unit_location",
-        "per_unit_heart_colors",
-        "location",
-        "effect_constraint",
-        "self_target",
-        "heart_colors",
-        "exclude_self",
-        "target_count",
-        "repeat_limit",
-        "filter_targets_by_heart_colors",
-        "cost_total",
-        "cost_total_operator",
-        "distinct",
-        "position",
-        "activation_position",
-        "card_names",
-        "card_property",
-        "state",
-        "negation",
-        "max_repeats",
-        "need_heart_operator",
-        "need_heart_total",
-    ],
-    "ModifyHearts": [
-        "operation",
-        "value",
-        "duration",
-        "heart_colors",
-        "group_names",
-        "per_unit",
-        "per_unit_count",
-        "per_unit_heart_colors",
-        "location",
-        "timing_condition",
-        "original_value",
-        "original_count",
-        "original_operator",
-        "exclude_self",
-        "self_target",
-        "exclude_heart_colors",
-        "repeat_limit",
-        "card_type",
-        "target_count",
-        "filter_targets_by_heart_colors",
-        "cost_total",
-        "cost_total_operator",
-        "group_reference",
-        "negation",
-        "replace_all",
-        "position",
-        "all",
-        "per_unit_type",
-        "distinct",
-    ],
-    "GainResource": [
-        "resource",
-        "heart_colors",
-        "heart_colors_from_selected_card",
-        "sign",
-        "operation",
-        "value",
-        "energy_count",
-        "dynamic_count",
-        "optional",
-        "duration",
-        "position",
-        "any_number",
-        "per_unit",
-        "per_unit_count",
-        "per_unit_type",
-        "per_unit_heart_colors",
-        "per_unit_location",
-        "location",
-        "group_names",
-        "card_type",
-        "cost_limit",
-        "cost_limit_operator",
-        "characters",
-        "exclude_characters",
-        "exclude_group_names",
-        "self_target",
-        "target_from_selection",
-        "card_property",
-        "original_value",
-        "negation",
-        "filter_targets_by_heart_colors",
-        "activation_position",
-        "state",
-        "heart_type",
-        "target_count",
-        "all",
-        "same_name",
-        "exclude_self",
-        "group_reference",
-        "trigger_type",
-        "distinct",
-        "heart_color",
-        "action_by",
-        "activation_condition_parsed",
-        "multiple_targets",
-        "repeat_limit",
-        "timing_condition",
-        "require_all_heart_colors",
-        "heart_color_count",
-    ],
-    "ChangeState": [
-        "source",
-        "target",
-        "destination",
-        "state_change",
-        "card_type",
-        "cost_limit",
-        "cost_limit_operator",
-        "cost_from_revealed",
-        "optional",
-        "self_cost",
-        "characters",
-        "exclude_characters",
-        "group_names",
-        "exclude_group_names",
-        "blade_limit",
-        "blade_limit_operator",
-        "per_unit",
-        "per_unit_count",
-        "per_unit_type",
-        "per_unit_heart_colors",
-        "per_unit_location",
-        "location",
-        "distinct",
-        "exclude_self",
-        "self_target",
-        "identities",
-        "all_regions",
-        "card_names",
-        "negation",
-        "cost_total",
-        "cost_total_operator",
-        "card_property",
-        "original_value",
-        "name_constraint",
-        "name_constraint_source",
-        "filter_targets_by_heart_colors",
-        "group_reference",
-        "activation_position",
-        "ability_filter",
-        "ability_filter_triggers",
-        "or_ability_filters",
-        "exclude_heart_colors",
-        "heart_colors",
-        "all",
-        "position",
-        "state",
-        "action_by",
-        "activation_condition_parsed",
-    ],
-    "AbilityOp": [
-        "source",
-        "target",
-        "destination",
-        "ability_gain",
-        "ability_gain_trigger",
-        "gained_effect",
-        "ability_text",
-        "target_trigger",
-        "source_card",
-        "suppressed_trigger",
-        "card_type",
-        "group_names",
-        "exclude_group_names",
-        "characters",
-        "exclude_characters",
-        "cost_limit",
-        "cost_limit_operator",
-        "location",
-        "trigger_filter",
-        "trigger_type",
-        "duration",
-        "self_target",
-        "exclude_self",
-        "effect_type",
-        "use_limit",
-        "triggers",
-        "activation_condition_parsed",
-        "option",
-        "all",
-        "activation_position",
-        "heart_colors",
-        "dynamic_count",
-    ],
-    "CompoundEffect": [
-        "source",
-        "target",
-        "destination",
-        "repeat_limit",
-        "options",
-        "choice_type",
-        "choice_options",
-        "question",
-        "answers",
-        "choice_maker",
-        "alternative_effect",
-        "optional",
-        "target_count",
-        "group_names",
-        "heart_colors",
-        "exclude_self",
-        "duration",
-        "position",
-        "all",
-        "activation_position",
-        "card_type",
-        "trigger_type",
-        "activation_condition_parsed",
-        "original_value",
-        "shuffle",
-        "distinct",
-        "group_reference",
-        "per_unit",
-        "per_unit_count",
-        "per_unit_type",
-        "alternative_count_type",
-    ],
-    "RestrictionOp": [
-        "restriction_type",
-        "restricted_destination",
-        "delayed",
-        "timing",
-        "treat_as",
-        "timing_condition",
-        "phase",
-        "non_stackable",
-        "operation",
-        "card_type",
-        "location",
-        "effect_type",
-        "replaces_event",
-        "choice_based",
-        "trigger_type",
-        "trigger_filter",
-        "duration",
-        "self_target",
-        "exclude_self",
-        "group_names",
-        "exclude_group_names",
-        "characters",
-        "exclude_characters",
-    ],
-    "PositionOp": [
-        "source",
-        "target",
-        "destination",
-        "position",
-        "target_member",
-        "source_position",
-        "exclude_position",
-        "allow_occupied_stage",
-        "optional",
-        "card_type",
-        "group_names",
-        "exclude_group_names",
-        "characters",
-        "exclude_characters",
-        "cost_limit",
-        "cost_limit_operator",
-        "energy_count",
-        "dynamic_count",
-        "any_number",
-        "cost_from_revealed",
-        "exclude_self",
-        "multiple_targets",
-        "self_target",
-        "state",
-        "activation_position",
-        "group_reference",
-    ],
-    "MiscOp": [
-        "source",
-        "target",
-        "destination",
-        "operation",
-        "value",
-        "card_type",
-        "group_names",
-        "exclude_group_names",
-        "characters",
-        "exclude_characters",
-        "cost_limit",
-        "cost_limit_operator",
-        "location",
-        "duration",
-        "heart_colors",
-        "heart_type",
-        "heart_selection",
-        "blade_type",
-        "self_target",
-        "exclude_self",
-        "choice",
-        "lose_blade_hearts",
-        "dynamic_count",
-        "per_unit",
-        "per_unit_count",
-        "per_unit_type",
-        "per_unit_heart_colors",
-        "per_unit_location",
-        "repeat_limit",
-        "identities",
-        "all_regions",
-        "timing",
-        "treat_as",
-        "effect_constraint",
-        "original_value",
-        "original_count",
-        "original_operator",
-        "original_cost",
-        "blade_limit",
-        "blade_limit_operator",
-        "negation",
-        "activation_position",
-        "target_count",
-        "group_reference",
-        "parenthetical",
-        "quoted_text",
-        "same_unit_name",
-        "alternative_count_type",
-        "per_group",
-        "per_group_count",
-        "resource_icon_count",
-        "cost_total",
-        "cost_total_operator",
-        "cost_reference",
-        "cost_offset",
-        "blind",
-        "picker",
-        "all",
-        "sign",
-        "heart_color_count",
-        "require_all_heart_colors",
-        "energy_count",
-        "placement_order",
-        "ref_value",
-        "ref_offset",
-        "id",
-        "card_names",
-        "character_effects",
-        "or_card_types",
-        "options",
-        "position",
-        "ability_filter",
-    ],
-    "CustomOp": [
-        "action_by",
-        "opponent_action",
-        "effect_type",
-        "replaces_event",
-        "choice_based",
-        "card_type",
-        "group_names",
-        "exclude_group_names",
-        "characters",
-        "exclude_characters",
-        "identities",
-        "all_regions",
-        "question",
-        "answers",
-        "choice_maker",
-        "options",
-        "location",
-        "duration",
-        "self_target",
-        "exclude_self",
-        "original_value",
-        "timing",
-        "treat_as",
-        "trigger_type",
-        "trigger_filter",
-        "activation_condition_parsed",
-        "use_limit",
-        "triggers",
-    ],
-}
-
-# For each effect opcode, describe how to decode it.
-# Format: (EffectKind_variant, action_string, [(optype, var_name, ek_field_name)])
-# opcode -> (variant, action_str, [(operand_type, read_variable, effectkind_field)])
-# All non-specified EffectKind fields get Default::default()
-# Operand types: "u8", "i8", "u16", "zone", "player", "bool", "card_type", "resource", "heart", "state", "duration", "operator", "str_idx"
-EFFECT_DECODE_MAP = {
-    "draw_card": (
-        "DrawCards",
-        "draw_card",
-        [
-            ("u8", "target_count", "target_count"),
-            ("zone", "source", "source"),
-        ],
-    ),
-    "move_cards": (
-        "MoveCards",
-        "move_cards",
-        [
-            ("u8", "count", "count"),
-            ("zone", "source", "source"),
-            ("zone", "destination", "destination"),
-            ("card_type", "card_type", "card_type"),
-            ("player", "target", "target"),
-        ],
-    ),
-    "gain_resource": (
-        "GainResource",
-        "gain_resource",
-        [
-            ("resource", "resource", "resource"),
-            ("u8", "count", "value"),
-            ("heart", "heart_color", "heart_colors"),
-            ("duration", "duration", "duration"),
-            ("str_idx", "_char", "_char"),
-        ],
-    ),
-    "modify_score": (
-        "ModifyScore",
-        "modify_score",
-        [
-            ("i8", "value", "value"),
-            ("bool", "per_unit", "per_unit"),
-            ("player", "target", "target"),
-        ],
-    ),
-    "change_state": (
-        "ChangeState",
-        "change_state",
-        [
-            ("state", "state_change", "state_change"),
-            ("player", "target", "target"),
-        ],
-    ),
-    "position_change": (
-        "PositionOp",
-        "position_change",
-        [
-            ("player", "target", "target"),
-        ],
-    ),
-    "modify_required_hearts": (
-        "ModifyHearts",
-        "modify_required_hearts",
-        [
-            ("i8", "value", "value"),
-            ("player", "_target", "_target"),
-        ],
-    ),
-    "modify_cost": (
-        "CustomOp",
-        "modify_cost",
-        [
-            ("i8", "_value", "_value"),
-            ("player", "_target", "_target"),
-        ],
-    ),
-    "set_blade_type": (
-        "CustomOp",
-        "set_blade_type",
-        [("u8", "_placeholder", "_placeholder")],
-    ),
-    "set_blade_count": (
-        "MiscOp",
-        "set_blade_count",
-        [
-            ("u8", "value", "value"),
-        ],
-    ),
-    "set_heart_type": (
-        "MiscOp",
-        "set_heart_type",
-        [
-            ("heart", "value", "heart_type"),
-        ],
-    ),
-    "gain_ability": (
-        "AbilityOp",
-        "gain_ability",
-        [("u16", "_id", "_id"), ("u8", "_dur", "_dur")],
-    ),
-    "restriction": ("RestrictionOp", "restriction", []),
-    "choose_target_player": (
-        "SelectTarget",
-        "choose_target_player",
-        [
-            ("player", "target", "target"),
-        ],
-    ),
-    "place_energy_under_member": (
-        "MoveCards",
-        "place_energy_under_member",
-        [
-            ("u8", "count", "count"),
-        ],
-    ),
-    "draw_until_count": (
-        "DrawCards",
-        "draw_until_count",
-        [
-            ("u8", "target_count", "target_count"),
-            ("zone", "source", "source"),
-        ],
-    ),
-    "modify_yell_count": (
-        "ModifyScore",
-        "modify_yell_count",
-        [
-            ("i8", "value", "value"),
-        ],
-    ),
-    "invalidate_ability": ("AbilityOp", "invalidate_ability", []),
-    "suppress_ability_trigger": ("AbilityOp", "suppress_ability_trigger", []),
-    "activate_ability": ("AbilityOp", "activate_ability", []),
-    "play_baton_touch": ("MoveCards", "play_baton_touch", []),
-    "modify_required_hearts_global": (
-        "ModifyHearts",
-        "modify_required_hearts_global",
-        [
-            ("i8", "value", "value"),
-        ],
-    ),
-    "gain_ability_from_source": (
-        "AbilityOp",
-        "gain_ability_from_source",
-        [("u16", "_id", "_id")],
-    ),
-    "set_card_identity": (
-        "ChangeState",
-        "set_card_identity",
-        [("str_idx", "_value", "_value")],
-    ),
-}
-
-# Condition decode map: (Condition_variant, [(optype, var_name, cond_field)])
-CONDITION_DECODE_MAP = {
-    "card_count_condition": (
-        "Location",
-        [
-            ("zone", "_location", "_location"),
-            ("operator", "_operator", "_operator"),
-            ("u8", "_count", "_count"),
-            ("u8", "card_type_raw", "_ct_raw"),
-            ("str_idx", "_group_names", "_group_names"),
-            ("player", "_target", "_target"),
-        ],
-    ),
-    "location_condition": (
-        "Location",
-        [
-            ("zone", "_location", "_location"),
-            ("card_type", "_ct_str", "_ct_str"),
-            ("bool", "_exclude_self", "_exclude_self"),
-            ("player", "_target", "_target"),
-        ],
-    ),
-    "comparison_condition": (
-        "Comparison",
-        [
-            ("zone", "location", "location"),
-            ("u8", "_comp_type", "_comp_type"),
-            ("u8", "_agg", "_agg"),
-            ("operator", "operator", "operator"),
-            ("u16", "count", "count"),
-            ("player", "target", "target"),
-            ("resource", "resource_type", "resource_type"),
-            ("u8", "card_type_raw", "card_type"),
-            ("str_idx", "_group_names", "_group_names"),
-        ],
-    ),
-    "group_condition": (
-        "Group",
-        [
-            ("str_idx", "_group_names", "_group_names"),
-            ("u8", "_count", "_count"),
-            ("operator", "_operator", "_operator"),
-        ],
-    ),
-    "movement_condition": (
-        "Movement",
-        [
-            ("zone", "_location", "_location"),
-            ("card_type", "_ct_str", "_ct_str"),
-            ("u8", "_count", "_count"),
-            ("operator", "_operator", "_operator"),
-        ],
-    ),
-    "temporal_condition": (
-        "Temporal",
-        [("u8", "_count", "_count"), ("operator", "_operator", "_operator")],
-    ),
-    "appearance_condition": (
-        "Appearance",
-        [("zone", "_location", "_location"), ("u8", "_count", "_count")],
-    ),
-    "state_condition": (
-        "State",
-        [
-            ("state", "_state_val", "_state_val"),
-            ("operator", "_operator", "_operator"),
-            ("bool", "_value", "_value"),
-        ],
-    ),
-    "energy_state_condition": (
-        "State",
-        [("operator", "_operator", "_operator"), ("u8", "_count", "_count")],
-    ),
-    "position_condition": ("PositionCond", [("zone", "_location", "_location")]),
-    "highest_cost_on_stage_condition": ("ScoreThreshold", []),
-    "state_change_condition": ("State", [("state", "_from_state", "_from_state")]),
-    "card_blade_condition": (
-        "Resource",
-        [("operator", "_operator", "_operator"), ("u8", "_count", "_count")],
-    ),
-    "all_cost_comparison_condition": (
-        "Comparison",
-        [("operator", "_operator", "_operator"), ("u16", "_count", "_count")],
-    ),
-    "ability_filter_condition": (
-        "AbilityFilter",
-        [("str_idx", "_ability_filter", "_ability_filter")],
-    ),
-    "has_moved": (
-        "Movement",
-        [
-            ("zone", "_position", "_position"),
-            ("str_idx", "_group_names", "_group_names"),
-        ],
-    ),
-    "not_moved": ("Movement", []),
-    "opponent_live_success": (
-        "OpponentLiveSuccess",
-        [("bool", "_no_excess_heart", "_no_excess_heart")],
-    ),
-    "no_excess_heart": ("NoExcessHeart", []),
-}
-
-# Cost decode map: (action_string, [(optype, var_name, ek_field)])
-COST_DECODE_MAP = {
-    "move_cards_cost": (
-        "move_cards",
-        [
-            ("zone", "source", "source"),
-            ("zone", "destination", "destination"),
-            ("card_type", "card_type", "card_type"),
-            ("bool", "self_cost", "self_cost"),
-            ("u8", "count", "count"),
-        ],
-    ),
-    "tap": ("tap", []),
-    "rest": ("rest", [("u8", "count", "count")]),
-    "energy": ("pay_energy", [("u8", "energy", "energy_count")]),
-    "discard": (
-        "discard",
-        [("u8", "count", "count"), ("card_type", "card_type", "card_type")],
-    ),
-    "place_energy_under_member_cost": (
-        "place_energy_under_member",
-        [("u8", "count", "count")],
-    ),
-    "pay_energy": (
-        "pay_energy",
-        [("u8", "energy", "energy_count"), ("bool", "optional", "optional")],
-    ),
-    "change_state_cost": (
-        "change_state",
-        [
-            ("state", "state_change", "state_change"),
-            ("bool", "optional", "optional"),
-            ("bool", "self_cost", "self_cost"),
-        ],
-    ),
-    "sequential_cost": ("sequential_cost", [("u8", "sub_count", "_count")]),
-    "reveal": (
-        "reveal",
-        [
-            ("zone", "source", "source"),
-            ("card_type", "card_type", "card_type"),
-            ("u8", "count", "count"),
-        ],
-    ),
-    "choice_condition": ("choice", [("u8", "option_count", "_count")]),
-}
-
-
-def _assign_expr(optype, src_var, field_name):
-    """Generate Rust expression to assign a decoded value to an EffectKind field."""
-    conv = {
-        "u8": f"Some({src_var} as u32)",
-        "i8": f"Some({src_var} as u32)",
-        "u16": f"Some({src_var} as u32)",
-        "bool": f"Some({src_var})",
-        "zone": f"Some({src_var}.into())",
-        "player": f"Some({src_var}.into())",
-        "card_type": f"Some({src_var}.into())",
-        "resource": f"Some({src_var}.into())",
-        "heart": f"Some({src_var}.into())",
-        "state": f"Some({src_var}.into())",
-        "duration": f"Some({src_var}.into())",
-        "operator": f"Some({src_var}.into())",
-        "str_idx": f"{src_var}.map(|s| s.into())",
-    }
-    return conv.get(optype, f"Some({src_var})")
-
-
-def _cond_assign_expr(field_type, src_var):
-    """Generate assignment expression for a Condition field based on its Rust type.
-    Returns None for types we can't convert (field stays as default/None)."""
-    type_map = {
-        "ArcStr": f"Some({src_var}.into())",
-        "bool": f"Some({src_var})",
-        "u32": f"Some({src_var} as u32)",
-        "String": f"Some({src_var}.to_string())",
-    }
-    if field_type in type_map:
-        return type_map[field_type]
-    # Handle wrapped types
-    if field_type.startswith("Box<Vec<") and "String" in field_type:
-        return f"Some(Box::new(vec![{src_var}.to_string()]))"
-    if field_type.startswith("Vec<") and "String" in field_type:
-        return f"Some(vec![{src_var}.to_string()])"
-    if field_type == "ConditionCardType":
-        return f"Some(decode_cond_card_type({src_var}))"
-    if field_type == "Operator":
-        return f"Some(decode_operator_str({src_var}))"
-    # Types we skip (keep default=None): ComparisonType, ComparisonTarget, CardState,
-    # PositionInfo, DistinctInfo, CardProperty, Box<TriggerEvent>, Box<Condition>,
-    # Box<AbilityEffect>, Box<Vec<String>> (non-String), Vec<T>, AbilityFilter
-    return None
-
-
-def _default_field_val(field_name):
-    """Generate default value for an EffectKind field.
-    Default::default() works for both Option<T> and Box<Vec<String>>."""
-    return "Default::default()"
-
-
-def generate_vm_rs(build_dir):
-    build_dir.mkdir(parents=True, exist_ok=True)
-    lines = [
-        "// Auto-generated by compile_abilities.py — DO NOT EDIT",
-        "",
-    ]
-
-    # ── Default constructor for each Condition variant ──
-    cond_fields = _get_condition_fields()
-    for variant in sorted(cond_fields.keys()):
-        all_fields = cond_fields[variant]
-        fn_name = f"default_condition_{variant[0].lower()}{variant[1:]}"
-        lines.append(f"fn {fn_name}() -> Condition {{")
-        lines.append(f"    Condition::{variant} {{")
-        for f in all_fields:
-            # f is either (name, type) tuple or just name string
-            fname = f[0] if isinstance(f, tuple) else f
+    # Default condition constructors
+    for v in sorted(cf.keys()):
+        fn = f"default_condition_{v[0].lower()}{v[1:]}"
+        lines.append(f"fn {fn}() -> Condition {{")
+        lines.append(f"    Condition::{v} {{")
+        for fname in sorted(cf[v].keys()):
             lines.append(f"        {fname}: Default::default(),")
         lines.append("    }")
         lines.append("}")
         lines.append("")
 
-    # ── Default constructor for each EffectKind variant ──
-    variant_used = set()
-    for json_name, (variant, action, fields) in EFFECT_DECODE_MAP.items():
-        variant_used.add(variant)
+    # Default EffectKind constructors
+    action_to_variant = {
+        "draw_card": "DrawCards",
+        "draw_until_count": "DrawCards",
+        "move_cards": "MoveCards",
+        "gain_resource": "GainResource",
+        "modify_score": "ModifyScore",
+        "change_state": "ChangeState",
+        "position_change": "PositionOp",
+        "modify_required_hearts": "ModifyHearts",
+        "modify_required_hearts_global": "ModifyHearts",
+        "modify_cost": "CustomOp",
+        "set_blade_type": "CustomOp",
+        "set_blade_count": "MiscOp",
+        "set_heart_type": "MiscOp",
+        "gain_ability": "AbilityOp",
+        "gain_ability_from_source": "AbilityOp",
+        "restriction": "RestrictionOp",
+        "choose_target_player": "SelectTarget",
+        "place_energy_under_member": "MoveCards",
+        "modify_yell_count": "ModifyScore",
+        "invalidate_ability": "AbilityOp",
+        "suppress_ability_trigger": "AbilityOp",
+        "activate_ability": "AbilityOp",
+        "play_baton_touch": "MoveCards",
+        "set_card_identity": "ChangeState",
+        "pay_energy": "GainResource",
+        "look_at": "LookReveal",
+        "select": "SelectTarget",
+        "select_cards": "SelectTarget",
+        "select_number": "SelectTarget",
+        "reveal": "LookReveal",
+        "reveal_until_live_card": "LookReveal",
+        "do_nothing": "CustomOp",
+        "perform_yell": "MiscOp",
+        "specify_heart_color": "MiscOp",
+        "re_yell": "MiscOp",
+        "reduce_live_card_set_limit": "RestrictionOp",
+        "discard_until_count": "MoveCards",
+        "repeat_procedure": "CompoundEffect",
+        "conditional_alternative": "CompoundEffect",
+    }
+    used_ek = set()
+    for a in EFFECT_OPCODES:
+        v = action_to_variant.get(a)
+        if v:
+            used_ek.add(v)
+    used_ek.add("CompoundEffect")
+    used_ek.add("MoveCards")
+    used_ek.add("ChangeState")
 
-    for variant in sorted(variant_used):
-        all_fields = EFFECTKIND_ALL_FIELDS.get(variant, [])
-        fn_name = f"default_{variant[0].lower()}{variant[1:]}"
-        lines.append(f"fn {fn_name}() -> EffectKind {{")
-        lines.append(f"    EffectKind::{variant} {{")
-        for f in all_fields:
-            lines.append(f"        {f}: {_default_field_val(f)},")
+    for v in sorted(used_ek):
+        fn = f"default_{v[0].lower()}{v[1:]}"
+        lines.append(f"fn {fn}() -> EffectKind {{")
+        lines.append(f"    EffectKind::{v} {{")
+        for fname in sorted(ekf.get(v, {}).keys()):
+            ft = ekf[v][fname]
+            if ft.startswith("Option<Box<"):
+                lines.append(f"        {fname}: None,")
+            elif ft.startswith("Box<"):
+                lines.append(f"        {fname}: Box::default(),")
+            else:
+                lines.append(f"        {fname}: Default::default(),")
         lines.append("    }")
         lines.append("}")
         lines.append("")
 
-    # ── decode_effect_kind ──
+    # decode_effect_kind
     lines.append(
         "fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>> {"
     )
     lines.append("    match op {")
-    for json_name, (variant, action, ek_fields) in sorted(EFFECT_DECODE_MAP.items()):
-        op = rust_name(json_name)
-        fn_name = f"default_{variant[0].lower()}{variant[1:]}"
-        lines.append(f"        Opcode::{op} => {{")
-        for optype, var_name, ek_field in ek_fields:
-            # Always read all operands to advance cursor, even discarded ones
-            lines.append("            " + _read_expr(optype, var_name) + ";")
-        lines.append(f"            let mut ek = {fn_name}();")
-        ek_types = _get_effectkind_field_types().get(variant, {})
-        field_assigns = []
-        for optype, var_name, ek_field in ek_fields:
-            if not ek_field.startswith("_"):
-                field_type = ek_types.get(ek_field, "ArcStr")
-                expr = _effect_assign_expr(field_type, var_name, optype)
-                if expr is None:
-                    expr = _assign_expr(optype, var_name, ek_field)
-                field_assigns.append((ek_field, expr))
-        # Use if let to set variant-specific fields
-        # Use `field: ref mut alias` to avoid shadowing local variables
-        fields_list = ", ".join(f"{f}: ref mut _bc_{f}" for f, _ in field_assigns)
-        if field_assigns:
+    for action in sorted(EFFECT_OPCODES.keys()):
+        opname = rust_name(action)
+        variant = action_to_variant.get(action)
+        if variant is None:
+            continue
+        fn = f"default_{variant[0].lower()}{variant[1:]}"
+        fields = field_map.get(action, [])
+        lines.append(f"        Opcode::{opname} => {{")
+        vars_read = []
+        for ftype, fname in fields:
+            vname = fname.replace("-", "_")
+            lines.append("            " + _read_expr(ftype, vname) + ";")
+            vars_read.append((ftype, vname, fname))
+        lines.append(f"            let mut ek = {fn}();")
+        assigns = []
+        for ftype, vname, fname in vars_read:
+            ft = ekf.get(variant, {}).get(fname)
+            if ft:
+                expr = _assign(ft, vname, ftype)
+                if expr:
+                    assigns.append((fname, expr))
+        if assigns:
+            fl = ", ".join(f"{f}: ref mut _bc_{f}" for f, _ in assigns)
             lines.append(
-                f"            if let EffectKind::{variant} {{ {fields_list}, .. }} = &mut ek {{"
+                f"            if let EffectKind::{variant} {{ {fl}, .. }} = &mut ek {{"
             )
-            for f, expr in field_assigns:
-                lines.append(f"                *_bc_{f} = {expr};")
+            for f, e in assigns:
+                lines.append(f"                *_bc_{f} = {e};")
             lines.append("            }")
         lines.append("            Some(Box::new(ek))")
         lines.append("        }")
@@ -2115,25 +965,25 @@ def generate_vm_rs(build_dir):
     lines.append("}")
     lines.append("")
 
-    # ── decode_simple_effect (advance cursor, return action string) ──
-    lines.append(
-        "fn decode_simple_effect(op: Opcode, cursor: &mut &[u8]) -> &'static str {"
-    )
+    # action_for_op
+    lines.append("fn action_for_op(op: Opcode) -> &'static str {")
     lines.append("    match op {")
-    for json_name, (variant, action, ek_fields) in sorted(EFFECT_DECODE_MAP.items()):
-        op = rust_name(json_name)
-        lines.append(f"        Opcode::{op} => {{")
-        for optype, var_name, ek_field in ek_fields:
-            # In decode_simple_effect, we advance cursor but don't use values
-            lines.append("            " + _read_expr(optype, "_" + var_name) + ";")
-        lines.append(f'            "{action}"')
-        lines.append("        }")
+    for action in sorted(EFFECT_OPCODES.keys()):
+        lines.append(f'        Opcode::{rust_name(action)} => "{action}",')
     lines.append('        _ => "",')
     lines.append("    }")
     lines.append("}")
     lines.append("")
 
-    # ── Condition decode helper functions ──
+    # decode_operator_from_str
+    lines.append("fn decode_operator_from_str(s: &str) -> Operator {")
+    lines.append(
+        '    match s { ">=" => Operator::Gte, "<=" => Operator::Lte, ">" => Operator::Gt, "<" => Operator::Lt, "=" => Operator::Eq, _ => Operator::Eq }'
+    )
+    lines.append("}")
+    lines.append("")
+
+    # decode_cond_card_type
     lines.append("fn decode_cond_card_type(v: u8) -> ConditionCardType {")
     lines.append(
         "    match v { 1 => ConditionCardType::MemberCard, 2 => ConditionCardType::LiveCard, 3 => ConditionCardType::EnergyCard, _ => ConditionCardType::MemberCard }"
@@ -2141,46 +991,60 @@ def generate_vm_rs(build_dir):
     lines.append("}")
     lines.append("")
 
-    # ── decode_condition ──
+    # decode_condition
+    cond_variant = {
+        "card_count_condition": "Location",
+        "location_condition": "Location",
+        "comparison_condition": "Comparison",
+        "group_condition": "Group",
+        "movement_condition": "Movement",
+        "temporal_condition": "Temporal",
+        "appearance_condition": "Appearance",
+        "state_condition": "State",
+        "energy_state_condition": "State",
+        "position_condition": "PositionCond",
+        "highest_cost_on_stage_condition": "ScoreThreshold",
+        "state_change_condition": "State",
+        "card_blade_condition": "Resource",
+        "all_cost_comparison_condition": "Comparison",
+        "ability_filter_condition": "AbilityFilter",
+        "has_moved": "Movement",
+        "not_moved": "Movement",
+        "opponent_live_success": "OpponentLiveSuccess",
+        "no_excess_heart": "NoExcessHeart",
+    }
+
     lines.append("pub fn decode_condition(cursor: &mut &[u8]) -> Condition {")
     lines.append("    if cursor.is_empty() { return default_condition_alwaysTrue(); }")
     lines.append("    let op_val = cursor[0];")
     lines.append("    match op_val {")
-    for json_name, (variant, fields) in sorted(CONDITION_DECODE_MAP.items()):
-        code = CONDITION_OPCODES[json_name]
+    for ctype in sorted(COND_FIELDS.keys()):
+        code = COND_OPCODES[ctype]
+        v = cond_variant[ctype]
+        fn = f"default_condition_{v[0].lower()}{v[1:]}"
+        fields = COND_FIELDS[ctype]
         lines.append(f"        {code} => {{")
-        lines.append(f"            let _ = read_u8(cursor);")
-        for optype, var_name, ek_field in fields:
-            if ek_field.startswith("_"):
-                lines.append(f"            {_read_expr(optype, '_' + var_name)};")
-            else:
-                lines.append(f"            {_read_expr(optype, var_name)};")
-        fn_name = f"default_condition_{variant[0].lower()}{variant[1:]}"
-        lines.append(f"            let mut c = {fn_name}();")
-        # Get field types for this variant to generate type-aware assignments
-        cond_field_types = dict(_get_condition_fields().get(variant, []))
-        field_assigns = []
-        for optype, var_name, ek_field in fields:
-            if ek_field.startswith("_"):
-                continue
-            field_type = cond_field_types.get(ek_field, "ArcStr")
-            # Try operand-based assignment first (for EffectKind-style fields)
-            expr = _assign_expr(optype, var_name, ek_field)
-            # But override with type-aware condition assignment
-            cond_expr = _cond_assign_expr(field_type, var_name)
-            if cond_expr is not None:
-                field_assigns.append((ek_field, cond_expr))
-            elif optype == "str_idx":
-                # str_idx to Option<ArcStr> conversion
-                field_assigns.append((ek_field, f"{var_name}.map(|s| s.into())"))
-            # If neither works, skip (field stays None)
-        if field_assigns:
-            f_list = ", ".join(f"{f}: ref mut _bc_{f}" for f, _ in field_assigns)
+        lines.append("            let _ = read_u8(cursor);")
+        vr = []
+        for ftype, fname in fields:
+            vname = fname.replace("-", "_")
+            lines.append("            " + _read_expr(ftype, vname) + ";")
+            vr.append((ftype, vname, fname))
+        lines.append(f"            let mut c = {fn}();")
+        assigns = []
+        for ftype, vname, fname in vr:
+            ft = cf.get(v, {}).get(fname)
+            if ft:
+                expr = _cond_assign(ft, vname, ftype, fname)
+                if expr:
+                    assigns.append((fname, expr))
+        if assigns:
+            fl = ", ".join(f"{f}: ref mut _bc_{f}" for f, _ in assigns)
             lines.append(
-                f"            if let Condition::{variant} {{ {f_list}, .. }} = &mut c {{"
+                f"            if let Condition::{v} {{ {fl}, .. }} = &mut c {{"
             )
-            for f, expr in field_assigns:
-                lines.append(f"                *_bc_{f} = {expr};")
+            for f, e in assigns:
+                lines.append(f"                *_bc_{f} = {e};")
             lines.append("            }")
         lines.append("            c")
         lines.append("        }")
@@ -2197,19 +1061,20 @@ def generate_vm_rs(build_dir):
     lines.append("                }")
     lines.append("                conditions.push(Box::new(decode_condition(cursor)));")
     lines.append("            }")
-    lines.append("            if conditions.is_empty() {")
-    lines.append("                default_condition_alwaysTrue()")
-    lines.append("            } else if conditions.len() == 1 {")
-    lines.append("                *conditions.into_iter().next().unwrap()")
-    lines.append("            } else {")
-    lines.append("                let mut c = default_condition_compound();")
+    lines.append(
+        "            if conditions.is_empty() { default_condition_alwaysTrue() }"
+    )
+    lines.append(
+        "            else if conditions.len() == 1 { *conditions.into_iter().next().unwrap() }"
+    )
+    lines.append("            else { let mut c = default_condition_compound();")
     lines.append(
         "                if let Condition::Compound { operator: ref mut _bc_o, conditions: ref mut _bc_cond, .. } = &mut c {"
     )
-    lines.append("                    *_bc_o = Some(op_str.into());")
-    lines.append("                    *_bc_cond = Some(conditions);")
-    lines.append("                }")
-    lines.append("                c")
+    lines.append(
+        "                    *_bc_o = Some(op_str.into()); *_bc_cond = Some(conditions);"
+    )
+    lines.append("                } c")
     lines.append("            }")
     lines.append("        }")
     lines.append("        _ => default_condition_alwaysTrue(),")
@@ -2220,73 +1085,156 @@ def generate_vm_rs(build_dir):
     (build_dir / "vm_gen.rs").write_text("\n".join(lines), encoding="utf-8")
 
 
-def _read_expr(optype, name):
-    exprs = {
-        "u8": f"let {name} = read_u8(cursor)",
-        "i8": f"let {name} = read_i8(cursor)",
-        "u16": f"let {name} = read_u16(cursor)",
-        "bool": f"let {name} = read_u8(cursor) != 0",
-        "zone": f"let {name} = decode_zone(read_u8(cursor))",
-        "player": f"let {name} = decode_player(read_u8(cursor))",
-        "card_type": f"let {name} = decode_card_type(read_u8(cursor))",
-        "resource": f"let {name} = decode_resource(read_u8(cursor))",
-        "heart": f"let {name} = decode_heart(read_u8(cursor))",
-        "state": f"let {name} = decode_state(read_u8(cursor))",
-        "duration": f"let {name} = decode_duration(read_u8(cursor))",
-        "operator": f"let {name} = decode_operator(read_u8(cursor))",
-        "str_idx": f"let {name} = read_str(cursor)",
+def _read_expr(ftype, vname):
+    m = {
+        "u8": f"let {vname} = read_u8(cursor)",
+        "u16": f"let {vname} = read_u16(cursor)",
+        "i8": f"let {vname} = read_i8(cursor)",
+        "bool": f"let {vname} = read_u8(cursor) != 0",
+        "zone": f"let {vname} = decode_zone(read_u8(cursor))",
+        "player": f"let {vname} = decode_player(read_u8(cursor))",
+        "card_type": f"let {vname} = decode_card_type(read_u8(cursor))",
+        "resource": f"let {vname} = decode_resource(read_u8(cursor))",
+        "heart": f"let {vname} = decode_heart(read_u8(cursor))",
+        "state": f"let {vname} = decode_state(read_u8(cursor))",
+        "duration": f"let {vname} = decode_duration(read_u8(cursor))",
+        "operator": f"let {vname} = decode_operator(read_u8(cursor))",
+        "str_idx": f"let {vname} = read_str(cursor)",
     }
-    return exprs.get(optype, f"let {name} = read_u8(cursor)")
+    return m.get(ftype, f"let {vname} = read_u8(cursor)")
 
 
-def generate_disassembly(bytecode, offsets, names, disasm, build_dir):
-    lines = []
-    for i in range(len(offsets) - 1):
-        start = offsets[i]
-        end = offsets[i + 1]
-        lines.append(f"#{i:03d} [{start:04x}-{end:04x}] ({end - start}B): {names[i]}")
-        lines.append(f"    {disasm[i]}")
-        lines.append("")
-    (build_dir / "abilities_disasm.txt").write_text("\n".join(lines), encoding="utf-8")
+def _assign(ft, src_var, optype):
+    """Generate assignment expression. Returns None if not possible."""
+    if ft is None:
+        return None
+    is_opt = ft.startswith("Option<")
+    inner = ft[7:-1] if is_opt else ft
+    opt_ret = optype == "str_idx"
+
+    def wr(expr):
+        return f"Some({expr})" if is_opt else expr
+
+    if inner == "ArcStr":
+        if opt_ret:
+            return (
+                f"{src_var}.map(|s| s.into())"
+                if is_opt
+                else f"{src_var}.map_or(Default::default(), |s| s.into())"
+            )
+        return wr(f"{src_var}.into()")
+    if inner == "u32":
+        if opt_ret:
+            return (
+                f"{src_var}.map(|s| s.parse().ok().unwrap_or(0))"
+                if is_opt
+                else f"{src_var}.map_or(0, |s| s.parse().ok().unwrap_or(0))"
+            )
+        return wr(f"{src_var} as u32")
+    if inner == "bool":
+        return wr(f"{src_var}")
+    if inner == "String":
+        if opt_ret:
+            return (
+                f"{src_var}.map(|s| s.to_string())"
+                if is_opt
+                else f"{src_var}.map_or(String::new(), |s| s.to_string())"
+            )
+        return wr(f"{src_var}.to_string()")
+    if "Box<Vec<" in inner or "Vec<" in inner:
+        bwrap = "Box::new(" if "Box<" in inner else ""
+        bclose = ")" if "Box<" in inner else ""
+        if opt_ret:
+            if is_opt:
+                return f"{src_var}.map(|s| {bwrap}vec![s.to_string()]{bclose})"
+            return f"{src_var}.map_or(Default::default(), |s| {bwrap}vec![s.to_string()]{bclose})"
+        return wr(f"{bwrap}vec![{src_var}.to_string()]{bclose}")
+    if inner == "Operator":
+        return wr(f"decode_operator_from_str({src_var})")
+    if inner == "ConditionCardType":
+        return wr(f"decode_cond_card_type({src_var})") if not opt_ret else None
+    return None
 
 
-# ─────────────────────────────────────────────────────────────
-# Entry point
-# ─────────────────────────────────────────────────────────────
+def _cond_assign(ft, src_var, optype, fname):
+    if ft is None:
+        return None
+    is_opt = ft.startswith("Option<")
+    inner = ft[7:-1] if is_opt else ft
+    opt_ret = optype == "str_idx"
+
+    def wr(expr):
+        return f"Some({expr})" if is_opt else expr
+
+    if inner == "ArcStr":
+        if opt_ret:
+            return (
+                f"{src_var}.map(|s| s.into())"
+                if is_opt
+                else f"{src_var}.map_or(Default::default(), |s| s.into())"
+            )
+        return wr(f"{src_var}.into()")
+    if inner == "u32":
+        if opt_ret:
+            return (
+                f"{src_var}.map(|s| s.parse().ok().unwrap_or(0))"
+                if is_opt
+                else f"{src_var}.map_or(0, |s| s.parse().ok().unwrap_or(0))"
+            )
+        return wr(f"{src_var} as u32")
+    if inner == "bool":
+        return wr(f"{src_var}")
+    if inner == "String":
+        if opt_ret:
+            return (
+                f"{src_var}.map(|s| s.to_string())"
+                if is_opt
+                else f"{src_var}.map_or(String::new(), |s| s.to_string())"
+            )
+        return wr(f"{src_var}.to_string()")
+    if "Box<Vec<" in inner or "Vec<" in inner:
+        bwrap = "Box::new(" if "Box<" in inner else ""
+        bclose = ")" if "Box<" in inner else ""
+        if opt_ret:
+            if is_opt:
+                return f"{src_var}.map(|s| {bwrap}vec![s.to_string()]{bclose})"
+            return f"{src_var}.map_or(Default::default(), |s| {bwrap}vec![s.to_string()]{bclose})"
+        return wr(f"{bwrap}vec![{src_var}.to_string()]{bclose}")
+    if inner == "Operator":
+        return wr(f"decode_operator_from_str({src_var})")
+    if inner == "ConditionCardType":
+        return wr(f"decode_cond_card_type({src_var})") if not opt_ret else None
+    if inner in ("PositionInfo", "DistinctType", "PlacementOrder"):
+        return None
+    return None
 
 
+# ── Main ──
 def main():
     root = Path(__file__).parent
     with open(root / "abilities.json", encoding="utf-8") as f:
         data = json.load(f)
-
     abilities = data["unique_abilities"]
-    print(f"Compiling {len(abilities)} unique abilities...")
+    print(f"Compiling {len(abilities)} abilities...")
 
-    bytecode, offsets, disasm, names, strs = compile_all(abilities)
+    field_map = scan_abilities(abilities)
+    print(f"Discovered {len(field_map)} action types:")
+    for a in sorted(field_map.keys(), key=lambda x: EFFECT_OPCODES.get(x, 999)):
+        fields = field_map[a]
+        print(
+            f"  0x{EFFECT_OPCODES.get(a, 0):02x} {a}: {[f[0] + ':' + f[1] for f in fields]}"
+        )
 
+    bytecode, offsets, strs = compile_all(abilities, field_map)
     build_dir = root / "build"
     build_dir.mkdir(parents=True, exist_ok=True)
 
     (build_dir / "abilities.bin").write_bytes(bytecode)
-    print(
-        f"  abilities.bin          {len(bytecode):>8} bytes  ({len(bytecode) / 1024:.1f}KB)"
-    )
+    print(f"\n  abilities.bin: {len(bytecode)} bytes ({len(bytecode) / 1024:.1f}KB)")
 
-    generate_rust(bytecode, offsets, disasm, names, strs, build_dir)
-    print(f"  abilities_gen.rs       generated")
-
-    generate_vm_rs(build_dir)
-    print(f"  vm_gen.rs              generated")
-
-    generate_disassembly(bytecode, offsets, names, disasm, build_dir)
-    print(f"  abilities_disasm.txt   generated")
-    print(f"  String table entries:  {len(strs)}")
-    if bytecode:
-        print(f"  Average bytes/ability: {len(bytecode) / len(abilities):.1f}")
-        print(
-            f"  Compressed from {len(json.dumps(data, ensure_ascii=False)) / 1024:.0f}KB JSON -> {len(bytecode) / 1024:.1f}KB bytecode  ({len(json.dumps(data, ensure_ascii=False)) / max(len(bytecode), 1):.0f}x reduction)"
-        )
+    generate_abilities_gen(bytecode, offsets, strs, build_dir, field_map)
+    generate_vm_gen(build_dir, field_map)
+    print(f"  Strings: {len(strs)}, Avg: {len(bytecode) / len(abilities):.1f} bytes")
 
 
 if __name__ == "__main__":

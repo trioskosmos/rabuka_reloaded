@@ -1,31 +1,33 @@
 use super::abilities_gen::{Opcode, BYTECODE, NUM_ABILITIES, OFFSETS, STRINGS};
 use crate::card::{
     ek_box_new, Ability, AbilityCost, AbilityEffect, Condition, ConditionCardType, EffectKind,
+    Operator,
 };
 
-fn read_u8(cursor: &mut &[u8]) -> u8 {
-    let b = cursor[0];
-    *cursor = &cursor[1..];
+fn read_u8(c: &mut &[u8]) -> u8 {
+    let b = c[0];
+    *c = &c[1..];
     b
 }
-fn read_u16(cursor: &mut &[u8]) -> u16 {
-    let v = u16::from_le_bytes([cursor[0], cursor[1]]);
-    *cursor = &cursor[2..];
+fn read_u16(c: &mut &[u8]) -> u16 {
+    let v = u16::from_le_bytes([c[0], c[1]]);
+    *c = &c[2..];
     v
 }
-fn read_i8(cursor: &mut &[u8]) -> i8 {
-    let b = cursor[0] as i8;
-    *cursor = &cursor[1..];
+fn read_i8(c: &mut &[u8]) -> i8 {
+    let b = c[0] as i8;
+    *c = &c[1..];
     b
 }
-fn read_str(cursor: &mut &[u8]) -> Option<&'static str> {
-    let idx = read_u16(cursor) as usize;
+fn read_str(c: &mut &[u8]) -> Option<&'static str> {
+    let idx = read_u16(c) as usize;
     if idx == 0xFFFF {
         None
     } else {
         Some(STRINGS[idx])
     }
 }
+
 include!("vm_gen.rs");
 
 pub fn ability_count() -> usize {
@@ -41,7 +43,6 @@ pub fn get_ability(idx: usize) -> Option<Ability> {
     if start >= end {
         return Some(Ability::default());
     }
-
     let mut cursor = &BYTECODE[start..end];
     let mut cost_eff: Option<AbilityEffect> = None;
     let mut effect: Option<AbilityEffect> = None;
@@ -55,18 +56,159 @@ pub fn get_ability(idx: usize) -> Option<Ability> {
 
         if op_val >= 0x80 {
             cost_eff = Some(decode_cost_op(op, &mut cursor));
-        } else {
-            let eff = decode_op_into(op, &mut cursor);
-            effect = match effect.take() {
-                None => Some(eff),
-                Some(mut seq) => {
-                    let mut steps = seq.effect_steps.take().unwrap_or_default();
-                    steps.push(Box::new(eff));
-                    seq.effect_steps = Some(steps);
-                    seq.action = "sequential".into();
-                    Some(seq)
-                }
+        } else if op_val == 0x60 {
+            let n = read_u8(&mut cursor);
+            let mut steps = Vec::with_capacity(n as usize);
+            for _ in 0..n {
+                steps.push(Box::new(decode_effect_from_slice(&mut cursor)));
+            }
+            effect = Some(AbilityEffect {
+                action: "sequential".into(),
+                effect_steps: Some(steps),
+                ..Default::default()
+            });
+        } else if op_val == 0x61 {
+            let cond_len = read_u16(&mut cursor) as usize;
+            let (cc_data, rest1) = cursor.split_at(cond_len);
+            let mut cc = cc_data;
+            cursor = rest1;
+            let cond = decode_condition(&mut cc);
+            let body_len = read_u16(&mut cursor) as usize;
+            let (body, rest2) = cursor.split_at(body_len);
+            cursor = rest2;
+            let alt_len = read_u16(&mut cursor) as usize;
+            let alt = if alt_len > 0 {
+                let (ac_data, rest3) = cursor.split_at(alt_len);
+                let mut ac = ac_data;
+                cursor = rest3;
+                Some(Box::new(decode_effect_from_slice(&mut ac)))
+            } else {
+                None
             };
+            let primary = decode_effect_from_slice(&mut &body[..]);
+            effect = Some(match alt {
+                Some(a) => AbilityEffect {
+                    action: "conditional_alternative".into(),
+                    condition: Some(Box::new(cond)),
+                    effect_steps: Some(vec![Box::new(primary), a]),
+                    ..Default::default()
+                },
+                None => primary,
+            });
+        } else if op_val == 0x63 {
+            effect = Some(AbilityEffect {
+                action: "conditional_on_optional".into(),
+                optional: Some(read_u8(&mut cursor) != 0),
+                ..Default::default()
+            });
+        } else if op_val == 0x64 {
+            effect = Some(AbilityEffect {
+                action: "conditional_on_result".into(),
+                ..Default::default()
+            });
+        } else if op_val == 0x65 {
+            let count = read_u8(&mut cursor);
+            let group_names = read_str(&mut cursor);
+            let cc_len = read_u16(&mut cursor) as usize;
+            let choice_cond = (cc_len > 0).then(|| {
+                let (cd, r) = cursor.split_at(cc_len);
+                cursor = r;
+                let mut cc = cd;
+                Box::new(decode_condition(&mut cc))
+            });
+            let ac_len = read_u16(&mut cursor) as usize;
+            let alt_cond = (ac_len > 0).then(|| {
+                let (ad, r) = cursor.split_at(ac_len);
+                cursor = r;
+                let mut ac = ad;
+                Box::new(decode_condition(&mut ac))
+            });
+            let alt_count_type = read_u8(&mut cursor);
+            let num_opts = read_u8(&mut cursor);
+            let mut options = Vec::with_capacity(num_opts as usize);
+            for _ in 0..num_opts {
+                options.push(Box::new(decode_effect_from_slice(&mut cursor)));
+            }
+            let mut ek = default_compoundEffect();
+            if let EffectKind::CompoundEffect {
+                options: ref mut bc_o,
+                alternative_count_type: ref mut bc_act,
+                group_names: ref mut bc_gn,
+                ..
+            } = &mut ek
+            {
+                *bc_o = Some(options.iter().map(|o| (*o).clone()).collect());
+                *bc_act = (alt_count_type != 0).then(|| "any_number".into());
+                if let Some(s) = group_names {
+                    *bc_gn = Some(Box::new(vec![s.to_string()]));
+                }
+            }
+            effect = Some(AbilityEffect {
+                action: "choice".into(),
+                count: Some(count as u32),
+                kind: Some(ek_box_new(ek)),
+                compound: crate::card::CompoundBranch {
+                    actions: Some(options.iter().map(|o| (*o).clone()).collect()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+        } else if op_val == 0x70 {
+            let count = read_u8(&mut cursor);
+            let source = decode_zone(read_u8(&mut cursor));
+            let target = decode_player(read_u8(&mut cursor));
+            let mut steps = Vec::new();
+            steps.push(Box::new(AbilityEffect {
+                action: "look_at".into(),
+                count: Some(count as u32),
+                source: Some(source.into()),
+                target: Some(target.into()),
+                ..Default::default()
+            }));
+            if !cursor.is_empty() && cursor[0] == Opcode::SelectCards as u8 {
+                let _ = read_u8(&mut cursor);
+                let sc = read_u8(&mut cursor);
+                let dest = decode_zone(read_u8(&mut cursor));
+                let _dr = read_u8(&mut cursor);
+                steps.push(Box::new(AbilityEffect {
+                    action: "select_cards".into(),
+                    count: Some(sc as u32),
+                    destination: Some(dest.into()),
+                    ..Default::default()
+                }));
+            }
+            effect = Some(AbilityEffect {
+                action: "look_and_select".into(),
+                count: Some(count as u32),
+                source: Some(source.into()),
+                target: Some(target.into()),
+                effect_steps: Some(steps),
+                ..Default::default()
+            });
+        } else if op_val == 0x62 {
+            // conditional_alternative sub-type marker (handled by 0x61 wrapper)
+        } else if op_val == 0x71 {
+            // select_cards sub-opcode (handled by 0x70)
+        } else {
+            if let Some(mut ek) = decode_effect_kind(op, &mut cursor) {
+                let action = action_for_op(op);
+                let mut ae = AbilityEffect {
+                    action: action.into(),
+                    kind: Some(ek_box_new((*ek).clone())),
+                    ..Default::default()
+                };
+                set_direct_fields(&mut ae);
+                effect = match effect.take() {
+                    None => Some(ae),
+                    Some(mut seq) => {
+                        seq.effect_steps
+                            .get_or_insert_with(Vec::new)
+                            .push(Box::new(ae));
+                        seq.action = "sequential".into();
+                        Some(seq)
+                    }
+                };
+            }
         }
     }
 
@@ -82,150 +224,69 @@ pub fn get_ability(idx: usize) -> Option<Ability> {
     })
 }
 
-fn decode_op_into(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
-    // Compound effects need custom handling
-    match op {
-        Opcode::Sequential => {
-            let count = read_u8(cursor);
-            let mut steps = Vec::with_capacity(count as usize);
-            for _ in 0..count {
-                if !cursor.is_empty() {
-                    let sub_op_val = read_u8(cursor);
-                    if let Ok(sub_op) = Opcode::try_from(sub_op_val) {
-                        steps.push(Box::new(decode_op_into(sub_op, cursor)));
-                    }
-                }
+fn set_direct_fields(eff: &mut AbilityEffect) {
+    if let Some(ref ek) = eff.kind.as_ref().map(|k| k.as_ref()) {
+        match ek {
+            EffectKind::DrawCards {
+                target_count,
+                source,
+                ..
+            } => {
+                eff.count = *target_count;
+                eff.source.clone_from(source);
             }
-            return AbilityEffect {
-                action: "sequential".into(),
-                effect_steps: Some(steps),
-                ..Default::default()
-            };
-        }
-        Opcode::Conditional => {
-            let cond_len = read_u16(cursor) as usize;
-            let mut cond_cursor = &cursor[..cond_len];
-            *cursor = &cursor[cond_len..];
-            let cond = decode_condition(&mut cond_cursor);
-            let body_len = read_u16(cursor) as usize;
-            let body = &cursor[..body_len];
-            *cursor = &cursor[body_len..];
-            let alt_len = read_u16(cursor) as usize;
-            let alt = if alt_len > 0 {
-                let mut ac = &cursor[..alt_len];
-                *cursor = &cursor[alt_len..];
-                let aop_val = read_u8(&mut ac);
-                if let Ok(aop) = Opcode::try_from(aop_val) {
-                    Some(Box::new(decode_op_into(aop, &mut ac)))
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-            let primary = decode_effect_from_slice(body);
-            if let Some(alt_eff) = alt {
-                return AbilityEffect {
-                    action: "conditional_alternative".into(),
-                    effect_steps: Some(vec![Box::new(primary), alt_eff]),
-                    ..Default::default()
-                };
+            EffectKind::MoveCards {
+                count,
+                source,
+                destination,
+                target,
+                ..
+            } => {
+                eff.count = *count;
+                eff.source.clone_from(source);
+                eff.destination.clone_from(destination);
+                eff.target.clone_from(target);
             }
-            return primary;
-        }
-        Opcode::LookAt => {
-            let count = read_u8(cursor);
-            let source = decode_zone(read_u8(cursor));
-            let target = decode_player(read_u8(cursor));
-            let mut steps: Vec<Box<AbilityEffect>> = Vec::new();
-            steps.push(Box::new(AbilityEffect {
-                action: "look_at".into(),
-                count: Some(count as u32),
-                source: Some(source.into()),
-                target: Some(target.into()),
-                ..Default::default()
-            }));
-            if !cursor.is_empty() && cursor[0] == Opcode::SelectCards as u8 {
-                let _ = read_u8(cursor);
-                let sc = read_u8(cursor);
-                let dest = decode_zone(read_u8(cursor));
-                let _dr = read_u8(cursor);
-                steps.push(Box::new(AbilityEffect {
-                    action: "select_cards".into(),
-                    count: Some(sc as u32),
-                    destination: Some(dest.into()),
-                    ..Default::default()
-                }));
+            EffectKind::GainResource { value, .. } => {
+                eff.count = *value;
             }
-            return AbilityEffect {
-                action: "look_and_select".into(),
-                count: Some(count as u32),
-                source: Some(source.into()),
-                target: Some(target.into()),
-                effect_steps: Some(steps),
-                ..Default::default()
-            };
-        }
-        Opcode::ConditionalOnOptional => {
-            return AbilityEffect {
-                action: "conditional_on_optional".into(),
-                optional: Some(read_u8(cursor) != 0),
-                ..Default::default()
-            };
-        }
-        Opcode::ConditionalOnResult => {
-            return AbilityEffect {
-                action: "conditional_on_result".into(),
-                ..Default::default()
-            };
-        }
-        _ => {}
-    }
-    // Simple effects: use generated decode_effect_kind to construct EffectKind with all fields
-    if let Some(kind) = decode_effect_kind(op, cursor) {
-        let action = action_for_op(op);
-        return AbilityEffect {
-            action: action.into(),
-            kind: Some(ek_box_new(*kind)),
-            ..Default::default()
+            EffectKind::ModifyScore { value, target, .. } => {
+                eff.count = *value;
+                eff.target.clone_from(target);
+            }
+            EffectKind::ChangeState { target, .. } => {
+                eff.target.clone_from(target);
+            }
+            EffectKind::SelectTarget { target, .. } => {
+                eff.target.clone_from(target);
+            }
+            EffectKind::PositionOp { target, .. } => {
+                eff.target.clone_from(target);
+            }
+            _ => {}
         };
-    }
-    // Fallback: advance cursor manually
-    decode_simple_effect(op, cursor);
-    AbilityEffect {
-        action: action_for_op(op).into(),
-        ..Default::default()
     }
 }
 
-fn action_for_op(op: Opcode) -> &'static str {
-    match op {
-        Opcode::DrawCard => "draw_card",
-        Opcode::MoveCards => "move_cards",
-        Opcode::GainResource => "gain_resource",
-        Opcode::ModifyScore => "modify_score",
-        Opcode::ChangeState => "change_state",
-        Opcode::PositionChange => "position_change",
-        Opcode::ModifyRequiredHearts => "modify_required_hearts",
-        Opcode::ModifyCost => "modify_cost",
-        Opcode::SetBladeType => "set_blade_type",
-        Opcode::SetBladeCount => "set_blade_count",
-        Opcode::SetHeartType => "set_heart_type",
-        Opcode::GainAbility => "gain_ability",
-        Opcode::Restriction => "restriction",
-        Opcode::ChooseTargetPlayer => "choose_target_player",
-        Opcode::PlaceEnergyUnderMember => "place_energy_under_member",
-        Opcode::DrawUntilCount => "draw_until_count",
-        Opcode::ModifyYellCount => "modify_yell_count",
-        Opcode::InvalidateAbility => "invalidate_ability",
-        Opcode::SuppressAbilityTrigger => "suppress_ability_trigger",
-        Opcode::ActivateAbility => "activate_ability",
-        Opcode::PlayBatonTouch => "play_baton_touch",
-        Opcode::ModifyRequiredHeartsGlobal => "modify_required_hearts_global",
-        Opcode::GainAbilityFromSource => "gain_ability_from_source",
-        Opcode::SetCardIdentity => "set_card_identity",
-        _ => "",
+fn decode_effect_from_slice(cursor: &mut &[u8]) -> AbilityEffect {
+    if cursor.is_empty() {
+        return AbilityEffect::default();
     }
+    let op_val = read_u8(cursor);
+    if let Ok(op) = Opcode::try_from(op_val) {
+        if op_val >= 0x80 {
+            return decode_cost_op(op, cursor);
+        }
+        if let Some(kind) = decode_effect_kind(op, cursor) {
+            let action = action_for_op(op);
+            return AbilityEffect {
+                action: action.into(),
+                kind: Some(ek_box_new(*kind)),
+                ..Default::default()
+            };
+        }
+    }
+    AbilityEffect::default()
 }
 
 fn decode_cost_op(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
@@ -238,17 +299,17 @@ fn decode_cost_op(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
             let count = read_u8(cursor);
             let mut ek = default_moveCards();
             if let EffectKind::MoveCards {
-                source: ref mut _bc_s,
-                destination: ref mut _bc_d,
-                count: ref mut _bc_c,
-                card_type: ref mut _bc_ct,
+                source: ref mut s,
+                destination: ref mut d,
+                card_type: ref mut c,
+                count: ref mut n,
                 ..
             } = &mut ek
             {
-                *_bc_s = Some(src.into());
-                *_bc_d = Some(dest.into());
-                *_bc_c = Some(count as u32);
-                *_bc_ct = Some(ct.into());
+                *s = Some(src.into());
+                *d = Some(dest.into());
+                *c = Some(ct.into());
+                *n = Some(count as u32);
             }
             AbilityEffect {
                 action: "move_cards".into(),
@@ -264,106 +325,105 @@ fn decode_cost_op(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
             ..Default::default()
         },
         Opcode::Rest => {
-            let count = read_u8(cursor);
+            let c = read_u8(cursor);
             let mut ek = default_changeState();
             if let EffectKind::ChangeState {
-                state_change: ref mut _bc_sc,
+                state_change: ref mut s,
                 ..
             } = &mut ek
             {
-                *_bc_sc = Some("rest".into());
+                *s = Some("rest".into());
             }
             AbilityEffect {
                 action: "rest".into(),
-                count: Some(count as u32),
+                count: Some(c as u32),
                 kind: Some(ek_box_new(ek)),
                 ..Default::default()
             }
         }
-        Opcode::Energy => {
-            let amt = read_u8(cursor);
-            let _color = read_u8(cursor);
+        Opcode::EnergyCost => {
+            let a = read_u8(cursor);
+            let _ = read_u8(cursor);
             let mut ek = default_moveCards();
             if let EffectKind::MoveCards {
-                energy_count: ref mut _bc_ec,
+                energy_count: ref mut e,
                 ..
             } = &mut ek
             {
-                *_bc_ec = Some(amt as u32);
+                *e = Some(a as u32);
             }
             AbilityEffect {
                 action: "pay_energy".into(),
-                count: Some(amt as u32),
+                count: Some(a as u32),
                 kind: Some(ek_box_new(ek)),
                 ..Default::default()
             }
         }
-        Opcode::Discard => {
-            let count = read_u8(cursor);
+        Opcode::DiscardCost => {
+            let c = read_u8(cursor);
             let ct = decode_card_type(read_u8(cursor));
             let mut ek = default_moveCards();
             if let EffectKind::MoveCards {
-                count: ref mut _bc_c,
-                card_type: ref mut _bc_ct,
+                count: ref mut n,
+                card_type: ref mut t,
                 ..
             } = &mut ek
             {
-                *_bc_c = Some(count as u32);
-                *_bc_ct = Some(ct.into());
+                *n = Some(c as u32);
+                *t = Some(ct.into());
             }
             AbilityEffect {
                 action: "discard".into(),
-                count: Some(count as u32),
+                count: Some(c as u32),
                 kind: Some(ek_box_new(ek)),
                 ..Default::default()
             }
         }
         Opcode::PlaceEnergyUnderMemberCost => {
-            let count = read_u8(cursor);
+            let c = read_u8(cursor);
             let mut ek = default_moveCards();
             if let EffectKind::MoveCards {
-                count: ref mut _bc_c,
-                ..
+                count: ref mut n, ..
             } = &mut ek
             {
-                *_bc_c = Some(count as u32);
+                *n = Some(c as u32);
             }
             AbilityEffect {
                 action: "place_energy_under_member".into(),
-                count: Some(count as u32),
+                count: Some(c as u32),
                 kind: Some(ek_box_new(ek)),
                 ..Default::default()
             }
         }
-        Opcode::PayEnergy => {
-            let amt = read_u8(cursor);
-            let _opt = read_u8(cursor);
+        Opcode::PayEnergyCost => {
+            let a = read_u8(cursor);
+            let _ = read_u8(cursor);
             let mut ek = default_moveCards();
             if let EffectKind::MoveCards {
-                energy_count: ref mut _bc_ec,
+                energy_count: ref mut e,
                 ..
             } = &mut ek
             {
-                *_bc_ec = Some(amt as u32);
+                *e = Some(a as u32);
             }
             AbilityEffect {
                 action: "pay_energy".into(),
-                count: Some(amt as u32),
+                count: Some(a as u32),
                 kind: Some(ek_box_new(ek)),
                 ..Default::default()
             }
         }
         Opcode::ChangeStateCost => {
-            let state = decode_state(read_u8(cursor));
-            let _opt = read_u8(cursor);
-            let _self = read_u8(cursor);
+            let s = decode_state(read_u8(cursor));
+            let _ = read_u8(cursor);
+            let _ = read_u8(cursor);
             let mut ek = default_changeState();
             if let EffectKind::ChangeState {
-                state_change: ref mut _bc_sc,
+                state_change: ref mut st,
                 ..
             } = &mut ek
             {
-                *_bc_sc = Some(state.into());
+                *st = Some(s.into());
             }
             AbilityEffect {
                 action: "change_state".into(),
@@ -373,12 +433,12 @@ fn decode_cost_op(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
         }
         Opcode::SequentialCost => {
             let n = read_u8(cursor);
-            let mut steps = Vec::with_capacity(n as usize);
+            let mut steps = Vec::new();
             for _ in 0..n {
                 if !cursor.is_empty() {
-                    let sub_op_val = read_u8(cursor);
-                    if let Ok(sub_op) = Opcode::try_from(sub_op_val) {
-                        steps.push(Box::new(decode_cost_op(sub_op, cursor)));
+                    let sv = read_u8(cursor);
+                    if let Ok(so) = Opcode::try_from(sv) {
+                        steps.push(Box::new(decode_cost_op(so, cursor)));
                     }
                 }
             }
@@ -391,10 +451,10 @@ fn decode_cost_op(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
                 ..Default::default()
             }
         }
-        Opcode::Reveal => {
-            let _src = read_u8(cursor);
-            let _ct = read_u8(cursor);
-            let _count = read_u8(cursor);
+        Opcode::RevealCost => {
+            let _ = read_u8(cursor);
+            let _ = read_u8(cursor);
+            let _ = read_u8(cursor);
             AbilityEffect {
                 action: "reveal".into(),
                 ..Default::default()
@@ -402,91 +462,28 @@ fn decode_cost_op(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
         }
         Opcode::ChoiceCondition => {
             let n = read_u8(cursor);
-            let mut options = Vec::with_capacity(n as usize);
+            let mut opts = Vec::new();
             for _ in 0..n {
                 if !cursor.is_empty() {
-                    let sub_op_val = read_u8(cursor);
-                    if let Ok(sub_op) = Opcode::try_from(sub_op_val) {
-                        options.push(Box::new(decode_cost_op(sub_op, cursor)));
+                    let sv = read_u8(cursor);
+                    if let Ok(so) = Opcode::try_from(sv) {
+                        opts.push(Box::new(decode_cost_op(so, cursor)));
                     }
                 }
             }
             AbilityEffect {
                 action: "choice".into(),
                 compound: crate::card::CompoundBranch {
-                    actions: Some(options),
+                    actions: Some(opts),
                     ..Default::default()
                 },
                 ..Default::default()
             }
         }
-        _ => {
-            decode_simple_cost(op, cursor);
-            let action = cost_action_for_op(op);
-            AbilityEffect {
-                action: action.into(),
-                ..Default::default()
-            }
-        }
-    }
-}
-
-fn decode_simple_cost(op: Opcode, cursor: &mut &[u8]) {
-    match op {
-        Opcode::Tap => {}
-        Opcode::Rest => {
-            let _ = read_u8(cursor);
-        }
-        Opcode::Energy => {
-            let _amt = read_u8(cursor);
-            let _color = read_u8(cursor);
-        }
-        Opcode::Discard => {
-            let _ = read_u8(cursor);
-            let _ = read_u8(cursor);
-        }
-        Opcode::PlaceEnergyUnderMemberCost => {
-            let _ = read_u8(cursor);
-        }
-        Opcode::Reveal => {
-            let _ = read_u8(cursor);
-            let _ = read_u8(cursor);
-            let _ = read_u8(cursor);
-        }
-        Opcode::ChoiceCondition => {
-            let _ = read_u8(cursor);
-        }
-        _ => {}
-    }
-}
-
-fn cost_action_for_op(op: Opcode) -> &'static str {
-    match op {
-        Opcode::MoveCardsCost => "move_cards",
-        Opcode::Tap => "tap",
-        Opcode::Rest => "rest",
-        Opcode::Energy => "pay_energy",
-        Opcode::Discard => "discard",
-        Opcode::PlaceEnergyUnderMemberCost => "place_energy_under_member",
-        Opcode::PayEnergy => "pay_energy",
-        Opcode::ChangeStateCost => "change_state",
-        Opcode::SequentialCost => "sequential_cost",
-        Opcode::Reveal => "reveal",
-        Opcode::ChoiceCondition => "choice",
-        _ => "",
-    }
-}
-
-fn decode_effect_from_slice(data: &[u8]) -> AbilityEffect {
-    let mut cursor = data;
-    if cursor.is_empty() {
-        return AbilityEffect::default();
-    }
-    let op_val = read_u8(&mut cursor);
-    if let Ok(op) = Opcode::try_from(op_val) {
-        decode_op_into(op, &mut cursor)
-    } else {
-        AbilityEffect::default()
+        _ => AbilityEffect {
+            action: "".into(),
+            ..Default::default()
+        },
     }
 }
 
