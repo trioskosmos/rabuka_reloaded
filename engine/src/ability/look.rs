@@ -6,7 +6,10 @@ use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 use crate::HashMap;
 #[cfg(feature = "psp")]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 impl AbilityResolver {
     pub fn execute_look_and_select(

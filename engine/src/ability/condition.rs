@@ -6,7 +6,10 @@ use crate::ability::enums::{ConditionType, Zone};
 use crate::card::{CardState, Condition};
 use crate::game_state::Phase;
 #[cfg(feature = "psp")]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use serde_json::json;
 
 pub(crate) fn comparison_default_count(condition: &Condition) -> u32 {

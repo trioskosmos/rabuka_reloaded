@@ -114,18 +114,14 @@ fn mymai_tonight_with_non_aqours_live_no_blade() {
 /// Blade disappears after LiveVictoryDetermination (duration=live_end).
 #[test]
 fn mymai_tonight_blade_disappears_after_live_end() {
-
     let db = load_real_database();
 
-
     let mut game = TestGame::new(db);
-
 
     let aqours_live = game.id("PL!S-bp5-023-L");
     let (_, member_a) = setup_mymai_only(&mut game);
     game.state.player1.hand.cards.push(aqours_live);
     game.set_live_card(aqours_live);
-
 
     advance_to_performance(&mut game);
 
@@ -140,9 +136,7 @@ fn mymai_tonight_blade_disappears_after_live_end() {
 
     game.pass(); // FirstAttackerPerformance → SecondAttackerPerformance
 
-
     game.pass(); // SecondAttackerPerformance → LiveVictoryDetermination
-
 
     game.pass(); // LiveVictoryDetermination → Active (Turn 2, LiveEnd effects cleared)
 

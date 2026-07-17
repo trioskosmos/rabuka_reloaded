@@ -8,24 +8,8 @@ pub const BUF_WIDTH: u32 = 512;
 const FONT_W: i32 = 8;
 const FONT_H: i32 = 16;
 
-// Static pool for sceFont internal allocations (avoids bump allocator interaction)
-static mut FONT_POOL: [u8; 131072] = [0u8; 131072];
-static mut FONT_POOL_POS: usize = 0;
-
-extern "C" fn font_alloc(_user: *mut c_void, size: usize) -> *mut c_void {
-    unsafe {
-        let pos = FONT_POOL_POS;
-        let aligned = (pos + 3) & !3;
-        let new_pos = aligned + size;
-        if new_pos <= FONT_POOL.len() {
-            FONT_POOL_POS = new_pos;
-            return FONT_POOL.as_mut_ptr().add(aligned) as *mut c_void;
-        }
-        core::ptr::null_mut()
-    }
-}
-
-extern "C" fn font_free(_user: *mut c_void, _ptr: *mut c_void) {}
+// Font glyph cache buffer (used by sceFont, must live for program duration)
+static mut FONT_CACHE: [u8; 65536] = [0u8; 65536];
 
 pub struct Display {
     front: &'static mut [u32],
@@ -61,16 +45,16 @@ impl Display {
 
         let line_height = FONT_H + 2;
 
-        // Try to initialize sceFont with a dedicated static pool
+        // Try to initialize sceFont (no custom allocators — use built-in system font)
         let mut font = 0u32;
         let mut use_bitmap = true;
         let mut error = sys::SceFontErrorCode::Success;
         let params = sys::SceFontNewLibParams {
             user_data_addr: 0,
             num_fonts: 1,
-            cache_data: 0,
-            alloc_func: Some(font_alloc),
-            free_func: Some(font_free),
+            cache_data: unsafe { FONT_CACHE.as_mut_ptr() as u32 },
+            alloc_func: None,
+            free_func: None,
             open_func: None,
             close_func: None,
             read_func: None,

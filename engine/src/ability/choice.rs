@@ -8,9 +8,13 @@ use super::util;
 use crate::ability::debug::ABILITY_DEBUG;
 use crate::card::{AbilityEffect, EffectKind};
 use crate::game_state::GameState;
-use core::sync::atomic::Ordering;
 #[cfg(feature = "psp")]
-use alloc::{boxed::Box, string::{String, ToString}, vec::Vec};
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::sync::atomic::Ordering;
 
 pub(crate) struct SelectionContext {
     #[allow(dead_code)]

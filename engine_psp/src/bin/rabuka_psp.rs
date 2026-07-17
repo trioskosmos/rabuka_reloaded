@@ -334,7 +334,8 @@ fn execute_action(gs: &mut GameState, action: &game_setup::Action) -> bool {
             gs.reset_loop_detection();
             true
         }
-        Err(_e) => {
+        Err(e) => {
+            dprintln!("Action error: {}", e);
             gs.reset_loop_detection();
             true
         }

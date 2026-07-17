@@ -37,7 +37,7 @@ pub fn get_ability(idx: usize) -> Option<Ability> {
     let start = OFFSETS[idx] as usize;
     let end = OFFSETS[idx + 1] as usize;
     if start >= end {
-        return None;
+        return Some(Ability::default());
     }
 
     let mut cursor = &BYTECODE[start..end];
@@ -187,7 +187,12 @@ fn decode_op_into(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
             };
         }
         Opcode::GainResource => {
+            // Consume all 6 bytes: resource, count, heart, duration, str_idx(u16)
+            let _res = read_u8(cursor);
             let count = read_u8(cursor);
+            let _heart = read_u8(cursor);
+            let _dur = read_u8(cursor);
+            let _str = read_u16(cursor);
             return AbilityEffect {
                 action: "gain_resource".into(),
                 count: Some(count as u32),
@@ -416,10 +421,15 @@ fn decode_cost_op(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
                 ..Default::default()
             }
         }
-        Opcode::ChangeStateCost => AbilityEffect {
-            action: "change_state".into(),
-            ..Default::default()
-        },
+        Opcode::ChangeStateCost => {
+            let _state = read_u8(cursor);
+            let _opt = read_u8(cursor);
+            let _self = read_u8(cursor);
+            AbilityEffect {
+                action: "change_state".into(),
+                ..Default::default()
+            }
+        }
         Opcode::SequentialCost => {
             let n = read_u8(cursor);
             let mut steps = Vec::with_capacity(n as usize);

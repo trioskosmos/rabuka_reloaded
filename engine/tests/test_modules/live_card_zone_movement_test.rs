@@ -1,7 +1,7 @@
-use rabuka_engine::core::types::ArcStr;
 use crate::helpers::*;
 use rabuka_engine::ability::condition::ConditionContext;
 use rabuka_engine::card::{Condition, ConditionCardType};
+use rabuka_engine::core::types::ArcStr;
 
 fn fill_decks(game: &mut TestGame, filler: i16) {
     game.state.player1.main_deck.cards.clear();

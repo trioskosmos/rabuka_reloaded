@@ -1,6 +1,10 @@
 use crate::card::AbilityEffect;
 #[cfg(feature = "psp")]
-use alloc::{boxed::Box, string::{String, ToString}, vec::Vec};
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 fn plural(n: u32, word: &str) -> String {
     if n == 1 {

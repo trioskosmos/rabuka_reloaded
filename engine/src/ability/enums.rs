@@ -1,7 +1,7 @@
 /// Strongly-typed zone identifiers to prevent stringly-typed bugs.
 /// Replaces error-prone zone == "hand" patterns with Zone::Hand.
 #[cfg(feature = "psp")]
-use alloc::{string::{String, ToString}};
+use alloc::string::{String, ToString};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Zone {
     Hand,
