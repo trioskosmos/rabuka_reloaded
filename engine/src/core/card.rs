@@ -3103,9 +3103,31 @@ impl AbilityEffect {
 
     str_getter!(destination_any, [MoveCards => destination, DrawCards => destination, SelectTarget => destination, LookReveal => destination, ChangeState => destination, PositionOp => destination, ModifyScore => destination, CompoundEffect => destination, AbilityOp => destination, MiscOp => destination]);
 
-    u32_getter!(count_any, [MoveCards => count, DrawCards => count]);
+    pub fn count_any(&self) -> Option<u32> {
+        let variant_count = match self.kind.as_deref() {
+            Some(EffectKind::MoveCards { count, .. }) => *count,
+            Some(EffectKind::DrawCards { count, .. }) => *count,
+            _ => None,
+        };
+        variant_count.or(self.count)
+    }
 
-    str_getter!(target_any, [MoveCards => target, DrawCards => target, SelectTarget => target, LookReveal => target, ChangeState => target, PositionOp => target, ModifyScore => target, CompoundEffect => target, AbilityOp => target, MiscOp => target]);
+    pub fn target_any(&self) -> Option<&str> {
+        let variant_target = match self.kind.as_deref() {
+            Some(EffectKind::MoveCards { target, .. }) => target.as_deref(),
+            Some(EffectKind::DrawCards { target, .. }) => target.as_deref(),
+            Some(EffectKind::SelectTarget { target, .. }) => target.as_deref(),
+            Some(EffectKind::LookReveal { target, .. }) => target.as_deref(),
+            Some(EffectKind::ChangeState { target, .. }) => target.as_deref(),
+            Some(EffectKind::PositionOp { target, .. }) => target.as_deref(),
+            Some(EffectKind::ModifyScore { target, .. }) => target.as_deref(),
+            Some(EffectKind::CompoundEffect { target, .. }) => target.as_deref(),
+            Some(EffectKind::AbilityOp { target, .. }) => target.as_deref(),
+            Some(EffectKind::MiscOp { target, .. }) => target.as_deref(),
+            _ => None,
+        };
+        variant_target.or_else(|| self.target.as_deref())
+    }
 
     str_getter!(state_any, [MoveCards => state, DrawCards => state, LookReveal => state, GainResource => state, PositionOp => state, ChangeState => state, ModifyScore => state]);
 
