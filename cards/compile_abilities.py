@@ -159,6 +159,7 @@ RESOURCE = {
     "blade_icon": 1,
     "yell": 2,
     "shield": 3,
+    "energy": 4,
 }
 
 HEART = {
@@ -393,6 +394,10 @@ def compile_condition(cond, bc: BC, strs: StringTable):
         bc.u8(agg_map.get(cond.get("aggregate", "total"), 0))
         bc.u8(op(cond.get("operator", "=")))
         bc.u16(int(cond.get("count", cond.get("cost_total", 0))))
+        bc.u8(p(cond.get("target", "self")))
+        bc.u8(r(cond.get("resource_type", "")))
+        bc.u8(ct(cond.get("card_type", "card")))
+        bc.u16(strs.idx(normalize_group_names(cond.get("group_names"))))
         return
 
     if t == "group_condition":
@@ -1012,9 +1017,14 @@ def _get_condition_fields():
             current_var = m.group(1)
             variants[current_var] = []
             continue
-        m = re.match(r"        (\w+):", line)
+        m = re.match(r"        (\w+): (.+),", line)
         if m and current_var:
-            variants[current_var].append(m.group(1))
+            field_name = m.group(1)
+            field_type = m.group(2).strip()
+            inner = re.match(r"Option<(.+)>", field_type)
+            variants[current_var].append(
+                (field_name, inner.group(1) if inner else field_type)
+            )
         if line.strip() == "}," and current_var:
             current_var = None
     _CONDITION_FIELDS_CACHE = variants
@@ -1637,13 +1647,19 @@ EFFECT_DECODE_MAP = {
             ("u8", "count", "count"),
             ("zone", "source", "source"),
             ("zone", "destination", "destination"),
+            ("card_type", "card_type", "card_type"),
+            ("player", "target", "target"),
         ],
     ),
     "gain_resource": (
         "GainResource",
         "gain_resource",
         [
+            ("resource", "_resource", "_resource"),
             ("u8", "count", "value"),
+            ("heart", "_heart_color", "_heart_color"),
+            ("duration", "_duration", "_duration"),
+            ("str_idx", "_char", "_char"),
         ],
     ),
     "modify_score": (
@@ -1675,17 +1691,22 @@ EFFECT_DECODE_MAP = {
         "modify_required_hearts",
         [
             ("i8", "value", "value"),
+            ("player", "_target", "_target"),
         ],
     ),
     "modify_cost": (
         "CustomOp",
         "modify_cost",
         [
-            ("i8", "value", "_unused"),
-            ("player", "target", "_unused"),
+            ("i8", "_value", "_value"),
+            ("player", "_target", "_target"),
         ],
     ),
-    "set_blade_type": ("CustomOp", "set_blade_type", []),
+    "set_blade_type": (
+        "CustomOp",
+        "set_blade_type",
+        [("u8", "_placeholder", "_placeholder")],
+    ),
     "set_blade_count": (
         "MiscOp",
         "set_blade_count",
@@ -1700,7 +1721,11 @@ EFFECT_DECODE_MAP = {
             ("heart", "value", "heart_type"),
         ],
     ),
-    "gain_ability": ("AbilityOp", "gain_ability", []),
+    "gain_ability": (
+        "AbilityOp",
+        "gain_ability",
+        [("u16", "_id", "_id"), ("u8", "_dur", "_dur")],
+    ),
     "restriction": ("RestrictionOp", "restriction", []),
     "choose_target_player": (
         "SelectTarget",
@@ -1742,8 +1767,166 @@ EFFECT_DECODE_MAP = {
             ("i8", "value", "value"),
         ],
     ),
-    "gain_ability_from_source": ("AbilityOp", "gain_ability_from_source", []),
-    "set_card_identity": ("ChangeState", "set_card_identity", []),
+    "gain_ability_from_source": (
+        "AbilityOp",
+        "gain_ability_from_source",
+        [("u16", "_id", "_id")],
+    ),
+    "set_card_identity": (
+        "ChangeState",
+        "set_card_identity",
+        [("str_idx", "_value", "_value")],
+    ),
+}
+
+# Condition decode map: (Condition_variant, [(optype, var_name, cond_field)])
+CONDITION_DECODE_MAP = {
+    "card_count_condition": (
+        "Location",
+        [
+            ("zone", "_location", "_location"),
+            ("operator", "_operator", "_operator"),
+            ("u8", "_count", "_count"),
+            ("u8", "card_type_raw", "_ct_raw"),
+            ("str_idx", "_group_names", "_group_names"),
+            ("player", "_target", "_target"),
+        ],
+    ),
+    "location_condition": (
+        "Location",
+        [
+            ("zone", "_location", "_location"),
+            ("card_type", "_ct_str", "_ct_str"),
+            ("bool", "_exclude_self", "_exclude_self"),
+            ("player", "_target", "_target"),
+        ],
+    ),
+    "comparison_condition": (
+        "Comparison",
+        [
+            ("zone", "location", "location"),
+            ("u8", "_comp_type", "_comp_type"),
+            ("u8", "_agg", "_agg"),
+            ("operator", "operator", "operator"),
+            ("u16", "count", "count"),
+            ("player", "target", "target"),
+            ("resource", "resource_type", "resource_type"),
+            ("u8", "card_type_raw", "card_type"),
+            ("str_idx", "_group_names", "_group_names"),
+        ],
+    ),
+    "group_condition": (
+        "Group",
+        [
+            ("str_idx", "_group_names", "_group_names"),
+            ("u8", "_count", "_count"),
+            ("operator", "_operator", "_operator"),
+        ],
+    ),
+    "movement_condition": (
+        "Movement",
+        [
+            ("zone", "_location", "_location"),
+            ("card_type", "_ct_str", "_ct_str"),
+            ("u8", "_count", "_count"),
+            ("operator", "_operator", "_operator"),
+        ],
+    ),
+    "temporal_condition": (
+        "Temporal",
+        [("u8", "_count", "_count"), ("operator", "_operator", "_operator")],
+    ),
+    "appearance_condition": (
+        "Appearance",
+        [("zone", "_location", "_location"), ("u8", "_count", "_count")],
+    ),
+    "state_condition": (
+        "State",
+        [
+            ("state", "_state_val", "_state_val"),
+            ("operator", "_operator", "_operator"),
+            ("bool", "_value", "_value"),
+        ],
+    ),
+    "energy_state_condition": (
+        "State",
+        [("operator", "_operator", "_operator"), ("u8", "_count", "_count")],
+    ),
+    "position_condition": ("PositionCond", [("zone", "_location", "_location")]),
+    "highest_cost_on_stage_condition": ("ScoreThreshold", []),
+    "state_change_condition": ("State", [("state", "_from_state", "_from_state")]),
+    "card_blade_condition": (
+        "Resource",
+        [("operator", "_operator", "_operator"), ("u8", "_count", "_count")],
+    ),
+    "all_cost_comparison_condition": (
+        "Comparison",
+        [("operator", "_operator", "_operator"), ("u16", "_count", "_count")],
+    ),
+    "ability_filter_condition": (
+        "AbilityFilter",
+        [("str_idx", "_ability_filter", "_ability_filter")],
+    ),
+    "has_moved": (
+        "Movement",
+        [
+            ("zone", "_position", "_position"),
+            ("str_idx", "_group_names", "_group_names"),
+        ],
+    ),
+    "not_moved": ("Movement", []),
+    "opponent_live_success": (
+        "OpponentLiveSuccess",
+        [("bool", "_no_excess_heart", "_no_excess_heart")],
+    ),
+    "no_excess_heart": ("NoExcessHeart", []),
+}
+
+# Cost decode map: (action_string, [(optype, var_name, ek_field)])
+COST_DECODE_MAP = {
+    "move_cards_cost": (
+        "move_cards",
+        [
+            ("zone", "source", "source"),
+            ("zone", "destination", "destination"),
+            ("card_type", "card_type", "card_type"),
+            ("bool", "self_cost", "self_cost"),
+            ("u8", "count", "count"),
+        ],
+    ),
+    "tap": ("tap", []),
+    "rest": ("rest", [("u8", "count", "count")]),
+    "energy": ("pay_energy", [("u8", "energy", "energy_count")]),
+    "discard": (
+        "discard",
+        [("u8", "count", "count"), ("card_type", "card_type", "card_type")],
+    ),
+    "place_energy_under_member_cost": (
+        "place_energy_under_member",
+        [("u8", "count", "count")],
+    ),
+    "pay_energy": (
+        "pay_energy",
+        [("u8", "energy", "energy_count"), ("bool", "optional", "optional")],
+    ),
+    "change_state_cost": (
+        "change_state",
+        [
+            ("state", "state_change", "state_change"),
+            ("bool", "optional", "optional"),
+            ("bool", "self_cost", "self_cost"),
+        ],
+    ),
+    "sequential_cost": ("sequential_cost", [("u8", "sub_count", "_count")]),
+    "reveal": (
+        "reveal",
+        [
+            ("zone", "source", "source"),
+            ("card_type", "card_type", "card_type"),
+            ("u8", "count", "count"),
+        ],
+    ),
+    "choice_condition": ("choice", [("u8", "option_count", "_count")]),
 }
 
 
@@ -1767,6 +1950,32 @@ def _assign_expr(optype, src_var, field_name):
     return conv.get(optype, f"Some({src_var})")
 
 
+def _cond_assign_expr(field_type, src_var):
+    """Generate assignment expression for a Condition field based on its Rust type.
+    Returns None for types we can't convert (field stays as default/None)."""
+    type_map = {
+        "ArcStr": f"Some({src_var}.into())",
+        "bool": f"Some({src_var})",
+        "u32": f"Some({src_var} as u32)",
+        "String": f"Some({src_var}.to_string())",
+    }
+    if field_type in type_map:
+        return type_map[field_type]
+    # Handle wrapped types
+    if field_type.startswith("Box<Vec<") and "String" in field_type:
+        return f"Some(Box::new(vec![{src_var}.to_string()]))"
+    if field_type.startswith("Vec<") and "String" in field_type:
+        return f"Some(vec![{src_var}.to_string()])"
+    if field_type == "ConditionCardType":
+        return f"Some(decode_cond_card_type({src_var}))"
+    if field_type == "Operator":
+        return f"Some(decode_operator_str({src_var}))"
+    # Types we skip (keep default=None): ComparisonType, ComparisonTarget, CardState,
+    # PositionInfo, DistinctInfo, CardProperty, Box<TriggerEvent>, Box<Condition>,
+    # Box<AbilityEffect>, Box<Vec<String>> (non-String), Vec<T>, AbilityFilter
+    return None
+
+
 def _default_field_val(field_name):
     """Generate default value for an EffectKind field.
     Default::default() works for both Option<T> and Box<Vec<String>>."""
@@ -1788,7 +1997,9 @@ def generate_vm_rs(build_dir):
         lines.append(f"fn {fn_name}() -> Condition {{")
         lines.append(f"    Condition::{variant} {{")
         for f in all_fields:
-            lines.append(f"        {f}: Default::default(),")
+            # f is either (name, type) tuple or just name string
+            fname = f[0] if isinstance(f, tuple) else f
+            lines.append(f"        {fname}: Default::default(),")
         lines.append("    }")
         lines.append("}")
         lines.append("")
@@ -1819,8 +2030,8 @@ def generate_vm_rs(build_dir):
         fn_name = f"default_{variant[0].lower()}{variant[1:]}"
         lines.append(f"        Opcode::{op} => {{")
         for optype, var_name, ek_field in ek_fields:
-            if not var_name.startswith("_"):
-                lines.append("            " + _read_expr(optype, var_name) + ";")
+            # Always read all operands to advance cursor, even discarded ones
+            lines.append("            " + _read_expr(optype, var_name) + ";")
         lines.append(f"            let mut ek = {fn_name}();")
         field_assigns = []
         for optype, var_name, ek_field in ek_fields:
@@ -1859,6 +2070,90 @@ def generate_vm_rs(build_dir):
         lines.append(f'            "{action}"')
         lines.append("        }")
     lines.append('        _ => "",')
+    lines.append("    }")
+    lines.append("}")
+    lines.append("")
+
+    # ── Condition decode helper functions ──
+    lines.append("fn decode_cond_card_type(v: u8) -> ConditionCardType {")
+    lines.append(
+        "    match v { 1 => ConditionCardType::MemberCard, 2 => ConditionCardType::LiveCard, 3 => ConditionCardType::EnergyCard, _ => ConditionCardType::MemberCard }"
+    )
+    lines.append("}")
+    lines.append("")
+
+    # ── decode_condition ──
+    lines.append("pub fn decode_condition(cursor: &mut &[u8]) -> Condition {")
+    lines.append("    if cursor.is_empty() { return default_condition_alwaysTrue(); }")
+    lines.append("    let op_val = cursor[0];")
+    lines.append("    match op_val {")
+    for json_name, (variant, fields) in sorted(CONDITION_DECODE_MAP.items()):
+        code = CONDITION_OPCODES[json_name]
+        lines.append(f"        {code} => {{")
+        lines.append(f"            let _ = read_u8(cursor);")
+        for optype, var_name, ek_field in fields:
+            if ek_field.startswith("_"):
+                lines.append(f"            {_read_expr(optype, '_' + var_name)};")
+            else:
+                lines.append(f"            {_read_expr(optype, var_name)};")
+        fn_name = f"default_condition_{variant[0].lower()}{variant[1:]}"
+        lines.append(f"            let mut c = {fn_name}();")
+        # Get field types for this variant to generate type-aware assignments
+        cond_field_types = dict(_get_condition_fields().get(variant, []))
+        field_assigns = []
+        for optype, var_name, ek_field in fields:
+            if ek_field.startswith("_"):
+                continue
+            field_type = cond_field_types.get(ek_field, "ArcStr")
+            # Try operand-based assignment first (for EffectKind-style fields)
+            expr = _assign_expr(optype, var_name, ek_field)
+            # But override with type-aware condition assignment
+            cond_expr = _cond_assign_expr(field_type, var_name)
+            if cond_expr is not None:
+                field_assigns.append((ek_field, cond_expr))
+            elif optype == "str_idx":
+                # str_idx to Option<ArcStr> conversion
+                field_assigns.append((ek_field, f"{var_name}.map(|s| s.into())"))
+            # If neither works, skip (field stays None)
+        if field_assigns:
+            f_list = ", ".join(f"{f}: ref mut _bc_{f}" for f, _ in field_assigns)
+            lines.append(
+                f"            if let Condition::{variant} {{ {f_list}, .. }} = &mut c {{"
+            )
+            for f, expr in field_assigns:
+                lines.append(f"                *_bc_{f} = {expr};")
+            lines.append("            }")
+        lines.append("            c")
+        lines.append("        }")
+    lines.append("        0x4A | 0x4B => {")
+    lines.append("            let _ = read_u8(cursor);")
+    lines.append('            let op_str = if op_val == 0x4A { "or" } else { "and" };')
+    lines.append("            let mut conditions = Vec::new();")
+    lines.append("            loop {")
+    lines.append("                if cursor.is_empty() || cursor[0] == 0x4C {")
+    lines.append(
+        "                    if !cursor.is_empty() { let _ = read_u8(cursor); }"
+    )
+    lines.append("                    break;")
+    lines.append("                }")
+    lines.append("                conditions.push(Box::new(decode_condition(cursor)));")
+    lines.append("            }")
+    lines.append("            if conditions.is_empty() {")
+    lines.append("                default_condition_alwaysTrue()")
+    lines.append("            } else if conditions.len() == 1 {")
+    lines.append("                *conditions.into_iter().next().unwrap()")
+    lines.append("            } else {")
+    lines.append("                let mut c = default_condition_compound();")
+    lines.append(
+        "                if let Condition::Compound { operator: ref mut _bc_o, conditions: ref mut _bc_cond, .. } = &mut c {"
+    )
+    lines.append("                    *_bc_o = Some(op_str.into());")
+    lines.append("                    *_bc_cond = Some(conditions);")
+    lines.append("                }")
+    lines.append("                c")
+    lines.append("            }")
+    lines.append("        }")
+    lines.append("        _ => default_condition_alwaysTrue(),")
     lines.append("    }")
     lines.append("}")
     lines.append("")

@@ -1015,15 +1015,22 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             Some(Box::new(ek))
         }
         Opcode::GainAbility => {
+            let _id = read_u16(cursor);
+            let _dur = read_u8(cursor);
             let mut ek = default_abilityOp();
             Some(Box::new(ek))
         }
         Opcode::GainAbilityFromSource => {
+            let _id = read_u16(cursor);
             let mut ek = default_abilityOp();
             Some(Box::new(ek))
         }
         Opcode::GainResource => {
+            let _resource = decode_resource(read_u8(cursor));
             let count = read_u8(cursor);
+            let _heart_color = decode_heart(read_u8(cursor));
+            let _duration = decode_duration(read_u8(cursor));
+            let _char = read_str(cursor);
             let mut ek = default_gainResource();
             if let EffectKind::GainResource { value: ref mut _bc_value, .. } = &mut ek {
                 *_bc_value = Some(count as u32);
@@ -1035,13 +1042,14 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             Some(Box::new(ek))
         }
         Opcode::ModifyCost => {
-            let value = read_i8(cursor);
-            let target = decode_player(read_u8(cursor));
+            let _value = read_i8(cursor);
+            let _target = decode_player(read_u8(cursor));
             let mut ek = default_customOp();
             Some(Box::new(ek))
         }
         Opcode::ModifyRequiredHearts => {
             let value = read_i8(cursor);
+            let _target = decode_player(read_u8(cursor));
             let mut ek = default_modifyHearts();
             if let EffectKind::ModifyHearts { value: ref mut _bc_value, .. } = &mut ek {
                 *_bc_value = Some(value as u32);
@@ -1080,11 +1088,15 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             let count = read_u8(cursor);
             let source = decode_zone(read_u8(cursor));
             let destination = decode_zone(read_u8(cursor));
+            let card_type = decode_card_type(read_u8(cursor));
+            let target = decode_player(read_u8(cursor));
             let mut ek = default_moveCards();
-            if let EffectKind::MoveCards { count: ref mut _bc_count, source: ref mut _bc_source, destination: ref mut _bc_destination, .. } = &mut ek {
+            if let EffectKind::MoveCards { count: ref mut _bc_count, source: ref mut _bc_source, destination: ref mut _bc_destination, card_type: ref mut _bc_card_type, target: ref mut _bc_target, .. } = &mut ek {
                 *_bc_count = Some(count as u32);
                 *_bc_source = Some(source.into());
                 *_bc_destination = Some(destination.into());
+                *_bc_card_type = Some(card_type.into());
+                *_bc_target = Some(target.into());
             }
             Some(Box::new(ek))
         }
@@ -1121,10 +1133,12 @@ fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>>
             Some(Box::new(ek))
         }
         Opcode::SetBladeType => {
+            let _placeholder = read_u8(cursor);
             let mut ek = default_customOp();
             Some(Box::new(ek))
         }
         Opcode::SetCardIdentity => {
+            let _value = read_str(cursor);
             let mut ek = default_changeState();
             Some(Box::new(ek))
         }
@@ -1169,25 +1183,33 @@ fn decode_simple_effect(op: Opcode, cursor: &mut &[u8]) -> &'static str {
             "draw_until_count"
         }
         Opcode::GainAbility => {
+            let __id = read_u16(cursor);
+            let __dur = read_u8(cursor);
             "gain_ability"
         }
         Opcode::GainAbilityFromSource => {
+            let __id = read_u16(cursor);
             "gain_ability_from_source"
         }
         Opcode::GainResource => {
+            let __resource = decode_resource(read_u8(cursor));
             let _count = read_u8(cursor);
+            let __heart_color = decode_heart(read_u8(cursor));
+            let __duration = decode_duration(read_u8(cursor));
+            let __char = read_str(cursor);
             "gain_resource"
         }
         Opcode::InvalidateAbility => {
             "invalidate_ability"
         }
         Opcode::ModifyCost => {
-            let _value = read_i8(cursor);
-            let _target = decode_player(read_u8(cursor));
+            let __value = read_i8(cursor);
+            let __target = decode_player(read_u8(cursor));
             "modify_cost"
         }
         Opcode::ModifyRequiredHearts => {
             let _value = read_i8(cursor);
+            let __target = decode_player(read_u8(cursor));
             "modify_required_hearts"
         }
         Opcode::ModifyRequiredHeartsGlobal => {
@@ -1208,6 +1230,8 @@ fn decode_simple_effect(op: Opcode, cursor: &mut &[u8]) -> &'static str {
             let _count = read_u8(cursor);
             let _source = decode_zone(read_u8(cursor));
             let _destination = decode_zone(read_u8(cursor));
+            let _card_type = decode_card_type(read_u8(cursor));
+            let _target = decode_player(read_u8(cursor));
             "move_cards"
         }
         Opcode::PlaceEnergyUnderMember => {
@@ -1229,9 +1253,11 @@ fn decode_simple_effect(op: Opcode, cursor: &mut &[u8]) -> &'static str {
             "set_blade_count"
         }
         Opcode::SetBladeType => {
+            let __placeholder = read_u8(cursor);
             "set_blade_type"
         }
         Opcode::SetCardIdentity => {
+            let __value = read_str(cursor);
             "set_card_identity"
         }
         Opcode::SetHeartType => {
@@ -1242,5 +1268,189 @@ fn decode_simple_effect(op: Opcode, cursor: &mut &[u8]) -> &'static str {
             "suppress_ability_trigger"
         }
         _ => "",
+    }
+}
+
+fn decode_cond_card_type(v: u8) -> ConditionCardType {
+    match v { 1 => ConditionCardType::MemberCard, 2 => ConditionCardType::LiveCard, 3 => ConditionCardType::EnergyCard, _ => ConditionCardType::MemberCard }
+}
+
+pub fn decode_condition(cursor: &mut &[u8]) -> Condition {
+    if cursor.is_empty() { return default_condition_alwaysTrue(); }
+    let op_val = cursor[0];
+    match op_val {
+        81 => {
+            let _ = read_u8(cursor);
+            let __ability_filter = read_str(cursor);
+            let mut c = default_condition_abilityFilter();
+            c
+        }
+        80 => {
+            let _ = read_u8(cursor);
+            let __operator = decode_operator(read_u8(cursor));
+            let __count = read_u16(cursor);
+            let mut c = default_condition_comparison();
+            c
+        }
+        70 => {
+            let _ = read_u8(cursor);
+            let __location = decode_zone(read_u8(cursor));
+            let __count = read_u8(cursor);
+            let mut c = default_condition_appearance();
+            c
+        }
+        79 => {
+            let _ = read_u8(cursor);
+            let __operator = decode_operator(read_u8(cursor));
+            let __count = read_u8(cursor);
+            let mut c = default_condition_resource();
+            c
+        }
+        64 => {
+            let _ = read_u8(cursor);
+            let __location = decode_zone(read_u8(cursor));
+            let __operator = decode_operator(read_u8(cursor));
+            let __count = read_u8(cursor);
+            let _card_type_raw = read_u8(cursor);
+            let __group_names = read_str(cursor);
+            let __target = decode_player(read_u8(cursor));
+            let mut c = default_condition_location();
+            c
+        }
+        66 => {
+            let _ = read_u8(cursor);
+            let location = decode_zone(read_u8(cursor));
+            let __comp_type = read_u8(cursor);
+            let __agg = read_u8(cursor);
+            let operator = decode_operator(read_u8(cursor));
+            let count = read_u16(cursor);
+            let target = decode_player(read_u8(cursor));
+            let resource_type = decode_resource(read_u8(cursor));
+            let card_type_raw = read_u8(cursor);
+            let __group_names = read_str(cursor);
+            let mut c = default_condition_comparison();
+            if let Condition::Comparison { location: ref mut _bc_location, operator: ref mut _bc_operator, count: ref mut _bc_count, target: ref mut _bc_target, resource_type: ref mut _bc_resource_type, card_type: ref mut _bc_card_type, .. } = &mut c {
+                *_bc_location = Some(location.into());
+                *_bc_operator = Some(operator.into());
+                *_bc_count = Some(count as u32);
+                *_bc_target = Some(target.into());
+                *_bc_resource_type = Some(resource_type.into());
+                *_bc_card_type = Some(decode_cond_card_type(card_type_raw));
+            }
+            c
+        }
+        72 => {
+            let _ = read_u8(cursor);
+            let __operator = decode_operator(read_u8(cursor));
+            let __count = read_u8(cursor);
+            let mut c = default_condition_state();
+            c
+        }
+        67 => {
+            let _ = read_u8(cursor);
+            let __group_names = read_str(cursor);
+            let __count = read_u8(cursor);
+            let __operator = decode_operator(read_u8(cursor));
+            let mut c = default_condition_group();
+            c
+        }
+        82 => {
+            let _ = read_u8(cursor);
+            let __position = decode_zone(read_u8(cursor));
+            let __group_names = read_str(cursor);
+            let mut c = default_condition_movement();
+            c
+        }
+        77 => {
+            let _ = read_u8(cursor);
+            let mut c = default_condition_scoreThreshold();
+            c
+        }
+        65 => {
+            let _ = read_u8(cursor);
+            let __location = decode_zone(read_u8(cursor));
+            let __ct_str = decode_card_type(read_u8(cursor));
+            let __exclude_self = read_u8(cursor) != 0;
+            let __target = decode_player(read_u8(cursor));
+            let mut c = default_condition_location();
+            c
+        }
+        68 => {
+            let _ = read_u8(cursor);
+            let __location = decode_zone(read_u8(cursor));
+            let __ct_str = decode_card_type(read_u8(cursor));
+            let __count = read_u8(cursor);
+            let __operator = decode_operator(read_u8(cursor));
+            let mut c = default_condition_movement();
+            c
+        }
+        85 => {
+            let _ = read_u8(cursor);
+            let mut c = default_condition_noExcessHeart();
+            c
+        }
+        83 => {
+            let _ = read_u8(cursor);
+            let mut c = default_condition_movement();
+            c
+        }
+        84 => {
+            let _ = read_u8(cursor);
+            let __no_excess_heart = read_u8(cursor) != 0;
+            let mut c = default_condition_opponentLiveSuccess();
+            c
+        }
+        73 => {
+            let _ = read_u8(cursor);
+            let __location = decode_zone(read_u8(cursor));
+            let mut c = default_condition_positionCond();
+            c
+        }
+        78 => {
+            let _ = read_u8(cursor);
+            let __from_state = decode_state(read_u8(cursor));
+            let mut c = default_condition_state();
+            c
+        }
+        71 => {
+            let _ = read_u8(cursor);
+            let __state_val = decode_state(read_u8(cursor));
+            let __operator = decode_operator(read_u8(cursor));
+            let __value = read_u8(cursor) != 0;
+            let mut c = default_condition_state();
+            c
+        }
+        69 => {
+            let _ = read_u8(cursor);
+            let __count = read_u8(cursor);
+            let __operator = decode_operator(read_u8(cursor));
+            let mut c = default_condition_temporal();
+            c
+        }
+        0x4A | 0x4B => {
+            let _ = read_u8(cursor);
+            let op_str = if op_val == 0x4A { "or" } else { "and" };
+            let mut conditions = Vec::new();
+            loop {
+                if cursor.is_empty() || cursor[0] == 0x4C {
+                    if !cursor.is_empty() { let _ = read_u8(cursor); }
+                    break;
+                }
+                conditions.push(Box::new(decode_condition(cursor)));
+            }
+            if conditions.is_empty() {
+                default_condition_alwaysTrue()
+            } else if conditions.len() == 1 {
+                *conditions.into_iter().next().unwrap()
+            } else {
+                let mut c = default_condition_compound();
+                if let Condition::Compound { operator: ref mut _bc_o, conditions: ref mut _bc_cond, .. } = &mut c {
+                    *_bc_o = Some(op_str.into());
+                    *_bc_cond = Some(conditions);
+                }
+                c
+            }
+        }
+        _ => default_condition_alwaysTrue(),
     }
 }

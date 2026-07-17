@@ -83,6 +83,7 @@ pub fn get_ability(idx: usize) -> Option<Ability> {
 }
 
 fn decode_op_into(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
+    // Compound effects need custom handling
     match op {
         Opcode::Sequential => {
             let count = read_u8(cursor);
@@ -165,189 +166,6 @@ fn decode_op_into(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
                 ..Default::default()
             };
         }
-        Opcode::DrawCard | Opcode::DrawUntilCount => {
-            let count = read_u8(cursor);
-            let source = decode_zone(read_u8(cursor));
-            return AbilityEffect {
-                action: action_for_op(op).into(),
-                count: Some(count as u32),
-                source: Some(source.into()),
-                ..Default::default()
-            };
-        }
-        Opcode::MoveCards => {
-            let count = read_u8(cursor);
-            let source = decode_zone(read_u8(cursor));
-            let dest = decode_zone(read_u8(cursor));
-            let _ct = read_u8(cursor);
-            let target = decode_player(read_u8(cursor));
-            return AbilityEffect {
-                action: "move_cards".into(),
-                count: Some(count as u32),
-                source: Some(source.into()),
-                destination: Some(dest.into()),
-                target: Some(target.into()),
-                ..Default::default()
-            };
-        }
-        Opcode::GainResource => {
-            // Consume all 6 bytes: resource, count, heart, duration, str_idx(u16)
-            let _res = read_u8(cursor);
-            let count = read_u8(cursor);
-            let _heart = read_u8(cursor);
-            let _dur = read_u8(cursor);
-            let _str = read_u16(cursor);
-            return AbilityEffect {
-                action: "gain_resource".into(),
-                count: Some(count as u32),
-                ..Default::default()
-            };
-        }
-        Opcode::ModifyScore => {
-            let val = read_i8(cursor) as u32;
-            let _pu = read_u8(cursor);
-            let target = decode_player(read_u8(cursor));
-            return AbilityEffect {
-                action: "modify_score".into(),
-                count: Some(val),
-                target: Some(target.into()),
-                ..Default::default()
-            };
-        }
-        Opcode::ChangeState => {
-            let _state = read_u8(cursor);
-            let target = decode_player(read_u8(cursor));
-            return AbilityEffect {
-                action: "change_state".into(),
-                target: Some(target.into()),
-                ..Default::default()
-            };
-        }
-        Opcode::PositionChange => {
-            let target = decode_player(read_u8(cursor));
-            return AbilityEffect {
-                action: "position_change".into(),
-                target: Some(target.into()),
-                ..Default::default()
-            };
-        }
-        Opcode::ChooseTargetPlayer => {
-            let target = decode_player(read_u8(cursor));
-            return AbilityEffect {
-                action: "choose_target_player".into(),
-                target: Some(target.into()),
-                ..Default::default()
-            };
-        }
-        Opcode::Restriction => {
-            return AbilityEffect {
-                action: "restriction".into(),
-                ..Default::default()
-            }
-        }
-        Opcode::PlaceEnergyUnderMember => {
-            return AbilityEffect {
-                action: "place_energy_under_member".into(),
-                count: Some(read_u8(cursor) as u32),
-                ..Default::default()
-            };
-        }
-        Opcode::ModifyRequiredHearts => {
-            let val = read_i8(cursor) as u32;
-            let target = decode_player(read_u8(cursor));
-            return AbilityEffect {
-                action: "modify_required_hearts".into(),
-                count: Some(val),
-                target: Some(target.into()),
-                ..Default::default()
-            };
-        }
-        Opcode::ModifyRequiredHeartsGlobal => {
-            let val = read_i8(cursor) as u32;
-            return AbilityEffect {
-                action: "modify_required_hearts_global".into(),
-                count: Some(val),
-                ..Default::default()
-            };
-        }
-        Opcode::ModifyCost => {
-            let val = read_i8(cursor) as u32;
-            let target = decode_player(read_u8(cursor));
-            return AbilityEffect {
-                action: "modify_cost".into(),
-                count: Some(val),
-                target: Some(target.into()),
-                ..Default::default()
-            };
-        }
-        Opcode::SetBladeType => {
-            let _ = read_u8(cursor);
-            return AbilityEffect {
-                action: "set_blade_type".into(),
-                ..Default::default()
-            };
-        }
-        Opcode::SetBladeCount | Opcode::SetHeartType => {
-            return AbilityEffect {
-                action: action_for_op(op).into(),
-                count: Some(read_u8(cursor) as u32),
-                ..Default::default()
-            };
-        }
-        Opcode::GainAbility => {
-            read_u16(cursor);
-            let _d = read_u8(cursor);
-            return AbilityEffect {
-                action: "gain_ability".into(),
-                ..Default::default()
-            };
-        }
-        Opcode::GainAbilityFromSource => {
-            read_u16(cursor);
-            return AbilityEffect {
-                action: "gain_ability_from_source".into(),
-                ..Default::default()
-            };
-        }
-        Opcode::ModifyYellCount => {
-            let val = read_i8(cursor) as u32;
-            return AbilityEffect {
-                action: "modify_yell_count".into(),
-                count: Some(val),
-                ..Default::default()
-            };
-        }
-        Opcode::InvalidateAbility => {
-            return AbilityEffect {
-                action: "invalidate_ability".into(),
-                ..Default::default()
-            }
-        }
-        Opcode::SuppressAbilityTrigger => {
-            return AbilityEffect {
-                action: "suppress_ability_trigger".into(),
-                ..Default::default()
-            }
-        }
-        Opcode::ActivateAbility => {
-            return AbilityEffect {
-                action: "activate_ability".into(),
-                ..Default::default()
-            }
-        }
-        Opcode::PlayBatonTouch => {
-            return AbilityEffect {
-                action: "play_baton_touch".into(),
-                ..Default::default()
-            }
-        }
-        Opcode::SetCardIdentity => {
-            let _ = read_u16(cursor);
-            return AbilityEffect {
-                action: "set_card_identity".into(),
-                ..Default::default()
-            };
-        }
         Opcode::ConditionalOnOptional => {
             return AbilityEffect {
                 action: "conditional_on_optional".into(),
@@ -363,6 +181,16 @@ fn decode_op_into(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
         }
         _ => {}
     }
+    // Simple effects: use generated decode_effect_kind to construct EffectKind with all fields
+    if let Some(kind) = decode_effect_kind(op, cursor) {
+        let action = action_for_op(op);
+        return AbilityEffect {
+            action: action.into(),
+            kind: Some(ek_box_new(*kind)),
+            ..Default::default()
+        };
+    }
+    // Fallback: advance cursor manually
     decode_simple_effect(op, cursor);
     AbilityEffect {
         action: action_for_op(op).into(),
@@ -662,82 +490,6 @@ fn decode_effect_from_slice(data: &[u8]) -> AbilityEffect {
     }
 }
 
-fn decode_cond_card_type(v: u8) -> ConditionCardType {
-    match v {
-        1 => ConditionCardType::MemberCard,
-        2 => ConditionCardType::LiveCard,
-        3 => ConditionCardType::EnergyCard,
-        _ => ConditionCardType::MemberCard,
-    }
-}
-
-fn decode_condition(cursor: &mut &[u8]) -> Condition {
-    if cursor.is_empty() {
-        return default_condition_alwaysTrue();
-    }
-    let op_val = cursor[0];
-    match op_val {
-        0x40 => {
-            let _ = read_u8(cursor);
-            let location = decode_zone(read_u8(cursor));
-            let operator = decode_operator(read_u8(cursor));
-            let count = read_u8(cursor);
-            let ct = read_u8(cursor);
-            let _group = read_u16(cursor);
-            let target = decode_player(read_u8(cursor));
-            let mut c = default_condition_location();
-            if let Condition::Location {
-                location: ref mut _bc_l,
-                operator: ref mut _bc_o,
-                count: ref mut _bc_co,
-                card_type: ref mut _bc_ct,
-                target: ref mut _bc_t,
-                ..
-            } = &mut c
-            {
-                *_bc_l = Some(location.into());
-                *_bc_o = Some(operator.into());
-                *_bc_co = Some(count as u32);
-                *_bc_ct = Some(decode_cond_card_type(ct));
-                *_bc_t = Some(target.into());
-            }
-            c
-        }
-        0x4A | 0x4B => {
-            let _ = read_u8(cursor);
-            let op_str = if op_val == 0x4A { "or" } else { "and" };
-            let mut conditions = Vec::new();
-            loop {
-                if cursor.is_empty() || cursor[0] == 0x4C {
-                    if !cursor.is_empty() {
-                        let _ = read_u8(cursor);
-                    }
-                    break;
-                }
-                conditions.push(Box::new(decode_condition(cursor)));
-            }
-            if conditions.is_empty() {
-                default_condition_alwaysTrue()
-            } else if conditions.len() == 1 {
-                *conditions.into_iter().next().unwrap()
-            } else {
-                let mut c = default_condition_compound();
-                if let Condition::Compound {
-                    operator: ref mut _bc_o,
-                    conditions: ref mut _bc_cond,
-                    ..
-                } = &mut c
-                {
-                    *_bc_o = Some(op_str.into());
-                    *_bc_cond = Some(conditions);
-                }
-                c
-            }
-        }
-        _ => default_condition_alwaysTrue(),
-    }
-}
-
 fn decode_zone(v: u8) -> &'static str {
     match v {
         0 => "hand",
@@ -791,6 +543,7 @@ fn decode_resource(v: u8) -> &'static str {
         1 => "blade",
         2 => "yell",
         3 => "shield",
+        4 => "energy",
         _ => "heart",
     }
 }
