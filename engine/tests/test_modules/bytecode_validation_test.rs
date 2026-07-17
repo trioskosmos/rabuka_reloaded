@@ -117,4 +117,31 @@ mod bytecode_validation {
             }
         }
     }
+
+    #[test]
+    fn bytecode_debug_ability_239() {
+        let ab = get_ability(239).expect("ability 239 should exist");
+        println!("=== Ability 239 ===");
+        println!("effect: {:?}", ab.effect.as_ref().map(|e| &e.action));
+        if let Some(ref eff) = ab.effect {
+            println!("  action: {}", eff.action);
+            println!("  count: {:?}", eff.count);
+            println!("  source: {:?}", eff.source);
+            println!("  destination: {:?}", eff.destination);
+            println!("  target: {:?}", eff.target);
+            println!(
+                "  condition: {:?}",
+                eff.condition.as_ref().map(|c| format!("{:?}", c))
+            );
+            println!(
+                "  compound actions: {:?}",
+                eff.compound.actions.as_ref().map(|a| a.len())
+            );
+            println!(
+                "  effect_steps: {:?}",
+                eff.effect_steps.as_ref().map(|s| s.len())
+            );
+        }
+        assert!(ab.effect.is_some(), "ability 239 should have an effect");
+    }
 }

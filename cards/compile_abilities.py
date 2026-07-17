@@ -639,6 +639,13 @@ EFFECT_OPCODES = {
         ]
     )
 }
+# Compound opcodes — must be at fixed values 0x60+ for the hand-coded vm.rs handlers
+EFFECT_OPCODES["compound_sequential"] = 0x60
+EFFECT_OPCODES["compound_conditional"] = 0x61
+EFFECT_OPCODES["compound_conditional_alt"] = 0x62
+EFFECT_OPCODES["compound_choice"] = 0x65
+EFFECT_OPCODES["compound_look_at"] = 0x70
+EFFECT_OPCODES["compound_select_cards"] = 0x71
 
 
 def compile_one(eff, bc, strs, field_map, is_sub=False):

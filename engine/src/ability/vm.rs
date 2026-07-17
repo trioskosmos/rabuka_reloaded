@@ -279,11 +279,13 @@ fn decode_effect_from_slice(cursor: &mut &[u8]) -> AbilityEffect {
         }
         if let Some(kind) = decode_effect_kind(op, cursor) {
             let action = action_for_op(op);
-            return AbilityEffect {
+            let mut ae = AbilityEffect {
                 action: action.into(),
                 kind: Some(ek_box_new(*kind)),
                 ..Default::default()
             };
+            set_direct_fields(&mut ae);
+            return ae;
         }
     }
     AbilityEffect::default()
