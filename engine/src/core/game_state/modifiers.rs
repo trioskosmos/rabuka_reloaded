@@ -818,7 +818,9 @@ impl GameState {
 
     pub fn record_area_placement(&mut self, player_id: &str, area: &str) {
         let key = format!("{}:{}", player_id, area);
-        self.areas_placed_this_turn.insert(key);
+        if !self.areas_placed_this_turn.contains(&key) {
+            self.areas_placed_this_turn.push(key);
+        }
     }
 
     pub fn has_area_been_placed_this_turn(&self, player_id: &str, area: &str) -> bool {
@@ -831,7 +833,9 @@ impl GameState {
     }
 
     pub fn record_card_appearance(&mut self, card_id: i16, source: &str) {
-        self.cards_appeared_this_turn.insert(card_id);
+        if !self.cards_appeared_this_turn.contains(&card_id) {
+            self.cards_appeared_this_turn.push(card_id);
+        }
         if !self.recently_appeared_cards.contains(&card_id) {
             self.recently_appeared_cards.push(card_id);
         }
@@ -865,14 +869,23 @@ impl GameState {
     }
 
     pub fn record_auto_ability_trigger(&mut self, card_id: &str) {
-        *self
+        let key = card_id.to_string();
+        match self
             .auto_ability_trigger_counts
-            .entry(card_id.to_string())
-            .or_insert(0) += 1;
+            .iter_mut()
+            .find(|(k, _)| *k == key)
+        {
+            Some((_, count)) => *count += 1,
+            None => self.auto_ability_trigger_counts.push((key, 1)),
+        }
     }
 
     pub fn get_auto_ability_trigger_count(&self, card_id: &str) -> u32 {
-        *self.auto_ability_trigger_counts.get(card_id).unwrap_or(&0)
+        self.auto_ability_trigger_counts
+            .iter()
+            .find(|(k, _)| *k == card_id)
+            .map(|(_, c)| *c)
+            .unwrap_or(0)
     }
 
     pub fn clear_auto_ability_trigger_tracking(&mut self) {
@@ -1122,10 +1135,7 @@ impl GameState {
 
     pub fn clear_revealed_cards(&mut self) {
         self.revealed_cards.clear();
-        self.revealed_card_sources.clear();
-        self.revealed_card_source_names.clear();
-        self.revealed_card_is_private.clear();
-        self.revealed_card_owners.clear();
+        self.revealed_card_meta.clear();
         self.player1_cheer_revealed_cards.clear();
         self.player2_cheer_revealed_cards.clear();
     }

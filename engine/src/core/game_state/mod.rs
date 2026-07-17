@@ -7,11 +7,24 @@ use crate::player::Player;
 use crate::zones::{MemberArea, ResolutionZone};
 use crate::Arc;
 use crate::{HashMap, HashSet};
+use smallvec::SmallVec;
 #[cfg(feature = "psp")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+
+/// Tracking metadata for a single revealed card, kept in lockstep with the
+/// `revealed_cards` / `revealed_cost_cards` id vectors. Consolidates the four
+/// parallel `Vec` columns into one struct for better locality and fewer
+/// allocator headers.
+#[derive(Debug, Clone, Default)]
+pub struct RevealedCardMeta {
+    pub source: Option<i16>,
+    pub source_name: Option<String>,
+    pub is_private: bool,
+    pub owner: Option<u8>,
+}
 
 pub use crate::types::{
     AbilityApplication, AbilityBonus, AbilityTrigger, Adjustment, Allocation, BladeSource,
@@ -51,11 +64,11 @@ pub struct GameState {
     pub turn_limited_abilities_used: HashMap<(i16, usize, u32), u8>,
     pub mulligan_selected_indices: Vec<usize>,
     pub live_card_selected_indices: Vec<usize>,
-    pub auto_ability_trigger_counts: HashMap<String, u32>,
+    pub auto_ability_trigger_counts: SmallVec<[(String, u32); 8]>,
     pub turn_limit_usage: HashMap<String, u32>,
     pub card_instance_mapping: HashMap<i16, u32>,
-    pub areas_placed_this_turn: HashSet<String>,
-    pub cards_appeared_this_turn: HashSet<i16>,
+    pub areas_placed_this_turn: SmallVec<[String; 8]>,
+    pub cards_appeared_this_turn: SmallVec<[i16; 8]>,
     pub card_appearance_source: HashMap<i16, String>,
     pub cards_moved_this_turn: HashSet<i16>,
     pub gained_abilities: HashMap<i16, Vec<String>>,
@@ -67,19 +80,13 @@ pub struct GameState {
     /// and evaluated during `execute_live_victory_determination` when the yell
     /// results are available.
     pub delayed_gained_effects: Vec<(i16, crate::card::AbilityEffect)>,
-    pub negated_abilities: HashSet<i16>,
+    pub negated_abilities: SmallVec<[i16; 8]>,
     pub replacement_effects: Vec<ReplacementEffect>,
     pub constant_ability_statuses: Vec<crate::types::ConstantAbilityStatus>,
     pub revealed_cards: Vec<i16>,
-    pub revealed_card_sources: Vec<Option<i16>>,
-    pub revealed_card_source_names: Vec<Option<String>>,
-    pub revealed_card_is_private: Vec<bool>,
-    pub revealed_card_owners: Vec<Option<u8>>,
+    pub revealed_card_meta: Vec<RevealedCardMeta>,
     pub revealed_cost_cards: Vec<i16>,
-    pub revealed_cost_card_sources: Vec<Option<i16>>,
-    pub revealed_cost_card_source_names: Vec<Option<String>>,
-    pub revealed_cost_card_is_private: Vec<bool>,
-    pub revealed_cost_card_owners: Vec<Option<u8>>,
+    pub revealed_cost_card_meta: Vec<RevealedCardMeta>,
     pub player1_cheer_revealed_cards: Vec<i16>,
     pub player2_cheer_revealed_cards: Vec<i16>,
     /// Cards revealed by the initial yell (saved before re-yell overwrites them).
@@ -156,7 +163,7 @@ pub struct GameState {
     /// Batch-scoped set of ability IDs already enqueued during the current movement batch.
     /// Prevents each_time/movement abilities from being re-enqueued across multiple
     /// post-resolution TAS scans within the same batch. Cleared at post-loop batch scan.
-    pub this_batch_triggered_ability_ids: HashSet<String>,
+    pub this_batch_triggered_ability_ids: SmallVec<[String; 8]>,
     /// Cutoff index for depth-first each_time drain. Entries enqueued at >= this index
     /// are newly-triggered (each_time watchers) and must be force-resolved before
     /// stale entries are offered to the player. Set by process_player_abilities and
@@ -259,29 +266,23 @@ impl GameState {
             turn_limited_abilities_used: HashMap::default(),
             mulligan_selected_indices: Vec::new(),
             live_card_selected_indices: Vec::new(),
-            auto_ability_trigger_counts: HashMap::default(),
+            auto_ability_trigger_counts: SmallVec::new(),
             turn_limit_usage: HashMap::default(),
             card_instance_mapping: HashMap::default(),
-            areas_placed_this_turn: HashSet::default(),
-            cards_appeared_this_turn: HashSet::default(),
+            areas_placed_this_turn: SmallVec::new(),
+            cards_appeared_this_turn: SmallVec::new(),
             card_appearance_source: HashMap::default(),
             cards_moved_this_turn: HashSet::default(),
             gained_abilities: HashMap::default(),
             gained_card_abilities: HashMap::default(),
             delayed_gained_effects: Vec::new(),
-            negated_abilities: HashSet::default(),
+            negated_abilities: SmallVec::new(),
             replacement_effects: Vec::new(),
             constant_ability_statuses: Vec::new(),
             revealed_cards: Vec::new(),
-            revealed_card_sources: Vec::new(),
-            revealed_card_source_names: Vec::new(),
-            revealed_card_is_private: Vec::new(),
-            revealed_card_owners: Vec::new(),
+            revealed_card_meta: Vec::new(),
             revealed_cost_cards: Vec::new(),
-            revealed_cost_card_sources: Vec::new(),
-            revealed_cost_card_source_names: Vec::new(),
-            revealed_cost_card_is_private: Vec::new(),
-            revealed_cost_card_owners: Vec::new(),
+            revealed_cost_card_meta: Vec::new(),
             player1_cheer_revealed_cards: Vec::new(),
             player2_cheer_revealed_cards: Vec::new(),
             initial_yell_revealed_cards: Vec::new(),
@@ -323,7 +324,7 @@ impl GameState {
             activating_card: None,
             activating_ability_index: None,
             just_completed_ability_key: None,
-            this_batch_triggered_ability_ids: HashSet::default(),
+            this_batch_triggered_ability_ids: SmallVec::new(),
             depth_first_cutoff: None,
             // 1-byte aligned
             rps_winner: None,
@@ -590,10 +591,12 @@ impl GameState {
             .and_then(|sid| self.card_database.get_card(sid))
             .map(|c| c.name.to_string());
         self.revealed_cards.push(card_id);
-        self.revealed_card_sources.push(source_card_id);
-        self.revealed_card_source_names.push(source_name);
-        self.revealed_card_is_private.push(is_private);
-        self.revealed_card_owners.push(owner);
+        self.revealed_card_meta.push(RevealedCardMeta {
+            source: source_card_id,
+            source_name,
+            is_private,
+            owner,
+        });
     }
 
     /// Push a card to revealed_cost_cards with source/owner/private tracking.
@@ -608,10 +611,12 @@ impl GameState {
             .and_then(|sid| self.card_database.get_card(sid))
             .map(|c| c.name.to_string());
         self.revealed_cost_cards.push(card_id);
-        self.revealed_cost_card_sources.push(source_card_id);
-        self.revealed_cost_card_source_names.push(source_name);
-        self.revealed_cost_card_is_private.push(is_private);
-        self.revealed_cost_card_owners.push(owner);
+        self.revealed_cost_card_meta.push(RevealedCardMeta {
+            source: source_card_id,
+            source_name,
+            is_private,
+            owner,
+        });
     }
 
     /// Get the source card ID from the current ability queue entry, if any.

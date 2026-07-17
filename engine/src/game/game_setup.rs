@@ -1220,7 +1220,14 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                     },
                                     base_cost: Some(card_cost),
                                     stage_area: Some(area.area.clone()),
-                                    available_areas: Some(available_areas.clone()),
+                                    // available_areas is only consumed by the UI/web/main.rs
+                                    // path; the profiling/bot decision path never reads it, so
+                                    // skip the Vec<AreaInfo> clone in profiling builds.
+                                    available_areas: if cfg!(feature = "profiling") {
+                                        None
+                                    } else {
+                                        Some(available_areas.clone())
+                                    },
                                     ..make_params()
                                 },
                             ));
@@ -1250,12 +1257,24 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                     ActionParameters {
                                         card_id: Some(*card_id),
                                         card_index: Some(hand_index),
-                                        card_name: Some(card.name.to_string()),
-                                        card_no: Some(card.card_no.to_string()),
+                                        card_name: if cfg!(not(feature = "profiling")) {
+                                            Some(card.name.to_string())
+                                        } else {
+                                            None
+                                        },
+                                        card_no: if cfg!(not(feature = "profiling")) {
+                                            Some(card.card_no.to_string())
+                                        } else {
+                                            None
+                                        },
                                         base_cost: Some(card_cost),
                                         stage_area: Some(pair.placement.clone()),
                                         card_indices: Some(area_indices),
-                                        available_areas: Some(available_areas.clone()),
+                                        available_areas: if cfg!(feature = "profiling") {
+                                            None
+                                        } else {
+                                            Some(available_areas.clone())
+                                        },
                                         ..make_params()
                                     },
                                 ));
@@ -1340,11 +1359,29 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     ),
                     ActionParameters {
                         card_id: Some(card_id),
-                        stage_area: Some(area_name.to_string()),
-                        card_name: Some(card.name.to_string()),
-                        card_no: Some(card.card_no.to_string()),
+                        // Display-only fields; the profiling/bot path routes UseAbility by
+                        // card_id alone (handle_use_ability), so skip the String allocs.
+                        stage_area: if cfg!(not(feature = "profiling")) {
+                            Some(area_name.to_string())
+                        } else {
+                            None
+                        },
+                        card_name: if cfg!(not(feature = "profiling")) {
+                            Some(card.name.to_string())
+                        } else {
+                            None
+                        },
+                        card_no: if cfg!(not(feature = "profiling")) {
+                            Some(card.card_no.to_string())
+                        } else {
+                            None
+                        },
                         ability_index: Some(ability_index),
-                        source_ability: Some(ability.full_text.clone()),
+                        source_ability: if cfg!(not(feature = "profiling")) {
+                            Some(ability.full_text.clone())
+                        } else {
+                            None
+                        },
                         base_cost: Some(ability_cost),
                         final_cost: Some(ability_cost),
                         ..make_params()
@@ -1408,10 +1445,23 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     ),
                     ActionParameters {
                         card_id: Some(card_id),
-                        card_name: Some(card.name.to_string()),
-                        card_no: Some(card.card_no.to_string()),
+                        // Display-only fields; profiling/bot routes UseAbility by card_id.
+                        card_name: if cfg!(not(feature = "profiling")) {
+                            Some(card.name.to_string())
+                        } else {
+                            None
+                        },
+                        card_no: if cfg!(not(feature = "profiling")) {
+                            Some(card.card_no.to_string())
+                        } else {
+                            None
+                        },
                         ability_index: Some(ability_index),
-                        source_ability: Some(ability.full_text.clone()),
+                        source_ability: if cfg!(not(feature = "profiling")) {
+                            Some(ability.full_text.clone())
+                        } else {
+                            None
+                        },
                         base_cost: Some(ability_cost),
                         final_cost: Some(ability_cost),
                         ..make_params()

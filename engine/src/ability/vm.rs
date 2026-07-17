@@ -220,7 +220,7 @@ pub fn get_ability(idx: usize) -> Option<Ability> {
 
     Some(Ability {
         full_text: String::new(),
-        triggerless_text: String::new(),
+        triggerless_text: None,
         triggers: None,
         use_limit: None,
         is_null: false,

@@ -288,7 +288,7 @@ fn jellyfish_q98_member_appeared_then_left_not_counted() {
     advance_to_live_card_set_p1(&mut game);
 
     // Mark Chisato as appeared this turn AFTER phase advance (tracking may be cleared during passes)
-    game.state.cards_appeared_this_turn.insert(chisato);
+    game.state.cards_appeared_this_turn.push(chisato);
 
     game.set_live_card(jellyfish);
     advance_to_live_start(&mut game);
@@ -320,7 +320,7 @@ fn jellyfish_q98_one_left_one_stays() {
     advance_to_live_card_set_p1(&mut game);
 
     // Re-insert appeared tracking AFTER phase advance (it may be cleared during passes)
-    game.state.cards_appeared_this_turn.insert(natsumi);
+    game.state.cards_appeared_this_turn.push(natsumi);
 
     game.set_live_card(jellyfish);
     advance_to_live_start(&mut game);

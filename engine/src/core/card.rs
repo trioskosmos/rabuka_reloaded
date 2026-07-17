@@ -547,8 +547,12 @@ pub struct SpecialHeart {
 pub struct Ability {
     #[serde(default = "default_empty_string")]
     pub full_text: String,
-    #[serde(default = "default_empty_string")]
-    pub triggerless_text: String,
+    /// Trigger prefix stripped from `full_text` (e.g. "【自】"). Usually derived
+    /// on demand from `full_text`; only populated directly when the source JSON
+    /// carries an explicit, non-derivable value. `None` means "derive from
+    /// `full_text`" — see `Ability::triggerless_text`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub triggerless_text: Option<String>,
     pub triggers: Option<ArcStr>,
     pub use_limit: Option<u32>,
     #[serde(default)]
@@ -560,6 +564,26 @@ pub struct Ability {
 
 fn default_empty_string() -> String {
     String::new()
+}
+
+impl Ability {
+    /// Return the text with any leading trigger clause (e.g. `【自】`) stripped.
+    /// When `triggerless_text` was explicitly set it is returned directly;
+    /// otherwise it is derived from `full_text` on demand.
+    pub fn triggerless_text(&self) -> &str {
+        match &self.triggerless_text {
+            Some(t) => t.as_str(),
+            None => {
+                let ft = self.full_text.trim_start();
+                if let Some(rest) = ft.strip_prefix("【") {
+                    if let Some(idx) = rest.find('】') {
+                        return &ft[idx + '】'.len_utf8()..];
+                    }
+                }
+                ft
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

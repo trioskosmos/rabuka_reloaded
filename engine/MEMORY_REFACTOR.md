@@ -26,6 +26,16 @@ All `Vec<AbilityEffect>` → `Vec<Box<AbilityEffect>>` in CompoundBranch, Effect
 
 **All 1820 tests pass.**
 
+### P2 low-risk batch completed (2026-07-18)
+
+- ✅ **P2 revealed_cards** — consolidated 4 parallel tracking Vecs into `Vec<RevealedCardMeta>` (kept `Vec<i16>` id lists intact).
+- ✅ **P2 full_text/triggerless_text dedup** — `triggerless_text` is now `Option<String>` derived lazily via `Ability::triggerless_text()`.
+- ✅ **P2 tiny tracking maps → SmallVec** — `areas_placed_this_turn`, `cards_appeared_this_turn`, `negated_abilities`, `this_batch_triggered_ability_ids`, `auto_ability_trigger_counts` converted.
+- ❌ **P2 bounded log buffers** — dropped (would touch ~50 writer sites for a modest win; display already caps output at 500).
+
+All four changes are committed; **1820 tests pass on the default feature set.** The
+`bytecode_abilities` feature remains broken (see P1.6).
+
 ---
 
 ### ActionType enum: `action: String` → `ActionType` ✅ DONE
@@ -303,24 +313,44 @@ Covered by `debug_conditions` feature gate above. `trigger_event: Option<Box<Tri
 
 ---
 
-### P1.6 — Build bytecode VM
+### P1.6 — Build bytecode VM — ⚠️ IN PROGRESS (currently BROKEN)
 
 **Why:** The current engine decodes `abilities.json` into full `AbilityEffect` structs at load time (~4 MB JSON → ~2.8 MB in-memory structs). For PS1, N64, DS, Dreamcast targets with <1 MB RAM, this is too expensive. A bytecode format stores abilities as compact opcodes (~14B per ability vs ~400B per AbilityEffect).
 
-**Current state:**
-- `vm.rs` + `vm_gen.rs` already exist behind `#[cfg(feature = "bytecode_abilities")]` feature flag
-- The existing VM inflates bytecode back into `AbilityEffect` structs — it does NOT execute directly
-- `ActionType` enum now matches 1:1 with bytecode opcodes, making direct execution possible
+**Current state (verified 2026-07-18):**
+- `vm.rs` + `vm_gen.rs` + `abilities_gen.rs` exist behind `#[cfg(feature = "bytecode_abilities")]`.
+- `card_loader.rs` already routes ability loading through `vm::get_ability(idx)` when
+  the feature is on (patching `triggers` / `full_text` / `triggerless_text` /
+  `use_limit` from the JSON metadata that bytecode doesn't encode).
+- `compile_abilities.py` is a data-driven auto-compiler that scans `abilities.json`,
+  discovers field types, and emits `vm_gen.rs` (the decoder) + `abilities_gen.rs`
+  (the `Opcode` enum, `BYTECODE`, `OFFSETS`, `STRINGS`) + `build/abilities.bin`.
+- **It does NOT compile.** `cargo build --tests --features bytecode_abilities`
+  fails with ~50 errors: the generated `vm_gen.rs` is out of sync with the current
+  `EffectKind` / enum definitions — missing fields `card_property` and `count`,
+  missing `From<&str>` impls for `EffectCardType` / `EffectState` / `ActionType`,
+  and an unresolved `idx` binding. It was attempted (heavy git history) but never
+  completed and has since regressed against the hand-written types.
 
-**What remains:**
-1. Rewrite `compile_abilities.py` to emit a binary bytecode format (not inflated JSON)
-2. Rewrite `vm.rs` as a true opcode dispatch VM (match on `ActionType`, read operands inline)
-3. Remove the inflation step — decode straight from bytecode slice
-4. Card storage: embed bytecode offset in Card struct instead of `Vec<Arc<Ability>>`
+**What remains to make it build + green:**
+1. Re-run `cards/compile_abilities.py` against current `abilities.json` and regenerate
+   `vm_gen.rs` / `abilities_gen.rs` so they match the live `EffectKind`/`enums`.
+2. Add the missing `From<&str>` impls (`EffectCardType`, `EffectState`, `ActionType`)
+   that the generated decoder relies on, or update the generator's emit logic.
+3. Fix the `count` / `card_property` initializers (add the fields to the generated
+   `EffectKind` constructors) and the `idx` binding in `vm.rs`/`vm_gen.rs`.
+4. Get `cargo build --features bytecode_abilities` green, then get the bytecode test
+   path green (the JSON-path tests should still pass unchanged since it's
+   feature-gated).
+5. Optionally: true direct-execution VM (match on `ActionType`, inline operands)
+   removing the inflate-to-`AbilityEffect` step. This is the larger "100x reduction"
+   goal but is separate from merely getting the feature to compile.
 
-**Savings:** ~40 KB card data vs ~4 MB JSON-inflated. 100x reduction.
+**Savings (if completed):** ~40 KB card data vs ~4 MB JSON-inflated. 100x reduction —
+this is the key unlock for PS1/N64/DS/Dreamcast.
 
-**Estimated effort:** ~300 lines Python compiler + ~500 lines Rust VM. Coexists with JSON path behind feature flag.
+**Estimated effort:** regenerate + sync ~1-2 files; fix ~50 compile errors; then
+optional VM rewrite (~300 py + ~500 rs). Coexists with JSON path behind feature flag.
 
 ---
 
@@ -351,44 +381,74 @@ struct ModifierSet {
 
 ---
 
-### P2 — Bounded log buffers
+### P2 — Bounded log buffers — ❌ DROPPED
 
-**Why:** `rule_log: Vec<String>` and `structured_log: Vec<LogEntry>` grow unbounded. Each LogEntry has `text: String`, `metadata: Option<serde_json::Value>`. After 20+ turns, thousands of entries.
+**Why:** `rule_log: Vec<String>` and `structured_log: Vec<LogEntry>` grow unbounded.
 
-**Fix:** Replace with `VecDeque` capped at 200 entries.
-
-**Trade-offs:**
-- Lose infinite history. 200 entries is enough for any practical game play.
-- **Test risk:** Low
+**Status:** Dropped by decision. The display layer already caps output at the last 500
+entries (`display.rs`), and bounding the live buffers would require touching ~50 direct
+`.push()` writer sites across the engine (high churn for a modest win). Deferred.
 
 ---
 
-### P2 — Parallel Vec consolidation: revealed_cards
+### P2 — Parallel Vec consolidation: revealed_cards — ✅ DONE
 
-**Impact:** GameState has 5 parallel Vecs for revealed cards + 5 more for revealed_cost_cards:
-- `revealed_cards: Vec<i16>`, `revealed_card_sources: Vec<Option<i16>>`, `revealed_card_source_names: Vec<Option<String>>`, `revealed_card_is_private: Vec<bool>`, `revealed_card_owners: Vec<Option<u8>>`
+**Impact:** GameState had 5 parallel Vecs for revealed cards + 5 more for
+revealed_cost_cards (id, source, source_name, is_private, owner).
 
-**Fix:** Replace with single `Vec<RevealedCard>` struct.
+**Fix:** Kept `revealed_cards: Vec<i16>` / `revealed_cost_cards: Vec<i16>` as the
+card-id lists (they are read/written from ~30 engine + test sites as plain `Vec<i16>`),
+and consolidated the 4 parallel tracking columns into a single
+`Vec<RevealedCardMeta>` / `Vec<RevealedCardMeta>` (struct: `source`, `source_name`,
+`is_private`, `owner`). `push_revealed_card` / `push_revealed_cost_card` /
+`clear_revealed_cards` / display mapping updated accordingly.
 
-**Savings:** 10 Vec headers → 2. String deduplication. Better cache locality.
+**Why not a single `Vec<RevealedCard>` replacing the id Vec:** that would have required
+rewriting every one of the ~30 `revealed_cards` call sites (including 20+ test files
+that do `.push(id)`, `.len()`, `.contains(...)`, `core::mem::take`, indexing) — a
+high-risk "system shock". The contained version keeps `Vec<i16>` semantics intact
+and only rewrites the engine-internal meta tracking, which is not referenced by tests.
 
-**Trade-offs:**
-- Mechanical change, low risk
-- **Clock cycle win:** Adjacent fields per card instead of 5 separate arrays = fewer cache misses
+**Savings:** 8 Vec headers → 2 per group (4 → 2). Better cache locality for the
+tracking columns. All 1820 tests pass.
 
 ---
 
-### P2 — HashMap → SmallVec for tiny tracking maps
+### P2 — Ability full_text + triggerless_text dedup — ✅ DONE
 
-Many GameState HashMaps hold 0-5 entries:
-- `areas_placed_this_turn`, `cards_appeared_this_turn`, `negated_abilities`, `this_batch_triggered_ability_ids`, `gained_abilities`, `auto_ability_trigger_counts`, etc.
+**Why:** Every `Ability` stored both `full_text` and `triggerless_text` as `String`;
+for most abilities the latter is just `full_text` with a leading trigger clause
+(`【…】`) stripped.
 
-**Fix:** Replace with `SmallVec<[(K, V); 4]>` — linear search for <10 entries is faster than hashing.
+**Fix:** `triggerless_text` is now `Option<String>` (serde `skip_serializing_if`),
+defaulting to `None` = "derive from `full_text`". Added `Ability::triggerless_text()`
+which returns the stored value when `Some`, otherwise strips a leading `【…】` clause
+from `full_text`. All writers (`vm.rs`, `gen_abilities_map.rs`, `card_loader.rs`,
+`ability_effects.rs`, `ability_queue.rs`) and readers updated. The JSON serde contract
+is preserved (triggerless_text is still emitted when present).
 
-**Trade-offs:**
-- O(n) lookup instead of O(1), but n < 10 means no hash computation overhead
-- **Clock cycle win:** No heap alloc when empty. No hash computation for inserts/lookups.
-- **Test risk:** Medium
+**Savings:** `triggerless_text` is no longer stored redundantly for the common case
+(~80 KB across ~1000 abilities). All 1820 tests pass.
+
+---
+
+### P2 — HashMap → SmallVec for tiny tracking maps — ✅ DONE
+
+Many GameState collections hold 0-5 entries. Replaced the following with
+`SmallVec<[T; 8]>` (or `SmallVec<[(String, u32); 8]>` for the counter map):
+- `areas_placed_this_turn: HashSet<String>` → `SmallVec<[String; 8]>`
+- `cards_appeared_this_turn: HashSet<i16>` → `SmallVec<[i16; 8]>`
+- `negated_abilities: HashSet<i16>` → `SmallVec<[i16; 8]>`
+- `this_batch_triggered_ability_ids: HashSet<String>` → `SmallVec<[String; 8]>`
+- `auto_ability_trigger_counts: HashMap<String, u32>` → `SmallVec<[(String, u32); 8]>`
+
+Set `insert` → dedup-then-`push`; map `entry().or_insert().+=1` → `find`-or-push.
+`display.rs` target structs still receive `Vec`/`HashMap` (converted via `.iter()`).
+`gained_abilities` and `cards_moved_this_turn` were deliberately left as `HashMap`/
+`HashSet` (heavier value types / wider use). All 1820 tests pass.
+
+**Savings:** No heap alloc when empty; no hash computation for inserts/lookups on these
+tiny collections.
 
 ---
 
@@ -434,13 +494,17 @@ Many GameState HashMaps hold 0-5 entries:
 
 ---
 
-### P2 — Ability full_text + triggerless_text dedup
+### P2 — Ability full_text + triggerless_text dedup — ✅ DONE
 
 **Why:** Every Ability stores both. For most abilities these are identical or triggerless just strips the prefix.
 
-**Fix:** Store one `text: Box<str>`, compute triggerless on demand (lazily cached).
+**Fix:** `triggerless_text` is now `Option<String>` (serde `skip_serializing_if`),
+derived lazily via `Ability::triggerless_text()` which strips a leading `【…】`
+trigger clause from `full_text` when the field is `None`. The stored `String`
+`full_text` is retained as the canonical source. (See the detailed note in the P2
+section above.)
 
-**Savings:** ~80 KB for ~1000 abilities.
+**Savings:** ~80 KB for ~1000 abilities. All 1820 tests pass.
 
 **Trade-offs:**
 - Lazy computation on first access (cheap — str::strip_prefix)

@@ -1779,7 +1779,11 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
                 format!("{}_{}_{}", card_id, ability_index, turn)
             })
             .collect(),
-        auto_ability_trigger_counts: game_state.auto_ability_trigger_counts.clone(),
+        auto_ability_trigger_counts: game_state
+            .auto_ability_trigger_counts
+            .iter()
+            .cloned()
+            .collect(),
         turn_limit_usage: game_state.turn_limit_usage.clone(),
         non_stackable_effects: game_state.non_stackable_effects.iter().cloned().collect(),
         prohibition_effects: game_state.prohibition_effects.clone(),
@@ -1834,24 +1838,14 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .iter()
             .enumerate()
             .map(|(i, &cid)| {
-                let src_id = game_state.revealed_card_sources.get(i).copied().flatten();
-                let src_name = game_state
-                    .revealed_card_source_names
-                    .get(i)
-                    .cloned()
-                    .flatten();
-                let owner = game_state
-                    .revealed_card_owners
-                    .get(i)
-                    .copied()
-                    .flatten()
+                let meta = game_state.revealed_card_meta.get(i);
+                let src_id = meta.and_then(|m| m.source);
+                let src_name = meta.and_then(|m| m.source_name.clone());
+                let owner = meta
+                    .and_then(|m| m.owner)
                     .map(|o| o as i8)
                     .unwrap_or(-1i8);
-                let is_private = game_state
-                    .revealed_card_is_private
-                    .get(i)
-                    .copied()
-                    .unwrap_or(false);
+                let is_private = meta.map(|m| m.is_private).unwrap_or(false);
                 RevealedCardDisplay {
                     card_id: cid,
                     source_card_id: src_id,
@@ -1877,28 +1871,14 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .iter()
             .enumerate()
             .map(|(i, &cid)| {
-                let src_id = game_state
-                    .revealed_cost_card_sources
-                    .get(i)
-                    .copied()
-                    .flatten();
-                let src_name = game_state
-                    .revealed_cost_card_source_names
-                    .get(i)
-                    .cloned()
-                    .flatten();
-                let owner = game_state
-                    .revealed_cost_card_owners
-                    .get(i)
-                    .copied()
-                    .flatten()
+                let meta = game_state.revealed_cost_card_meta.get(i);
+                let src_id = meta.and_then(|m| m.source);
+                let src_name = meta.and_then(|m| m.source_name.clone());
+                let owner = meta
+                    .and_then(|m| m.owner)
                     .map(|o| o as i8)
                     .unwrap_or(-1i8);
-                let is_private = game_state
-                    .revealed_cost_card_is_private
-                    .get(i)
-                    .copied()
-                    .unwrap_or(false);
+                let is_private = meta.map(|m| m.is_private).unwrap_or(false);
                 RevealedCardDisplay {
                     card_id: cid,
                     source_card_id: src_id,

@@ -411,7 +411,12 @@ impl GameState {
                             if self.this_batch_triggered_ability_ids.contains(&batch_key) {
                                 continue;
                             }
-                            self.this_batch_triggered_ability_ids.insert(batch_key);
+                            if !self
+                                .this_batch_triggered_ability_ids
+                                .contains(&batch_key)
+                            {
+                                self.this_batch_triggered_ability_ids.push(batch_key);
+                            }
                             // §9.7.2.1: Multi-trigger — N trigger instances → N
                             // standby entries.  All entries share the same
                             // trigger_moved_cards (full batch) because each
@@ -480,7 +485,12 @@ impl GameState {
                             if self.this_batch_triggered_ability_ids.contains(&batch_key) {
                                 continue;
                             }
-                            self.this_batch_triggered_ability_ids.insert(batch_key);
+                            if !self
+                                .this_batch_triggered_ability_ids
+                                .contains(&batch_key)
+                            {
+                                self.this_batch_triggered_ability_ids.push(batch_key);
+                            }
                             abilities_to_trigger.push((
                                 ability_id,
                                 card.card_no.to_string(),
@@ -561,7 +571,12 @@ impl GameState {
                             if self.this_batch_triggered_ability_ids.contains(&batch_key) {
                                 continue;
                             }
-                            self.this_batch_triggered_ability_ids.insert(batch_key);
+                            if !self
+                                .this_batch_triggered_ability_ids
+                                .contains(&batch_key)
+                            {
+                                self.this_batch_triggered_ability_ids.push(batch_key);
+                            }
                             abilities_to_trigger.push((
                                 ability_id,
                                 card.card_no.to_string(),
@@ -574,8 +589,12 @@ impl GameState {
         }
         let moved = Some(event.moved_cards.clone());
         for (ability_id, card_no, stage_card_id) in abilities_to_trigger {
-            self.this_batch_triggered_ability_ids
-                .insert(ability_id.clone());
+            if !self
+                .this_batch_triggered_ability_ids
+                .contains(&ability_id)
+            {
+                self.this_batch_triggered_ability_ids.push(ability_id.clone());
+            }
             self.trigger_auto_ability(
                 ability_id,
                 AbilityTrigger::Auto,
@@ -2494,7 +2513,7 @@ impl GameState {
                     if card_to_clear.is_none() {
                         for (&cid, abils) in &self.gained_card_abilities {
                             if abils.iter().any(|a| {
-                                a.triggerless_text == ability_text || a.full_text == ability_text
+                                a.triggerless_text() == ability_text || a.full_text == ability_text
                             }) {
                                 card_to_clear = Some(cid);
                                 break;

@@ -155,7 +155,7 @@ impl AbilityResolver {
                 let cn = self.card_name(card_id);
                 gs.rule_log
                     .push(format!("{} {}: [[log_negate_ability_self]]", pp, cn));
-                gs.negated_abilities.insert(card_id);
+                gs.negated_abilities.push(card_id);
                 return Ok(());
             }
             return Err("no activating card for self-targeted invalidation".to_string());
@@ -187,7 +187,7 @@ impl AbilityResolver {
             gs.rule_log
                 .push(format!("{} {}: [[log_negate_ability]]", pp, cn));
             if let Some(&target_id) = valid.first() {
-                gs.negated_abilities.insert(target_id);
+                gs.negated_abilities.push(target_id);
             }
         }
         Ok(())
@@ -254,7 +254,7 @@ impl AbilityResolver {
             if let (Some(gained), Some(card_id)) = (gained_effect, gs.activating_card) {
                 let gained_ability = Ability {
                     full_text: ability_text.to_string(),
-                    triggerless_text: ability_text.to_string(),
+                    triggerless_text: Some(ability_text.to_string()),
                     triggers: Some(crate::triggers::LIVE_SUCCESS.into()),
                     use_limit: None,
                     is_null: false,
@@ -418,7 +418,7 @@ impl AbilityResolver {
                             .or_default()
                             .push(format!(
                                 "ability_from_source:{}:{}",
-                                src_id, ability.triggerless_text
+                                src_id, ability.triggerless_text()
                             ));
                         let gained = crate::card::Ability {
                             full_text: ability.full_text.clone(),

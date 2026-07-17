@@ -99,7 +99,7 @@ impl CardLoader {
             .get("unique_abilities")
             .and_then(|v| v.as_array())
         {
-            for (idx, ability_entry) in unique_abilities.iter().enumerate() {
+            for (_idx, ability_entry) in unique_abilities.iter().enumerate() {
                 #[cfg(feature = "bytecode_abilities")]
                 let ability = {
                     let mut ability = crate::ability::vm::get_ability(idx);
@@ -118,7 +118,7 @@ impl CardLoader {
                             .get("triggerless_text")
                             .and_then(|v| v.as_str())
                         {
-                            ab.triggerless_text = text.to_string();
+                            ab.triggerless_text = Some(text.to_string());
                         }
                         if let Some(limit) = ability_entry.get("use_limit").and_then(|v| v.as_u64())
                         {

@@ -6,7 +6,6 @@ use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
-use rabuka_engine::zones::MemberArea;
 use rand::Rng;
 use std::sync::Arc;
 

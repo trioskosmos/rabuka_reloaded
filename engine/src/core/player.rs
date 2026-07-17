@@ -5,7 +5,7 @@ use crate::zones::{
 };
 
 use crate::card::CardDatabase;
-use crate::core::game_modifiers::{GameModifiers, ModifierEntry};
+use crate::core::game_modifiers::ModifierEntry;
 
 use crate::{HashMap, HashSet, VecDeque};
 #[cfg(feature = "psp")]
@@ -202,7 +202,7 @@ impl Player {
         stage_area: crate::zones::MemberArea,
         use_baton_touch: bool,
         card_db: &CardDatabase,
-        mods: &GameModifiers,
+        replaced_member_cost_mod: i32,
     ) -> Result<(u32, bool, Option<u32>, Option<i16>), String> {
         // Rule 8.2: Main Phase - Play member card from hand to stage
 
@@ -287,8 +287,10 @@ impl Player {
                             .get_card(member_card_id)
                             .map(|c| c.cost.unwrap_or(1))
                             .unwrap_or(1);
-                        // Include cost modifiers from constant abilities (e.g. +3 cost)
-                        let cost_mod = mods.get_cost_modifier(member_card_id);
+                        // Include cost modifiers from constant abilities (e.g. +3 cost).
+                        // Resolved by the caller (from &game_state.mods) and passed in
+                        // to avoid cloning the entire GameModifiers per action.
+                        let cost_mod = replaced_member_cost_mod;
                         let replaced_member_cost = (base_cost as i32 + cost_mod).max(1) as u32;
 
                         // Store the replaced member cost for later use

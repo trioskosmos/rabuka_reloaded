@@ -259,7 +259,7 @@ impl AbilityQueue {
                     player_id: String::new(),
                     ability: Arc::new(Ability {
                         full_text: String::new(),
-                        triggerless_text: String::new(),
+                        triggerless_text: None,
                         triggers: None,
                         use_limit: None,
                         is_null: false,
@@ -361,7 +361,7 @@ impl AbilityQueue {
             player_id,
             ability: Arc::new(Ability {
                 full_text: String::new(),
-                triggerless_text: String::new(),
+                triggerless_text: None,
                 triggers: None,
                 use_limit: None,
                 is_null: true,

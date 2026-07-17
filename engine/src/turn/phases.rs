@@ -220,10 +220,7 @@ impl super::TurnEngine {
                     }
                     game_state.clear_revealed_cards();
                     game_state.revealed_cost_cards.clear();
-                    game_state.revealed_cost_card_sources.clear();
-                    game_state.revealed_cost_card_source_names.clear();
-                    game_state.revealed_cost_card_is_private.clear();
-                    game_state.revealed_cost_card_owners.clear();
+                    game_state.revealed_cost_card_meta.clear();
                     game_state.turn_limited_abilities_used.clear();
                     game_state.cannot_activate_members.clear();
                     game_state.cannot_live_players.clear();
@@ -825,7 +822,6 @@ impl super::TurnEngine {
         game_state.mark_constants_dirty();
         game_state.recalculate_constants();
         tdbg!("PHASE_EXEC:1 recalc OK");
-        let mods = game_state.mods.clone();
 
         let player = game_state.active_player_mut();
         let idx = if let Some(cid) = card_id {
@@ -1035,8 +1031,26 @@ impl super::TurnEngine {
             return Ok(());
         }
 
-        let (cost_paid, baton_touch_used, replaced_member_cost, replaced_member_id) =
-            player.move_card_from_hand_to_stage(idx, area, use_baton_touch, &card_db, &mods)?;
+        // Resolve the cost modifier for the member that baton touch would replace
+        // at `area` (if any) using disjoint immutable reads. This replaces the
+        // previous full `game_state.mods.clone()` per action: move_card_from_hand_to_stage
+        // only reads a single cost modifier from `mods`, so pass just that scalar.
+        let replaced_member_cost_mod = game_state
+            .active_player()
+            .stage
+            .get_area(area)
+            .map(|cid| game_state.mods.get_cost_modifier(cid))
+            .unwrap_or(0);
+
+        let player = game_state.active_player_mut();
+        let (cost_paid, baton_touch_used, replaced_member_cost, replaced_member_id) = player
+            .move_card_from_hand_to_stage(
+                idx,
+                area,
+                use_baton_touch,
+                &card_db,
+                replaced_member_cost_mod,
+            )?;
         game_state.baton_touch_zero_cost = baton_touch_used && cost_paid == 0;
         game_state.baton_touch_replaced_member_cost = replaced_member_cost;
         game_state.baton_touch_replaced_member_id = replaced_member_id;

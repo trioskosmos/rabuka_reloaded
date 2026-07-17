@@ -58,7 +58,7 @@ fn main() {
     // Strip display-only text — not needed for gameplay
     for ability in &mut abilities {
         ability.full_text = String::new();
-        ability.triggerless_text = String::new();
+        ability.triggerless_text = None;
     }
 
     let file = AbilitiesMapFile { abilities, cards };

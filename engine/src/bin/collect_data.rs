@@ -1,4 +1,3 @@
-use rand::Rng;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
@@ -48,7 +47,7 @@ fn main() {
 
     let mut out = File::create(&out_path).unwrap();
     let mut total: u64 = 0;
-    let mut start = std::time::Instant::now();
+    let start = std::time::Instant::now();
     let program_seed = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()

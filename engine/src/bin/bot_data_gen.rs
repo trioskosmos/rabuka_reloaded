@@ -126,7 +126,7 @@ fn main() {
             let ex = Example::capture(&gs);
             examples.push(ex);
 
-            let action = if let Some(ref b) = bot {
+            let action = if let Some(ref _b) = bot {
                 if gs.active_player().id == "player1" && gs.current_phase == Phase::Main {
                     // Use the smart heuristic — no clones, no NN
                     let heuristic =
