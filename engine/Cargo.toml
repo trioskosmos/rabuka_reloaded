@@ -22,7 +22,7 @@ doctest = false
 [dependencies]
 log = { version = "=0.4.22", default-features = false }
 env_logger = { version = "0.11", optional = true }
-serde = { version = "=1.0.197", default-features = false, features = ["derive", "alloc"] }
+serde = { version = "=1.0.228", default-features = false, features = ["derive", "alloc"] }
 serde_json = { version = "=1.0.99", default-features = false, features = ["alloc"] }
 rand = { version = "0.8", optional = true }
 actix-web = { version = "4.4", optional = true }
