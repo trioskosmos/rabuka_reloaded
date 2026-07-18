@@ -10,6 +10,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::hash::{BuildHasher, Hasher};
 
+use psp::dprintln;
 use psp::sys::*;
 
 use rabuka_psp::display::Display;
@@ -409,7 +410,7 @@ fn init_rng() {
     unsafe {
         sceRtcGetCurrentTick(&mut tick);
     }
-    rng::seed(if tick == 0 { 1 } else { tick });
+    rng::seed(if tick == 0 { 1 } else { tick as u32 });
 }
 
 fn wait_frames(n: u32) {

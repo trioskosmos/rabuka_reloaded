@@ -1,6 +1,4 @@
-#[cfg(not(feature = "psp"))]
 use crate::core::types::ArcStr;
-#[cfg(not(feature = "psp"))]
 use serde::ser::Serializer;
 
 /// Strongly-typed zone identifiers to prevent stringly-typed bugs.

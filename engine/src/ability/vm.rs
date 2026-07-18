@@ -1,5 +1,5 @@
 use super::abilities_gen::{Opcode, BYTECODE, NUM_ABILITIES, OFFSETS, STRINGS};
-use crate::ability::enums::EffectState;
+use crate::ability::enums::{ActionType, EffectCardType, EffectState};
 use crate::card::{
     ek_box_new, Ability, AbilityCost, AbilityEffect, Condition, ConditionCardType, EffectKind,
     Operator,
@@ -591,5 +591,47 @@ fn decode_operator(v: u8) -> &'static str {
         4 => "<",
         5 => "<=",
         _ => ">=",
+    }
+}
+
+fn decode_effect_card_type(v: u8) -> EffectCardType {
+    match v {
+        0 => EffectCardType::MemberCard,
+        1 => EffectCardType::LiveCard,
+        2 => EffectCardType::EnergyCard,
+        _ => EffectCardType::Other(ArcStr::from("")),
+    }
+}
+fn decode_action_type(v: u8) -> ActionType {
+    match v {
+        0 => ActionType::DrawCard,
+        1 => ActionType::MoveCards,
+        2 => ActionType::GainResource,
+        3 => ActionType::ModifyScore,
+        4 => ActionType::ChangeState,
+        5 => ActionType::PositionChange,
+        6 => ActionType::Custom,
+        7 => ActionType::SetBladeCount,
+        8 => ActionType::GainAbility,
+        9 => ActionType::Restriction,
+        10 => ActionType::Select,
+        11 => ActionType::Reveal,
+        _ => ActionType::Custom,
+    }
+}
+
+impl From<&str> for EffectCardType {
+    fn from(s: &str) -> Self {
+        EffectCardType::from_str(s)
+    }
+}
+impl From<&str> for EffectState {
+    fn from(s: &str) -> Self {
+        EffectState::from_str(s)
+    }
+}
+impl From<&str> for ActionType {
+    fn from(s: &str) -> Self {
+        ActionType::from_str(s).unwrap_or(ActionType::Custom)
     }
 }

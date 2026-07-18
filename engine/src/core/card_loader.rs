@@ -99,7 +99,7 @@ impl CardLoader {
             .get("unique_abilities")
             .and_then(|v| v.as_array())
         {
-            for (_idx, ability_entry) in unique_abilities.iter().enumerate() {
+            for (idx, ability_entry) in unique_abilities.iter().enumerate() {
                 #[cfg(feature = "bytecode_abilities")]
                 let ability = {
                     let mut ability = crate::ability::vm::get_ability(idx);

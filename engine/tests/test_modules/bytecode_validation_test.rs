@@ -1,5 +1,6 @@
 #[cfg(feature = "bytecode_abilities")]
 mod bytecode_validation {
+    use rabuka_engine::ability::enums::ActionType;
     use rabuka_engine::ability::vm::{ability_count, get_ability};
     use rabuka_engine::card::{Ability, AbilityEffect};
     use std::collections::HashMap;
@@ -63,9 +64,10 @@ mod bytecode_validation {
                 if let Some(json_action) = json_effect.get("action").and_then(|v| v.as_str()) {
                     if !json_action.is_empty() && ability.effect.is_some() {
                         let eff = ability.effect.as_ref().unwrap();
-                        if eff.action.is_empty() {
+                        let bc_action = eff.action.to_str();
+                        if bc_action.is_empty() {
                             // skip — compound effects use different naming
-                        } else if eff.action != json_action {
+                        } else if bc_action != json_action {
                             // Some actions are normalized (e.g. "draw" -> "draw_card")
                             // Accept known renames
                             let normalized = match json_action {
@@ -73,9 +75,9 @@ mod bytecode_validation {
                                 _ => json_action,
                             };
                             assert_eq!(
-                                eff.action, normalized,
+                                bc_action, normalized,
                                 "Ability {}: action mismatch: JSON='{}' BC='{}'",
-                                i, json_action, eff.action
+                                i, json_action, bc_action
                             );
                         }
                     }
