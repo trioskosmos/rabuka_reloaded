@@ -12,7 +12,7 @@ echo render correctly instead of showing "?".
 echo.
 
 echo [1/3] Baking card data...
-cd /d "%~dp0engine_psp\tools\bake_cards"
+cd /d "%~dp0ports\psp\tools\bake_cards"
 cargo run --release
 cd /d "%~dp0"
 if %ERRORLEVEL% neq 0 (
@@ -24,7 +24,7 @@ echo [1/3] Done.
 echo.
 
 echo [2/3] Building PSP binary...
-cd /d "%~dp0engine_psp"
+cd /d "%~dp0ports\psp"
 cargo psp --release --features psp
 cd /d "%~dp0"
 if %ERRORLEVEL% neq 0 (

@@ -55,7 +55,7 @@ fn main() {
         cwd
     };
 
-    let out = repo_root.join("engine_psp/baked");
+    let out = repo_root.join("ports/psp/baked");
     fs::create_dir_all(&out).ok();
 
     // Load all cards as object

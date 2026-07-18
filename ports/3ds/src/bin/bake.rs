@@ -17,11 +17,12 @@ fn main() {
     let out_dir: PathBuf = std::env::args()
         .nth(1)
         .map(Into::into)
-        .unwrap_or_else(|| "engine_3ds/romfs".into());
+        .unwrap_or_else(|| "ports/3ds/romfs".into());
     let cwd = std::env::current_dir().unwrap();
-    let repo_root = if cwd.ends_with("engine_3ds") {
-        cwd.parent().unwrap().to_owned()
+    let repo_root = if cwd.ends_with("ports/3ds") || cwd.ends_with("engine_3ds") {
+        cwd.parent().unwrap().parent().unwrap().to_owned()
     } else {
+        // Already at repo root
         cwd
     };
     let out = repo_root.join(&out_dir);

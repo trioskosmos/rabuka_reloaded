@@ -21,7 +21,13 @@ cloudflared.exe
 
 source_images/
 
+# Port target directories
+ports/*/target/
+
 # 3DS card conversion intermediates (PNGs only — .t3x atlases are tracked)
-engine_3ds/romfs/cards/*.png
+ports/3ds/romfs/cards/*.png
 
 output_3ds/
+
+# Dreamcast toolchain build artifacts
+dc-toolchain/

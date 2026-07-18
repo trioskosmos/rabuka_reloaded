@@ -86,7 +86,7 @@ Consoles that remain borderline:
 - CPU: ARM11 MPCore @ 268MHz
 - RAM: 128MB
 - SDK: devkitARM (`armv6k-nintendo-3ds`), `ctru-rs`, `cargo-3ds`
-- Status: **Already works.** See `engine_3ds/`.
+- Status: **Already works.** See `ports/3ds/`.
 - Engine changes: Zilch. Std works via newlib.
 
 ---
@@ -260,7 +260,7 @@ The platform-specific parts are a tiny surface area:
     ┌────────────────┼────────────────┐
     │                │                │
     ▼                ▼                ▼
- engine_3ds     engine_ps1       engine_pc_cli
+ ports/3ds     engine_ps1       engine_pc_cli
  (display,      (display,        (display,
   input,         input,           input,
   audio,         allocator,       RNG)
@@ -409,7 +409,7 @@ with libgccjit using the [dreamcast-rs](https://github.com/dreamcast-rs) tooling
 - Display: KOS BIOS font via `bfont_draw()` (640×480, 8×16 font)
 - Input: KOS Maple controller polling (`maple_dev_attach` + `cont_get_cond`)
 - RNG: xorshift32 seeded from KOS `timer_ms_gettime64()`
-- Sourcing baked card JSON files from `engine_psp/baked/`
+- Sourcing baked card JSON files from `ports/psp/baked/`
 - Panic handler: dumps to framebuffer
 
 ### Next steps (once toolchain finishes building)

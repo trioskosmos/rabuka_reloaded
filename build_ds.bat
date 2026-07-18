@@ -16,7 +16,7 @@ if "%DEVKITARM%"=="" (
 )
 
 echo [1/3] Baking card data...
-cd /d "%~dp0engine_psp\tools\bake_cards"
+cd /d "%~dp0ports\psp\tools\bake_cards"
 cargo run --release
 cd /d "%~dp0"
 if %ERRORLEVEL% neq 0 (
@@ -28,7 +28,7 @@ echo [1/3] Done.
 echo.
 
 echo [2/3] Building DS binary...
-cd /d "%~dp0engine_ds"
+cd /d "%~dp0ports\ds"
 cargo build --release --target armv5te-nintendo-ds
 cd /d "%~dp0"
 if %ERRORLEVEL% neq 0 (
@@ -40,7 +40,7 @@ echo [2/3] Done.
 echo.
 
 echo [3/3] Creating NDS ROM...
-set TARGET_DIR=%~dp0engine_ds\target\armv5te-nintendo-ds\release
+set TARGET_DIR=%~dp0ports\ds\target\armv5te-nintendo-ds\release
 if exist "%DEVKITPRO%\tools\bin\ndstool.exe" (
     "%DEVKITPRO%\tools\bin\ndstool.exe" -c "%~dp0output_ds\rabuka.nds" -9 "%TARGET_DIR%\rabuka_ds.elf"
 ) else (
