@@ -6,14 +6,14 @@ pub fn set_debug(enabled: bool) {
     ABILITY_DEBUG.store(enabled, Ordering::SeqCst);
 }
 
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{string::String, vec::Vec};
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 pub use inner::AbDebug;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 pub struct AbDebug;
 
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 impl AbDebug {
     pub fn new() -> Self {
         AbDebug
@@ -42,7 +42,7 @@ impl AbDebug {
     pub fn print_cost(&mut self, _cost: &crate::card::AbilityEffect, _prefix: &str) {}
 }
 
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 mod inner {
     use crate::card::{Ability, AbilityEffect, Condition};
     use core::sync::atomic::Ordering;

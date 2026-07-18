@@ -1,7 +1,7 @@
 use crate::card::{BladeColor, HeartColor};
 use crate::types::AbilityApplication;
 use crate::HashMap;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,

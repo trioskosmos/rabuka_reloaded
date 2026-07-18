@@ -25,7 +25,7 @@ fn xorshift32(state: &mut u32) -> u32 {
 }
 
 // ── std path (desktop + 3DS) ─────────────────────────────────────────────
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 mod inner {
     use std::sync::Mutex;
 
@@ -80,7 +80,7 @@ mod inner {
 }
 
 // ── PSP path (no_std) ────────────────────────────────────────────────────
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 mod inner {
     use core::cell::UnsafeCell;
 
@@ -126,6 +126,6 @@ mod inner {
 
 // Public surface
 pub use inner::rand_range;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 pub use inner::seed;
 pub use inner::shuffle_slice;

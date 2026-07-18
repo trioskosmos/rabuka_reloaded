@@ -2,7 +2,7 @@ use crate::constants::MAX_LIVE_CARDS;
 use crate::game_state::{GameState, Phase};
 use crate::types::LogEntry;
 use crate::HashMap;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -59,7 +59,7 @@ impl super::TurnEngine {
     }
 
     pub fn advance_phase(game_state: &mut GameState) {
-        #[cfg(not(feature = "psp"))]
+        #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("advance_phase");
         debug_assert!(
             game_state.phase_invariant(),

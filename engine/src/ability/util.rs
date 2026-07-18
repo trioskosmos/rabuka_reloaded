@@ -2,13 +2,13 @@ use super::enums::{ActionType, Zone};
 use crate::card::{parse_heart_color, AbilityFilter, CardDatabase, DistinctType, Operator};
 use crate::game_state::Duration;
 use crate::{HashMap, HashSet};
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     borrow::Cow,
     string::{String, ToString},
     vec::Vec,
 };
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 use std::borrow::Cow;
 
 // ============== MODIFY COST ==============
@@ -363,7 +363,7 @@ pub fn card_matches_group(
 /// Like `card_matches_group_str` but returns a vec of (reason, result) pairs
 /// for each check so callers can log detailed diagnostics. Disabled by default;
 /// enable via `RABUKA_DEBUG_GROUP=1`.
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 fn debug_group_match(
     _card_db: &CardDatabase,
     _card_id: i16,
@@ -372,7 +372,7 @@ fn debug_group_match(
 ) {
 }
 
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 fn debug_group_match(card_db: &CardDatabase, card_id: i16, group_name: Option<&str>, result: bool) {
     static DEBUG_GROUP: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     if !*DEBUG_GROUP.get_or_init(|| std::env::var("RABUKA_DEBUG_GROUP").as_deref() == Ok("1")) {

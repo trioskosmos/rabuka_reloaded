@@ -5,13 +5,13 @@ use super::types::{Choice, ChoiceRoute};
 use super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     collections::BTreeMap,
     string::{String, ToString},
     vec::Vec,
 };
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 use std::collections::BTreeMap;
 
 impl AbilityResolver {

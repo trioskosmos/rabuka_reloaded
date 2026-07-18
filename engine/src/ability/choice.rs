@@ -8,7 +8,7 @@ use super::util;
 use crate::ability::debug::ABILITY_DEBUG;
 use crate::card::{AbilityEffect, EffectKind};
 use crate::game_state::GameState;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     boxed::Box,
     string::{String, ToString},

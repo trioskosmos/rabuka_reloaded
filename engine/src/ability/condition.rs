@@ -5,7 +5,7 @@ use crate::ability::debug::ABILITY_DEBUG;
 use crate::ability::enums::{ConditionType, Zone};
 use crate::card::{CardState, Condition};
 use crate::game_state::Phase;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -149,7 +149,7 @@ impl<'a> ConditionContext<'a> {
 
 /// Push a condition verdict to the structured log buffer.
 /// `actual_label` overrides the auto-generated actual string; use "" to auto-generate.
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 pub fn push_cond_verdict(
     condition: &Condition,
     extra_actual: &str,
@@ -427,7 +427,7 @@ impl<'a> ConditionContext<'a> {
 
         let mut dbg = AbDebug::new();
         // Snapshot buffer before compound/or so children can be collected
-        #[cfg(not(feature = "psp"))]
+        #[cfg(not(feature = "no_std"))]
         let _before = crate::ability::log::buffer_len();
         // Handle compound/or first — they push their own verdicts with children
         if let Condition::Compound { .. } = condition {
@@ -551,7 +551,7 @@ impl<'a> ConditionContext<'a> {
         // Push ONE verdict per condition with actual game state value.
         // Skip if the sub-type-specific evaluator already pushed a verdict
         // (e.g. comparison_condition, card_count_condition).
-        #[cfg(not(feature = "psp"))]
+        #[cfg(not(feature = "no_std"))]
         {
             if crate::ability::log::buffer_len() <= _before {
                 let actual = self.describe_condition_actual(condition);

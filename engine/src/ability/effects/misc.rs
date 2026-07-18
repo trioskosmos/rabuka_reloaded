@@ -6,7 +6,7 @@ use crate::card::{AbilityEffect, PlacementOrder, PositionInfo};
 use crate::core::types::ArcStr;
 use crate::game_state::GameState;
 use crate::{HashMap, HashSet};
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     borrow::Cow,
     boxed::Box,
@@ -14,7 +14,7 @@ use alloc::{
     vec::Vec,
 };
 use smallvec::SmallVec;
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 use std::borrow::Cow;
 
 impl AbilityResolver {

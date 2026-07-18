@@ -8,7 +8,7 @@ use crate::card::{
     AbilityFilter, CardProperty, CardState, ComparisonTarget, Condition, HeartColor,
 };
 use crate::{HashMap, HashSet};
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -371,9 +371,9 @@ impl<'a> ConditionContext<'a> {
         } else {
             result
         };
-        #[cfg(not(feature = "psp"))]
+        #[cfg(not(feature = "no_std"))]
         let op_str = condition.get_operator().unwrap_or(">=");
-        #[cfg(not(feature = "psp"))]
+        #[cfg(not(feature = "no_std"))]
         super::push_cond_verdict(
             condition,
             &format!("実際={}, 期待={}{}", count, op_str, target_count),
@@ -2643,7 +2643,7 @@ impl<'a> ConditionContext<'a> {
         }
         let mut dbg = AbDebug::new();
         dbg.condition(condition, actual, count, passed);
-        #[cfg(not(feature = "psp"))]
+        #[cfg(not(feature = "no_std"))]
         super::push_cond_verdict(condition, &format!("{}枚", actual), passed, vec![]);
         passed
     }
@@ -2706,11 +2706,11 @@ impl<'a> ConditionContext<'a> {
         let player = self.resolve_condition_player(target);
 
         // Helper to push enriched verdict with character/cost data
-        #[cfg(not(feature = "psp"))]
+        #[cfg(not(feature = "no_std"))]
         let push_rich = |actual: &str, ok: bool| {
             super::push_cond_verdict(condition, actual, ok, vec![]);
         };
-        #[cfg(feature = "psp")]
+        #[cfg(feature = "no_std")]
         let push_rich = |_actual: &str, _ok: bool| {};
 
         if baton_touch_trigger {

@@ -6,13 +6,13 @@ use crate::ability::types::Choice;
 use crate::game_state::GameState;
 use crate::zones::MemberArea;
 use crate::HashSet;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
 use serde::{Deserialize, Serialize};
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -265,7 +265,7 @@ fn make_params() -> ActionParameters {
 }
 
 pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
-    #[cfg(not(feature = "psp"))]
+    #[cfg(not(feature = "no_std"))]
     let _timer = crate::timer::Timer::start("generate_possible_actions");
     if let Some(choice) = game_state.get_pending_choice() {
         return generate_pending_choice_actions(game_state, choice);
@@ -984,7 +984,7 @@ fn has_cannot_baton_touch(
 }
 
 fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
-    #[cfg(not(feature = "psp"))]
+    #[cfg(not(feature = "no_std"))]
     let _timer = crate::timer::Timer::start("generate_main_phase_actions");
     let active_player = game_state.active_player();
     let mut actions = vec![make_action(ActionType::Pass, "Pass - End Main Phase")];

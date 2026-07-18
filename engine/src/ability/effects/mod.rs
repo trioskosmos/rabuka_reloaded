@@ -13,7 +13,7 @@ use super::types::Choice;
 use super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -38,7 +38,7 @@ impl AbilityResolver {
             effect.source_or("none"),
             effect.destination.as_deref().unwrap_or("none")
         );
-        #[cfg(not(feature = "psp"))]
+        #[cfg(not(feature = "no_std"))]
         let exec_snapshot = crate::ability::log::buffer_len();
         if !self.can_activate_effect(gs, effect) {
             log::debug!("DEBUG: cannot activate effect");
@@ -47,7 +47,7 @@ impl AbilityResolver {
         }
         // Drain condition verdicts from the can_activate_effect pre-check;
         // the effect execution will produce its own items and we don't want duplicates.
-        #[cfg(not(feature = "psp"))]
+        #[cfg(not(feature = "no_std"))]
         {
             let _pre = crate::ability::log::drain_verdicts_since(exec_snapshot);
         }
@@ -938,19 +938,19 @@ impl AbilityResolver {
                 | ActionType::ConditionalOnOptional
         );
         if !is_structural {
-            #[cfg(not(feature = "psp"))]
+            #[cfg(not(feature = "no_std"))]
             let val = effect
                 .count
                 .or(effect.value_any())
                 .map(|v| v.to_string())
                 .unwrap_or_default();
-            #[cfg(not(feature = "psp"))]
+            #[cfg(not(feature = "no_std"))]
             let details = if !val.is_empty() {
                 format!("{} {}", effect.action, val)
             } else {
                 effect.action.to_string()
             };
-            #[cfg(not(feature = "psp"))]
+            #[cfg(not(feature = "no_std"))]
             crate::ability::log::push_verdict(crate::ability::log::AbilityLogItem::Effect {
                 text: effect.text.clone(),
                 action: effect.action.to_string(),

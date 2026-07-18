@@ -48,8 +48,12 @@ server = ["actix-web", "actix-cors", "actix-files", "tokio", "tokio-stream", "lo
 profiling = []
 # Alloc tracker: counts every malloc/free, reports via RABUKA_ALLOC_TRACK env var
 alloc_tracker = []
+# Generic no_std flag — used in cfg gates so ports don't touch engine source
+no_std = []
 # PSP target: no_std + alloc mode for mipsel-sony-psp
-psp = ["once_cell", "debug_conditions"]
+psp = ["no_std", "once_cell", "debug_conditions"]
+# Dreamcast target: no_std + alloc via KallistiOS + rustc_codegen_gcc
+dc = ["no_std", "debug_conditions"]
 # Bytecode abilities: use pre-compiled bytecode instead of JSON serde
 # for ability loading. Dramatically reduces memory footprint (~7KB vs 1.4MB).
 bytecode_abilities = []

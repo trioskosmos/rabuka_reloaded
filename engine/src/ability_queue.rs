@@ -5,7 +5,7 @@ use crate::ability::resolver::AbilityResolver;
 use crate::ability::types::Choice;
 use crate::card::{Ability, AbilityEffect};
 use crate::game_state::AbilityTrigger;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{string::{String, ToString}, vec::Vec};
 
 /// Unique identifier for an ability instance in the queue

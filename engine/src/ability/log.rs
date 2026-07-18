@@ -32,7 +32,7 @@ pub enum AbilityLogItem {
     },
 }
 
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 mod inner {
     use super::AbilityLogItem;
     pub fn push_verdict(_item: AbilityLogItem) {}
@@ -48,7 +48,7 @@ mod inner {
     pub fn clear_verdicts() {}
 }
 
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 mod inner {
     use super::{AbilityLogItem, ABILITY_DEBUG};
     use core::sync::atomic::Ordering;
@@ -112,7 +112,7 @@ mod inner {
     }
 }
 
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,

@@ -4,7 +4,7 @@ use super::super::types::{Choice, ExecutionContext};
 use super::super::util;
 use crate::card::{AbilityEffect, DistinctType};
 use crate::game_state::GameState;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,

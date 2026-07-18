@@ -7,7 +7,7 @@ use crate::game_state::GameState;
 use smallvec::SmallVec;
 
 use crate::HashMap;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,

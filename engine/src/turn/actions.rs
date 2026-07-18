@@ -3,7 +3,7 @@ use crate::ability::types::ChoiceRoute;
 use crate::card::CardDatabase;
 use crate::game_state::GameState;
 use crate::game_state::Phase;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{string::{String, ToString}, vec::Vec};
 #[cfg(feature = "3ds")]
 extern "C" {
@@ -32,7 +32,7 @@ impl super::TurnEngine {
         stage_area: Option<crate::zones::MemberArea>,
         use_baton_touch: Option<bool>,
     ) -> Result<(), String> {
-        #[cfg(not(feature = "psp"))]
+        #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("execute_main_phase_action");
         // UseAbility must check activation legality independently — never
         // route through resume_with_choice, even when another ability's choice
@@ -1015,7 +1015,7 @@ impl super::TurnEngine {
     }
 
     pub fn check_timing(game_state: &mut GameState) {
-        #[cfg(not(feature = "psp"))]
+        #[cfg(not(feature = "no_std"))]
         let _t = crate::timer::Timer::start("check_timing");
         tdbg!("CHECK_TIMING:0");
         game_state.player1.refresh();

@@ -1,7 +1,7 @@
 // Binary to run QA data tests independently
 // This avoids file lock issues with the main binary
 
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{string::{String, ToString}, vec::Vec};
 use crate::card::{Card, CardDatabase};
 use crate::card_loader::CardLoader;

@@ -378,3 +378,50 @@ Everything below N64/DS (GBA, Genesis, SNES, etc.) is still dead —
 their RAM is measured in kilobytes, not megabytes. No amount of
 bytecode cleverness fits a card game engine in 64KB.
 
+---
+
+## Dreamcast Port — Current Status (Jul 2026)
+
+**Toolchain setup in progress.** Building a custom SH-ELF cross-compiler
+with libgccjit using the [dreamcast-rs](https://github.com/dreamcast-rs) tooling.
+
+### Downloads (via download_dreamcast_toolchain.bat)
+
+| File | Size | Status |
+|---|---|---|
+| binutils-2.44.tar.xz | 27MB | Done |
+| newlib-4.5.0.20241231.tar.gz | 65MB | Done |
+| gdb-16.2.tar.xz | 70MB | Done |
+| gmp-6.2.1.tar.xz | 2.6MB | Done |
+| mpfr-4.1.0.tar.xz | 1.4MB | Done |
+| mpc-1.2.1.tar.gz | 0.9MB | Done |
+| isl-0.24.tar.bz2 | 3.1MB | Done |
+| gcc (dreamcast-rs fork, master) | ~150MB | Cloning |
+| rustc_codegen_gcc (branch 2025-08-14) | — | Pending |
+| libc (branch libc-0.2-kos) | — | Pending |
+| Rust sysroot (branch kos-2025-08-14) | — | Pending |
+
+### Code status
+- `engine_dc/` crate: **written** (754 lines total)
+- Engine feature gates: consolidated to single `no_std = []` intermediate feature
+  - `psp = ["no_std", ...]`, `dc = ["no_std", ...]`
+  - New ports never touch engine source — just add `console_x = ["no_std"]`
+- Display: KOS BIOS font via `bfont_draw()` (640×480, 8×16 font)
+- Input: KOS Maple controller polling (`maple_dev_attach` + `cont_get_cond`)
+- RNG: xorshift32 seeded from KOS `timer_ms_gettime64()`
+- Sourcing baked card JSON files from `engine_psp/baked/`
+- Panic handler: dumps to framebuffer
+
+### Next steps (once toolchain finishes building)
+1. `make build-sh4` — builds GCC 15+ with libgccjit (~40min on 12 cores)
+2. `install-rust.sh` — rustc_codegen_gcc + SH-ELF sysroot (~15min)
+3. `kos-cargo build --release` — compile engine_dc for Dreamcast
+4. Test on flycast / redream emulator
+
+### Notes
+- Build environment: MSYS2 (devkitPro) on Windows 10
+- curl.exe broken (DLL mismatch), replaced with Python wrapper
+- Engine no_std feature added: `dc = ["no_std", "debug_conditions"]` in Cargo.toml
+- All 48 `#[cfg(feature = "psp")]` gates migrated to `#[cfg(feature = "no_std")]`
+- Target arch: SH-4 via MIPS ELF header rewrite trick (dreamcast-rs target.json)
+

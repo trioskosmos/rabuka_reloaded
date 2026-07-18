@@ -2,7 +2,7 @@ use super::super::resolver::AbilityResolver;
 use super::super::util;
 use crate::card::{Ability, AbilityEffect};
 use crate::game_state::GameState;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     boxed::Box,
     string::{String, ToString},

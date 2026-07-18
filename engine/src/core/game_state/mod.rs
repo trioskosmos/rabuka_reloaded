@@ -8,7 +8,7 @@ use crate::zones::{MemberArea, ResolutionZone};
 use crate::Arc;
 use crate::{HashMap, HashSet};
 use smallvec::SmallVec;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -761,7 +761,7 @@ impl GameState {
     }
 
     /// Print a human-readable execution trace of the last resolved ability.
-    #[cfg(not(feature = "psp"))]
+    #[cfg(not(feature = "no_std"))]
     pub fn dump_last_trace(&self) {
         if let Some(ref trace) = self.last_ability_trace {
             println!("\n=== LAST RESOLVED ABILITY TRACE ===");
@@ -776,7 +776,7 @@ impl GameState {
         }
     }
 
-    #[cfg(not(feature = "psp"))]
+    #[cfg(not(feature = "no_std"))]
     fn print_trace_node(node: &crate::ability::types::AbilityTraceNode, indent: usize) {
         let pad = "  ".repeat(indent);
         let card_str = node

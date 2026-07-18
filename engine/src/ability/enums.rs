@@ -3,7 +3,7 @@ use serde::ser::Serializer;
 
 /// Strongly-typed zone identifiers to prevent stringly-typed bugs.
 /// Replaces error-prone zone == "hand" patterns with Zone::Hand.
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::string::{String, ToString};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Zone {
@@ -726,14 +726,14 @@ impl EffectCardType {
     }
 }
 
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 impl serde::Serialize for EffectCardType {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
 
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 impl<'de> serde::Deserialize<'de> for EffectCardType {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = <ArcStr as serde::Deserialize>::deserialize(deserializer)?;
@@ -741,14 +741,14 @@ impl<'de> serde::Deserialize<'de> for EffectCardType {
     }
 }
 
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 impl serde::Serialize for EffectCardType {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
 
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 impl<'de> serde::Deserialize<'de> for EffectCardType {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = <String as serde::Deserialize>::deserialize(deserializer)?;
@@ -799,14 +799,14 @@ impl EffectState {
     }
 }
 
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 impl serde::Serialize for EffectState {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
 
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 impl<'de> serde::Deserialize<'de> for EffectState {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = <ArcStr as serde::Deserialize>::deserialize(deserializer)?;
@@ -814,14 +814,14 @@ impl<'de> serde::Deserialize<'de> for EffectState {
     }
 }
 
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 impl serde::Serialize for EffectState {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
 
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 impl<'de> serde::Deserialize<'de> for EffectState {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = <String as serde::Deserialize>::deserialize(deserializer)?;

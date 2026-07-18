@@ -1,17 +1,17 @@
 #![recursion_limit = "512"]
-#![cfg_attr(feature = "psp", no_std)]
+#![cfg_attr(feature = "no_std", no_std)]
 
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 #[macro_use]
 extern crate alloc;
 
 // PSP stubs for std macros
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 #[macro_export]
 macro_rules! println {
     ($($arg:tt)*) => {};
 }
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 #[macro_export]
 macro_rules! eprintln {
     ($($arg:tt)*) => {};
@@ -38,13 +38,13 @@ pub use core::types;
 pub use core::zones;
 
 // Bot AI module (excluded on PSP)
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 pub mod bot;
 
 // Game logic modules
 pub mod game;
 pub use game::deck_builder;
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 pub use game::deck_parser;
 pub use game::display;
 pub use game::game_setup;
@@ -54,9 +54,9 @@ pub use game::web_server;
 // Effect/condition system
 pub mod ability;
 pub mod ability_queue;
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 pub mod qa_test_suite;
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 pub mod timer;
 pub mod rng;
 pub mod triggers;

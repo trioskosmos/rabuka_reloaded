@@ -8,7 +8,7 @@ use crate::card::CardDatabase;
 use crate::core::game_modifiers::ModifierEntry;
 
 use crate::{HashMap, HashSet, VecDeque};
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,

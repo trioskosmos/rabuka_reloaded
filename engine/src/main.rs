@@ -1,4 +1,4 @@
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{string::{String, ToString}, vec::Vec};
 use rabuka_engine::game_setup::{ActionParameters, AreaInfo, DoubleBatonPair};
 use rabuka_engine::game_state::GameState;

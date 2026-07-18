@@ -1,26 +1,26 @@
 use super::debug::AbDebug;
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 use super::log::{drain_verdicts, push_verdict, AbilityLogItem};
 
 // PSP stubs — no debug logging on console
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     boxed::Box,
     string::{String, ToString},
     vec::Vec,
 };
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct AbilityLogItem;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 #[allow(dead_code)]
 fn drain_verdicts() -> Vec<AbilityLogItem> {
     Vec::new()
 }
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 #[allow(dead_code)]
 fn push_verdict(_item: AbilityLogItem) {}
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 #[allow(dead_code)]
 fn drain_verdicts_since(_snapshot: usize) -> Vec<AbilityLogItem> {
     Vec::new()
@@ -214,13 +214,13 @@ impl AbilityResolver {
                         merged_cond.set_activation_position((*act_pos).to_string());
                     }
                 }
-                #[cfg(not(feature = "psp"))]
+                #[cfg(not(feature = "no_std"))]
                 let snapshot = crate::ability::log::buffer_len();
                 let result = ctx.evaluate_condition(&merged_cond);
                 // On success: drain pre-check verdicts (condition will be re-evaluated
                 // during effect execution, avoiding duplicates).
                 // On failure: keep verdicts (they're the only info for the failure path).
-                #[cfg(not(feature = "psp"))]
+                #[cfg(not(feature = "no_std"))]
                 {
                     if result {
                         let _pre_check_verdicts =
@@ -283,12 +283,12 @@ impl AbilityResolver {
                 let gns_binding = effect.group_names_any();
                 let gns = gns_binding.as_ref();
                 merge_group_names(&mut cond, gns.map(|v| &**v));
-                #[cfg(not(feature = "psp"))]
+                #[cfg(not(feature = "no_std"))]
                 let cond_snapshot = crate::ability::log::buffer_len();
                 let passed = ctx.evaluate_condition(&cond);
                 // On success: drain (will be re-evaluated during execution).
                 // On failure: keep verdicts.
-                #[cfg(not(feature = "psp"))]
+                #[cfg(not(feature = "no_std"))]
                 {
                     if passed {
                         let _pre_check_verdicts2 =
@@ -668,7 +668,7 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         let mut dbg = AbDebug::new();
         // Clear structured verdict buffer from any previous ability
-        #[cfg(not(feature = "psp"))]
+        #[cfg(not(feature = "no_std"))]
         crate::ability::log::clear_verdicts();
 
         // Card info for debug (owned Strings to avoid borrowing gs across mutation)
@@ -751,7 +751,7 @@ impl AbilityResolver {
                     return Err(e);
                 }
                 dbg.p("RESULT", "cost paid ✓");
-                #[cfg(not(feature = "psp"))]
+                #[cfg(not(feature = "no_std"))]
                 let cost_desc = format!(
                     "{}: {}→{} {}",
                     cost.action,
@@ -759,7 +759,7 @@ impl AbilityResolver {
                     cost.destination.as_deref().unwrap_or("?"),
                     cost.count.unwrap_or(cost.energy_count_any().unwrap_or(1))
                 );
-                #[cfg(not(feature = "psp"))]
+                #[cfg(not(feature = "no_std"))]
                 push_verdict(AbilityLogItem::Cost {
                     text: cost.text.clone(),
                     expectation: cost_desc,

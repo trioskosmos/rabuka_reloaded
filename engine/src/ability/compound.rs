@@ -5,7 +5,7 @@ use crate::ability::debug::ABILITY_DEBUG;
 use crate::ability::enums::ActionType;
 use crate::card::{AbilityEffect, Condition};
 use crate::game_state::GameState;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     boxed::Box,
     string::{String, ToString},
@@ -47,7 +47,7 @@ impl AbilityResolver {
         conditional: bool,
         is_further: bool,
     ) -> Result<(), String> {
-        #[cfg(not(feature = "psp"))]
+        #[cfg(not(feature = "no_std"))]
         let actions_str = effect
             .compound
             .actions
@@ -59,7 +59,7 @@ impl AbilityResolver {
                     .join(",")
             })
             .unwrap_or_default();
-        #[cfg(not(feature = "psp"))]
+        #[cfg(not(feature = "no_std"))]
         eprintln!(
             "[DEBUG_SEQ] execute_sequential_effect called! action={} n_actions={} actions=[{}] effect_ptr={:p}",
             effect.action,

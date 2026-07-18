@@ -5,7 +5,7 @@ use super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 use crate::HashMap;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,

@@ -8,7 +8,7 @@ use crate::types::PerformanceSnapshot;
 use crate::zones::Orientation;
 use crate::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{string::{String, ToString}, vec::Vec};
 
 fn heart_color_index(color: &HeartColor) -> Option<usize> {

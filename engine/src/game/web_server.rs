@@ -1,4 +1,4 @@
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{string::{String, ToString}, vec::Vec};
 use actix_cors::Cors;
 use actix_files as fs;

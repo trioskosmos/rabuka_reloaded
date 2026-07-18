@@ -5,7 +5,7 @@ use crate::ability::util::compare_counts;
 use crate::card::{CardProperty, Condition};
 use crate::game_state::Phase;
 use crate::HashSet;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::vec::Vec;
 
 impl<'a> ConditionContext<'a> {

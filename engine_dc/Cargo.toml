@@ -1,0 +1,22 @@
+[package]
+name = "rabuka_dc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rabuka_engine = { path = "../engine", default-features = false, features = ["dc"] }
+hashbrown = { version = "0.14", default-features = false, features = ["serde"] }
+smallvec = { version = "1", default-features = false }
+log = { version = "0.4", default-features = false }
+serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
+
+[[bin]]
+name = "rabuka_dc"
+path = "src/bin/rabuka_dc.rs"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 2
+panic = "abort"

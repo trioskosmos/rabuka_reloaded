@@ -1,6 +1,6 @@
 use crate::ability::enums::ActionType;
 use crate::card::AbilityEffect;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     boxed::Box,
     string::{String, ToString},

@@ -1,18 +1,18 @@
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 use std::fs::File;
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 use std::io::Read;
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 use std::path::Path;
 
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 use std::string::String;
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
 
 #[cfg(not(feature = "bytecode_abilities"))]
@@ -21,14 +21,14 @@ use crate::card::AbilityEffect;
 use crate::card::{Ability, Card};
 use crate::Arc;
 use crate::HashMap;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::boxed::Box;
 use serde_json;
 
 pub struct CardLoader;
 
 impl CardLoader {
-    #[cfg(not(feature = "psp"))]
+    #[cfg(not(feature = "no_std"))]
     pub fn load_cards_from_file(path: &Path) -> Result<Vec<Card>, String> {
         let mut file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
         let mut contents = String::new();
@@ -63,7 +63,7 @@ impl CardLoader {
         Ok(cards)
     }
 
-    #[cfg(not(feature = "psp"))]
+    #[cfg(not(feature = "no_std"))]
     #[allow(dead_code)]
     fn load_abilities_from_file(path: &Path) -> Result<serde_json::Value, String> {
         let mut file =

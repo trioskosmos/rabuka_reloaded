@@ -8,7 +8,7 @@ use crate::types::{
     MemberContribution, SourceName, SourceType, YellCardResult,
 };
 use crate::{HashMap, HashSet};
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,

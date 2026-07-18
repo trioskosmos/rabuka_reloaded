@@ -1,7 +1,7 @@
 use crate::game_state::{AbilityTrigger, GameState};
 use crate::types::LogEntry;
 use crate::HashSet;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,

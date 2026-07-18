@@ -5,20 +5,20 @@ use crate::HashMap;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{boxed::Box, string::String, string::ToString, vec::Vec};
 
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 pub(crate) use crate::core::pool::EkBox;
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 pub(crate) type EkBox = alloc::boxed::Box<EffectKind>;
 
 pub(crate) fn ek_box_new(val: EffectKind) -> EkBox {
-    #[cfg(not(feature = "psp"))]
+    #[cfg(not(feature = "no_std"))]
     {
         crate::core::pool::EkBox::new(val)
     }
-    #[cfg(feature = "psp")]
+    #[cfg(feature = "no_std")]
     {
         alloc::boxed::Box::new(val)
     }

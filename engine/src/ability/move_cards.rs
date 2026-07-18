@@ -6,14 +6,14 @@ use crate::card::{AbilityEffect, CardDatabase, DistinctType, Operator, Placement
 use crate::game_state::GameState;
 use crate::player::Player;
 use crate::{HashMap, HashSet};
-#[cfg(feature = "psp")]
+#[cfg(feature = "no_std")]
 use alloc::{
     boxed::Box,
     collections::BTreeSet,
     string::{String, ToString},
     vec::Vec,
 };
-#[cfg(not(feature = "psp"))]
+#[cfg(not(feature = "no_std"))]
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, PartialEq)]
