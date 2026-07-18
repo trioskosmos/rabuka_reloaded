@@ -7,16 +7,25 @@ use crate::card::{
 use crate::core::types::ArcStr;
 
 fn read_u8(c: &mut &[u8]) -> u8 {
+    if c.is_empty() {
+        return 0;
+    }
     let b = c[0];
     *c = &c[1..];
     b
 }
 fn read_u16(c: &mut &[u8]) -> u16 {
+    if c.len() < 2 {
+        return 0;
+    }
     let v = u16::from_le_bytes([c[0], c[1]]);
     *c = &c[2..];
     v
 }
 fn read_i8(c: &mut &[u8]) -> i8 {
+    if c.is_empty() {
+        return 0;
+    }
     let b = c[0] as i8;
     *c = &c[1..];
     b
@@ -25,8 +34,10 @@ fn read_str(c: &mut &[u8]) -> Option<&'static str> {
     let idx = read_u16(c) as usize;
     if idx == 0xFFFF {
         None
-    } else {
+    } else if idx < STRINGS.len() {
         Some(STRINGS[idx])
+    } else {
+        None
     }
 }
 
@@ -51,6 +62,49 @@ pub fn get_ability(idx: usize) -> Option<Ability> {
 
     while !cursor.is_empty() {
         let op_val = read_u8(&mut cursor);
+
+        // Control / compound opcodes that are not part of the generated Opcode enum.
+        if op_val == 0x70 {
+            let count = read_u8(&mut cursor);
+            let source = decode_zone(read_u8(&mut cursor));
+            let target = decode_player(read_u8(&mut cursor));
+            let mut steps = Vec::new();
+            steps.push(Box::new(AbilityEffect {
+                action: "look_at".into(),
+                count: Some(count as u32),
+                source: Some(source.into()),
+                target: Some(target.into()),
+                ..Default::default()
+            }));
+            if !cursor.is_empty() && cursor[0] == 0x71 {
+                let _ = read_u8(&mut cursor);
+                let sc = read_u8(&mut cursor);
+                let dest = decode_zone(read_u8(&mut cursor));
+                let _dr = read_u8(&mut cursor);
+                steps.push(Box::new(AbilityEffect {
+                    action: "select_cards".into(),
+                    count: Some(sc as u32),
+                    destination: Some(dest.into()),
+                    ..Default::default()
+                }));
+            }
+            effect = Some(AbilityEffect {
+                action: "look_and_select".into(),
+                count: Some(count as u32),
+                source: Some(source.into()),
+                target: Some(target.into()),
+                effect_steps: Some(steps),
+                ..Default::default()
+            });
+            continue;
+        } else if op_val == 0x71 {
+            // select_cards sub-opcode (handled by 0x70 wrapper)
+            continue;
+        } else if op_val == 0x62 {
+            // conditional_alternative sub-type marker (handled by 0x61 wrapper)
+            continue;
+        }
+
         let op = match Opcode::try_from(op_val) {
             Ok(o) => o,
             Err(_) => break,
@@ -159,42 +213,6 @@ pub fn get_ability(idx: usize) -> Option<Ability> {
                 },
                 ..Default::default()
             });
-        } else if op_val == 0x70 {
-            let count = read_u8(&mut cursor);
-            let source = decode_zone(read_u8(&mut cursor));
-            let target = decode_player(read_u8(&mut cursor));
-            let mut steps = Vec::new();
-            steps.push(Box::new(AbilityEffect {
-                action: "look_at".into(),
-                count: Some(count as u32),
-                source: Some(source.into()),
-                target: Some(target.into()),
-                ..Default::default()
-            }));
-            if !cursor.is_empty() && cursor[0] == Opcode::SelectCards as u8 {
-                let _ = read_u8(&mut cursor);
-                let sc = read_u8(&mut cursor);
-                let dest = decode_zone(read_u8(&mut cursor));
-                let _dr = read_u8(&mut cursor);
-                steps.push(Box::new(AbilityEffect {
-                    action: "select_cards".into(),
-                    count: Some(sc as u32),
-                    destination: Some(dest.into()),
-                    ..Default::default()
-                }));
-            }
-            effect = Some(AbilityEffect {
-                action: "look_and_select".into(),
-                count: Some(count as u32),
-                source: Some(source.into()),
-                target: Some(target.into()),
-                effect_steps: Some(steps),
-                ..Default::default()
-            });
-        } else if op_val == 0x62 {
-            // conditional_alternative sub-type marker (handled by 0x61 wrapper)
-        } else if op_val == 0x71 {
-            // select_cards sub-opcode (handled by 0x70)
         } else {
             if let Some(mut ek) = decode_effect_kind(op, &mut cursor) {
                 let action = action_for_op(op);

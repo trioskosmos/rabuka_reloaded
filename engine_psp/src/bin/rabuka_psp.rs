@@ -7,6 +7,7 @@ extern crate alloc;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
+use alloc::vec;
 use alloc::vec::Vec;
 use core::hash::{BuildHasher, Hasher};
 
@@ -197,7 +198,9 @@ fn psp_main() {
         }
 
         if gs.has_pending_choice() {
-            handle_auto_choice(&mut gs);
+            if !handle_choice(&mut display, &mut input, &mut gs) {
+                break;
+            }
             continue;
         }
 
@@ -343,21 +346,239 @@ fn execute_action(gs: &mut GameState, action: &game_setup::Action) -> bool {
     }
 }
 
-fn handle_auto_choice(gs: &mut GameState) {
+fn menu_select(
+    display: &mut Display,
+    input: &mut Input,
+    items: &[String],
+    title: &str,
+    allow_skip: bool,
+) -> Option<usize> {
+    let total = if allow_skip {
+        items.len() + 1
+    } else {
+        items.len()
+    };
+    if total == 0 {
+        return None;
+    }
+    let mut sel = 0usize;
+    loop {
+        display.clear();
+        display.println(title);
+        for (i, item) in items.iter().enumerate() {
+            let prefix = if i == sel { " >" } else { "  " };
+            display.println(&format!("{prefix} {item}"));
+        }
+        if allow_skip {
+            let prefix = if sel == items.len() { " >" } else { "  " };
+            display.println(&format!("{}  [Skip]", prefix));
+        }
+        display.println("");
+        display.println("  D-Pad: navigate  X: select");
+        display.swap_buffers();
+        wait_frames(2);
+        input.poll();
+        if input.just_pressed(Button::Down) {
+            sel = (sel + 1).min(total.saturating_sub(1));
+        } else if input.just_pressed(Button::Up) {
+            sel = sel.saturating_sub(1);
+        } else if input.just_pressed(Button::Cross) {
+            if allow_skip && sel >= items.len() {
+                return None;
+            }
+            return Some(sel);
+        }
+    }
+}
+
+fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -> bool {
     use rabuka_engine::ability::types::Choice;
-    if let Some(choice) = gs.get_pending_choice() {
-        match choice {
-            Choice::SelectAutoAbility { .. } => {
-                TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok();
+    use rabuka_engine::ability::util::zone_cards;
+
+    let choice = match gs.get_pending_choice() {
+        Some(c) => c.clone(),
+        None => return true,
+    };
+
+    match choice {
+        Choice::SelectAutoAbility {
+            options,
+            description,
+            ..
+        } => {
+            let items: Vec<String> = options
+                .iter()
+                .map(|o| format!("{}: {}", o.card_name, o.ability_text))
+                .collect();
+            if items.is_empty() {
+                TurnEngine::resume_with_choice(gs, Some(0), None).ok();
+                return true;
             }
-            Choice::SelectCard {
-                count: 0,
-                allow_skip: true,
-                ..
-            } => {
-                TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok();
+            let sel = menu_select(display, input, &items, &description, false).unwrap_or(0);
+            TurnEngine::resume_with_choice(gs, Some(sel as i16), None).ok();
+            true
+        }
+        Choice::SelectCard {
+            zone,
+            count,
+            allow_skip,
+            target_player_id,
+            description,
+            filtered_indices,
+            ..
+        } => {
+            let player = if let Some(ref pid) = target_player_id {
+                if pid == &gs.player1.id {
+                    &gs.player1
+                } else {
+                    &gs.player2
+                }
+            } else {
+                gs.active_player()
+            };
+            let card_ids = zone_cards(player, &zone);
+            let items: Vec<String> = match filtered_indices {
+                Some(ref indices) => indices
+                    .iter()
+                    .map(|&i| {
+                        if i < card_ids.len() {
+                            gs.card_database
+                                .get_card(card_ids[i])
+                                .map(|c| c.name.to_string())
+                                .unwrap_or_else(|| format!("#{}", card_ids[i]))
+                        } else {
+                            format!("#{}", i)
+                        }
+                    })
+                    .collect(),
+                None => card_ids
+                    .iter()
+                    .map(|cid| {
+                        gs.card_database
+                            .get_card(*cid)
+                            .map(|c| c.name.to_string())
+                            .unwrap_or_else(|| format!("#{}", cid))
+                    })
+                    .collect(),
+            };
+
+            if count <= 1 {
+                let sel = menu_select(display, input, &items, &description, allow_skip);
+                match sel {
+                    None => {
+                        TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok();
+                    }
+                    Some(idx) => {
+                        let actual_idx = filtered_indices.as_ref().map(|fi| fi[idx]).unwrap_or(idx);
+                        TurnEngine::resume_with_choice(gs, None, Some(vec![actual_idx])).ok();
+                    }
+                }
+            } else {
+                let mut selected: Vec<usize> = Vec::new();
+                while selected.len() < count.min(items.len()) {
+                    let display_items: Vec<String> = items
+                        .iter()
+                        .enumerate()
+                        .map(|(i, name)| {
+                            if selected.contains(&i) {
+                                format!("[X] {}", name)
+                            } else {
+                                format!("[ ] {}", name)
+                            }
+                        })
+                        .collect();
+                    let sel = menu_select(display, input, &display_items, &description, allow_skip);
+                    match sel {
+                        None => break,
+                        Some(idx) => {
+                            if !selected.contains(&idx) {
+                                selected.push(idx);
+                            }
+                        }
+                    }
+                }
+                let actual_indices: Vec<usize> = match filtered_indices {
+                    Some(ref fi) => selected.iter().map(|&i| fi[i]).collect(),
+                    None => selected,
+                };
+                TurnEngine::resume_with_choice(gs, None, Some(actual_indices)).ok();
             }
-            _ => {}
+            true
+        }
+        Choice::SelectTarget {
+            target,
+            options,
+            description,
+            allow_skip,
+            ..
+        } => {
+            let items: Vec<String> = match options {
+                Some(ref opts) if !opts.is_empty() => opts.clone(),
+                _ => (0..2).map(|i| format!("Option {}", i + 1)).collect(),
+            };
+            let sel = menu_select(display, input, &items, &description, allow_skip);
+            match sel {
+                None => match target.as_str() {
+                    "choice" | "choice_string" | "conditional_optional" => {
+                        TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok();
+                    }
+                    _ => {
+                        TurnEngine::resume_with_choice(gs, Some(-1), None).ok();
+                    }
+                },
+                Some(idx) => {
+                    TurnEngine::resume_with_choice(gs, Some(idx as i16), None).ok();
+                }
+            };
+            true
+        }
+        Choice::SelectPosition {
+            description,
+            allow_skip,
+            ..
+        } => {
+            let items: Vec<String> = ["Left", "Center", "Right"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+            let sel = menu_select(display, input, &items, &description, allow_skip);
+            match sel {
+                None => TurnEngine::resume_with_choice(gs, Some(-1), None).ok(),
+                Some(idx) => TurnEngine::resume_with_choice(gs, Some(idx as i16), None).ok(),
+            };
+            true
+        }
+        Choice::SelectHeartColor {
+            options,
+            description,
+            ..
+        } => {
+            let sel = menu_select(display, input, &options, &description, false).unwrap_or(0);
+            TurnEngine::resume_with_choice(gs, Some(sel as i16), None).ok();
+            true
+        }
+        Choice::SelectHeartType {
+            options,
+            description,
+            ..
+        } => {
+            let sel = menu_select(display, input, &options, &description, false).unwrap_or(0);
+            TurnEngine::resume_with_choice(gs, Some(sel as i16), None).ok();
+            true
+        }
+        Choice::SelectLiveSuccess {
+            options,
+            description,
+            ..
+        } => {
+            let items: Vec<String> = options.iter().map(|o| o.card_name.clone()).collect();
+            if items.is_empty() {
+                TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok();
+                return true;
+            }
+            let sel = menu_select(display, input, &items, &description, false).unwrap_or(0);
+            TurnEngine::resume_with_choice(gs, None, Some(vec![sel])).ok();
+            true
         }
     }
 }
