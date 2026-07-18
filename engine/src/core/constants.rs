@@ -8,13 +8,13 @@ pub const STAGE_SIZE: usize = 3;
 pub const EMPTY_SLOT: i16 = -1;
 
 /// Maximum number of energy cards that can be placed in energy zone
-pub const MAX_ENERGY_CARDS: usize = 20;
+pub const MAX_ENERGY_CARDS: usize = 12;
 
 /// Maximum number of cards that can be set in live card zone
 pub const MAX_LIVE_CARDS: usize = 3;
 
 /// Default maximum size for game state history (for loop detection)
-pub const DEFAULT_HISTORY_SIZE: usize = 100;
+pub const DEFAULT_HISTORY_SIZE: usize = 1000;
 
 /// Victory condition: number of cards in success live card zone to win
 pub const VICTORY_CARD_COUNT: usize = 3;

@@ -1228,6 +1228,11 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                     } else {
                                         Some(available_areas.clone())
                                     },
+                                    double_baton_pairs: if cfg!(feature = "profiling") {
+                                        None
+                                    } else {
+                                        double_baton_pairs.clone()
+                                    },
                                     ..make_params()
                                 },
                             ));
@@ -1274,6 +1279,11 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                             None
                                         } else {
                                             Some(available_areas.clone())
+                                        },
+                                        double_baton_pairs: if cfg!(feature = "profiling") {
+                                            None
+                                        } else {
+                                            double_baton_pairs.clone()
                                         },
                                         ..make_params()
                                     },
