@@ -86,15 +86,6 @@ mod bytecode_validation {
                     if !json_action.is_empty() && ability.effect.is_some() {
                         let eff = ability.effect.as_ref().unwrap();
                         let bc_action = eff.action.to_str();
-                        if i == 24 {
-                            eprintln!(
-                                "DBG a24: bc_action={:?} has_steps={:?} has_cond={:?} has_kind={:?}",
-                                bc_action,
-                                eff.effect_steps.is_some(),
-                                eff.condition.is_some(),
-                                eff.kind.is_some(),
-                            );
-                        }
                         if bc_action.is_empty() {
                             // skip — compound effects use different naming
                         } else if bc_action != json_action {

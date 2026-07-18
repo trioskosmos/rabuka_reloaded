@@ -63,177 +63,25 @@ pub fn get_ability(idx: usize) -> Option<Ability> {
     while !cursor.is_empty() {
         let op_val = read_u8(&mut cursor);
 
-        // Control / compound opcodes that are not part of the generated Opcode enum.
-        if op_val == 0x70 {
-            let count = read_u8(&mut cursor);
-            let source = decode_zone(read_u8(&mut cursor));
-            let target = decode_player(read_u8(&mut cursor));
-            let mut steps = Vec::new();
-            steps.push(Box::new(AbilityEffect {
-                action: "look_at".into(),
-                count: Some(count as u32),
-                source: Some(source.into()),
-                target: Some(target.into()),
-                ..Default::default()
-            }));
-            if !cursor.is_empty() && cursor[0] == 0x71 {
-                let _ = read_u8(&mut cursor);
-                let sc = read_u8(&mut cursor);
-                let dest = decode_zone(read_u8(&mut cursor));
-                let _dr = read_u8(&mut cursor);
-                steps.push(Box::new(AbilityEffect {
-                    action: "select_cards".into(),
-                    count: Some(sc as u32),
-                    destination: Some(dest.into()),
-                    ..Default::default()
-                }));
-            }
-            effect = Some(AbilityEffect {
-                action: "look_and_select".into(),
-                count: Some(count as u32),
-                source: Some(source.into()),
-                target: Some(target.into()),
-                effect_steps: Some(steps),
-                ..Default::default()
-            });
-            continue;
-        } else if op_val == 0x71 {
-            // select_cards sub-opcode (handled by 0x70 wrapper)
-            continue;
-        } else if op_val == 0x62 {
-            // conditional_alternative sub-type marker (handled by 0x61 wrapper)
-            continue;
-        }
-
-        let op = match Opcode::try_from(op_val) {
-            Ok(o) => o,
-            Err(_) => break,
-        };
-
+        // Cost opcodes (0x80+) route to the cost slot; everything else is an
+        // effect (including the compound/control shapes 0x60-0x65, 0x70/0x71),
+        // decoded uniformly by `decode_effect_from_slice`.
         if op_val >= 0x80 {
-            cost_eff = Some(decode_cost_op(op, &mut cursor));
-        } else if op_val == 0x60 {
-            let n = read_u8(&mut cursor);
-            let mut steps = Vec::with_capacity(n as usize);
-            for _ in 0..n {
-                steps.push(Box::new(decode_effect_from_slice(&mut cursor)));
+            match Opcode::try_from(op_val) {
+                Ok(op) => cost_eff = Some(decode_cost_op(op, &mut cursor)),
+                Err(_) => break,
             }
-            effect = Some(AbilityEffect {
-                action: "sequential".into(),
-                effect_steps: Some(steps),
-                ..Default::default()
-            });
-        } else if op_val == 0x61 {
-            let cond_len = read_u16(&mut cursor) as usize;
-            let (cc_data, rest1) = cursor.split_at(cond_len);
-            let mut cc = cc_data;
-            cursor = rest1;
-            let cond = decode_condition(&mut cc);
-            let body_len = read_u16(&mut cursor) as usize;
-            let (body, rest2) = cursor.split_at(body_len);
-            cursor = rest2;
-            let alt_len = read_u16(&mut cursor) as usize;
-            let alt = if alt_len > 0 {
-                let (ac_data, rest3) = cursor.split_at(alt_len);
-                let mut ac = ac_data;
-                cursor = rest3;
-                Some(Box::new(decode_effect_from_slice(&mut ac)))
-            } else {
-                None
-            };
-            let primary = decode_effect_from_slice(&mut &body[..]);
-            effect = Some(match alt {
-                Some(a) => AbilityEffect {
-                    action: "conditional_alternative".into(),
-                    condition: Some(Box::new(cond)),
-                    effect_steps: Some(vec![Box::new(primary), a]),
-                    ..Default::default()
-                },
-                None => primary,
-            });
-        } else if op_val == 0x63 {
-            effect = Some(AbilityEffect {
-                action: "conditional_on_optional".into(),
-                optional: Some(read_u8(&mut cursor) != 0),
-                ..Default::default()
-            });
-        } else if op_val == 0x64 {
-            effect = Some(AbilityEffect {
-                action: "conditional_on_result".into(),
-                ..Default::default()
-            });
-        } else if op_val == 0x65 {
-            let count = read_u8(&mut cursor);
-            let group_names = read_str(&mut cursor);
-            let cc_len = read_u16(&mut cursor) as usize;
-            let choice_cond = (cc_len > 0).then(|| {
-                let (cd, r) = cursor.split_at(cc_len);
-                cursor = r;
-                let mut cc = cd;
-                Box::new(decode_condition(&mut cc))
-            });
-            let ac_len = read_u16(&mut cursor) as usize;
-            let alt_cond = (ac_len > 0).then(|| {
-                let (ad, r) = cursor.split_at(ac_len);
-                cursor = r;
-                let mut ac = ad;
-                Box::new(decode_condition(&mut ac))
-            });
-            let alt_count_type = read_u8(&mut cursor);
-            let num_opts = read_u8(&mut cursor);
-            let mut options = Vec::with_capacity(num_opts as usize);
-            for _ in 0..num_opts {
-                options.push(Box::new(decode_effect_from_slice(&mut cursor)));
-            }
-            let mut ek = default_compoundEffect();
-            if let EffectKind::CompoundEffect {
-                options: ref mut bc_o,
-                alternative_count_type: ref mut bc_act,
-                group_names: ref mut bc_gn,
-                choice_condition: ref mut bc_cc,
-                alternative_condition: ref mut bc_ac,
-                ..
-            } = &mut ek
-            {
-                *bc_o = Some(options.iter().map(|o| (*o).clone()).collect());
-                *bc_act = (alt_count_type != 0).then(|| "any_number".into());
-                if let Some(s) = group_names {
-                    *bc_gn = Some(Box::new(vec![s.to_string()]));
-                }
-                *bc_cc = choice_cond;
-                *bc_ac = alt_cond;
-            }
-            effect = Some(AbilityEffect {
-                action: "choice".into(),
-                count: Some(count as u32),
-                kind: Some(ek_box_new(ek)),
-                compound: crate::card::CompoundBranch {
-                    actions: Some(options.iter().map(|o| (*o).clone()).collect()),
-                    ..Default::default()
-                },
-                ..Default::default()
-            });
-        } else {
-            if let Some(mut ek) = decode_effect_kind(op, &mut cursor) {
-                let action = action_for_op(op);
-                let mut ae = AbilityEffect {
-                    action: action.into(),
-                    kind: Some(ek_box_new((*ek).clone())),
-                    ..Default::default()
-                };
-                set_direct_fields(&mut ae);
-                effect = match effect.take() {
-                    None => Some(ae),
-                    Some(mut seq) => {
-                        seq.effect_steps
-                            .get_or_insert_with(Vec::new)
-                            .push(Box::new(ae));
-                        seq.action = "sequential".into();
-                        Some(seq)
-                    }
-                };
-            }
+            continue;
         }
+
+        let eff = decode_effect_from_slice(&mut cursor);
+        if eff.action == ActionType::Custom && eff.kind.is_none() && eff.effect_steps.is_none()
+            && eff.condition.is_none() && eff.compound.actions.is_none()
+        {
+            // Unrecognized opcode produced an empty effect; stop to avoid desync.
+            break;
+        }
+        effect = Some(eff);
     }
 
     Some(Ability {
@@ -297,6 +145,146 @@ fn decode_effect_from_slice(cursor: &mut &[u8]) -> AbilityEffect {
         return AbilityEffect::default();
     }
     let op_val = read_u8(cursor);
+
+    // look_and_select (0x70) + optional select_cards sub-op (0x71)
+    if op_val == 0x70 {
+        let count = read_u8(cursor);
+        let source = decode_zone(read_u8(cursor));
+        let target = decode_player(read_u8(cursor));
+        let mut steps = Vec::new();
+        steps.push(Box::new(AbilityEffect {
+            action: "look_at".into(),
+            count: Some(count as u32),
+            source: Some(source.into()),
+            target: Some(target.into()),
+            ..Default::default()
+        }));
+        if !cursor.is_empty() && cursor[0] == 0x71 {
+            let _ = read_u8(cursor);
+            let sc = read_u8(cursor);
+            let dest = decode_zone(read_u8(cursor));
+            let _dr = read_u8(cursor);
+            steps.push(Box::new(AbilityEffect {
+                action: "select_cards".into(),
+                count: Some(sc as u32),
+                destination: Some(dest.into()),
+                ..Default::default()
+            }));
+        }
+        return AbilityEffect {
+            action: "look_and_select".into(),
+            count: Some(count as u32),
+            source: Some(source.into()),
+            target: Some(target.into()),
+            effect_steps: Some(steps),
+            ..Default::default()
+        };
+    }
+    if op_val == 0x71 || op_val == 0x62 {
+        // sub-opcode markers (handled by their parent wrapper); emit empty.
+        return AbilityEffect::default();
+    }
+
+    // sequential (0x60)
+    if op_val == 0x60 {
+        let n = read_u8(cursor);
+        let mut steps = Vec::with_capacity(n as usize);
+        for _ in 0..n {
+            steps.push(Box::new(decode_effect_from_slice(cursor)));
+        }
+        return AbilityEffect {
+            action: "sequential".into(),
+            effect_steps: Some(steps),
+            ..Default::default()
+        };
+    }
+
+    // conditional_alternative (0x61)
+    if op_val == 0x61 {
+        let cond_len = read_u16(cursor) as usize;
+        let (cc_data, rest1) = cursor.split_at(cond_len);
+        let mut cc = cc_data;
+        *cursor = rest1;
+        let cond = decode_condition(&mut cc);
+        let body_len = read_u16(cursor) as usize;
+        let (body, rest2) = cursor.split_at(body_len);
+        *cursor = rest2;
+        let alt_len = read_u16(cursor) as usize;
+        let alt = if alt_len > 0 {
+            let (ac_data, rest3) = cursor.split_at(alt_len);
+            let mut ac = ac_data;
+            *cursor = rest3;
+            Some(Box::new(decode_effect_from_slice(&mut ac)))
+        } else {
+            None
+        };
+        let primary = decode_effect_from_slice(&mut &body[..]);
+        return match alt {
+            Some(a) => AbilityEffect {
+                action: "conditional_alternative".into(),
+                condition: Some(Box::new(cond)),
+                effect_steps: Some(vec![Box::new(primary), a]),
+                ..Default::default()
+            },
+            None => primary,
+        };
+    }
+
+    // choice (0x65)
+    if op_val == 0x65 {
+        let count = read_u8(cursor);
+        let group_names = read_str(cursor);
+        let cc_len = read_u16(cursor) as usize;
+        let choice_cond = (cc_len > 0).then(|| {
+            let (cd, r) = cursor.split_at(cc_len);
+            *cursor = r;
+            let mut cc = cd;
+            Box::new(decode_condition(&mut cc))
+        });
+        let ac_len = read_u16(cursor) as usize;
+        let alt_cond = (ac_len > 0).then(|| {
+            let (ad, r) = cursor.split_at(ac_len);
+            *cursor = r;
+            let mut ac = ad;
+            Box::new(decode_condition(&mut ac))
+        });
+        let alt_count_type = read_u8(cursor);
+        let num_opts = read_u8(cursor);
+        let mut options = Vec::with_capacity(num_opts as usize);
+        for _ in 0..num_opts {
+            options.push(Box::new(decode_effect_from_slice(cursor)));
+        }
+        let mut ek = default_compoundEffect();
+        if let EffectKind::CompoundEffect {
+            options: ref mut bc_o,
+            alternative_count_type: ref mut bc_act,
+            group_names: ref mut bc_gn,
+            choice_condition: ref mut bc_cc,
+            alternative_condition: ref mut bc_ac,
+            ..
+        } = &mut ek
+        {
+            *bc_o = Some(options.iter().map(|o| (*o).clone()).collect());
+            *bc_act = (alt_count_type != 0).then(|| "any_number".into());
+            if let Some(s) = group_names {
+                *bc_gn = Some(Box::new(vec![s.to_string()]));
+            }
+            *bc_cc = choice_cond;
+            *bc_ac = alt_cond;
+        }
+        return AbilityEffect {
+            action: "choice".into(),
+            count: Some(count as u32),
+            kind: Some(ek_box_new(ek)),
+            compound: crate::card::CompoundBranch {
+                actions: Some(options.iter().map(|o| (*o).clone()).collect()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+    }
+
+    // generic effect / cost opcodes present in the Opcode enum
     if let Ok(op) = Opcode::try_from(op_val) {
         if op_val >= 0x80 {
             return decode_cost_op(op, cursor);

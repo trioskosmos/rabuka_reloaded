@@ -1,5 +1,6 @@
-use core::ffi::c_void;
 use psp::sys;
+
+include!("sjis_table.rs");
 
 pub const WIDTH: u32 = 480;
 pub const HEIGHT: u32 = 272;
@@ -182,8 +183,21 @@ impl Display {
             return;
         }
 
+        // Convert Unicode to Shift-JIS for JP font compatibility.
+        let char_code = if ch.is_ascii() {
+            ch as u32
+        } else {
+            match unicode_to_sjis(ch) {
+                Some(sjis) => sjis as u32,
+                None => {
+                    self.draw_bitmap_glyph(ch, x, y);
+                    return;
+                }
+            }
+        };
+
         let mut char_info = sys::SceFontCharInfo::default();
-        let ret = unsafe { sys::sceFontGetCharInfo(self.font, ch as u32, &mut char_info) };
+        let ret = unsafe { sys::sceFontGetCharInfo(self.font, char_code, &mut char_info) };
         if ret != 0 {
             self.draw_bitmap_glyph(ch, x, y);
             return;
@@ -209,7 +223,7 @@ impl Display {
             buffer_ptr: buf.as_mut_ptr() as u32,
         };
 
-        let ret = unsafe { sys::sceFontGetCharGlyphImage(self.font, ch as u32, &mut glyph) };
+        let ret = unsafe { sys::sceFontGetCharGlyphImage(self.font, char_code, &mut glyph) };
         if ret != 0 {
             self.cursor_x = x + (char_info.sfp26_advance_h >> 6);
             return;
