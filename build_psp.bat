@@ -3,6 +3,11 @@ setlocal enabledelayedexpansion
 
 echo === Rabuka PSP Build Script ===
 echo.
+echo NOTE: Japanese card names only render on JP-region PSPs (jpn0.pgf
+echo in flash0:/font/). US/EU PSPs show "?" for CJK glyphs. To fix
+echo universally, embed a CJK bitmap font in engine_psp/src/display.rs
+echo or bundle jpn0.pgf and load via sceFontOpenUserMemory.
+echo.
 
 echo [1/3] Baking card data...
 cd /d "%~dp0engine_psp\tools\bake_cards"

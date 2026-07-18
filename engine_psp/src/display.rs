@@ -46,6 +46,11 @@ impl Display {
         let line_height = FONT_H + 2;
 
         // Try to initialize sceFont (no custom allocators — use built-in system font)
+        // NOTE: Japanese card names rely on jpn0.pgf (font index 1), which only
+        // exists on JP-region PSPs (flash0:/font/jpn0.pgf). US/EU PSPs only have
+        // Latin fonts (ltn0.pgf, index 0). For universal CJK support, embed a
+        // bitmap font in the ASCII_BITMAPS array below, or load jpn0.pgf via
+        // sceFontOpenUserMemory.
         let mut font = 0u32;
         let mut use_bitmap = true;
         let mut error = sys::SceFontErrorCode::Success;
@@ -64,7 +69,10 @@ impl Display {
         };
         let font_lib = unsafe { sys::sceFontNewLib(&params, &mut error) };
         if font_lib != 0 {
-            let f = unsafe { sys::sceFontOpen(font_lib, 0, 0, &mut error) };
+            let mut f = unsafe { sys::sceFontOpen(font_lib, 1, 0, &mut error) };
+            if f == 0 {
+                f = unsafe { sys::sceFontOpen(font_lib, 0, 0, &mut error) };
+            }
             if f != 0 {
                 font = f;
                 use_bitmap = false;
