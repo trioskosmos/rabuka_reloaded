@@ -104,7 +104,6 @@ impl Input {
         self.curr_buttons & mask != 0
     }
 
-    #[cfg(not(feature = "dc"))]
     pub fn any_just_pressed(&self) -> Option<Button> {
         const ALL: &[Button] = &[
             Button::Up,

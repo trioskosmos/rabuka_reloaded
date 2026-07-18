@@ -3,6 +3,28 @@
 
 extern crate alloc;
 
+use core::alloc::{GlobalAlloc, Layout};
+
+struct DcAlloc;
+
+unsafe impl GlobalAlloc for DcAlloc {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        extern "C" {
+            fn malloc(size: usize) -> *mut u8;
+        }
+        malloc(layout.size())
+    }
+    unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
+        extern "C" {
+            fn free(ptr: *mut u8);
+        }
+        free(ptr)
+    }
+}
+
+#[global_allocator]
+static ALLOC: DcAlloc = DcAlloc;
+
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
@@ -456,7 +478,9 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
             if count <= 1 {
                 let sel = menu_select(display, input, &items, &description, allow_skip);
                 match sel {
-                    None => TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok(),
+                    None => {
+                        TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok();
+                    }
                     Some(idx) => {
                         let actual = filtered_indices.as_ref().map(|fi| fi[idx]).unwrap_or(idx);
                         TurnEngine::resume_with_choice(gs, None, Some(vec![actual])).ok();
@@ -517,7 +541,7 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
             allow_skip,
             ..
         } => {
-            let items = ["Left", "Center", "Right"]
+            let items: Vec<String> = ["Left", "Center", "Right"]
                 .iter()
                 .map(|s| s.to_string())
                 .collect();

@@ -35,7 +35,11 @@ impl Display {
             bfont_set_encoding(BFONT_ENC_ASCII);
         }
         let vram = unsafe { vid_get_fb() };
-        let mut d = Display { vram, cursor_x: 0, cursor_y: 0 };
+        let mut d = Display {
+            vram,
+            cursor_x: 0,
+            cursor_y: 0,
+        };
         d.clear();
         d
     }
@@ -93,11 +97,7 @@ impl Display {
         let y = (row as usize) * FONT_H as usize;
         let line_words = WIDTH as usize * FONT_H as usize;
         unsafe {
-            core::ptr::write_bytes(
-                self.vram.add(y * WIDTH as usize),
-                0,
-                line_words,
-            );
+            core::ptr::write_bytes(self.vram.add(y * WIDTH as usize), 0, line_words);
         }
     }
 
@@ -126,7 +126,9 @@ impl Display {
         }
         let mut buf = [0u8; 8];
         let s = ch.encode_utf8(&mut buf);
-        let c_str = CStr::from_bytes_with_nul(s.as_bytes()).unwrap_or(c"\0");
+        let len = s.len();
+        buf[len] = 0;
+        let c_str = unsafe { CStr::from_bytes_with_nul_unchecked(&buf[..=len]) };
         unsafe {
             bfont_draw(self.vram, self.cursor_x, self.cursor_y, c_str.as_ptr());
         }
