@@ -906,6 +906,20 @@ impl GameState {
     }
 
     fn process_player_abilities(&mut self, raw_player_id: &str) {
+        self.process_player_abilities_depth(raw_player_id, 0)
+    }
+
+    /// Recursive auto-ability resolution with a bounded re-entry depth.
+    ///
+    /// `process_player_abilities` re-enters itself from its post-loop batch
+    /// scan (§9.5.3.1 loopback) whenever a watcher enqueues further abilities.
+    /// The per-ability `reprocess_counts` guard is local to each invocation, so
+    /// runaway re-triggering would otherwise recurse without bound and overflow
+    /// the stack. `max_auto_recursion` caps the depth as a last-resort safety
+    /// net; well-formed games resolve in a handful of levels.
+    const MAX_AUTO_RECURSION: u32 = 64;
+
+    fn process_player_abilities_depth(&mut self, raw_player_id: &str, depth: u32) {
         let player_id = match raw_player_id {
             "player1" => "p1",
             "player2" => "p2",
@@ -1117,7 +1131,14 @@ impl GameState {
             // Keep this_batch_triggered_ability_ids alive through the recursive
             // call so the same ability isn't enqueued twice from stale events.
             if !self.has_pending_choice() {
-                self.process_player_abilities(player_id);
+                if depth + 1 > Self::MAX_AUTO_RECURSION {
+                    log::error!(
+                        "[PCA_RECURSION_LIMIT] auto-ability re-entry exceeded {} levels for player={}; aborting batch scan",
+                        Self::MAX_AUTO_RECURSION, player_id
+                    );
+                } else {
+                    self.process_player_abilities_depth(player_id, depth + 1);
+                }
             }
             self.batch_movements.clear();
             self.position_change_events.clear();

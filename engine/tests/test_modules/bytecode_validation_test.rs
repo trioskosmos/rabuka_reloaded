@@ -140,6 +140,30 @@ mod bytecode_validation {
     }
 
     #[test]
+    fn bytecode_debug_ability_399() {
+        for idx in [545usize] {
+            let ab = get_ability(idx).expect("exists");
+            eprintln!("[{}] cost={:?}", idx, ab.cost.as_ref().map(|c| format!("{:?}", c.0.kind.as_ref().map(|k| format!("{:?}", k.as_ref())))));
+            if let Some(c) = ab.cost.as_ref() {
+                eprintln!("  cost action={} optional={:?}", c.0.action, c.0.optional);
+            }
+            eprintln!("[{}] effect={:?}", idx, ab.effect.as_ref().map(|e| e.action.to_str().to_string()));
+        }
+    }
+
+    #[test]
+    fn bytecode_debug_ability_399_disabled() {
+        let ab = get_ability(399).expect("ability 399 should exist");
+        let eff = ab.effect.as_ref().expect("has effect");
+        eprintln!("399 action={} steps={:?} count={:?}", eff.action, eff.effect_steps.as_ref().map(|s| s.len()), eff.count);
+        if let Some(steps) = eff.effect_steps.as_ref() {
+            for (i, s) in steps.iter().enumerate() {
+                eprintln!("  step[{}] action={} kind={:?}", i, s.action, s.kind.as_ref().map(|k| format!("{:?}", k)));
+            }
+        }
+    }
+
+    #[test]
     fn bytecode_debug_ability_239() {
         let ab = get_ability(239).expect("ability 239 should exist");
         println!("=== Ability 239 ===");

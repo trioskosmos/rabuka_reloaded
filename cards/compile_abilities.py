@@ -4,6 +4,38 @@ import json, struct, re
 from pathlib import Path
 from collections import defaultdict
 
+
+def _parse_list_fields():
+    """Return the set of EffectKind/Condition field names whose Rust type is a
+    Vec-of-strings. These are encoded/decoded as `str_list` so multi-element
+    lists (e.g. heart_colors) round-trip losslessly."""
+    fields = set()
+    try:
+        content = (Path(__file__).parent / ".." / "engine" / "src" / "core" / "card.rs").read_text(
+            encoding="utf-8"
+        )
+    except OSError:
+        return fields
+    for enum in ("pub enum EffectKind", "pub enum Condition"):
+        ei = content.find(enum)
+        if ei < 0:
+            continue
+        ee = content.find("};", ei) + 2
+        cur = None
+        for line in content[ei:ee].split("\n"):
+            m = re.match(r"    (\w+) \{", line)
+            if m:
+                cur = m.group(1)
+            m2 = re.match(r"        (\w+): (.+),", line)
+            if m2 and cur:
+                t = m2.group(2)
+                if "Vec<String>" in t or "Vec<ArcStr" in t:
+                    fields.add(m2.group(1))
+    return fields
+
+
+LIST_FIELDS = _parse_list_fields()
+
 # ── Value vocabulary tables for type inference ──
 ZONES = {
     "hand",
@@ -191,15 +223,27 @@ def norm(v):
 
 
 def encode(val, ftype, strs):
+    if ftype == "str_list":
+        items = []
+        if isinstance(val, list):
+            items = [str(x).strip() for x in val if x is not None and str(x).strip()]
+        elif val is not None and str(val).strip():
+            items = [str(val).strip()]
+        out = bytearray([len(items) & 0xFF])
+        for it in items:
+            out.extend(struct.pack("<H", strs.idx(it)))
+        return bytes(out)
     if val is None:
         if ftype == "str_idx":
             return struct.pack("<H", 0xFFFF)
         if ftype == "u16":
-            return struct.pack("<H", 0)
-        return b"\x00"
+            return struct.pack("<H", 0xFFFF)
+        # All scalar/enum optypes use 0xFF as the "absent" sentinel so the
+        # decoder can distinguish an unset field (→ None) from a real value.
+        return b"\xff"
     if isinstance(val, list):
         if not val:
-            return struct.pack("<H", 0xFFFF) if ftype == "str_idx" else b"\x00"
+            return struct.pack("<H", 0xFFFF) if ftype == "str_idx" else b"\xff"
         val = val[0]
     s = norm(val)
     if ftype == "u8":
@@ -383,7 +427,11 @@ def scan_abilities(abilities):
     result = {}
     for a, fields in action_fields.items():
         field_list = [
-            (infer_type(fn, list(vals)), fn) for fn, vals in sorted(fields.items())
+            (
+                "str_list" if fn in LIST_FIELDS else infer_type(fn, list(vals)),
+                fn,
+            )
+            for fn, vals in sorted(fields.items())
         ]
         result[a] = field_list
     return result
@@ -446,10 +494,28 @@ COND_FIELDS = {
         ("operator", "operator"),
     ],
     "movement_condition": [
+        ("str_idx", "movement"),
         ("zone", "location"),
-        ("u8", "card_type"),
-        ("u8", "count"),
+        ("player", "target"),
+        ("u16", "cost_limit"),
+        ("operator", "cost_limit_operator"),
+        ("bool", "baton_touch_trigger"),
+        ("u8", "min_baton_touch_count"),
+        ("bool", "exclude_self"),
+        ("str_list", "group_names"),
+        ("card_type", "card_type"),
+        ("str_list", "characters"),
+        ("zone", "baton_touch_source"),
+        ("str_idx", "comparison_type"),
         ("operator", "operator"),
+        ("bool", "self_effect_only"),
+        ("bool", "energy_placed"),
+        ("zone", "area_direction"),
+        ("bool", "self_target"),
+        ("zone", "source"),
+        ("zone", "destination"),
+        ("state", "from_state"),
+        ("state", "to_state"),
     ],
     "temporal_condition": [("u8", "count"), ("operator", "operator")],
     "appearance_condition": [("zone", "location"), ("u8", "count")],
@@ -536,7 +602,11 @@ def compile_cost(cost, bc, strs):
         bc.data.extend(encode(cost.get("destination", "discard"), "zone", strs))
         bc.data.extend(encode(cost.get("card_type", "member_card"), "card_type", strs))
         bc.u8(1 if cost.get("self_cost") else 0)
-        bc.data.extend(encode(cost.get("count", 1), "u8", strs))
+        bc.data.extend(encode(cost.get("count"), "u8", strs))
+        bc.u8(1 if cost.get("optional") else 0)
+        bc.u8(1 if cost.get("any_number") else 0)
+        bc.data.extend(encode(cost.get("group_names"), "str_list", strs))
+        bc.data.extend(encode(cost.get("characters"), "str_list", strs))
     elif t == "tap":
         bc.u8(0x81)
     elif t == "rest":
@@ -548,8 +618,12 @@ def compile_cost(cost, bc, strs):
         bc.u8(0)
     elif t == "discard":
         bc.u8(0x84)
-        bc.data.extend(encode(cost.get("count", 1), "u8", strs))
+        bc.data.extend(encode(cost.get("count"), "u8", strs))
         bc.data.extend(encode(cost.get("card_type", "card"), "card_type", strs))
+        bc.u8(1 if cost.get("optional") else 0)
+        bc.u8(1 if cost.get("any_number") else 0)
+        bc.data.extend(encode(cost.get("group_names"), "str_list", strs))
+        bc.data.extend(encode(cost.get("characters"), "str_list", strs))
     elif t == "place_energy_under_member":
         bc.u8(0x85)
         bc.data.extend(encode(cost.get("count", 1), "u8", strs))
@@ -639,7 +713,7 @@ EFFECT_OPCODES = {
         ]
     )
 }
-# Compound opcodes — must be at fixed values 0x60+ for the hand-coded vm.rs handlers
+# Compound opcodes  Emust be at fixed values 0x60+ for the hand-coded vm.rs handlers
 EFFECT_OPCODES["compound_sequential"] = 0x60
 EFFECT_OPCODES["compound_conditional"] = 0x61
 EFFECT_OPCODES["compound_conditional_alt"] = 0x62
@@ -1013,7 +1087,7 @@ def generate_vm_gen(build_dir, field_map):
         lines.append("}")
         lines.append("")
 
-    # decode_ability_effect — builds AbilityEffect directly from bytecode,
+    # decode_ability_effect  Ebuilds AbilityEffect directly from bytecode,
     # setting both EffectKind type tag AND convenience fields
     lines.append(
         "fn decode_effect_kind(op: Opcode, cursor: &mut &[u8]) -> Option<Box<EffectKind>> {"
@@ -1184,126 +1258,115 @@ def generate_vm_gen(build_dir, field_map):
 
 def _read_expr(ftype, vname):
     m = {
-        "u8": f"let {vname} = read_u8(cursor)",
-        "u16": f"let {vname} = read_u16(cursor)",
-        "i8": f"let {vname} = read_i8(cursor)",
-        "bool": f"let {vname} = read_u8(cursor) != 0",
-        "zone": f"let {vname} = decode_zone(read_u8(cursor))",
-        "player": f"let {vname} = decode_player(read_u8(cursor))",
-        "card_type": f"let {vname} = decode_card_type(read_u8(cursor))",
-        "resource": f"let {vname} = decode_resource(read_u8(cursor))",
-        "heart": f"let {vname} = decode_heart(read_u8(cursor))",
-        "state": f"let {vname} = decode_state(read_u8(cursor))",
-        "duration": f"let {vname} = decode_duration(read_u8(cursor))",
-        "operator": f"let {vname} = decode_operator(read_u8(cursor))",
+        "u8": f"let {vname} = read_u8_opt(cursor)",
+        "u16": f"let {vname} = read_u16_opt(cursor)",
+        "i8": f"let {vname} = read_i8_opt(cursor)",
+        "bool": f"let {vname} = read_bool_opt(cursor)",
+        "zone": f"let {vname} = read_zone_opt(cursor)",
+        "player": f"let {vname} = read_player_opt(cursor)",
+        "card_type": f"let {vname} = read_card_type_opt(cursor)",
+        "resource": f"let {vname} = read_resource_opt(cursor)",
+        "heart": f"let {vname} = read_heart_opt(cursor)",
+        "state": f"let {vname} = read_state_opt(cursor)",
+        "duration": f"let {vname} = read_duration_opt(cursor)",
+        "operator": f"let {vname} = read_operator_opt(cursor)",
         "str_idx": f"let {vname} = read_str(cursor)",
     }
-    return m.get(ftype, f"let {vname} = read_u8(cursor)")
+    if ftype == "str_list":
+        return f"let {vname} = read_str_list(cursor)"
+    return m.get(ftype, f"let {vname} = read_u8_opt(cursor)")
 
 
 def _assign(ft, src_var, optype):
-    """Generate assignment expression. Returns None if not possible."""
+    """Generate an assignment expression from a decoded local into a struct
+    field. All scalar/enum optypes decode into `Option<..>` locals (0xFF/0xFFFF
+    sentinel → None); `str_list` decodes into a `Vec<String>`. Returns None when
+    the field type is unsupported (field is then left at its default)."""
     if ft is None:
         return None
     is_opt = ft.startswith("Option<")
     inner = ft[7:-1] if is_opt else ft
-    opt_ret = optype == "str_idx"
 
     def wr(expr):
         return f"Some({expr})" if is_opt else expr
 
-    if inner == "ArcStr":
-        if opt_ret:
+    # ── list wire format ──
+    if optype == "str_list":
+        if "Vec<String>" in inner or "Vec<ArcStr" in inner:
+            boxed = f"Box::new({src_var})" if inner.startswith("Box<") else src_var
+            if is_opt:
+                return f"if {src_var}.is_empty() {{ None }} else {{ Some({boxed}) }}"
+            return boxed
+        first = f"{src_var}.into_iter().next()"
+        if inner == "ArcStr":
+            return f"{first}.map(|s| s.into())" if is_opt else f"{first}.map_or(Default::default(), |s| s.into())"
+        if inner == "String":
+            return f"{first}" if is_opt else f"{first}.unwrap_or_default()"
+        if inner == "EffectState":
+            return f"{first}.map(|s| EffectState::from_str(&s))" if is_opt else None
+        if inner == "EffectCardType":
+            return f"{first}.map(|s| EffectCardType::from_str(&s))" if is_opt else None
+        return None
+
+    # ── scalar/enum wire format: `src_var` is Option<..> ──
+    # state optype decodes to Option<EffectState>.
+    if optype == "state":
+        if inner == "EffectState":
+            return src_var if is_opt else f"{src_var}.unwrap_or_default()"
+        return None
+    # card_type optype decodes to Option<&str>.
+    if optype == "card_type":
+        if inner == "EffectCardType":
             return (
-                f"{src_var}.map(|s| s.into())"
+                f"{src_var}.map(EffectCardType::from_str)"
                 if is_opt
-                else f"{src_var}.map_or(Default::default(), |s| s.into())"
+                else f"{src_var}.map_or_else(EffectCardType::default, EffectCardType::from_str)"
             )
-        return wr(f"{src_var}.into()")
+        if inner == "ArcStr":
+            return f"{src_var}.map(|s| s.into())" if is_opt else f"{src_var}.map_or(Default::default(), |s| s.into())"
+        return None
+
+    if inner == "ArcStr":
+        return f"{src_var}.map(|s| s.into())" if is_opt else f"{src_var}.map_or(Default::default(), |s| s.into())"
+    if inner == "String":
+        return f"{src_var}.map(|s| s.to_string())" if is_opt else f"{src_var}.map_or(String::new(), |s| s.to_string())"
     if inner == "u32":
-        if opt_ret:
+        # str_idx numeric fields parse the interned string; numeric optypes cast.
+        if optype == "str_idx":
             return (
                 f"{src_var}.map(|s| s.parse().ok().unwrap_or(0))"
                 if is_opt
                 else f"{src_var}.map_or(0, |s| s.parse().ok().unwrap_or(0))"
             )
-        return wr(f"{src_var} as u32")
+        return f"{src_var}.map(|v| v as u32)" if is_opt else f"{src_var}.map_or(0, |v| v as u32)"
+    if inner == "i32":
+        return f"{src_var}.map(|v| v as i32)" if is_opt else f"{src_var}.map_or(0, |v| v as i32)"
     if inner == "bool":
-        return wr(f"{src_var}")
-    if inner == "String":
-        if opt_ret:
-            return (
-                f"{src_var}.map(|s| s.to_string())"
-                if is_opt
-                else f"{src_var}.map_or(String::new(), |s| s.to_string())"
-            )
-        return wr(f"{src_var}.to_string()")
+        return src_var if is_opt else f"{src_var}.unwrap_or(false)"
+    if inner == "Operator":
+        return (
+            f"{src_var}.map(decode_operator_from_str)"
+            if is_opt
+            else f"{src_var}.map_or(Operator::Eq, decode_operator_from_str)"
+        )
+    if inner == "ConditionCardType":
+        return (
+            f"{src_var}.map(decode_cond_card_type)"
+            if is_opt
+            else f"{src_var}.map_or(ConditionCardType::MemberCard, decode_cond_card_type)"
+        )
     if "Box<Vec<" in inner or "Vec<" in inner:
+        # Single interned string wrapped into a one-element list.
         bwrap = "Box::new(" if "Box<" in inner else ""
         bclose = ")" if "Box<" in inner else ""
-        if opt_ret:
-            if is_opt:
-                return f"{src_var}.map(|s| {bwrap}vec![s.to_string()]{bclose})"
-            return f"{src_var}.map_or(Default::default(), |s| {bwrap}vec![s.to_string()]{bclose})"
-        return wr(f"{bwrap}vec![{src_var}.to_string()]{bclose}")
-    if inner == "Operator":
-        return wr(f"decode_operator_from_str({src_var})")
-    if inner == "ConditionCardType":
-        return wr(f"decode_cond_card_type({src_var})") if not opt_ret else None
+        if is_opt:
+            return f"{src_var}.map(|s| {bwrap}vec![s.to_string()]{bclose})"
+        return f"{src_var}.map_or(Default::default(), |s| {bwrap}vec![s.to_string()]{bclose})"
     return None
 
 
 def _cond_assign(ft, src_var, optype, fname):
-    if ft is None:
-        return None
-    is_opt = ft.startswith("Option<")
-    inner = ft[7:-1] if is_opt else ft
-    opt_ret = optype == "str_idx"
-
-    def wr(expr):
-        return f"Some({expr})" if is_opt else expr
-
-    if inner == "ArcStr":
-        if opt_ret:
-            return (
-                f"{src_var}.map(|s| s.into())"
-                if is_opt
-                else f"{src_var}.map_or(Default::default(), |s| s.into())"
-            )
-        return wr(f"{src_var}.into()")
-    if inner == "u32":
-        if opt_ret:
-            return (
-                f"{src_var}.map(|s| s.parse().ok().unwrap_or(0))"
-                if is_opt
-                else f"{src_var}.map_or(0, |s| s.parse().ok().unwrap_or(0))"
-            )
-        return wr(f"{src_var} as u32")
-    if inner == "bool":
-        return wr(f"{src_var}")
-    if inner == "String":
-        if opt_ret:
-            return (
-                f"{src_var}.map(|s| s.to_string())"
-                if is_opt
-                else f"{src_var}.map_or(String::new(), |s| s.to_string())"
-            )
-        return wr(f"{src_var}.to_string()")
-    if "Box<Vec<" in inner or "Vec<" in inner:
-        bwrap = "Box::new(" if "Box<" in inner else ""
-        bclose = ")" if "Box<" in inner else ""
-        if opt_ret:
-            if is_opt:
-                return f"{src_var}.map(|s| {bwrap}vec![s.to_string()]{bclose})"
-            return f"{src_var}.map_or(Default::default(), |s| {bwrap}vec![s.to_string()]{bclose})"
-        return wr(f"{bwrap}vec![{src_var}.to_string()]{bclose}")
-    if inner == "Operator":
-        return wr(f"decode_operator_from_str({src_var})")
-    if inner == "ConditionCardType":
-        return wr(f"decode_cond_card_type({src_var})") if not opt_ret else None
-    if inner in ("PositionInfo", "DistinctType", "PlacementOrder"):
-        return None
-    return None
+    return _assign(ft, src_var, optype)
 
 
 # ── Main ──
@@ -1336,3 +1399,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

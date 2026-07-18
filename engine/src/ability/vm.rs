@@ -41,6 +41,81 @@ fn read_str(c: &mut &[u8]) -> Option<&'static str> {
     }
 }
 
+/// Decode a length-prefixed list of interned strings: `u8 count` followed by
+/// `count` little-endian `u16` string-table indices. Used for `Vec<String>`
+/// effect/condition fields (e.g. `heart_colors`, `group_names`).
+fn read_str_list(c: &mut &[u8]) -> Vec<String> {
+    let n = read_u8(c) as usize;
+    let mut out = Vec::with_capacity(n);
+    for _ in 0..n {
+        let idx = read_u16(c) as usize;
+        if idx != 0xFFFF && idx < STRINGS.len() {
+            out.push(STRINGS[idx].to_string());
+        }
+    }
+    out
+}
+
+// ── Presence-aware scalar readers ──
+// Absent fields are encoded as the 0xFF (or 0xFFFF) sentinel and decode to
+// `None`, so the bytecode path matches the JSON loader (which leaves unset
+// fields as `None`).
+fn read_u8_opt(c: &mut &[u8]) -> Option<u8> {
+    let b = read_u8(c);
+    if b == 0xFF {
+        None
+    } else {
+        Some(b)
+    }
+}
+fn read_u16_opt(c: &mut &[u8]) -> Option<u16> {
+    let v = read_u16(c);
+    if v == 0xFFFF {
+        None
+    } else {
+        Some(v)
+    }
+}
+fn read_bool_opt(c: &mut &[u8]) -> Option<bool> {
+    match read_u8(c) {
+        0 => Some(false),
+        1 => Some(true),
+        _ => None,
+    }
+}
+fn read_zone_opt(c: &mut &[u8]) -> Option<&'static str> {
+    read_u8_opt(c).map(decode_zone)
+}
+fn read_player_opt(c: &mut &[u8]) -> Option<&'static str> {
+    read_u8_opt(c).map(decode_player)
+}
+fn read_card_type_opt(c: &mut &[u8]) -> Option<&'static str> {
+    read_u8_opt(c).map(decode_card_type)
+}
+fn read_resource_opt(c: &mut &[u8]) -> Option<&'static str> {
+    read_u8_opt(c).map(decode_resource)
+}
+fn read_heart_opt(c: &mut &[u8]) -> Option<&'static str> {
+    read_u8_opt(c).map(decode_heart)
+}
+fn read_duration_opt(c: &mut &[u8]) -> Option<&'static str> {
+    read_u8_opt(c).map(decode_duration)
+}
+fn read_operator_opt(c: &mut &[u8]) -> Option<&'static str> {
+    read_u8_opt(c).map(decode_operator)
+}
+fn read_state_opt(c: &mut &[u8]) -> Option<EffectState> {
+    read_u8_opt(c).map(decode_state)
+}
+fn read_i8_opt(c: &mut &[u8]) -> Option<i8> {
+    let b = read_u8(c);
+    if b == 0xFF {
+        None
+    } else {
+        Some(b as i8)
+    }
+}
+
 include!("vm_gen.rs");
 
 pub fn ability_count() -> usize {
@@ -61,12 +136,14 @@ pub fn get_ability(idx: usize) -> Option<Ability> {
     let mut effect: Option<AbilityEffect> = None;
 
     while !cursor.is_empty() {
-        let op_val = read_u8(&mut cursor);
+        // Peek at the opcode without consuming it. Cost opcodes (0x80+) route to
+        // the cost slot; everything else is an effect (including the
+        // compound/control shapes 0x60-0x65, 0x70/0x71), decoded uniformly by
+        // `decode_effect_from_slice`, which reads the opcode byte itself.
+        let op_val = cursor[0];
 
-        // Cost opcodes (0x80+) route to the cost slot; everything else is an
-        // effect (including the compound/control shapes 0x60-0x65, 0x70/0x71),
-        // decoded uniformly by `decode_effect_from_slice`.
         if op_val >= 0x80 {
+            let op_val = read_u8(&mut cursor);
             match Opcode::try_from(op_val) {
                 Ok(op) => cost_eff = Some(decode_cost_op(op, &mut cursor)),
                 Err(_) => break,
@@ -81,7 +158,27 @@ pub fn get_ability(idx: usize) -> Option<Ability> {
             // Unrecognized opcode produced an empty effect; stop to avoid desync.
             break;
         }
-        effect = Some(eff);
+        // Chain multiple top-level effects into a sequential wrapper, matching
+        // the JSON loader's behaviour.
+        effect = match effect.take() {
+            None => Some(eff),
+            Some(prev) => {
+                let mut seq = if prev.action == ActionType::Sequential && prev.kind.is_none() {
+                    prev
+                } else {
+                    AbilityEffect {
+                        action: "sequential".into(),
+                        effect_steps: Some(vec![Box::new(prev)]),
+                        ..Default::default()
+                    }
+                };
+                seq.effect_steps
+                    .get_or_insert_with(Vec::new)
+                    .push(Box::new(eff));
+                seq.action = "sequential".into();
+                Some(seq)
+            }
+        };
     }
 
     Some(Ability {
@@ -226,7 +323,17 @@ fn decode_effect_from_slice(cursor: &mut &[u8]) -> AbilityEffect {
                 effect_steps: Some(vec![Box::new(primary), a]),
                 ..Default::default()
             },
-            None => primary,
+            None => {
+                // No alternative branch: this is a plain condition-gated effect.
+                // Preserve the trigger condition on the primary effect so the
+                // resolver's condition gate fires correctly (matches the JSON
+                // loader, which keeps `effect.condition` on a condition-wrapped
+                // sequential). Dropping it would make the ability fire
+                // unconditionally.
+                let mut p = primary;
+                p.condition = Some(Box::new(cond));
+                p
+            }
         };
     }
 
@@ -311,25 +418,40 @@ fn decode_cost_op(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
             let ct = decode_card_type(read_u8(cursor));
             let _sc = read_u8(cursor);
             let count = read_u8(cursor);
+            let optional = read_u8(cursor) != 0;
+            let any_number = read_u8(cursor) != 0;
+            let group_names = read_str_list(cursor);
+            let characters = read_str_list(cursor);
             let mut ek = default_moveCards();
             if let EffectKind::MoveCards {
                 source: ref mut s,
                 destination: ref mut d,
                 card_type: ref mut c,
                 count: ref mut n,
+                any_number: ref mut an,
+                group_names: ref mut gn,
+                characters: ref mut ch,
                 ..
             } = &mut ek
             {
                 *s = Some(src.into());
                 *d = Some(dest.into());
-                *c = Some(ct.into());
+                *c = Some(EffectCardType::from_str(ct));
                 *n = Some(count as u32);
+                *an = Some(any_number);
+                if !group_names.is_empty() {
+                    *gn = Some(Box::new(group_names));
+                }
+                if !characters.is_empty() {
+                    *ch = Some(Box::new(characters));
+                }
             }
             AbilityEffect {
                 action: "move_cards".into(),
                 source: Some(src.into()),
                 destination: Some(dest.into()),
                 count: Some(count as u32),
+                optional: Some(optional),
                 kind: Some(ek_box_new(ek)),
                 ..Default::default()
             }
@@ -376,19 +498,34 @@ fn decode_cost_op(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
         Opcode::DiscardCost => {
             let c = read_u8(cursor);
             let ct = decode_card_type(read_u8(cursor));
+            let optional = read_u8(cursor) != 0;
+            let any_number = read_u8(cursor) != 0;
+            let group_names = read_str_list(cursor);
+            let characters = read_str_list(cursor);
             let mut ek = default_moveCards();
             if let EffectKind::MoveCards {
                 count: ref mut n,
                 card_type: ref mut t,
+                any_number: ref mut an,
+                group_names: ref mut gn,
+                characters: ref mut ch,
                 ..
             } = &mut ek
             {
                 *n = Some(c as u32);
-                *t = Some(ct.into());
+                *t = Some(EffectCardType::from_str(ct));
+                *an = Some(any_number);
+                if !group_names.is_empty() {
+                    *gn = Some(Box::new(group_names));
+                }
+                if !characters.is_empty() {
+                    *ch = Some(Box::new(characters));
+                }
             }
             AbilityEffect {
                 action: "discard".into(),
                 count: Some(c as u32),
+                optional: Some(optional),
                 kind: Some(ek_box_new(ek)),
                 ..Default::default()
             }
@@ -502,6 +639,7 @@ fn decode_cost_op(op: Opcode, cursor: &mut &[u8]) -> AbilityEffect {
 }
 
 fn decode_zone(v: u8) -> &'static str {
+    // Must stay in sync with ZONE_ENCODE in cards/compile_abilities.py.
     match v {
         0 => "hand",
         1 => "stage",
@@ -511,17 +649,22 @@ fn decode_zone(v: u8) -> &'static str {
         5 => "discard",
         6 => "waitroom",
         7 => "energy",
+        8 => "energy_zone",
         9 => "deck",
         10 => "deck_top",
         11 => "deck_bottom",
         12 => "success_zone",
         13 => "live_card_zone",
+        14 => "success_live_zone",
         15 => "energy_deck",
+        16 => "empty_area",
+        17 => "same_area",
         18 => "under_member",
         19 => "looked_at",
         20 => "revealed_cards",
         21 => "selected_cards",
         22 => "resolution",
+        23 => "exclusion_zone",
         24 => "deck_or_discard",
         _ => "hand",
     }
