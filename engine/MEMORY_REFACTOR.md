@@ -313,7 +313,7 @@ Covered by `debug_conditions` feature gate above. `trigger_event: Option<Box<Tri
 
 ---
 
-### P1.6 — Build bytecode VM — ⚠️ IN PROGRESS (currently BROKEN)
+### P1.6 — Build bytecode VM — ⚠️ IN PROGRESS (REPAIR PLAN, 2026-07-18)
 
 **Why:** The current engine decodes `abilities.json` into full `AbilityEffect` structs at load time (~4 MB JSON → ~2.8 MB in-memory structs). For PS1, N64, DS, Dreamcast targets with <1 MB RAM, this is too expensive. A bytecode format stores abilities as compact opcodes (~14B per ability vs ~400B per AbilityEffect).
 
@@ -326,25 +326,29 @@ Covered by `debug_conditions` feature gate above. `trigger_event: Option<Box<Tri
   discovers field types, and emits `vm_gen.rs` (the decoder) + `abilities_gen.rs`
   (the `Opcode` enum, `BYTECODE`, `OFFSETS`, `STRINGS`) + `build/abilities.bin`.
 - **It does NOT compile.** `cargo build --tests --features bytecode_abilities`
-  fails with ~50 errors: the generated `vm_gen.rs` is out of sync with the current
-  `EffectKind` / enum definitions — missing fields `card_property` and `count`,
-  missing `From<&str>` impls for `EffectCardType` / `EffectState` / `ActionType`,
-  and an unresolved `idx` binding. It was attempted (heavy git history) but never
-  completed and has since regressed against the hand-written types.
+  fails: the generated `vm_gen.rs` is out of sync with the current
+  `EffectKind` / enum definitions. Root cause below.
 
-**What remains to make it build + green:**
-1. Re-run `cards/compile_abilities.py` against current `abilities.json` and regenerate
-   `vm_gen.rs` / `abilities_gen.rs` so they match the live `EffectKind`/`enums`.
-2. Add the missing `From<&str>` impls (`EffectCardType`, `EffectState`, `ActionType`)
-   that the generated decoder relies on, or update the generator's emit logic.
-3. Fix the `count` / `card_property` initializers (add the fields to the generated
-   `EffectKind` constructors) and the `idx` binding in `vm.rs`/`vm_gen.rs`.
-4. Get `cargo build --features bytecode_abilities` green, then get the bytecode test
-   path green (the JSON-path tests should still pass unchanged since it's
-   feature-gated).
-5. Optionally: true direct-execution VM (match on `ActionType`, inline operands)
-   removing the inflate-to-`AbilityEffect` step. This is the larger "100x reduction"
-   goal but is separate from merely getting the feature to compile.
+**Isolation guarantee (verified):** Every file touched is outside the default-build path.
+- `cards/compile_abilities.py` — standalone Python, not Rust.
+- `src/ability/vm_gen.rs`, `src/ability/abilities_gen.rs` — generated artifacts, only used under the feature (regenerating keeps them valid Rust).
+- `src/ability/vm.rs` — `pub mod vm` is behind `#[cfg(feature = "bytecode_abilities")]` (`src/ability/mod.rs:18-19`), so NOT compiled in the default build.
+- `src/core/card_loader.rs:103-129` — the `idx` bug is inside a `#[cfg(feature = "bytecode_abilities")]` block; fixing it does not change the default loader.
+- No edit to `enums.rs`, `types.rs`, `EffectKind` variants, or any default-path code.
+
+**Root cause (verified):**
+- Condition decoder uses a uniform `u8 → enum` registry (`decode_zone`, `decode_card_type`, `decode_state`, `decode_operator`, `decode_resource`, `decode_heart`, `decode_duration`, `decode_player`) — all hand-written in `vm.rs` (~lines 498-585), feature-gated.
+- Effect decoder (`gen_decode_expr`/`_effect_assign` in `compile_abilities.py`, ~1240-1306) only special-cases `Operator`/`ConditionCardType` and returns `None` for `EffectCardType`/`EffectState`/`ActionType` → generated `vm_gen.rs` emits `.into()` needing `From<&str>` (absent) → ~49 errors.
+- `vm_gen.rs:557` builds `EffectKind::CustomOp { card_property, count, .. }` but `CustomOp` (would be a main edit) lacks those fields.
+
+**Repair plan (fully isolated from main):**
+1. **Generator** (`compile_abilities.py`): replace hard-coded `Operator`/`ConditionCardType` special cases in `gen_decode_expr`/`_effect_assign` with a uniform enum-type → `decode_X(read_u8(cursor))` mapping covering `EffectCardType`, `EffectState`, `ActionType`, and any other enum `scan_abilities` finds (data-driven, so new abilities stay automatic).
+2. **Generator**: trim `card_property`/`count` from the `CustomOp` action field map (~lines 887-982) so the generated constructor matches the hand-written `CustomOp` variant — do NOT add fields to `CustomOp` in `types.rs` (would touch main).
+3. **vm.rs** (cfg-gated, not main): add `decode_effect_card_type(v: u8) -> EffectCardType`, `decode_action_type(v: u8) -> ActionType`, `impl From<&str> for EffectCardType/EffectState/ActionType` (fallback `Default`/`from_str().unwrap_or_default()`), and fix `_idx → idx` used at `card_loader.rs:105`.
+4. **Regenerate:** `python cards/compile_abilities.py` (writes `vm_gen.rs`, `abilities_gen.rs`, `cards/build/abilities.bin`); commit the regenerated Rust files.
+5. **Validate:** `cargo build --tests --features bytecode_abilities` compiles (exit 0); `cargo test` stays 1820 passed, 0 failed. If regenerated `vm_gen.rs` still references a missing variant field, fix it on the generator side (step 2 pattern), never by editing `types.rs`.
+
+**Out of scope:** True direct-execution VM (match on `ActionType`, inline operands). Separate, larger. Bytecode-path game-level tests passing (~20 failing even when it last built). "Done" = feature compiles + default tests green. Any default-path Rust edit.
 
 **Savings (if completed):** ~40 KB card data vs ~4 MB JSON-inflated. 100x reduction —
 this is the key unlock for PS1/N64/DS/Dreamcast.

@@ -482,7 +482,7 @@ impl GameState {
         }
         let _jyouji_len = jyouji_statuses.len();
         self.constant_ability_statuses = jyouji_statuses;
-        tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", jyouji_len);
+        tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
 
         // Blade
         tdbg!("RC:7 BLADE");

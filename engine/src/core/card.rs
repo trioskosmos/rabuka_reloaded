@@ -2579,16 +2579,34 @@ impl AbilityEffect {
         match self.kind.as_deref() {
             Some(EffectKind::MoveCards { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
             Some(EffectKind::DrawCards { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
-            Some(EffectKind::SelectTarget { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
-            Some(EffectKind::LookReveal { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
-            Some(EffectKind::ModifyScore { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
-            Some(EffectKind::ModifyHearts { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
-            Some(EffectKind::GainResource { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
-            Some(EffectKind::ChangeState { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            Some(EffectKind::SelectTarget { card_type, .. }) => {
+                card_type.as_ref().map(|c| c.as_str())
+            }
+            Some(EffectKind::LookReveal { card_type, .. }) => {
+                card_type.as_ref().map(|c| c.as_str())
+            }
+            Some(EffectKind::ModifyScore { card_type, .. }) => {
+                card_type.as_ref().map(|c| c.as_str())
+            }
+            Some(EffectKind::ModifyHearts { card_type, .. }) => {
+                card_type.as_ref().map(|c| c.as_str())
+            }
+            Some(EffectKind::GainResource { card_type, .. }) => {
+                card_type.as_ref().map(|c| c.as_str())
+            }
+            Some(EffectKind::ChangeState { card_type, .. }) => {
+                card_type.as_ref().map(|c| c.as_str())
+            }
             Some(EffectKind::AbilityOp { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
-            Some(EffectKind::CompoundEffect { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
-            Some(EffectKind::RestrictionOp { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
-            Some(EffectKind::PositionOp { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            Some(EffectKind::CompoundEffect { card_type, .. }) => {
+                card_type.as_ref().map(|c| c.as_str())
+            }
+            Some(EffectKind::RestrictionOp { card_type, .. }) => {
+                card_type.as_ref().map(|c| c.as_str())
+            }
+            Some(EffectKind::PositionOp { card_type, .. }) => {
+                card_type.as_ref().map(|c| c.as_str())
+            }
             Some(EffectKind::MiscOp { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
             Some(EffectKind::CustomOp { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
             _ => None,
@@ -3250,20 +3268,48 @@ impl AbilityEffect {
     pub fn set_card_type(&mut self, val: Option<ArcStr>) {
         let parsed = val.map(|s| EffectCardType::from_str(&s));
         match self.kind.as_deref_mut() {
-            Some(EffectKind::MoveCards { ref mut card_type, .. }) => *card_type = parsed,
-            Some(EffectKind::DrawCards { ref mut card_type, .. }) => *card_type = parsed,
-            Some(EffectKind::SelectTarget { ref mut card_type, .. }) => *card_type = parsed,
-            Some(EffectKind::LookReveal { ref mut card_type, .. }) => *card_type = parsed,
-            Some(EffectKind::ModifyScore { ref mut card_type, .. }) => *card_type = parsed,
-            Some(EffectKind::ModifyHearts { ref mut card_type, .. }) => *card_type = parsed,
-            Some(EffectKind::GainResource { ref mut card_type, .. }) => *card_type = parsed,
-            Some(EffectKind::ChangeState { ref mut card_type, .. }) => *card_type = parsed,
-            Some(EffectKind::AbilityOp { ref mut card_type, .. }) => *card_type = parsed,
-            Some(EffectKind::CompoundEffect { ref mut card_type, .. }) => *card_type = parsed,
-            Some(EffectKind::RestrictionOp { ref mut card_type, .. }) => *card_type = parsed,
-            Some(EffectKind::PositionOp { ref mut card_type, .. }) => *card_type = parsed,
-            Some(EffectKind::MiscOp { ref mut card_type, .. }) => *card_type = parsed,
-            Some(EffectKind::CustomOp { ref mut card_type, .. }) => *card_type = parsed,
+            Some(EffectKind::MoveCards {
+                ref mut card_type, ..
+            }) => *card_type = parsed,
+            Some(EffectKind::DrawCards {
+                ref mut card_type, ..
+            }) => *card_type = parsed,
+            Some(EffectKind::SelectTarget {
+                ref mut card_type, ..
+            }) => *card_type = parsed,
+            Some(EffectKind::LookReveal {
+                ref mut card_type, ..
+            }) => *card_type = parsed,
+            Some(EffectKind::ModifyScore {
+                ref mut card_type, ..
+            }) => *card_type = parsed,
+            Some(EffectKind::ModifyHearts {
+                ref mut card_type, ..
+            }) => *card_type = parsed,
+            Some(EffectKind::GainResource {
+                ref mut card_type, ..
+            }) => *card_type = parsed,
+            Some(EffectKind::ChangeState {
+                ref mut card_type, ..
+            }) => *card_type = parsed,
+            Some(EffectKind::AbilityOp {
+                ref mut card_type, ..
+            }) => *card_type = parsed,
+            Some(EffectKind::CompoundEffect {
+                ref mut card_type, ..
+            }) => *card_type = parsed,
+            Some(EffectKind::RestrictionOp {
+                ref mut card_type, ..
+            }) => *card_type = parsed,
+            Some(EffectKind::PositionOp {
+                ref mut card_type, ..
+            }) => *card_type = parsed,
+            Some(EffectKind::MiscOp {
+                ref mut card_type, ..
+            }) => *card_type = parsed,
+            Some(EffectKind::CustomOp {
+                ref mut card_type, ..
+            }) => *card_type = parsed,
             _ => {}
         }
     }
@@ -3390,7 +3436,10 @@ impl AbilityEffect {
     pub fn set_state_change(&mut self, val: Option<ArcStr>) {
         let parsed = val.map(|s| EffectState::from_str(&s));
         match self.kind.as_deref_mut() {
-            Some(EffectKind::ChangeState { ref mut state_change, .. }) => *state_change = parsed,
+            Some(EffectKind::ChangeState {
+                ref mut state_change,
+                ..
+            }) => *state_change = parsed,
             _ => {}
         }
     }
@@ -4517,11 +4566,13 @@ pub struct LocationSubChecks {
 impl Default for Condition {
     fn default() -> Self {
         Condition::AlwaysTrue {
+            #[cfg(feature = "debug_conditions")]
             text: None,
             negation: None,
             phase: None,
             phase_target: None,
             cache: None,
+            #[cfg(feature = "debug_conditions")]
             trigger_event: None,
         }
     }
@@ -4531,35 +4582,42 @@ impl Default for Condition {
 
 impl Condition {
     pub fn get_text(&self) -> Option<&str> {
-        let t: Option<&str> = match self {
-            Condition::Compound { text, .. }
-            | Condition::Location { text, .. }
-            | Condition::Comparison { text, .. }
-            | Condition::Movement { text, .. }
-            | Condition::Group { text, .. }
-            | Condition::Appearance { text, .. }
-            | Condition::Temporal { text, .. }
-            | Condition::State { text, .. }
-            | Condition::Resource { text, .. }
-            | Condition::AbilityFilter { text, .. }
-            | Condition::ScoreThreshold { text, .. }
-            | Condition::Choice { text, .. }
-            | Condition::Complex { text, .. }
-            | Condition::PositionCond { text, .. }
-            | Condition::OpponentChoice { text, .. }
-            | Condition::OpponentLiveSuccess { text, .. }
-            | Condition::NoExcessHeart { text, .. }
-            | Condition::AlwaysTrue { text, .. }
-            | Condition::AnyOf { text, .. }
-            | Condition::AllRevealedMatchHeartColor { text, .. } => text.as_deref(),
-        };
-        // Preserve old behavior: text was always "" even when absent.
-        // Code that compares condition text (e.g. same_as_prev in compound.rs)
-        // relies on None == None matching the old "" == "".
-        if t.is_none() {
-            Some("")
-        } else {
-            t
+        #[cfg(feature = "debug_conditions")]
+        {
+            let t: Option<&str> = match self {
+                Condition::Compound { text, .. }
+                | Condition::Location { text, .. }
+                | Condition::Comparison { text, .. }
+                | Condition::Movement { text, .. }
+                | Condition::Group { text, .. }
+                | Condition::Appearance { text, .. }
+                | Condition::Temporal { text, .. }
+                | Condition::State { text, .. }
+                | Condition::Resource { text, .. }
+                | Condition::AbilityFilter { text, .. }
+                | Condition::ScoreThreshold { text, .. }
+                | Condition::Choice { text, .. }
+                | Condition::Complex { text, .. }
+                | Condition::PositionCond { text, .. }
+                | Condition::OpponentChoice { text, .. }
+                | Condition::OpponentLiveSuccess { text, .. }
+                | Condition::NoExcessHeart { text, .. }
+                | Condition::AlwaysTrue { text, .. }
+                | Condition::AnyOf { text, .. }
+                | Condition::AllRevealedMatchHeartColor { text, .. } => text.as_deref(),
+            };
+            // Preserve old behavior: text was always "" even when absent.
+            // Code that compares condition text (e.g. same_as_prev in compound.rs)
+            // relies on None == None matching the old "" == "".
+            if t.is_none() {
+                Some("")
+            } else {
+                t
+            }
+        }
+        #[cfg(not(feature = "debug_conditions"))]
+        {
+            None
         }
     }
 
@@ -4664,29 +4722,36 @@ impl Condition {
     }
 
     pub fn get_trigger_event(&self) -> Option<&TriggerEvent> {
-        match self {
-            Condition::Compound { trigger_event, .. }
-            | Condition::Location { trigger_event, .. }
-            | Condition::Comparison { trigger_event, .. }
-            | Condition::Movement { trigger_event, .. }
-            | Condition::Group { trigger_event, .. }
-            | Condition::Appearance { trigger_event, .. }
-            | Condition::Temporal { trigger_event, .. }
-            | Condition::State { trigger_event, .. }
-            | Condition::Resource { trigger_event, .. }
-            | Condition::AbilityFilter { trigger_event, .. }
-            | Condition::ScoreThreshold { trigger_event, .. }
-            | Condition::Choice { trigger_event, .. }
-            | Condition::Complex { trigger_event, .. }
-            | Condition::PositionCond { trigger_event, .. }
-            | Condition::OpponentChoice { trigger_event, .. }
-            | Condition::OpponentLiveSuccess { trigger_event, .. }
-            | Condition::NoExcessHeart { trigger_event, .. }
-            | Condition::AlwaysTrue { trigger_event, .. }
-            | Condition::AnyOf { trigger_event, .. }
-            | Condition::AllRevealedMatchHeartColor { trigger_event, .. } => {
-                trigger_event.as_deref()
+        #[cfg(feature = "debug_conditions")]
+        {
+            match self {
+                Condition::Compound { trigger_event, .. }
+                | Condition::Location { trigger_event, .. }
+                | Condition::Comparison { trigger_event, .. }
+                | Condition::Movement { trigger_event, .. }
+                | Condition::Group { trigger_event, .. }
+                | Condition::Appearance { trigger_event, .. }
+                | Condition::Temporal { trigger_event, .. }
+                | Condition::State { trigger_event, .. }
+                | Condition::Resource { trigger_event, .. }
+                | Condition::AbilityFilter { trigger_event, .. }
+                | Condition::ScoreThreshold { trigger_event, .. }
+                | Condition::Choice { trigger_event, .. }
+                | Condition::Complex { trigger_event, .. }
+                | Condition::PositionCond { trigger_event, .. }
+                | Condition::OpponentChoice { trigger_event, .. }
+                | Condition::OpponentLiveSuccess { trigger_event, .. }
+                | Condition::NoExcessHeart { trigger_event, .. }
+                | Condition::AlwaysTrue { trigger_event, .. }
+                | Condition::AnyOf { trigger_event, .. }
+                | Condition::AllRevealedMatchHeartColor { trigger_event, .. } => {
+                    trigger_event.as_deref()
+                }
             }
+        }
+        #[cfg(not(feature = "debug_conditions"))]
+        {
+            None
         }
     }
 

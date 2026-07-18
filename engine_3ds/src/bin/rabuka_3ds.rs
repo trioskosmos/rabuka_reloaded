@@ -716,7 +716,7 @@ fn main() {
                                 .chain(pd2.energy_deck.iter())
                             {
                                 if let Some(card) = db.get_card(*cid) {
-                                    deck_nos.insert(card.card_no.clone());
+                                    deck_nos.insert(card.card_no.to_string());
                                 }
                             }
                             if let Ok(json) = File::open(Path::new("romfs:/abilities.json"))
@@ -728,8 +728,8 @@ fn main() {
                                 if let Ok(a) = CardLoader::load_abilities_from_str(&json) {
                                     let am = CardLoader::build_abilities_map(&a);
                                     for (_, card) in Arc::make_mut(&mut db).cards.iter_mut() {
-                                        if deck_nos.contains(&card.card_no) {
-                                            if let Some(ab) = am.get(&card.card_no) {
+                                        if deck_nos.contains(&*card.card_no) {
+                                            if let Some(ab) = am.get(&*card.card_no) {
                                                 card.abilities = ab
                                                     .iter()
                                                     .map(|a| Arc::new(a.clone()))
@@ -1082,7 +1082,9 @@ fn main() {
 
                     // Helper closures (shared by both modes)
                     let card_no = |cid: i16| -> Option<String> {
-                        gs.card_database.get_card(cid).map(|c| c.card_no.clone())
+                        gs.card_database
+                            .get_card(cid)
+                            .map(|c| c.card_no.to_string())
                     };
                     let is_tapped = |cid: i16| -> bool {
                         gs.mods.orientation_modifiers.get(&cid).map(|s| s.as_str()) == Some("Wait")

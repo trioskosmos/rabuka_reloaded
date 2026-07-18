@@ -1,37 +1,63 @@
-/// Platform-portable shuffle helper.
+/// Single xorshift32 PRNG for all platforms.
 ///
-/// On desktop (`thread_rng` is available): delegates to rand's `thread_rng`.
-/// On 3DS (`feature = "3ds"`): uses a global xorshift64 seeded from
-/// `svcGetSystemTick` via a `no_std`-friendly FFI call.  This avoids the
-/// TLS usage inside `rand::thread_rng()` that panics on 3DS.
+/// xorshift32 uses only native 32-bit ops (fast on 32-bit ARM / 3DS),
+/// state is 4 bytes, period is 2^32-1, good enough for game use.
+///
+/// Platform-specific sync:
+///   - Desktop/3DS: `Mutex<u32>` (std)
+///   - PSP: `UnsafeCell<u32>` (no_std)
+///
+/// Platform-specific seeding:
+///   - 3DS: `_3ds_system_tick()` from hardware tick counter
+///   - PSP: via `seed()` function
+///   - Desktop: constant seed (deterministic between runs; bots use their own RNG)
 
-// ── 3DS path ─────────────────────────────────────────────────────────────────
-// Note: AtomicU64 is not available on ARMv6k (3DS CPU).  We use Mutex instead.
-#[cfg(feature = "3ds")]
+fn xorshift32(state: &mut u32) -> u32 {
+    let mut x = *state;
+    if x == 0 {
+        x = 1;
+    }
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    *state = x;
+    x
+}
+
+// ── std path (desktop + 3DS) ─────────────────────────────────────────────
+#[cfg(not(feature = "psp"))]
 mod inner {
     use std::sync::Mutex;
 
+    #[cfg(feature = "3ds")]
     extern "C" {
         fn _3ds_system_tick() -> u64;
     }
 
-    static STATE: Mutex<u64> = Mutex::new(0);
+    static STATE: Mutex<u32> = Mutex::new(0);
 
-    fn next_u64() -> u64 {
-        let mut s = *STATE.lock().unwrap();
-        if s == 0 {
-            // lazy seed from the 3DS hardware tick counter
-            s = unsafe { _3ds_system_tick() };
-            if s == 0 {
-                s = 1;
+    fn next_u32() -> u32 {
+        let mut guard = STATE.lock().unwrap();
+        if *guard == 0 {
+            *guard = seed_value();
+        }
+        super::xorshift32(&mut *guard)
+    }
+
+    fn seed_value() -> u32 {
+        #[cfg(feature = "3ds")]
+        {
+            let tick = unsafe { _3ds_system_tick() };
+            if tick != 0 {
+                tick as u32
+            } else {
+                1
             }
         }
-        // xorshift64
-        s ^= s << 13;
-        s ^= s >> 7;
-        s ^= s << 17;
-        *STATE.lock().unwrap() = s;
-        s
+        #[cfg(not(feature = "3ds"))]
+        {
+            1
+        }
     }
 
     pub fn shuffle_slice<T>(slice: &mut [T]) {
@@ -39,15 +65,21 @@ mod inner {
         if n <= 1 {
             return;
         }
-        // Fisher-Yates
         for i in (1..n).rev() {
-            let j = (next_u64() as usize) % (i + 1);
+            let j = (next_u32() as usize) % (i + 1);
             slice.swap(i, j);
         }
     }
+
+    pub fn rand_range(max: usize) -> usize {
+        if max == 0 {
+            return 0;
+        }
+        (next_u32() as usize) % max
+    }
 }
 
-// ── PSP path ────────────────────────────────────────────────────────────────
+// ── PSP path (no_std) ────────────────────────────────────────────────────
 #[cfg(feature = "psp")]
 mod inner {
     use core::cell::UnsafeCell;
@@ -55,24 +87,22 @@ mod inner {
     struct SyncUnsafeCell<T>(UnsafeCell<T>);
     unsafe impl<T> Sync for SyncUnsafeCell<T> {}
 
-    static STATE: SyncUnsafeCell<u64> = SyncUnsafeCell(UnsafeCell::new(0));
+    static STATE: SyncUnsafeCell<u32> = SyncUnsafeCell(UnsafeCell::new(0));
 
-    pub fn seed(seed: u64) {
+    pub fn seed(seed: u32) {
         unsafe {
             *STATE.0.get() = seed;
         }
     }
 
-    fn next_u64() -> u64 {
-        let s = unsafe { *STATE.0.get() };
-        let s = if s == 0 { 1 } else { s };
-        let s = s ^ (s << 13);
-        let s = s ^ (s >> 7);
-        let s = s ^ (s << 17);
+    fn next_u32() -> u32 {
+        let ptr = STATE.0.get();
         unsafe {
-            *STATE.0.get() = s;
+            if *ptr == 0 {
+                *ptr = 1;
+            }
+            super::xorshift32(&mut *ptr)
         }
-        s
     }
 
     pub fn shuffle_slice<T>(slice: &mut [T]) {
@@ -81,34 +111,20 @@ mod inner {
             return;
         }
         for i in (1..n).rev() {
-            let j = (next_u64() as usize) % (i + 1);
+            let j = (next_u32() as usize) % (i + 1);
             slice.swap(i, j);
         }
     }
 
     pub fn rand_range(max: usize) -> usize {
-        (next_u64() as usize) % max
-    }
-}
-
-// ── desktop path ─────────────────────────────────────────────────────────────
-#[cfg(not(any(feature = "3ds", feature = "psp")))]
-mod inner {
-    use rand::seq::SliceRandom;
-
-    pub fn shuffle_slice<T>(slice: &mut [T]) {
-        slice.shuffle(&mut rand::thread_rng());
-    }
-
-    #[allow(dead_code)]
-    pub fn rand_range(max: usize) -> usize {
-        use rand::Rng;
-        rand::thread_rng().gen_range(0..max)
+        if max == 0 {
+            return 0;
+        }
+        (next_u32() as usize) % max
     }
 }
 
 // Public surface
-#[cfg(feature = "psp")]
 pub use inner::rand_range;
 #[cfg(feature = "psp")]
 pub use inner::seed;
