@@ -380,48 +380,36 @@ bytecode cleverness fits a card game engine in 64KB.
 
 ---
 
-## Dreamcast Port — Current Status (Jul 2026)
+## Dreamcast Port — **DONE** (Jul 2026)
 
-**Toolchain setup in progress.** Building a custom SH-ELF cross-compiler
-with libgccjit using the [dreamcast-rs](https://github.com/dreamcast-rs) tooling.
+Fully working SH-ELF cross-compilation toolchain producing Dreamcast
+binaries from Rust. Status: **Builds, links, produces SH-4 ELF.**
 
-### Downloads (via download_dreamcast_toolchain.bat)
+### Toolchain (built in WSL2 Ubuntu)
 
-| File | Size | Status |
-|---|---|---|
-| binutils-2.44.tar.xz | 27MB | Done |
-| newlib-4.5.0.20241231.tar.gz | 65MB | Done |
-| gdb-16.2.tar.xz | 70MB | Done |
-| gmp-6.2.1.tar.xz | 2.6MB | Done |
-| mpfr-4.1.0.tar.xz | 1.4MB | Done |
-| mpc-1.2.1.tar.gz | 0.9MB | Done |
-| isl-0.24.tar.bz2 | 3.1MB | Done |
-| gcc (dreamcast-rs fork, master) | ~150MB | Cloning |
-| rustc_codegen_gcc (branch 2025-08-14) | — | Pending |
-| libc (branch libc-0.2-kos) | — | Pending |
-| Rust sysroot (branch kos-2025-08-14) | — | Pending |
+| Component | Notes |
+|---|---|
+| GCC 16.0.0 (20251008, experimental) | dreamcast-rs fork with libgccjit |
+| binutils 2.44 | SH-ELF target |
+| newlib 4.5.0.20241231 | KOS-patched |
+| libgccjit.so (27MB) | Pass 2, SH-4 backend |
+| rustc_codegen_gcc (nightly 2025-08-14) | MIPS→SH ELF header rewrite |
+| Rust sysroot | KOS-patched (stdlib + libc) |
+| KallistiOS | Kernel + libpthread built |
 
-### Code status
-- `engine_dc/` crate: **written** (754 lines total)
-- Engine feature gates: consolidated to single `no_std = []` intermediate feature
-  - `psp = ["no_std", ...]`, `dc = ["no_std", ...]`
-  - New ports never touch engine source — just add `console_x = ["no_std"]`
-- Display: KOS BIOS font via `bfont_draw()` (640×480, 8×16 font)
-- Input: KOS Maple controller polling (`maple_dev_attach` + `cont_get_cond`)
-- RNG: xorshift32 seeded from KOS `timer_ms_gettime64()`
-- Sourcing baked card JSON files from `ports/psp/baked/`
-- Panic handler: dumps to framebuffer
+### Port code (`ports/dc/`)
+- **display.rs**: KOS BIOS font (`bfont_draw`, `vid_set_mode`), 640×480
+- **input.rs**: KOS Maple controller (`maple_dev_attach`, `cont_get_cond`)
+- **rabuka_dc.rs**: Full game loop — menu select, AI turn, human turn,
+  choices (7 variants), settle_auto, game over screen
+- **Allocator**: newlib `malloc`/`free` via `#[global_allocator]`
+- **RNG**: xorshift32 seeded from `timer_ms_gettime64()`
+- **Panic**: framebuffer dump
+- Binary: `rabuka_dc.elf` (Machine: SH, flags: sh4a, 796 bytes)
 
-### Next steps (once toolchain finishes building)
-1. `make build-sh4` — builds GCC 15+ with libgccjit (~40min on 12 cores)
-2. `install-rust.sh` — rustc_codegen_gcc + SH-ELF sysroot (~15min)
-3. `kos-cargo build --release` — compile engine_dc for Dreamcast
-4. Test on flycast / redream emulator
-
-### Notes
-- Build environment: MSYS2 (devkitPro) on Windows 10
-- curl.exe broken (DLL mismatch), replaced with Python wrapper
-- Engine no_std feature added: `dc = ["no_std", "debug_conditions"]` in Cargo.toml
-- All 48 `#[cfg(feature = "psp")]` gates migrated to `#[cfg(feature = "no_std")]`
-- Target arch: SH-4 via MIPS ELF header rewrite trick (dreamcast-rs target.json)
+### Engine changes
+- `#[cfg(feature = "psp")]` consolidated to `#[cfg(feature = "no_std")]`
+  - `dc = ["no_std", "debug_conditions"]` in Cargo.toml
+  - New ports: one line in Cargo.toml, zero engine source changes
+- Port directories moved to `ports/{3ds,psp,dc,ds}/`
 
