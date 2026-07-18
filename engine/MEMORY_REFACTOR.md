@@ -347,30 +347,38 @@ types can be added with no issue" — any decoder divergence from the JSON loade
 this test at regen time. All 1829 tests pass under `--features bytecode_abilities`
 (incl. this guard); all 1820 pass on the default path.
 
-**Measured results (2026-07-18):**
-- On-disk/ROM asset: `abilities.json` 1421 KB → `abilities.bin` **147 KB (90% smaller)**.
-  Real, large win for console ROM shipping.
-- Per-ability blob: ~1395 B (text) → **~188 B** (binary-JSON).
-- Runtime in-memory `Ability` structs: **UNCHANGED** (~2.8 MB) — the decoded struct is
-  identical to the JSON path. The doc's "14B/ability vs 400B/ability" target is only
-  reachable by a *direct-to-struct* decode that never builds the full `EffectKind` tree
-  (the larger "true VM" rewrite, out of scope here).
-- Peak parse heap: real win — the text path materializes the whole 4 MB file string +
-  a full `Value` tree; the bytecode path reads only the one needed slice.
+**Measured results (2026-07-18, second pass):**
+- On-disk/ROM asset: `abilities.json` 1421 KB → `abilities.bin` **136 KB (90% smaller)**.
+  Real, large win for console ROM shipping. (Dropped the loader-only `cards` mapping
+  from the binary: STRINGS 5320 → 3592 entries, blob 147 → 136 KB.)
+- Per-ability blob: ~1395 B (text) → **~175 B** (binary-JSON).
+- Peak parse heap at load: lower than the text path — the decoder consumes the
+  reconstructed `Value` by value (no whole-tree `clone`) and reads only the one needed
+  slice; the text path materializes the whole 4 MB file string + a full `Value` tree.
 - CPU: binary-JSON decode is ~2x the structured work of text `from_value` (it builds a
   `Value` then runs `from_value`+`populate_from_json`), so it is *not* faster per
-  ability. CPU is not the current bottleneck, so this is acceptable.
+  ability. CPU is not the current bottleneck, so this is acceptable. The `get_ability`
+  path also avoids the old redundant `entry.clone()` of the whole tree.
+- Runtime in-memory **decoded** `Ability` structs: **UNCHANGED** (~2.8 MB) — the decoded
+  struct is identical to the JSON path, and the bytecode path decodes the same number of
+  `Arc<Ability>` per card as the default path. The doc's "14B/ability vs 400B/ability"
+  target is only reachable by *not holding decoded structs in RAM* — i.e. **lazy /
+  on-demand decoding** that keeps abilities in the compact ROM blob and decodes only the
+  abilities a card actually needs (see "Resident RAM — the real remaining gap" below).
 
-**Savings delivered:** 90% smaller ROM asset + no full-file parse buffer. **Not yet
-delivered:** runtime struct reduction (needs direct-to-struct decode).
+**Savings delivered:** 90% smaller ROM asset + smaller STRINGS + lower peak load heap.
+**Not yet delivered:** resident decoded-struct reduction (needs lazy/on-demand decode).
 
-**Decision point (open):** if the runtime struct reduction is also required, the next
-step is a *generated direct-to-struct decoder* — keep the binary-JSON wire format
-(automatic + small) but generate per-variant decode code that writes straight into
-`EffectKind`/`AbilityEffect` (reusing `kind_from_action` + field assignment), skipping
-the `Value`/`from_value` round-trip. Still guarded by `bytecode_deep_compare_test`. This
-removes the redundant `Value` allocation (lower peak heap) and the double-decode (faster
-than current binary-JSON). Coexists with JSON path behind feature flag.
+**Resident RAM — the real remaining gap (open decision):**
+The decoded `Ability`/`EffectKind` struct layout is fixed, so no decoder change shrinks
+what is *held* in RAM. Today `CardLoader::build_abilities_map_inner` eagerly decodes
+**all 800** abilities into `Arc<Ability>` at load, and `Card.abilities: Vec<Arc<Ability>>`
+is read at ~67 sites. To cut resident RAM you must keep abilities in the compact blob and
+decode on demand (cache decoded ones in a pool). That requires changing `Card.abilities`'s
+type + its ~67 access sites — a default-path refactor that breaks the isolation guarantee
+and risks regressions, so it is **deliberately out of scope** for the bytecode feature
+work. It is the genuine path to the doc's "<1 MB RAM" target and should be its own tracked
+task with its own test gate.
 
 **Isolation:** only `cards/compile_abilities.py` (generator) + generated
 `src/ability/abilities_gen.rs` + feature-gated `src/ability/vm.rs` + added test are

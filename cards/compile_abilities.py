@@ -829,7 +829,15 @@ def compile_all(abilities):
 
     This is fully data-driven: the codec is generic over any JSON shape, so a
     new action type or field needs ZERO encoder/decoder changes.
+
+    The top-level ``cards`` field is skipped: it is the card_no→ability mapping
+    consumed only by the loader (not an ``Ability`` field) and is large, so
+    dropping it shrinks the blob with zero effect on the decoded ``Ability``.
     """
+    # Top-level keys that are loader metadata, not part of `Ability`, and are
+    # large/redundant in the binary.
+    SKIP_KEYS = {"cards"}
+
     strings = []          # interned strings (UTF-8)
     string_idx = {}       # str -> u16 index
 
@@ -871,10 +879,20 @@ def compile_all(abilities):
         else:
             out.append(0x00)
 
+    def enc_entry(entry, out: bytearray):
+        # Object with `cards` (loader-only mapping) stripped.
+        out.append(0x08)
+        out.extend(struct.pack("<I", sum(1 for k in entry if k not in SKIP_KEYS)))
+        for k, val in entry.items():
+            if k in SKIP_KEYS:
+                continue
+            out.extend(struct.pack("<H", intern(str(k))))
+            enc_val(val, out)
+
     offsets, bytecode = [], bytearray()
     for entry in abilities:
         offsets.append(len(bytecode))
-        enc_val(entry, bytecode)
+        enc_entry(entry, bytecode)
     offsets.append(len(bytecode))
     return bytes(bytecode), offsets, strings
 

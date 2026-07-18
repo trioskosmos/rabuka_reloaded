@@ -40,16 +40,19 @@ pub fn get_ability(idx: usize) -> Option<Ability> {
     };
 
     // Mirror `CardLoader::build_abilities_map_inner` (default path) exactly.
+    // `value` is owned (no clone of the whole tree) — we consume it directly.
     decode_like_json(value)
 }
 
 /// Reconstruct an `Ability` from a `serde_json::Value` using the same logic the
-/// default JSON loader applies.
+/// default JSON loader applies. `entry` is consumed by value (no clone of the
+/// whole tree) to keep peak heap at load low.
 pub(crate) fn decode_like_json(entry: serde_json::Value) -> Option<Ability> {
-    let mut ab: Ability = serde_json::from_value::<Ability>(entry.clone()).ok()?;
+    let effect_json = entry.get("effect").cloned();
+    let mut ab: Ability = serde_json::from_value::<Ability>(entry).ok()?;
     if let Some(ref mut effect) = ab.effect {
-        if let Some(ref json_effect) = entry.get("effect") {
-            effect.populate_from_json(json_effect);
+        if let Some(ref json_effect) = effect_json {
+            effect.populate_from_json(&json_effect);
         }
     }
     if let Some(ref mut effect) = ab.effect {
