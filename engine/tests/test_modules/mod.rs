@@ -23,6 +23,8 @@ pub mod bring_love_test;
 pub mod butterfly_wing_suppress_test;
 #[cfg(feature = "bytecode_abilities")]
 pub mod bytecode_validation_test;
+#[cfg(feature = "bytecode_abilities")]
+pub mod bytecode_deep_compare_test;
 pub mod cannot_baton_touch_test;
 pub mod card_ability_tests;
 pub mod card_count_state_test;

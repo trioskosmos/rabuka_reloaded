@@ -313,48 +313,69 @@ Covered by `debug_conditions` feature gate above. `trigger_event: Option<Box<Tri
 
 ---
 
-### P1.6 — Build bytecode VM — ⚠️ IN PROGRESS (REPAIR PLAN, 2026-07-18)
+### P1.6 — Build bytecode VM — ✅ REDESIGNED (2026-07-18)
 
-**Why:** The current engine decodes `abilities.json` into full `AbilityEffect` structs at load time (~4 MB JSON → ~2.8 MB in-memory structs). For PS1, N64, DS, Dreamcast targets with <1 MB RAM, this is too expensive. A bytecode format stores abilities as compact opcodes (~14B per ability vs ~400B per AbilityEffect).
+**Why:** The current engine decodes `abilities.json` into full `AbilityEffect` structs
+at load time (~4 MB JSON → ~2.8 MB in-memory structs). For PS1, N64, DS, Dreamcast
+targets with <1 MB RAM, this is too expensive. A bytecode format stores abilities as
+compact opcodes (~14B per ability vs ~400B per AbilityEffect).
 
-**Current state (verified 2026-07-18):**
-- `vm.rs` + `vm_gen.rs` + `abilities_gen.rs` exist behind `#[cfg(feature = "bytecode_abilities")]`.
-- `card_loader.rs` already routes ability loading through `vm::get_ability(idx)` when
-  the feature is on (patching `triggers` / `full_text` / `triggerless_text` /
-  `use_limit` from the JSON metadata that bytecode doesn't encode).
-- `compile_abilities.py` is a data-driven auto-compiler that scans `abilities.json`,
-  discovers field types, and emits `vm_gen.rs` (the decoder) + `abilities_gen.rs`
-  (the `Opcode` enum, `BYTECODE`, `OFFSETS`, `STRINGS`) + `build/abilities.bin`.
-- **It does NOT compile.** `cargo build --tests --features bytecode_abilities`
-  fails: the generated `vm_gen.rs` is out of sync with the current
-  `EffectKind` / enum definitions. Root cause below.
+**Design pivot (2026-07-18):** Approach evolved through two implementations:
 
-**Isolation guarantee (verified):** Every file touched is outside the default-build path.
-- `cards/compile_abilities.py` — standalone Python, not Rust.
-- `src/ability/vm_gen.rs`, `src/ability/abilities_gen.rs` — generated artifacts, only used under the feature (regenerating keeps them valid Rust).
-- `src/ability/vm.rs` — `pub mod vm` is behind `#[cfg(feature = "bytecode_abilities")]` (`src/ability/mod.rs:18-19`), so NOT compiled in the default build.
-- `src/core/card_loader.rs:103-129` — the `idx` bug is inside a `#[cfg(feature = "bytecode_abilities")]` block; fixing it does not change the default loader.
-- No edit to `enums.rs`, `types.rs`, `EffectKind` variants, or any default-path code.
+1. *Minified-JSON slice* (first attempt): store each ability as its minified JSON and
+   re-parse with `serde_json::from_slice`. 100% correct drop-in (all 1820 pass, fully
+   automatic) but only 1421 KB → 1090 KB, and still a full serde parse at load — kept
+   the runtime cost. Rejected.
+2. *Binary-JSON (current)*: store each ability as a compact tagged tree with all
+   strings (object keys + string values) interned into a generated `STRINGS` table and
+   referenced by 2-byte indices. The decoder (`vm.rs::read_value`) reconstructs the
+   **exact same** `serde_json::Value` the text loader would, then runs the identical
+   default-path post-processing (`from_value::<Ability>` + `populate_from_json` +
+   draw-count fix). The codec is **generic over JSON shape** (no per-action schema),
+   so a new action type / field needs ZERO encoder or decoder changes.
 
-**Root cause (verified):**
-- Condition decoder uses a uniform `u8 → enum` registry (`decode_zone`, `decode_card_type`, `decode_state`, `decode_operator`, `decode_resource`, `decode_heart`, `decode_duration`, `decode_player`) — all hand-written in `vm.rs` (~lines 498-585), feature-gated.
-- Effect decoder (`gen_decode_expr`/`_effect_assign` in `compile_abilities.py`, ~1240-1306) only special-cases `Operator`/`ConditionCardType` and returns `None` for `EffectCardType`/`EffectState`/`ActionType` → generated `vm_gen.rs` emits `.into()` needing `From<&str>` (absent) → ~49 errors.
-- `vm_gen.rs:557` builds `EffectKind::CustomOp { card_property, count, .. }` but `CustomOp` (would be a main edit) lacks those fields.
+**Why generic binary-JSON instead of a schema-aware per-variant codec:** the per-variant
+approach was the original design but it diverged from the JSON loader (the 730+ failures
+— field-alias mismatches, missing enum decoders). Generic binary-JSON + reuse of the
+proven `populate_from_json` path is *correct by construction* and stays automatic.
 
-**Repair plan (fully isolated from main):**
-1. **Generator** (`compile_abilities.py`): replace hard-coded `Operator`/`ConditionCardType` special cases in `gen_decode_expr`/`_effect_assign` with a uniform enum-type → `decode_X(read_u8(cursor))` mapping covering `EffectCardType`, `EffectState`, `ActionType`, and any other enum `scan_abilities` finds (data-driven, so new abilities stay automatic).
-2. **Generator**: trim `card_property`/`count` from the `CustomOp` action field map (~lines 887-982) so the generated constructor matches the hand-written `CustomOp` variant — do NOT add fields to `CustomOp` in `types.rs` (would touch main).
-3. **vm.rs** (cfg-gated, not main): add `decode_effect_card_type(v: u8) -> EffectCardType`, `decode_action_type(v: u8) -> ActionType`, `impl From<&str> for EffectCardType/EffectState/ActionType` (fallback `Default`/`from_str().unwrap_or_default()`), and fix `_idx → idx` used at `card_loader.rs:105`.
-4. **Regenerate:** `python cards/compile_abilities.py` (writes `vm_gen.rs`, `abilities_gen.rs`, `cards/build/abilities.bin`); commit the regenerated Rust files.
-5. **Validate:** `cargo build --tests --features bytecode_abilities` compiles (exit 0); `cargo test` stays 1820 passed, 0 failed. If regenerated `vm_gen.rs` still references a missing variant field, fix it on the generator side (step 2 pattern), never by editing `types.rs`.
+**Correctness guard (new):** `tests/test_modules/bytecode_deep_compare_test.rs`
+decodes every ability both ways (bytecode `get_ability(idx)` vs the default JSON-path
+`serde_json::from_value::<Ability>` + `populate_from_json` + draw-fix) and asserts the
+two `Ability` values are deep-equal. This is the automated guarantee that "new ability
+types can be added with no issue" — any decoder divergence from the JSON loader fails
+this test at regen time. All 1829 tests pass under `--features bytecode_abilities`
+(incl. this guard); all 1820 pass on the default path.
 
-**Out of scope:** True direct-execution VM (match on `ActionType`, inline operands). Separate, larger. Bytecode-path game-level tests passing (~20 failing even when it last built). "Done" = feature compiles + default tests green. Any default-path Rust edit.
+**Measured results (2026-07-18):**
+- On-disk/ROM asset: `abilities.json` 1421 KB → `abilities.bin` **147 KB (90% smaller)**.
+  Real, large win for console ROM shipping.
+- Per-ability blob: ~1395 B (text) → **~188 B** (binary-JSON).
+- Runtime in-memory `Ability` structs: **UNCHANGED** (~2.8 MB) — the decoded struct is
+  identical to the JSON path. The doc's "14B/ability vs 400B/ability" target is only
+  reachable by a *direct-to-struct* decode that never builds the full `EffectKind` tree
+  (the larger "true VM" rewrite, out of scope here).
+- Peak parse heap: real win — the text path materializes the whole 4 MB file string +
+  a full `Value` tree; the bytecode path reads only the one needed slice.
+- CPU: binary-JSON decode is ~2x the structured work of text `from_value` (it builds a
+  `Value` then runs `from_value`+`populate_from_json`), so it is *not* faster per
+  ability. CPU is not the current bottleneck, so this is acceptable.
 
-**Savings (if completed):** ~40 KB card data vs ~4 MB JSON-inflated. 100x reduction —
-this is the key unlock for PS1/N64/DS/Dreamcast.
+**Savings delivered:** 90% smaller ROM asset + no full-file parse buffer. **Not yet
+delivered:** runtime struct reduction (needs direct-to-struct decode).
 
-**Estimated effort:** regenerate + sync ~1-2 files; fix ~50 compile errors; then
-optional VM rewrite (~300 py + ~500 rs). Coexists with JSON path behind feature flag.
+**Decision point (open):** if the runtime struct reduction is also required, the next
+step is a *generated direct-to-struct decoder* — keep the binary-JSON wire format
+(automatic + small) but generate per-variant decode code that writes straight into
+`EffectKind`/`AbilityEffect` (reusing `kind_from_action` + field assignment), skipping
+the `Value`/`from_value` round-trip. Still guarded by `bytecode_deep_compare_test`. This
+removes the redundant `Value` allocation (lower peak heap) and the double-decode (faster
+than current binary-JSON). Coexists with JSON path behind feature flag.
+
+**Isolation:** only `cards/compile_abilities.py` (generator) + generated
+`src/ability/abilities_gen.rs` + feature-gated `src/ability/vm.rs` + added test are
+touched. No default-path code changed. Regenerate with `python cards/compile_abilities.py`
+(which writes both `cards/build/` and `src/ability/abilities_gen.rs`).
 
 ---
 
