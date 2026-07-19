@@ -31,3 +31,16 @@ output_3ds/
 
 # Dreamcast toolchain build artifacts
 dc-toolchain/
+output_dc/
+
+# Build intermediates
+a.out
+binutils-2.44.tar.xz
+cards/_probe.txt
+clean_gcc.ps1
+
+# Old port directory (replaced by ports/ds/)
+engine_ds/
+
+# Rust ICE dumps
+engine/rustc-ice-*.txt
