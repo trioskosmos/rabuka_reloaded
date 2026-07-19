@@ -43,18 +43,6 @@ use rabuka_engine::player::Player;
 use rabuka_engine::rng;
 use rabuka_engine::turn::TurnEngine;
 
-// ── Panic handler ─────────────────────────────────────────────────────────
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    unsafe {
-        let vram = vid_get_fb();
-        let msg = alloc::format!("PANIC: {}", info);
-        let c = b"PANIC - SEE SERIAL\0" as *const u8 as *const i8;
-        bfont_draw(vram, 0, 0, c);
-    }
-    loop {}
-}
-
 // ── KOS FFI ───────────────────────────────────────────────────────────────
 extern "C" {
     fn vid_set_mode(mode: i32);
@@ -64,12 +52,23 @@ extern "C" {
     fn thd_sleep(duration: i32);
 }
 
-// ── Startup ───────────────────────────────────────────────────────────────
-#[no_mangle]
-pub extern "C" fn main() -> i32 {
+// Entry point for the C wrapper (entry.o). C ABI adds leading underscore,
+// so "game_main" becomes "_game_main", matching the entry.o reference.
+#[export_name = "_game_main"]
+pub extern "C" fn game_main() -> i32 {
     kos_init();
     run_game();
     0
+}
+
+#[panic_handler]
+fn panic(_info: &PanicInfo) -> ! {
+    unsafe {
+        let vram = vid_get_fb();
+        let c = b"PANIC - SEE SERIAL\0" as *const u8 as *const i8;
+        bfont_draw(vram, 0, 0, c);
+    }
+    loop {}
 }
 
 #[no_mangle]
@@ -312,7 +311,7 @@ fn human_turn(
                 Some(ref params) => params
                     .card_no
                     .as_ref()
-                    .map(|no| alloc::format!(" [{}]", no))
+                    .map(|no| format!(" [{}]", no))
                     .unwrap_or_default(),
                 None => String::new(),
             };

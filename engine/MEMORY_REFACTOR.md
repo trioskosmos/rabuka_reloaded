@@ -138,6 +138,37 @@ Same for effects: `{"action": "draw_card", "count": 2}` maps to `EffectKind::Dra
 
 ## ❌ What remains: ranked by RAM + cycle impact
 
+### P1.7 — Lazy / on-demand ability resolution — ⏳ OPEN (next tracked task)
+
+**Why:** The bytecode blob is already 136 KB (90% smaller than the 1421 KB text JSON) and
+decodes byte-identically to the JSON loader, but the engine still **eagerly decodes all 800
+abilities into `Arc<Ability>` at load** (`CardLoader::build_abilities_map_inner`), so
+resident ability RAM is ~2.8 MB — identical to the JSON path. The doc's "<1 MB RAM" /
+"14B/ability" target is only reachable by keeping abilities in the compact blob and
+decoding only what a card needs, cached in a bounded pool.
+
+**Full design:** see the expanded "Resident RAM — the real remaining gap" block under
+[P1.6](#) (same file). In short: replace `Card.abilities: Vec<Arc<Ability>>` with
+`Vec<AbilityRef>` (a `u16` index into `BYTECODE`), add a `AbilityResolver` that decodes on
+demand via `vm::get_ability` and caches in a bounded (LRU/arena) map, and mechanically
+rewrite the ~67 `card.abilities` access sites to `resolver.resolve(ref)`. The default path
+keeps an identity resolver so its 1820 tests are untouched.
+
+**Savings:** resident decoded ability RAM drops from ~2.8 MB (all 800) to a bounded cache
+(tens of KB in practice; capped at e.g. 256 entries ≈ 900 KB worst case), with total
+ability memory (136 KB blob + cache) fitting the <1 MB console budget.
+
+**Risks:** the only real risk is the 67-site rewrite — mitigated because it's mechanical
+(`Vec<Arc<Ability>>` → `Vec<AbilityRef>` + per-element `resolve`) and the iteration API
+(`iter`, `len`, `enumerate`, `any`, `is_empty`, `clone`) is preserved. Lands behind a
+`lazy_abilities` feature flag. **Test gate:** all 1820 default + 1829 bytecode tests green,
+plus a new fuzz test asserting game outcomes are stable under random cache caps (decoding
+is pure).
+
+**Estimated effort:** ~1 day.
+
+---
+
 ### P0 — Condition: flat struct → tagged enum  ✅ DONE (1820 tests pass, 0 warnings)
 
 **Result:** Flat struct (1864 bytes, 85 Option fields) replaced with `#[serde(tag = "type")]` enum (20 variants, ~120 bytes). **94% reduction.**
@@ -369,16 +400,123 @@ this test at regen time. All 1829 tests pass under `--features bytecode_abilitie
 **Savings delivered:** 90% smaller ROM asset + smaller STRINGS + lower peak load heap.
 **Not yet delivered:** resident decoded-struct reduction (needs lazy/on-demand decode).
 
-**Resident RAM — the real remaining gap (open decision):**
-The decoded `Ability`/`EffectKind` struct layout is fixed, so no decoder change shrinks
-what is *held* in RAM. Today `CardLoader::build_abilities_map_inner` eagerly decodes
-**all 800** abilities into `Arc<Ability>` at load, and `Card.abilities: Vec<Arc<Ability>>`
-is read at ~67 sites. To cut resident RAM you must keep abilities in the compact blob and
-decode on demand (cache decoded ones in a pool). That requires changing `Card.abilities`'s
-type + its ~67 access sites — a default-path refactor that breaks the isolation guarantee
-and risks regressions, so it is **deliberately out of scope** for the bytecode feature
-work. It is the genuine path to the doc's "<1 MB RAM" target and should be its own tracked
-task with its own test gate.
+**Resident RAM — the real remaining gap (next tracked task):**
+
+The decoded `Ability`/`EffectKind` struct layout is fixed, so *no decoder change* shrinks
+what is held in RAM. Today `CardLoader::build_abilities_map_inner`
+(`src/core/card_loader.rs:94`) eagerly decodes **all 800** abilities into
+`Arc<Ability>` at load, and `Card.abilities: Vec<Arc<Ability>>` (`src/core/card.rs:274`)
+is read at ~67 sites. The bytecode path decodes the same set, so resident RAM is identical
+to the JSON path (~2.8 MB of unique `Ability` structs). The doc's "14B/ability vs 400B"
+target is only reachable by **not holding decoded structs in RAM** — i.e. keep abilities in
+the compact 136 KB blob (ROM/static) and decode only the abilities a card actually needs,
+caching decoded ones in a bounded pool.
+
+This is a **default-path refactor** (it changes `Card.abilities`'s type and its access
+sites), so it breaks the bytecode feature's isolation guarantee and must be its own tracked
+task with its own test gate (all 1820 must stay green on the default path AND the
+bytecode path). It is the genuine path to the "<1 MB RAM" console target.
+
+#### Design: lazy / on-demand ability resolution
+
+**Goal:** `Card.abilities` no longer owns decoded `Ability` structs up front. Instead it
+holds lightweight *references* into the bytecode blob; the engine resolves them to
+`Arc<Ability>` on first use and caches in a shared pool.
+
+**1. Keep the blob resident, not the structs.**
+The regenerated `BYTECODE`/`OFFSETS`/`STRINGS` (`src/ability/abilities_gen.rs`) already live
+in the binary as `&[u8]` — zero heap. They become the *source of truth* for ability data.
+We never parse the 4 MB `abilities.json` at runtime; `compile_abilities.py` output is the
+only asset shipped.
+
+**2. Replace `Card.abilities` with a reference handle.**
+```rust
+// Before (default path):
+pub abilities: Vec<Arc<Ability>>,
+
+// After (unified):
+pub abilities: Vec<AbilityRef>,   // AbilityRef = u16 ability index into BYTECODE
+```
+`AbilityRef` is a newtype over the `unique_abilities` index. It is `Copy`, 2 bytes, and
+serializes/compares trivially. Because abilities are *shared* across many cards, the index
+form also **dedupes for free** — 50 cards referencing the same ability store one `u16`
+each instead of 50 `Arc` headers.
+
+**3. A resolver that decodes on demand + caches.**
+Introduce `AbilityResolver` (feature-gated wrapper, but the *interface* `resolve(ref) ->
+Arc<Ability>` is used by all 67 sites so default + bytecode share call sites):
+```rust
+pub struct AbilityResolver {
+    cache: Mutex<HashMap<u16, Arc<Ability>>>,   // decoded abilities, bounded
+    // optional: an LRU/arena eviction so the cache can't grow past N entries
+}
+impl AbilityResolver {
+    pub fn resolve(&self, r: AbilityRef) -> Arc<Ability> {
+        if let Some(a) = self.cache.get(&r.0) { return a.clone(); }
+        let a = crate::ability::vm::get_ability(r.0 as usize)
+                    .map(Arc::new)
+                    .expect("ability index out of range");
+        self.cache.insert(r.0, a.clone());
+        a
+    }
+}
+```
+- Default (non-bytecode) builds can keep `get_ability` as "parse the one JSON slice from
+  the in-memory `abilities_data`" (or just keep eager `Arc<Ability>` and skip the resolver
+  entirely) — i.e. the resolver is a no-op shim on the default path, so default-path
+  behavior is unchanged and the 1820 tests stay green without touching 67 sites.
+
+**4. Mechanically rewrite the 67 access sites.** Each `card.abilities` (currently
+`Vec<Arc<Ability>>`) becomes "iterate `AbilityRef`, resolve per element." The minimal,
+low-risk transformation per site:
+```rust
+// Before:
+for ability in &card.abilities { ... ability.full_text ... }
+// After:
+for ar in &card.abilities {
+    let ability = resolver.resolve(*ar);
+    ... ability.full_text ...
+}
+```
+Because the iteration shape (`for ... in &card.abilities`) is identical, this is a
+mechanical `s/&card.abilities/&card.abilities/` + inject `resolver.resolve(...)` edit,
+not a logic rewrite. `card.abilities.iter().enumerate()` and `.len()` still work
+(`Vec<AbilityRef>` keeps those methods). `.any(|a| ...)`, `.is_empty()`, `.clone()` all
+still apply (resolve returns `Arc<Ability>`).
+
+**5. Pass the resolver everywhere it's needed.** `resolver` is created once at game setup
+and threaded through `GameState` (already the natural owner of per-game mutable state) or
+stored as a `OnceLock`/global since abilities are immutable for a game. The default path
+can supply an identity resolver that returns pre-built `Arc<Ability>` (so non-bytecode
+builds need zero structural change — only the bytecode path actually decodes lazily).
+
+**6. Bound the cache (the actual RAM win).** With an LRU or arena cap (e.g. 256 entries),
+resident decoded ability RAM tops out at ~256 × ~3.5 KB ≈ 900 KB instead of 800 × 3.5 KB
+≈ 2.8 MB — and in practice a game touches far fewer than 256 distinct abilities, so peak
+is much lower. Combined with the 136 KB blob, total ability memory fits the <1 MB console
+budget. The `CountingAllocator` (already in the repo) can measure before/after.
+
+**7. Test gate (mandatory).**
+- All 1820 default-path tests must pass unchanged.
+- All 1829 bytecode-path tests must pass (the deep-compare guard still proves
+  `get_ability` is byte-identical to the JSON loader).
+- Add `tests/test_modules/ability_lazy_resolve_test.rs`: build a deck, force the cache to
+  a tiny cap (e.g. 4 entries), play a full game, and assert (a) every resolved ability
+  matches the eager decode, and (b) the cache never exceeds its cap (proving eviction +
+  re-decode works without logic changes).
+- Fuzz: randomly cap the cache at 1..N and run a few game scripts; assert outcomes are
+  stable regardless of cap (decoding is pure).
+
+**Risks / mitigations:** the 67-site rewrite is the only real risk; because it's mechanical
+(`Vec<Arc<Ability>>` → `Vec<AbilityRef>` + per-element resolve) and the iteration API is
+preserved, each site is a 1-2 line change. Keep the default-path resolver as an identity
+shim so the default build is untouched and its 1820 tests are unaffected. Do it behind a
+feature flag (`lazy_abilities`) so it can land independently and be reverted if any site
+is missed.
+
+**Estimated effort:** ~1 day — 1 newtype + 1 resolver + 67 mechanical edits + 1 fuzz test.
+The bytecode generator/decoder are already done and need no change; this task only changes
+how `Card.abilities` is *populated and read*.
 
 **Isolation:** only `cards/compile_abilities.py` (generator) + generated
 `src/ability/abilities_gen.rs` + feature-gated `src/ability/vm.rs` + added test are

@@ -380,36 +380,32 @@ bytecode cleverness fits a card game engine in 64KB.
 
 ---
 
-## Dreamcast Port — **DONE** (Jul 2026)
+## Dreamcast Port — **Toolchain done, entry point TBD** (Jul 2026)
 
-Fully working SH-ELF cross-compilation toolchain producing Dreamcast
-binaries from Rust. Status: **Builds, links, produces SH-4 ELF.**
+Toolchain: working. Produces SH-4 ELF binaries.
+Status: **Entry point not reaching Rust code** due to DCE in rustc_codegen_gcc.
 
-### Toolchain (built in WSL2 Ubuntu)
+### Root cause
+rustc_codegen_gcc (GCC backend for rustc) dead-code eliminates all
+user-defined symbols for `#![no_std]` targets on SH. Even `#[used]`,
+`#[global_allocator]`, `#[export_name]`, C wrapper objects, and linker
+`--no-gc-sections` fail to prevent this. The `hello` example works
+because it uses `std`, which provides proper entry point routing.
 
-| Component | Notes |
-|---|---|
-| GCC 16.0.0 (20251008, experimental) | dreamcast-rs fork with libgccjit |
-| binutils 2.44 | SH-ELF target |
-| newlib 4.5.0.20241231 | KOS-patched |
-| libgccjit.so (27MB) | Pass 2, SH-4 backend |
-| rustc_codegen_gcc (nightly 2025-08-14) | MIPS→SH ELF header rewrite |
-| Rust sysroot | KOS-patched (stdlib + libc) |
-| KallistiOS | Kernel + libpthread built |
+The std path is blocked because the engine's dependency chain pulls in
+`getrandom → libc`, and the KOS-patched libc version (0.2.175) doesn't
+match what cargo fetches (0.2.186). Fixing this requires:
+1. Updating the KOS libc patch to version 0.2.186 ✓ (done)
+2. Adding missing types (sigset_t, etc.) to the KOS libc patch
+3. Or removing the `rand` dep which pulls in getrandom (engine binary only, not lib)
 
-### Port code (`ports/dc/`)
-- **display.rs**: KOS BIOS font (`bfont_draw`, `vid_set_mode`), 640×480
-- **input.rs**: KOS Maple controller (`maple_dev_attach`, `cont_get_cond`)
-- **rabuka_dc.rs**: Full game loop — menu select, AI turn, human turn,
-  choices (7 variants), settle_auto, game over screen
-- **Allocator**: newlib `malloc`/`free` via `#[global_allocator]`
-- **RNG**: xorshift32 seeded from `timer_ms_gettime64()`
-- **Panic**: framebuffer dump
-- Binary: `rabuka_dc.elf` (Machine: SH, flags: sh4a, 796 bytes)
+### binary
+- `output_dc/rabuka_dc.elf` — valid SH-4 ELF, statically linked, 4.6KB
+- Machine: Renesas SH, Entry: 0x1038 (_start → abort via weak _arch_main)
+- To make runnable: need entry point to reach Rust code
 
-### Engine changes
-- `#[cfg(feature = "psp")]` consolidated to `#[cfg(feature = "no_std")]`
-  - `dc = ["no_std", "debug_conditions"]` in Cargo.toml
-  - New ports: one line in Cargo.toml, zero engine source changes
-- Port directories moved to `ports/{3ds,psp,dc,ds}/`
+### Next
+Two paths to finish:
+- **A**: Patch KOS libc to include missing types → std `fn main()` works
+- **B**: Fix rustc_codegen_gcc symbol emission for no_std (upstream fix)
 
