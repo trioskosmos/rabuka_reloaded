@@ -960,27 +960,4 @@ impl StepState {
         self.looked_at_total_count = 0;
     }
 
-    /// Resolve a `ref` field on an effect to the list of card ids the
-    /// referenced step produced. Returns an empty Vec when the reference
-    /// is not present in step_results (or when `ref` is None).
-    pub fn resolve_ref_cards(&self, effect: &AbilityEffect) -> Vec<i16> {
-        match &effect.r#ref {
-            Some(id) => self.get(id).cards,
-            None => Vec::new(),
-        }
-    }
-
-    /// Resolve a `ref_value` field on an effect to the integer value the
-    /// referenced step produced, plus an optional offset. Returns `fallback`
-    /// when the reference is not present (or `ref_value` is None).
-    pub fn resolve_ref_value(&self, effect: &AbilityEffect, fallback: i32) -> i32 {
-        match &effect.ref_value_any() {
-            Some(id) => self
-                .get(id)
-                .value
-                .map(|v| v + effect.ref_offset_any().unwrap_or(0))
-                .unwrap_or(fallback),
-            None => fallback,
-        }
-    }
 }

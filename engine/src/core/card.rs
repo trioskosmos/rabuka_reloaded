@@ -2102,8 +2102,6 @@ pub struct AbilityEffect {
     #[serde(default)]
     pub is_further: Option<bool>,
     #[serde(default)]
-    pub r#ref: Option<ArcStr>,
-    #[serde(default)]
     pub optional: Option<bool>,
     #[serde(default)]
     pub max: Option<bool>,
@@ -3545,23 +3543,6 @@ impl AbilityEffect {
     /// Returns the numeric value from `value` or `count`, in that priority.
     pub fn value_or_count(&self, default: u32) -> u32 {
         self.value_any().or(self.count).unwrap_or(default)
-    }
-
-    /// Like `value_or_count`, but if a `ref_value` is set, resolves against
-    /// the supplied step_results to a value the referenced step produced.
-    pub fn value_or_count_resolved(
-        &self,
-        step_results: &HashMap<String, crate::ability::types::StepOutput>,
-        default: u32,
-    ) -> i32 {
-        if let Some(id) = self.ref_value_any() {
-            if let Some(out) = step_results.get(id) {
-                if let Some(v) = out.value {
-                    return v + self.ref_offset_any().unwrap_or(0);
-                }
-            }
-        }
-        self.value_any().or(self.count).unwrap_or(default) as i32
     }
 
     /// Normalized sub-effect steps
