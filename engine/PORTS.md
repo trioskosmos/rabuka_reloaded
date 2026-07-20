@@ -24,7 +24,8 @@ A **bytecode-compiled** approach shrinks that to:
 
 The real minimum RAM for the engine depends entirely on how the card data
 is stored. With JSON: ~4MB. With bytecode: **~1MB** (40KB data + 600KB code +
-300KB state/stack). This changes which consoles are reachable.
+300KB state/stack). With bytecode + packed structs + no decoded effect
+structs: **~150KB** (12B-per-card structs + bytecode interpreter + 2.5KB game state).
 
 Everything below is sorted oldest-first within each tier.
 
@@ -189,7 +190,9 @@ Consoles that remain borderline:
 - RAM: **288KB** (32KB internal + 256KB external)
 - Target: `armv4t-none-eabi` / `thumbv4t-none-eabi`
 - SDK: `agb-rs` (most mature Rust console SDK — 474 stars)
-- Verdict: **Impossible** — 288KB is ~1/15th of what's needed
+- Verdict: **Possible with bytecode interpreter** — 150KB fits in 288KB.
+  Requires packed card structs (12B each) and direct bytecode evaluation
+  (no decoded Ability/AbilityEffect structs in RAM).
 
 ---
 
@@ -226,10 +229,9 @@ Two consoles in Tier 6 become feasible with the right approach:
 
 ### Still impossible
 
-Everything with <256KB RAM (SNES, NES, Z80 machines, WonderSwan, Neo Geo Pocket) is
-dead regardless of language — the bytecode engine alone (~600KB code + 40KB data)
-overflows them before the first card is dealt. No amount of compiler cleverness
-solves: a 16-bit address space cannot hold a ~600KB program.
+Everything with <150KB RAM is dead regardless of language — even the
+bytecode interpreter needs ~150KB minimum (40KB bytecode blob + 27KB card
+data + 80KB code/stack). This rules out all 8/16-bit consoles except GBA.
 
 The 8/16-bit consoles that remain (Genesis, Neo Geo, Jaguar) have m68k CPUs that
 LLVM actually supports, but their 64KB-2MB RAM is too small even for the

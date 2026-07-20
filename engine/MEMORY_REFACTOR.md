@@ -138,102 +138,103 @@ Same for effects: `{"action": "draw_card", "count": 2}` maps to `EffectKind::Dra
 
 ## What remains: ranked by RAM + cycle impact
 
-### Current memory budget (runtime)
+### Target: absurdly low RAM with full 800-ability functionality
 
-| Consumer | RAM | Notes |
-|----------|-----|-------|
-| **CardDatabase** | **~2 MB** | 7400 cards × ~200B inline + heap. Shared via Arc, immutable. |
-| **AbilityEffect trees** | **~1.1 MB** | 1451 effects × EffectKind (544B). Already optimized. |
-| **Ability decode cache** | ~160 KB | Lazy path, bounded. |
-| **GameState inline** | ~4 KB | ~130 fields. |
-| **GameState heap** | ~100–500 KB | Logs, movements, snapshots per game. |
-| **Bytecode blob** | 136 KB | ROM-resident, doesn't count. |
-| **History snapshots (web)** | 0.5–50 MB | Full GameState clones for undo. Web only, not consoles. |
-| **Display serialization** | ~20–60 KB | Per HTTP request, temporary. |
+The goal: run the full game (all 800 abilities, all conditions, all choices) in
+**150KB RAM** — below GBA's 288KB, below the GBC Pokemon Card Game's 32KB
+budget when scaled for 4× the cards.
 
-### Current type sizes (after all completed work)
+### Current vs target
 
-| Type | Original | Current | Reduction |
-|------|----------|---------|-----------|
-| `EffectKind` | 1248 B | **544 B** | 56% |
-| `AbilityEffect` | 1536 B | **152 B** | 90% |
-| `Condition` | 1864 B | **520 B** | 72% |
-| Ability RAM (lazy) | ~2.8 MB | **~283 KB** | 90% |
+| Consumer | Current (console) | Target | How |
+|----------|-------------------|--------|-----|
+| Card data | 60 KB (120 cards × 500B) | **1.4 KB** (120 cards × 12B packed structs) |
+| Ability structs in RAM | 283 KB (decoded on demand) | **0** (interpret bytecode directly, no decoded structs) |
+| EffectKind + AbilityEffect | 696B per effect × 1451 | **0** (bytecode IS the effect representation) |
+| GameState | 300 KB (HashMaps, Vecs, Logs) | **2.5 KB** (fixed arrays, u16 IDs, no strings) |
+| String data | ~50 KB | **0** at runtime (u16 indices into compile-time table) |
+| **Total** | **~700 KB** | **~150 KB** |
 
----
+### P0 — Bytecode interpreter (no decode to structs)
 
-## Active priorities (re-audited 2026-07-20)
-
-### P0 — CardDatabase slimming
-
-**Status:** ✅ Already solved on consoles. Console ports (DC/DS/PSP) load only ~120 cards from `deck_N_cards.json` files. The full 7400-card database is only loaded by desktop binaries and web server for the card browser UI. No action needed for console targets.
-
-**Desktop/web note:** `main.rs` and `web_server.rs` load the full 7400-card `cards.json` (~2 MB). This could be split: full DB for card browser UI, slim DB (~120 cards) for gameplay. But this is a desktop optimization, not a console concern.
-
-### P0 — Direct bytecode→struct decoder (eliminate serde from runtime) — 🔄 IN PROGRESS
-
-**The data flow (current):**
+The current architecture:
 ```
-abilities.json (800 abilities, source of truth)
-  → compile_abilities.py (build tool, runs once)
-  → abilities_gen.rs (BYTECODE blob + OFFSETS + STRINGS, checked into git)
-  → vm.rs::get_ability(idx) at startup
-  → BcDeserializer (custom serde::Deserializer reads binary tags directly)
-  → serde fills Ability/AbilityEffect structs (zero intermediary allocs)
-  → populate_from_json() (fills EffectKind, which serde skips)
-  → Ability struct in RAM
+bytecode → decode into Ability/AbilityEffect/EffectKind structs → evaluate structs
 ```
 
-**What's done:**
-- `BcDeserializer` — custom `serde::Deserializer` for the binary format
-- `BcMapAccess` / `BcSeqAccess` — serde MapAccess/SeqAccess reading from bytecode
-- `from_bytes<T>()` — direct binary→struct via serde (no serde_json::Value intermediary)
-- Deep compare test passes — binary decoder matches JSON path exactly
-- All 1829 tests pass
+This creates ~1.1MB of decoded effect data. The target architecture:
+```
+bytecode → evaluate directly from bytes (like a CPU reads ROM)
+```
 
-**What remains:**
-1. ~~Fold `populate_from_json` into a custom `Deserialize for AbilityEffect`~~ — **BLOCKED.** AbilityEffect contains `Option<Vec<Box<AbilityEffect>>>` (in effect_steps, compound.actions). A custom Deserialize impl would be called recursively for those fields → infinite recursion. Would require a parallel `AbilityEffectInner` struct + recursive conversion, which is more code than it saves.
-2. `populate_from_json` stays as a post-processing step — it's ~200 lines but stable and well-tested.
-3. Fix `choice.rs` round-trips — store pre-decoded AbilityEffect structs instead of JSON strings.
+The bytecode blob (136KB, ROM-resident) already encodes everything.
+A direct interpreter reads bytes and applies effects without ever
+creating Ability/AbilityEffect/EffectKind structs in RAM.
 
-**Why this is data-driven:** Adding a new field to Ability/AbilityEffect/EffectKind/Condition just needs `#[serde(default)]` on the struct. The BcDeserializer handles any key-value pair. Zero decoder code changes for new fields or action types.
+**What this eliminates:**
+- All Ability struct allocations (~160B × 800 abilities on default path)
+- All AbilityEffect struct allocations (~152B × 1451 effects)
+- All EffectKind enum allocations (~544B × 1451 effects)
+- All Condition struct allocations (~520B × N conditions)
+- All populate_from_json / serde / BcDeserializer infrastructure
 
----
+**What the interpreter needs:**
+- A program counter (u16 into bytecode blob)
+- A stack for sub-effect results (SmallVec<[u16; 8]>)
+- Direct field reads from the binary format
+- Zone/state/card_type as u8 enums (not strings)
+- ~500 lines of Rust
 
-### P0.5 — Console history: delta snapshots or disabled
+**What stays the same:**
+- All game rules (conditions, triggers, choices, timing)
+- All 800 abilities (encoded in the same bytecode blob)
+- The web server (uses the full decoded engine)
+- PC/desktop builds (use the full decoded engine)
+- compile_abilities.py (build tool, unchanged)
 
-**Why:** Web server stores full GameState clones for undo (Room.history). 50 undo steps = ~25 MB. This is fine for desktop but impossible on consoles.
+**Split architecture:**
+- **PC/web**: Full decoded engine (current, ~4MB RAM)
+- **Console (PS1/DS/N64)**: Bytecode interpreter (~150KB RAM)
+- Both share the same bytecode blob and card data format
 
-**Strategy:**
-- Web: keep full history (user wants it). Optionally switch to delta snapshots later.
-- Console builds: `#[cfg(not(target_arch = "arm"))]` gate the history, or cap at 10 entries with delta compression.
-- `DEFAULT_HISTORY_SIZE` is already 1000 but only used by web. Consoles can set it to 0.
+### P0 — Card packed structs
 
-**Estimated effort:** Small — feature gate + config flag.
+Replace `Card` struct (String fields, Vec, HashMap) with a 12-byte packed struct:
 
----
+```rust
+#[repr(C, packed)]
+struct PackedCard {
+    id: u16,          // unique card ID
+    card_type: u8,    // member=0, live=1, energy=2, spell=3
+    cost: u8,         // debut cost
+    blade: u8,        // blade value
+    score: u8,        // score value
+    base_heart: u8,   // base heart count
+    blade_heart: u8,  // blade heart count
+    special_heart: u8,// special heart count
+    abilities_idx: u16, // index into bytecode offsets
+    group: u8,        // group ID (hashed from name)
+    rare: u8,         // rarity tier
+    reserved: u8,     // padding for alignment
+}
+// 12 bytes per card × 2280 cards = 27KB
+// 12 bytes × 120 deck cards = 1.4KB
+```
 
-### P1 — Arena allocator v1 (per-turn lifecycle)
+No Strings, no heap allocs, no serde at runtime. Card names resolved
+from a compile-time string table via u16 index.
 
-**Status:** v0 committed (monotonic bump, 64KB static buffer). Cursor reset is the blocking issue.
+### P0.5 — Console history: already web-only ✅ DONE
 
-**Why:** Current arena fills up after ~100-200 ability evaluations then degrades to normal allocation.
+### P0.5 — Parser _collapse_to_effect_steps — DEFERRED
 
-**Options:**
-1. Per-turn lifecycle: enter at turn start, exit at turn end.
-2. Double-buffer: alternate between two 64KB buffers per turn.
-3. Epoch-based: objects promoted out of arena before reset.
+### P1 — Arena allocator — DEFERRED (3× slower on desktop, lifecycle issue unsolved)
 
----
+### P2 — orientation_modifiers String→CardOrientation — ✅ DONE
 
-### P0.5 — Activate parser _collapse_to_effect_steps
-
-**Why:** Removes ~200 lines of Rust dispatch code + eliminates 4 legacy compound effect shapes. No RAM savings but reduces binary size.
-
----
-
-### P2 — Replace orientation_modifiers String values with CardState enum (~300B saved)
-`HashMap<i16, String>` → `HashMap<i16, CardState>`. Eliminates 6 String heap allocs.
+### P2 — String→Enum audit (zone/state/card_type fields)
+See completed items above for orientation_modifiers conversion.
+Remaining: zone/state/card_type fields across EffectKind variants.
 
 ---
 
@@ -246,6 +247,9 @@ abilities.json (800 abilities, source of truth)
 ### ✅ DONE — EffectKind: 1248→544B (56% reduction)
 ### ✅ DONE — AbilityEffect: 1536→152B (90% reduction)
 ### ✅ DONE — Condition: 1864→520B (72% reduction)
+### ✅ DONE — orientation_modifiers String→CardOrientation enum
+### ✅ DONE — Non-bytecode path removed (bytecode is universal default)
+### ✅ DONE — BcDeserializer: custom serde::Deserializer for bytecode format
 
 ---
 
