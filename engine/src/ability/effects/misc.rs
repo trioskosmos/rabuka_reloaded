@@ -278,7 +278,7 @@ impl AbilityResolver {
         heart_distribution: &[(crate::card::HeartColor, u32)],
         is_negative: bool,
         is_temporary: bool,
-        effect_data: &mut Option<serde_json::Value>,
+        effect_data: &mut Option<crate::core::types::EffectData>,
         heart_color_str: &Option<String>,
         heart_to_add: i32,
         effect_text: &str,
@@ -300,14 +300,18 @@ impl AbilityResolver {
         }
         if is_temporary && effect_data.is_none() {
             if heart_distribution.len() > 1 {
-                let cards_json: Vec<serde_json::Value> = heart_distribution
+                let items: Vec<crate::core::types::CardEffectItem> = heart_distribution
                     .iter()
                     .map(|&(c, dc)| {
                         let amount = if is_negative { -(dc as i32) } else { dc as i32 };
-                        serde_json::json!({"card_id": card_id, "amount": amount, "color": format!("{:?}", c)})
+                        crate::core::types::CardEffectItem {
+                            card_id,
+                            amount,
+                            color: Some(format!("{:?}", c)),
+                        }
                     })
                     .collect();
-                *effect_data = Some(serde_json::Value::Array(cards_json));
+                *effect_data = Some(crate::core::types::EffectData::MultiCard { items });
             } else {
                 let color_name = heart_color_str.as_deref().unwrap_or("heart01");
                 *effect_data = Some(Self::make_card_effect_data(
@@ -388,13 +392,15 @@ impl AbilityResolver {
                         .iter()
                         .map(|c| format!("{:?}", c).to_lowercase())
                         .collect();
-                    let cards_json: Vec<serde_json::Value> = distinct_colors
+                    let items: Vec<crate::core::types::CardEffectItem> = distinct_colors
                         .iter()
-                        .map(|color| {
-                            serde_json::json!({"card_id": card_id, "amount": 1, "color": color.to_string()})
+                        .map(|color| crate::core::types::CardEffectItem {
+                            card_id,
+                            amount: 1,
+                            color: Some(color.to_string()),
                         })
                         .collect();
-                    let effect_data = Some(serde_json::Value::Array(cards_json));
+                    let effect_data = Some(crate::core::types::EffectData::MultiCard { items });
                     util::push_temporary_effect(
                         gs,
                         "gain_heart",
@@ -464,7 +470,10 @@ impl AbilityResolver {
                     "Gain"
                 }
             );
-            let effect_data = old.map(|v| serde_json::json!({"is_p1": is_p1, "old_value": v}));
+            let effect_data = old.map(|v| crate::core::types::EffectData::SurplusHeart {
+                is_p1,
+                old_value: v as u64,
+            });
             util::push_temporary_effect(
                 gs,
                 "gain_surplus_heart",
@@ -666,11 +675,11 @@ impl AbilityResolver {
                                     );
                                 }
                                 if effect.duration_any().as_deref() == Some("live_end") {
-                                    let effect_data = serde_json::json!({
-                                        "card_id": target_id,
-                                        "amount": 1,
-                                        "color": format!("{:?}", color),
-                                    });
+                                    let effect_data = crate::core::types::EffectData::SingleCard {
+                                        card_id: target_id,
+                                        amount: 1,
+                                        color: Some(format!("{:?}", color)),
+                                    };
                                     crate::ability::util::push_temporary_effect(
                                         gs,
                                         "gain_heart",
@@ -726,11 +735,11 @@ impl AbilityResolver {
                     &effect.text,
                 );
                 if effect.duration_any().as_deref() == Some("live_end") {
-                    let effect_data = serde_json::json!({
-                        "card_id": card_id,
-                        "amount": amount,
-                        "color": "all",
-                    });
+                    let effect_data = crate::core::types::EffectData::SingleCard {
+                        card_id,
+                        amount,
+                        color: Some("all".to_string()),
+                    };
                     crate::ability::util::push_temporary_effect(
                         gs,
                         "gain_heart",
@@ -1320,7 +1329,7 @@ impl AbilityResolver {
             }
         }
 
-        let mut effect_data: Option<serde_json::Value> = None;
+        let mut effect_data: Option<crate::core::types::EffectData> = None;
         let is_negative = sign == Some("negative");
         let blades_to_add = if is_negative {
             -(final_count as i32)
@@ -1395,16 +1404,16 @@ impl AbilityResolver {
                         );
                     }
                     if is_temporary && effect_data.is_none() {
-                        let mut data_list: Vec<serde_json::Value> = Vec::new();
+                        let mut items: Vec<crate::core::types::CardEffectItem> = Vec::new();
                         for (color, color_amount) in &heart_distribution {
                             let color_name = format!("{:?}", color).to_lowercase();
-                            data_list.push(Self::make_card_effect_data(
+                            items.push(crate::core::types::CardEffectItem {
                                 card_id,
-                                *color_amount as i32,
-                                Some(&color_name),
-                            ));
+                                amount: *color_amount as i32,
+                                color: Some(color_name),
+                            });
                         }
-                        effect_data = Some(serde_json::Value::Array(data_list));
+                        effect_data = Some(crate::core::types::EffectData::MultiCard { items });
                     }
                 }
                 if is_temporary {
@@ -1451,13 +1460,9 @@ impl AbilityResolver {
                         );
                     }
                     if is_temporary {
-                        let mut data = serde_json::Map::new();
-                        data.insert("all_cards".to_string(), serde_json::Value::Bool(true));
-                        data.insert(
-                            "amount".to_string(),
-                            serde_json::Value::Number(blades_to_add.into()),
-                        );
-                        effect_data = Some(serde_json::Value::Object(data));
+                        effect_data = Some(crate::core::types::EffectData::AllCards {
+                            amount: blades_to_add,
+                        });
                     }
                 } else if effect.position_any().is_some() {
                     // Position-based target: apply to the stage member at that position
@@ -1694,25 +1699,31 @@ impl AbilityResolver {
                 // Build effect_data for heart cleanup on expiry
                 if is_temporary && effect_data.is_none() && !targets.is_empty() {
                     if heart_distribution.len() > 1 {
-                        let cards_json: Vec<serde_json::Value> = targets
+                        let items: Vec<crate::core::types::CardEffectItem> = targets
                             .iter()
                             .flat_map(|&cid| {
                                 heart_distribution.iter().map(move |&(c, dc)| {
                                     let amount = if is_negative { -(dc as i32) } else { dc as i32 };
-                                    serde_json::json!({"card_id": cid, "amount": amount, "color": format!("{:?}", c)})
+                                    crate::core::types::CardEffectItem {
+                                        card_id: cid,
+                                        amount,
+                                        color: Some(format!("{:?}", c)),
+                                    }
                                 })
                             })
                             .collect();
-                        effect_data = Some(serde_json::Value::Array(cards_json));
+                        effect_data = Some(crate::core::types::EffectData::MultiCard { items });
                     } else {
                         let color_name = heart_color_str.as_deref().unwrap_or("heart01");
-                        let cards_json: Vec<serde_json::Value> = targets
+                        let items: Vec<crate::core::types::CardEffectItem> = targets
                             .iter()
-                            .map(|&cid| {
-                                serde_json::json!({"card_id": cid, "amount": heart_to_add, "color": color_name})
+                            .map(|&cid| crate::core::types::CardEffectItem {
+                                card_id: cid,
+                                amount: heart_to_add,
+                                color: Some(color_name.to_string()),
                             })
                             .collect();
-                        effect_data = Some(serde_json::Value::Array(cards_json));
+                        effect_data = Some(crate::core::types::EffectData::MultiCard { items });
                     }
                 }
             }
@@ -1721,11 +1732,15 @@ impl AbilityResolver {
         // Store effect_data for blade cleanup.
         if is_temporary && effect_data.is_none() && (resource == "blade" || resource == "ブレード")
         {
-            let cards_json: Vec<serde_json::Value> = blade_targets_save
+            let items: Vec<crate::core::types::CardEffectItem> = blade_targets_save
                 .iter()
-                .map(|&cid| serde_json::json!({"card_id": cid, "amount": final_count}))
+                .map(|&cid| crate::core::types::CardEffectItem {
+                    card_id: cid,
+                    amount: final_count as i32,
+                    color: None,
+                })
                 .collect();
-            effect_data = Some(serde_json::Value::Array(cards_json.clone()));
+            effect_data = Some(crate::core::types::EffectData::MultiCard { items });
         }
 
         // Resource gain details captured in structured ability_resolution entry

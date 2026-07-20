@@ -168,6 +168,123 @@ pub enum Duration {
     Unless,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CardEffectItem {
+    pub card_id: i16,
+    pub amount: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum EffectData {
+    HeartOverride {
+        card_id: i16,
+        color: String,
+        count: u32,
+    },
+    SingleCard {
+        card_id: i16,
+        amount: i32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        color: Option<String>,
+    },
+    MultiCard {
+        items: Vec<CardEffectItem>,
+    },
+    AllCards {
+        amount: i32,
+    },
+    SetBladeCount {
+        card_id: i16,
+    },
+    SurplusHeart {
+        is_p1: bool,
+        old_value: u64,
+    },
+}
+
+impl EffectData {
+    pub fn card_id(&self) -> Option<i16> {
+        match self {
+            EffectData::HeartOverride { card_id, .. } => Some(*card_id),
+            EffectData::SingleCard { card_id, .. } => Some(*card_id),
+            EffectData::SetBladeCount { card_id } => Some(*card_id),
+            _ => None,
+        }
+    }
+
+    pub fn items(&self) -> Vec<CardEffectItemRef<'_>> {
+        match self {
+            EffectData::SingleCard {
+                card_id,
+                amount,
+                color,
+            } => {
+                vec![CardEffectItemRef {
+                    card_id: *card_id,
+                    amount: *amount,
+                    color: color.as_deref(),
+                }]
+            }
+            EffectData::MultiCard { items } => items
+                .iter()
+                .map(|i| CardEffectItemRef {
+                    card_id: i.card_id,
+                    amount: i.amount,
+                    color: i.color.as_deref(),
+                })
+                .collect(),
+            _ => vec![],
+        }
+    }
+
+    pub fn is_p1(&self) -> Option<bool> {
+        match self {
+            EffectData::SurplusHeart { is_p1, .. } => Some(*is_p1),
+            _ => None,
+        }
+    }
+
+    pub fn old_value(&self) -> Option<u64> {
+        match self {
+            EffectData::SurplusHeart { old_value, .. } => Some(*old_value),
+            _ => None,
+        }
+    }
+
+    pub fn count(&self) -> Option<u32> {
+        match self {
+            EffectData::HeartOverride { count, .. } => Some(*count),
+            _ => None,
+        }
+    }
+
+    pub fn color(&self) -> Option<&str> {
+        match self {
+            EffectData::HeartOverride { color, .. } => Some(color.as_str()),
+            EffectData::SingleCard { color, .. } => color.as_deref(),
+            _ => None,
+        }
+    }
+
+    pub fn amount(&self) -> Option<i32> {
+        match self {
+            EffectData::SingleCard { amount, .. } => Some(*amount),
+            EffectData::AllCards { amount } => Some(*amount),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CardEffectItemRef<'a> {
+    pub card_id: i16,
+    pub amount: i32,
+    pub color: Option<&'a str>,
+}
+
 #[derive(Debug, Clone)]
 pub struct TemporaryEffect {
     pub effect_type: String,
@@ -177,7 +294,7 @@ pub struct TemporaryEffect {
     pub target_player_id: String,
     pub description: String,
     pub creation_order: u32,
-    pub effect_data: Option<serde_json::Value>,
+    pub effect_data: Option<EffectData>,
 }
 
 #[derive(Debug, Clone)]

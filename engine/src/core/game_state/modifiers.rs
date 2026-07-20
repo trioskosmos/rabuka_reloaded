@@ -812,7 +812,11 @@ impl GameState {
             target_player_id: String::new(),
             description: format!("Heart override: card {} = {:?} x{}", card_id, color, count),
             creation_order: 0,
-            effect_data: Some(serde_json::Value::Object(data)),
+            effect_data: Some(crate::core::types::EffectData::HeartOverride {
+                card_id,
+                color: format!("{:?}", color),
+                count,
+            }),
         });
     }
 

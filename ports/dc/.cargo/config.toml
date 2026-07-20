@@ -1,5 +1,2 @@
-[build]
-target-dir = "/tmp/rabuka_dc_target"
-
 [target.sh-elf]
 rustflags = []

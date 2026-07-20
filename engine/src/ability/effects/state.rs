@@ -874,7 +874,7 @@ impl AbilityResolver {
             if let Some(color) = blade_color {
                 gs.mods.set_blade_type_modifier(card_id, color);
             }
-            let ed = serde_json::json!({"card_id": card_id});
+            let ed = crate::core::types::EffectData::SetBladeCount { card_id };
             util::push_temporary_effect(
                 gs,
                 &format!("set_blade_type:{}", blade_type.unwrap_or("")),
@@ -942,7 +942,7 @@ impl AbilityResolver {
             Some(color.index()),
             0,
         );
-        let ed = serde_json::json!({"card_id": card_id});
+        let ed = crate::core::types::EffectData::SetBladeCount { card_id };
         util::push_temporary_effect(
             gs,
             "set_heart_type",
@@ -1070,18 +1070,13 @@ impl AbilityResolver {
             gs.mods.set_blade_modifier(card_id, value as i32);
             // Register for cleanup at live end / duration expiry
             if effect.duration_any().is_some() {
-                let mut data = serde_json::Map::new();
-                data.insert(
-                    "card_id".to_string(),
-                    serde_json::Value::Number(card_id.into()),
-                );
                 util::push_temporary_effect(
                     gs,
                     "set_blade_count",
                     effect.duration_any().as_deref(),
                     target,
                     &format!("set blade count to {} for card {}", value, card_id),
-                    Some(serde_json::Value::Object(data)),
+                    Some(crate::core::types::EffectData::SetBladeCount { card_id }),
                 );
             }
         }
@@ -1269,9 +1264,13 @@ impl AbilityResolver {
         if let Some(dur) = duration {
             if dur != "permanent" {
                 let target_str = target.to_string();
-                let data: Vec<serde_json::Value> = card_ids
+                let items: Vec<crate::core::types::CardEffectItem> = card_ids
                     .iter()
-                    .map(|&cid| serde_json::json!({"card_id": cid, "amount": delta.abs()}))
+                    .map(|&cid| crate::core::types::CardEffectItem {
+                        card_id: cid,
+                        amount: delta.abs(),
+                        color: None,
+                    })
                     .collect();
                 util::push_temporary_effect(
                     gs,
@@ -1279,7 +1278,7 @@ impl AbilityResolver {
                     Some(dur),
                     &target_str,
                     &format!("Cost {} {} ({})", operation, value, dur),
-                    Some(serde_json::Value::Array(data)),
+                    Some(crate::core::types::EffectData::MultiCard { items }),
                 );
             }
         }

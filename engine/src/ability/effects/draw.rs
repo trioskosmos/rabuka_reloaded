@@ -729,18 +729,16 @@ impl AbilityResolver {
         }
     }
 
-    /// Build serde_json effect_data for a single-card resource grant (blade or heart).
+    /// Build EffectData for a single-card resource grant (blade or heart).
     pub(crate) fn make_card_effect_data(
         card_id: i16,
         amount: i32,
         color: Option<&str>,
-    ) -> serde_json::Value {
-        let mut data = serde_json::Map::new();
-        data.insert("card_id".into(), serde_json::Value::Number(card_id.into()));
-        data.insert("amount".into(), serde_json::Value::Number(amount.into()));
-        if let Some(c) = color {
-            data.insert("color".into(), serde_json::Value::String(c.to_string()));
+    ) -> crate::core::types::EffectData {
+        crate::core::types::EffectData::SingleCard {
+            card_id,
+            amount,
+            color: color.map(|c| c.to_string()),
         }
-        serde_json::Value::Object(data)
     }
 }

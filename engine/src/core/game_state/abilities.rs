@@ -2361,50 +2361,28 @@ impl GameState {
                 }
                 "set_blade_count" => {
                     if let Some(ref data) = effect.effect_data {
-                        if let Some(card_id) = data.get("card_id").and_then(|v| v.as_i64()) {
-                            self.mods.clear_blade_set_modifier(card_id as i16);
+                        if let Some(card_id) = data.card_id() {
+                            self.mods.clear_blade_set_modifier(card_id);
                             log::debug!("Cleared set_blade_count modifier for card {}", card_id);
                         }
                     }
                 }
                 s if s.starts_with("gain_blade") => {
                     if let Some(ref data) = effect.effect_data {
-                        if let Some(cards) = data.as_array() {
-                            for card_data in cards {
-                                if let Some(card_id) =
-                                    card_data.get("card_id").and_then(|v| v.as_i64())
-                                {
-                                    if let Some(amount) =
-                                        card_data.get("amount").and_then(|v| v.as_i64())
-                                    {
-                                        self.mods
-                                            .remove_blade_modifier(card_id as i16, amount as i32);
-                                        log::debug!(
-                                            "Reverted {} blades from card {}",
-                                            amount,
-                                            card_id
-                                        );
-                                    }
-                                }
-                            }
-                        } else if let Some(card_data) = data.as_object() {
-                            if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64())
-                            {
-                                if let Some(amount) =
-                                    card_data.get("amount").and_then(|v| v.as_i64())
-                                {
-                                    self.mods
-                                        .remove_blade_modifier(card_id as i16, amount as i32);
-                                    log::debug!("Reverted {} blades from card {}", amount, card_id);
-                                }
-                            }
+                        for item in data.items() {
+                            self.mods.remove_blade_modifier(item.card_id, item.amount);
+                            log::debug!(
+                                "Reverted {} blades from card {}",
+                                item.amount,
+                                item.card_id
+                            );
                         }
                     }
                 }
                 "gain_surplus_heart" => {
                     if let Some(ref data) = effect.effect_data {
-                        if let Some(old) = data.get("old_value").and_then(|v| v.as_u64()) {
-                            let is_p1 = data.get("is_p1").and_then(|v| v.as_bool()).unwrap_or(true);
+                        if let Some(old) = data.old_value() {
+                            let is_p1 = data.is_p1().unwrap_or(true);
                             if is_p1 {
                                 self.self_live_surplus_count = old as u32;
                             } else {
@@ -2416,109 +2394,42 @@ impl GameState {
                 }
                 s if s.starts_with("gain_heart") => {
                     if let Some(ref data) = effect.effect_data {
-                        if let Some(cards) = data.as_array() {
-                            for card_data in cards {
-                                if let Some(card_id) =
-                                    card_data.get("card_id").and_then(|v| v.as_i64())
-                                {
-                                    if let Some(amount) =
-                                        card_data.get("amount").and_then(|v| v.as_i64())
-                                    {
-                                        let color_str = card_data
-                                            .get("color")
-                                            .and_then(|v| v.as_str())
-                                            .unwrap_or("heart01");
-                                        let color = crate::zones::parse_heart_color(color_str);
-                                        self.mods.remove_heart_modifier(
-                                            card_id as i16,
-                                            color,
-                                            amount as i32,
-                                        );
-                                        log::debug!(
-                                            "Reverted {} hearts from card {} (color {:?})",
-                                            amount,
-                                            card_id,
-                                            color
-                                        );
-                                    }
-                                }
-                            }
-                        } else if let Some(card_data) = data.as_object() {
-                            if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64())
-                            {
-                                if let Some(amount) =
-                                    card_data.get("amount").and_then(|v| v.as_i64())
-                                {
-                                    let color_str = card_data
-                                        .get("color")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("heart01");
-                                    let color = crate::zones::parse_heart_color(color_str);
-                                    self.mods.remove_heart_modifier(
-                                        card_id as i16,
-                                        color,
-                                        amount as i32,
-                                    );
-                                    log::debug!(
-                                        "Reverted {} hearts from card {} (color {:?})",
-                                        amount,
-                                        card_id,
-                                        color
-                                    );
-                                }
-                            }
+                        for item in data.items() {
+                            let color_str = item.color.unwrap_or("heart01");
+                            let color = crate::zones::parse_heart_color(color_str);
+                            self.mods
+                                .remove_heart_modifier(item.card_id, color, item.amount);
+                            log::debug!(
+                                "Reverted {} hearts from card {} (color {:?})",
+                                item.amount,
+                                item.card_id,
+                                color
+                            );
                         }
                     }
                 }
                 "heart_override" => {
                     if let Some(ref data) = effect.effect_data {
-                        if let Some(card_id) = data.get("card_id").and_then(|v| v.as_i64()) {
-                            self.mods.remove_heart_override(card_id as i16);
+                        if let Some(card_id) = data.card_id() {
+                            self.mods.remove_heart_override(card_id);
                             log::debug!("Removed heart override for card {}", card_id);
                         }
                     }
                 }
                 "modify_cost" => {
                     if let Some(ref data) = effect.effect_data {
-                        if let Some(cards) = data.as_array() {
-                            for card_data in cards {
-                                if let Some(card_id) =
-                                    card_data.get("card_id").and_then(|v| v.as_i64())
-                                {
-                                    if let Some(amount) =
-                                        card_data.get("amount").and_then(|v| v.as_i64())
-                                    {
-                                        self.mods
-                                            .remove_cost_modifier(card_id as i16, amount as i32);
-                                        log::debug!(
-                                            "Reverted cost modifier {} from card {}",
-                                            amount,
-                                            card_id
-                                        );
-                                    }
-                                }
-                            }
-                        } else if let Some(card_data) = data.as_object() {
-                            if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64())
-                            {
-                                if let Some(amount) =
-                                    card_data.get("amount").and_then(|v| v.as_i64())
-                                {
-                                    self.mods
-                                        .remove_cost_modifier(card_id as i16, amount as i32);
-                                    log::debug!(
-                                        "Reverted cost modifier {} from card {}",
-                                        amount,
-                                        card_id
-                                    );
-                                }
-                            }
+                        for item in data.items() {
+                            self.mods.remove_cost_modifier(item.card_id, item.amount);
+                            log::debug!(
+                                "Reverted cost modifier {} from card {}",
+                                item.amount,
+                                item.card_id
+                            );
                         }
                     }
                 }
                 s if s.starts_with("gain_ability:") => {
                     let ability_text = s.trim_start_matches("gain_ability:");
-                    // Find the card that has this gained ability
                     let mut card_to_clear = None;
                     for (&cid, abilities) in &self.gained_abilities {
                         if abilities.contains(&ability_text.to_string()) {
@@ -2526,7 +2437,6 @@ impl GameState {
                             break;
                         }
                     }
-                    // Also check gained_card_abilities for the card
                     if card_to_clear.is_none() {
                         for (&cid, abils) in &self.gained_card_abilities {
                             if abils.iter().any(|a| {
@@ -2538,7 +2448,6 @@ impl GameState {
                         }
                     }
                     if let Some(card_id) = card_to_clear {
-                        // Revert gained score modifier if any
                         if let Some(val) = ability_text.split('+').nth(1).and_then(|s| {
                             s.chars()
                                 .take_while(|c| c.is_ascii_digit())
@@ -2558,55 +2467,33 @@ impl GameState {
                 }
                 "set_heart_type" => {
                     if let Some(ref data) = effect.effect_data {
-                        if let Some(card_id) = data.get("card_id").and_then(|v| v.as_i64()) {
-                            self.mods.heart_color_multiplier.remove(&(card_id as i16));
+                        if let Some(card_id) = data.card_id() {
+                            self.mods.heart_color_multiplier.remove(&card_id);
                             log::debug!("Removed heart color multiplier for card {}", card_id);
                         }
                     }
                 }
                 s if s.starts_with("set_blade_type:") => {
                     if let Some(ref data) = effect.effect_data {
-                        if let Some(card_id) = data.get("card_id").and_then(|v| v.as_i64()) {
-                            self.mods.clear_blade_type_modifier(card_id as i16);
+                        if let Some(card_id) = data.card_id() {
+                            self.mods.clear_blade_type_modifier(card_id);
                             log::debug!("Cleared blade type modifier for card {}", card_id);
                         }
                     }
                 }
                 s if s.starts_with("modify_score_") => {
-                    if s == "modify_score_set" {
-                        if let Some(ref data) = effect.effect_data {
-                            if let Some(cards) = data.as_array() {
-                                for card_data in cards {
-                                    if let Some(card_id) =
-                                        card_data.get("card_id").and_then(|v| v.as_i64())
-                                    {
-                                        self.mods.clear_score_set_modifier(card_id as i16);
-                                        log::debug!(
-                                            "Cleared score set modifier for card {}",
-                                            card_id
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    } else if let Some(ref data) = effect.effect_data {
-                        if let Some(cards) = data.as_array() {
-                            for card_data in cards {
-                                if let Some(card_id) =
-                                    card_data.get("card_id").and_then(|v| v.as_i64())
-                                {
-                                    if let Some(amount) =
-                                        card_data.get("amount").and_then(|v| v.as_i64())
-                                    {
-                                        self.mods
-                                            .remove_score_modifier(card_id as i16, amount as i32);
-                                        log::debug!(
-                                            "Removed score modifier {} from card {}",
-                                            amount,
-                                            card_id
-                                        );
-                                    }
-                                }
+                    if let Some(ref data) = effect.effect_data {
+                        for item in data.items() {
+                            if s == "modify_score_set" {
+                                self.mods.clear_score_set_modifier(item.card_id);
+                                log::debug!("Cleared score set modifier for card {}", item.card_id);
+                            } else {
+                                self.mods.remove_score_modifier(item.card_id, item.amount);
+                                log::debug!(
+                                    "Removed score modifier {} from card {}",
+                                    item.amount,
+                                    item.card_id
+                                );
                             }
                         }
                     }

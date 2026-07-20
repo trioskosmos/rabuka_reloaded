@@ -7,9 +7,12 @@ use crate::player::Player;
 use crate::types::PerformanceSnapshot;
 use crate::zones::Orientation;
 use crate::{HashMap, HashSet};
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "no_std")]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+use serde::{Deserialize, Serialize};
 
 fn heart_color_index(color: &HeartColor) -> Option<usize> {
     Some(match color {
@@ -1442,28 +1445,42 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         .is_some_and(|id| *id == game_state.player2.id)
         .then_some(game_state.live_card_selected_indices.as_slice());
 
-    let mut blade_flat: HashMap<i16, i32> =
-        HashMap::with_capacity_and_hasher(game_state.mods.blade_modifiers.len(), Default::default());
-    let mut blade_set_flat: HashMap<i16, i32> =
-        HashMap::with_capacity_and_hasher(game_state.mods.blade_modifiers.len(), Default::default());
+    let mut blade_flat: HashMap<i16, i32> = HashMap::with_capacity_and_hasher(
+        game_state.mods.blade_modifiers.len(),
+        Default::default(),
+    );
+    let mut blade_set_flat: HashMap<i16, i32> = HashMap::with_capacity_and_hasher(
+        game_state.mods.blade_modifiers.len(),
+        Default::default(),
+    );
     for (&k, v) in &game_state.mods.blade_modifiers {
         blade_flat.insert(k, v.total());
         blade_set_flat.insert(k, v.set);
     }
 
-    let mut score_flat: HashMap<i16, i32> =
-        HashMap::with_capacity_and_hasher(game_state.mods.score_modifiers.len(), Default::default());
-    let mut score_set_flat: HashMap<i16, i32> =
-        HashMap::with_capacity_and_hasher(game_state.mods.score_modifiers.len(), Default::default());
+    let mut score_flat: HashMap<i16, i32> = HashMap::with_capacity_and_hasher(
+        game_state.mods.score_modifiers.len(),
+        Default::default(),
+    );
+    let mut score_set_flat: HashMap<i16, i32> = HashMap::with_capacity_and_hasher(
+        game_state.mods.score_modifiers.len(),
+        Default::default(),
+    );
     for (&k, v) in &game_state.mods.score_modifiers {
         score_flat.insert(k, v.total());
         score_set_flat.insert(k, v.set);
     }
 
     let mut heart_flat: HashMap<i16, HashMap<crate::card::HeartColor, i32>> =
-        HashMap::with_capacity_and_hasher(game_state.mods.heart_modifiers.len(), Default::default());
+        HashMap::with_capacity_and_hasher(
+            game_state.mods.heart_modifiers.len(),
+            Default::default(),
+        );
     let mut heart_set_flat: HashMap<i16, HashMap<crate::card::HeartColor, i32>> =
-        HashMap::with_capacity_and_hasher(game_state.mods.heart_modifiers.len(), Default::default());
+        HashMap::with_capacity_and_hasher(
+            game_state.mods.heart_modifiers.len(),
+            Default::default(),
+        );
     for (&k, colors) in &game_state.mods.heart_modifiers {
         let total: HashMap<crate::card::HeartColor, i32> =
             colors.iter().map(|(&c, e)| (c, e.total())).collect();
@@ -1551,7 +1568,10 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             created_turn: te.created_turn,
             target_player_id: te.target_player_id.clone(),
             description: te.description.clone(),
-            effect_data: te.effect_data.clone(),
+            effect_data: te
+                .effect_data
+                .as_ref()
+                .and_then(|d| serde_json::to_value(d).ok()),
         })
         .collect();
 
@@ -1841,10 +1861,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
                 let meta = game_state.revealed_card_meta.get(i);
                 let src_id = meta.and_then(|m| m.source);
                 let src_name = meta.and_then(|m| m.source_name.clone());
-                let owner = meta
-                    .and_then(|m| m.owner)
-                    .map(|o| o as i8)
-                    .unwrap_or(-1i8);
+                let owner = meta.and_then(|m| m.owner).map(|o| o as i8).unwrap_or(-1i8);
                 let is_private = meta.map(|m| m.is_private).unwrap_or(false);
                 RevealedCardDisplay {
                     card_id: cid,
@@ -1874,10 +1891,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
                 let meta = game_state.revealed_cost_card_meta.get(i);
                 let src_id = meta.and_then(|m| m.source);
                 let src_name = meta.and_then(|m| m.source_name.clone());
-                let owner = meta
-                    .and_then(|m| m.owner)
-                    .map(|o| o as i8)
-                    .unwrap_or(-1i8);
+                let owner = meta.and_then(|m| m.owner).map(|o| o as i8).unwrap_or(-1i8);
                 let is_private = meta.map(|m| m.is_private).unwrap_or(false);
                 RevealedCardDisplay {
                     card_id: cid,

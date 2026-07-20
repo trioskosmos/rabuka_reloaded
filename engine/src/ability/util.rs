@@ -2083,7 +2083,7 @@ pub fn push_temporary_effect(
     duration: Option<&str>,
     target_player_id: &str,
     description: &str,
-    effect_data: Option<serde_json::Value>,
+    effect_data: Option<crate::core::types::EffectData>,
 ) {
     if let Some(d) = duration {
         if d != "permanent" {

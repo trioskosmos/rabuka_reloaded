@@ -209,11 +209,15 @@ impl AbilityResolver {
         }
 
         let effect_data = {
-            let data: Vec<serde_json::Value> = live_card_ids
+            let items: Vec<crate::core::types::CardEffectItem> = live_card_ids
                 .iter()
-                .map(|(card_id, delta)| serde_json::json!({"card_id": card_id, "amount": delta}))
+                .map(|(card_id, delta)| crate::core::types::CardEffectItem {
+                    card_id: *card_id,
+                    amount: *delta,
+                    color: None,
+                })
                 .collect();
-            Some(serde_json::Value::Array(data))
+            Some(crate::core::types::EffectData::MultiCard { items })
         };
         util::push_temporary_effect(
             gs,
