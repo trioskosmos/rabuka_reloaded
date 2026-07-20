@@ -200,40 +200,23 @@ abilities.json (800 abilities, source of truth)
 
 ---
 
-### P0.5 — Console history: delta snapshots or disabled
+### P0.5 — Console history: delta snapshots or disabled — ✅ DONE (web-only by architecture)
 
-**Why:** Web server stores full GameState clones for undo (Room.history). 50 undo steps = ~25 MB. This is fine for desktop but impossible on consoles.
+### P0.5 — Activate parser _collapse_to_effect_steps — DEFERRED (Python parser + engine refactor, not quick)
 
-**Strategy:**
-- Web: keep full history (user wants it). Optionally switch to delta snapshots later.
-- Console builds: `#[cfg(not(target_arch = "arm"))]` gate the history, or cap at 10 entries with delta compression.
-- `DEFAULT_HISTORY_SIZE` is already 1000 but only used by web. Consoles can set it to 0.
+### P2 — Replace orientation_modifiers String values with CardState enum (~300B saved) — ✅ DONE
 
-**Estimated effort:** Small — feature gate + config flag.
+### P2 — String→Enum audit: close sets of string fields across EffectKind, Condition, GameState
 
----
+Many fields use `String` or `Option<ArcStr>` for values that are always one of 2-10 known strings. Each String is 24B + heap alloc; an enum is 1-8B + zero alloc. Candidates found during this session:
 
-### P1 — Arena allocator v1 (per-turn lifecycle)
+- **EffectKind zone fields** (`source`, `destination`, `target`, `location`): values like "deck", "hand", "stage", "waitroom", "discard", "energy_zone", "live_card_zone" — `Zone` enum already exists in enums.rs, just not used here
+- **EffectKind state fields** (`state`, `state_change`): "active", "wait" — `EffectState` enum already exists
+- **EffectKind card_type**: "member_card", "live_card", "energy_card" — `EffectCardType` enum already exists
+- **Condition state fields**: "active", "wait" for card states
+- **GameState zone names** in various Vec<String> fields
 
-**Status:** v0 committed (monotonic bump, 64KB static buffer). Cursor reset is the blocking issue.
-
-**Why:** Current arena fills up after ~100-200 ability evaluations then degrades to normal allocation.
-
-**Options:**
-1. Per-turn lifecycle: enter at turn start, exit at turn end.
-2. Double-buffer: alternate between two 64KB buffers per turn.
-3. Epoch-based: objects promoted out of arena before reset.
-
----
-
-### P0.5 — Activate parser _collapse_to_effect_steps
-
-**Why:** Removes ~200 lines of Rust dispatch code + eliminates 4 legacy compound effect shapes. No RAM savings but reduces binary size.
-
----
-
-### P2 — Replace orientation_modifiers String values with CardState enum (~300B saved)
-`HashMap<i16, String>` → `HashMap<i16, CardState>`. Eliminates 6 String heap allocs.
+This is a codebase-wide audit that would save ~500B+ in EffectKind alone plus eliminate many heap allocs. Needs systematic grep + enum creation + field type changes across ~30 files.
 
 ---
 
