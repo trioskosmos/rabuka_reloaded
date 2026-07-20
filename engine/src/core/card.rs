@@ -422,16 +422,6 @@ impl CardDatabase {
         name.chars().filter(|c| !c.is_whitespace()).collect()
     }
 
-    /// Check if a card's name contains the given name fragment
-    /// Used for cost payment and ability targeting (Q90, Q81, Q74)
-    pub fn card_name_contains(&self, card_id: i16, name_fragment: &str) -> bool {
-        if let Some(card) = self.cards.get(&card_id) {
-            Self::normalize_name(&card.name).contains(&Self::normalize_name(name_fragment))
-        } else {
-            false
-        }
-    }
-
     /// Get all names from a multi-name card (e.g., "A&B&C" -> ["A", "B", "C"])
     /// Used for multi-name card handling (Q65, Q69, Q81)
     pub fn get_card_names(&self, card_id: i16) -> Vec<String> {
@@ -445,15 +435,6 @@ impl CardDatabase {
         } else {
             Vec::new()
         }
-    }
-
-    /// Check if card has any of the given names (for multi-name cards)
-    pub fn card_has_any_name(&self, card_id: i16, names: &[&str]) -> bool {
-        let card_names = self.get_card_names(card_id);
-        names.iter().any(|&name| {
-            let norm = Self::normalize_name(name);
-            card_names.iter().any(|cn| cn.contains(&norm))
-        })
     }
 }
 
@@ -876,21 +857,6 @@ pub struct CompoundBranch {
 pub struct AbilityFilterBranch {
     pub ability_filter: Option<AbilityFilter>,
     pub ability_filter_triggers: Option<Vec<String>>,
-}
-
-/// Macro to generate accessor methods on AbilityEffect that delegate to EffectKind.
-/// Usage: ekf!(field_name: return_type => VariantName)
-/// This expands to a method `pub fn field_name(&self) -> &return_type`
-/// that checks self.kind for the given variant and returns a reference
-/// or default.
-#[macro_export]
-macro_rules! ekf {
-    ($effect:expr, $variant:path, $field:ident) => {{
-        match &$effect.kind {
-            Some($variant { $field, .. }) => $field,
-            _ => &None,
-        }
-    }};
 }
 
 /// Tagged union of effect-specific fields, indexed by effect action type.
@@ -2500,8 +2466,6 @@ impl AbilityEffect {
 
     str_getter!(ability_text_any, [AbilityOp => ability_text]);
 
-    str_getter!(action_by_any, [CustomOp => action_by, SelectTarget => action_by, MoveCards => action_by, DrawCards => action_by, ChangeState => action_by, GainResource => action_by]);
-
     pub fn activation_condition_parsed_any(&self) -> Option<&Box<Condition>> {
         match self.kind.as_deref() {
             Some(EffectKind::AbilityOp {
@@ -2575,8 +2539,6 @@ impl AbilityEffect {
 
     bool_getter!(blind_any, [MiscOp => blind, LookReveal => blind]);
 
-    bool_getter!(is_reveal_any, [LookReveal => is_reveal]);
-
     box_vec_ref_getter!(card_names_any, [MoveCards => card_names, DrawCards => card_names, SelectTarget => card_names, LookReveal => card_names, ChangeState => card_names, MiscOp => card_names, ModifyScore => card_names]);
 
     str_getter!(card_property_any, [MoveCards => card_property, SelectTarget => card_property, LookReveal => card_property, GainResource => card_property, ChangeState => card_property, ModifyScore => card_property, CustomOp => card_property]);
@@ -2634,8 +2596,6 @@ impl AbilityEffect {
     bool_getter!(cost_from_revealed_any, [MoveCards => cost_from_revealed, ChangeState => cost_from_revealed, PositionOp => cost_from_revealed]);
 
     u32_getter!(cost_limit_any, [MoveCards => cost_limit, SelectTarget => cost_limit, LookReveal => cost_limit, GainResource => cost_limit, ChangeState => cost_limit, AbilityOp => cost_limit, PositionOp => cost_limit, MiscOp => cost_limit]);
-
-    u32_getter!(cost_limit_max_any, [MoveCards => cost_limit_max, SelectTarget => cost_limit_max, LookReveal => cost_limit_max]);
 
     u32_getter!(cost_limit_min_any, [MoveCards => cost_limit_min, SelectTarget => cost_limit_min, LookReveal => cost_limit_min]);
 
@@ -2753,8 +2713,6 @@ impl AbilityEffect {
     }
 
     str_getter!(effect_constraint_any, [ModifyScore => effect_constraint, MiscOp => effect_constraint]);
-
-    str_getter!(effect_type_any, [AbilityOp => effect_type, RestrictionOp => effect_type, CustomOp => effect_type]);
 
     u32_getter!(energy_count_any, [GainResource => energy_count, PositionOp => energy_count, MiscOp => energy_count, MoveCards => energy_count]);
 
@@ -2889,20 +2847,7 @@ impl AbilityEffect {
 
     bool_getter!(negation_any, [MoveCards => negation, SelectTarget => negation, LookReveal => negation, ModifyHearts => negation, GainResource => negation, ChangeState => negation, MiscOp => negation, ModifyScore => negation]);
 
-    bool_getter!(non_stackable_any, [RestrictionOp => non_stackable]);
-
     str_getter!(operation_any, [ModifyScore => operation, ModifyHearts => operation, GainResource => operation, RestrictionOp => operation, MiscOp => operation]);
-
-    pub fn opponent_action_any(&self) -> Option<&Box<AbilityEffect>> {
-        match self.kind.as_deref() {
-            Some(EffectKind::CustomOp {
-                opponent_action, ..
-            }) => opponent_action.as_ref(),
-            _ => None,
-        }
-    }
-
-    str_getter!(option_any, [AbilityOp => option]);
 
     bool_getter!(optional_any, [SelectTarget => optional, LookReveal => optional, GainResource => optional, ChangeState => optional, CompoundEffect => optional, PositionOp => optional]);
 
@@ -2937,8 +2882,6 @@ impl AbilityEffect {
 
     vec_ref_getter!(or_card_types_any, [MoveCards => or_card_types, SelectTarget => or_card_types, MiscOp => or_card_types]);
 
-    u32_getter!(original_cost_any, [MiscOp => original_cost]);
-
     u32_getter!(original_count_any, [ModifyHearts => original_count, MiscOp => original_count]);
 
     pub fn original_operator_any(&self) -> Option<Operator> {
@@ -2954,12 +2897,6 @@ impl AbilityEffect {
     }
 
     bool_getter!(original_value_any, [MoveCards => original_value, SelectTarget => original_value, LookReveal => original_value, ModifyHearts => original_value, GainResource => original_value, ChangeState => original_value, MiscOp => original_value, CustomOp => original_value, DrawCards => original_value, CompoundEffect => original_value]);
-
-    bool_getter!(replace_all_any, [ModifyHearts => replace_all]);
-
-    vec_ref_getter_unboxed!(parenthetical_any, [MiscOp => parenthetical]);
-
-    bool_getter!(per_group_any, [MoveCards => per_group, MiscOp => per_group, SelectTarget => per_group]);
 
     u32_getter!(per_group_count_any, [MoveCards => per_group_count, MiscOp => per_group_count, SelectTarget => per_group_count]);
 
@@ -3034,10 +2971,6 @@ impl AbilityEffect {
 
     str_getter!(per_unit_type_any, [SelectTarget => per_unit_type, LookReveal => per_unit_type, ModifyScore => per_unit_type, GainResource => per_unit_type, DrawCards => per_unit_type, ChangeState => per_unit_type, MiscOp => per_unit_type, CompoundEffect => per_unit_type, ModifyHearts => per_unit_type]);
 
-    str_getter!(phase_any, [RestrictionOp => phase]);
-
-    str_getter!(picker_any, [MiscOp => picker, LookReveal => picker]);
-
     pub fn placement_order_any(&self) -> Option<PlacementOrder> {
         match self.kind.as_deref() {
             Some(EffectKind::MoveCards {
@@ -3067,24 +3000,6 @@ impl AbilityEffect {
             _ => None,
         }
     }
-
-    str_getter!(question_any, [SelectTarget => question, CompoundEffect => question, CustomOp => question]);
-
-    pub fn quoted_text_any(&self) -> Option<&QuotedText> {
-        match self.kind.as_deref() {
-            Some(EffectKind::MiscOp { quoted_text, .. }) => quoted_text.as_deref(),
-            _ => None,
-        }
-    }
-
-    pub fn ref_offset_any(&self) -> Option<i32> {
-        match self.kind.as_deref() {
-            Some(EffectKind::MiscOp { ref_offset, .. }) => *ref_offset,
-            _ => None,
-        }
-    }
-
-    str_getter!(ref_value_any, [MiscOp => ref_value]);
 
     pub fn repeat_limit_any(&self) -> Option<u32> {
         match self.kind.as_deref() {
@@ -3213,10 +3128,6 @@ impl AbilityEffect {
 
     str_getter!(trigger_type_any, [DrawCards => trigger_type, GainResource => trigger_type, AbilityOp => trigger_type, CompoundEffect => trigger_type, RestrictionOp => trigger_type, CustomOp => trigger_type]);
 
-    str_getter!(triggers_any, [AbilityOp => triggers, CustomOp => triggers]);
-
-    u32_getter!(use_limit_any, [AbilityOp => use_limit, CustomOp => use_limit]);
-
     u32_getter!(value_any, [ModifyScore => value, ModifyHearts => value, GainResource => value, MiscOp => value]);
 }
 
@@ -3228,8 +3139,7 @@ impl AbilityEffect {
     setter!(set_ability_text, ability_text: ArcStr => [AbilityOp]);
     setter!(set_action_by, action_by: ArcStr => [CustomOp]);
     setter!(set_activation_position, activation_position: ArcStr => [MoveCards, SelectTarget, LookReveal, GainResource, ChangeState, PositionOp], boxed [MiscOp]);
-    setter!(set_all, all: bool => [MiscOp]);
-    setter!(set_all_regions, all_regions: bool => [ChangeState, MiscOp, CustomOp]);
+
     setter!(set_allow_occupied_stage, allow_occupied_stage: bool => [MoveCards, PositionOp]);
     box_setter!(set_alternative_count_type, alternative_count_type: ArcStr => [MiscOp]);
     box_setter!(set_answers, answers: Vec<String> => [SelectTarget, CompoundEffect, CustomOp]);
@@ -3237,7 +3147,7 @@ impl AbilityEffect {
     setter!(set_blade_limit, blade_limit: u32 => [ChangeState, MiscOp]);
     setter!(set_blade_limit_operator, blade_limit_operator: Operator => [ChangeState, MiscOp]);
     box_setter!(set_blade_type, blade_type: ArcStr => [MiscOp]);
-    setter!(set_blind, blind: bool => [MiscOp]);
+
     pub fn set_card_names(&mut self, val: Vec<String>) {
         match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
@@ -3311,7 +3221,7 @@ impl AbilityEffect {
         }
     }
     box_setter!(set_characters, characters: Vec<String> => [MoveCards, SelectTarget, LookReveal, GainResource, ChangeState, AbilityOp, RestrictionOp, PositionOp, MiscOp, CustomOp]);
-    setter!(set_choice, choice: bool => [MiscOp]);
+
     setter!(set_choice_based, choice_based: bool => [RestrictionOp, CustomOp]);
     setter!(set_choice_maker, choice_maker: ArcStr => [SelectTarget, CompoundEffect, CustomOp]);
     box_setter!(set_choice_options, choice_options: Vec<String> => [SelectTarget, CompoundEffect]);
@@ -3325,7 +3235,7 @@ impl AbilityEffect {
     box_setter!(set_cost_reference, cost_reference: ArcStr => [MiscOp]);
     setter!(set_cost_total, cost_total: u32 => [MoveCards, SelectTarget, ModifyScore, ModifyHearts, ChangeState, MiscOp]);
     setter!(set_cost_total_operator, cost_total_operator: Operator => [MoveCards, SelectTarget, ModifyScore, ModifyHearts, ChangeState, MiscOp]);
-    setter!(set_delayed, delayed: bool => [RestrictionOp]);
+
     setter!(set_discard_remaining, discard_remaining: bool => [MoveCards]);
     setter!(set_distinct, distinct: DistinctType => [MoveCards, SelectTarget, LookReveal, ModifyScore, ChangeState]);
     setter!(set_duration, duration: ArcStr => [ModifyScore, ModifyHearts, GainResource, AbilityOp, RestrictionOp, CustomOp], boxed [MiscOp]);
@@ -3345,12 +3255,12 @@ impl AbilityEffect {
     setter!(set_heart_color_count, heart_color_count: u32 => [MiscOp]);
     setter!(set_heart_color, heart_color: ArcStr => [GainResource]);
     setter!(set_heart_colors_from_selected_card, heart_colors_from_selected_card: bool => [GainResource]);
-    setter!(set_heart_selection, heart_selection: bool => [MiscOp]);
+
     box_setter!(set_heart_type, heart_type: ArcStr => [MiscOp]);
     box_setter!(set_id, id: ArcStr => [MiscOp]);
     box_setter!(set_identities, identities: Vec<String> => [ChangeState, MiscOp, CustomOp]);
     setter!(set_location, location: ArcStr => [MoveCards, DrawCards, SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, AbilityOp, RestrictionOp, CustomOp], boxed [MiscOp]);
-    setter!(set_lose_blade_hearts, lose_blade_hearts: bool => [MiscOp]);
+
     setter!(set_multiple_targets, multiple_targets: bool => [MoveCards, SelectTarget, PositionOp]);
     setter!(set_name_constraint, name_constraint: ArcStr => [MoveCards, SelectTarget, LookReveal, ChangeState]);
     setter!(set_name_constraint_source, name_constraint_source: ArcStr => [MoveCards, SelectTarget, LookReveal, ChangeState]);
@@ -3358,9 +3268,9 @@ impl AbilityEffect {
     setter!(set_need_heart_operator, need_heart_operator: Operator => [MoveCards]);
     setter!(set_need_heart_total, need_heart_total: u32 => [MoveCards]);
     setter!(set_negation, negation: bool => [MoveCards, SelectTarget, LookReveal, ModifyHearts, GainResource, ChangeState, MiscOp]);
-    setter!(set_non_stackable, non_stackable: bool => [RestrictionOp]);
+
     setter!(set_operation, operation: ArcStr => [ModifyScore, ModifyHearts, GainResource, RestrictionOp], boxed [MiscOp]);
-    setter!(set_option, option: ArcStr => [AbilityOp]);
+
     pub fn set_optional(&mut self, val: Option<bool>) {
         self.optional = val;
         match self.kind.as_deref_mut() {
@@ -3390,14 +3300,14 @@ impl AbilityEffect {
     setter!(set_original_count, original_count: u32 => [ModifyHearts, MiscOp]);
     setter!(set_original_operator, original_operator: Operator => [ModifyHearts, MiscOp]);
     setter!(set_original_value, original_value: bool => [MoveCards, SelectTarget, LookReveal, ModifyHearts, GainResource, ChangeState, MiscOp, CustomOp]);
-    box_setter!(set_parenthetical, parenthetical: Vec<String> => [MiscOp]);
+
     setter!(set_per_group, per_group: bool => [MoveCards, MiscOp]);
     setter!(set_per_group_count, per_group_count: u32 => [MoveCards, MiscOp]);
     setter!(set_per_unit, per_unit: bool => [SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, MiscOp]);
     setter!(set_per_unit_count, per_unit_count: u32 => [SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, MiscOp]);
     setter!(set_per_unit_location, per_unit_location: ArcStr => [SelectTarget, LookReveal, ModifyScore, GainResource, ChangeState], boxed [MiscOp]);
     setter!(set_per_unit_type, per_unit_type: ArcStr => [SelectTarget, LookReveal, ModifyScore, GainResource, ChangeState], boxed [MiscOp]);
-    setter!(set_phase, phase: ArcStr => [RestrictionOp]);
+
     box_setter!(set_picker, picker: ArcStr => [MiscOp]);
     setter!(set_placement_order, placement_order: PlacementOrder => [MoveCards, SelectTarget, MiscOp]);
     setter!(set_question, question: ArcStr => [SelectTarget, CompoundEffect, CustomOp]);
@@ -3405,10 +3315,10 @@ impl AbilityEffect {
     box_setter!(set_ref_value, ref_value: ArcStr => [MiscOp]);
     setter!(set_repeat_limit, repeat_limit: u32 => [ModifyScore, ModifyHearts, CompoundEffect, MiscOp]);
     setter!(set_replaces_event, replaces_event: ArcStr => [RestrictionOp, CustomOp]);
-    setter!(set_replace_all, replace_all: bool => [ModifyHearts]);
+
     setter!(set_require_all_heart_colors, require_all_heart_colors: bool => [MiscOp]);
     setter!(set_resource, resource: ArcStr => [GainResource]);
-    setter!(set_resource_icon_count, resource_icon_count: u32 => [MiscOp]);
+
     setter!(set_restricted_destination, restricted_destination: ArcStr => [RestrictionOp]);
     setter!(set_restriction_type, restriction_type: ArcStr => [RestrictionOp]);
     setter!(set_reveal, reveal: bool => [LookReveal, SelectTarget]);
@@ -3440,7 +3350,7 @@ impl AbilityEffect {
             _ => {}
         }
     }
-    setter!(set_suppressed_trigger, suppressed_trigger: ArcStr => [AbilityOp]);
+
     setter!(set_target_count, target_count: u32 => [MoveCards, DrawCards, SelectTarget, ModifyScore, ModifyHearts, CompoundEffect, MiscOp]);
     setter!(set_target_from_selection, target_from_selection: bool => [MoveCards, GainResource]);
     setter!(set_target_member, target_member: ArcStr => [PositionOp]);
@@ -3451,7 +3361,7 @@ impl AbilityEffect {
     box_setter!(set_trigger_filter, trigger_filter: Vec<String> => [AbilityOp, RestrictionOp, CustomOp]);
     setter!(set_trigger_type, trigger_type: ArcStr => [AbilityOp, RestrictionOp, CustomOp]);
     setter!(set_triggers, triggers: ArcStr => [AbilityOp, CustomOp]);
-    setter!(set_use_limit, use_limit: u32 => [AbilityOp, CustomOp]);
+
     setter!(set_value, value: u32 => [ModifyScore, ModifyHearts, GainResource, MiscOp]);
 }
 
@@ -6026,21 +5936,5 @@ impl Card {
     /// Set cost to specific value
     pub fn set_cost(&mut self, amount: u32) {
         self.cost = Some(amount);
-    }
-
-    pub fn get_hand_cost_reduction(&self, hand_size: usize) -> u32 {
-        for ability in &self.abilities {
-            if let Some(ref effect) = ability.effect {
-                if effect.action == crate::ability::enums::ActionType::ModifyCost
-                    && effect.operation_any() == Some("subtract")
-                    && Zone::from_str(effect.location_any().unwrap_or("")) == Some(Zone::Hand)
-                    && effect.cost_limit_any().is_none()
-                {
-                    let per_unit = effect.per_unit_count_any().unwrap_or(1) as usize;
-                    return (hand_size.saturating_sub(1) * per_unit) as u32;
-                }
-            }
-        }
-        0
     }
 }
