@@ -942,23 +942,36 @@ Currently implemented for EffectKind (128 slots × 808B = 103 KB). Condition poo
 | `CountingAllocator` | ✅ Live | 130 | Measurement tool |
 | `Pool<T>` + `EkBox` | ✅ Live | 180 | 0.3% alloc reduction (52 allocs saved) |
 | `CondBox` (Condition pool) | 🔲 Blocked | ~50 | Same again (52 allocs) |
-| Bump arena in `#[global_allocator]` | 🔲 Not started | ~100 | **~99% alloc reduction** (~14,900 allocs saved) |
+| Bump arena v0 (monotonic) | ✅ Live (feature-gated) | ~90 | 64KB static buffer, cursor never resets |
+| Bump arena v1 (cursor reset) | 🔲 Not started | ~40 | **~99% alloc reduction** (~14,900 allocs saved) |
 | Arena reset in trigger boundary | 🔲 Not started | ~20 | Reset cursor after each trigger |
 
 The bump arena is the 99% solution. The pools are just insurance for the few allocations that outlive the trigger.
 
 ### What doesn't work yet
 
+**Arena v0 (monotonic) — committed:**
+A 64KB static buffer with a bump cursor that never resets. `arena_alloc()` bumps the cursor; `arena_contains_ptr()` identifies arena-owned pointers; `CountingAllocator::dealloc()` no-ops for arena pointers. Feature-gated behind `arena_allocator` (NOT in default).
+
+The arena v0 proves the architecture works (1828/1829 tests pass with arena enabled) but fills up after ~100-200 ability evaluations. Once full, all allocs fall through to System — degrading to the status quo.
+
+**Cursor reset — the blocking issue:**
+Resetting the cursor requires knowing when ALL arena-allocated data from a trigger batch is dropped. The problem: `process_current_ability` enters/exits the arena per-ability, but the resolver and pending queue may hold references to arena-allocated data (Vecs of moved cards, selected cards, etc.) that outlive the ability's `clear_effect_tracking()` call. When the next ability's `arena_enter()` resets the cursor, those references become dangling.
+
+Attempted solutions that failed:
+1. **thread_local! + Cell** — re-entrant init from global allocator caused stack overflow
+2. **Static mut + AtomicBool** — not thread-safe across test threads
+3. **platform_alloc (HeapAlloc)** — different heap than Rust's System allocator caused heap corruption
+4. **Depth counter** — cursor reset at depth 0→1 still overwrites live data from paused abilities
+
+The correct solution requires a **per-turn arena** (reset between game turns, not between abilities) OR an **epoch-based reclamation** scheme where objects are promoted out of the arena before reset.
+
 **CondBox serde issue:** Condition's deserialization uses `#[serde(tag = "type")]`. When wrapped in `CondBox`, serde needs to deserialize the inner enum. The naive approach of delegating to `Condition::deserialize(d)` should work — but testing showed 6 Kasumi test failures that need investigation.
 
-**Cloning out of arena:** When an effect is cloned for the pending queue, the clone currently copies the entire tree into a new `Box::new()` allocation. With the arena, pending-queued effects need to be cloned to the heap (or pool) before the arena resets. This is already handled naturally by `EkBox::clone()` (which uses the pool) and `Box::clone()` (which uses the system allocator). Arena-backed Vecs would need explicit draining before reset.
+### What it would take to finish arena v1
 
-**Thread safety:** The bump arena is thread-local (per-handler). The pool is shared with a Mutex (only hit during cloning, not during the hot path). The `#[global_allocator]` wrapper needs to detect whether the current thread has an active arena.
-
-### What it would take to finish
-
-1. **Add bump arena to `CountingAllocator`** — ~100 lines
-2. **Wire arena enable/disable into trigger boundaries** — ~20 lines in `execute_effect` / `resume_pending_actions`
+1. **Per-turn arena lifecycle** — enter at game turn start, exit at turn end (not per-ability). ~10 lines. This means the arena survives across all ability evaluations within a single turn, and the cursor resets between turns. Risk: arena might fill up during a complex turn with many abilities.
+2. **Double-buffer arena** — two 64KB buffers, alternate between turns. One is live (active), one is dead (safe to reset). ~40 lines.
 3. **Fix CondBox serde** — ~10 lines  
 4. **Add arena-backed Vec/Box type** — ~150 lines (or use `bumpalo` crate)
 
