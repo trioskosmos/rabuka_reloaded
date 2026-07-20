@@ -102,8 +102,8 @@ Each `Vec<String>` (24 bytes) → `Box<Vec<String>>` (8 bytes) saves 16 bytes pe
 
 | Type | Size (before) | Size (after) | Notes |
 |------|--------------|-------------|-------|
-| `Condition` | **1864** | **536** | Flat struct → tagged enum, 71% reduction |
-| `EffectKind` | **1248** | **656** | 14 Vec fields boxed + DynamicCount/PositionInfo/QuotedText boxed + field additions |
+| `Condition` | **1864** | **520** | Flat struct → tagged enum, 72% reduction |
+| `EffectKind` | **1248** | **544** | Vec/ArcStr/DynamicCount/PositionInfo/QuotedText all boxed. MiscOp is the determining variant. |
 | `AbilityEffect` | **1536** | **152** | Box\<EffectKind\> → Box, -800B stack. `action: String (24B)` → `ActionType (1B+padding=2B)`, `r#ref` removed |
 | `ActionType` | **String (24B)** | **1B (enum)** | serde-compatible via `rename_all = "snake_case"`. Discriminant fits in 1 byte, padding takes it to 2 |
 | `CompoundBranch` | **96** | **96** | Mostly boxed pointers now |
@@ -136,7 +136,99 @@ Same for effects: `{"action": "draw_card", "count": 2}` maps to `EffectKind::Dra
 
 ---
 
-## ❌ What remains: ranked by RAM + cycle impact
+## What remains: ranked by RAM + cycle impact
+
+### Current snapshot (after all completed work)
+
+| Type | Original | Current | Reduction |
+|------|----------|---------|-----------|
+| `EffectKind` | 1248 B | **544 B** | 56% |
+| `AbilityEffect` | 1536 B | **152 B** | 90% |
+| `Condition` | 1864 B | **520 B** | 72% |
+| Ability RAM (lazy) | ~2.8 MB | **~283 KB** | 90% |
+
+---
+
+### P1 — Consolidate AbilityEffect + EffectKind flat fields
+
+**Status:** 🔄 Audited. source/destination are LIVE (27+ read sites). count/target are LIVE (50+ reads).
+
+**Why:** `AbilityEffect` stores flat `source`, `destination`, `count`, `target` fields that duplicate EffectKind variant data. Removing them would shrink AbilityEffect from 152→~96B (~80KB saved).
+
+**Audit findings:**
+- `source` and `destination` — 27+ direct read/write sites across effects/, move_cards.rs, describe.rs, choice.rs, cost.rs
+- `count` — 4 getter methods, ~25 call sites
+- `target` — 3 getter methods, ~40 call sites
+- `conditional` — 2 readers (live)
+- `is_further` — 2 readers (live)
+- `optional` — ~50 readers (very live)
+- `max` — ~15 readers (very live)
+- `non_stackable` — 2 readers (live)
+
+**Strategy:** Custom Deserialize impl on AbilityEffect that feeds flat JSON keys into EffectKind during deserialization. Then remove flat fields. This also kills `populate_from_json` (the "rekindle" mechanism).
+
+**Estimated effort:** ~50-100 files, careful serde compat.
+
+---
+
+### P0.5 — Activate parser _collapse_to_effect_steps
+
+**Why:** The parser has a stub function that should replace 4 legacy compound effect shapes with unified `effect_steps`. Removes ~200 lines of Rust dispatch code. No direct RAM savings but reduces binary size.
+
+**Estimated effort:** Migrate 4 handlers, then activate stub.
+
+---
+
+### P1 — Arena allocator v1 (per-turn lifecycle)
+
+**Status:** v0 committed (monotonic bump, 64KB static buffer). Cursor reset is the blocking issue.
+
+**Why:** Current arena fills up after ~100-200 ability evaluations then degrades to normal allocation. Per-turn reset would reclaim arena memory between turns.
+
+**Blocking issue:** Arena data must outlive the ability that allocated it (pending choices, queued effects). Per-ability enter/exit is wrong — need per-turn lifecycle. But arena-allocated data from one ability might be stored in pending queues and accessed during the next turn.
+
+**Options:**
+1. Per-turn lifecycle: enter at turn start, exit at turn end. Risk: arena fills during complex turns.
+2. Double-buffer: alternate between two 64KB buffers per turn. One is live, one resets.
+3. Epoch-based: objects promoted out of arena before reset.
+
+---
+
+### serde_json::Value → typed enums — ✅ DONE
+
+**Completed (2026-07-20):**
+- `LogEntry.metadata: serde_json::Value` → `LogMetadata` tagged enum (4 variants: TriggerEvaluation, TurnStart, RpsResult, AbilityResolution)
+- `TemporaryEffect.effect_data: serde_json::Value` → `EffectData` tagged enum (6 variants: HeartOverride, SingleCard, MultiCard, AllCards, SetBladeCount, SurplusHeart)
+- ~40B saved per instance, heap allocations eliminated
+- All 1820+1829+1829 tests pass
+
+---
+
+### New priorities (audited 2026-07-20)
+
+#### P2 — Replace orientation_modifiers String values with CardState enum (~300B saved)
+`HashMap<i16, String>` → `HashMap<i16, CardState>` where CardState is "active"/"wait" enum. Eliminates 6 String heap allocs.
+
+#### P2 — Replace character_effects Vec<serde_json::Value> with typed enum
+Last remaining serde_json::Value in hot-path code (MiscOp variant).
+
+#### P2 — SmallVec for short GameState Vec fields (~500B saved)
+`prohibition_effects`, `cannot_activate_members`, `cannot_live_players`, `temporary_effects`, `replacement_effects`, etc. are typically 0-3 entries. `SmallVec<[T; 4]>` avoids heap alloc.
+
+#### P2 — HashMap→SmallVec in GameState (~1200B saved)
+`baton_touch_count`, `turn_limit_usage`, `turn1_abilities_played`, `turn2_abilities_played` etc. are only 2 players. SmallVec avoids HashMap overhead.
+
+#### P3 — Extract EffectFilters from EffectKind variants (~200B per instance)
+Common filter fields (characters, group_names, heart_colors, etc.) repeated across 7+ variants. Extract to `Box<EffectFilters>`.
+
+#### P3 — Box<str> for short String fields (~8-16B per field × ~30 fields)
+zone names, player IDs, effect types are always short. Box<str> saves 8 bytes each.
+
+#### P3 — u8/enum for player IDs (~24B per field × ~20 fields)
+"p1"/"p2" → PlayerId enum or u8 throughout GameState, MovementEvent, LogEntry, etc.
+
+#### P4 — Box SelectCardFields in Choice enum (~320B)
+SelectCard variant is ~400B, other variants are ~80B. Boxing SelectCard shrinks Choice enum.
 
 ### P1.7 — Lazy / on-demand ability resolution — ✅ DONE
 
