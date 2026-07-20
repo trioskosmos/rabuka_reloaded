@@ -1013,7 +1013,7 @@ impl<'a> ConditionContext<'a> {
             Some(Zone::Energy) => player.energy_zone.cards.to_vec(),
             Some(Zone::LiveCardZone) => player.live_card_zone.cards.to_vec(),
             Some(Zone::SuccessLiveZone) => player.success_live_card_zone.cards.to_vec(),
-            Some(Zone::RevealedCards) => self.game_state.revealed_cards.clone(),
+            Some(Zone::RevealedCards) => self.game_state.revealed_cards.to_vec(),
             _ => return true,
         };
         // If a group filter is specified, only check distinctness within that group
@@ -1293,7 +1293,7 @@ impl<'a> ConditionContext<'a> {
             if condition.get_yell_trigger() == Some(true) {
                 return self.game_state.yell_occurred;
             }
-            self.game_state.revealed_cards.clone()
+            self.game_state.revealed_cards.to_vec()
         } else if is_both {
             let self_p = self.resolve_condition_player("self");
             let opp_p = self.resolve_condition_player("opponent");
@@ -1777,7 +1777,7 @@ impl<'a> ConditionContext<'a> {
                 .and_then(|gn| gn.first().map(|s| s.as_str()));
             let location = condition.get_location().unwrap_or("");
             let source_cards: Vec<i16> = match Zone::from_str(location) {
-                Some(Zone::RevealedCards) => self.game_state.revealed_cards.clone(),
+                Some(Zone::RevealedCards) => self.game_state.revealed_cards.to_vec(),
                 Some(Zone::Stage) => player
                     .stage
                     .stage

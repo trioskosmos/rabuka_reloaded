@@ -481,7 +481,7 @@ impl GameState {
             self.activating_card = prev_activating;
         }
         let _jyouji_len = jyouji_statuses.len();
-        self.constant_ability_statuses = jyouji_statuses;
+        self.constant_ability_statuses = jyouji_statuses.into();
         tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
 
         // Blade
@@ -1144,7 +1144,7 @@ impl GameState {
     }
 
     pub fn remove_revealed_card(&mut self, card_id: i16) {
-        self.revealed_cards.retain(|&id| id != card_id);
+        self.revealed_cards.retain(|id| *id != card_id);
     }
 
     pub fn is_card_revealed(&self, card_id: i16) -> bool {

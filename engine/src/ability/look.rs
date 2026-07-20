@@ -448,10 +448,10 @@ impl AbilityResolver {
                 .filter(|&&id| id != -1)
                 .copied()
                 .collect(),
-            Some(Zone::LookedAt) => gs.looked_at_cards.clone(),
+            Some(Zone::LookedAt) => gs.looked_at_cards.to_vec(),
             Some(Zone::LiveCardZone) => player.live_card_zone.cards.iter().copied().collect(),
             Some(Zone::SelectedCards) => self.selected_cards.clone(),
-            Some(Zone::RevealedCards) => gs.revealed_cards.clone(),
+            Some(Zone::RevealedCards) => gs.revealed_cards.to_vec(),
             _ => vec![],
         };
 
@@ -489,13 +489,13 @@ impl AbilityResolver {
                 super::util::filter_distinct(&filtered, &card_db, &distinct_filter, false);
             gs.looked_at_cards = distinct_indices.iter().map(|&i| filtered[i]).collect();
         } else {
-            gs.looked_at_cards = filtered;
+            gs.looked_at_cards = filtered.into();
         }
 
         // Apply CardFilter::from_effect for all remaining filters
         let filter = super::util::CardFilter::from_effect(effect);
         gs.looked_at_cards
-            .retain(|&id| filter.matches(&card_db, id, false));
+            .retain(|id| filter.matches(&card_db, *id, false));
 
         if effect.exclude_selected_any().unwrap_or(false) && !self.selected_cards.is_empty() {
             gs.looked_at_cards
@@ -503,7 +503,7 @@ impl AbilityResolver {
         }
         if effect.exclude_self_any().unwrap_or(false) {
             if let Some(activating_id) = gs.activating_card {
-                gs.looked_at_cards.retain(|&id| id != activating_id);
+                gs.looked_at_cards.retain(|id| *id != activating_id);
             }
         }
 
@@ -609,7 +609,7 @@ impl AbilityResolver {
             if filter.has_filter() {
                 // Filter revealed_cards in-place
                 gs.revealed_cards
-                    .retain(|&cid| filter.matches(card_db, cid, false));
+                    .retain(|cid| filter.matches(card_db, *cid, false));
             }
             let available = gs.revealed_cards.len();
             let max_select = if optional || any_number {
@@ -916,7 +916,7 @@ impl AbilityResolver {
             _ => take_cards(util::zone_cards(player, source)),
         };
 
-        gs.looked_at_cards = cards;
+        gs.looked_at_cards = cards.into();
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card
@@ -961,7 +961,7 @@ impl AbilityResolver {
                 looked.extend(player.main_deck.draw_multiple(more));
             }
         }
-        gs.looked_at_cards = looked;
+        gs.looked_at_cards = looked.into();
         Ok(())
     }
 
@@ -987,7 +987,7 @@ impl AbilityResolver {
                 Some(Zone::Discard) | Some(Zone::Waitroom) => {
                     player.waitroom.cards.iter().copied().collect()
                 }
-                Some(Zone::LookedAt) => gs.looked_at_cards.clone(),
+                Some(Zone::LookedAt) => gs.looked_at_cards.to_vec(),
                 _ => vec![],
             }
         };
@@ -1110,7 +1110,7 @@ impl AbilityResolver {
         let (all_revealed, _) = self.reveal_until(gs, target, |card_db, cid| {
             card_db.get_card(cid).map(|c| c.is_live()).unwrap_or(false)
         });
-        gs.looked_at_cards = all_revealed;
+        gs.looked_at_cards = all_revealed.into();
         Ok(())
     }
 

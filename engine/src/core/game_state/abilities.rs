@@ -1794,8 +1794,8 @@ impl GameState {
                             Some(Zone::Energy) | Some(Zone::EnergyZone) => {
                                 player.energy_zone.cards.iter().copied().collect()
                             }
-                            Some(Zone::LookedAt) => self.looked_at_cards.clone(),
-                            Some(Zone::RevealedCards) => self.revealed_cards.clone(),
+                            Some(Zone::LookedAt) => self.looked_at_cards.to_vec(),
+                            Some(Zone::RevealedCards) => self.revealed_cards.to_vec(),
                             Some(Zone::Deck) => player.main_deck.cards.iter().copied().collect(),
                             Some(Zone::SelectedCards) => entry
                                 .resolver

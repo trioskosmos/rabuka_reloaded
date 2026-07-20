@@ -1048,7 +1048,7 @@ impl<'a> ConditionContext<'a> {
                     let cards = util::zone_cards(player, loc);
                     let matching = match zone {
                         Some(z) if z == crate::ability::enums::Zone::RevealedCards => {
-                            self.game_state.revealed_cards.clone()
+                            self.game_state.revealed_cards.to_vec()
                         }
                         _ => cards.to_vec(),
                     };

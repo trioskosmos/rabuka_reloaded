@@ -13,6 +13,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use smallvec::SmallVec;
 #[cfg(not(feature = "no_std"))]
 use std::collections::BTreeSet;
 
@@ -1170,9 +1171,9 @@ impl AbilityResolver {
                 //  causing the returned cards to still exist in the source after move.)
                 // Use gs.revealed_cards as the primary source; drain cheer_buf in sync.
                 let cards: Vec<i16> = if !cheer_buf.is_empty() {
-                    let c = core::mem::take(cheer_buf);
+                    let c: SmallVec<[i16; 8]> = core::mem::take(cheer_buf);
                     gs.revealed_cards.retain(|id| !c.contains(id));
-                    c
+                    c.to_vec()
                 } else {
                     // Filter to only include cards owned by the target player.
                     // revealed_cards is a global pool containing cards from both players'
@@ -1437,7 +1438,7 @@ impl AbilityResolver {
         {
             let taken_count = taken.len();
             moved_cards.extend(taken.iter().copied());
-            gs.looked_at_cards = taken.clone();
+            gs.looked_at_cards = taken.clone().into();
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "order".to_string(),
                 description: format!("Choose order for cards on deck ({} cards)", taken_count),
@@ -2497,7 +2498,7 @@ impl AbilityResolver {
         );
 
         if gs.looked_at_cards.is_empty() && !self.selected_cards.is_empty() {
-            gs.looked_at_cards = self.selected_cards.clone();
+            gs.looked_at_cards = self.selected_cards.clone().into();
         }
 
         log::debug!(
@@ -2561,7 +2562,7 @@ impl AbilityResolver {
             });
         }
 
-        let remaining_cards: Vec<i16> = core::mem::take(looked_at);
+        let remaining_cards: SmallVec<[i16; 8]> = core::mem::take(looked_at);
 
         let is_deck_dest = Zone::from_str(&destination) == Some(Zone::DeckTop)
             || Zone::from_str(&destination) == Some(Zone::Deck);
@@ -2570,7 +2571,7 @@ impl AbilityResolver {
             && selected_cards.len() > 1;
 
         if needs_order {
-            gs.looked_at_cards = selected_cards;
+            gs.looked_at_cards = selected_cards.into();
             let player = gs.resolve_target_player_mut(&target);
             let dest_zone = if discard_remaining {
                 Zone::Discard.to_str()

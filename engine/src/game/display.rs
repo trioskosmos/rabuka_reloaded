@@ -1357,7 +1357,7 @@ pub fn player_to_display(
 
 pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     // Collect publicly visible revealed cards + pending_choice selection cards
-    let mut looked_ids: Vec<i16> = game_state.looked_at_cards.clone();
+    let mut looked_ids: Vec<i16> = game_state.looked_at_cards.to_vec();
     looked_ids.extend(&game_state.revealed_cards);
     if let Some(ref pc) = game_state.get_pending_choice_json() {
         if let Some(cards) = pc.get("selection_cards").and_then(|v| v.as_array()) {
@@ -1674,7 +1674,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     });
 
     // Mulligan indices
-    let mulligan_indices: Vec<usize> = game_state.mulligan_selected_indices.clone();
+    let mulligan_indices: Vec<usize> = game_state.mulligan_selected_indices.to_vec();
 
     GameStateDisplay {
         turn: game_state.turn_number,
@@ -1815,7 +1815,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .iter()
             .cloned()
             .collect(),
-        constant_ability_statuses: game_state.constant_ability_statuses.clone(),
+        constant_ability_statuses: game_state.constant_ability_statuses.to_vec(),
         negated_abilities: game_state.negated_abilities.iter().copied().collect(),
         temporary_effects: temp_effects,
         replacement_effects: repl_effects,
@@ -1850,9 +1850,9 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         cheer_check_completed: game_state.cheer_check_completed,
         player1_cheer_blade_heart_count: game_state.player1_cheer_blade_heart_count,
         player2_cheer_blade_heart_count: game_state.player2_cheer_blade_heart_count,
-        player1_cheer_revealed_cards: game_state.player1_cheer_revealed_cards.clone(),
-        player2_cheer_revealed_cards: game_state.player2_cheer_revealed_cards.clone(),
-        revealed_cards: game_state.revealed_cards.clone(),
+        player1_cheer_revealed_cards: game_state.player1_cheer_revealed_cards.to_vec(),
+        player2_cheer_revealed_cards: game_state.player2_cheer_revealed_cards.to_vec(),
+        revealed_cards: game_state.revealed_cards.to_vec(),
         revealed_card_info: game_state
             .revealed_cards
             .iter()
@@ -1872,8 +1872,8 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
                 }
             })
             .collect(),
-        initial_yell_revealed_cards: game_state.initial_yell_revealed_cards.clone(),
-        re_yell_revealed_cards: game_state.re_yell_revealed_cards.clone(),
+        initial_yell_revealed_cards: game_state.initial_yell_revealed_cards.to_vec(),
+        re_yell_revealed_cards: game_state.re_yell_revealed_cards.to_vec(),
         heart_color_decision_phase: game_state.heart_color_decision_phase.clone(),
         live_owned_hearts: live_owned,
         opponent_choice_declined: game_state.opponent_choice_declined,
@@ -1882,7 +1882,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .pending_success_replacement_player_id
             .clone(),
         resolution_zone_cards: game_state.resolution_zone.cards.iter().copied().collect(),
-        revealed_cost_cards: game_state.revealed_cost_cards.clone(),
+        revealed_cost_cards: game_state.revealed_cost_cards.to_vec(),
         revealed_cost_card_info: game_state
             .revealed_cost_cards
             .iter()

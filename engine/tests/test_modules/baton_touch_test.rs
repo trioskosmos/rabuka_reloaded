@@ -370,7 +370,7 @@ fn card_count_condition_baton_touch_filter() {
     // Remove one member from baton_touch_arriving_card_ids — condition should fail
     game.state
         .baton_touch_arriving_card_ids
-        .retain(|&id| id != member2);
+        .retain(|id| *id != member2);
     let ctx3 = ConditionContext::new(&game.state);
     assert!(
         !ctx3.evaluate_condition(&condition),

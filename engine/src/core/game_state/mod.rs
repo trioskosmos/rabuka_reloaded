@@ -54,7 +54,7 @@ pub struct GameState {
     pub turn1_abilities_played: HashSet<String>,
     pub turn2_abilities_played: HashMap<String, u32>,
     pub live_owned_hearts: HashMap<String, Vec<(String, u32)>>,
-    pub temporary_effects: Vec<TemporaryEffect>,
+    pub temporary_effects: SmallVec<[TemporaryEffect; 4]>,
     pub prohibition_effects: SmallVec<[String; 4]>,
     pub delayed_prohibition_effects: SmallVec<[String; 4]>,
     pub non_stackable_effects: HashSet<String>,
@@ -62,8 +62,8 @@ pub struct GameState {
     pub constant_cannot_activate_members: HashSet<String>,
     pub cannot_live_players: SmallVec<[String; 2]>,
     pub turn_limited_abilities_used: HashMap<(i16, usize, u32), u8>,
-    pub mulligan_selected_indices: Vec<usize>,
-    pub live_card_selected_indices: Vec<usize>,
+    pub mulligan_selected_indices: SmallVec<[usize; 2]>,
+    pub live_card_selected_indices: SmallVec<[usize; 3]>,
     pub auto_ability_trigger_counts: SmallVec<[(String, u32); 8]>,
     pub turn_limit_usage: SmallVec<[(String, u32); 8]>,
     pub card_instance_mapping: HashMap<i16, u32>,
@@ -79,25 +79,25 @@ pub struct GameState {
     /// they depend on revealed_cards from the yell).  Stored as `(card_id, effect)`
     /// and evaluated during `execute_live_victory_determination` when the yell
     /// results are available.
-    pub delayed_gained_effects: Vec<(i16, crate::card::AbilityEffect)>,
+    pub delayed_gained_effects: SmallVec<[(i16, crate::card::AbilityEffect); 2]>,
     pub negated_abilities: SmallVec<[i16; 8]>,
-    pub replacement_effects: Vec<ReplacementEffect>,
-    pub constant_ability_statuses: Vec<crate::types::ConstantAbilityStatus>,
-    pub revealed_cards: Vec<i16>,
-    pub revealed_card_meta: Vec<RevealedCardMeta>,
-    pub revealed_cost_cards: Vec<i16>,
-    pub revealed_cost_card_meta: Vec<RevealedCardMeta>,
-    pub player1_cheer_revealed_cards: Vec<i16>,
-    pub player2_cheer_revealed_cards: Vec<i16>,
+    pub replacement_effects: SmallVec<[ReplacementEffect; 2]>,
+    pub constant_ability_statuses: SmallVec<[crate::types::ConstantAbilityStatus; 6]>,
+    pub revealed_cards: SmallVec<[i16; 8]>,
+    pub revealed_card_meta: SmallVec<[RevealedCardMeta; 8]>,
+    pub revealed_cost_cards: SmallVec<[i16; 8]>,
+    pub revealed_cost_card_meta: SmallVec<[RevealedCardMeta; 8]>,
+    pub player1_cheer_revealed_cards: SmallVec<[i16; 8]>,
+    pub player2_cheer_revealed_cards: SmallVec<[i16; 8]>,
     /// Cards revealed by the initial yell (saved before re-yell overwrites them).
-    pub initial_yell_revealed_cards: Vec<i16>,
+    pub initial_yell_revealed_cards: SmallVec<[i16; 8]>,
     /// Cards revealed by a re-yell (set after perform_yell draws new cards).
-    pub re_yell_revealed_cards: Vec<i16>,
-    pub looked_at_cards: Vec<i16>,
+    pub re_yell_revealed_cards: SmallVec<[i16; 8]>,
+    pub looked_at_cards: SmallVec<[i16; 8]>,
     pub ability_applications: Vec<crate::types::AbilityApplication>,
     /// Synced from batch_movements by push_movement_event().
     pub recently_moved_cards: Option<Vec<i16>>,
-    pub recently_appeared_cards: Vec<i16>,
+    pub recently_appeared_cards: SmallVec<[i16; 4]>,
     pub recently_moved_from_zone: Option<String>,
     /// Explicit per-batch event log of stage-area-to-stage-area position changes.
     /// Each entry records the moved card, old/new position, and cause info.
@@ -127,7 +127,7 @@ pub struct GameState {
     /// After a change_state effect executes, records what actually changed:
     /// (card_id, from_state, to_state). Cleared after post-resolution TAS scan.
     pub recently_state_changed: Vec<(i16, String, String)>,
-    pub debut_ability_triggers: Vec<(String, i16)>,
+    pub debut_ability_triggers: SmallVec<[(String, i16); 4]>,
     pub last_vacated_stage_area: Option<usize>,
     // --- 4-byte aligned (u32, Option<i32>) ---
     pub turn_number: u32,
@@ -139,7 +139,7 @@ pub struct GameState {
     pub card_instance_counter: u32,
     pub baton_touch_count_p1: u32,
     pub baton_touch_count_p2: u32,
-    pub baton_touch_arriving_card_ids: Vec<i16>,
+    pub baton_touch_arriving_card_ids: SmallVec<[i16; 2]>,
     pub effect_creation_counter: u32,
     pub last_state_change_wait_to_active_count: u32,
     pub player1_rps_choice: Option<i32>,
@@ -257,7 +257,7 @@ impl GameState {
             turn1_abilities_played: HashSet::default(),
             turn2_abilities_played: HashMap::default(),
             live_owned_hearts: HashMap::default(),
-            temporary_effects: Vec::new(),
+            temporary_effects: SmallVec::new(),
             prohibition_effects: SmallVec::new(),
             delayed_prohibition_effects: SmallVec::new(),
             non_stackable_effects: HashSet::default(),
@@ -265,8 +265,8 @@ impl GameState {
             constant_cannot_activate_members: HashSet::default(),
             cannot_live_players: SmallVec::new(),
             turn_limited_abilities_used: HashMap::default(),
-            mulligan_selected_indices: Vec::new(),
-            live_card_selected_indices: Vec::new(),
+            mulligan_selected_indices: SmallVec::new(),
+            live_card_selected_indices: SmallVec::new(),
             auto_ability_trigger_counts: SmallVec::new(),
             turn_limit_usage: SmallVec::new(),
             card_instance_mapping: HashMap::default(),
@@ -276,22 +276,22 @@ impl GameState {
             cards_moved_this_turn: HashSet::default(),
             gained_abilities: HashMap::default(),
             gained_card_abilities: HashMap::default(),
-            delayed_gained_effects: Vec::new(),
+            delayed_gained_effects: SmallVec::new(),
             negated_abilities: SmallVec::new(),
-            replacement_effects: Vec::new(),
-            constant_ability_statuses: Vec::new(),
-            revealed_cards: Vec::new(),
-            revealed_card_meta: Vec::new(),
-            revealed_cost_cards: Vec::new(),
-            revealed_cost_card_meta: Vec::new(),
-            player1_cheer_revealed_cards: Vec::new(),
-            player2_cheer_revealed_cards: Vec::new(),
-            initial_yell_revealed_cards: Vec::new(),
-            re_yell_revealed_cards: Vec::new(),
-            looked_at_cards: Vec::new(),
+            replacement_effects: SmallVec::new(),
+            constant_ability_statuses: SmallVec::new(),
+            revealed_cards: SmallVec::new(),
+            revealed_card_meta: SmallVec::new(),
+            revealed_cost_cards: SmallVec::new(),
+            revealed_cost_card_meta: SmallVec::new(),
+            player1_cheer_revealed_cards: SmallVec::new(),
+            player2_cheer_revealed_cards: SmallVec::new(),
+            initial_yell_revealed_cards: SmallVec::new(),
+            re_yell_revealed_cards: SmallVec::new(),
+            looked_at_cards: SmallVec::new(),
             ability_applications: Vec::new(),
             recently_moved_cards: None,
-            recently_appeared_cards: Vec::new(),
+            recently_appeared_cards: SmallVec::new(),
             recently_moved_from_zone: None,
             position_change_events: Vec::new(),
             batch_movements: Vec::new(),
@@ -300,7 +300,7 @@ impl GameState {
             movement_event_counter: 0,
             state_snapshot_before_change: None,
             recently_state_changed: Vec::new(),
-            debut_ability_triggers: Vec::new(),
+            debut_ability_triggers: SmallVec::new(),
             last_vacated_stage_area: None,
             // 4-byte aligned
             turn_number: 1,
@@ -312,7 +312,7 @@ impl GameState {
             card_instance_counter: 0,
             baton_touch_count_p1: 0,
             baton_touch_count_p2: 0,
-            baton_touch_arriving_card_ids: Vec::new(),
+            baton_touch_arriving_card_ids: SmallVec::new(),
             effect_creation_counter: 0,
             last_state_change_wait_to_active_count: 0,
             player1_rps_choice: None,
@@ -551,14 +551,14 @@ impl GameState {
     }
 
     /// Resolve which player's cheer_revealed_cards to use based on ability master.
-    pub fn cheer_revealed_cards_mut(&mut self) -> &mut Vec<i16> {
+    pub fn cheer_revealed_cards_mut(&mut self) -> &mut SmallVec<[i16; 8]> {
         match self.ability_master_id().as_deref() {
             Some("player2") | Some("p2") => &mut self.player2_cheer_revealed_cards,
             _ => &mut self.player1_cheer_revealed_cards,
         }
     }
 
-    pub fn cheer_revealed_cards(&self) -> &Vec<i16> {
+    pub fn cheer_revealed_cards(&self) -> &SmallVec<[i16; 8]> {
         match self.ability_master_id().as_deref() {
             Some("player2") | Some("p2") => &self.player2_cheer_revealed_cards,
             _ => &self.player1_cheer_revealed_cards,
@@ -575,7 +575,7 @@ impl GameState {
     }
 
     /// Cheer revealed cards, keyed by first/second attacker.
-    pub fn cheer_revealed_cards_first(&mut self, is_first: bool) -> &mut Vec<i16> {
+    pub fn cheer_revealed_cards_first(&mut self, is_first: bool) -> &mut SmallVec<[i16; 8]> {
         if is_first {
             &mut self.player1_cheer_revealed_cards
         } else {

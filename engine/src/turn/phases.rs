@@ -626,7 +626,7 @@ impl super::TurnEngine {
         };
         // Use provided indices (from PVP/local selection) or fallback to server state
         let mulligan_indices =
-            card_indices.unwrap_or_else(|| game_state.mulligan_selected_indices.clone());
+            card_indices.unwrap_or_else(|| game_state.mulligan_selected_indices.to_vec());
         // Sort descending so removals don't shift other targets
         let mut sorted_indices = mulligan_indices.clone();
         sorted_indices.sort_unstable();
@@ -754,7 +754,7 @@ impl super::TurnEngine {
         let is_second = matches!(game_state.current_phase, Phase::LiveCardSetSecondAttacker);
         let live_indices = card_indices
             .filter(|v| !v.is_empty())
-            .unwrap_or_else(|| game_state.live_card_selected_indices.clone());
+            .unwrap_or_else(|| game_state.live_card_selected_indices.to_vec());
         let mut sorted_indices: Vec<usize> = live_indices.clone();
         sorted_indices.sort_unstable();
         sorted_indices.dedup();
