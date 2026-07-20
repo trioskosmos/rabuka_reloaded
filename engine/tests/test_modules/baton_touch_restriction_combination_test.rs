@@ -125,10 +125,7 @@ fn double_baton_to_non_protected_zones_succeeds() {
         result
     );
     // 2 baton touches recorded
-    assert_eq!(
-        game.state.baton_touch_count.get("p1").copied().unwrap_or(0),
-        2
-    );
+    assert_eq!(game.state.baton_touch_count_p1, 2);
     // Protected card on Right should be untouched
     assert_eq!(game.state.player1.stage.stage[2], protected);
 }

@@ -33,7 +33,7 @@ fn setup_baton_touch_scenario(
     game.state.player1.waitroom.cards.push(niji_card);
     game.state.recently_moved_cards = Some(vec![niji_card]);
     game.state.recently_moved_from_zone = Some("stage".to_string());
-    game.state.baton_touch_count.insert("p1".to_string(), 1);
+    game.state.baton_touch_count_p1 = 1;
     game.state.baton_touch_replaced_member_id = Some(niji_card);
     game.state.baton_touch_arriving_card_id = Some(arriving_card);
     // Place arriving card on stage (as it would be after baton touch)

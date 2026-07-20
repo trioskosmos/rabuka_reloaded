@@ -2001,8 +2001,6 @@ pub enum EffectKind {
         #[serde(default)]
         card_names: Box<Vec<String>>,
         #[serde(default)]
-        character_effects: Option<Box<Vec<serde_json::Value>>>,
-        #[serde(default)]
         or_card_types: Option<Box<Vec<String>>>,
         #[serde(default)]
         options: Option<Box<Vec<Box<AbilityEffect>>>>,
@@ -2617,15 +2615,6 @@ impl AbilityEffect {
             }
             Some(EffectKind::MiscOp { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
             Some(EffectKind::CustomOp { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
-            _ => None,
-        }
-    }
-
-    pub fn character_effects_any(&self) -> Option<&Vec<serde_json::Value>> {
-        match self.kind.as_deref() {
-            Some(EffectKind::MiscOp {
-                character_effects, ..
-            }) => character_effects.as_ref().map(|b| b.as_ref()),
             _ => None,
         }
     }

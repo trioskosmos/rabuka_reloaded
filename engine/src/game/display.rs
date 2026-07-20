@@ -1748,7 +1748,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         game_result: game_result_str,
         is_first_turn: game_state.is_first_turn,
         turn_order_changed: game_state.turn_order_changed,
-        baton_touch_count: game_state.baton_touch_count.values().sum(),
+        baton_touch_count: game_state.baton_touch_count_p1 + game_state.baton_touch_count_p2,
         baton_touch_zero_cost: game_state.baton_touch_zero_cost,
         baton_touch_replaced_member_cost: game_state.baton_touch_replaced_member_cost,
         baton_touch_replaced_member_id: game_state.baton_touch_replaced_member_id,
@@ -1804,12 +1804,12 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .iter()
             .cloned()
             .collect(),
-        turn_limit_usage: game_state.turn_limit_usage.clone(),
+        turn_limit_usage: game_state.turn_limit_usage.iter().cloned().collect(),
         non_stackable_effects: game_state.non_stackable_effects.iter().cloned().collect(),
-        prohibition_effects: game_state.prohibition_effects.clone(),
-        delayed_prohibition_effects: game_state.delayed_prohibition_effects.clone(),
-        cannot_live_players: game_state.cannot_live_players.clone(),
-        cannot_activate_members: game_state.cannot_activate_members.clone(),
+        prohibition_effects: game_state.prohibition_effects.to_vec(),
+        delayed_prohibition_effects: game_state.delayed_prohibition_effects.to_vec(),
+        cannot_live_players: game_state.cannot_live_players.to_vec(),
+        cannot_activate_members: game_state.cannot_activate_members.to_vec(),
         constant_cannot_activate_members: game_state
             .constant_cannot_activate_members
             .iter()

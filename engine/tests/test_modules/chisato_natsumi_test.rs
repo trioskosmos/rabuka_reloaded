@@ -66,11 +66,7 @@ fn chisato_natsumi_double_baton_both_have_blade_heart() {
         game.state.player1.main_deck.cards.len()
     );
 
-    assert_eq!(
-        game.state.baton_touch_count.get("p1").copied().unwrap_or(0),
-        2,
-        "double baton → count=2"
-    );
+    assert_eq!(game.state.baton_touch_count_p1, 2, "double baton → count=2");
     // Draw: 2 Liella! replaced → 2 cards. Hand: 2 (initial) - 1 (played) + 2 (draw) = 3
     assert_eq!(
         game.state.player1.hand.cards.len(),
@@ -136,11 +132,7 @@ fn chisato_natsumi_double_baton_no_blade_heart() {
         game.state.player1.main_deck.cards.len()
     );
 
-    assert_eq!(
-        game.state.baton_touch_count.get("p1").copied().unwrap_or(0),
-        2,
-        "double baton → count=2"
-    );
+    assert_eq!(game.state.baton_touch_count_p1, 2, "double baton → count=2");
     // Draw: 2 Liella! replaced → 2 cards. Hand: 2 - 1 + 2 = 3
     assert_eq!(
         game.state.player1.hand.cards.len(),
@@ -192,11 +184,7 @@ fn chisato_natsumi_q265_double_baton_both_no_blade_heart() {
         game.select_indices(&[]);
     }
 
-    assert_eq!(
-        game.state.baton_touch_count.get("p1").copied().unwrap_or(0),
-        2,
-        "double baton → count=2"
-    );
+    assert_eq!(game.state.baton_touch_count_p1, 2, "double baton → count=2");
     // Draw: 2 Liella! replaced → 2 cards. Hand: 2 - 1 + 2 = 3
     assert_eq!(
         game.state.player1.hand.cards.len(),

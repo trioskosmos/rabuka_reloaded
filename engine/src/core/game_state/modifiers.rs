@@ -898,12 +898,20 @@ impl GameState {
 
     pub fn record_turn_limit_usage(&mut self, player_id: &str, card_instance_id: u32) {
         let key = format!("{}:{}", player_id, card_instance_id);
-        *self.turn_limit_usage.entry(key).or_insert(0) += 1;
+        if let Some((_, count)) = self.turn_limit_usage.iter_mut().find(|(k, _)| *k == key) {
+            *count += 1;
+        } else {
+            self.turn_limit_usage.push((key, 1));
+        }
     }
 
     pub fn get_turn_limit_usage(&self, player_id: &str, card_instance_id: u32) -> u32 {
         let key = format!("{}:{}", player_id, card_instance_id);
-        *self.turn_limit_usage.get(&key).unwrap_or(&0)
+        self.turn_limit_usage
+            .iter()
+            .find(|(k, _)| *k == key)
+            .map(|(_, v)| *v)
+            .unwrap_or(0)
     }
 
     pub fn clear_turn_limit_tracking(&mut self) {
@@ -931,21 +939,27 @@ impl GameState {
     }
 
     pub fn record_baton_touch(&mut self, player_id: &str, arriving_card_id: Option<i16>) {
-        *self
-            .baton_touch_count
-            .entry(player_id.to_string())
-            .or_insert(0) += 1;
+        if player_id == "p1" {
+            self.baton_touch_count_p1 += 1;
+        } else {
+            self.baton_touch_count_p2 += 1;
+        }
         if let Some(cid) = arriving_card_id {
             self.baton_touch_arriving_card_ids.push(cid);
         }
     }
 
     pub fn get_baton_touch_count(&self, player_id: &str) -> u32 {
-        self.baton_touch_count.get(player_id).copied().unwrap_or(0)
+        if player_id == "p1" {
+            self.baton_touch_count_p1
+        } else {
+            self.baton_touch_count_p2
+        }
     }
 
     pub fn clear_baton_touch_tracking(&mut self) {
-        self.baton_touch_count.clear();
+        self.baton_touch_count_p1 = 0;
+        self.baton_touch_count_p2 = 0;
         self.baton_touch_arriving_card_ids.clear();
         self.baton_touch_zero_cost = false;
         self.baton_touch_replaced_member_cost = None;
