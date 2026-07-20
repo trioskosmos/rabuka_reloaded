@@ -38,7 +38,7 @@ bytes = { version = "1", optional = true }
 rmp-serde = { version = "=1.1.2", optional = true }
 once_cell = { version = "1", default-features = false, features = ["alloc"], optional = true }
 [features]
-default = ["env_logger", "debug_conditions", "alloc_tracker", "rand", "rmp-serde"]
+default = ["env_logger", "debug_conditions", "alloc_tracker", "rand", "rmp-serde", "bytecode_abilities"]
 debug_conditions = []
 # Optional server feature: enables the web server and async runtime
 server = ["actix-web", "actix-cors", "actix-files", "tokio", "tokio-stream", "local-ip-address", "uuid", "bytes"]
