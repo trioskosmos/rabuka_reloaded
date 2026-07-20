@@ -1,5 +1,5 @@
 use crate::ability::ability_store::AbilityRef;
-use crate::ability::enums::{ActionType, ConditionType, EffectCardType, EffectState, Zone};
+use crate::ability::enums::{ActionType, ConditionType, EffectCardType, EffectState};
 use crate::core::types::ArcStr;
 use crate::HashMap;
 use serde::{Deserialize, Serialize};
@@ -856,11 +856,11 @@ pub enum EffectKind {
     /// MoveCards effect fields
     MoveCards {
         #[serde(default)]
-        source: Option<Zone>,
+        source: Option<ArcStr>,
         #[serde(default)]
         target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Zone>,
+        destination: Option<ArcStr>,
         #[serde(default)]
         count: Option<u32>,
         #[serde(default)]
@@ -938,7 +938,7 @@ pub enum EffectKind {
         #[serde(default)]
         negation: Option<bool>,
         #[serde(default)]
-        location: Option<Zone>,
+        location: Option<ArcStr>,
         #[serde(default)]
         activation_position: Option<ArcStr>,
         #[serde(default)]
@@ -993,11 +993,11 @@ pub enum EffectKind {
     /// DrawCards effect fields
     DrawCards {
         #[serde(default)]
-        source: Option<Zone>,
+        source: Option<ArcStr>,
         #[serde(default)]
         target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Zone>,
+        destination: Option<ArcStr>,
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
@@ -1009,7 +1009,7 @@ pub enum EffectKind {
         #[serde(default)]
         card_names: Box<Vec<String>>,
         #[serde(default)]
-        location: Option<Zone>,
+        location: Option<ArcStr>,
         #[serde(default)]
         exclude_self: Option<bool>,
         #[serde(default)]
@@ -1038,11 +1038,11 @@ pub enum EffectKind {
     /// SelectTarget effect fields
     SelectTarget {
         #[serde(default)]
-        source: Option<Zone>,
+        source: Option<ArcStr>,
         #[serde(default)]
         target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Zone>,
+        destination: Option<ArcStr>,
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
@@ -1104,7 +1104,7 @@ pub enum EffectKind {
         #[serde(default)]
         optional: Option<bool>,
         #[serde(default)]
-        location: Option<Zone>,
+        location: Option<ArcStr>,
         #[serde(default)]
         state: Option<EffectState>,
         #[serde(default)]
@@ -1155,11 +1155,11 @@ pub enum EffectKind {
     /// LookReveal effect fields
     LookReveal {
         #[serde(default)]
-        source: Option<Zone>,
+        source: Option<ArcStr>,
         #[serde(default)]
         target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Zone>,
+        destination: Option<ArcStr>,
         #[serde(default)]
         card_type: Option<EffectCardType>,
         #[serde(default)]
@@ -1213,7 +1213,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_location: Option<ArcStr>,
         #[serde(default)]
-        location: Option<Zone>,
+        location: Option<ArcStr>,
         #[serde(default)]
         group_reference: Option<ArcStr>,
         #[serde(default)]
@@ -1250,11 +1250,11 @@ pub enum EffectKind {
     /// ModifyScore effect fields
     ModifyScore {
         #[serde(default)]
-        source: Option<Zone>,
+        source: Option<ArcStr>,
         #[serde(default)]
         target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Zone>,
+        destination: Option<ArcStr>,
         #[serde(default)]
         operation: Option<ArcStr>,
         #[serde(default)]
@@ -1276,7 +1276,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_heart_colors: Box<Vec<String>>,
         #[serde(default)]
-        location: Option<Zone>,
+        location: Option<ArcStr>,
         #[serde(default)]
         effect_constraint: Option<ArcStr>,
         #[serde(default)]
@@ -1335,7 +1335,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_heart_colors: Box<Vec<String>>,
         #[serde(default)]
-        location: Option<Zone>,
+        location: Option<ArcStr>,
         #[serde(default)]
         timing_condition: Option<ArcStr>,
         #[serde(default)]
@@ -1414,7 +1414,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_location: Option<ArcStr>,
         #[serde(default)]
-        location: Option<Zone>,
+        location: Option<ArcStr>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1481,11 +1481,11 @@ pub enum EffectKind {
     /// ChangeState effect fields
     ChangeState {
         #[serde(default)]
-        source: Option<Zone>,
+        source: Option<ArcStr>,
         #[serde(default)]
         target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Zone>,
+        destination: Option<ArcStr>,
         #[serde(default)]
         state_change: Option<EffectState>,
         #[serde(default)]
@@ -1523,7 +1523,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_location: Option<ArcStr>,
         #[serde(default)]
-        location: Option<Zone>,
+        location: Option<ArcStr>,
         #[serde(default)]
         distinct: Option<DistinctType>,
         #[serde(default)]
@@ -1580,11 +1580,11 @@ pub enum EffectKind {
     /// AbilityOp effect fields
     AbilityOp {
         #[serde(default)]
-        source: Option<Zone>,
+        source: Option<ArcStr>,
         #[serde(default)]
         target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Zone>,
+        destination: Option<ArcStr>,
         #[serde(default)]
         ability_gain: Option<ArcStr>,
         #[serde(default)]
@@ -1614,7 +1614,7 @@ pub enum EffectKind {
         #[serde(default)]
         cost_limit_operator: Option<Operator>,
         #[serde(default)]
-        location: Option<Zone>,
+        location: Option<ArcStr>,
         #[serde(default)]
         trigger_filter: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1647,11 +1647,11 @@ pub enum EffectKind {
     /// CompoundEffect effect fields
     CompoundEffect {
         #[serde(default)]
-        source: Option<Zone>,
+        source: Option<ArcStr>,
         #[serde(default)]
         target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Zone>,
+        destination: Option<ArcStr>,
         #[serde(default, alias = "max_repeats")]
         repeat_limit: Option<u32>,
         #[serde(default)]
@@ -1736,7 +1736,7 @@ pub enum EffectKind {
         #[serde(default)]
         card_type: Option<EffectCardType>,
         #[serde(default)]
-        location: Option<Zone>,
+        location: Option<ArcStr>,
         #[serde(default)]
         effect_type: Option<ArcStr>,
         #[serde(default)]
@@ -1765,11 +1765,11 @@ pub enum EffectKind {
     /// PositionOp effect fields
     PositionOp {
         #[serde(default)]
-        source: Option<Zone>,
+        source: Option<ArcStr>,
         #[serde(default)]
         target: Option<ArcStr>,
         #[serde(default)]
-        destination: Option<Zone>,
+        destination: Option<ArcStr>,
         #[serde(default)]
         position: Option<Box<PositionInfo>>,
         #[serde(default)]
@@ -1999,7 +1999,7 @@ pub enum EffectKind {
         #[serde(default)]
         card_property: Option<ArcStr>,
         #[serde(default)]
-        location: Option<Zone>,
+        location: Option<ArcStr>,
         #[serde(default)]
         duration: Option<ArcStr>,
         #[serde(default)]
@@ -2804,23 +2804,7 @@ impl AbilityEffect {
 
     vec_ref_getter!(identities_any, [ChangeState => identities, MiscOp => identities, CustomOp => identities]);
 
-    pub fn location_any(&self) -> Option<&str> {
-        match self.kind.as_deref() {
-            Some(EffectKind::MoveCards { location, .. })
-            | Some(EffectKind::DrawCards { location, .. })
-            | Some(EffectKind::SelectTarget { location, .. })
-            | Some(EffectKind::LookReveal { location, .. })
-            | Some(EffectKind::ModifyScore { location, .. })
-            | Some(EffectKind::ModifyHearts { location, .. })
-            | Some(EffectKind::GainResource { location, .. })
-            | Some(EffectKind::ChangeState { location, .. })
-            | Some(EffectKind::AbilityOp { location, .. })
-            | Some(EffectKind::RestrictionOp { location, .. })
-            | Some(EffectKind::CustomOp { location, .. }) => location.as_ref().map(|z| z.to_str()),
-            Some(EffectKind::MiscOp { location, .. }) => location.as_ref().map(|s| -> &str { s }),
-            _ => None,
-        }
-    }
+    str_getter!(location_any, [MoveCards => location, DrawCards => location, SelectTarget => location, LookReveal => location, ModifyScore => location, ModifyHearts => location, GainResource => location, ChangeState => location, AbilityOp => location, RestrictionOp => location, MiscOp => location, CustomOp => location]);
 
     bool_getter!(lose_blade_hearts_any, [MiscOp => lose_blade_hearts]);
 
@@ -3056,41 +3040,9 @@ impl AbilityEffect {
 
     str_getter!(source_position_any, [MoveCards => source_position, PositionOp => source_position]);
 
-    pub fn source_any(&self) -> Option<&str> {
-        match self.kind.as_deref() {
-            Some(EffectKind::MoveCards { source, .. })
-            | Some(EffectKind::DrawCards { source, .. })
-            | Some(EffectKind::SelectTarget { source, .. })
-            | Some(EffectKind::LookReveal { source, .. })
-            | Some(EffectKind::ChangeState { source, .. })
-            | Some(EffectKind::PositionOp { source, .. })
-            | Some(EffectKind::ModifyScore { source, .. })
-            | Some(EffectKind::CompoundEffect { source, .. })
-            | Some(EffectKind::AbilityOp { source, .. }) => source.as_ref().map(|z| z.to_str()),
-            Some(EffectKind::MiscOp { source, .. }) => source.as_ref().map(|s| -> &str { s }),
-            _ => None,
-        }
-    }
+    str_getter!(source_any, [MoveCards => source, DrawCards => source, SelectTarget => source, LookReveal => source, ChangeState => source, PositionOp => source, ModifyScore => source, CompoundEffect => source, AbilityOp => source, MiscOp => source]);
 
-    pub fn destination_any(&self) -> Option<&str> {
-        match self.kind.as_deref() {
-            Some(EffectKind::MoveCards { destination, .. })
-            | Some(EffectKind::DrawCards { destination, .. })
-            | Some(EffectKind::SelectTarget { destination, .. })
-            | Some(EffectKind::LookReveal { destination, .. })
-            | Some(EffectKind::ChangeState { destination, .. })
-            | Some(EffectKind::PositionOp { destination, .. })
-            | Some(EffectKind::ModifyScore { destination, .. })
-            | Some(EffectKind::CompoundEffect { destination, .. })
-            | Some(EffectKind::AbilityOp { destination, .. }) => {
-                destination.as_ref().map(|z| z.to_str())
-            }
-            Some(EffectKind::MiscOp { destination, .. }) => {
-                destination.as_ref().map(|s| -> &str { s })
-            }
-            _ => None,
-        }
-    }
+    str_getter!(destination_any, [MoveCards => destination, DrawCards => destination, SelectTarget => destination, LookReveal => destination, ChangeState => destination, PositionOp => destination, ModifyScore => destination, CompoundEffect => destination, AbilityOp => destination, MiscOp => destination]);
 
     pub fn count_any(&self) -> Option<u32> {
         let variant_count = match self.kind.as_deref() {
@@ -3294,47 +3246,7 @@ impl AbilityEffect {
     box_setter!(set_heart_type, heart_type: ArcStr => [MiscOp]);
     box_setter!(set_id, id: ArcStr => [MiscOp]);
     box_setter!(set_identities, identities: Vec<String> => [ChangeState, MiscOp, CustomOp]);
-    pub fn set_location(&mut self, val: Option<Zone>) {
-        match self.kind.as_deref_mut() {
-            Some(EffectKind::MoveCards {
-                ref mut location, ..
-            }) => *location = val,
-            Some(EffectKind::DrawCards {
-                ref mut location, ..
-            }) => *location = val,
-            Some(EffectKind::SelectTarget {
-                ref mut location, ..
-            }) => *location = val,
-            Some(EffectKind::LookReveal {
-                ref mut location, ..
-            }) => *location = val,
-            Some(EffectKind::ModifyScore {
-                ref mut location, ..
-            }) => *location = val,
-            Some(EffectKind::ModifyHearts {
-                ref mut location, ..
-            }) => *location = val,
-            Some(EffectKind::GainResource {
-                ref mut location, ..
-            }) => *location = val,
-            Some(EffectKind::ChangeState {
-                ref mut location, ..
-            }) => *location = val,
-            Some(EffectKind::AbilityOp {
-                ref mut location, ..
-            }) => *location = val,
-            Some(EffectKind::RestrictionOp {
-                ref mut location, ..
-            }) => *location = val,
-            Some(EffectKind::CustomOp {
-                ref mut location, ..
-            }) => *location = val,
-            Some(EffectKind::MiscOp {
-                ref mut location, ..
-            }) => *location = val.map(|z| Box::new(ArcStr::from(z.to_str()))),
-            _ => {}
-        }
-    }
+    setter!(set_location, location: ArcStr => [MoveCards, DrawCards, SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, AbilityOp, RestrictionOp, CustomOp], boxed [MiscOp]);
 
     setter!(set_multiple_targets, multiple_targets: bool => [MoveCards, SelectTarget, PositionOp]);
     setter!(set_name_constraint, name_constraint: ArcStr => [MoveCards, SelectTarget, LookReveal, ChangeState]);
@@ -4121,7 +4033,7 @@ pub enum Condition {
         #[serde(default)]
         self_target: Option<bool>,
         #[serde(default)]
-        destination: Option<Zone>,
+        destination: Option<ArcStr>,
         #[serde(default)]
         state: Option<CardState>,
         #[serde(default)]

@@ -5,7 +5,7 @@ use serde::ser::Serializer;
 /// Replaces error-prone zone == "hand" patterns with Zone::Hand.
 #[cfg(feature = "no_std")]
 use alloc::string::{String, ToString};
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Zone {
     Hand,
     Stage,
@@ -31,7 +31,6 @@ pub enum Zone {
     SelectedCards,
     Resolution,
     ExclusionZone,
-    Other(ArcStr),
 }
 
 impl Zone {
@@ -67,7 +66,7 @@ impl Zone {
     }
 
     /// Convert the typed zone back to a string representation (for JSON/display).
-    pub fn to_str(&self) -> &str {
+    pub fn to_str(&self) -> &'static str {
         match self {
             Zone::Hand => "hand",
             Zone::Stage => "stage",
@@ -93,12 +92,11 @@ impl Zone {
             Zone::SelectedCards => "selected_cards",
             Zone::Resolution => "resolution",
             Zone::ExclusionZone => "exclusion_zone",
-            Zone::Other(s) => s.as_ref(),
         }
     }
 
     /// Human-readable zone label for UI/messages.
-    pub fn label(&self) -> &str {
+    pub fn label(&self) -> &'static str {
         match self {
             Zone::Hand => "Hand",
             Zone::Stage => "Stage",
@@ -124,7 +122,6 @@ impl Zone {
             Zone::SelectedCards => "Selected Cards",
             Zone::Resolution => "Resolution",
             Zone::ExclusionZone => "Exclusion Zone",
-            Zone::Other(s) => s.as_ref(),
         }
     }
 }
@@ -132,36 +129,6 @@ impl Zone {
 impl core::fmt::Display for Zone {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.to_str())
-    }
-}
-
-#[cfg(not(feature = "no_std"))]
-impl serde::Serialize for Zone {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self.to_str())
-    }
-}
-
-#[cfg(not(feature = "no_std"))]
-impl<'de> serde::Deserialize<'de> for Zone {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = <String as serde::Deserialize>::deserialize(deserializer)?;
-        Ok(Zone::from_str(&s).unwrap_or(Zone::Other(ArcStr::from(s))))
-    }
-}
-
-#[cfg(feature = "no_std")]
-impl serde::Serialize for Zone {
-    fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self.to_str())
-    }
-}
-
-#[cfg(feature = "no_std")]
-impl<'de> serde::Deserialize<'de> for Zone {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = <alloc::string::String as serde::Deserialize>::deserialize(deserializer)?;
-        Ok(Zone::from_str(&s).unwrap_or(Zone::Other(ArcStr::from(s))))
     }
 }
 

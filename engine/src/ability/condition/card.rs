@@ -3661,7 +3661,7 @@ impl<'a> ConditionContext<'a> {
         let zone = Zone::from_str(location);
         match comparison_type {
             Some("score") => {
-                let is_live_zone = zone.as_ref().map_or(true, |z| {
+                let is_live_zone = zone.map_or(true, |z| {
                     matches!(z, Zone::LiveCardZone | Zone::SuccessLiveZone)
                 });
 
