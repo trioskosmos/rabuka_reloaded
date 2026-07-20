@@ -1009,11 +1009,11 @@ pub enum EffectKind {
         #[serde(default)]
         self_cost: Option<bool>,
         #[serde(default)]
-        dynamic_count: Option<DynamicCount>,
+        dynamic_count: Option<Box<DynamicCount>>,
         #[serde(default)]
         or_card_types: Option<Box<Vec<String>>>,
         #[serde(default)]
-        position: Option<PositionInfo>,
+        position: Option<Box<PositionInfo>>,
         #[serde(default)]
         cost_reference: Option<ArcStr>,
         #[serde(default)]
@@ -1035,7 +1035,7 @@ pub enum EffectKind {
         #[serde(default)]
         activation_condition_parsed: Option<Box<Condition>>,
         #[serde(default)]
-        quoted_text: Option<QuotedText>,
+        quoted_text: Option<Box<QuotedText>>,
     },
     /// DrawCards effect fields
     DrawCards {
@@ -1052,7 +1052,7 @@ pub enum EffectKind {
         #[serde(default)]
         card_type: Option<EffectCardType>,
         #[serde(default)]
-        dynamic_count: Option<DynamicCount>,
+        dynamic_count: Option<Box<DynamicCount>>,
         #[serde(default)]
         card_names: Box<Vec<String>>,
         #[serde(default)]
@@ -1070,7 +1070,7 @@ pub enum EffectKind {
         #[serde(default)]
         per_unit_location: Option<ArcStr>,
         #[serde(default)]
-        position: Option<PositionInfo>,
+        position: Option<Box<PositionInfo>>,
         #[serde(default)]
         state: Option<EffectState>,
         #[serde(default)]
@@ -1264,7 +1264,7 @@ pub enum EffectKind {
         #[serde(default)]
         group_reference: Option<ArcStr>,
         #[serde(default)]
-        dynamic_count: Option<DynamicCount>,
+        dynamic_count: Option<Box<DynamicCount>>,
         #[serde(default)]
         heart_colors: Box<Vec<String>>,
         #[serde(default)]
@@ -1345,7 +1345,7 @@ pub enum EffectKind {
         #[serde(default)]
         distinct: Option<DistinctType>,
         #[serde(default)]
-        position: Option<PositionInfo>,
+        position: Option<Box<PositionInfo>>,
         #[serde(default)]
         activation_position: Option<ArcStr>,
         #[serde(default)]
@@ -1416,7 +1416,7 @@ pub enum EffectKind {
         #[serde(default)]
         replace_all: Option<bool>,
         #[serde(default)]
-        position: Option<PositionInfo>,
+        position: Option<Box<PositionInfo>>,
         #[serde(default)]
         all: Option<bool>,
         #[serde(default)]
@@ -1441,13 +1441,13 @@ pub enum EffectKind {
         #[serde(default, alias = "energy")]
         energy_count: Option<u32>,
         #[serde(default)]
-        dynamic_count: Option<DynamicCount>,
+        dynamic_count: Option<Box<DynamicCount>>,
         #[serde(default)]
         optional: Option<bool>,
         #[serde(default)]
         duration: Option<ArcStr>,
         #[serde(default)]
-        position: Option<PositionInfo>,
+        position: Option<Box<PositionInfo>>,
         #[serde(default)]
         any_number: Option<bool>,
         #[serde(default)]
@@ -1616,7 +1616,7 @@ pub enum EffectKind {
         #[serde(default)]
         all: Option<bool>,
         #[serde(default)]
-        position: Option<PositionInfo>,
+        position: Option<Box<PositionInfo>>,
         #[serde(default)]
         state: Option<EffectState>,
         #[serde(default)]
@@ -1689,7 +1689,7 @@ pub enum EffectKind {
         #[serde(default)]
         heart_colors: Box<Vec<String>>,
         #[serde(default)]
-        dynamic_count: Option<DynamicCount>,
+        dynamic_count: Option<Box<DynamicCount>>,
     },
     /// CompoundEffect effect fields
     CompoundEffect {
@@ -1728,7 +1728,7 @@ pub enum EffectKind {
         #[serde(default)]
         duration: Option<ArcStr>,
         #[serde(default)]
-        position: Option<PositionInfo>,
+        position: Option<Box<PositionInfo>>,
         #[serde(default)]
         all: Option<bool>,
         #[serde(default)]
@@ -1818,7 +1818,7 @@ pub enum EffectKind {
         #[serde(default)]
         destination: Option<ArcStr>,
         #[serde(default)]
-        position: Option<PositionInfo>,
+        position: Option<Box<PositionInfo>>,
         #[serde(default)]
         target_member: Option<ArcStr>,
         #[serde(default)]
@@ -1846,7 +1846,7 @@ pub enum EffectKind {
         #[serde(default)]
         energy_count: Option<u32>,
         #[serde(default)]
-        dynamic_count: Option<DynamicCount>,
+        dynamic_count: Option<Box<DynamicCount>>,
         #[serde(default)]
         any_number: Option<bool>,
         #[serde(default)]
@@ -1911,7 +1911,7 @@ pub enum EffectKind {
         #[serde(default)]
         lose_blade_hearts: Option<bool>,
         #[serde(default)]
-        dynamic_count: Option<DynamicCount>,
+        dynamic_count: Option<Box<DynamicCount>>,
         #[serde(default)]
         per_unit: Option<bool>,
         #[serde(default)]
@@ -1957,7 +1957,7 @@ pub enum EffectKind {
         #[serde(default)]
         parenthetical: Option<Vec<String>>,
         #[serde(default)]
-        quoted_text: Option<QuotedText>,
+        quoted_text: Option<Box<QuotedText>>,
         #[serde(default)]
         same_unit_name: Option<bool>,
         #[serde(default)]
@@ -2007,7 +2007,7 @@ pub enum EffectKind {
         #[serde(default)]
         options: Option<Vec<Box<AbilityEffect>>>,
         #[serde(default)]
-        position: Option<PositionInfo>,
+        position: Option<Box<PositionInfo>>,
         #[serde(default)]
         ability_filter: Option<AbilityFilter>,
     },
@@ -2745,13 +2745,13 @@ impl AbilityEffect {
 
     pub fn dynamic_count_any(&self) -> Option<&DynamicCount> {
         match self.kind.as_deref() {
-            Some(EffectKind::DrawCards { dynamic_count, .. }) => dynamic_count.as_ref(),
-            Some(EffectKind::LookReveal { dynamic_count, .. }) => dynamic_count.as_ref(),
-            Some(EffectKind::GainResource { dynamic_count, .. }) => dynamic_count.as_ref(),
-            Some(EffectKind::MoveCards { dynamic_count, .. }) => dynamic_count.as_ref(),
-            Some(EffectKind::PositionOp { dynamic_count, .. }) => dynamic_count.as_ref(),
-            Some(EffectKind::MiscOp { dynamic_count, .. }) => dynamic_count.as_ref(),
-            Some(EffectKind::AbilityOp { dynamic_count, .. }) => dynamic_count.as_ref(),
+            Some(EffectKind::DrawCards { dynamic_count, .. }) => dynamic_count.as_deref(),
+            Some(EffectKind::LookReveal { dynamic_count, .. }) => dynamic_count.as_deref(),
+            Some(EffectKind::GainResource { dynamic_count, .. }) => dynamic_count.as_deref(),
+            Some(EffectKind::MoveCards { dynamic_count, .. }) => dynamic_count.as_deref(),
+            Some(EffectKind::PositionOp { dynamic_count, .. }) => dynamic_count.as_deref(),
+            Some(EffectKind::MiscOp { dynamic_count, .. }) => dynamic_count.as_deref(),
+            Some(EffectKind::AbilityOp { dynamic_count, .. }) => dynamic_count.as_deref(),
             _ => None,
         }
     }
@@ -3059,15 +3059,15 @@ impl AbilityEffect {
 
     pub fn position_any(&self) -> Option<&PositionInfo> {
         match self.kind.as_deref() {
-            Some(EffectKind::MoveCards { position, .. }) => position.as_ref(),
-            Some(EffectKind::DrawCards { position, .. }) => position.as_ref(),
-            Some(EffectKind::GainResource { position, .. }) => position.as_ref(),
-            Some(EffectKind::ModifyScore { position, .. }) => position.as_ref(),
-            Some(EffectKind::ChangeState { position, .. }) => position.as_ref(),
-            Some(EffectKind::CompoundEffect { position, .. }) => position.as_ref(),
-            Some(EffectKind::PositionOp { position, .. }) => position.as_ref(),
-            Some(EffectKind::ModifyHearts { position, .. }) => position.as_ref(),
-            Some(EffectKind::MiscOp { position, .. }) => position.as_ref(),
+            Some(EffectKind::MoveCards { position, .. }) => position.as_deref(),
+            Some(EffectKind::DrawCards { position, .. }) => position.as_deref(),
+            Some(EffectKind::GainResource { position, .. }) => position.as_deref(),
+            Some(EffectKind::ModifyScore { position, .. }) => position.as_deref(),
+            Some(EffectKind::ChangeState { position, .. }) => position.as_deref(),
+            Some(EffectKind::CompoundEffect { position, .. }) => position.as_deref(),
+            Some(EffectKind::PositionOp { position, .. }) => position.as_deref(),
+            Some(EffectKind::ModifyHearts { position, .. }) => position.as_deref(),
+            Some(EffectKind::MiscOp { position, .. }) => position.as_deref(),
             _ => None,
         }
     }
@@ -3076,7 +3076,7 @@ impl AbilityEffect {
 
     pub fn quoted_text_any(&self) -> Option<&QuotedText> {
         match self.kind.as_deref() {
-            Some(EffectKind::MiscOp { quoted_text, .. }) => quoted_text.as_ref(),
+            Some(EffectKind::MiscOp { quoted_text, .. }) => quoted_text.as_deref(),
             _ => None,
         }
     }

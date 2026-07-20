@@ -103,8 +103,8 @@ Each `Vec<String>` (24 bytes) → `Box<Vec<String>>` (8 bytes) saves 16 bytes pe
 | Type | Size (before) | Size (after) | Notes |
 |------|--------------|-------------|-------|
 | `Condition` | **1864** | **536** | Flat struct → tagged enum, 71% reduction |
-| `EffectKind` | **1248** | **808** | 14 Vec fields boxed + field additions |
-| `AbilityEffect` | **1536** | **264** | Box\<EffectKind\> → Box, -800B stack. `action: String (24B)` → `ActionType (1B+padding=2B)`, stack effect minimal |
+| `EffectKind` | **1248** | **656** | 14 Vec fields boxed + DynamicCount/PositionInfo/QuotedText boxed + field additions |
+| `AbilityEffect` | **1536** | **168** | Box\<EffectKind\> → Box, -800B stack. `action: String (24B)` → `ActionType (1B+padding=2B)`, stack effect minimal |
 | `ActionType` | **String (24B)** | **1B (enum)** | serde-compatible via `rename_all = "snake_case"`. Discriminant fits in 1 byte, padding takes it to 2 |
 | `CompoundBranch` | **96** | **96** | Mostly boxed pointers now |
 | `AbilityQueueEntry` | **~600+** | **~600+** | Has condition_cache HashMap, snapshot Vecs, resolver, pending_actions |
@@ -257,6 +257,25 @@ Keep `#[serde(default)]` on `kind: Option<EffectKind>` (NOT `#[serde(skip)]` —
 - All 1820 tests pass
 
 **Savings:** ~16 bytes per field × ~10 fields per variant = ~160 bytes saved on largest variants. Total EffectKind: 1248 → ~1150.
+
+---
+
+### Box large inline fields on EffectKind variants ✅ DONE
+
+**Why:** Three large non-`Copy` types were inlined in 7-9 EffectKind variants each, inflating the enum to 816 bytes. Boxing them removes their size from the enum discriminant.
+
+**What was done:**
+- `dynamic_count: Option<DynamicCount>` → `Option<Box<DynamicCount>>` (96B → 8B) in 7 variants
+- `position: Option<PositionInfo>` → `Option<Box<PositionInfo>>` (40B → 8B) in 9 variants
+- `quoted_text: Option<QuotedText>` → `Option<Box<QuotedText>>` (48B → 8B) in 2 variants
+- Updated `dynamic_count_any()`, `position_any()`, `quoted_text_any()` getters to use `.as_deref()`
+- `vm_gen.rs` generated code unchanged (uses `Default::default()` for these fields)
+- Condition variant `position` fields left unboxed (different struct, different semantics)
+
+**Measured results:**
+- EffectKind: **816 → 656 bytes** (160 bytes saved per variant)
+- Total EffectKind heap: **1,172,408 → 951,856 bytes** (~215 KB saved)
+- All 1820 default + 1829 bytecode + 1829 lazy tests pass
 
 **Trade-offs:**
 - Boxed filters add a heap alloc when filters are present

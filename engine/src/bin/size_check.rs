@@ -23,6 +23,18 @@ fn main() {
     sz!(Box<Vec<String>>);
 
     println!();
+    println!("=== Field-level sizes ===");
+    sz!(rabuka_engine::card::DynamicCount);
+    sz!(Option<rabuka_engine::card::DynamicCount>);
+    sz!(rabuka_engine::card::PositionInfo);
+    sz!(Option<rabuka_engine::card::PositionInfo>);
+    sz!(rabuka_engine::card::QuotedText);
+    sz!(Option<rabuka_engine::card::QuotedText>);
+    sz!(rabuka_engine::card::AbilityFilter);
+    sz!(Option<rabuka_engine::card::AbilityFilter>);
+    sz!(rabuka_engine::card::AbilityFilterBranch);
+    sz!(Option<rabuka_engine::card::AbilityFilterBranch>);
+    println!();
     println!("=== Top 10 longest abilities by effect text ===");
     let path = std::path::Path::new("../romfs/abilities.json");
     if !path.exists() {
@@ -45,7 +57,7 @@ fn main() {
     };
 
     let effect_overhead = 264i64;
-    let effectkind_heap = 808i64;
+    let effectkind_heap = 656i64;
 
     struct AbEntry {
         name: String,
