@@ -41,7 +41,7 @@ fn chika_q152_self_only() {
     let p1_wait = game.state.mods.get_orientation_modifier(chika);
     assert_eq!(
         p1_wait,
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Q152: Chika should be in wait state after activation"
     );
 
@@ -49,7 +49,7 @@ fn chika_q152_self_only() {
     let p2_wait = game.state.mods.get_orientation_modifier(filler);
     assert_ne!(
         p2_wait,
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Q152: Opponent member should NOT be waited"
     );
 }
@@ -245,7 +245,7 @@ fn chika_wait_target_stays_on_stage() {
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(other),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Selected member should be in wait state"
     );
     // Chika stays at center, unchanged
@@ -313,7 +313,7 @@ fn chika_wait_can_select_any_member() {
     // Only b should be waited
     assert_eq!(
         game.state.mods.get_orientation_modifier(b),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Selected member (b) should be in wait state"
     );
     assert_eq!(

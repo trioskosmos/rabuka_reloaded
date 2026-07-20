@@ -333,7 +333,7 @@ fn fuyumari_appear_triggers_opponent_wait() {
     // Verify target is now in wait state.
     let ori = game.state.mods.get_orientation_modifier(target);
     assert_eq!(
-        ori.map(|s| s.as_str()),
+        ori,
         Some("wait"),
         "Target should be in wait state"
     );
@@ -373,7 +373,7 @@ fn fuyumari_area_move_triggers_opponent_wait() {
     // With only 1 valid candidate and count=1, the effect auto-applies (no prompt).
     let ori = game.state.mods.get_orientation_modifier(target);
     assert_eq!(
-        ori.map(|s| s.as_str()),
+        ori,
         Some("wait"),
         "Target should be in wait state after area move"
     );
@@ -411,7 +411,7 @@ fn fuyumari_blade_limit_excludes_high_blade() {
     // Verify high-blade card is NOT in wait state
     let ori = game.state.mods.get_orientation_modifier(high_blade);
     assert!(
-        ori.is_none() || ori.map(|s| s.as_str()) != Some("wait"),
+        ori.is_none() || ori != Some("wait"),
         "High-blade member should NOT be waited"
     );
 }
@@ -445,7 +445,7 @@ fn fuyumari_already_wait_excluded_from_candidates() {
     // The non-wait card should now be waited
     let ori_other = game.state.mods.get_orientation_modifier(other);
     assert_eq!(
-        ori_other.map(|s| s.as_str()),
+        ori_other,
         Some("wait"),
         "The non-wait card should be waited"
     );
@@ -453,7 +453,7 @@ fn fuyumari_already_wait_excluded_from_candidates() {
     // The already-wait card should remain wait (unchanged)
     let ori_target = game.state.mods.get_orientation_modifier(target);
     assert_eq!(
-        ori_target.map(|s| s.as_str()),
+        ori_target,
         Some("wait"),
         "Already-wait card should remain wait"
     );
@@ -490,14 +490,14 @@ fn fuyumari_waits_only_one_member() {
 
     let ori_a = game.state.mods.get_orientation_modifier(target_a);
     assert_eq!(
-        ori_a.map(|s| s.as_str()),
+        ori_a,
         Some("wait"),
         "Selected target should be waited"
     );
 
     let ori_b = game.state.mods.get_orientation_modifier(target_b);
     assert!(
-        ori_b.is_none() || ori_b.map(|s| s.as_str()) != Some("wait"),
+        ori_b.is_none() || ori_b != Some("wait"),
         "Unselected target should NOT be waited"
     );
 }
@@ -542,7 +542,7 @@ fn fuyumari_real_play_to_stage_triggers_appearance() {
     // Target on P2 stage should be in wait state
     let ori = game.state.mods.get_orientation_modifier(target);
     assert_eq!(
-        ori.map(|s| s.as_str()),
+        ori,
         Some("wait"),
         "Q: Real play_to_stage should trigger appearance → target waited"
     );
@@ -601,7 +601,7 @@ fn fuyumari_p2_play_to_stage_triggers_appearance() {
 
     let ori = game.state.mods.get_orientation_modifier(target);
     assert_eq!(
-        ori.map(|s| s.as_str()),
+        ori,
         Some("wait"),
         "P2 play_to_stage should trigger appearance -> P1 target waited"
     );
@@ -651,7 +651,7 @@ fn fuyumari_baton_touch_triggers_area_move() {
     // Target on P2 stage should be in wait state
     let ori = game.state.mods.get_orientation_modifier(target);
     assert_eq!(
-        ori.map(|s| s.as_str()),
+        ori,
         Some("wait"),
         "Baton touch should trigger area move -> target waited"
     );
@@ -694,7 +694,7 @@ fn fuyumari_baton_touch_left_to_center_triggers() {
 
     let ori = game.state.mods.get_orientation_modifier(target);
     assert_eq!(
-        ori.map(|s| s.as_str()),
+        ori,
         Some("wait"),
         "Baton touch from hand to occupied Center -> target waited"
     );

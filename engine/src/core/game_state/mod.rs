@@ -2,7 +2,7 @@ use crate::ability::enums::Zone;
 use crate::ability_queue::AbilityQueue;
 use crate::card::CardDatabase;
 use crate::constants::DEFAULT_HISTORY_SIZE;
-use crate::core::game_modifiers::GameModifiers;
+use crate::core::game_modifiers::{CardOrientation, GameModifiers};
 use crate::player::Player;
 use crate::zones::{MemberArea, ResolutionZone};
 use crate::Arc;
@@ -123,7 +123,7 @@ pub struct GameState {
     /// Snapshot of target cards' orientations taken before a change_state
     /// effect executes. Compared after the effect to detect actual transitions.
     /// None = no snapshot active.
-    pub state_snapshot_before_change: Option<HashMap<i16, Option<String>>>,
+    pub state_snapshot_before_change: Option<HashMap<i16, Option<CardOrientation>>>,
     /// After a change_state effect executes, records what actually changed:
     /// (card_id, from_state, to_state). Cleared after post-resolution TAS scan.
     pub recently_state_changed: Vec<(i16, String, String)>,

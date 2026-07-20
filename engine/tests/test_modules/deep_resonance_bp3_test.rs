@@ -263,7 +263,7 @@ fn deep_resonance_option_1_opponent_wait_exact_state() {
     let orientation = game.state.mods.get_orientation_modifier(filler);
     assert_eq!(
         orientation,
-        Some(&"wait".to_string()),
+        Some("wait"),
         "opponent filler card should have 'wait' orientation modifier"
     );
 }

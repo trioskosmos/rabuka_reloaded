@@ -112,7 +112,7 @@ fn edelnote_appearance_waits_opponent() {
     eprintln!("Opponent wait state: {:?}", opp_wait);
     assert_eq!(
         opp_wait,
-        Some(&"wait".to_string()),
+        Some("wait"),
         "EdelNote appearance should wait opponent member"
     );
 }
@@ -160,7 +160,7 @@ fn both_triggers_in_baton_touch() {
     // セラス triggers on EdelNote appearance
     assert_eq!(
         opp_wait,
-        Some(&"wait".to_string()),
+        Some("wait"),
         "セラス fires on EdelNote appearance"
     );
 }

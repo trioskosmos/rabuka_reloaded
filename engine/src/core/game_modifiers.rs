@@ -7,6 +7,27 @@ use alloc::{
     vec::Vec,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum CardOrientation {
+    Active,
+    Wait,
+}
+
+impl CardOrientation {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Active => "active",
+            Self::Wait => "wait",
+        }
+    }
+}
+
+impl core::fmt::Display for CardOrientation {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// Stores both the additive delta and absolute set value for a modifier.
 /// Replaces the old dual-map pattern (`blade_modifiers` + `set_blade_modifiers`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -37,7 +58,7 @@ pub struct GameModifiers {
     pub blade_type_modifiers: HashMap<i16, BladeColor>,
     pub heart_modifiers: HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
     pub heart_override: HashMap<i16, (HeartColor, u32)>,
-    pub orientation_modifiers: HashMap<i16, String>,
+    pub orientation_modifiers: HashMap<i16, CardOrientation>,
     pub cost_modifiers: HashMap<i16, ModifierEntry>,
     pub score_modifiers: HashMap<i16, ModifierEntry>,
     pub need_heart_modifiers: HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
@@ -335,15 +356,15 @@ impl GameModifiers {
     // ============== ORIENTATION ==============
 
     pub fn add_orientation_modifier(&mut self, card_id: i16, orientation: &str) {
-        // Idempotent: skip if card already has the target orientation.
-        // This prevents setting "wait" on an already-wait card — a card
-        // can only be waited once per standing.  All 11 call sites
-        // (costs, effects, move_cards handlers) benefit from this guard.
-        if self.orientation_modifiers.get(&card_id).map(|s| s.as_str()) == Some(orientation) {
+        let card_orient = match orientation {
+            "active" => CardOrientation::Active,
+            "wait" => CardOrientation::Wait,
+            _ => return,
+        };
+        if self.orientation_modifiers.get(&card_id) == Some(&card_orient) {
             return;
         }
-        self.orientation_modifiers
-            .insert(card_id, orientation.to_string());
+        self.orientation_modifiers.insert(card_id, card_orient);
     }
 
     // ============== COST ==============
@@ -369,8 +390,8 @@ impl GameModifiers {
         self.cost_modifiers.entry(card_id).or_default().set = value;
     }
 
-    pub fn get_orientation_modifier(&self, card_id: i16) -> Option<&String> {
-        self.orientation_modifiers.get(&card_id)
+    pub fn get_orientation_modifier(&self, card_id: i16) -> Option<&str> {
+        self.orientation_modifiers.get(&card_id).map(|o| o.as_str())
     }
 
     // ============== CLEAR ==============

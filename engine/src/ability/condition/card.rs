@@ -2296,7 +2296,7 @@ impl<'a> ConditionContext<'a> {
                             self.game_state
                                 .mods
                                 .get_orientation_modifier(cid)
-                                .map_or(state == &CardState::Active, |o| &*o == state.as_str())
+                                .map_or(state == &CardState::Active, |o| o == state.as_str())
                         })
                         .collect()
                 } else {
@@ -2507,7 +2507,7 @@ impl<'a> ConditionContext<'a> {
                                         .mods
                                         .get_orientation_modifier(id)
                                         .map_or(state == &CardState::Active, |o| {
-                                            &*o == state.as_str()
+                                            o == state.as_str()
                                         });
                                     if !state_ok {
                                         return false;
@@ -2622,7 +2622,7 @@ impl<'a> ConditionContext<'a> {
                         self.game_state
                             .mods
                             .get_orientation_modifier(cid)
-                            .map_or(state == &CardState::Active, |o| &*o == state.as_str())
+                            .map_or(state == &CardState::Active, |o| o == state.as_str())
                     })
                     .collect()
             } else {

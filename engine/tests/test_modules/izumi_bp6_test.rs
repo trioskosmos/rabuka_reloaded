@@ -35,7 +35,7 @@ fn izumi_bp6_q257_waitroom_empty_becomes_wait() {
 
     assert_eq!(
         game.state.mods.get_orientation_modifier(izumi),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Q257 Case A: Izumi must become wait even when waitroom is empty"
     );
 
@@ -71,7 +71,7 @@ fn izumi_bp6_q257_single_match_moves_to_hand() {
 
     assert_eq!(
         game.state.mods.get_orientation_modifier(izumi),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Q257 Case B: Izumi must become wait before step 2"
     );
 
@@ -106,7 +106,7 @@ fn izumi_bp6_q257_non_matching_only_no_second_effect() {
 
     assert_eq!(
         game.state.mods.get_orientation_modifier(izumi),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Q257 Case C: Izumi must still become wait"
     );
 
@@ -135,7 +135,7 @@ fn izumi_bp6_q257_multiple_matches_prompts_choice() {
 
     assert_eq!(
         game.state.mods.get_orientation_modifier(izumi),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Q257 Case D: Izumi must become wait before step 2"
     );
 

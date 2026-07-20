@@ -788,7 +788,7 @@ impl<'a> ConditionContext<'a> {
                             self.game_state
                                 .mods
                                 .get_orientation_modifier(cid)
-                                .map_or(state == "active", |o| o.as_str() == state)
+                                .map_or(state == "active", |o| o == state)
                         })
                         .count();
                     format!(

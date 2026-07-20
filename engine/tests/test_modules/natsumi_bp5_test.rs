@@ -127,7 +127,7 @@ fn natsumi_bp5_mill_one_live_stop() {
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(natsumi),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Natsumi should be in wait state after milling a live card"
     );
 }
@@ -197,7 +197,7 @@ fn natsumi_bp5_mill_non_live_then_live_stop() {
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(natsumi),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Natsumi should be wait after milling a live card in iter 1"
     );
 }
@@ -288,7 +288,7 @@ fn natsumi_bp5_change_state_only_self_with_fillers() {
     // Only natsumi should be in wait state
     assert_eq!(
         game.state.mods.get_orientation_modifier(natsumi),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Only Natsumi should be wait"
     );
     assert!(
@@ -323,7 +323,7 @@ fn natsumi_bp5_change_state_at_left_position() {
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(natsumi),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Left position should be wait"
     );
 }
@@ -351,7 +351,7 @@ fn natsumi_bp5_change_state_at_right_position() {
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(natsumi),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Right position should be wait"
     );
 }
@@ -426,7 +426,7 @@ fn natsumi_bp5_stop_after_two_iterations() {
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(natsumi),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Natsumi still in wait from iter 0 live mill"
     );
 }
@@ -472,7 +472,7 @@ fn natsumi_bp5_repeat_does_not_wait_fillers_when_self_is_wait() {
     // Verify: only natsumi is wait
     assert_eq!(
         game.state.mods.get_orientation_modifier(natsumi),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Natsumi should be wait after milling live cards"
     );
     assert!(
@@ -524,7 +524,7 @@ fn natsumi_bp5_all_iterations_live_never_waits_fillers() {
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(natsumi),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Natsumi should be wait"
     );
     assert!(
@@ -572,7 +572,7 @@ fn natsumi_bp5_q222_repeat_continues_after_wait() {
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(natsumi),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Natsumi should be in wait state after live card discards"
     );
 }

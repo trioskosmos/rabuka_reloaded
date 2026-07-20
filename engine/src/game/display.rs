@@ -817,7 +817,7 @@ pub fn stage_to_display(
     card_db: &CardDatabase,
     blade_additive: &HashMap<i16, i32>,
     blade_set: &HashMap<i16, i32>,
-    orientation_modifiers: &HashMap<i16, String>,
+    orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
     heart_additive: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
     heart_set: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
     score_additive: &HashMap<i16, i32>,
@@ -842,8 +842,8 @@ pub fn stage_to_display(
             .map_or(&[] as &[String], |v| v.as_slice())
     };
     let orientation = |cid: i16| {
-        orientation_modifiers.get(&cid).map(|o| match o.as_str() {
-            "wait" => Orientation::Wait,
+        orientation_modifiers.get(&cid).map(|o| match o {
+            crate::core::game_modifiers::CardOrientation::Wait => Orientation::Wait,
             _ => Orientation::Active,
         })
     };
@@ -934,7 +934,7 @@ pub fn player_to_display(
     blade_set: &HashMap<i16, i32>,
     score_set: &HashMap<i16, i32>,
     heart_set: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
-    orientation_modifiers: &HashMap<i16, String>,
+    orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
     gained_abilities: &HashMap<i16, Vec<String>>,
     need_heart_modifiers: &HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
     prohibition_effects: &[String],

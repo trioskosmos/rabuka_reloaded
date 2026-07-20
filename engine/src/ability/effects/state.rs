@@ -3,6 +3,7 @@ use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
 use super::super::util;
 use crate::card::AbilityEffect;
+use crate::core::game_modifiers::CardOrientation;
 use crate::game_state::GameState;
 use smallvec::SmallVec;
 
@@ -419,12 +420,12 @@ impl AbilityResolver {
 
             // Snapshot orientations BEFORE applying any changes (for active→wait
             // and wait→active transition detection).
-            let snapshots: HashMap<i16, Option<String>> = actual_targets
+            let snapshots: HashMap<i16, Option<CardOrientation>> = actual_targets
                 .iter()
                 .map(|(_, card_id)| {
                     (
                         *card_id,
-                        gs.mods.get_orientation_modifier(*card_id).cloned(),
+                        gs.mods.orientation_modifiers.get(card_id).copied(),
                     )
                 })
                 .collect();
@@ -490,10 +491,16 @@ impl AbilityResolver {
             // Compare snapshot with current state to detect actual transitions.
             if let Some(before) = gs.state_snapshot_before_change.take() {
                 for (card_id, before_ori) in &before {
-                    let after_ori = gs.mods.get_orientation_modifier(*card_id).cloned();
-                    if before_ori != &after_ori {
-                        let from_str = before_ori.as_deref().unwrap_or("active").to_string();
-                        let to_str = after_ori.as_deref().unwrap_or("active").to_string();
+                    let after_ori = gs.mods.orientation_modifiers.get(card_id).copied();
+                    if *before_ori != after_ori {
+                        let from_str = before_ori
+                            .unwrap_or(CardOrientation::Active)
+                            .as_str()
+                            .to_string();
+                        let to_str = after_ori
+                            .unwrap_or(CardOrientation::Active)
+                            .as_str()
+                            .to_string();
                         gs.recently_state_changed.push((
                             *card_id,
                             from_str.clone(),

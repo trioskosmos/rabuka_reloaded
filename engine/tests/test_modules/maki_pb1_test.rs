@@ -19,6 +19,7 @@
 /// cost choice. A second select_option(1) pays it. Then the opponent
 /// choice or auto-draw resolves.
 use crate::helpers::*;
+use rabuka_engine::core::game_modifiers::CardOrientation;
 use rabuka_engine::zones::MemberArea;
 
 /// Maki debut at center: pay optional cost → opponent waits 1 member.
@@ -56,12 +57,14 @@ fn maki_debut_pay_cost_opponent_waits_one() {
     // Maki should be waited (state change, not moved to waitroom)
     assert_eq!(
         game.state.mods.orientation_modifiers.get(&maki),
-        Some(&"wait".to_string()),
+        Some(&CardOrientation::Wait),
         "Maki should be in wait state (cost paid)"
     );
     let waited = [p2_a, p2_b]
         .iter()
-        .filter(|&&id| game.state.mods.orientation_modifiers.get(&id) == Some(&"wait".to_string()))
+        .filter(|&&id| {
+            game.state.mods.orientation_modifiers.get(&id) == Some(&CardOrientation::Wait)
+        })
         .count();
     assert_eq!(
         waited, 1,
@@ -97,7 +100,7 @@ fn maki_debut_skip_cost_no_effect() {
 
     let orientation = game.state.mods.orientation_modifiers.get(&maki);
     assert!(
-        orientation.is_none() || orientation == Some(&"active".to_string()),
+        orientation.is_none() || orientation == Some(&CardOrientation::Active),
         "Maki should remain active when cost is skipped"
     );
 }
@@ -266,7 +269,7 @@ fn maki_ab0_plus_ab1_end_to_end() {
 
     assert_eq!(
         game.state.mods.orientation_modifiers.get(&p2_member),
-        Some(&"wait".to_string()),
+        Some(&CardOrientation::Wait),
         "Opponent ≤4 member should be waited by ab#0"
     );
     assert_eq!(

@@ -1,5 +1,5 @@
 use crate::helpers::*;
-use rabuka_engine::core::game_modifiers::ModifierEntry;
+use rabuka_engine::core::game_modifiers::{CardOrientation, ModifierEntry};
 use rabuka_engine::zones::MemberArea;
 
 /// Test for PL!SP-bp5-002-R＋ 唐 可可
@@ -33,30 +33,21 @@ fn keke_discard_0_no_blade_heart_members() {
 
     // Keke should be wait as a cost
     assert_eq!(
-        game.state
-            .mods
-            .orientation_modifiers
-            .get(&keke)
-            .map(|s| s.as_str()),
-        Some("wait"),
+        game.state.mods.orientation_modifiers.get(&keke),
+        Some(&CardOrientation::Wait),
         "Keke should be wait after paying cost"
     );
 
     // We should be prompted to discard 2 cards
     assert_eq!(game.pending_choice_type().as_deref(), Some("SelectCard"));
 
-    // Select the 2 live cards to discard (they are the first 2 in hand before drawing, but after drawing 3 they might be at index 0 and 1, or somewhere else. Wait, drawing adds to the end of the hand).
-    // Original hand had 2 cards. We drew 3. Hand now has 5 cards. The original 2 live cards are at index 0 and 1.
+    // Select the 2 live cards to discard
     game.select_indices(&[0, 1]);
 
     // Check resolution
     assert_eq!(
-        game.state
-            .mods
-            .orientation_modifiers
-            .get(&keke)
-            .map(|s| s.as_str()),
-        Some("wait"),
+        game.state.mods.orientation_modifiers.get(&keke),
+        Some(&CardOrientation::Wait),
         "Keke should remain wait because 0 no-blade-heart members were discarded"
     );
 
@@ -91,24 +82,16 @@ fn keke_discard_1_no_blade_heart_member() {
     game.activate_ability(keke);
 
     assert_eq!(
-        game.state
-            .mods
-            .orientation_modifiers
-            .get(&keke)
-            .map(|s| s.as_str()),
-        Some("wait"),
+        game.state.mods.orientation_modifiers.get(&keke),
+        Some(&CardOrientation::Wait),
         "Keke should be wait after paying cost"
     );
 
     game.select_indices(&[0, 1]);
 
     assert_ne!(
-        game.state
-            .mods
-            .orientation_modifiers
-            .get(&keke)
-            .map(|s| s.as_str()),
-        Some("wait"),
+        game.state.mods.orientation_modifiers.get(&keke),
+        Some(&CardOrientation::Wait),
         "Keke should become active after discarding 1 no-blade-heart member"
     );
 
@@ -142,24 +125,16 @@ fn keke_discard_2_no_blade_heart_members() {
     game.activate_ability(keke);
 
     assert_eq!(
-        game.state
-            .mods
-            .orientation_modifiers
-            .get(&keke)
-            .map(|s| s.as_str()),
-        Some("wait"),
+        game.state.mods.orientation_modifiers.get(&keke),
+        Some(&CardOrientation::Wait),
         "Keke should be wait after paying cost"
     );
 
     game.select_indices(&[0, 1]);
 
     assert_ne!(
-        game.state
-            .mods
-            .orientation_modifiers
-            .get(&keke)
-            .map(|s| s.as_str()),
-        Some("wait"),
+        game.state.mods.orientation_modifiers.get(&keke),
+        Some(&CardOrientation::Wait),
         "Keke should become active after discarding 2 no-blade-heart members"
     );
 
@@ -197,24 +172,16 @@ fn keke_discard_2_tomari_no_blade_heart() {
     game.activate_ability(keke);
 
     assert_eq!(
-        game.state
-            .mods
-            .orientation_modifiers
-            .get(&keke)
-            .map(|s| s.as_str()),
-        Some("wait"),
+        game.state.mods.orientation_modifiers.get(&keke),
+        Some(&CardOrientation::Wait),
         "Keke should be wait after paying cost"
     );
 
     game.select_indices(&[0, 1]);
 
     assert_ne!(
-        game.state
-            .mods
-            .orientation_modifiers
-            .get(&keke)
-            .map(|s| s.as_str()),
-        Some("wait"),
+        game.state.mods.orientation_modifiers.get(&keke),
+        Some(&CardOrientation::Wait),
         "Keke should become active after discarding 2 no-blade-heart members"
     );
 

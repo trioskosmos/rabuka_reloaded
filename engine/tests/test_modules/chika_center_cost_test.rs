@@ -46,7 +46,7 @@ fn chika_center_cost_succeeds_in_center() {
     game.activate_ability(chika);
 
     assert!(
-        game.state.mods.get_orientation_modifier(chika) == Some(&"wait".to_string()),
+        game.state.mods.get_orientation_modifier(chika) == Some("wait"),
         "Chika should be in wait state"
     );
 }

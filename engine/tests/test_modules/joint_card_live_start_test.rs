@@ -603,17 +603,17 @@ fn test_bp4_debut_wait_opponent_members_after_selection() {
     let ori = |cid| game.state.mods.get_orientation_modifier(cid);
     assert_eq!(
         ori(p2_low),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "p2_low should be waited"
     );
     assert_ne!(
         ori(p2_high_cost),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "p2_high_cost should NOT be waited"
     );
     assert_ne!(
         ori(p2_filler),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "p2_filler should NOT be waited"
     );
 }

@@ -47,11 +47,8 @@ fn rurino_activates_wait_member_and_adds_live() {
 
     // Verify preconditions
     assert_eq!(
-        game.state
-            .mods
-            .get_orientation_modifier(mirakura_member)
-            .cloned(),
-        Some("wait".to_string()),
+        game.state.mods.get_orientation_modifier(mirakura_member),
+        Some("wait"),
         "Member should start in wait"
     );
     assert!(
@@ -70,13 +67,9 @@ fn rurino_activates_wait_member_and_adds_live() {
     game.select_option(1); // pay
 
     // After the change_state resolves, the member should be active.
-    let ori = game
-        .state
-        .mods
-        .get_orientation_modifier(mirakura_member)
-        .cloned();
+    let ori = game.state.mods.get_orientation_modifier(mirakura_member);
     assert!(
-        ori != Some("wait".to_string()),
+        ori != Some("wait"),
         "Member should no longer be in wait (was activated). Got: {:?}",
         ori
     );
@@ -174,15 +167,8 @@ fn rurino_empty_discard_no_crash() {
 
     // Activation succeeded, the conditional move_cards runs but finds nothing.
     // No crash.
-    let ori = game
-        .state
-        .mods
-        .get_orientation_modifier(mirakura_member)
-        .cloned();
-    assert!(
-        ori != Some("wait".to_string()),
-        "Member should be activated"
-    );
+    let ori = game.state.mods.get_orientation_modifier(mirakura_member);
+    assert!(ori != Some("wait"), "Member should be activated");
 }
 
 /// Tests for PL!HS-bp5-003-R＋ — LiveStart ability:

@@ -244,7 +244,7 @@ fn test_change_state_choice_bug() {
     // Verify Nozomi is in wait state
     let nozomi_orientation = game.state.mods.get_orientation_modifier(nozomi);
     assert_eq!(
-        nozomi_orientation.map(|s| s.as_str()),
+        nozomi_orientation,
         Some("wait"),
         "Nozomi should be in wait state"
     );
@@ -270,7 +270,7 @@ fn test_change_state_choice_bug() {
 
     let target1_orientation = game.state.mods.get_orientation_modifier(target1);
     assert_eq!(
-        target1_orientation.map(|s| s.as_str()),
+        target1_orientation,
         Some("wait"),
         "Target member should be in wait state"
     );
@@ -521,7 +521,7 @@ fn test_honoka_change_state_with_valid_targets() {
 
     let target1_ori = g.state.mods.get_orientation_modifier(target1);
     assert_eq!(
-        target1_ori.map(|s| s.as_str()),
+        target1_ori,
         Some("wait"),
         "Target should be in wait state"
     );

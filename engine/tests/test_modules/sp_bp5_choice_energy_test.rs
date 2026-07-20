@@ -122,7 +122,7 @@ fn sp_bp5_choice_energy_pay_and_wait_opponent() {
     );
 
     assert!(
-        opp_wait == Some(&"wait".to_string()),
+        opp_wait == Some("wait"),
         "Opponent member should be in wait state, got {:?}",
         opp_wait
     );

@@ -86,7 +86,7 @@ fn riko_equal_cost_both_occupied_triggers() {
     run_live_start(&mut game);
 
     assert!(
-        game.state.mods.get_orientation_modifier(opp) == Some(&"wait".to_string()),
+        game.state.mods.get_orientation_modifier(opp) == Some("wait"),
         "Low-blade opponent member should be wait when costs are equal"
     );
 }
@@ -109,7 +109,7 @@ fn riko_different_costs_no_trigger() {
     run_live_start(&mut game);
 
     assert!(
-        game.state.mods.get_orientation_modifier(opp) != Some(&"wait".to_string()),
+        game.state.mods.get_orientation_modifier(opp) != Some("wait"),
         "Should NOT trigger when costs differ"
     );
 }
@@ -132,7 +132,7 @@ fn riko_left_empty_no_trigger() {
     run_live_start(&mut game);
 
     assert!(
-        game.state.mods.get_orientation_modifier(opp) != Some(&"wait".to_string()),
+        game.state.mods.get_orientation_modifier(opp) != Some("wait"),
         "Should NOT trigger when left side is empty"
     );
 }
@@ -155,7 +155,7 @@ fn riko_right_empty_no_trigger() {
     run_live_start(&mut game);
 
     assert!(
-        game.state.mods.get_orientation_modifier(opp) != Some(&"wait".to_string()),
+        game.state.mods.get_orientation_modifier(opp) != Some("wait"),
         "Should NOT trigger when right side is empty"
     );
 }
@@ -175,7 +175,7 @@ fn riko_both_empty_no_trigger() {
     run_live_start(&mut game);
 
     assert!(
-        game.state.mods.get_orientation_modifier(opp) != Some(&"wait".to_string()),
+        game.state.mods.get_orientation_modifier(opp) != Some("wait"),
         "Should NOT trigger when both sides are empty"
     );
 }
@@ -198,7 +198,7 @@ fn riko_same_cost_different_cards_triggers() {
     run_live_start(&mut game);
 
     assert!(
-        game.state.mods.get_orientation_modifier(opp) == Some(&"wait".to_string()),
+        game.state.mods.get_orientation_modifier(opp) == Some("wait"),
         "Should trigger when both cost=2"
     );
 }

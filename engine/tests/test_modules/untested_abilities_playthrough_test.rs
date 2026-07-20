@@ -69,7 +69,7 @@ fn n_pb1_006_wait_self_activates_one_energy() {
     // Cost: card should be in wait state
     assert_eq!(
         game.state.mods.get_orientation_modifier(card),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Cost: card must be in wait state after activation"
     );
     // Effect: energy increased by exactly 1
@@ -120,7 +120,7 @@ fn n_pb1_006_activates_wait_energy_to_active() {
     // Cost paid
     assert_eq!(
         game.state.mods.get_orientation_modifier(card),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Cost paid: card must be wait"
     );
     // Effect: one wait-energy card activated
@@ -183,7 +183,7 @@ fn n_pb1_006_can_activate_multiple_times() {
     // Card is in wait state after final activation
     assert_eq!(
         game.state.mods.get_orientation_modifier(card),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Card should be wait after multiple activations"
     );
 }
@@ -367,7 +367,7 @@ fn hs_bp5_016_wait_opponent_members_triggers_constant_heart06() {
     // Assert: opponent members are now in wait state
     assert_eq!(
         game.state.mods.get_orientation_modifier(opp_member),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Appear: opponent member should be waited"
     );
 

@@ -1060,7 +1060,7 @@ impl super::TurnEngine {
         heart_override: &HashMap<i16, (HeartColor, u32)>,
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
         blade_type_modifiers: &HashMap<i16, BladeColor>,
-        orientation_modifiers: &HashMap<i16, String>,
+        orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
         need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
         heart_color_multiplier: &HashMap<i16, HeartColor>,
         cannot_live: bool,
@@ -1158,7 +1158,7 @@ impl super::TurnEngine {
 
             let is_wait = orientation_modifiers
                 .get(&cid)
-                .map(|o| o == "wait")
+                .map(|o| *o == crate::core::game_modifiers::CardOrientation::Wait)
                 .unwrap_or(false);
 
             member_contributions.push(MemberContribution {

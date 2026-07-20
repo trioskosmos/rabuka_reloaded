@@ -1087,7 +1087,7 @@ fn main() {
                             .map(|c| c.card_no.to_string())
                     };
                     let is_tapped = |cid: i16| -> bool {
-                        gs.mods.orientation_modifiers.get(&cid).map(|s| s.as_str()) == Some("Wait")
+                        gs.mods.orientation_modifiers.get(&cid).map(|o| o.as_str()) == Some("wait")
                     };
                     let set_slot =
                         |slot_fn: unsafe extern "C" fn(i32, bool, *const u8, i32, bool, bool),

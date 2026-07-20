@@ -360,7 +360,7 @@ impl<'a> ConditionContext<'a> {
                         self.game_state
                             .mods
                             .get_orientation_modifier(cid)
-                            .map_or(state == "active", |o| &*o == state)
+                            .map_or(state == "active", |o| o == state)
                     };
                     if has_filter {
                         stage_cards.iter().any(|&cid| {

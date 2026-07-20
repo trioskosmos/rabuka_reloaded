@@ -82,7 +82,7 @@ fn eri_q144_up_to_semantics_1_eligible_opponent_still_works() {
     let orientation = game.state.mods.get_orientation_modifier(eligible);
     assert_eq!(
         orientation,
-        Some(&"wait".to_string()),
+        Some("wait"),
         "1 eligible opponent member was put to wait — 'up to 2' is an upper bound"
     );
 }

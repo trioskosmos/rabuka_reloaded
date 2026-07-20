@@ -51,5 +51,5 @@ fn eli_bp5_sequential_wait_then_discard_works() {
     assert_eq!(game.state.player1.hand.cards.len(), 2);
     let w = game.state.mods.get_orientation_modifier(eli);
     assert!(w.is_some());
-    assert_eq!(w.unwrap().as_str(), "wait");
+    assert_eq!(w.unwrap(), "wait");
 }

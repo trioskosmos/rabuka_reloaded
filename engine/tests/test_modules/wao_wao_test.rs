@@ -67,19 +67,19 @@ fn wao_wao_q178_activate_3_printemps_score_plus_1() {
     // All 3 Printemps should now be active ("active" string modifier = active state)
     let o_a = game.state.mods.get_orientation_modifier(printemps_a);
     assert!(
-        o_a.map(|s| s.as_str()) == Some("active"),
+        o_a == Some("active"),
         "printemps_a should be active, got {:?}",
         o_a
     );
     let o_b = game.state.mods.get_orientation_modifier(printemps_b);
     assert!(
-        o_b.map(|s| s.as_str()) == Some("active"),
+        o_b == Some("active"),
         "printemps_b should be active, got {:?}",
         o_b
     );
     let o_c = game.state.mods.get_orientation_modifier(printemps_c);
     assert!(
-        o_c.map(|s| s.as_str()) == Some("active"),
+        o_c == Some("active"),
         "printemps_c should be active, got {:?}",
         o_c
     );

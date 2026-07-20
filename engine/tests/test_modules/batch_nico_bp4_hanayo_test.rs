@@ -30,7 +30,7 @@ fn nico_bp4_q189_debut_opponent_waits_own_member() {
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(p2_member),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Opponent member should be in wait state"
     );
 }
@@ -69,7 +69,7 @@ fn nico_bp4_multi_opponent_choice() {
     // Verify: p2_member_b is waited, p2_member_a stays active
     assert_eq!(
         game.state.mods.get_orientation_modifier(p2_member_b),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "p2_member_b should be in wait state"
     );
     assert!(
@@ -77,7 +77,7 @@ fn nico_bp4_multi_opponent_choice() {
             .mods
             .get_orientation_modifier(p2_member_a)
             .is_none()
-            || game.state.mods.get_orientation_modifier(p2_member_a) == Some(&"active".to_string()),
+            || game.state.mods.get_orientation_modifier(p2_member_a) == Some("active"),
         "p2_member_a should stay active (not waited)"
     );
 }

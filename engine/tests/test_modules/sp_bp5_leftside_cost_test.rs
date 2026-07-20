@@ -19,7 +19,7 @@ fn sp_bp5_leftside_cost_success_in_left_side() {
     game.activate_ability(card);
 
     assert!(
-        game.state.mods.get_orientation_modifier(card) == Some(&"wait".to_string()),
+        game.state.mods.get_orientation_modifier(card) == Some("wait"),
         "Cost paid: card should be in wait state"
     );
 }

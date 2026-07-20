@@ -29,7 +29,7 @@ fn cl_gain_resource_pay_cost_wait_gain_blade() {
 
     // Cost paid: card in wait
     assert!(
-        game.state.mods.get_orientation_modifier(card) == Some(&"wait".to_string()),
+        game.state.mods.get_orientation_modifier(card) == Some("wait"),
         "Card should be in wait state"
     );
 
@@ -54,7 +54,7 @@ fn cl_gain_resource_cost_pays_when_no_condition_target() {
 
     // Cost should still be paid (change_state cost is unconditional)
     assert!(
-        game.state.mods.get_orientation_modifier(card) == Some(&"wait".to_string()),
+        game.state.mods.get_orientation_modifier(card) == Some("wait"),
         "Card should be in wait state even without valid effect target"
     );
 }

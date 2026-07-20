@@ -302,7 +302,7 @@ fn serasu_edelnote_appear_triggers_opponent_wait() {
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(p2_member_a),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "p2_member_a should be in wait state (first member was waited)"
     );
 }

@@ -500,7 +500,7 @@ impl AbilityResolver {
         entry_snapshot: &Option<Vec<i16>>,
         last_energy: u32,
         last_discard_count: u32,
-        orientation_modifiers: &HashMap<i16, String>,
+        orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
         filter: &crate::ability::util::CardFilter,
     ) -> u32 {
         if !per_unit {
@@ -3615,11 +3615,11 @@ impl AbilityResolver {
     pub(crate) fn execute_perform_yell(&mut self, gs: &mut GameState, count: u32, target: &str) {
         let card_db = gs.card_database.clone();
         let bm = gs.mods.blade_modifiers.clone();
-        let om: HashMap<i16, String> = gs
+        let om: HashMap<i16, crate::core::game_modifiers::CardOrientation> = gs
             .mods
             .orientation_modifiers
             .iter()
-            .map(|(k, v)| (*k, v.clone()))
+            .map(|(k, v)| (*k, *v))
             .collect();
         for _ in 0..count {
             let total_blade = {

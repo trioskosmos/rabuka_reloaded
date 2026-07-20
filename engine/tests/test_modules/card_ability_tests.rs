@@ -669,7 +669,7 @@ fn hanayo_pay_optional_cost_waits_member_and_gains_hearts() {
     // After paying, the wait should have been applied
     let hanayo_orientation = game.state.mods.get_orientation_modifier(hanayo);
     assert_eq!(
-        hanayo_orientation.map(|s| s.as_str()),
+        hanayo_orientation,
         Some("wait"),
         "Hanayo should be waited after paying optional cost"
     );
@@ -721,7 +721,7 @@ fn hanayo_skip_optional_cost_no_effect() {
     // Hanayo should NOT be waited
     let hanayo_orientation = game.state.mods.get_orientation_modifier(hanayo);
     assert_ne!(
-        hanayo_orientation.map(|s| s.as_str()),
+        hanayo_orientation,
         Some("wait"),
         "Hanayo should NOT be waited when cost is skipped"
     );

@@ -1007,12 +1007,12 @@ fn nico_q168_both_appear_from_discard() {
     // Both in wait state
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_p1),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "P1's member wait state"
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_p2),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "P2's member wait state"
     );
 
@@ -1163,7 +1163,7 @@ fn nico_sync_path_opponent_gets_choice_when_self_has_none() {
     assert!(game.state.player2.stage.stage.contains(&cheap_a));
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_a),
-        Some(&"wait".to_string())
+        Some("wait")
     );
 
     // cheap_b still in P2 discard (was not selected)
@@ -1222,11 +1222,11 @@ fn nico_q170_turn_player_appears_first() {
 
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_p1),
-        Some(&"wait".to_string())
+        Some("wait")
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_p2),
-        Some(&"wait".to_string())
+        Some("wait")
     );
 }
 
@@ -1289,7 +1289,7 @@ fn nico_q181_area_freed_after_card_leaves() {
     assert_eq!(game.state.player1.stage.stage[1], cheap);
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap),
-        Some(&"wait".to_string())
+        Some("wait")
     );
 
     // Remove the appeared member
@@ -1425,7 +1425,7 @@ fn nico_cost_filter_only_shows_eligible() {
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap),
-        Some(&"wait".to_string())
+        Some("wait")
     );
 
     // P2's card also in wait state
@@ -1440,7 +1440,7 @@ fn nico_cost_filter_only_shows_eligible() {
                 .find(|&&id| id != -1)
                 .unwrap()
         ),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "P2's card wait state"
     );
 
@@ -1513,7 +1513,7 @@ fn nico_q169_appeared_card_occupies_area() {
     // Wait state
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap),
-        Some(&"wait".to_string())
+        Some("wait")
     );
 }
 
@@ -1589,7 +1589,7 @@ fn nico_prompt_path_two_eligible_in_discard() {
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_a),
-        Some(&"wait".to_string())
+        Some("wait")
     );
     // cheap_b still in discard (was not selected)
     assert!(
@@ -1616,7 +1616,7 @@ fn nico_prompt_path_two_eligible_in_discard() {
     // Both cards placed are in wait state
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_a),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "P1's card wait state"
     );
     assert_eq!(
@@ -1630,7 +1630,7 @@ fn nico_prompt_path_two_eligible_in_discard() {
                 .find(|&&id| id != -1)
                 .unwrap()
         ),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "P2's card wait state"
     );
 }
@@ -1742,12 +1742,12 @@ fn nico_both_players_two_eligible_cards() {
     // Both in wait state
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_p1a),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "P1 card wait"
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_p2a),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "P2 card wait"
     );
 }
@@ -1849,12 +1849,12 @@ fn nico_prompt_path_direct_placement_wait_state() {
     // BOTH must be in wait state
     assert_eq!(
         game2.state.mods.get_orientation_modifier(cheap_a2),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "P1's card wait state (direct placement via Prompt path)"
     );
     assert_eq!(
         game2.state.mods.get_orientation_modifier(cheap_b2),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "P2's card wait state"
     );
 
@@ -1998,12 +1998,12 @@ fn nico_q170_placed_cards_debut_abilities_fire() {
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(keke_p1),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "P1 Keke wait state"
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(keke_p2),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "P2 Keke wait state"
     );
 }
@@ -3347,7 +3347,7 @@ fn kanon_activation_choice_condition_wait_option() {
     // Kanon should be in wait state
     assert_eq!(
         game.state.mods.get_orientation_modifier(kanon),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Kanon should be in wait state"
     );
 }

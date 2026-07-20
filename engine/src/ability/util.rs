@@ -1882,7 +1882,7 @@ pub fn calculate_per_unit_multiplier(
     per_unit: bool,
     per_unit_type: Option<&str>,
     player: &crate::player::Player,
-    orientation_modifiers: &HashMap<i16, String>,
+    orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
     state_filter: Option<&str>,
 ) -> u32 {
     if !per_unit {
@@ -1928,7 +1928,7 @@ pub fn resolve_per_unit_count(
     filter: &CardFilter,
     heart_colors: &[String],
     state_filter: Option<&str>,
-    orientation_modifiers: &HashMap<i16, String>,
+    orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
 ) -> u32 {
     if !per_unit {
         return 1;

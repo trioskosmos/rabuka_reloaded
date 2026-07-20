@@ -39,7 +39,7 @@ fn q248_hanayo_activate_no_other_members() {
     // Cost was paid: Hanayo is now wait
     assert_eq!(
         game.state.mods.get_orientation_modifier(hanayo),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Hanayo should be wait after activation cost"
     );
 
@@ -77,7 +77,7 @@ fn q248_hanayo_activate_others_all_active() {
     // Cost paid
     assert_eq!(
         game.state.mods.get_orientation_modifier(hanayo),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Hanayo should be wait after activation"
     );
 
@@ -122,14 +122,14 @@ fn q248_hanayo_activate_with_wait_member() {
     // Cost paid: Hanayo becomes wait
     assert_eq!(
         game.state.mods.get_orientation_modifier(hanayo),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Hanayo should be wait after activation"
     );
 
     // Effect: friend should now be active
     assert_eq!(
         game.state.mods.get_orientation_modifier(friend),
-        Some(&"active".to_string()),
+        Some("active"),
         "Friend should be activated by the effect"
     );
 

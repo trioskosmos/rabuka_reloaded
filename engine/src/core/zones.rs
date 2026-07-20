@@ -346,7 +346,7 @@ impl Stage {
         &self,
         card_db: &CardDatabase,
         blade_entries: &HashMap<i16, ModifierEntry>,
-        orientation_modifiers: &HashMap<i16, String>,
+        orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
         include_waited: bool,
     ) -> u32 {
         let mut total = 0;
@@ -355,7 +355,7 @@ impl Stage {
                 if !include_waited {
                     if orientation_modifiers
                         .get(&card_id)
-                        .map(|o| o == "wait")
+                        .map(|o| *o == crate::core::game_modifiers::CardOrientation::Wait)
                         .unwrap_or(false)
                     {
                         continue;

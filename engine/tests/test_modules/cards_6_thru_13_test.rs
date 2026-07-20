@@ -495,7 +495,7 @@ fn c12_restriction_blocks_opponent_active() {
     let orientation = g.state.mods.get_orientation_modifier(waiting);
     assert_eq!(
         orientation,
-        Some(&"wait".to_string()),
+        Some("wait"),
         "P2's waiting member should remain in wait state (blocked by restriction)"
     );
 }
@@ -539,7 +539,7 @@ fn c12_restriction_p2_owned_blocks_p1_active() {
     let orientation = g.state.mods.get_orientation_modifier(waiting);
     assert_eq!(
         orientation,
-        Some(&"wait".to_string()),
+        Some("wait"),
         "P1's waiting member should remain in wait state despite active phase"
     );
 }
@@ -583,7 +583,7 @@ fn c12_restriction_does_not_block_self_active() {
     let orientation = g.state.mods.get_orientation_modifier(waiting);
     assert_eq!(
         orientation,
-        Some(&"active".to_string()),
+        Some("active"),
         "P1's own waiting member should become active during active phase"
     );
 }

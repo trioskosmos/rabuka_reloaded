@@ -11,6 +11,7 @@
 ///   PL!HS-bp6-007-R (セラス柳田リリエンフェルト) — auto: EdelNote appears → opponent waits
 ///   PL!HS-sd1-001-SD (日野下花帆) — auto: baton-touched by cost10+ 蓮ノ空 → activate 2 energy
 use crate::helpers::*;
+use rabuka_engine::core::game_modifiers::CardOrientation;
 use rabuka_engine::zones::MemberArea;
 
 // ====================================================================
@@ -45,7 +46,7 @@ fn serasu_played_to_stage_triggers_self() {
     let orientation = game.state.mods.orientation_modifiers.get(&p2_member);
     assert_eq!(
         orientation,
-        Some(&"wait".to_string()),
+        Some(&CardOrientation::Wait),
         "Opponent member must be waited when Serasu self-plays"
     );
 
@@ -67,7 +68,7 @@ fn serasu_played_to_stage_triggers_self() {
     let orientation = game.state.mods.orientation_modifiers.get(&p2_member);
     assert_eq!(
         orientation,
-        Some(&"wait".to_string()),
+        Some(&CardOrientation::Wait),
         "Opponent member must be waited when Serasu self-plays"
     );
 
@@ -105,7 +106,7 @@ fn serasu_on_stage_non_edelnote_appears_no_trigger() {
     );
     let orientation = game.state.mods.orientation_modifiers.get(&p2_member);
     assert!(
-        orientation.is_none() || orientation == Some(&"active".to_string()),
+        orientation.is_none() || orientation == Some(&CardOrientation::Active),
         "Opponent member must not be waited by wrong-group trigger"
     );
 }
@@ -159,9 +160,9 @@ fn serasu_edelnote_appears_fires_once() {
 
     // Exactly one member waited, the other stays active
     let a_waited =
-        game.state.mods.orientation_modifiers.get(&p2_member_a) == Some(&"wait".to_string());
+        game.state.mods.orientation_modifiers.get(&p2_member_a) == Some(&CardOrientation::Wait);
     let b_waited =
-        game.state.mods.orientation_modifiers.get(&p2_member_b) == Some(&"wait".to_string());
+        game.state.mods.orientation_modifiers.get(&p2_member_b) == Some(&CardOrientation::Wait);
     assert_eq!(
         (a_waited as i32) + (b_waited as i32),
         1,
@@ -201,9 +202,9 @@ fn serasu_edelnote_appears_with_non_edelnote_on_stage() {
     }
 
     let a_waited =
-        game.state.mods.orientation_modifiers.get(&p2_member_a) == Some(&"wait".to_string());
+        game.state.mods.orientation_modifiers.get(&p2_member_a) == Some(&CardOrientation::Wait);
     let b_waited =
-        game.state.mods.orientation_modifiers.get(&p2_member_b) == Some(&"wait".to_string());
+        game.state.mods.orientation_modifiers.get(&p2_member_b) == Some(&CardOrientation::Wait);
     assert_eq!(
         (a_waited as i32) + (b_waited as i32),
         1,
@@ -535,7 +536,7 @@ fn serasu_double_trigger_regression() {
         .mods
         .orientation_modifiers
         .iter()
-        .filter(|(_, v)| *v == "wait")
+        .filter(|(_, v)| **v == CardOrientation::Wait)
         .count();
     assert_eq!(
         waited_count, 1,
@@ -548,10 +549,11 @@ fn serasu_double_trigger_regression() {
         .mods
         .orientation_modifiers
         .get(&p2_member)
-        .cloned()
-        .unwrap_or_else(|| "active".to_string());
+        .copied()
+        .unwrap_or(CardOrientation::Active);
     assert_eq!(
-        p2_mod, "wait",
+        p2_mod,
+        CardOrientation::Wait,
         "The single opponent member must be in wait state, got {:?}",
         p2_mod
     );

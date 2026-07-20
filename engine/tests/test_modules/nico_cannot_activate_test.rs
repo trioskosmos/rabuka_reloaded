@@ -46,8 +46,8 @@ fn nico_blocks_kotori_activation() {
     // Manually put filler in wait (Nico's ab#0 targets opponent stage).
     game.state.mods.add_orientation_modifier(filler, "wait");
     assert_eq!(
-        game.state.mods.get_orientation_modifier(filler).cloned(),
-        Some("wait".to_string()),
+        game.state.mods.get_orientation_modifier(filler),
+        Some("wait"),
         "Filler should be in wait after manual setting"
     );
 
@@ -79,8 +79,8 @@ fn nico_blocks_kotori_activation() {
     // The cannot_activate_by_effect restriction should have blocked the
     // state change. Filler should still be in wait.
     assert_eq!(
-        game.state.mods.get_orientation_modifier(filler).cloned(),
-        Some("wait".to_string()),
+        game.state.mods.get_orientation_modifier(filler),
+        Some("wait"),
         "Filler should remain in wait — cannot_activate_by_effect blocked Kotori's activation"
     );
 }
@@ -104,8 +104,8 @@ fn kotori_activate_works_without_restriction() {
     // Manually put filler in wait.
     game.state.mods.add_orientation_modifier(filler, "wait");
     assert_eq!(
-        game.state.mods.get_orientation_modifier(filler).cloned(),
-        Some("wait".to_string()),
+        game.state.mods.get_orientation_modifier(filler),
+        Some("wait"),
         "Filler should be in wait after manual setting"
     );
 
@@ -119,9 +119,9 @@ fn kotori_activate_works_without_restriction() {
 
     // No restriction → activation should succeed.
     // Filler is now active (no wait modifier).
-    let ori = game.state.mods.get_orientation_modifier(filler).cloned();
+    let ori = game.state.mods.get_orientation_modifier(filler);
     assert!(
-        ori != Some("wait".to_string()),
+        ori != Some("wait"),
         "Filler should no longer be in wait (activation succeeded). Got: {:?}",
         ori
     );
@@ -161,9 +161,9 @@ fn nico_q180_active_phase_still_activates() {
 
     // Q180: P2's Active phase should activate P2's wait members naturally
     // despite the cannot_activate_by_effect restriction.
-    let ori = game.state.mods.get_orientation_modifier(filler2).cloned();
+    let ori = game.state.mods.get_orientation_modifier(filler2);
     assert!(
-        ori.is_none() || ori != Some("wait".to_string()),
+        ori.is_none() || ori != Some("wait"),
         "Q180: Active phase activates wait members despite restriction. Got: {:?}",
         ori
     );

@@ -79,15 +79,11 @@ fn kanata_not_auto_activated_in_active_phase_but_others_are() {
     game.state.current_phase = rabuka_engine::types::Phase::Active;
     rabuka_engine::turn::TurnEngine::advance_phase(&mut game.state);
     assert_eq!(
-        game.state.mods.get_orientation_modifier(kanata).cloned(),
-        Some("wait".to_string())
+        game.state.mods.get_orientation_modifier(kanata),
+        Some("wait")
     );
-    let other_ori = game
-        .state
-        .mods
-        .get_orientation_modifier(other_member)
-        .cloned();
-    assert!(other_ori != Some("wait".to_string()));
+    let other_ori = game.state.mods.get_orientation_modifier(other_member);
+    assert!(other_ori != Some("wait"));
 }
 
 #[test]
@@ -103,7 +99,7 @@ fn kanata_can_be_activated_by_effect() {
     game.state.recalculate_constants();
     game.state.mods.add_orientation_modifier(kanata, "wait");
     game.state.mods.add_orientation_modifier(kanata, "active");
-    assert!(game.state.mods.get_orientation_modifier(kanata).cloned() != Some("wait".to_string()));
+    assert!(game.state.mods.get_orientation_modifier(kanata) != Some("wait"));
 }
 
 #[test]
@@ -134,8 +130,8 @@ fn kanata_live_success_with_others_waits_self() {
     }
     game.pass();
     assert_eq!(
-        game.state.mods.get_orientation_modifier(kanata).cloned(),
-        Some("wait".to_string()),
+        game.state.mods.get_orientation_modifier(kanata),
+        Some("wait"),
         "Kanata should be waited by her own LiveSuccess ability"
     );
 }
@@ -167,7 +163,7 @@ fn kanata_live_success_no_others_does_not_wait() {
     }
     game.pass();
     assert!(
-        game.state.mods.get_orientation_modifier(kanata).cloned() != Some("wait".to_string()),
+        game.state.mods.get_orientation_modifier(kanata) != Some("wait"),
         "Kanata should NOT be waited (no other members)"
     );
 }

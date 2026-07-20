@@ -44,7 +44,7 @@ fn izumi_bp5_pay_cost_waits_and_discards() {
     // Wait should now be paid
     let w = game.state.mods.get_orientation_modifier(izumi);
     assert!(w.is_some(), "Wait should be applied after paying cost");
-    assert_eq!(w.unwrap().as_str(), "wait");
+    assert_eq!(w.unwrap(), "wait");
 
     // After discard, hand goes from [filler] to []
     // Then look_and_select fires → no matching cards (filler ≠ 蓮ノ空 + cost≥9) → auto-skip

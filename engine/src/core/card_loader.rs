@@ -17,7 +17,6 @@ use std::vec::Vec;
 
 use crate::ability::ability_store::AbilityRef;
 use crate::card::{Ability, Card};
-use crate::Arc;
 use crate::HashMap;
 #[cfg(feature = "no_std")]
 use alloc::boxed::Box;

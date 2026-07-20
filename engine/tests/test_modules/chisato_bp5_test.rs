@@ -223,14 +223,14 @@ fn chisato_promo_ab1_live_start() {
     game.state.player1.stage.stage = [liella, chisato, filler];
 
     // Set Liella member and Chisato to wait (rested) state
-    game.state
-        .mods
-        .orientation_modifiers
-        .insert(liella, "wait".to_string());
-    game.state
-        .mods
-        .orientation_modifiers
-        .insert(chisato, "wait".to_string());
+    game.state.mods.orientation_modifiers.insert(
+        liella,
+        rabuka_engine::core::game_modifiers::CardOrientation::Wait,
+    );
+    game.state.mods.orientation_modifiers.insert(
+        chisato,
+        rabuka_engine::core::game_modifiers::CardOrientation::Wait,
+    );
 
     // Give 3 energy, but make them all rested
     game.give_energy(3);
@@ -256,14 +256,14 @@ fn chisato_promo_ab1_live_start() {
 
     // Since Chisato's ab#1 triggers automatically and is not optional,
     // the members and energy should be activated.
-    let liella_ori = game.state.mods.orientation_modifiers.get(&liella).cloned();
-    let chisato_ori = game.state.mods.orientation_modifiers.get(&chisato).cloned();
+    let liella_ori = game.state.mods.orientation_modifiers.get(&liella).copied();
+    let chisato_ori = game.state.mods.orientation_modifiers.get(&chisato).copied();
     assert!(
-        liella_ori != Some("wait".to_string()),
+        liella_ori != Some(rabuka_engine::core::game_modifiers::CardOrientation::Wait),
         "Liella! member should be active"
     );
     assert!(
-        chisato_ori != Some("wait".to_string()),
+        chisato_ori != Some(rabuka_engine::core::game_modifiers::CardOrientation::Wait),
         "Chisato should be active"
     );
     assert_eq!(

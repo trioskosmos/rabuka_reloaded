@@ -35,10 +35,10 @@ fn q137_keke_active_cost_pay_applies_wait() {
     );
     game.select_option(1); // Pay
 
-    let ori = game.state.mods.get_orientation_modifier(keke).cloned();
+    let ori = game.state.mods.get_orientation_modifier(keke);
     assert_eq!(
         ori,
-        Some("wait".to_string()),
+        Some("wait"),
         "Keke should be waited after paying cost"
     );
 
@@ -76,7 +76,7 @@ fn q137_keke_skip_cost_no_wait() {
     }
 
     // Keke should NOT be in wait state
-    let ori = game.state.mods.get_orientation_modifier(keke).cloned();
+    let ori = game.state.mods.get_orientation_modifier(keke);
     assert_eq!(ori, None, "Keke should NOT be waited after skipping cost");
 }
 
@@ -106,8 +106,8 @@ fn q137_keke_already_waited_cannot_pay_again() {
     }
 
     assert_eq!(
-        game.state.mods.get_orientation_modifier(keke).cloned(),
-        Some("wait".to_string()),
+        game.state.mods.get_orientation_modifier(keke),
+        Some("wait"),
         "Keke should be waited after paying cost"
     );
 
@@ -168,7 +168,7 @@ fn q137_nico_both_have_eligible_members() {
     assert_eq!(game.state.player1.stage.stage[1], cheap_p1);
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_p1),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "P1's placed member should be in wait state"
     );
 
@@ -176,7 +176,7 @@ fn q137_nico_both_have_eligible_members() {
     assert_eq!(game.state.player2.stage.stage[2], cheap_p2);
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_p2),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "P2's placed member should be in wait state"
     );
 }
@@ -237,7 +237,7 @@ fn q137_nico_only_opponent_has_eligible() {
     assert_eq!(game.state.player2.stage.stage[0], cheap_p2);
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_p2),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "P2's placed member should be in wait state"
     );
 }

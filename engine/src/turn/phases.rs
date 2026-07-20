@@ -101,9 +101,7 @@ impl super::TurnEngine {
                             if cid == -1 {
                                 return None;
                             }
-                            if game_state.mods.get_orientation_modifier(cid)
-                                != Some(&"wait".to_string())
-                            {
+                            if game_state.mods.get_orientation_modifier(cid) != Some("wait") {
                                 return None;
                             }
                             // Skip members with a constant cannot_activate restriction

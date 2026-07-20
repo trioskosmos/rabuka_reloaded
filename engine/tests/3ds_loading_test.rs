@@ -9,7 +9,7 @@ use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::deck_builder::DeckBuilder;
 use rabuka_engine::deck_parser::DeckParser;
 use rabuka_engine::game_setup;
-use rabuka_engine::game_state::{GameResult, GameState};
+use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
 
 fn build_game(json_str: &str, abilities_str: &str) -> Result<GameState, String> {

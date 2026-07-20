@@ -76,7 +76,7 @@ fn maki_q177_debut_triggers_draw_via_ab0() {
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_opp),
-        Some(&"wait".to_string()),
+        Some("wait"),
         "Opponent's cheap member should be in wait state"
     );
 }
