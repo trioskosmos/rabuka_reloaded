@@ -206,17 +206,32 @@ Same for effects: `{"action": "draw_card", "count": 2}` maps to `EffectKind::Dra
 
 ### New priorities (audited 2026-07-20)
 
+#### ✅ DONE — character_effects Vec<serde_json::Value> removed (dead code)
+#### ✅ DONE — SmallVec for short GameState Vec fields (24 fields converted)
+#### ✅ DONE — HashMap→SmallVec in GameState (baton_touch_count → two u32s, turn_limit_usage → SmallVec)
+#### ✅ DONE — bytecode_abilities is now universal default, old JSON path deleted
+
+#### P0 — Direct bytecode→struct decoder (eliminate serde from runtime)
+**Why:** The bytecode path currently round-trips through `serde_json::Value`:
+```
+bytecode → serde_json::Value → serde_json::from_value::<Ability> → populate_from_json
+```
+This means serde is needed at RUNTIME for every ability decode. A direct bytecode→struct decoder would make serde a build-time-only dependency.
+
+**What changes:**
+- Rewrite `vm.rs` to decode bytecode bytes directly into `Ability`/`AbilityEffect`/`EffectKind` structs (no serde_json::Value intermediate)
+- Delete `populate_from_json` (~200 lines) — decoder fills EffectKind directly
+- Delete `kind_from_action` (~66 lines) — no longer needed
+- Fix `choice.rs` round-trips — store pre-decoded AbilityEffect structs instead of JSON strings
+- Keep serde for card loading (one-time startup, cards.json only)
+- **Runtime serde: ZERO for abilities**
+
+**Lean runtime representation:** The engine doesn't need the full 152-byte AbilityEffect with 65+ flat fields. At evaluation time it only reads: `action` (ActionType), `kind` (EffectKind), `text`, `condition`, `compound`. The flat fields that duplicate EffectKind data can be dropped entirely — they're only needed for JSON round-trip.
+
+**Estimated savings:** ~300 lines deleted, ~10-20% faster ability decode, serde removed from runtime dependency tree.
+
 #### P2 — Replace orientation_modifiers String values with CardState enum (~300B saved)
 `HashMap<i16, String>` → `HashMap<i16, CardState>` where CardState is "active"/"wait" enum. Eliminates 6 String heap allocs.
-
-#### P2 — Replace character_effects Vec<serde_json::Value> with typed enum
-Last remaining serde_json::Value in hot-path code (MiscOp variant).
-
-#### P2 — SmallVec for short GameState Vec fields (~500B saved)
-`prohibition_effects`, `cannot_activate_members`, `cannot_live_players`, `temporary_effects`, `replacement_effects`, etc. are typically 0-3 entries. `SmallVec<[T; 4]>` avoids heap alloc.
-
-#### P2 — HashMap→SmallVec in GameState (~1200B saved)
-`baton_touch_count`, `turn_limit_usage`, `turn1_abilities_played`, `turn2_abilities_played` etc. are only 2 players. SmallVec avoids HashMap overhead.
 
 #### P3 — Extract EffectFilters from EffectKind variants (~200B per instance)
 Common filter fields (characters, group_names, heart_colors, etc.) repeated across 7+ variants. Extract to `Box<EffectFilters>`.
@@ -306,23 +321,20 @@ is pure waste.
 
 ---
 
-### P1 — Consolidate AbilityEffect + EffectKind
+### P1 — Consolidate AbilityEffect + EffectKind → SUPERSEDED by P0 Direct Bytecode Decoder
 
-**Status:** 🔄 Step 5 done (Box filter sets). Steps 1-4 require careful handling of field name semantics.
+**Status:** Superseded. The direct bytecode decoder (P0 above) eliminates the need for flat fields entirely. Instead of removing flat fields from AbilityEffect and maintaining serde compatibility, the decoder produces a lean runtime representation without flat fields in the first place.
 
-**Why:** `AbilityEffect` (1536 bytes) and `EffectKind` (1248 bytes) store the SAME data redundantly.
-- `effect.source` flat field vs `EffectKind::MoveCards.source_position` vs `EffectKind::DrawCards.sources` — three DIFFERENT names for the same concept.
-- 137 `_any()` getter methods exist because flat fields and EffectKind can diverge.
-- `rekindle_effect` exists because EffectKind is reconstructed from flat JSON.
+**What was done:** Audited all 27+ live flat field access sites. source/destination/count/target are LIVE (not dead code). Removing them individually would require migrating 27+ sites. The direct decoder approach is cleaner — it produces only what the engine needs.
 
-**Lesson from Condition refactor:** This is NOT a simple field removal. The field NAMES are inconsistent across EffectKind variants (`source_position` vs `source`, `target_count` vs `count`, etc.). Before removing flat fields, the EffectKind fields need to be RENAMED to a consistent convention that mirrors the JSON output (e.g., all variants use `source`, `count`, `target`). Then the flat fields can be removed from AbilityEffect and the getters collapse into single-match arms.
-
-**Progress:**
-1. ✅ Added flat field equivalents (`source`, `destination`, `count`, `target`) to EffectKind as NEW fields — keeping existing `source_position` and `target_count` intact (they represent DIFFERENT concepts: zone vs stage position, card count vs target count). Created `source_any()`, `destination_any()`, `count_any()`, `target_any()` getters.
-2. 🔲 Remove flat fields from `AbilityEffect` (`action`, `source`, `destination`, `count`, `target`) — requires custom Deserialize for AbilityEffect to feed flat JSON fields into EffectKind during deserialization instead of storing them as struct fields
-3. 🔲 Simplify 137 `_any()` getters — no flat field fallback needed once flat fields are removed
-4. 🔲 Kill `rekindle_effect` — EffectKind becomes the single source of truth  
-5. ✅ **Box filter sets** on large EffectKind variants — DONE. 14 Vec fields boxed
+**The engine actually needs at evaluation time:**
+- `action: ActionType` (2B) — dispatch
+- `kind: EffectKind` (544B) — the actual data
+- `text: Arc<str>` (16B) — display
+- `condition: Option<Box<Condition>>` (8B) — gate
+- `compound: Option<Box<CompoundBranch>>` (8B) — sub-effects
+- `dynamic_count: Option<Box<DynamicCount>>` (8B) — count resolution
+- Total: ~586B (vs current 152B + 544B = 696B with redundant flat fields)
 
 **Strategy for flat field removal:**
 Replace `#[serde(skip)]` on `kind: Option<EffectKind>` with a custom Deserialize impl that reads the raw JSON, extracts flat field keys (source, destination, count, target) into EffectKind during deserialization, and returns AbilityEffect without storing them separately. This eliminates the flat fields AND makes `rekindle_effect` unnecessary, naturally killing both code paths.
@@ -376,30 +388,12 @@ Keep `#[serde(default)]` on `kind: Option<EffectKind>` (NOT `#[serde(skip)]` —
 
 ---
 
-### P1 — Remove serde_json::Value → typed enums
+### P1 — Remove serde_json::Value → typed enums ✅ DONE
 
-**Why:** `TemporaryEffect.effect_data: Option<serde_json::Value>` and `LogEntry.metadata: Option<serde_json::Value>`. `serde_json::Value` is a heap-allocated JSON tree. Every temporary effect and log entry pays this cost.
-
-**Fix:** Replace with `Option<EffectMetadata>` where EffectMetadata is a compact typed enum:
-
-```rust
-enum EffectMetadata {
-    HeartColorOverride { color: HeartColor, amount: u32 },
-    BladeBonus { target: i16, amount: i32 },
-    ScoreBonus { amount: i32 },
-    CostMod { target: i16, delta: i32 },
-    AbilityGain { ability_key: String },
-    // ...
-    None,
-}
-```
-
-**Savings:** `serde_json::Value` is ~72 bytes minimum + heap alloc per nested value. Typed enum: ~24-40 bytes, stack-local.
-
-**Trade-offs:**
-- Needs to enumerate all metadata forms — but they're internal to the engine (effects know what they emit)
-- More rigid, harder to extend mid-game
-- **Test risk:** Medium
+**Completed (2026-07-20):**
+- `LogEntry.metadata: serde_json::Value` → `LogMetadata` tagged enum
+- `TemporaryEffect.effect_data: serde_json::Value` → `EffectData` tagged enum
+- All 1829 tests pass
 
 ---
 
