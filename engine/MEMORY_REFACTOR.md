@@ -166,32 +166,9 @@ Same for effects: `{"action": "draw_card", "count": 2}` maps to `EffectKind::Dra
 
 ### P0 — CardDatabase slimming
 
-**Why:** 7400 cards at ~200B each = ~2 MB. This is the single largest memory consumer. On a 3DS (64 MB RAM) it's 3% of total. On a GBA/DMG-class target it would be the entire RAM budget.
+**Status:** ✅ Already solved on consoles. Console ports (DC/DS/PSP) load only ~120 cards from `deck_N_cards.json` files. The full 7400-card database is only loaded by desktop binaries and web server for the card browser UI. No action needed for console targets.
 
-**Optimization paths:**
-
-#### A. Arc<str> for shared strings (~200-300 KB saved)
-Card fields `product`, `series`, `group` are `Box<str>` — owned, unique per card. But many cards share the same product/series/group. Using `Arc<str>` instead enables deduplication: the first card to use "PR" creates the Arc, subsequent cards share the pointer. With ~100 unique products × 16B pointer vs 16B Box<str> per card = similar per-card cost, but heap string deduplication saves ~5-10 KB per shared string.
-
-More impactful: `rare` and `ability` are `String` (24B). Switching to `Box<str>` saves 8B each (16B → 8B? No: String 24B → Box<str> 16B = 8B per field). With 7400 cards: 7400 × 16B = ~118 KB saved.
-
-#### B. On-demand card loading (~1.5 MB saved)
-Only ~200-300 cards are in any given deck. The other 7000+ are never accessed during a game. If cards were loaded lazily from a pre-baked binary format (only the card data needed for the current game), the resident footprint drops from ~2 MB to ~60-100 KB.
-
-This is the same approach the GBC Pokemon Card Game used: only the 60 cards in the two decks were loaded, plus a compact card index for search effects.
-
-**Approach:** Pre-bake a compact binary format per card (name, type, cost, stats, abilities index). Load all ~7400 card headers (~40B each = ~300 KB) for search/condition effects, but defer loading full ability text, FAQ, and heart maps until the card enters play.
-
-#### C. Card struct field reduction (~100 KB saved)
-- ~~`_img: Option<ArcStr>`~~ — **DELETED** (unused duplicate of `img`)
-- ~~`baked_abilities: Option<Vec<Ability>>`~~ — **DELETED** (dead with bytecode universal)
-- ~~`rare: String`~~ → `Box<str>` — **DONE** (-8B per card)
-- ~~`ability: String`~~ → `Box<str>` — **DONE** (-8B per card)
-- Remaining: `faq: Vec<FAQEntry>` — only shown to frontend, could feature-gate behind `debug_frontend`
-
-**Estimated total savings:** 100-300 KB (approach B is highest impact but largest effort).
-
----
+**Desktop/web note:** `main.rs` and `web_server.rs` load the full 7400-card `cards.json` (~2 MB). This could be split: full DB for card browser UI, slim DB (~120 cards) for gameplay. But this is a desktop optimization, not a console concern.
 
 ### P0 — Direct bytecode→struct decoder (eliminate serde from runtime)
 
