@@ -183,10 +183,11 @@ This is the same approach the GBC Pokemon Card Game used: only the 60 cards in t
 **Approach:** Pre-bake a compact binary format per card (name, type, cost, stats, abilities index). Load all ~7400 card headers (~40B each = ~300 KB) for search/condition effects, but defer loading full ability text, FAQ, and heart maps until the card enters play.
 
 #### C. Card struct field reduction (~100 KB saved)
-Some Card fields are rarely read:
-- `faq: Vec<FAQEntry>` — only shown to frontend, never by engine logic. Feature-gate behind `debug_frontend`.
-- `_img: Option<ArcStr>` — unused duplicate of `img`. Delete.
-- `baked_abilities: Option<Vec<Ability>>` — only used by PSP/3DS bake path. Already dead with bytecode universal.
+- ~~`_img: Option<ArcStr>`~~ — **DELETED** (unused duplicate of `img`)
+- ~~`baked_abilities: Option<Vec<Ability>>`~~ — **DELETED** (dead with bytecode universal)
+- ~~`rare: String`~~ → `Box<str>` — **DONE** (-8B per card)
+- ~~`ability: String`~~ → `Box<str>` — **DONE** (-8B per card)
+- Remaining: `faq: Vec<FAQEntry>` — only shown to frontend, could feature-gate behind `debug_frontend`
 
 **Estimated total savings:** 100-300 KB (approach B is highest impact but largest effort).
 
