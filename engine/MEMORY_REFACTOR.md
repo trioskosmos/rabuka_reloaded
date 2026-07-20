@@ -192,8 +192,9 @@ abilities.json (800 abilities, source of truth)
 - All 1829 tests pass
 
 **What remains:**
-1. Fold `populate_from_json` into a custom `Deserialize for AbilityEffect` — this eliminates the last serde_json::Value usage and the post-processing step
-2. Fix `choice.rs` round-trips — store pre-decoded AbilityEffect structs instead of JSON strings
+1. ~~Fold `populate_from_json` into a custom `Deserialize for AbilityEffect`~~ — **BLOCKED.** AbilityEffect contains `Option<Vec<Box<AbilityEffect>>>` (in effect_steps, compound.actions). A custom Deserialize impl would be called recursively for those fields → infinite recursion. Would require a parallel `AbilityEffectInner` struct + recursive conversion, which is more code than it saves.
+2. `populate_from_json` stays as a post-processing step — it's ~200 lines but stable and well-tested.
+3. Fix `choice.rs` round-trips — store pre-decoded AbilityEffect structs instead of JSON strings.
 
 **Why this is data-driven:** Adding a new field to Ability/AbilityEffect/EffectKind/Condition just needs `#[serde(default)]` on the struct. The BcDeserializer handles any key-value pair. Zero decoder code changes for new fields or action types.
 

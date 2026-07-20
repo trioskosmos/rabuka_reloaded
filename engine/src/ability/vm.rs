@@ -2,7 +2,6 @@ use super::abilities_gen::{BYTECODE, NUM_ABILITIES, OFFSETS, STRINGS};
 use crate::ability::enums::ActionType;
 use crate::card::{Ability, AbilityCost, AbilityEffect};
 use crate::core::types::ArcStr;
-use serde::de::IntoDeserializer;
 
 #[cfg(feature = "no_std")]
 use alloc::{boxed::Box, string::String, string::ToString, vec, vec::Vec};
@@ -130,8 +129,8 @@ impl<'a> BcReader<'a> {
         }
     }
 
-    fn remaining(&self) -> &'a [u8] {
-        self.cursor
+    fn read_json_value(&mut self) -> Option<serde_json::Value> {
+        read_value_from_bc(self)
     }
 }
 
@@ -168,160 +167,56 @@ fn skip_value_with_tag(bc: &mut BcReader, tag: u8) -> Option<()> {
     }
 }
 
-// ── Serde binary deserializer ──
-
-#[derive(Debug)]
-struct BcError(String);
-
-impl serde::de::Error for BcError {
-    fn custom<T: std::fmt::Display>(msg: T) -> Self {
-        BcError(msg.to_string())
-    }
-}
-
-impl std::fmt::Display for BcError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl std::error::Error for BcError {}
-
-struct BcDeserializer<'de> {
-    slice: &'de [u8],
-}
-
-impl<'de, 'a> serde::Deserializer<'de> for &'a mut BcDeserializer<'de> {
-    type Error = BcError;
-
-    fn deserialize_any<V: serde::de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, BcError> {
-        if self.slice.is_empty() {
-            return Err(BcError("unexpected end of input".into()));
+/// Read a tagged value from a BcReader into a serde_json::Value.
+fn read_value_from_bc(bc: &mut BcReader) -> Option<serde_json::Value> {
+    let tag = bc.u8()?;
+    match tag {
+        TAG_NULL => Some(serde_json::Value::Null),
+        TAG_FALSE => Some(serde_json::Value::Bool(false)),
+        TAG_TRUE => Some(serde_json::Value::Bool(true)),
+        TAG_I64 => {
+            let v = bc.i64()?;
+            Some(serde_json::Value::from(v))
         }
-        let tag = self.slice[0];
-        self.slice = &self.slice[1..];
-        match tag {
-            TAG_NULL => visitor.visit_unit(),
-            TAG_FALSE => visitor.visit_bool(false),
-            TAG_TRUE => visitor.visit_bool(true),
-            TAG_I64 => {
-                if self.slice.len() < 8 {
-                    return Err(BcError("unexpected end of input for i64".into()));
-                }
-                let v = i64::from_le_bytes(self.slice[..8].try_into().unwrap());
-                self.slice = &self.slice[8..];
-                visitor.visit_i64(v)
+        TAG_F64 => {
+            if bc.cursor.len() < 8 {
+                return None;
             }
-            TAG_F64 => {
-                if self.slice.len() < 8 {
-                    return Err(BcError("unexpected end of input for f64".into()));
-                }
-                let v = f64::from_le_bytes(self.slice[..8].try_into().unwrap());
-                self.slice = &self.slice[8..];
-                visitor.visit_f64(v)
+            let v = f64::from_le_bytes(bc.cursor[..8].try_into().ok()?);
+            bc.cursor = &bc.cursor[8..];
+            Some(serde_json::Value::from(v))
+        }
+        TAG_STR => {
+            let idx = bc.u16()? as usize;
+            if idx >= STRINGS.len() {
+                return None;
             }
-            TAG_STR => {
-                if self.slice.len() < 2 {
-                    return Err(BcError("unexpected end of input for string index".into()));
-                }
-                let idx = u16::from_le_bytes([self.slice[0], self.slice[1]]) as usize;
-                self.slice = &self.slice[2..];
-                if idx >= STRINGS.len() {
-                    return Err(BcError(format!("string index {idx} out of range")));
-                }
-                visitor.visit_borrowed_str(STRINGS[idx])
+            Some(serde_json::Value::String(STRINGS[idx].to_string()))
+        }
+        TAG_ARRAY => {
+            let len = bc.u32()? as usize;
+            let mut arr = Vec::with_capacity(len);
+            for _ in 0..len {
+                arr.push(read_value_from_bc(bc)?);
             }
-            TAG_ARRAY => {
-                if self.slice.len() < 4 {
-                    return Err(BcError("unexpected end of input for array length".into()));
+            Some(serde_json::Value::Array(arr))
+        }
+        TAG_OBJECT => {
+            let len = bc.u32()? as usize;
+            let mut obj = serde_json::Map::with_capacity(len);
+            for _ in 0..len {
+                let kidx = bc.u16()? as usize;
+                if kidx >= STRINGS.len() {
+                    return None;
                 }
-                let len = u32::from_le_bytes(self.slice[..4].try_into().unwrap()) as usize;
-                self.slice = &self.slice[4..];
-                visitor.visit_seq(BcSeqAccess {
-                    deser: self,
-                    remaining: len,
-                })
+                let key = STRINGS[kidx].to_string();
+                let val = read_value_from_bc(bc)?;
+                obj.insert(key, val);
             }
-            TAG_OBJECT => {
-                if self.slice.len() < 4 {
-                    return Err(BcError("unexpected end of input for object length".into()));
-                }
-                let len = u32::from_le_bytes(self.slice[..4].try_into().unwrap()) as usize;
-                self.slice = &self.slice[4..];
-                visitor.visit_map(BcMapAccess {
-                    deser: self,
-                    remaining: len,
-                })
-            }
-            _ => Err(BcError(format!("unknown tag: {tag:#04x}"))),
+            Some(serde_json::Value::Object(obj))
         }
+        _ => None,
     }
-
-    serde::forward_to_deserialize_any! {
-        bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string
-        bytes byte_buf option unit unit_struct newtype_struct seq tuple
-        tuple_struct map enum identifier ignored_any struct
-    }
-}
-
-struct BcSeqAccess<'de, 'a> {
-    deser: &'a mut BcDeserializer<'de>,
-    remaining: usize,
-}
-
-impl<'de, 'a> serde::de::SeqAccess<'de> for BcSeqAccess<'de, 'a> {
-    type Error = BcError;
-
-    fn next_element_seed<T: serde::de::DeserializeSeed<'de>>(
-        &mut self,
-        seed: T,
-    ) -> Result<Option<T::Value>, BcError> {
-        if self.remaining == 0 {
-            return Ok(None);
-        }
-        self.remaining -= 1;
-        seed.deserialize(&mut *self.deser).map(Some)
-    }
-}
-
-struct BcMapAccess<'de, 'a> {
-    deser: &'a mut BcDeserializer<'de>,
-    remaining: usize,
-}
-
-impl<'de, 'a> serde::de::MapAccess<'de> for BcMapAccess<'de, 'a> {
-    type Error = BcError;
-
-    fn next_key_seed<K: serde::de::DeserializeSeed<'de>>(
-        &mut self,
-        seed: K,
-    ) -> Result<Option<K::Value>, BcError> {
-        if self.remaining == 0 {
-            return Ok(None);
-        }
-        self.remaining -= 1;
-        if self.deser.slice.len() < 2 {
-            return Err(BcError("unexpected end of input for key index".into()));
-        }
-        let idx = u16::from_le_bytes([self.deser.slice[0], self.deser.slice[1]]) as usize;
-        self.deser.slice = &self.deser.slice[2..];
-        if idx >= STRINGS.len() {
-            return Err(BcError(format!("key string index {idx} out of range")));
-        }
-        seed.deserialize(STRINGS[idx].into_deserializer()).map(Some)
-    }
-
-    fn next_value_seed<V: serde::de::DeserializeSeed<'de>>(
-        &mut self,
-        seed: V,
-    ) -> Result<V::Value, BcError> {
-        seed.deserialize(&mut *self.deser)
-    }
-}
-
-fn from_bytes<'de, T: serde::Deserialize<'de>>(data: &'de [u8]) -> Result<T, BcError> {
-    let mut deser = BcDeserializer { slice: data };
-    T::deserialize(&mut deser)
 }
 
 // ── Direct Ability decoder ──
@@ -395,20 +290,10 @@ fn decode_ability_cost(bc: &mut BcReader) -> Option<Option<Box<AbilityCost>>> {
         TAG_NULL => Some(None),
         TAG_OBJECT => {
             let count = bc.u32()? as usize;
-
-            let start = bc.remaining();
-            for _ in 0..count {
-                bc.u16()?;
-                bc.skip_value()?;
-            }
-            let consumed = start.len() - bc.remaining().len();
-            let obj_bytes = &start[..consumed];
-
-            let mut map_val: serde_json::Value = from_bytes(obj_bytes).ok()?;
-            if let Some(obj) = map_val.as_object_mut() {
-                normalize_cost_keys(obj);
-            }
-
+            // Collect into map, then apply AbilityCost-specific normalizations.
+            let mut map = collect_json_map(bc, count)?;
+            normalize_cost_keys(&mut map);
+            let map_val = serde_json::Value::Object(map);
             let mut inner: AbilityEffect = serde_json::from_value(map_val.clone()).ok()?;
             inner.populate_from_json(&map_val);
             Some(Some(Box::new(AbilityCost(inner))))
@@ -427,6 +312,24 @@ fn decode_ability_effect(bc: &mut BcReader) -> Option<Option<AbilityEffect>> {
         }
         _ => None,
     }
+}
+
+/// Collect `count` key-value pairs from a BcReader into a serde_json::Map.
+fn collect_json_map(
+    bc: &mut BcReader,
+    count: usize,
+) -> Option<serde_json::Map<String, serde_json::Value>> {
+    let mut map = serde_json::Map::with_capacity(count);
+    for _ in 0..count {
+        let key_idx = bc.u16()? as usize;
+        if key_idx >= STRINGS.len() {
+            return None;
+        }
+        let key = STRINGS[key_idx].to_string();
+        let val = bc.read_json_value()?;
+        map.insert(key, val);
+    }
+    Some(map)
 }
 
 /// Apply AbilityCost-specific key normalizations recursively.
@@ -472,41 +375,42 @@ fn recursive_normalize_cost_value(val: &mut serde_json::Value) {
 
 /// Decode an AbilityEffect from an object whose TAG_OBJECT + count have been
 /// consumed. Strategy:
-///   1. Capture the byte range of the object body
-///   2. Deserialize serde_json::Value directly from binary via BcDeserializer
-///   3. Normalize legacy / alias keys
-///   4. Deserialize AbilityEffect from the normalized JSON via serde
-///   5. Call `populate_from_json` to build EffectKind and recurse into sub-effects
+///   1. Collect every key→value pair into a serde_json::Map
+///   2. Deserialize AbilityEffect from the Map via serde (handles all fields
+///      including `#[serde(flatten)]` CompoundBranch)
+///   3. Call `populate_from_json` to build EffectKind and recurse into sub-effects
 fn decode_ability_effect_from_object(bc: &mut BcReader) -> Option<AbilityEffect> {
     let count = bc.u32()? as usize;
 
-    let start = bc.remaining();
-    for _ in 0..count {
-        bc.u16()?;
-        bc.skip_value()?;
-    }
-    let consumed = start.len() - bc.remaining().len();
-    let obj_bytes = &start[..consumed];
+    // Phase 1: collect all key-value pairs into a JSON map.
+    let mut map = collect_json_map(bc, count)?;
 
-    let mut map_val: serde_json::Value = from_bytes(obj_bytes).ok()?;
-
-    if let Some(obj) = map_val.as_object_mut() {
-        if !obj.contains_key("action") {
-            if let Some(v) = obj.remove("type").or_else(|| obj.remove("cost_type")) {
-                obj.insert("action".into(), v);
-            }
+    // Normalize legacy / alias keys so AbilityEffect::Deserialize picks them up:
+    //   "type" / "cost_type" → "action"   (AbilityCost uses "type")
+    //   "zone"               → "source"   (AbilityCost uses "zone")
+    if !map.contains_key("action") {
+        if let Some(v) = map.remove("type").or_else(|| map.remove("cost_type")) {
+            map.insert("action".into(), v);
         }
-        if !obj.contains_key("source") {
-            if let Some(v) = obj.remove("zone") {
-                obj.insert("source".into(), v);
-            }
+    }
+    if !map.contains_key("source") {
+        if let Some(v) = map.remove("zone") {
+            map.insert("source".into(), v);
         }
     }
 
+    let map_val = serde_json::Value::Object(map);
+
+    // Phase 2: deserialize AbilityEffect via serde.
+    // This handles text, action, source, destination, count, target, condition,
+    // compound (look_action, select_action, actions, etc.), and all other fields
+    // including #[serde(flatten)] CompoundBranch.
     let mut effect: AbilityEffect = serde_json::from_value(map_val.clone()).ok()?;
 
+    // Phase 3: populate EffectKind and recurse into sub-effects.
     effect.populate_from_json(&map_val);
 
+    // Phase 4: draw-count fix (mirror decode_like_json)
     if let Some(ref actions) = effect.compound.actions {
         let fixed: Vec<Box<AbilityEffect>> = actions
             .iter()
