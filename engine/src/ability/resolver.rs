@@ -578,15 +578,18 @@ impl AbilityResolver {
         let zone = card_id
             .map(|cid| Self::zone_for_card(gs, cid))
             .unwrap_or_default();
-        let mut meta = serde_json::json!({
-            "result": result,
-            "items": items,
-            "ability_text": ability_text,
-            "zone": zone,
-        });
-        if let Some(e) = error {
-            meta["error"] = serde_json::json!(e);
-        }
+        let items_json: Vec<serde_json::Value> = items
+            .iter()
+            .map(|i| serde_json::to_value(i).unwrap_or_default())
+            .collect();
+        let meta = crate::core::types::LogMetadata::AbilityResolution {
+            result: result.to_string(),
+            items: items_json.clone(),
+            ability_text: ability_text.clone(),
+            zone: zone.clone(),
+            error: error.map(|e| e.to_string()),
+            resolved: None,
+        };
         let log_text = format!(
             "{pp} {card_name} [{zone}]: [[log_ability_result:trigger=trigger_{trigger_str},result=result_{}]]",
             result
@@ -622,22 +625,22 @@ impl AbilityResolver {
                 if entry.turn != gs.turn_number {
                     continue;
                 }
-                let trigger_match = entry
-                    .metadata
-                    .as_ref()
-                    .and_then(|m| m.get("trigger"))
-                    .and_then(|v| v.as_str())
-                    == Some(trigger_str);
+                let trigger_match = match entry.metadata.as_ref() {
+                    Some(crate::core::types::LogMetadata::TriggerEvaluation {
+                        trigger, ..
+                    }) => trigger == trigger_str,
+                    _ => false,
+                };
                 if !trigger_match {
                     continue;
                 }
-                // Match ability_index when present in both queue entry and metadata
-                let eval_idx = entry
-                    .metadata
-                    .as_ref()
-                    .and_then(|m| m.get("ability_index"))
-                    .and_then(|v| v.as_u64())
-                    .map(|v| v as usize);
+                let eval_idx = match entry.metadata.as_ref() {
+                    Some(crate::core::types::LogMetadata::TriggerEvaluation {
+                        ability_index,
+                        ..
+                    }) => Some(*ability_index),
+                    _ => None,
+                };
                 if let Some(ai) = ability_index {
                     if let Some(ei) = eval_idx {
                         if ai != ei {
@@ -647,12 +650,14 @@ impl AbilityResolver {
                 }
                 // Found the matching entry — update its metadata
                 if let Some(ref mut meta) = entry.metadata {
-                    if let Some(obj) = meta.as_object_mut() {
-                        obj.insert("result".to_string(), serde_json::json!(result));
-                        obj.insert("items".to_string(), serde_json::json!(items));
-                        obj.insert("ability_text".to_string(), serde_json::json!(ability_text));
-                        obj.insert("resolved".to_string(), serde_json::json!(true));
-                    }
+                    *meta = crate::core::types::LogMetadata::AbilityResolution {
+                        result: result.to_string(),
+                        items: items_json.clone(),
+                        ability_text: ability_text.clone(),
+                        zone: String::new(),
+                        error: None,
+                        resolved: Some(true),
+                    };
                 }
                 break;
             }

@@ -486,6 +486,52 @@ pub struct AbilityBonus {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum LogMetadata {
+    TriggerEvaluation {
+        trigger: String,
+        zone: String,
+        result: String,
+        ability_index: usize,
+        ability_text: String,
+    },
+    TurnStart {
+        turn: u32,
+    },
+    RpsResult {
+        p1_choice: String,
+        p2_choice: String,
+        p1_value: u32,
+        p2_value: u32,
+        winner: String,
+    },
+    AbilityResolution {
+        result: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        items: Vec<serde_json::Value>,
+        ability_text: String,
+        zone: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        resolved: Option<bool>,
+    },
+}
+
+impl Default for LogMetadata {
+    fn default() -> Self {
+        LogMetadata::AbilityResolution {
+            result: String::new(),
+            items: Vec::new(),
+            ability_text: String::new(),
+            zone: String::new(),
+            error: None,
+            resolved: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LogEntry {
     pub text: String,
     pub turn: u32,
@@ -494,7 +540,7 @@ pub struct LogEntry {
     pub source_card_name: Option<String>,
     pub category: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<serde_json::Value>,
+    pub metadata: Option<LogMetadata>,
 }
 
 /// Condition evaluation result for a single condition on a jyouji ability.

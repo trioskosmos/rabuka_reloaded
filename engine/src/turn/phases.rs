@@ -54,7 +54,9 @@ impl super::TurnEngine {
             source_card_id: None,
             source_card_name: None,
             category: "turn_transition".to_string(),
-            metadata: Some(serde_json::json!({"turn": game_state.turn_number})),
+            metadata: Some(crate::core::types::LogMetadata::TurnStart {
+                turn: game_state.turn_number,
+            }),
         });
     }
 
@@ -1219,13 +1221,13 @@ impl super::TurnEngine {
             source_card_id: None,
             source_card_name: None,
             category: "rps".into(),
-            metadata: Some(serde_json::json!({
-                "p1_choice": Self::rps_choice_name(p1),
-                "p2_choice": Self::rps_choice_name(p2),
-                "p1_value": p1,
-                "p2_value": p2,
-                "winner": winner_str,
-            })),
+            metadata: Some(crate::core::types::LogMetadata::RpsResult {
+                p1_choice: Self::rps_choice_name(p1).to_string(),
+                p2_choice: Self::rps_choice_name(p2).to_string(),
+                p1_value: p1 as u32,
+                p2_value: p2 as u32,
+                winner: winner_str.to_string(),
+            }),
         });
     }
 

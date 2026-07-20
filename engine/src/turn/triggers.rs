@@ -113,13 +113,13 @@ impl super::TurnEngine {
                                             source_card_id: Some(card_id),
                                             source_card_name: Some(card_name.to_string()),
                                             category: "trigger_evaluation".to_string(),
-                                            metadata: Some(serde_json::json!({
-                                                "trigger": "debut",
-                                                "zone": "stage",
-                                                "result": "pending",
-                                                "ability_index": ability_index,
-                                                "ability_text": ability.full_text,
-                                            })),
+                                            metadata: Some(crate::core::types::LogMetadata::TriggerEvaluation {
+                                                trigger: "debut".to_string(),
+                                                zone: "stage".to_string(),
+                                                result: "pending".to_string(),
+                                                ability_index,
+                                                ability_text: ability.full_text.clone(),
+                                            }),
                                         });
                                     }
                                     let ability_id =
@@ -304,13 +304,15 @@ impl super::TurnEngine {
                                         source_card_id: Some(*card_id),
                                         source_card_name: Some(card_name.to_string()),
                                         category: "trigger_evaluation".to_string(),
-                                        metadata: Some(serde_json::json!({
-                                            "trigger": "live_start",
-                                            "zone": "live_card_zone",
-                                            "result": "pending",
-                                            "ability_index": aidx,
-                                            "ability_text": ability.full_text,
-                                        })),
+                                        metadata: Some(
+                                            crate::core::types::LogMetadata::TriggerEvaluation {
+                                                trigger: "live_start".to_string(),
+                                                zone: "live_card_zone".to_string(),
+                                                result: "pending".to_string(),
+                                                ability_index: aidx,
+                                                ability_text: ability.full_text.clone(),
+                                            },
+                                        ),
                                     });
                                 }
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
@@ -362,13 +364,13 @@ impl super::TurnEngine {
                                             source_card_id: Some(card_id),
                                             source_card_name: Some(card_name.to_string()),
                                             category: "trigger_evaluation".to_string(),
-                                            metadata: Some(serde_json::json!({
-                                                "trigger": "live_start",
-                                                "zone": "stage",
-                                                "result": "pending",
-                                                "ability_index": aidx,
-                                                "ability_text": ability.full_text,
-                                            })),
+                                            metadata: Some(crate::core::types::LogMetadata::TriggerEvaluation {
+                                                trigger: "live_start".to_string(),
+                                                zone: "stage".to_string(),
+                                                result: "pending".to_string(),
+                                                ability_index: aidx,
+                                                ability_text: ability.full_text.clone(),
+                                            }),
                                         });
                                     }
                                     let ability_id =
@@ -514,13 +516,15 @@ impl super::TurnEngine {
                                         source_card_id: Some(card_id),
                                         source_card_name: Some(card_name.to_string()),
                                         category: "trigger_evaluation".to_string(),
-                                        metadata: Some(serde_json::json!({
-                                            "trigger": "live_success",
-                                            "zone": "stage",
-                                            "result": "pending",
-                                            "ability_index": aidx,
-                                            "ability_text": ability.full_text,
-                                        })),
+                                        metadata: Some(
+                                            crate::core::types::LogMetadata::TriggerEvaluation {
+                                                trigger: "live_success".to_string(),
+                                                zone: "stage".to_string(),
+                                                result: "pending".to_string(),
+                                                ability_index: aidx,
+                                                ability_text: ability.full_text.clone(),
+                                            },
+                                        ),
                                     });
                                 }
                                 let ability_id = format!("{}_{}", card_no, ability.full_text);
@@ -560,13 +564,13 @@ impl super::TurnEngine {
                                         source_card_id: Some(card_id),
                                         source_card_name: None,
                                         category: "trigger_evaluation".to_string(),
-                                        metadata: Some(serde_json::json!({
-                                            "trigger": "live_success",
-                                            "zone": "stage_gained",
-                                            "result": "pending",
-                                            "ability_index": 10000 + gidx,
-                                            "ability_text": gained_ability.full_text,
-                                        })),
+                                        metadata: Some(crate::core::types::LogMetadata::TriggerEvaluation {
+                                            trigger: "live_success".to_string(),
+                                            zone: "stage_gained".to_string(),
+                                            result: "pending".to_string(),
+                                            ability_index: 10000 + gidx,
+                                            ability_text: gained_ability.full_text.clone(),
+                                        }),
                                     });
                                     }
                                     let ability_id = format!("{}_gained_{}", card_no, gidx);
@@ -609,13 +613,15 @@ impl super::TurnEngine {
                                 source_card_id: Some(*card_id),
                                 source_card_name: Some(card_name.to_string()),
                                 category: "trigger_evaluation".to_string(),
-                                metadata: Some(serde_json::json!({
-                                    "trigger": "live_success",
-                                    "zone": "live_card_zone",
-                                    "result": "pending",
-                                    "ability_index": aidx,
-                                    "ability_text": ability.full_text,
-                                })),
+                                metadata: Some(
+                                    crate::core::types::LogMetadata::TriggerEvaluation {
+                                        trigger: "live_success".to_string(),
+                                        zone: "live_card_zone".to_string(),
+                                        result: "pending".to_string(),
+                                        ability_index: aidx,
+                                        ability_text: ability.full_text.clone(),
+                                    },
+                                ),
                             });
                         }
                         let ability_id = format!("{}_{}", card_no, ability.full_text);
@@ -645,13 +651,13 @@ impl super::TurnEngine {
                                     source_card_id: Some(*card_id),
                                     source_card_name: None,
                                     category: "trigger_evaluation".to_string(),
-                                    metadata: Some(serde_json::json!({
-                                        "trigger": "live_success",
-                                        "zone": "live_card_zone_gained",
-                                        "result": "pending",
-                                        "ability_index": 10000 + gidx,
-                                        "ability_text": gained_ability.full_text,
-                                    })),
+                                    metadata: Some(crate::core::types::LogMetadata::TriggerEvaluation {
+                                        trigger: "live_success".to_string(),
+                                        zone: "live_card_zone_gained".to_string(),
+                                        result: "pending".to_string(),
+                                        ability_index: 10000 + gidx,
+                                        ability_text: gained_ability.full_text.clone(),
+                                    }),
                                 });
                                 }
                                 let ability_id = format!("{}_gained_{}", card_no, gidx);

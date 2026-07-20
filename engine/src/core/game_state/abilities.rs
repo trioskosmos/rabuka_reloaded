@@ -1247,13 +1247,14 @@ impl GameState {
                 source_card_id: card_id,
                 source_card_name: Some(card_name),
                 category: "ability_resolution".to_string(),
-                metadata: Some(serde_json::json!({
-                    "result": "skipped",
-                    "items": [],
-                    "ability_text": ability_text,
-                    "zone": zone,
-                    "error": "card negated",
-                })),
+                metadata: Some(crate::core::types::LogMetadata::AbilityResolution {
+                    result: "skipped".to_string(),
+                    items: Vec::new(),
+                    ability_text: ability_text.to_string(),
+                    zone: zone.to_string(),
+                    error: Some("card negated".to_string()),
+                    resolved: None,
+                }),
             });
             // Update matching trigger_evaluation entry
             let ability_index = ability_index;
@@ -1268,33 +1269,37 @@ impl GameState {
                     if entry.turn != self.turn_number {
                         continue;
                     }
-                    let trigger_match = entry
-                        .metadata
-                        .as_ref()
-                        .and_then(|m| m.get("trigger"))
-                        .and_then(|v| v.as_str())
-                        == Some(trigger_str);
+                    let trigger_match = match entry.metadata.as_ref() {
+                        Some(crate::core::types::LogMetadata::TriggerEvaluation {
+                            trigger,
+                            ..
+                        }) => trigger == trigger_str,
+                        _ => false,
+                    };
                     if !trigger_match {
                         continue;
                     }
-                    let eval_idx = entry
-                        .metadata
-                        .as_ref()
-                        .and_then(|m| m.get("ability_index"))
-                        .and_then(|v| v.as_u64())
-                        .map(|v| v as usize);
+                    let eval_idx = match entry.metadata.as_ref() {
+                        Some(crate::core::types::LogMetadata::TriggerEvaluation {
+                            ability_index,
+                            ..
+                        }) => Some(*ability_index),
+                        _ => None,
+                    };
                     if let Some(ei) = eval_idx {
                         if ability_index != ei {
                             continue;
                         }
                     }
                     if let Some(ref mut meta) = entry.metadata {
-                        if let Some(obj) = meta.as_object_mut() {
-                            obj.insert("result".to_string(), serde_json::json!("skipped"));
-                            obj.insert("items".to_string(), serde_json::json!([]));
-                            obj.insert("ability_text".to_string(), serde_json::json!(ability_text));
-                            obj.insert("resolved".to_string(), serde_json::json!(true));
-                        }
+                        *meta = crate::core::types::LogMetadata::AbilityResolution {
+                            result: "skipped".to_string(),
+                            items: Vec::new(),
+                            ability_text: ability_text.clone(),
+                            zone: String::new(),
+                            error: None,
+                            resolved: Some(true),
+                        };
                     }
                     break;
                 }
