@@ -155,86 +155,24 @@ budget when scaled for 4× the cards.
 | String data | ~50 KB | **0** at runtime (u16 indices into compile-time table) |
 | **Total** | **~700 KB** | **~150 KB** |
 
-### P0 — Bytecode interpreter (no decode to structs)
+### P0 — Eliminate ability decode cache (283KB → ~19KB)
 
-The current architecture:
-```
-bytecode → decode into Ability/AbilityEffect/EffectKind structs → evaluate structs
-```
+**Current:** The lazy path caches every decoded Ability in `AbilityStore.abilities: Vec<OnceLock<Arc<Ability>>>` — 800 slots × ~353B = 283KB. Once decoded, abilities are pinned forever.
 
-This creates ~1.1MB of decoded effect data. The target architecture:
-```
-bytecode → evaluate directly from bytes (like a CPU reads ROM)
-```
+**Problem:** We only need abilities on cards in the current deck (~120 cards × ~2 abilities = ~240 abilities = ~38KB). The other 560 cached abilities are dead weight.
 
-The bytecode blob (136KB, ROM-resident) already encodes everything.
-A direct interpreter reads bytes and applies effects without ever
-creating Ability/AbilityEffect/EffectKind structs in RAM.
+**Fix:** Remove `AbilityStore` entirely. `AbilityRef` on the lazy path holds `Ability` directly (owned, not index). Decode at load time from bytecode, store on cards. No global cache.
 
-**What this eliminates:**
-- All Ability struct allocations (~160B × 800 abilities on default path)
-- All AbilityEffect struct allocations (~152B × 1451 effects)
-- All EffectKind enum allocations (~544B × 1451 effects)
-- All Condition struct allocations (~520B × N conditions)
-- All populate_from_json / serde / BcDeserializer infrastructure
+**What changes:**
+1. `ability_store.rs`: Remove `AbilityStore`, `OnceLock`, lazy `AbilityRef(u16)`. Keep only `AbilityRef(Arc<Ability>)` (the non-lazy path becomes the only path).
+2. `card_loader.rs: build_abilities_index_map`: Instead of storing u16 indices, decode abilities immediately via `vm::get_ability(idx)` and wrap in `Arc<Ability>`.
+3. `card_loader.rs: attach_abilities`: Use the decoded abilities directly — no lazy resolution needed.
+4. Delete `lazy_abilities` feature flag entirely — bytecode is the only path, abilities are decoded at load time.
+5. `Cargo.toml`: Remove `lazy_abilities` feature, keep `bytecode_abilities` in default.
 
-**What the interpreter needs:**
-- A program counter (u16 into bytecode blob)
-- A stack for sub-effect results (SmallVec<[u16; 8]>)
-- Direct field reads from the binary format
-- Zone/state/card_type as u8 enums (not strings)
-- ~500 lines of Rust
+**Result:** ~19KB decoded abilities (only deck cards) vs 283KB cached (all 800). No runtime decode overhead — abilities decoded once at startup.
 
-**What stays the same:**
-- All game rules (conditions, triggers, choices, timing)
-- All 800 abilities (encoded in the same bytecode blob)
-- The web server (uses the full decoded engine)
-- PC/desktop builds (use the full decoded engine)
-- compile_abilities.py (build tool, unchanged)
-
-**Split architecture:**
-- **PC/web**: Full decoded engine (current, ~4MB RAM)
-- **Console (PS1/DS/N64)**: Bytecode interpreter (~150KB RAM)
-- Both share the same bytecode blob and card data format
-
-### P0 — Card packed structs
-
-Replace `Card` struct (String fields, Vec, HashMap) with a 12-byte packed struct:
-
-```rust
-#[repr(C, packed)]
-struct PackedCard {
-    id: u16,          // unique card ID
-    card_type: u8,    // member=0, live=1, energy=2, spell=3
-    cost: u8,         // debut cost
-    blade: u8,        // blade value
-    score: u8,        // score value
-    base_heart: u8,   // base heart count
-    blade_heart: u8,  // blade heart count
-    special_heart: u8,// special heart count
-    abilities_idx: u16, // index into bytecode offsets
-    group: u8,        // group ID (hashed from name)
-    rare: u8,         // rarity tier
-    reserved: u8,     // padding for alignment
-}
-// 12 bytes per card × 2280 cards = 27KB
-// 12 bytes × 120 deck cards = 1.4KB
-```
-
-No Strings, no heap allocs, no serde at runtime. Card names resolved
-from a compile-time string table via u16 index.
-
-### P0.5 — Console history: already web-only ✅ DONE
-
-### P0.5 — Parser _collapse_to_effect_steps — DEFERRED
-
-### P1 — Arena allocator — DEFERRED (3× slower on desktop, lifecycle issue unsolved)
-
-### P2 — orientation_modifiers String→CardOrientation — ✅ DONE
-
-### P2 — String→Enum audit (zone/state/card_type fields)
-See completed items above for orientation_modifiers conversion.
-Remaining: zone/state/card_type fields across EffectKind variants.
+**The "absurdly low RAM" path** (150KB target) uses this same approach plus packed card structs and fixed-size GameState. The execution layer (5000 lines of handlers) stays unchanged — the handlers still receive `&AbilityEffect` structs, they just don't persist after execution.
 
 ---
 

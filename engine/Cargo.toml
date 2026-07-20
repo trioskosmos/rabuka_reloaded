@@ -57,11 +57,6 @@ dc = ["no_std", "debug_conditions"]
 # Bytecode abilities: use pre-compiled bytecode instead of JSON serde
 # for ability loading. Dramatically reduces memory footprint (~7KB vs 1.4MB).
 bytecode_abilities = []
-# Lazy abilities: cards store AbilityRef (u16 index) instead of decoded Arc<Ability>.
-# Abilities are decoded on demand from the bytecode blob and cached. Reduces resident
-# ability RAM from ~2.8 MB (all 800 eagerly decoded) to a bounded on-demand cache.
-# Implies bytecode_abilities.
-lazy_abilities = ["bytecode_abilities"]
 # Arena allocator: bump arena for temporary allocations during ability triggers.
 # Reduces per-trigger heap allocs from ~15K to ~150. Requires alloc_tracker.
 # NOT in default — enable explicitly for production/profiling builds.

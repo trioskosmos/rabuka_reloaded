@@ -79,14 +79,6 @@ impl CardLoader {
     }
 
     pub fn attach_abilities(mut cards: Vec<Card>, abilities_data: &serde_json::Value) -> Vec<Card> {
-        #[cfg(feature = "lazy_abilities")]
-        {
-            let count = abilities_data
-                .get("unique_abilities")
-                .and_then(|v| v.as_array())
-                .map_or(0, |a| a.len());
-            crate::ability::ability_store::init_ability_store(count);
-        }
         let ability_map = Self::build_abilities_map_shared(abilities_data);
         for card in &mut cards {
             if let Some(card_abilities) = ability_map.get(card.card_no.as_ref()) {
@@ -96,62 +88,18 @@ impl CardLoader {
         cards
     }
 
-    /// Build a map of card_no → Vec<AbilityRef> from the abilities JSON.
-    ///
-    /// - Default path: decodes each ability from JSON, wraps in `Arc`, stores as
-    ///   `AbilityRef(Arc<Ability>)`.
-    /// - Lazy path: stores only the ability index as `AbilityRef(u16)`. The
-    ///   `AbilityStore` decodes on demand from the bytecode blob.
+    /// Build a map of card_no → Vec<AbilityRef> by decoding abilities from bytecode.
     pub fn build_abilities_map_shared(
         abilities_data: &serde_json::Value,
     ) -> HashMap<String, Vec<AbilityRef>> {
-        #[cfg(not(feature = "lazy_abilities"))]
-        {
-            let inner = Self::build_abilities_map_inner(abilities_data);
-            inner
-                .into_iter()
-                .map(|(k, v)| (k, v.into_iter().map(|a| AbilityRef(Arc::new(a))).collect()))
-                .collect()
-        }
-        #[cfg(feature = "lazy_abilities")]
-        {
-            Self::build_abilities_index_map(abilities_data)
-        }
+        let inner = Self::build_abilities_map_inner(abilities_data);
+        inner
+            .into_iter()
+            .map(|(k, v)| (k, v.into_iter().map(|a| AbilityRef(Arc::new(a))).collect()))
+            .collect()
     }
 
-    /// Lazy path: build card_no → Vec<AbilityRef(u16 index)> without decoding
-    /// any abilities. The AbilityStore decodes them on demand from bytecode.
-    #[cfg(feature = "lazy_abilities")]
-    fn build_abilities_index_map(
-        abilities_data: &serde_json::Value,
-    ) -> HashMap<String, Vec<AbilityRef>> {
-        let mut ability_map: HashMap<String, Vec<AbilityRef>> = HashMap::default();
-
-        if let Some(unique_abilities) = abilities_data
-            .get("unique_abilities")
-            .and_then(|v| v.as_array())
-        {
-            for (idx, ability_entry) in unique_abilities.iter().enumerate() {
-                let ability_ref = AbilityRef(idx as u16);
-                if let Some(card_list) = ability_entry.get("cards").and_then(|v| v.as_array()) {
-                    for card_entry in card_list {
-                        if let Some(card_str) = card_entry.as_str() {
-                            if let Some(card_no) = card_str.split(" | ").next() {
-                                ability_map
-                                    .entry(card_no.to_string())
-                                    .or_default()
-                                    .push(ability_ref);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        ability_map
-    }
-
-    /// Decode all abilities from bytecode. Each ability is decoded on demand
-    /// via `vm::get_ability(idx)`.
+    /// Decode all abilities from bytecode via `vm::get_ability(idx)`.
     fn build_abilities_map_inner(
         abilities_data: &serde_json::Value,
     ) -> HashMap<String, Vec<Ability>> {
