@@ -155,22 +155,13 @@ budget when scaled for 4× the cards.
 | String data | ~50 KB | **0** at runtime (u16 indices into compile-time table) |
 | **Total** | **~700 KB** | **~150 KB** |
 
-### P0 — Eliminate ability decode cache (283KB → ~19KB)
+### P0 — Eliminate ability decode cache (283KB → ~19KB) — ✅ DONE
 
-**Current:** The lazy path caches every decoded Ability in `AbilityStore.abilities: Vec<OnceLock<Arc<Ability>>>` — 800 slots × ~353B = 283KB. Once decoded, abilities are pinned forever.
+Removed `AbilityStore` (OnceLock cache of 800 abilities = 283KB). `AbilityRef` is
+always `Arc<Ability>`, decoded at load time from bytecode via `vm::get_ability`.
+`lazy_abilities` feature flag deleted. Simplified `ability_store.rs` from 127→20 lines.
 
-**Problem:** We only need abilities on cards in the current deck (~120 cards × ~2 abilities = ~240 abilities = ~38KB). The other 560 cached abilities are dead weight.
-
-**Fix:** Remove `AbilityStore` entirely. `AbilityRef` on the lazy path holds `Ability` directly (owned, not index). Decode at load time from bytecode, store on cards. No global cache.
-
-**What changes:**
-1. `ability_store.rs`: Remove `AbilityStore`, `OnceLock`, lazy `AbilityRef(u16)`. Keep only `AbilityRef(Arc<Ability>)` (the non-lazy path becomes the only path).
-2. `card_loader.rs: build_abilities_index_map`: Instead of storing u16 indices, decode abilities immediately via `vm::get_ability(idx)` and wrap in `Arc<Ability>`.
-3. `card_loader.rs: attach_abilities`: Use the decoded abilities directly — no lazy resolution needed.
-4. Delete `lazy_abilities` feature flag entirely — bytecode is the only path, abilities are decoded at load time.
-5. `Cargo.toml`: Remove `lazy_abilities` feature, keep `bytecode_abilities` in default.
-
-**Result:** ~19KB decoded abilities (only deck cards) vs 283KB cached (all 800). No runtime decode overhead — abilities decoded once at startup.
+Ability RAM: ~283KB cached → ~19KB (only deck cards decoded at load).
 
 **The "absurdly low RAM" path** (150KB target) uses this same approach plus packed card structs and fixed-size GameState. The execution layer (5000 lines of handlers) stays unchanged — the handlers still receive `&AbilityEffect` structs, they just don't persist after execution.
 
