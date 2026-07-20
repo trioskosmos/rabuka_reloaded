@@ -16,7 +16,12 @@ use std::string::String;
 use std::vec::Vec;
 
 use crate::ability::ability_store::AbilityRef;
+#[cfg(not(feature = "bytecode_abilities"))]
+use crate::ability::enums::ActionType;
+#[cfg(not(feature = "bytecode_abilities"))]
+use crate::card::AbilityEffect;
 use crate::card::{Ability, Card};
+use crate::Arc;
 use crate::HashMap;
 #[cfg(feature = "no_std")]
 use alloc::boxed::Box;

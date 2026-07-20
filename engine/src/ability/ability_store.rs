@@ -1,4 +1,5 @@
 use crate::card::Ability;
+use crate::Arc;
 
 // ── Default path: AbilityRef is a thin wrapper around Arc<Ability> ──
 
