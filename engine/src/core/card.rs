@@ -2093,7 +2093,7 @@ pub struct AbilityEffect {
     #[serde(default)]
     pub condition: Option<Box<Condition>>,
     #[serde(flatten)]
-    pub compound: CompoundBranch,
+    pub compound: Box<CompoundBranch>,
     #[serde(default)]
     pub kind: Option<EkBox>,
     pub non_stackable: Option<bool>,

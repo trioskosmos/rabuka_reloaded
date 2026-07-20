@@ -83,6 +83,14 @@ impl CardLoader {
     }
 
     pub fn attach_abilities(mut cards: Vec<Card>, abilities_data: &serde_json::Value) -> Vec<Card> {
+        #[cfg(feature = "lazy_abilities")]
+        {
+            let count = abilities_data
+                .get("unique_abilities")
+                .and_then(|v| v.as_array())
+                .map_or(0, |a| a.len());
+            crate::ability::ability_store::init_ability_store(count);
+        }
         let ability_map = Self::build_abilities_map_shared(abilities_data);
         for card in &mut cards {
             if let Some(card_abilities) = ability_map.get(card.card_no.as_ref()) {
@@ -147,7 +155,6 @@ impl CardLoader {
     }
 
     /// Default path: decode all abilities from JSON eagerly.
-    #[cfg(not(feature = "lazy_abilities"))]
     fn build_abilities_map_inner(
         abilities_data: &serde_json::Value,
     ) -> HashMap<String, Vec<Ability>> {
@@ -222,7 +229,6 @@ impl CardLoader {
         ability_map
     }
 
-    #[cfg(not(feature = "lazy_abilities"))]
     pub fn build_abilities_map(
         abilities_data: &serde_json::Value,
     ) -> HashMap<String, Vec<Ability>> {
