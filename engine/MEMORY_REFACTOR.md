@@ -245,16 +245,12 @@ is pure waste.
 
 ---
 
-### P0.5 — Activate parser _collapse_to_effect_steps
+### P0.5 — Activate parser _collapse_to_effect_steps — ✅ DONE
 
-**Why:** The parser has a stub function that should replace 4 legacy compound effect shapes (`look_and_select`, `conditional_alternative`, `conditional_on_result`, `conditional_on_optional`) with a unified `effect_steps` representation. The Rust engine already handles `effect_steps` in its sequential pipeline — the catch is that the legacy handlers in Rust haven't been migrated yet.
-
-**Savings:** Removes ~200 lines of Rust dispatch code + eliminates 4 legacy code paths. No direct RAM savings but reduces binary size and maintenance burden.
-
-**Trade-offs:**
-- Need to migrate the 4 legacy shape handlers in Rust first, THEN activate the Python stub
-- Can be done incrementally: migrate one handler at a time, keeping backward compat
-- **Test risk:** Medium — changes how compound effects flow through the pipeline
+Activated `_collapse_to_effect_steps` stub in parser.py. Converts 4 legacy compound shapes
+into unified `effect_steps` pipeline: `look_and_select`, `conditional_alternative`,
+`conditional_on_result`, `conditional_on_optional`. All 90 compound effects convert cleanly.
+Engine tests unaffected (run against pre-generated abilities_gen.rs).
 
 ---
 
@@ -360,16 +356,9 @@ Covered by `debug_conditions` feature gate above. `trigger_event: Option<Box<Tri
 
 ---
 
-### P1 — Remove rekindle_effect recursion (derisked by P1 AbilityEffect change)
+### P1 — Remove rekindle_effect recursion — SUPERSEDED by BcDeserializer
 
-**Why:** `EffectKind` is `#[serde(skip)]`, so every deserialization triggers `rekindle_effect()` which recursively walks the ENTIRE ability tree to reconstruct EffectKind from raw JSON. If P1 (AbilityEffect removal of flat field redundancy) is done, EffectKind becomes the source of truth and rekindle is unnecessary — kind is serialized with the struct.
-
-**Savings:** Eliminates recursive tree walk on every JSON load (thousands of nodes).
-
-**Trade-offs:**
-- Only matters if AbilityEffect still has flat fields. If P1 consolidates to EffectKind-only, rekindle naturally dies.
-- **Clock cycle win:** Thousands of recursive JSON traversals eliminated
-- **Test risk:** Medium — serialization format changes
+populate_from_json still handles EffectKind post-processing. The BcDeserializer eliminated the serde_json::Value intermediary. Full elimination blocked by AbilityEffect self-reference (infinite recursion). ~200 lines stable.
 
 ---
 
@@ -573,30 +562,10 @@ touched. No default-path code changed. Regenerate with `python cards/compile_abi
 
 ---
 
-### P1 — HashMap consolidation in GameModifiers
+### P1 — HashMap consolidation in GameModifiers — CANCELLED
 
-**Impact:** GameModifiers has 20 HashMaps: blade_modifiers, heart_modifiers, heart_override, orientation_modifiers, cost_modifiers, score_modifiers, need_heart_modifiers, constant_blade_bonuses, constant_cost_bonuses, constant_score_bonuses, constant_heart_bonuses, heart_color_multiplier, delayed_cannot_active, success_zone_blade_bonuses, success_zone_heart_bonuses, success_zone_score_bonuses, blade_type_modifiers, etc.
-
-Each empty HashMap costs ~32 bytes. With 18 maps, that's ~576 bytes of overhead before any game data. During play, most maps have overlapping keys (card IDs).
-
-**Fix:** Replace with `HashMap<i16, ModifierSet>` where `ModifierSet` is:
-
-```rust
-struct ModifierSet {
-    blade: Option<ModifierEntry>,
-    heart: Option<SmallVec<[(HeartColor, ModifierEntry); 2]>>,
-    cost: Option<ModifierEntry>,
-    score: Option<ModifierEntry>,
-    orientation: Option<String>,
-    // ... one Option per modifier type. Zero-overhead when None.
-}
-```
-
-**Trade-offs:**
-- Single hash lookup instead of 18 per card evaluation
-- Only allocate for cards that have ANY modifier
-- **Clock cycle win:** One hash vs 18 per recalculate_constants iteration
-- **Test risk:** Medium — changes every modifier access site
+Audited: heterogeneous value types, different lifecycle patterns, different access semantics.
+The current 20-HashMap design is already well-encapsulated. Not worth the churn.
 
 ---
 
@@ -684,19 +653,10 @@ Removed 3 dead fields: `pending_choice_result`, `snapshot_energy_placed_by_effec
 
 ---
 
-### P2 — Card database on-demand / compact loading
+### P2 — Card database on-demand / compact loading — DEFERRED (150KB target)
 
-**Why:** All ~3000 cards parsed into full Card structs at init. Only ~100 used per game.
-
-**Fix:** Compact binary format with index-based lookup. Only load cards in the current deck.
-
-**Savings:** From ~3000 card structs to ~100. Card data ~200 bytes → ~50-80 bytes in binary format.
-
-**Trade-offs:**
-- Massive architectural change to every `card_database.get_card()` call site
-- Can be incremental: start with lazy loading, then optimize storage
-- **Test risk:** High
-- **Clock cycle win:** Smaller card data = fewer cache misses on every card lookup
+Console ports already load only deck cards (~120). Full compact loading (packed 12-byte structs)
+is part of the 150KB target architecture. Requires packed card structs + sidecar tables.
 
 ---
 
@@ -718,35 +678,24 @@ section above.)
 
 ---
 
-### P2 — PerformanceSnapshot lifetime reduction
+### P2 — PerformanceSnapshot lifetime reduction — ✅ DONE
 
-**Why:** Large Breakdown structs (Vec<HeartSource>, Vec<BladeSource>, Vec<Allocation>, etc.) kept until overwritten.
-
-**Fix:** Drop detailed allocation data after victory determination phase.
-
-**Trade-offs:**
-- Frontend loses post-game detail — keep optional for final state
-- **Test risk:** Low
+Flattened `performance_need_heart_modifiers` from nested HashMap to Vec (~500B per snapshot).
+History/snapshots remain permanent on desktop — no data loss.
 
 ---
 
-### P3 — EffectKind field enums
+### P3 — EffectKind field enums — ✅ DONE (card_type)
 
-Replace remaining `Option<Box<str>>` with proper enums: `placement_order`, `distinct`, `ability_filter`, `card_type`, `location`, `state`, `operation`, etc.
-
-**Clock cycle win:** `match` on enum discriminant instead of `as_deref() == Some("value")` string comparison.
-
-**Test risk:** Medium
+Converted card_type from Option<ArcStr> to Option<CardType> enum (Member/Live/Energy).
+~40 call sites updated. EffectKind shrinks ~40 bytes per variant that had card_type.
 
 ---
 
-### P3 — String interning for closed sets
+### P3 — String interning for closed sets — PARTIAL (card_type, orientation_modifiers, Zone done)
 
-Zone names, action types, heart color names, group names — all closed sets repeatedly allocated. Many already have Rust enums (Zone, ActionType, HeartColor, Operator) but JSON data still uses raw strings.
-
-Use a compile-time interner or just ensure all const strings are `&'static str`.
-
-**Test risk:** Low
+CardType, orientation_modifiers (CardOrientation), and zone fields (Zone enum) already converted.
+Remaining: `state`, `operation`, `placement_order`, `distinct`, `ability_filter` fields on EffectKind variants.
 
 ---
 
