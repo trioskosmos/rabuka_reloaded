@@ -1,2 +1,5 @@
+[build]
+target-dir = "/tmp/rabuka_dc_target"
+
 [target.sh-elf]
-rustflags = ["-C", "link-args=-Wl,--undefined=_arch_main"]
+rustflags = []

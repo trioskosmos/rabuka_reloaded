@@ -20,6 +20,10 @@ extern "C" {
     fn thd_sleep(duration: i32);
 }
 
+// KOS calls library_shutdown() on application exit (weak symbol in libkallisti)
+#[no_mangle]
+extern "C" fn library_shutdown() {}
+
 fn main() {
     run_game();
 }
