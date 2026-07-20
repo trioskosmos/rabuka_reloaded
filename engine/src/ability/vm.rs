@@ -1,6 +1,6 @@
+use super::abilities_gen::{BYTECODE, NUM_ABILITIES, OFFSETS, STRINGS};
 use crate::ability::enums::ActionType;
 use crate::card::{Ability, AbilityEffect};
-use super::abilities_gen::{BYTECODE, NUM_ABILITIES, OFFSETS, STRINGS};
 
 /// Decode a single `unique_abilities[idx]` entry from the bundled bytecode.
 ///

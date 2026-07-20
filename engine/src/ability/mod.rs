@@ -1,3 +1,4 @@
+pub mod ability_store;
 pub mod choice;
 pub mod compound;
 pub mod condition;

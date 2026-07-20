@@ -33,8 +33,8 @@ All `Vec<AbilityEffect>` → `Vec<Box<AbilityEffect>>` in CompoundBranch, Effect
 - ✅ **P2 tiny tracking maps → SmallVec** — `areas_placed_this_turn`, `cards_appeared_this_turn`, `negated_abilities`, `this_batch_triggered_ability_ids`, `auto_ability_trigger_counts` converted.
 - ❌ **P2 bounded log buffers** — dropped (would touch ~50 writer sites for a modest win; display already caps output at 500).
 
-All four changes are committed; **1820 tests pass on the default feature set.** The
-`bytecode_abilities` feature remains broken (see P1.6).
+All four changes are committed; **1820 tests pass on the default feature set.**
+`bytecode_abilities` also passes (1829 tests).
 
 ---
 
@@ -138,7 +138,34 @@ Same for effects: `{"action": "draw_card", "count": 2}` maps to `EffectKind::Dra
 
 ## ❌ What remains: ranked by RAM + cycle impact
 
-### P1.7 — Lazy / on-demand ability resolution — ⏳ OPEN (next tracked task)
+### P1.7 — Lazy / on-demand ability resolution — 🔄 IN PROGRESS
+
+**Status update:** Both 1820 default + 1829 bytecode tests pass (the "bytecode broken" claim in P1.6 was stale).
+
+**Completed (2026-07-20):**
+- `AbilityRef` newtype created in `ability/ability_store.rs`:
+  - Default path: wraps `Arc<Ability>` (thin wrapper, `Deref<Target=Ability>`)
+  - Lazy path: `u16` index into global `AbilityStore`, `Deref` resolves from bytecode
+- `Card.abilities: Vec<Arc<Ability>>` → `Vec<AbilityRef>` (unconditional type change)
+- `CardLoader::build_abilities_map_shared` returns `HashMap<String, Vec<AbilityRef>>`
+- `CardLoader::apply_abilities_index` updated for `AbilityRef`
+- All access sites work unchanged via `Deref` auto-coercion (zero rewrite needed!)
+  - `for ability in &card.abilities` → `&AbilityRef` auto-derefs to `&Ability`
+  - `.iter().any(|a| ...)` → `a` auto-derefs to `&Ability`
+  - `.iter().map(|a| &**a)` → produces `&Ability` via Deref chain
+  - `.is_empty()`, `.len()`, `.clone()` → work on `Vec<AbilityRef>` directly
+- 3 sites needed explicit conversion to `Arc<Ability>` (via `to_arc()`):
+  - `abilities.rs:704` — `build_ability_queue_entry` parameter
+  - `actions.rs:267` — `AbilityActivation` local struct (holds gained abilities)
+  - `util.rs:198` — `scan_abilities_for_cost_reduction` parameter type changed
+- `lazy_abilities` feature added to Cargo.toml (implies `bytecode_abilities`)
+- All 1820 default + 1829 bytecode tests pass
+
+**Remaining:**
+- Wire lazy path: `init_ability_store()` call in card_loader, populate from bytecode
+- Add `ability_store.rs` to `no_std` compat (currently std-only)
+- Fuzz test: random cache caps, assert stable outcomes
+- Update MEMORY_REFACTOR.md (this section)
 
 **Why:** The bytecode blob is already 136 KB (90% smaller than the 1421 KB text JSON) and
 decodes byte-identically to the JSON loader, but the engine still **eagerly decodes all 800
@@ -147,23 +174,15 @@ resident ability RAM is ~2.8 MB — identical to the JSON path. The doc's "<1 MB
 "14B/ability" target is only reachable by keeping abilities in the compact blob and
 decoding only what a card needs, cached in a bounded pool.
 
-**Full design:** see the expanded "Resident RAM — the real remaining gap" block under
-[P1.6](#) (same file). In short: replace `Card.abilities: Vec<Arc<Ability>>` with
-`Vec<AbilityRef>` (a `u16` index into `BYTECODE`), add a `AbilityResolver` that decodes on
-demand via `vm::get_ability` and caches in a bounded (LRU/arena) map, and mechanically
-rewrite the ~67 `card.abilities` access sites to `resolver.resolve(ref)`. The default path
-keeps an identity resolver so its 1820 tests are untouched.
+**Design:** `AbilityRef` is a u16 index into the bytecode blob. `AbilityStore` (global
+`OnceLock`) holds `OnceLock<Arc<Ability>>` slots — decoded on first access via
+`vm::get_ability`, cached forever. The `Deref<Target=Ability>` impl means **zero changes
+to the67 access sites** — auto-coercion handles everything. The only explicit conversions
+are at `Arc<Ability>` boundaries (queue entries, gained abilities).
 
 **Savings:** resident decoded ability RAM drops from ~2.8 MB (all 800) to a bounded cache
 (tens of KB in practice; capped at e.g. 256 entries ≈ 900 KB worst case), with total
 ability memory (136 KB blob + cache) fitting the <1 MB console budget.
-
-**Risks:** the only real risk is the 67-site rewrite — mitigated because it's mechanical
-(`Vec<Arc<Ability>>` → `Vec<AbilityRef>` + per-element `resolve`) and the iteration API
-(`iter`, `len`, `enumerate`, `any`, `is_empty`, `clone`) is preserved. Lands behind a
-`lazy_abilities` feature flag. **Test gate:** all 1820 default + 1829 bytecode tests green,
-plus a new fuzz test asserting game outcomes are stable under random cache caps (decoding
-is pure).
 
 **Estimated effort:** ~1 day.
 

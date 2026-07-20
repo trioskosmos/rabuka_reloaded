@@ -411,10 +411,7 @@ impl GameState {
                             if self.this_batch_triggered_ability_ids.contains(&batch_key) {
                                 continue;
                             }
-                            if !self
-                                .this_batch_triggered_ability_ids
-                                .contains(&batch_key)
-                            {
+                            if !self.this_batch_triggered_ability_ids.contains(&batch_key) {
                                 self.this_batch_triggered_ability_ids.push(batch_key);
                             }
                             // §9.7.2.1: Multi-trigger — N trigger instances → N
@@ -485,10 +482,7 @@ impl GameState {
                             if self.this_batch_triggered_ability_ids.contains(&batch_key) {
                                 continue;
                             }
-                            if !self
-                                .this_batch_triggered_ability_ids
-                                .contains(&batch_key)
-                            {
+                            if !self.this_batch_triggered_ability_ids.contains(&batch_key) {
                                 self.this_batch_triggered_ability_ids.push(batch_key);
                             }
                             abilities_to_trigger.push((
@@ -571,10 +565,7 @@ impl GameState {
                             if self.this_batch_triggered_ability_ids.contains(&batch_key) {
                                 continue;
                             }
-                            if !self
-                                .this_batch_triggered_ability_ids
-                                .contains(&batch_key)
-                            {
+                            if !self.this_batch_triggered_ability_ids.contains(&batch_key) {
                                 self.this_batch_triggered_ability_ids.push(batch_key);
                             }
                             abilities_to_trigger.push((
@@ -589,11 +580,9 @@ impl GameState {
         }
         let moved = Some(event.moved_cards.clone());
         for (ability_id, card_no, stage_card_id) in abilities_to_trigger {
-            if !self
-                .this_batch_triggered_ability_ids
-                .contains(&ability_id)
-            {
-                self.this_batch_triggered_ability_ids.push(ability_id.clone());
+            if !self.this_batch_triggered_ability_ids.contains(&ability_id) {
+                self.this_batch_triggered_ability_ids
+                    .push(ability_id.clone());
             }
             self.trigger_auto_ability(
                 ability_id,
@@ -701,7 +690,7 @@ impl GameState {
                         let entry = self.build_ability_queue_entry(
                             card_no.clone(),
                             ability_index,
-                            ability.clone(),
+                            ability.to_arc(),
                             card_id,
                             player_id.clone(),
                             trigger_type,

@@ -1,3 +1,4 @@
+use crate::ability::ability_store::AbilityRef;
 use crate::ability::enums::{ActionType, ConditionType, EffectCardType, EffectState, Zone};
 use crate::core::types::ArcStr;
 use crate::Arc;
@@ -271,7 +272,7 @@ pub struct Card {
     pub special_heart: Option<SpecialHeart>,
     // Parsed abilities from abilities.json
     #[serde(skip)]
-    pub abilities: Vec<Arc<Ability>>,
+    pub abilities: Vec<AbilityRef>,
     /// Pre-baked ability data (populated by bake tool for PSP).
     /// Serialized so that PSP can avoid parsing abilities.json at runtime.
     #[serde(default, skip_serializing_if = "Option::is_none")]

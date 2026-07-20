@@ -1,37 +1,7 @@
-#![no_std]
-#![no_main]
-
-extern crate alloc;
-
-use core::alloc::{GlobalAlloc, Layout};
-
-struct DcAlloc;
-
-unsafe impl GlobalAlloc for DcAlloc {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        extern "C" {
-            fn malloc(size: usize) -> *mut u8;
-        }
-        malloc(layout.size())
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
-        extern "C" {
-            fn free(ptr: *mut u8);
-        }
-        free(ptr)
-    }
-}
-
-#[global_allocator]
-static ALLOC: DcAlloc = DcAlloc;
-
-use alloc::format;
-use alloc::string::{String, ToString};
-use alloc::sync::Arc;
-use alloc::vec;
-use alloc::vec::Vec;
-use core::hash::{BuildHasher, Hasher};
-use core::panic::PanicInfo;
+use std::hash::{BuildHasher, Hasher};
+use std::string::{String, ToString};
+use std::sync::Arc;
+use std::vec::Vec;
 
 use rabuka_dc::display::Display;
 use rabuka_dc::input::{Button, Input};
@@ -45,37 +15,12 @@ use rabuka_engine::turn::TurnEngine;
 
 // ── KOS FFI ───────────────────────────────────────────────────────────────
 extern "C" {
-    fn vid_set_mode(mode: i32);
-    fn vid_get_fb() -> *mut u16;
-    fn bfont_draw(vram: *mut u16, x: i32, y: i32, str: *const i8);
     fn timer_ms_gettime64() -> u64;
     fn thd_sleep(duration: i32);
 }
 
-// Entry point for the C wrapper (entry.o). C ABI adds leading underscore,
-// so "game_main" becomes "_game_main", matching the entry.o reference.
-#[export_name = "_game_main"]
-pub extern "C" fn game_main() -> i32 {
-    kos_init();
+fn main() {
     run_game();
-    0
-}
-
-#[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    unsafe {
-        let vram = vid_get_fb();
-        let c = b"PANIC - SEE SERIAL\0" as *const u8 as *const i8;
-        bfont_draw(vram, 0, 0, c);
-    }
-    loop {}
-}
-
-#[no_mangle]
-pub extern "C" fn kos_init() {
-    unsafe {
-        vid_set_mode(1);
-    }
 }
 
 // ── Hasher ────────────────────────────────────────────────────────────────

@@ -6,11 +6,41 @@ Architecture overview:
   cards.json (raw text)
     → extract_card_abilities.py (splits by newline, extracts trigger icons)
       → parser.py (this file):
-          1. parse_cost()     - cost before colon (：)
-          2. parse_effect()   - effect after colon, dispatched through handler cascade
-          3. parse_condition()- trigger conditions (場合/とき/たび)
-          4. parse_action()   - individual actions (move, gain, etc.)
+          1. parse_cost()         - cost before colon (：)
+          2. parse_effect()       - effect after colon, dispatched through handler cascade
+          3. parse_condition()    - trigger conditions (場合/とき/たび)
+          4. parse_action()       - individual actions (move, gain, etc.)
       → abilities.json (structured output consumed by Rust engine)
+
+=== FILE STRUCTURE (line ranges) ===
+  45- 62   Imports (parser_utils)
+  64- 103  Shared configuration constants
+ 105- 169  Text extraction utilities
+ 171- 204  Regex patterns
+ 206- 413  Utility functions (extract_location, etc.)
+ 414- 459  split_cost_effect, split_condition_action
+ 460- 632  parse_complex_condition, _extract_basic_cost_fields
+ 633- 714  _try_duration_prefix, extract_phase_gate
+ 715- 840  parse_ability
+ 841-1058  parse_cost
+1059-1296  parse_effect
+1297-1430  parse_condition
+1431-2785  parse_action + dispatch table (_R)
+2786-4277  Condition handler functions (_try_*)
+4278-4424  CONDITION_PATTERNS + _condition_registry
+4427-4766  _extract_generic_fields (fallthrough extraction)
+4767-4868  _infer_condition_type
+4869-4932  _enrich_* helpers
+4933-5048  Action utility helpers (_infer_card_type, infer_resource, etc.)
+5049-5550  _fill_defaults
+5551-8691  Effect handler functions (_try_effect_*) + _EFFECT_HANDLERS
+8692-9180  _walk (post-processing tree walker)
+9181-9720  _normalize_effect_tree
+9721-10615 process_abilities (post-hoc fixes)
+10616-10698 _propagate_optional, _merge_parenthetical
+10699-10765 Validation helpers (_VALIDATORS, _validate_effect, _enrich_effect_type)
+10766-11348 Semantic validation (_json_has*, _validate_semantic)
+11348-11351 __main__ entry point
 
 Condition types produced (type field in condition dict):
   complex                - nested compound conditions (AかつBかつC)
@@ -182,14 +212,14 @@ def _strip_duration_prefix(text):
 
 # ============== COST MODIFICATION PATTERNS ==============
 COST_MODIFICATION_PATTERNS = [
-    ("元々持つコストより(\d+)低い値に等しくなる", "decrease_by"),
-    ("元々持つコストより(\d+)高い値に等しくなる", "increase_by"),
-    ("コストが(\d+)以上になった場合", "cost_threshold"),
-    ("コストが(\d+)以下になった場合", "cost_threshold_below"),
-    ("コストは(\d+)減る", "decrease_by"),
-    ("コストは(\d+)減らす", "decrease_by"),
-    ("コストは(\d+)増える", "increase_by"),
-    ("コストは(\d+)増やす", "increase_by"),
+    (r"元々持つコストより(\d+)低い値に等しくなる", "decrease_by"),
+    (r"元々持つコストより(\d+)高い値に等しくなる", "increase_by"),
+    (r"コストが(\d+)以上になった場合", "cost_threshold"),
+    (r"コストが(\d+)以下になった場合", "cost_threshold_below"),
+    (r"コストは(\d+)減る", "decrease_by"),
+    (r"コストは(\d+)減らす", "decrease_by"),
+    (r"コストは(\d+)増える", "increase_by"),
+    (r"コストは(\d+)増やす", "increase_by"),
 ]
 
 # ============== COMPLEX CONDITION PATTERNS ==============

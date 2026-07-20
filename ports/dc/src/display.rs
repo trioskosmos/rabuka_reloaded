@@ -1,19 +1,17 @@
-use core::ffi::{c_char, c_int, CStr};
+use std::ffi::{c_char, c_int, CStr};
+use std::format;
+use std::string::ToString;
 
 extern "C" {
-    static vid_mode: c_int;
-    fn vid_set_mode(mode: c_int);
-    fn vid_get_fb() -> *mut u16;
-    fn bfont_draw(vram: *mut u16, x: c_int, y: c_int, str: *const c_char);
-    fn bfont_draw_memset(vram: *mut u16, x: c_int, y: c_int, str: *const c_char);
+    fn vid_set_mode(dm: c_int, pm: c_int);
+    fn bfont_draw(buffer: *mut core::ffi::c_void, bufwidth: u32, opaque: bool, c: u32) -> usize;
     fn bfont_set_encoding(encoding: c_int) -> c_int;
+    static vram_s: *mut u16;
 }
 
-const DM_320x240: c_int = 0;
-const DM_640x480: c_int = 1;
-const DM_256: c_int = 2;
+const DM_640X480: c_int = 0;
+const PM_RGB565: c_int = 3;
 const BFONT_ENC_ASCII: c_int = 0;
-const BFONT_ENC_SJIS: c_int = 1;
 
 pub const WIDTH: u32 = 640;
 pub const HEIGHT: u32 = 480;
@@ -31,10 +29,10 @@ pub struct Display {
 impl Display {
     pub fn new() -> Self {
         unsafe {
-            vid_set_mode(DM_640x480);
+            vid_set_mode(DM_640X480, PM_RGB565);
             bfont_set_encoding(BFONT_ENC_ASCII);
         }
-        let vram = unsafe { vid_get_fb() };
+        let vram = unsafe { vram_s };
         let mut d = Display {
             vram,
             cursor_x: 0,
@@ -107,14 +105,12 @@ impl Display {
         self.println(&"-".repeat(COLUMNS as usize));
         for (i, item) in items.iter().enumerate() {
             let prefix = if i == selected { " >" } else { "  " };
-            let line = alloc::format!("{prefix} {item}");
+            let line = std::format!("{prefix} {item}");
             self.println(&line);
         }
     }
 
-    pub fn swap_buffers(&mut self) {
-        // Dreamcast vid_set_mode uses single-buffer; no swap needed.
-    }
+    pub fn swap_buffers(&mut self) {}
 
     fn draw_char(&mut self, ch: char) {
         if self.cursor_x + FONT_W > WIDTH as i32 {
@@ -124,13 +120,17 @@ impl Display {
                 self.scroll();
             }
         }
-        let mut buf = [0u8; 8];
-        let s = ch.encode_utf8(&mut buf);
-        let len = s.len();
-        buf[len] = 0;
-        let c_str = unsafe { CStr::from_bytes_with_nul_unchecked(&buf[..=len]) };
-        unsafe {
-            bfont_draw(self.vram, self.cursor_x, self.cursor_y, c_str.as_ptr());
+        for c in ch.to_string().bytes() {
+            unsafe {
+                bfont_draw(
+                    self.vram
+                        .add(self.cursor_y as usize * WIDTH as usize + self.cursor_x as usize)
+                        as *mut core::ffi::c_void,
+                    WIDTH,
+                    true,
+                    c as u32,
+                );
+            }
         }
         self.cursor_x += FONT_W;
     }

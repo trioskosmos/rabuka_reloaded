@@ -195,7 +195,7 @@ pub fn calculate_play_cost_reduction(
 /// requires `location == "hand"` are skipped (the aura card is on stage, not
 /// in hand, so the condition is not met).
 fn scan_abilities_for_cost_reduction(
-    abilities: &[crate::Arc<crate::card::Ability>],
+    abilities: &[crate::ability::ability_store::AbilityRef],
     target_id: i16,
     target_card: &crate::card::Card,
     card_db: &CardDatabase,

@@ -15,45 +15,35 @@ if "%DEVKITARM%"=="" (
     exit /b 1
 )
 
-echo [1/3] Baking card data...
-cd /d "%~dp0ports\psp\tools\bake_cards"
-cargo run --release
-cd /d "%~dp0"
-if %ERRORLEVEL% neq 0 (
-    echo [FAIL] Bake failed.
-    pause
-    exit /b 1
-)
-echo [1/3] Done.
-echo.
-
-echo [2/3] Building DS binary...
-cd /d "%~dp0ports\ds"
-cargo build --release --target armv5te-nintendo-ds
+echo [1/2] Building DS binary...
+cd /d "%~dp0engine_ds"
+cargo +nightly build --release -Zbuild-std=core,alloc -Zjson-target-spec --target armv5te-nintendo-ds.json
 cd /d "%~dp0"
 if %ERRORLEVEL% neq 0 (
     echo [FAIL] DS build failed.
     pause
     exit /b 1
 )
-echo [2/3] Done.
+echo [1/2] Done.
 echo.
 
-echo [3/3] Creating NDS ROM...
-set TARGET_DIR=%~dp0ports\ds\target\armv5te-nintendo-ds\release
+echo [2/2] Creating NDS ROM...
+set TARGET_DIR=C:\rust_targets\armv5te-nintendo-ds\release
+set ARM7_ELF=%DEVKITPRO%\calico\bin\ds7_maine.elf
+if not exist "%~dp0output_ds" mkdir "%~dp0output_ds"
 if exist "%DEVKITPRO%\tools\bin\ndstool.exe" (
-    "%DEVKITPRO%\tools\bin\ndstool.exe" -c "%~dp0output_ds\rabuka.nds" -9 "%TARGET_DIR%\rabuka_ds.elf"
+    "%DEVKITPRO%\tools\bin\ndstool.exe" -c "%~dp0output_ds\rabuka.nds" -9 "%TARGET_DIR%\rabuka_ds" -7 "%ARM7_ELF%"
 ) else (
-    echo [WARN] ndstool not found. ELF output at: %TARGET_DIR%\rabuka_ds.elf
+    echo [WARN] ndstool not found. ELF output at: %TARGET_DIR%\rabuka_ds
 )
-echo [3/3] Done.
+echo [2/2] Done.
 echo.
 
 echo === Build Complete ===
 if exist "%~dp0output_ds\rabuka.nds" (
     echo Output: output_ds\rabuka.nds
 ) else (
-    echo ELF output: %TARGET_DIR%\rabuka_ds.elf
+    echo ELF output: %TARGET_DIR%\rabuka_ds
 )
 echo.
 pause

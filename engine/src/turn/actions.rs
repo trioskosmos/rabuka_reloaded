@@ -4,7 +4,10 @@ use crate::card::CardDatabase;
 use crate::game_state::GameState;
 use crate::game_state::Phase;
 #[cfg(feature = "no_std")]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 #[cfg(feature = "3ds")]
 extern "C" {
     fn _3ds_tdbg(msg: *const u8);
@@ -264,7 +267,7 @@ impl super::TurnEngine {
                     }
                     ability_to_activate = Some(AbilityActivation {
                         idx,
-                        ability: ability.clone(),
+                        ability: ability.to_arc(),
                         loc,
                     });
                     break;
@@ -1057,14 +1060,18 @@ impl super::TurnEngine {
         tdbg!("CHECK_TIMING:5 invalid live p1 OK");
         Self::check_invalid_live_cards(game_state, &p2_id);
         tdbg!("CHECK_TIMING:6 invalid live p2 OK");
-        let _e1 = Self::check_invalid_energy_cards(&mut game_state.player1, &game_state.card_database);
-        let _e2 = Self::check_invalid_energy_cards(&mut game_state.player2, &game_state.card_database);
+        let _e1 =
+            Self::check_invalid_energy_cards(&mut game_state.player1, &game_state.card_database);
+        let _e2 =
+            Self::check_invalid_energy_cards(&mut game_state.player2, &game_state.card_database);
         if _e2 > 0 || _e1 > 0 {
             game_state.mark_constants_dirty();
         }
         tdbg!("CHECK_TIMING:7 invalid energy OK");
-        let _o1 = Self::check_orphaned_under_cards(&mut game_state.player1, &game_state.card_database);
-        let _o2 = Self::check_orphaned_under_cards(&mut game_state.player2, &game_state.card_database);
+        let _o1 =
+            Self::check_orphaned_under_cards(&mut game_state.player1, &game_state.card_database);
+        let _o2 =
+            Self::check_orphaned_under_cards(&mut game_state.player2, &game_state.card_database);
         if _o1 > 0 || _o2 > 0 {
             game_state.mark_constants_dirty();
         }
@@ -1194,7 +1201,10 @@ impl super::TurnEngine {
     }
 
     /// Rule 10.5.2: Non-energy cards in energy zone → moved to discard.
-    fn check_invalid_energy_cards(player: &mut crate::player::Player, card_db: &CardDatabase) -> usize {
+    fn check_invalid_energy_cards(
+        player: &mut crate::player::Player,
+        card_db: &CardDatabase,
+    ) -> usize {
         let mut invalid_indices = Vec::new();
         for (i, card_id) in player.energy_zone.cards.iter().enumerate() {
             if !card_db.get_card(*card_id).is_some_and(|c| c.is_energy()) {
@@ -1215,7 +1225,10 @@ impl super::TurnEngine {
     /// Rule 10.5.3-4: Orphaned cards under members.
     /// When a member leaves its area, any member cards under it go to discard (10.5.3)
     /// and any energy cards under it go to energy deck (10.5.4).
-    fn check_orphaned_under_cards(player: &mut crate::player::Player, card_db: &CardDatabase) -> usize {
+    fn check_orphaned_under_cards(
+        player: &mut crate::player::Player,
+        card_db: &CardDatabase,
+    ) -> usize {
         let mut moved = 0;
         for area_idx in 0..3 {
             let top = player.stage.stage[area_idx];

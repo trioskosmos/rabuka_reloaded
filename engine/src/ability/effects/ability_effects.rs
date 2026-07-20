@@ -418,7 +418,8 @@ impl AbilityResolver {
                             .or_default()
                             .push(format!(
                                 "ability_from_source:{}:{}",
-                                src_id, ability.triggerless_text()
+                                src_id,
+                                ability.triggerless_text()
                             ));
                         let gained = crate::card::Ability {
                             full_text: ability.full_text.clone(),

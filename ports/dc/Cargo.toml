@@ -22,6 +22,6 @@ path = "src/bin/rabuka_dc.rs"
 
 [profile.release]
 codegen-units = 1
-lto = true
+lto = false
 opt-level = 2
 panic = "abort"

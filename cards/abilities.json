@@ -1,8 +1,8 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-10T12:07:35.622624",
+  "generated_at": "2026-07-20T00:40:17.185414",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
-  "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
+  "source_file": "/home/trios/OneDrive/Documents/rabuka_reloaded/cards/cards.json",
   "statistics": {
     "total_cards": 2280,
     "cards_with_abilities": 1373,

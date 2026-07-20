@@ -34,6 +34,11 @@ mod inner {
         fn _3ds_system_tick() -> u64;
     }
 
+    #[cfg(feature = "dc")]
+    extern "C" {
+        fn timer_ms_gettime64() -> u64;
+    }
+
     static STATE: Mutex<u32> = Mutex::new(0);
 
     fn next_u32() -> u32 {
@@ -54,10 +59,24 @@ mod inner {
                 1
             }
         }
-        #[cfg(not(feature = "3ds"))]
+        #[cfg(feature = "dc")]
+        {
+            let tick = unsafe { timer_ms_gettime64() };
+            if tick != 0 {
+                tick as u32
+            } else {
+                1
+            }
+        }
+        #[cfg(not(any(feature = "3ds", feature = "dc")))]
         {
             1
         }
+    }
+
+    pub fn seed(seed: u32) {
+        let mut guard = STATE.lock().unwrap();
+        *guard = seed;
     }
 
     pub fn shuffle_slice<T>(slice: &mut [T]) {
@@ -126,6 +145,5 @@ mod inner {
 
 // Public surface
 pub use inner::rand_range;
-#[cfg(feature = "no_std")]
 pub use inner::seed;
 pub use inner::shuffle_slice;

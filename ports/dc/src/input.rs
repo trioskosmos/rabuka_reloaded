@@ -1,55 +1,32 @@
-use core::ffi::c_uint;
-
-const MAPLE_FUNC_CONTROLLER: c_uint = 0x801;
-
-#[repr(C)]
-struct ContState {
-    buttons: c_uint,
-    rtrn: c_uint,
-    ltrig: u16,
-    rtrig: u16,
-    joyx: u16,
-    joyy: u16,
-    joy2x: u16,
-    joy2y: u16,
-}
-
-#[repr(C)]
-enum MapleDeviceClass {
-    None,
-    Maple,
-    Drum,
-    Keyboard,
-    Mouse,
-    Lightgun,
-    Media,
-}
+use std::ffi::c_int;
+use std::ffi::c_void;
 
 #[repr(C)]
 struct MapleDevice {
-    dev_class: MapleDeviceClass,
-    port: u32,
-    unit: u32,
-    info: *mut core::ffi::c_void,
-    frame: u32,
-    func: c_uint,
-    _private: [u32; 3],
+    _opaque: [u8; 0],
+}
+
+#[repr(C)]
+struct ContState {
+    buttons: u32,
+    _rest: [u8; 64],
 }
 
 extern "C" {
-    fn maple_dev_attach(port: c_uint, func: c_uint) -> *mut MapleDevice;
-    fn maple_dev_status(dev: *mut MapleDevice) -> *mut core::ffi::c_void;
+    fn maple_enum_dev(port: c_int, unit: c_int) -> *mut MapleDevice;
+    fn maple_dev_status(dev: *mut MapleDevice) -> *mut c_void;
+    fn thd_sleep(ms: c_int);
 }
 
-const CONT_DPAD_UP: c_uint = 0x0001;
-const CONT_DPAD_DOWN: c_uint = 0x0002;
-const CONT_DPAD_LEFT: c_uint = 0x0004;
-const CONT_DPAD_RIGHT: c_uint = 0x0008;
-const CONT_A: c_uint = 0x0100;
-const CONT_B: c_uint = 0x0200;
-const CONT_X: c_uint = 0x0400;
-const CONT_Y: c_uint = 0x0800;
-const CONT_START: c_uint = 0x1000;
+const CONT_DPAD_UP: u32 = 1 << 4;
+const CONT_DPAD_DOWN: u32 = 1 << 5;
+const CONT_DPAD_LEFT: u32 = 1 << 6;
+const CONT_DPAD_RIGHT: u32 = 1 << 7;
+const CONT_A: u32 = 1 << 2;
+const CONT_B: u32 = 1 << 1;
+const CONT_X: u32 = 1 << 10;
+const CONT_Y: u32 = 1 << 9;
+const CONT_START: u32 = 1 << 3;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Button {
@@ -66,13 +43,16 @@ pub enum Button {
 
 pub struct Input {
     dev: *mut MapleDevice,
-    prev_buttons: c_uint,
-    curr_buttons: c_uint,
+    prev_buttons: u32,
+    curr_buttons: u32,
 }
 
 impl Input {
     pub fn new() -> Self {
-        let dev = unsafe { maple_dev_attach(0, MAPLE_FUNC_CONTROLLER) };
+        unsafe {
+            thd_sleep(100);
+        }
+        let dev = unsafe { maple_enum_dev(0, 0) };
         Input {
             dev,
             prev_buttons: 0,
@@ -125,7 +105,7 @@ impl Input {
     }
 }
 
-fn button_mask(btn: Button) -> c_uint {
+fn button_mask(btn: Button) -> u32 {
     match btn {
         Button::Up => CONT_DPAD_UP,
         Button::Down => CONT_DPAD_DOWN,
