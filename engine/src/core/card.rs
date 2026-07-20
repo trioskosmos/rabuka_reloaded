@@ -955,9 +955,9 @@ pub enum EffectKind {
         #[serde(default)]
         ability_filter: Option<AbilityFilter>,
         #[serde(default)]
-        ability_filter_triggers: Option<Vec<String>>,
+        ability_filter_triggers: Option<Box<Vec<String>>>,
         #[serde(default)]
-        or_ability_filters: Option<Vec<AbilityFilterBranch>>,
+        or_ability_filters: Option<Box<Vec<AbilityFilterBranch>>>,
         #[serde(default)]
         card_property: Option<ArcStr>,
         #[serde(default)]
@@ -1127,9 +1127,9 @@ pub enum EffectKind {
         #[serde(default)]
         ability_filter: Option<AbilityFilter>,
         #[serde(default)]
-        ability_filter_triggers: Option<Vec<String>>,
+        ability_filter_triggers: Option<Box<Vec<String>>>,
         #[serde(default)]
-        or_ability_filters: Option<Vec<AbilityFilterBranch>>,
+        or_ability_filters: Option<Box<Vec<AbilityFilterBranch>>>,
         #[serde(default)]
         card_property: Option<ArcStr>,
         #[serde(default)]
@@ -1187,7 +1187,7 @@ pub enum EffectKind {
         #[serde(default)]
         heart_color_count: Option<u32>,
         #[serde(default)]
-        options: Option<Vec<Box<AbilityEffect>>>,
+        options: Option<Box<Vec<Box<AbilityEffect>>>>,
         #[serde(default)]
         per_group: Option<bool>,
         #[serde(default)]
@@ -1238,9 +1238,9 @@ pub enum EffectKind {
         #[serde(default)]
         ability_filter: Option<AbilityFilter>,
         #[serde(default)]
-        ability_filter_triggers: Option<Vec<String>>,
+        ability_filter_triggers: Option<Box<Vec<String>>>,
         #[serde(default)]
-        or_ability_filters: Option<Vec<AbilityFilterBranch>>,
+        or_ability_filters: Option<Box<Vec<AbilityFilterBranch>>>,
         #[serde(default)]
         card_property: Option<ArcStr>,
         #[serde(default)]
@@ -1286,7 +1286,7 @@ pub enum EffectKind {
         #[serde(default)]
         multiple_targets: Option<bool>,
         #[serde(default)]
-        options: Option<Vec<Box<AbilityEffect>>>,
+        options: Option<Box<Vec<Box<AbilityEffect>>>>,
         #[serde(default)]
         resource_on_select: Option<Box<AbilityEffect>>,
         #[serde(default)]
@@ -1606,9 +1606,9 @@ pub enum EffectKind {
         #[serde(default)]
         ability_filter: Option<AbilityFilter>,
         #[serde(default)]
-        ability_filter_triggers: Option<Vec<String>>,
+        ability_filter_triggers: Option<Box<Vec<String>>>,
         #[serde(default)]
-        or_ability_filters: Option<Vec<AbilityFilterBranch>>,
+        or_ability_filters: Option<Box<Vec<AbilityFilterBranch>>>,
         #[serde(default)]
         exclude_heart_colors: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1702,7 +1702,7 @@ pub enum EffectKind {
         #[serde(default, alias = "max_repeats")]
         repeat_limit: Option<u32>,
         #[serde(default)]
-        options: Option<Vec<Box<AbilityEffect>>>,
+        options: Option<Box<Vec<Box<AbilityEffect>>>>,
         #[serde(default)]
         choice_type: Option<ArcStr>,
         #[serde(default)]
@@ -1955,7 +1955,7 @@ pub enum EffectKind {
         #[serde(default)]
         group_reference: Option<ArcStr>,
         #[serde(default)]
-        parenthetical: Option<Vec<String>>,
+        parenthetical: Option<Box<Vec<String>>>,
         #[serde(default)]
         quoted_text: Option<Box<QuotedText>>,
         #[serde(default)]
@@ -2005,7 +2005,7 @@ pub enum EffectKind {
         #[serde(default)]
         or_card_types: Option<Box<Vec<String>>>,
         #[serde(default)]
-        options: Option<Vec<Box<AbilityEffect>>>,
+        options: Option<Box<Vec<Box<AbilityEffect>>>>,
         #[serde(default)]
         position: Option<Box<PositionInfo>>,
         #[serde(default)]
@@ -2044,7 +2044,7 @@ pub enum EffectKind {
         #[serde(default)]
         choice_maker: Option<ArcStr>,
         #[serde(default)]
-        options: Option<Vec<Box<AbilityEffect>>>,
+        options: Option<Box<Vec<Box<AbilityEffect>>>>,
         #[serde(default)]
         card_property: Option<ArcStr>,
         #[serde(default)]
@@ -2432,7 +2432,7 @@ macro_rules! vec_ref_getter_unboxed {
     ($name:ident, [$($variant:ident => $field:ident),+]) => {
         pub fn $name(&self) -> Option<&Vec<String>> {
             match self.kind.as_deref() {
-                $(Some(EffectKind::$variant { $field, .. }) => $field.as_ref(),)+
+                $(Some(EffectKind::$variant { $field, .. }) => $field.as_deref(),)+
                 _ => None,
             }
         }
@@ -2910,11 +2910,11 @@ impl AbilityEffect {
 
     pub fn options_any(&self) -> Option<&Vec<Box<AbilityEffect>>> {
         match self.kind.as_deref() {
-            Some(EffectKind::LookReveal { options, .. }) => options.as_ref(),
-            Some(EffectKind::CompoundEffect { options, .. }) => options.as_ref(),
-            Some(EffectKind::MiscOp { options, .. }) => options.as_ref(),
-            Some(EffectKind::CustomOp { options, .. }) => options.as_ref(),
-            Some(EffectKind::SelectTarget { options, .. }) => options.as_ref(),
+            Some(EffectKind::LookReveal { options, .. }) => options.as_deref(),
+            Some(EffectKind::CompoundEffect { options, .. }) => options.as_deref(),
+            Some(EffectKind::MiscOp { options, .. }) => options.as_deref(),
+            Some(EffectKind::CustomOp { options, .. }) => options.as_deref(),
+            Some(EffectKind::SelectTarget { options, .. }) => options.as_deref(),
             _ => None,
         }
     }
@@ -2923,16 +2923,16 @@ impl AbilityEffect {
         match self.kind.as_deref() {
             Some(EffectKind::MoveCards {
                 or_ability_filters, ..
-            }) => or_ability_filters.as_ref(),
+            }) => or_ability_filters.as_deref(),
             Some(EffectKind::SelectTarget {
                 or_ability_filters, ..
-            }) => or_ability_filters.as_ref(),
+            }) => or_ability_filters.as_deref(),
             Some(EffectKind::LookReveal {
                 or_ability_filters, ..
-            }) => or_ability_filters.as_ref(),
+            }) => or_ability_filters.as_deref(),
             Some(EffectKind::ChangeState {
                 or_ability_filters, ..
-            }) => or_ability_filters.as_ref(),
+            }) => or_ability_filters.as_deref(),
             _ => None,
         }
     }
@@ -3224,7 +3224,7 @@ impl AbilityEffect {
 
 impl AbilityEffect {
     setter!(set_ability_filter, ability_filter: AbilityFilter => [MoveCards, SelectTarget, LookReveal, ChangeState]);
-    setter!(set_ability_filter_triggers, ability_filter_triggers: Vec<String> => [MoveCards, SelectTarget, LookReveal, ChangeState]);
+    box_setter!(set_ability_filter_triggers, ability_filter_triggers: Vec<String> => [MoveCards, SelectTarget, LookReveal, ChangeState]);
     setter!(set_ability_gain, ability_gain: ArcStr => [AbilityOp]);
     setter!(set_ability_gain_trigger, ability_gain_trigger: ArcStr => [AbilityOp]);
     setter!(set_ability_text, ability_text: ArcStr => [AbilityOp]);
@@ -3392,7 +3392,7 @@ impl AbilityEffect {
     setter!(set_original_count, original_count: u32 => [ModifyHearts, MiscOp]);
     setter!(set_original_operator, original_operator: Operator => [ModifyHearts, MiscOp]);
     setter!(set_original_value, original_value: bool => [MoveCards, SelectTarget, LookReveal, ModifyHearts, GainResource, ChangeState, MiscOp, CustomOp]);
-    setter!(set_parenthetical, parenthetical: Vec<String> => [MiscOp]);
+    box_setter!(set_parenthetical, parenthetical: Vec<String> => [MiscOp]);
     setter!(set_per_group, per_group: bool => [MoveCards, MiscOp]);
     setter!(set_per_group_count, per_group_count: u32 => [MoveCards, MiscOp]);
     setter!(set_per_unit, per_unit: bool => [SelectTarget, LookReveal, ModifyScore, ModifyHearts, GainResource, ChangeState, MiscOp]);
@@ -4154,7 +4154,7 @@ pub enum Condition {
         #[serde(default)]
         ability_filter: Option<ArcStr>,
         #[serde(default)]
-        ability_filter_triggers: Option<Vec<String>>,
+        ability_filter_triggers: Option<Box<Vec<String>>>,
         #[serde(default)]
         baton_touch_trigger: Option<bool>,
         #[serde(default)]
@@ -4372,7 +4372,7 @@ pub enum Condition {
         trigger_event: Option<Box<TriggerEvent>>,
         ability_filter: Option<AbilityFilter>,
         #[serde(default)]
-        ability_filter_triggers: Option<Vec<String>>,
+        ability_filter_triggers: Option<Box<Vec<String>>>,
         target: Option<ArcStr>,
         location: Option<ArcStr>,
         operator: Option<ArcStr>,
@@ -4405,7 +4405,7 @@ pub enum Condition {
         #[cfg(feature = "debug_conditions")]
         trigger_event: Option<Box<TriggerEvent>>,
         #[serde(default)]
-        options: Option<Vec<Box<AbilityEffect>>>,
+        options: Option<Box<Vec<Box<AbilityEffect>>>>,
     },
     #[serde(rename = "complex_condition")]
     Complex {
@@ -5395,7 +5395,7 @@ impl Condition {
 
     pub fn get_options(&self) -> Option<&[Box<AbilityEffect>]> {
         match self {
-            Condition::Choice { options, .. } => options.as_deref(),
+            Condition::Choice { options, .. } => options.as_ref().map(|b| &b[..]),
             _ => None,
         }
     }
@@ -5692,10 +5692,10 @@ impl Condition {
             Condition::AbilityFilter {
                 ability_filter_triggers,
                 ..
-            } => ability_filter_triggers.as_deref(),
+            } => ability_filter_triggers.as_ref().map(|b| &b[..]),
             Condition::Location { sub_checks, .. } => sub_checks
                 .as_ref()
-                .and_then(|sc| sc.ability_filter_triggers.as_deref()),
+                .and_then(|sc| sc.ability_filter_triggers.as_ref().map(|b| &b[..])),
             _ => None,
         }
     }
