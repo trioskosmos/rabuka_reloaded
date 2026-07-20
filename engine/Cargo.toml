@@ -102,12 +102,6 @@ path = "src/bin/rabuka_3ds.rs"
 test = false
 
 [[bin]]
-name = "gen_abilities_map"
-path = "src/bin/gen_abilities_map.rs"
-required-features = ["rmp-serde"]
-test = false
-
-[[bin]]
 name = "bot_demo"
 path = "src/bin/bot_demo.rs"
 test = false

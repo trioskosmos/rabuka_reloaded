@@ -16,10 +16,6 @@ use std::string::String;
 use std::vec::Vec;
 
 use crate::ability::ability_store::AbilityRef;
-#[cfg(not(feature = "bytecode_abilities"))]
-use crate::ability::enums::ActionType;
-#[cfg(not(feature = "bytecode_abilities"))]
-use crate::card::AbilityEffect;
 use crate::card::{Ability, Card};
 use crate::Arc;
 use crate::HashMap;
@@ -154,7 +150,8 @@ impl CardLoader {
         ability_map
     }
 
-    /// Default path: decode all abilities from JSON eagerly.
+    /// Decode all abilities from bytecode. Each ability is decoded on demand
+    /// via `vm::get_ability(idx)`.
     fn build_abilities_map_inner(
         abilities_data: &serde_json::Value,
     ) -> HashMap<String, Vec<Ability>> {
@@ -165,50 +162,7 @@ impl CardLoader {
             .and_then(|v| v.as_array())
         {
             for (_idx, ability_entry) in unique_abilities.iter().enumerate() {
-                #[cfg(feature = "bytecode_abilities")]
                 let ability = crate::ability::vm::get_ability(_idx);
-
-                #[cfg(not(feature = "bytecode_abilities"))]
-                let ability = {
-                    let entry = ability_entry.clone();
-                    let effect_entry = entry.get("effect").cloned();
-                    let mut ability: Option<Ability> = None;
-
-                    if let Ok(mut ab) = serde_json::from_value::<Ability>(entry) {
-                        if let Some(ref mut effect) = ab.effect {
-                            if let Some(ref json_effect) = effect_entry {
-                                effect.populate_from_json(json_effect);
-                            }
-                        }
-
-                        if let Some(ref mut effect) = ab.effect {
-                            if let Some(ref actions) = effect.compound.actions.clone() {
-                                let fixed_actions: Vec<Box<AbilityEffect>> = actions
-                                    .iter()
-                                    .map(|action| {
-                                        let mut fixed_action = action.clone();
-                                        if (fixed_action.action == ActionType::Draw
-                                            || fixed_action.action == ActionType::DrawCard)
-                                            && fixed_action.count.is_none()
-                                            && fixed_action.dynamic_count_any().is_none()
-                                        {
-                                            fixed_action.count = Some(1);
-                                        }
-                                        fixed_action
-                                    })
-                                    .collect();
-                                effect.compound.actions = Some(fixed_actions);
-                            }
-                        }
-                        ability = Some(ab);
-                    } else {
-                        log::debug!(
-                            "Failed to deserialize ability entry: {}",
-                            serde_json::to_string_pretty(ability_entry).unwrap_or_default()
-                        );
-                    }
-                    ability
-                };
 
                 if let Some(ability) = ability {
                     if let Some(card_list) = ability_entry.get("cards").and_then(|v| v.as_array()) {
@@ -227,34 +181,5 @@ impl CardLoader {
             }
         }
         ability_map
-    }
-
-    pub fn build_abilities_map(
-        abilities_data: &serde_json::Value,
-    ) -> HashMap<String, Vec<Ability>> {
-        Self::build_abilities_map_inner(abilities_data)
-    }
-
-    /// PSP/baked path: eagerly decode all abilities into Vec<Arc<Ability>> per card.
-    #[cfg(not(feature = "lazy_abilities"))]
-    pub fn apply_abilities_index(
-        mut cards: Vec<Card>,
-        abilities_index: &[Ability],
-        card_index: &HashMap<String, Vec<usize>>,
-    ) -> Vec<Card> {
-        let shared_pool: Vec<AbilityRef> = abilities_index
-            .iter()
-            .map(|a| AbilityRef(Arc::new(a.clone())))
-            .collect();
-        for card in &mut cards {
-            if let Some(indices) = card_index.get(card.card_no.as_ref()) {
-                card.abilities = indices
-                    .iter()
-                    .filter_map(|&i| shared_pool.get(i))
-                    .cloned()
-                    .collect();
-            }
-        }
-        cards
     }
 }
