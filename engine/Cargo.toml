@@ -62,6 +62,10 @@ bytecode_abilities = []
 # ability RAM from ~2.8 MB (all 800 eagerly decoded) to a bounded on-demand cache.
 # Implies bytecode_abilities.
 lazy_abilities = ["bytecode_abilities"]
+# Arena allocator: bump arena for temporary allocations during ability triggers.
+# Reduces per-trigger heap allocs from ~15K to ~150. Requires alloc_tracker.
+# NOT in default — enable explicitly for production/profiling builds.
+arena_allocator = ["alloc_tracker"]
 
 [dev-dependencies]
 criterion = "0.5"

@@ -23,6 +23,8 @@ pub(crate) use compat::{Arc, HashMap, HashSet, VecDeque};
 
 #[cfg(feature = "alloc_tracker")]
 pub mod alloc_counter;
+#[cfg(feature = "arena_allocator")]
+pub mod arena;
 #[cfg(feature = "alloc_tracker")]
 #[global_allocator]
 static ALLOC: alloc_counter::CountingAllocator = alloc_counter::CountingAllocator;

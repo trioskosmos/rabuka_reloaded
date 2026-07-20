@@ -1,11 +1,15 @@
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 
+#[cfg(feature = "arena_allocator")]
+use crate::arena;
+
 static ALLOC_COUNT: AtomicU64 = AtomicU64::new(0);
 static DEALLOC_COUNT: AtomicU64 = AtomicU64::new(0);
 static BYTES_ALLOCATED: AtomicI64 = AtomicI64::new(0);
 static PEAK_BYTES: AtomicI64 = AtomicI64::new(0);
 static TOTAL_BYTES_ALLOCATED: AtomicU64 = AtomicU64::new(0);
+static ARENA_BUMPS: AtomicU64 = AtomicU64::new(0);
 
 // Size-class histogram: count of allocs per power-of-2 bucket
 // 0=1-7B, 1=8-15B, 2=16-31B, ..., 12=4KB+, 13=8KB+
@@ -53,10 +57,23 @@ unsafe impl GlobalAlloc for CountingAllocator {
                 Err(p) => peak = p,
             }
         }
+        #[cfg(feature = "arena_allocator")]
+        {
+            if let Some(ptr) = arena::arena_alloc(layout) {
+                ARENA_BUMPS.fetch_add(1, Ordering::Relaxed);
+                return ptr;
+            }
+        }
         System.alloc(layout)
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        #[cfg(feature = "arena_allocator")]
+        {
+            if arena::arena_contains_ptr(ptr) {
+                return;
+            }
+        }
         DEALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
         BYTES_ALLOCATED.fetch_sub(layout.size() as i64, Ordering::Relaxed);
         System.dealloc(ptr, layout)
@@ -98,6 +115,7 @@ struct Snapshot {
     live_bytes: i64,
     peak_bytes: i64,
     total_allocated: u64,
+    arena_bumps: u64,
     buckets: [u64; 14],
 }
 
@@ -108,6 +126,7 @@ fn snapshot() -> Snapshot {
         live_bytes: BYTES_ALLOCATED.load(Ordering::Relaxed),
         peak_bytes: PEAK_BYTES.load(Ordering::Relaxed),
         total_allocated: TOTAL_BYTES_ALLOCATED.load(Ordering::Relaxed),
+        arena_bumps: ARENA_BUMPS.load(Ordering::Relaxed),
         buckets: read_buckets(),
     }
 }
@@ -150,6 +169,8 @@ impl Drop for AllocGuard {
             eprintln!("  alloc calls:       {}", d);
             eprintln!("  dealloc calls:     {}", dd);
             eprintln!("  net live allocs:   {}", d.saturating_sub(dd));
+            let ab = now.arena_bumps.saturating_sub(self.baseline.arena_bumps);
+            eprintln!("  arena bumps:       {} (skipped system alloc)", ab);
             if live >= 0 {
                 eprintln!("  live bytes:        {} B  ({} KB)", live, live / 1024);
             } else {
