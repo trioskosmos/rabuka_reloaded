@@ -126,7 +126,7 @@ fn psp_main() {
     let cards2: Vec<Card> =
         serde_json::from_str(DECK_CARDS[deck2_idx]).expect("Failed to parse deck cards");
 
-    // Merge and deduplicate by card_no, converting baked_abilities to abilities
+    // Merge and deduplicate by card_no
     display.println("Merging cards...");
     display.swap_buffers();
     let mut card_map: hashbrown::HashMap<String, Card, PspHasher> =
@@ -135,12 +135,6 @@ fn psp_main() {
         let key = c.card_no.to_string();
         if !card_map.contains_key(&key) {
             let mut card = c;
-            if let Some(baked) = card.baked_abilities.take() {
-                card.abilities = baked
-                    .into_iter()
-                    .map(|a| alloc::sync::Arc::new(a))
-                    .collect();
-            }
             card_map.insert(key, card);
         }
     }

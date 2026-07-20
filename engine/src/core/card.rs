@@ -259,13 +259,11 @@ pub struct Card {
     #[serde(default = "default_blade")]
     pub blade: u32,
     #[serde(default)]
-    pub rare: String,
+    pub rare: Box<str>,
     #[serde(default)]
-    pub ability: String,
+    pub ability: Box<str>,
     #[serde(default)]
     pub faq: Vec<FAQEntry>,
-    #[serde(rename = "_img")]
-    pub _img: Option<ArcStr>,
     // Live card fields
     pub score: Option<u32>,
     pub need_heart: Option<BaseHeart>,
@@ -273,10 +271,6 @@ pub struct Card {
     // Parsed abilities from abilities.json
     #[serde(skip)]
     pub abilities: Vec<AbilityRef>,
-    /// Pre-baked ability data (populated by bake tool for PSP).
-    /// Serialized so that PSP can avoid parsing abilities.json at runtime.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub baked_abilities: Option<Vec<Ability>>,
 }
 
 #[derive(Debug, Clone)]
@@ -466,13 +460,9 @@ impl<'de> Deserialize<'de> for Card {
             pub ability: String,
             #[serde(default)]
             pub faq: Vec<FAQEntry>,
-            #[serde(rename = "_img")]
-            pub _img: Option<ArcStr>,
             pub score: Option<u32>,
             pub need_heart: Option<BaseHeart>,
             pub special_heart: Option<SpecialHeart>,
-            #[serde(default)]
-            pub baked_abilities: Option<Vec<Ability>>,
         }
 
         let helper = CardHelper::deserialize(deserializer)?;
@@ -491,15 +481,13 @@ impl<'de> Deserialize<'de> for Card {
             base_heart: helper.base_heart,
             blade_heart: helper.blade_heart,
             blade: helper.blade,
-            rare: helper.rare,
-            ability: helper.ability,
+            rare: helper.rare.into(),
+            ability: helper.ability.into(),
             faq: helper.faq,
-            _img: helper._img,
             score: helper.score,
             need_heart: helper.need_heart,
             special_heart: helper.special_heart,
             abilities: Vec::new(),
-            baked_abilities: helper.baked_abilities,
         })
     }
 }

@@ -150,19 +150,12 @@ fn main() {
                 // Write per-deck card file with abilities pre-attached
                 let deck_filename = format!("deck_{deck_index}_cards.json");
                 let deck_cards_str = if let Some(ref abil_val) = abilities_value {
-                    // Parse into Card structs, attach abilities, re-serialize with baked_abilities
+                    // Parse into Card structs, attach abilities, re-serialize
                     let cards: Vec<Card> = deck_cards
                         .iter()
                         .map(|v| serde_json::from_value(v.clone()).unwrap())
                         .collect();
-                    let cards: Vec<Card> = CardLoader::attach_abilities(cards, abil_val)
-                        .into_iter()
-                        .map(|mut c| {
-                            c.baked_abilities =
-                                Some(c.abilities.iter().map(|a| (**a).clone()).collect());
-                            c
-                        })
-                        .collect();
+                    let cards: Vec<Card> = CardLoader::attach_abilities(cards, abil_val);
                     serde_json::to_string(&cards).unwrap()
                 } else {
                     serde_json::to_string(&deck_cards).unwrap()

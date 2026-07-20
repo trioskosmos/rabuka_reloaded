@@ -5,7 +5,6 @@ use std::vec::Vec;
 
 use rabuka_dc::display::Display;
 use rabuka_dc::input::{Button, Input};
-use rabuka_engine::ability::ability_store::AbilityRef;
 use rabuka_engine::card::Card;
 use rabuka_engine::game::deck_builder;
 use rabuka_engine::game_setup;
@@ -110,9 +109,6 @@ fn run_game() {
         let key = c.card_no.to_string();
         if !card_map.contains_key(&key) {
             let mut card = c;
-            if let Some(baked) = card.baked_abilities.take() {
-                card.abilities = baked.into_iter().map(|a| AbilityRef(Arc::new(a))).collect();
-            }
             card_map.insert(key, card);
         }
     }

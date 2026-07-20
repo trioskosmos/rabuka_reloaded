@@ -168,12 +168,6 @@ pub extern "C" fn main() {
         let key = c.card_no.to_string();
         if !card_map.contains_key(&key) {
             let mut card = c;
-            if let Some(baked) = card.baked_abilities.take() {
-                card.abilities = baked
-                    .into_iter()
-                    .map(|a| alloc::sync::Arc::new(a))
-                    .collect();
-            }
             card_map.insert(key, card);
         }
     }
