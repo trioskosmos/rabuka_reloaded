@@ -104,7 +104,7 @@ Each `Vec<String>` (24 bytes) → `Box<Vec<String>>` (8 bytes) saves 16 bytes pe
 |------|--------------|-------------|-------|
 | `Condition` | **1864** | **536** | Flat struct → tagged enum, 71% reduction |
 | `EffectKind` | **1248** | **656** | 14 Vec fields boxed + DynamicCount/PositionInfo/QuotedText boxed + field additions |
-| `AbilityEffect` | **1536** | **168** | Box\<EffectKind\> → Box, -800B stack. `action: String (24B)` → `ActionType (1B+padding=2B)`, stack effect minimal |
+| `AbilityEffect` | **1536** | **152** | Box\<EffectKind\> → Box, -800B stack. `action: String (24B)` → `ActionType (1B+padding=2B)`, `r#ref` removed |
 | `ActionType` | **String (24B)** | **1B (enum)** | serde-compatible via `rename_all = "snake_case"`. Discriminant fits in 1 byte, padding takes it to 2 |
 | `CompoundBranch` | **96** | **96** | Mostly boxed pointers now |
 | `AbilityQueueEntry` | **~600+** | **~600+** | Has condition_cache HashMap, snapshot Vecs, resolver, pending_actions |
