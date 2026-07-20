@@ -138,7 +138,20 @@ Same for effects: `{"action": "draw_card", "count": 2}` maps to `EffectKind::Dra
 
 ## What remains: ranked by RAM + cycle impact
 
-### Current snapshot (after all completed work)
+### Current memory budget (runtime)
+
+| Consumer | RAM | Notes |
+|----------|-----|-------|
+| **CardDatabase** | **~2 MB** | 7400 cards × ~200B inline + heap. Shared via Arc, immutable. |
+| **AbilityEffect trees** | **~1.1 MB** | 1451 effects × EffectKind (544B). Already optimized. |
+| **Ability decode cache** | ~160 KB | Lazy path, bounded. |
+| **GameState inline** | ~4 KB | ~130 fields. |
+| **GameState heap** | ~100–500 KB | Logs, movements, snapshots per game. |
+| **Bytecode blob** | 136 KB | ROM-resident, doesn't count. |
+| **History snapshots (web)** | 0.5–50 MB | Full GameState clones for undo. Web only, not consoles. |
+| **Display serialization** | ~20–60 KB | Per HTTP request, temporary. |
+
+### Current type sizes (after all completed work)
 
 | Type | Original | Current | Reduction |
 |------|----------|---------|-----------|
@@ -149,69 +162,38 @@ Same for effects: `{"action": "draw_card", "count": 2}` maps to `EffectKind::Dra
 
 ---
 
-### P1 — Consolidate AbilityEffect + EffectKind flat fields
+## Active priorities (re-audited 2026-07-20)
 
-**Status:** 🔄 Audited. source/destination are LIVE (27+ read sites). count/target are LIVE (50+ reads).
+### P0 — CardDatabase slimming
 
-**Why:** `AbilityEffect` stores flat `source`, `destination`, `count`, `target` fields that duplicate EffectKind variant data. Removing them would shrink AbilityEffect from 152→~96B (~80KB saved).
+**Why:** 7400 cards at ~200B each = ~2 MB. This is the single largest memory consumer. On a 3DS (64 MB RAM) it's 3% of total. On a GBA/DMG-class target it would be the entire RAM budget.
 
-**Audit findings:**
-- `source` and `destination` — 27+ direct read/write sites across effects/, move_cards.rs, describe.rs, choice.rs, cost.rs
-- `count` — 4 getter methods, ~25 call sites
-- `target` — 3 getter methods, ~40 call sites
-- `conditional` — 2 readers (live)
-- `is_further` — 2 readers (live)
-- `optional` — ~50 readers (very live)
-- `max` — ~15 readers (very live)
-- `non_stackable` — 2 readers (live)
+**Optimization paths:**
 
-**Strategy:** Custom Deserialize impl on AbilityEffect that feeds flat JSON keys into EffectKind during deserialization. Then remove flat fields. This also kills `populate_from_json` (the "rekindle" mechanism).
+#### A. Arc<str> for shared strings (~200-300 KB saved)
+Card fields `product`, `series`, `group` are `Box<str>` — owned, unique per card. But many cards share the same product/series/group. Using `Arc<str>` instead enables deduplication: the first card to use "PR" creates the Arc, subsequent cards share the pointer. With ~100 unique products × 16B pointer vs 16B Box<str> per card = similar per-card cost, but heap string deduplication saves ~5-10 KB per shared string.
 
-**Estimated effort:** ~50-100 files, careful serde compat.
+More impactful: `rare` and `ability` are `String` (24B). Switching to `Box<str>` saves 8B each (16B → 8B? No: String 24B → Box<str> 16B = 8B per field). With 7400 cards: 7400 × 16B = ~118 KB saved.
 
----
+#### B. On-demand card loading (~1.5 MB saved)
+Only ~200-300 cards are in any given deck. The other 7000+ are never accessed during a game. If cards were loaded lazily from a pre-baked binary format (only the card data needed for the current game), the resident footprint drops from ~2 MB to ~60-100 KB.
 
-### P0.5 — Activate parser _collapse_to_effect_steps
+This is the same approach the GBC Pokemon Card Game used: only the 60 cards in the two decks were loaded, plus a compact card index for search effects.
 
-**Why:** The parser has a stub function that should replace 4 legacy compound effect shapes with unified `effect_steps`. Removes ~200 lines of Rust dispatch code. No direct RAM savings but reduces binary size.
+**Approach:** Pre-bake a compact binary format per card (name, type, cost, stats, abilities index). Load all ~7400 card headers (~40B each = ~300 KB) for search/condition effects, but defer loading full ability text, FAQ, and heart maps until the card enters play.
 
-**Estimated effort:** Migrate 4 handlers, then activate stub.
+#### C. Card struct field reduction (~100 KB saved)
+Some Card fields are rarely read:
+- `faq: Vec<FAQEntry>` — only shown to frontend, never by engine logic. Feature-gate behind `debug_frontend`.
+- `_img: Option<ArcStr>` — unused duplicate of `img`. Delete.
+- `baked_abilities: Option<Vec<Ability>>` — only used by PSP/3DS bake path. Already dead with bytecode universal.
 
----
-
-### P1 — Arena allocator v1 (per-turn lifecycle)
-
-**Status:** v0 committed (monotonic bump, 64KB static buffer). Cursor reset is the blocking issue.
-
-**Why:** Current arena fills up after ~100-200 ability evaluations then degrades to normal allocation. Per-turn reset would reclaim arena memory between turns.
-
-**Blocking issue:** Arena data must outlive the ability that allocated it (pending choices, queued effects). Per-ability enter/exit is wrong — need per-turn lifecycle. But arena-allocated data from one ability might be stored in pending queues and accessed during the next turn.
-
-**Options:**
-1. Per-turn lifecycle: enter at turn start, exit at turn end. Risk: arena fills during complex turns.
-2. Double-buffer: alternate between two 64KB buffers per turn. One is live, one resets.
-3. Epoch-based: objects promoted out of arena before reset.
+**Estimated total savings:** 100-300 KB (approach B is highest impact but largest effort).
 
 ---
 
-### serde_json::Value → typed enums — ✅ DONE
+### P0 — Direct bytecode→struct decoder (eliminate serde from runtime)
 
-**Completed (2026-07-20):**
-- `LogEntry.metadata: serde_json::Value` → `LogMetadata` tagged enum (4 variants: TriggerEvaluation, TurnStart, RpsResult, AbilityResolution)
-- `TemporaryEffect.effect_data: serde_json::Value` → `EffectData` tagged enum (6 variants: HeartOverride, SingleCard, MultiCard, AllCards, SetBladeCount, SurplusHeart)
-- ~40B saved per instance, heap allocations eliminated
-- All 1820+1829+1829 tests pass
-
----
-
-### New priorities (audited 2026-07-20)
-
-#### ✅ DONE — character_effects Vec<serde_json::Value> removed (dead code)
-#### ✅ DONE — SmallVec for short GameState Vec fields (24 fields converted)
-#### ✅ DONE — HashMap→SmallVec in GameState (baton_touch_count → two u32s, turn_limit_usage → SmallVec)
-#### ✅ DONE — bytecode_abilities is now universal default, old JSON path deleted
-
-#### P0 — Direct bytecode→struct decoder (eliminate serde from runtime)
 **Why:** The bytecode path currently round-trips through `serde_json::Value`:
 ```
 bytecode → serde_json::Value → serde_json::from_value::<Ability> → populate_from_json
@@ -226,24 +208,60 @@ This means serde is needed at RUNTIME for every ability decode. A direct bytecod
 - Keep serde for card loading (one-time startup, cards.json only)
 - **Runtime serde: ZERO for abilities**
 
-**Lean runtime representation:** The engine doesn't need the full 152-byte AbilityEffect with 65+ flat fields. At evaluation time it only reads: `action` (ActionType), `kind` (EffectKind), `text`, `condition`, `compound`. The flat fields that duplicate EffectKind data can be dropped entirely — they're only needed for JSON round-trip.
+**Lean runtime representation:** The engine doesn't need the full 152-byte AbilityEffect with 65+ flat fields. At evaluation time it only reads: `action` (ActionType), `kind` (EffectKind), `text`, `condition`, `compound`. The flat fields that duplicate EffectKind data can be dropped entirely.
 
 **Estimated savings:** ~300 lines deleted, ~10-20% faster ability decode, serde removed from runtime dependency tree.
 
-#### P2 — Replace orientation_modifiers String values with CardState enum (~300B saved)
-`HashMap<i16, String>` → `HashMap<i16, CardState>` where CardState is "active"/"wait" enum. Eliminates 6 String heap allocs.
+---
 
-#### P3 — Extract EffectFilters from EffectKind variants (~200B per instance)
-Common filter fields (characters, group_names, heart_colors, etc.) repeated across 7+ variants. Extract to `Box<EffectFilters>`.
+### P0.5 — Console history: delta snapshots or disabled
 
-#### P3 — Box<str> for short String fields (~8-16B per field × ~30 fields)
-zone names, player IDs, effect types are always short. Box<str> saves 8 bytes each.
+**Why:** Web server stores full GameState clones for undo (Room.history). 50 undo steps = ~25 MB. This is fine for desktop but impossible on consoles.
 
-#### P3 — u8/enum for player IDs (~24B per field × ~20 fields)
-"p1"/"p2" → PlayerId enum or u8 throughout GameState, MovementEvent, LogEntry, etc.
+**Strategy:**
+- Web: keep full history (user wants it). Optionally switch to delta snapshots later.
+- Console builds: `#[cfg(not(target_arch = "arm"))]` gate the history, or cap at 10 entries with delta compression.
+- `DEFAULT_HISTORY_SIZE` is already 1000 but only used by web. Consoles can set it to 0.
 
-#### P4 — Box SelectCardFields in Choice enum (~320B)
-SelectCard variant is ~400B, other variants are ~80B. Boxing SelectCard shrinks Choice enum.
+**Estimated effort:** Small — feature gate + config flag.
+
+---
+
+### P1 — Arena allocator v1 (per-turn lifecycle)
+
+**Status:** v0 committed (monotonic bump, 64KB static buffer). Cursor reset is the blocking issue.
+
+**Why:** Current arena fills up after ~100-200 ability evaluations then degrades to normal allocation.
+
+**Options:**
+1. Per-turn lifecycle: enter at turn start, exit at turn end.
+2. Double-buffer: alternate between two 64KB buffers per turn.
+3. Epoch-based: objects promoted out of arena before reset.
+
+---
+
+### P0.5 — Activate parser _collapse_to_effect_steps
+
+**Why:** Removes ~200 lines of Rust dispatch code + eliminates 4 legacy compound effect shapes. No RAM savings but reduces binary size.
+
+---
+
+### P2 — Replace orientation_modifiers String values with CardState enum (~300B saved)
+`HashMap<i16, String>` → `HashMap<i16, CardState>`. Eliminates 6 String heap allocs.
+
+---
+
+### ✅ DONE — serde_json::Value → typed enums
+### ✅ DONE — SmallVec for short GameState Vec fields (24 fields)
+### ✅ DONE — HashMap→SmallVec in GameState
+### ✅ DONE — bytecode_abilities is now universal default
+### ✅ DONE — 38 dead methods removed from card.rs (-106 lines)
+### ✅ DONE — Old JSON ability path deleted (-167 lines)
+### ✅ DONE — EffectKind: 1248→544B (56% reduction)
+### ✅ DONE — AbilityEffect: 1536→152B (90% reduction)
+### ✅ DONE — Condition: 1864→520B (72% reduction)
+
+---
 
 ### P1.7 — Lazy / on-demand ability resolution — ✅ DONE
 
