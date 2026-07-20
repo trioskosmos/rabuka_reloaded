@@ -172,31 +172,41 @@ Same for effects: `{"action": "draw_card", "count": 2}` maps to `EffectKind::Dra
 
 ### P0 — Direct bytecode→struct decoder (eliminate serde from runtime) — 🔄 IN PROGRESS
 
-**Current status:** `vm.rs` now has a `BcReader` that reads binary JSON objects directly into struct fields. `decode_ability()` reads Ability fields directly from bytes. `decode_ability_effect_from_object()` collects binary key-value pairs into a `serde_json::Map` then deserializes via serde + `populate_from_json`.
+**The data flow (current):**
+```
+abilities.json (800 abilities, source of truth)
+  → compile_abilities.py (build tool, runs once)
+  → abilities_gen.rs (BYTECODE blob + OFFSETS + STRINGS, checked into git)
+  → vm.rs::get_ability(idx) at startup
+  → decode binary tags → serde_json::Map (heap allocs per string/array/object)
+  → serde_json::from_value::<Ability> (serde deserializes from Map)
+  → populate_from_json() (walks JSON AGAIN to build EffectKind, which serde skips)
+  → Ability struct in RAM
+```
+
+**The problem:** Steps Map→serde→populate_from_json create ~50 temporary heap allocs per ability (strings, arrays, nested objects). 800 abilities = ~40,000 allocs at startup that are immediately freed.
+
+**Target:**
+```
+bytecode → BcReader → custom MapAccess → serde deserializer → Ability (directly)
+                   ↑ no serde_json::Map, no serde_json::Value, no populate_from_json
+```
 
 **What's done:**
 - `BcReader` struct with typed readers (string, bool, u32, arc_str, skip)
 - `decode_ability()` — direct Ability struct from binary JSON bytes
 - `decode_ability_effect_from_object()` — hybrid: binary→Map→serde→populate_from_json
-- `decode_ability_cost()` — cost-specific path with key normalization
 - Deep compare test passes — new decoder matches JSON path exactly
 - All 1829 tests pass
 
 **What remains:**
-1. Eliminate the `serde_json::Map` intermediary in `decode_ability_effect_from_object()` — read fields directly into AbilityEffect/CompoundBranch without Map+serde
-2. Decode EffectKind fields directly from binary (currently returns None, populated by populate_from_json)
-3. Decode Condition from binary (currently returns AlwaysTrue, populated by populate_from_json)
-4. Delete `populate_from_json` (~200 lines) once direct decoders are complete
-5. Delete `kind_from_action` (~66 lines) once EffectKind is decoded directly
-6. Fix `choice.rs` round-trips — store pre-decoded AbilityEffect structs instead of JSON strings
+1. Custom `MapAccess` that reads directly from bytecode (replaces `serde_json::Map`)
+2. Custom `Deserialize` for `AbilityEffect` that folds `populate_from_json` inline
+3. Delete `populate_from_json` (~200 lines)
+4. Delete `kind_from_action` (~66 lines)
+5. Fix `choice.rs` round-trips
 
-**Architecture:**
-```
-Current:  bytecode → BcReader → serde_json::Map → serde_json::from_value → populate_from_json
-Target:   bytecode → BcReader → Ability/AbilityEffect/EffectKind (directly, no serde)
-```
-
-**Estimated remaining effort:** ~400 lines of per-variant EffectKind/Condition decoders (mechanical but tedious).
+**Why this is data-driven:** Adding a new field to Ability/AbilityEffect/EffectKind just needs `#[serde(default)]` on the struct. The custom Deserializer reads any key-value pair and serde handles routing. No decoder code changes needed for new fields or action types.
 
 ---
 
