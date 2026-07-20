@@ -1500,10 +1500,6 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         })
         .collect();
 
-    let blade_flat2 = blade_flat.clone();
-    let blade_set_flat2 = blade_set_flat.clone();
-    let score_flat2 = score_flat.clone();
-    let score_set_flat2 = score_set_flat.clone();
     let mut cost_flat: HashMap<i16, i32> =
         HashMap::with_capacity_and_hasher(game_state.mods.cost_modifiers.len(), Default::default());
     let mut cost_set_flat: HashMap<i16, i32> =
@@ -1512,11 +1508,6 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         cost_flat.insert(k, v.total());
         cost_set_flat.insert(k, v.set);
     }
-    let cost_flat2 = cost_flat.clone();
-    let cost_set_flat2 = cost_set_flat.clone();
-    let heart_flat2 = heart_flat.clone();
-    let heart_set_flat2 = heart_set_flat.clone();
-    let need_heart_flat2 = need_heart_flat.clone();
 
     // ── Build bonus_triggers map from gained_card_abilities ────────
     // gain_ability and gain_ability_from_source store the gained ability
@@ -1557,8 +1548,6 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             }
         }
     }
-    let bonus_triggers2 = bonus_triggers.clone();
-
     let temp_effects: Vec<TempEffectDisplay> = game_state
         .temporary_effects
         .iter()
@@ -1676,52 +1665,55 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     // Mulligan indices
     let mulligan_indices: Vec<usize> = game_state.mulligan_selected_indices.to_vec();
 
+    let player1 = player_to_display(
+        &game_state.player1,
+        &game_state.card_database,
+        &blade_flat,
+        &score_flat,
+        &heart_flat,
+        &blade_set_flat,
+        &score_set_flat,
+        &heart_set_flat,
+        &game_state.mods.orientation_modifiers,
+        &game_state.gained_abilities,
+        &need_heart_flat,
+        &game_state.prohibition_effects,
+        &game_state.cannot_activate_members,
+        p1_mulligan,
+        p1_live_selection,
+        &game_state.mods.heart_color_multiplier,
+        &cost_flat,
+        &cost_set_flat,
+        &bonus_triggers,
+    );
+    let player2 = player_to_display(
+        &game_state.player2,
+        &game_state.card_database,
+        &blade_flat,
+        &score_flat,
+        &heart_flat,
+        &blade_set_flat,
+        &score_set_flat,
+        &heart_set_flat,
+        &game_state.mods.orientation_modifiers,
+        &game_state.gained_abilities,
+        &need_heart_flat,
+        &game_state.prohibition_effects,
+        &game_state.cannot_activate_members,
+        p2_mulligan,
+        p2_live_selection,
+        &game_state.mods.heart_color_multiplier,
+        &cost_flat,
+        &cost_set_flat,
+        &bonus_triggers,
+    );
+
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?}", game_state.current_phase),
         active_player: game_state.active_player().id.clone(),
-        player1: player_to_display(
-            &game_state.player1,
-            &game_state.card_database,
-            &blade_flat,
-            &score_flat,
-            &heart_flat,
-            &blade_set_flat,
-            &score_set_flat,
-            &heart_set_flat,
-            &game_state.mods.orientation_modifiers,
-            &game_state.gained_abilities,
-            &need_heart_flat,
-            &game_state.prohibition_effects,
-            &game_state.cannot_activate_members,
-            p1_mulligan,
-            p1_live_selection,
-            &game_state.mods.heart_color_multiplier,
-            &cost_flat,
-            &cost_set_flat,
-            &bonus_triggers,
-        ),
-        player2: player_to_display(
-            &game_state.player2,
-            &game_state.card_database,
-            &blade_flat2,
-            &score_flat2,
-            &heart_flat2,
-            &blade_set_flat2,
-            &score_set_flat2,
-            &heart_set_flat2,
-            &game_state.mods.orientation_modifiers,
-            &game_state.gained_abilities,
-            &need_heart_flat2,
-            &game_state.prohibition_effects,
-            &game_state.cannot_activate_members,
-            p2_mulligan,
-            p2_live_selection,
-            &game_state.mods.heart_color_multiplier,
-            &cost_flat2,
-            &cost_set_flat2,
-            &bonus_triggers2,
-        ),
+        player1,
+        player2,
         pending_choice: game_state.get_pending_choice_json(),
         looked_cards: zone_to_display(&looked_ids, &game_state.card_database),
         rule_log,

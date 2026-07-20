@@ -51,23 +51,21 @@ impl super::TurnEngine {
         // global modifier is captured in multiple players' snapshots.
         let mut restored: HashSet<(i16, crate::card::HeartColor)> = HashSet::default();
         for snap in &game_state.performance_snapshots {
-            for (cid, colors) in &snap.performance_need_heart_modifiers {
-                for (color, entry) in colors {
-                    if !restored.insert((*cid, *color)) {
-                        continue;
-                    }
-                    let target = game_state
-                        .mods
-                        .need_heart_modifiers
-                        .entry(*cid)
-                        .or_default()
-                        .entry(*color)
-                        .or_insert(ModifierEntry::default());
-                    if entry.set != 0 && target.set == 0 {
-                        target.set = entry.set;
-                    }
-                    target.additive += entry.additive;
+            for &(cid, color, ref entry) in &snap.performance_need_heart_modifiers {
+                if !restored.insert((cid, color)) {
+                    continue;
                 }
+                let target = game_state
+                    .mods
+                    .need_heart_modifiers
+                    .entry(cid)
+                    .or_default()
+                    .entry(color)
+                    .or_insert(ModifierEntry::default());
+                if entry.set != 0 && target.set == 0 {
+                    target.set = entry.set;
+                }
+                target.additive += entry.additive;
             }
         }
 
@@ -2477,7 +2475,7 @@ pub fn build_snapshot(
     perf: &LivePerformanceData,
     card_db: &CardDatabase,
     note_icons: u32,
-    performance_need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
+    performance_need_heart_modifiers: &[(i16, HeartColor, ModifierEntry)],
 ) -> crate::types::PerformanceSnapshot {
     let mut lives = Vec::new();
     // Use perf.live_card_ids (captured before heart check cleared the zone)
@@ -2560,7 +2558,7 @@ pub fn build_snapshot(
         revealed_ids: perf.revealed_ids.clone(),
         p0_wins: false,
         p1_wins: false,
-        performance_need_heart_modifiers: performance_need_heart_modifiers.clone(),
+        performance_need_heart_modifiers: performance_need_heart_modifiers.to_vec(),
     }
 }
 

@@ -267,6 +267,14 @@ impl super::TurnEngine {
                 (k, flat)
             })
             .collect();
+        let nhm_flat: Vec<(
+            i16,
+            crate::card::HeartColor,
+            crate::core::game_modifiers::ModifierEntry,
+        )> = nhm
+            .iter()
+            .flat_map(|(&k, colors)| colors.iter().map(move |(&c, e)| (k, c, *e)))
+            .collect();
         let player_id = if is_first {
             game_state.player1.id.clone()
         } else {
@@ -533,7 +541,7 @@ impl super::TurnEngine {
             &perf_data,
             &game_state.card_database,
             note_icons,
-            &nhm,
+            &nhm_flat,
         );
         // Add constant score source info into breakdown.scores
         {

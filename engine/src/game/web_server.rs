@@ -1537,11 +1537,7 @@ async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
         }
     }
 
-    let state_clone = game_state.clone();
-
-    drop(game_state);
-
-    let ctx = crate::ability::condition::ConditionContext::new(&state_clone);
+    let ctx = crate::ability::condition::ConditionContext::new(&game_state);
 
     let evaluated: Vec<serde_json::Value> = results
         .into_iter()

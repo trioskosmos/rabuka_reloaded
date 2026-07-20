@@ -641,7 +641,7 @@ impl super::TurnEngine {
                 } else {
                     String::new()
                 };
-                game_state.ability_queue.resume_with_choice(result.clone());
+                game_state.ability_queue.resume_with_choice();
                 // Set depth-first cutoff BEFORE resolution so entries queued by
                 // process_current_ability (each_time watchers) are excluded from
                 // the stale-entries pool when process_player_abilities re-enters.
@@ -698,7 +698,7 @@ impl super::TurnEngine {
             }
         }
 
-        game_state.ability_queue.resume_with_choice(result.clone());
+        game_state.ability_queue.resume_with_choice();
         let had_pending_sequential = game_state.ability_queue.has_pending_actions();
 
         // Take the persistent resolver from the queue entry

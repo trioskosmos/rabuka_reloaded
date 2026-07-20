@@ -79,7 +79,6 @@ impl GameState {
             completed: false,
             cost_paid: false,
             cost_paid_index: 0,
-            pending_choice_result: None,
             choice_card_no: None,
             conditional_choice: None,
             effect_started: false,
@@ -90,8 +89,6 @@ impl GameState {
             trigger_moved_cards,
             triggering_member_id,
             snapshot_movements: Vec::new(),
-            snapshot_energy_placed_by_effect: false,
-            snapshot_energy_placed_by_player: None,
             choice_effect_text: None,
             condition_cache: HashMap::default(),
         }
@@ -703,10 +700,6 @@ impl GameState {
                         // clear_effect_tracking clears the global lists.
                         let mut entry = entry;
                         entry.snapshot_movements = self.batch_movements.clone();
-                        entry.snapshot_energy_placed_by_effect =
-                            self.last_energy_placed_by_effect();
-                        entry.snapshot_energy_placed_by_player =
-                            self.last_energy_placed_by_player().map(|s| s.to_string());
                         if crate::ability::debug::ABILITY_DEBUG
                             .load(core::sync::atomic::Ordering::Relaxed)
                         {
@@ -745,11 +738,6 @@ impl GameState {
                                             );
                                             let mut entry = entry;
                                             entry.snapshot_movements = self.batch_movements.clone();
-                                            entry.snapshot_energy_placed_by_effect =
-                                                self.last_energy_placed_by_effect();
-                                            entry.snapshot_energy_placed_by_player = self
-                                                .last_energy_placed_by_player()
-                                                .map(|s| s.to_string());
                                             self.ability_queue.enqueue(entry);
                                         }
                                     }

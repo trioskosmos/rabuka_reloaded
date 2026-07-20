@@ -6,7 +6,10 @@ use crate::ability::types::Choice;
 use crate::card::{Ability, AbilityEffect};
 use crate::game_state::AbilityTrigger;
 #[cfg(feature = "no_std")]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 /// Unique identifier for an ability instance in the queue
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -51,7 +54,6 @@ pub struct AbilityQueueEntry {
     pub cost_paid: bool,
     /// Stored choice result for resumption
     pub cost_paid_index: usize,
-    pub pending_choice_result: Option<crate::ability::types::ChoiceResult>,
     /// Discriminator for routing choice results to the correct handler.
     pub choice_card_no: Option<crate::ability::types::ChoiceRoute>,
     /// JSON-serialized options for choice/choice_string discriminators
@@ -71,8 +73,6 @@ pub struct AbilityQueueEntry {
     /// conditions can see what triggered the ability even after
     /// clear_effect_tracking() clears the global batch_movements.
     pub snapshot_movements: Vec<crate::types::MovementEvent>,
-    pub snapshot_energy_placed_by_effect: bool,
-    pub snapshot_energy_placed_by_player: Option<String>,
     /// Actions queued for sequential execution after a choice round-trip.
     pub pending_actions: Vec<AbilityEffect>,
     /// Persistent ability resolver — stays alive across choice round-trips
@@ -273,7 +273,6 @@ impl AbilityQueue {
                     completed: false,
                     cost_paid: false,
                     cost_paid_index: 0,
-                    pending_choice_result: None,
                     choice_card_no: None,
                     conditional_choice: None,
                     effect_started: false,
@@ -284,8 +283,6 @@ impl AbilityQueue {
                     trigger_moved_cards: None,
                     triggering_member_id: None,
                     snapshot_movements: Vec::new(),
-                    snapshot_energy_placed_by_effect: false,
-                    snapshot_energy_placed_by_player: None,
                     choice_effect_text: None,
                     condition_cache: HashMap::default(),
                 };
@@ -306,15 +303,12 @@ impl AbilityQueue {
     }
 
     /// Resume after user provides choice result
-    pub fn resume_with_choice(&mut self, result: crate::ability::types::ChoiceResult) {
+    pub fn resume_with_choice(&mut self) {
         match &self.state {
             QueueState::WaitingForAutoAbilityChoice { .. } => {
                 self.state = QueueState::Idle;
             }
             QueueState::WaitingForChoice { entry_index, .. } => {
-                if let Some(entry) = self.entries.get_mut(*entry_index) {
-                    entry.pending_choice_result = Some(result);
-                }
                 self.state = QueueState::ExecutingEffect {
                     entry_index: *entry_index,
                 };
@@ -375,7 +369,6 @@ impl AbilityQueue {
             completed: false,
             cost_paid: false,
             cost_paid_index: 0,
-            pending_choice_result: None,
             choice_card_no: None,
             conditional_choice: None,
             effect_started: false,
@@ -386,8 +379,6 @@ impl AbilityQueue {
             trigger_moved_cards: None,
             triggering_member_id: None,
             snapshot_movements: Vec::new(),
-            snapshot_energy_placed_by_effect: false,
-            snapshot_energy_placed_by_player: None,
             choice_effect_text: None,
             condition_cache: HashMap::default(),
         });

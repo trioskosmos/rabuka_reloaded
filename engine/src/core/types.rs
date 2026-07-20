@@ -350,7 +350,8 @@ pub struct PerformanceSnapshot {
     /// and other non-constant changes that get cleared by
     /// evaluate_success_zone_heart_reductions during victory determination).
     /// Merged back during snapshot finalization for correct required/adjustments/passed.
-    pub performance_need_heart_modifiers: HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
+    /// Flat (card_id, color, entry) — only iterated, never keyed.
+    pub performance_need_heart_modifiers: Vec<(i16, HeartColor, ModifierEntry)>,
     /// Per-color surplus hearts remaining after filling all live card requirements.
     /// Computed as total_hearts[color] - sum(live.filled[color]) across all lives.
     pub surplus_hearts: [u32; 8],
