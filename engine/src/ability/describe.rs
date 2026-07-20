@@ -96,7 +96,7 @@ fn group_label(gn: Option<&Vec<String>>) -> String {
 pub fn describe_effect_en(effect: &AbilityEffect) -> String {
     let action = effect.action.to_str();
     let ct_binding = effect.card_type_any();
-    let ct = card_type_label(ct_binding.as_deref());
+    let ct = card_type_label(ct_binding.map(|ct| ct.as_card_str()));
     let c = effect.count_any();
     let t = effect.target_any();
     let s = effect.source_any();
@@ -528,7 +528,7 @@ pub fn describe_cost_en(cost: &AbilityEffect) -> String {
             let src = zone_label(cost.source.as_deref());
             let dest = zone_label(cost.destination.as_deref());
             let card_type_binding = cost.card_type_any();
-            let card_type = card_type_label(card_type_binding.as_deref());
+            let card_type = card_type_label(card_type_binding.map(|ct| ct.as_card_str()));
             let count = cost.count.unwrap_or(1);
             if cost.self_cost_any() == Some(true) && cost.source.as_deref() == Some("those_cards") {
                 format!("Move that card to {}", dest)
@@ -568,7 +568,7 @@ pub fn describe_cost_ja(cost: &AbilityEffect) -> String {
             let src = zone_label_ja(cost.source.as_deref());
             let dest = zone_label_ja(cost.destination.as_deref());
             let ct_binding = cost.card_type_any();
-            let ct = card_type_label_ja(ct_binding.as_deref());
+            let ct = card_type_label_ja(ct_binding.map(|ct| ct.as_card_str()));
             let count = cost.count.unwrap_or(1);
             if cost.self_cost_any() == Some(true) && cost.source.as_deref() == Some("those_cards") {
                 format!("そのカードを{}に置く", dest)
@@ -690,7 +690,7 @@ fn duration_label_ja(d: Option<&str>) -> &str {
 pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
     let action = effect.action.to_str();
     let ct_binding = effect.card_type_any();
-    let ct = card_type_label_ja(ct_binding.as_deref());
+    let ct = card_type_label_ja(ct_binding.map(|ct| ct.as_card_str()));
     let c = effect.count_any();
     let t = effect.target_any();
     let s = effect.source_any();

@@ -1,5 +1,5 @@
 use crate::ability::ability_store::AbilityRef;
-use crate::ability::enums::{ActionType, ConditionType, EffectCardType, EffectState};
+use crate::ability::enums::{ActionType, ConditionType, EffectState};
 use crate::core::types::ArcStr;
 use crate::HashMap;
 use serde::{Deserialize, Serialize};
@@ -24,17 +24,81 @@ pub(crate) fn ek_box_new(val: EffectKind) -> EkBox {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CardType {
-    #[serde(rename = "メンバー")]
     // Rule 4.1: Member cards are placed on the stage and used for performance
     Member,
-    #[serde(rename = "ライブ")]
     // Rule 4.2: Live cards are placed in Live Card Zone and used for live performance
     Live,
-    #[serde(rename = "エネルギー")]
     // Rule 4.3: Energy cards are placed in Energy Zone and used to pay costs
     Energy,
+}
+
+impl CardType {
+    pub fn from_card_str(s: &str) -> Option<Self> {
+        match s {
+            "member_card" => Some(CardType::Member),
+            "live_card" => Some(CardType::Live),
+            "energy_card" => Some(CardType::Energy),
+            _ => None,
+        }
+    }
+    pub fn as_card_str(&self) -> &'static str {
+        match self {
+            CardType::Member => "member_card",
+            CardType::Live => "live_card",
+            CardType::Energy => "energy_card",
+        }
+    }
+}
+
+impl serde::Serialize for CardType {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_card_str())
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CardType {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = <String as serde::Deserialize>::deserialize(deserializer)?;
+        match s.as_str() {
+            "member_card" | "メンバー" => Ok(CardType::Member),
+            "live_card" | "ライブ" => Ok(CardType::Live),
+            "energy_card" | "エネルギー" => Ok(CardType::Energy),
+            other => Err(serde::de::Error::custom(format!(
+                "unknown card_type: {}",
+                other
+            ))),
+        }
+    }
+}
+
+pub(crate) mod opt_card_type {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<super::CardType>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: Option<String> = Option::deserialize(deserializer)?;
+        Ok(s.and_then(|s| super::CardType::from_card_str(&s)))
+    }
+    pub fn serialize<S>(val: &Option<super::CardType>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::Serialize;
+        match val {
+            Some(ct) => ct.serialize(serializer),
+            None => serializer.serialize_none(),
+        }
+    }
+}
+
+impl core::fmt::Display for CardType {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.as_card_str())
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -620,7 +684,7 @@ impl serde::Serialize for AbilityCost {
             map.serialize_entry("count", v)?;
         }
         if let Some(v) = inner.card_type_any() {
-            map.serialize_entry("card_type", v)?;
+            map.serialize_entry("card_type", v.as_card_str())?;
         }
         if let Some(ref v) = inner.target {
             map.serialize_entry("target", v)?;
@@ -781,7 +845,7 @@ impl AbilityCost {
     /// handlers can use the same consolidation pattern as effect handlers.
     pub fn filter_subset(&self) -> crate::ability::util::CardFilter<'_> {
         crate::ability::util::CardFilter {
-            card_type: self.card_type_any(),
+            card_type: self.card_type_any().map(|ct| ct.as_card_str()),
             group: self
                 .group_names_any()
                 .as_ref()
@@ -863,8 +927,8 @@ pub enum EffectKind {
         destination: Option<ArcStr>,
         #[serde(default)]
         count: Option<u32>,
-        #[serde(default)]
-        card_type: Option<EffectCardType>,
+        #[serde(default, with = "opt_card_type")]
+        card_type: Option<CardType>,
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
@@ -1002,8 +1066,8 @@ pub enum EffectKind {
         target_count: Option<u32>,
         #[serde(default)]
         count: Option<u32>,
-        #[serde(default)]
-        card_type: Option<EffectCardType>,
+        #[serde(default, with = "opt_card_type")]
+        card_type: Option<CardType>,
         #[serde(default)]
         dynamic_count: Option<Box<DynamicCount>>,
         #[serde(default)]
@@ -1045,8 +1109,8 @@ pub enum EffectKind {
         destination: Option<ArcStr>,
         #[serde(default)]
         target_count: Option<u32>,
-        #[serde(default)]
-        card_type: Option<EffectCardType>,
+        #[serde(default, with = "opt_card_type")]
+        card_type: Option<CardType>,
         #[serde(default)]
         characters: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1160,8 +1224,8 @@ pub enum EffectKind {
         target: Option<ArcStr>,
         #[serde(default)]
         destination: Option<ArcStr>,
-        #[serde(default)]
-        card_type: Option<EffectCardType>,
+        #[serde(default, with = "opt_card_type")]
+        card_type: Option<CardType>,
         #[serde(default)]
         characters: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1261,8 +1325,8 @@ pub enum EffectKind {
         value: Option<u32>,
         #[serde(default)]
         duration: Option<ArcStr>,
-        #[serde(default)]
-        card_type: Option<EffectCardType>,
+        #[serde(default, with = "opt_card_type")]
+        card_type: Option<CardType>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1352,8 +1416,8 @@ pub enum EffectKind {
         exclude_heart_colors: Option<Box<Vec<String>>>,
         #[serde(default)]
         repeat_limit: Option<u32>,
-        #[serde(default)]
-        card_type: Option<EffectCardType>,
+        #[serde(default, with = "opt_card_type")]
+        card_type: Option<CardType>,
         #[serde(default)]
         target_count: Option<u32>,
         #[serde(default)]
@@ -1417,8 +1481,8 @@ pub enum EffectKind {
         location: Option<ArcStr>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
-        #[serde(default)]
-        card_type: Option<EffectCardType>,
+        #[serde(default, with = "opt_card_type")]
+        card_type: Option<CardType>,
         #[serde(default)]
         cost_limit: Option<u32>,
         #[serde(default)]
@@ -1488,8 +1552,8 @@ pub enum EffectKind {
         destination: Option<ArcStr>,
         #[serde(default)]
         state_change: Option<EffectState>,
-        #[serde(default)]
-        card_type: Option<EffectCardType>,
+        #[serde(default, with = "opt_card_type")]
+        card_type: Option<CardType>,
         #[serde(default)]
         cost_limit: Option<u32>,
         #[serde(default)]
@@ -1599,8 +1663,8 @@ pub enum EffectKind {
         source_card: Option<ArcStr>,
         #[serde(default)]
         suppressed_trigger: Option<ArcStr>,
-        #[serde(default)]
-        card_type: Option<EffectCardType>,
+        #[serde(default, with = "opt_card_type")]
+        card_type: Option<CardType>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1686,8 +1750,8 @@ pub enum EffectKind {
         all: Option<bool>,
         #[serde(default)]
         activation_position: Option<ArcStr>,
-        #[serde(default)]
-        card_type: Option<EffectCardType>,
+        #[serde(default, with = "opt_card_type")]
+        card_type: Option<CardType>,
         #[serde(default)]
         trigger_type: Option<ArcStr>,
         #[serde(default)]
@@ -1733,8 +1797,8 @@ pub enum EffectKind {
         non_stackable: Option<bool>,
         #[serde(default)]
         operation: Option<ArcStr>,
-        #[serde(default)]
-        card_type: Option<EffectCardType>,
+        #[serde(default, with = "opt_card_type")]
+        card_type: Option<CardType>,
         #[serde(default)]
         location: Option<ArcStr>,
         #[serde(default)]
@@ -1782,8 +1846,8 @@ pub enum EffectKind {
         allow_occupied_stage: Option<bool>,
         #[serde(default)]
         optional: Option<bool>,
-        #[serde(default)]
-        card_type: Option<EffectCardType>,
+        #[serde(default, with = "opt_card_type")]
+        card_type: Option<CardType>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1829,8 +1893,8 @@ pub enum EffectKind {
         operation: Option<Box<ArcStr>>,
         #[serde(default)]
         value: Option<u32>,
-        #[serde(default)]
-        card_type: Option<EffectCardType>,
+        #[serde(default, with = "opt_card_type")]
+        card_type: Option<CardType>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -1974,8 +2038,8 @@ pub enum EffectKind {
         replaces_event: Option<ArcStr>,
         #[serde(default)]
         choice_based: Option<bool>,
-        #[serde(default)]
-        card_type: Option<EffectCardType>,
+        #[serde(default, with = "opt_card_type")]
+        card_type: Option<CardType>,
         #[serde(default)]
         group_names: Option<Box<Vec<String>>>,
         #[serde(default)]
@@ -2530,40 +2594,22 @@ impl AbilityEffect {
 
     str_getter!(card_property_any, [MoveCards => card_property, SelectTarget => card_property, LookReveal => card_property, GainResource => card_property, ChangeState => card_property, ModifyScore => card_property, CustomOp => card_property]);
 
-    pub fn card_type_any(&self) -> Option<&str> {
+    pub fn card_type_any(&self) -> Option<&CardType> {
         match self.kind.as_deref() {
-            Some(EffectKind::MoveCards { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
-            Some(EffectKind::DrawCards { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
-            Some(EffectKind::SelectTarget { card_type, .. }) => {
-                card_type.as_ref().map(|c| c.as_str())
-            }
-            Some(EffectKind::LookReveal { card_type, .. }) => {
-                card_type.as_ref().map(|c| c.as_str())
-            }
-            Some(EffectKind::ModifyScore { card_type, .. }) => {
-                card_type.as_ref().map(|c| c.as_str())
-            }
-            Some(EffectKind::ModifyHearts { card_type, .. }) => {
-                card_type.as_ref().map(|c| c.as_str())
-            }
-            Some(EffectKind::GainResource { card_type, .. }) => {
-                card_type.as_ref().map(|c| c.as_str())
-            }
-            Some(EffectKind::ChangeState { card_type, .. }) => {
-                card_type.as_ref().map(|c| c.as_str())
-            }
-            Some(EffectKind::AbilityOp { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
-            Some(EffectKind::CompoundEffect { card_type, .. }) => {
-                card_type.as_ref().map(|c| c.as_str())
-            }
-            Some(EffectKind::RestrictionOp { card_type, .. }) => {
-                card_type.as_ref().map(|c| c.as_str())
-            }
-            Some(EffectKind::PositionOp { card_type, .. }) => {
-                card_type.as_ref().map(|c| c.as_str())
-            }
-            Some(EffectKind::MiscOp { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
-            Some(EffectKind::CustomOp { card_type, .. }) => card_type.as_ref().map(|c| c.as_str()),
+            Some(EffectKind::MoveCards { card_type, .. })
+            | Some(EffectKind::DrawCards { card_type, .. })
+            | Some(EffectKind::SelectTarget { card_type, .. })
+            | Some(EffectKind::LookReveal { card_type, .. })
+            | Some(EffectKind::ModifyScore { card_type, .. })
+            | Some(EffectKind::ModifyHearts { card_type, .. })
+            | Some(EffectKind::GainResource { card_type, .. })
+            | Some(EffectKind::ChangeState { card_type, .. })
+            | Some(EffectKind::AbilityOp { card_type, .. })
+            | Some(EffectKind::CompoundEffect { card_type, .. })
+            | Some(EffectKind::RestrictionOp { card_type, .. })
+            | Some(EffectKind::PositionOp { card_type, .. })
+            | Some(EffectKind::MiscOp { card_type, .. })
+            | Some(EffectKind::CustomOp { card_type, .. }) => card_type.as_ref(),
             _ => None,
         }
     }
@@ -3160,7 +3206,7 @@ impl AbilityEffect {
     }
     setter!(set_card_property, card_property: ArcStr => [MoveCards, SelectTarget, LookReveal, GainResource, ChangeState]);
     pub fn set_card_type(&mut self, val: Option<ArcStr>) {
-        let parsed = val.map(|s| EffectCardType::from_str(&s));
+        let parsed = val.and_then(|s| CardType::from_card_str(&s));
         match self.kind.as_deref_mut() {
             Some(EffectKind::MoveCards {
                 ref mut card_type, ..
@@ -3367,7 +3413,7 @@ impl AbilityEffect {
     /// exclude_self) that effect handlers most commonly need.
     pub fn filter_subset(&self) -> crate::ability::util::CardFilter<'_> {
         crate::ability::util::CardFilter {
-            card_type: self.card_type_any(),
+            card_type: self.card_type_any().map(|ct| ct.as_card_str()),
             group: self.group_name(),
             cost_limit: self.cost_limit_any(),
             cost_operator: self.cost_limit_operator_any().map(Operator::as_str),

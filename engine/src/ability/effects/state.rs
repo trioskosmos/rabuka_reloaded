@@ -774,11 +774,11 @@ impl AbilityResolver {
     ) {
         let target = effect.target_name();
         let ct_binding = effect.card_type_any();
-        let card_type = ct_binding.as_deref();
+        let card_type = ct_binding;
         let player = gs.resolve_target_player_mut(target);
-        let mut card_ids: SmallVec<[i16; 8]> = if let Some("live_card") = card_type {
+        let mut card_ids: SmallVec<[i16; 8]> = if Some(&crate::card::CardType::Live) == card_type {
             player.live_card_zone.cards.iter().copied().collect()
-        } else if let Some("member_card") = card_type {
+        } else if Some(&crate::card::CardType::Member) == card_type {
             player
                 .stage
                 .stage
@@ -1212,9 +1212,9 @@ impl AbilityResolver {
             pp, act_name, operation, value
         ));
         let player = gs.resolve_target_player_mut(target);
-        let mut card_ids: SmallVec<[i16; 8]> = if let Some("live_card") = card_type {
+        let mut card_ids: SmallVec<[i16; 8]> = if Some(&crate::card::CardType::Live) == card_type {
             player.live_card_zone.cards.iter().copied().collect()
-        } else if let Some("member_card") = card_type {
+        } else if Some(&crate::card::CardType::Member) == card_type {
             player
                 .stage
                 .stage
@@ -1222,7 +1222,7 @@ impl AbilityResolver {
                 .filter(|&&id| id != -1)
                 .copied()
                 .collect()
-        } else if let Some("energy_card") = card_type {
+        } else if Some(&crate::card::CardType::Energy) == card_type {
             player.energy_zone.cards.iter().copied().collect()
         } else {
             player.hand.cards.iter().copied().collect()

@@ -414,7 +414,9 @@ impl AbilityResolver {
             };
 
         let ct_binding = effect.card_type_any();
-        let card_type = chosen_card_type.as_deref().or(ct_binding.as_deref());
+        let card_type = chosen_card_type
+            .as_deref()
+            .or(ct_binding.map(|ct| ct.as_card_str()));
         let target = effect.target_name().to_string();
         let count = effect
             .count

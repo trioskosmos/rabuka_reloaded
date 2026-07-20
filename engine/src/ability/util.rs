@@ -61,8 +61,8 @@ fn play_cost_reduction_matches(
     if !cost_threshold_met(card, effect) {
         return false;
     }
-    if let Some(ref ct) = effect.card_type_any() {
-        if *ct != "member_card" && *ct != "card" && *ct != "member" {
+    if let Some(ct) = effect.card_type_any() {
+        if *ct != crate::card::CardType::Member {
             return false;
         }
     }
@@ -239,8 +239,8 @@ fn scan_abilities_for_cost_reduction(
                 continue;
             }
             // Card-type guard: only applies to member/card types
-            if let Some(ref ct) = effect.card_type_any() {
-                if *ct != "member_card" && *ct != "card" && *ct != "member" {
+            if let Some(ct) = effect.card_type_any() {
+                if *ct != crate::card::CardType::Member {
                     continue;
                 }
             }
@@ -1212,7 +1212,7 @@ impl<'a> CardFilter<'a> {
     /// ability filters, card properties, distinct, etc.
     /// Use filter_subset() only for minimal zone lookups.
     pub fn from_effect(effect: &'a crate::card::AbilityEffect) -> Self {
-        let card_type = effect.card_type_any();
+        let card_type = effect.card_type_any().map(|ct| ct.as_card_str());
         let group_names = effect.group_names_any();
 
         let cost_operator = effect.cost_limit_operator_any().map(Operator::as_str);

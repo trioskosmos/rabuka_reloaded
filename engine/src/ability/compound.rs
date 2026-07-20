@@ -307,13 +307,14 @@ impl AbilityResolver {
                     if action_to_execute.self_target_any().is_none() {
                         let inheritable = if i > 0 {
                             let first_ct_binding = repeat_actions[0].card_type_any();
-                            let first_ct = first_ct_binding.as_deref();
+                            let first_ct = first_ct_binding;
                             let cur_ct_binding = action.card_type_any();
-                            let cur_ct = cur_ct_binding.as_deref();
+                            let cur_ct = cur_ct_binding;
                             // If the first action targets a live card (no card_type
                             // or live_card) and the current targets a member, don't
                             // inherit — they're different cards entirely.
-                            !(first_ct != Some("member_card") && cur_ct == Some("member_card"))
+                            !(first_ct != Some(&crate::card::CardType::Member)
+                                && cur_ct == Some(&crate::card::CardType::Member))
                         } else {
                             true
                         };

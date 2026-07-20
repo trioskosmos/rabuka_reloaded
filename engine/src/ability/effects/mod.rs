@@ -341,7 +341,7 @@ impl AbilityResolver {
                     effect.target_name(),
                     change_count,
                     effect.max.unwrap_or(false),
-                    effect.card_type_any().as_deref(),
+                    effect.card_type_any().map(|ct| ct.as_card_str()),
                     change_cost_limit,
                     effect.optional.unwrap_or(false),
                     change_group,
@@ -361,7 +361,7 @@ impl AbilityResolver {
                 effect.value_any().unwrap_or(0),
                 effect.target_name(),
                 effect.duration_any().as_deref(),
-                effect.card_type_any().as_deref(),
+                effect.card_type_any().map(|ct| ct.as_card_str()),
                 effect.group_name(),
                 effect.per_unit_any().unwrap_or(false),
                 effect.per_unit_count_any().unwrap_or(1),
@@ -405,7 +405,7 @@ impl AbilityResolver {
                 let needs_target = !is_self_target
                     && (effect.heart_selection_any().unwrap_or(false)
                         || effect.group_names_any().is_some()
-                        || effect.card_type_any().as_deref() == Some("member_card"));
+                        || effect.card_type_any() == Some(&crate::card::CardType::Member));
                 let ht_binding = effect.heart_type_any();
                 let heart_type =
                     ht_binding.or(effect.heart_colors_any().first().map(|s| s.as_str()));
@@ -799,7 +799,7 @@ impl AbilityResolver {
                     effect.operation_any().as_deref().unwrap_or("increase"),
                     effect.value_any().unwrap_or(0),
                     effect.target_name(),
-                    effect.card_type_any().as_deref(),
+                    effect.card_type_any().map(|ct| ct.as_card_str()),
                     effect.heart_colors_any(),
                 );
                 Ok(())

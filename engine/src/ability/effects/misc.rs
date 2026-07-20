@@ -63,16 +63,16 @@ impl AbilityResolver {
             effect.source_or(Zone::Hand.to_str()),
             effect.count_or(1),
             effect.target_name(),
-            effect.card_type_any().as_deref(),
+            effect.card_type_any().map(|ct| ct.as_card_str()),
             effect.heart_colors_any(),
             effect.blind_any().unwrap_or(false),
         )?;
 
         if effect.self_target_any().unwrap_or(false) {
-            if let Some(ref ct) = effect.card_type_any() {
+            if let Some(ct) = effect.card_type_any() {
                 let card_db = &gs.card_database;
                 let has_matching = gs.revealed_cards.iter().any(|&cid| {
-                    crate::ability::util::card_matches_type(card_db, cid, Some(ct.as_ref()))
+                    crate::ability::util::card_matches_type(card_db, cid, Some(ct.as_card_str()))
                 });
                 if has_matching {
                     if let Some(cid) = gs.activating_card {
@@ -776,14 +776,14 @@ impl AbilityResolver {
         let last_discard_count = gs.mods.last_cost_discard_count;
         let is_all = effect.all_any().unwrap_or(false)
             || (effect.source_any().is_none()
-                && effect.card_type_any().as_deref() == Some("member_card")
+                && effect.card_type_any() == Some(&crate::card::CardType::Member)
                 && (target == "self" || target == "opponent")
                 && !is_self_target
                 && effect.exclude_self_any().is_none()
                 && effect.target_count_any().is_none())
             // Also detect "all members" when the effect has no target_count limit
             // and targets "self"/"opponent" members (e.g. "自分のステージにいるメンバーは")
-            || (effect.card_type_any().as_deref() == Some("member_card")
+            || (effect.card_type_any() == Some(&crate::card::CardType::Member)
                 && (target == "self" || target == "opponent")
                 && effect.target_count_any().is_none()
                 && effect.distinct_any().is_none());

@@ -1503,19 +1503,20 @@ impl super::resolver::AbilityResolver {
                 if idx < player.hand.cards.len() {
                     let cid = player.hand.cards[idx];
                     let passes =
-                        util::card_matches_type(&card_db, cid, cost.card_type_any().as_deref())
-                            && util::card_matches_characters(
-                                &card_db,
-                                cid,
-                                cost.characters_any().map(|v| &**v),
-                            )
-                            && match cost.group_names_any().as_ref() {
-                                Some(groups) => groups.iter().any(|g| {
-                                    util::card_matches_group_str(&card_db, cid, Some(g.as_str()))
-                                }),
-                                None => true,
-                            }
-                            && util::card_matches_cost_limit(&card_db, cid, cost.cost_limit_any());
+                        util::card_matches_type(
+                            &card_db,
+                            cid,
+                            cost.card_type_any().map(|ct| ct.as_card_str()),
+                        ) && util::card_matches_characters(
+                            &card_db,
+                            cid,
+                            cost.characters_any().map(|v| &**v),
+                        ) && match cost.group_names_any().as_ref() {
+                            Some(groups) => groups.iter().any(|g| {
+                                util::card_matches_group_str(&card_db, cid, Some(g.as_str()))
+                            }),
+                            None => true,
+                        } && util::card_matches_cost_limit(&card_db, cid, cost.cost_limit_any());
                     if passes {
                         Some(cid)
                     } else {
@@ -2308,7 +2309,7 @@ impl super::resolver::AbilityResolver {
             let source = effect.source_any().unwrap_or(Zone::Deck.to_str());
             let destination = effect.destination.as_deref().unwrap_or(Zone::Hand.to_str());
             let ct_binding = effect.card_type_any();
-            let card_type = ct_binding.as_deref();
+            let card_type = ct_binding.map(|ct| ct.as_card_str());
             let card_db = gs.card_database.clone();
             let target = effect.target.as_deref().unwrap_or("self");
             let player = gs.resolve_target_player_mut(target);

@@ -1059,9 +1059,9 @@ impl<'a> ConditionContext<'a> {
                                 .card_database
                                 .get_card(cid)
                                 .is_some_and(|c| {
-                                    if *card_type == "live_card" {
+                                    if *card_type == &crate::card::CardType::Live {
                                         c.is_live()
-                                    } else if *card_type == "member_card" {
+                                    } else if *card_type == &crate::card::CardType::Member {
                                         c.is_member()
                                     } else {
                                         true

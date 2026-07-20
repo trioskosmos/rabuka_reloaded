@@ -149,7 +149,7 @@ impl AbilityResolver {
                     let candidates = get_change_state_candidates(
                         gs,
                         target,
-                        cost.card_type_any().as_deref(),
+                        cost.card_type_any().map(|ct| ct.as_card_str()),
                         cost.group_names_any(),
                         exclude_self,
                         cost.self_cost_any().unwrap_or(false),
@@ -605,7 +605,7 @@ impl AbilityResolver {
                         let candidates = get_change_state_candidates(
                             gs,
                             target,
-                            cost.card_type_any().as_deref(),
+                            cost.card_type_any().map(|ct| ct.as_card_str()),
                             cost.group_names_any(),
                             exclude_self,
                             cost.self_cost_any().unwrap_or(false),
@@ -651,7 +651,7 @@ impl AbilityResolver {
                     let candidates = get_change_state_candidates(
                         gs,
                         target,
-                        cost.card_type_any().as_deref(),
+                        cost.card_type_any().map(|ct| ct.as_card_str()),
                         cost.group_names_any(),
                         exclude_self,
                         cost.self_cost_any().unwrap_or(false),
@@ -1075,7 +1075,7 @@ impl AbilityResolver {
                         let candidates = get_change_state_candidates(
                             gs,
                             target,
-                            cost.card_type_any().as_deref(),
+                            cost.card_type_any().map(|ct| ct.as_card_str()),
                             cost.group_names_any(),
                             exclude_self,
                             false,

@@ -9348,17 +9348,98 @@ def _normalize_effect_tree(effect, original_text=None):
 
 
 def _collapse_to_effect_steps(effect):
-    """STUB: All 4 specialized compound shapes (look_and_select,
-    conditional_alternative, conditional_on_result, conditional_on_optional)
-    still have dedicated handlers in the Rust engine. Until those handlers
-    are migrated to the unified sequential pipeline, this function is a no-op.
+    """Convert 4 legacy compound shapes into unified `effect_steps` pipeline.
 
-    When the engine is ready, this should convert:
-      look_and_select        → [look_action, select_action]
-      conditional_alternative→ [alternative (with alt_condition), primary]
-      conditional_on_result  → [primary, followup (with result_condition)]
-      conditional_on_optional→ [single conditional_optional step]
+    The engine dispatches `Sequential` effects that carry `effect_steps`
+    through the generic sequential pipeline, eliminating per-shape code
+    paths.  Mirrors the Rust ``AbilityEffect::normalized_steps()``
+    method in ``engine/src/core/card.rs``.
+
+    Converts:
+      look_and_select        → sequential [look_action, select_action, ...]
+      conditional_alternative→ sequential [alternative (with condition), primary]
+      conditional_on_result  → sequential [primary, followup (with result_condition)]
+      conditional_on_optional→ sequential [single conditional_optional step]
     """
+    if not isinstance(effect, dict):
+        return effect
+
+    action = effect.get("action")
+
+    # --- look_and_select → sequential [look_action, select_action, ...] ---
+    if action == "look_and_select":
+        steps = []
+        if effect.get("look_action"):
+            steps.append(effect["look_action"])
+        if effect.get("select_action"):
+            steps.append(effect["select_action"])
+        if effect.get("followup_action"):
+            steps.append(effect["followup_action"])
+        if steps:
+            effect["action"] = "sequential"
+            effect["effect_steps"] = steps
+            # Remove legacy compound fields so the engine uses effect_steps
+            effect.pop("look_action", None)
+            effect.pop("select_action", None)
+            # followup_action kept for backward compat (other code reads it)
+
+    # --- conditional_alternative → sequential [alternative (with condition), primary] ---
+    elif action == "conditional_alternative":
+        steps = []
+        alt = effect.get("alternative_effect")
+        if alt is not None:
+            # Apply the stricter alternative_condition first, else the base condition
+            cond = effect.get("alternative_condition") or effect.get("condition")
+            if cond and isinstance(alt, dict):
+                alt = dict(alt)  # shallow copy to avoid mutating original
+                alt["condition"] = cond
+            steps.append(alt)
+        primary = effect.get("primary_effect")
+        if primary is not None:
+            steps.append(primary)
+        if steps:
+            effect["action"] = "sequential"
+            effect["effect_steps"] = steps
+            effect.pop("alternative_effect", None)
+            effect.pop("primary_effect", None)
+            effect.pop("alternative_condition", None)
+
+    # --- conditional_on_result → sequential [primary, followup (with result_condition)] ---
+    elif action == "conditional_on_result":
+        steps = []
+        primary = effect.get("primary_effect")
+        if primary is not None:
+            steps.append(primary)
+        followup = effect.get("followup_action")
+        if followup is not None:
+            result_cond = effect.get("result_condition")
+            if result_cond and isinstance(followup, dict):
+                followup = dict(followup)
+                followup["condition"] = result_cond
+            steps.append(followup)
+        if steps:
+            effect["action"] = "sequential"
+            effect["effect_steps"] = steps
+            effect.pop("primary_effect", None)
+            effect.pop("followup_action", None)
+            effect.pop("result_condition", None)
+
+    # --- conditional_on_optional → sequential [single conditional_optional step] ---
+    elif action == "conditional_on_optional":
+        step = {"action": "conditional_optional"}
+        if effect.get("optional_action"):
+            step["optional_action"] = effect["optional_action"]
+            step["text"] = effect["optional_action"].get("text", effect.get("text", ""))
+        if effect.get("conditional_action"):
+            step["conditional_action"] = effect["conditional_action"]
+        if effect.get("conditional_negation") is not None:
+            step["conditional_negation"] = effect["conditional_negation"]
+        effect["action"] = "sequential"
+        effect["effect_steps"] = [step]
+        effect.pop("optional_action", None)
+        effect.pop("conditional_action", None)
+        effect.pop("conditional_negation", None)
+
     return effect
 
 

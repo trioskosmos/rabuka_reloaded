@@ -360,12 +360,15 @@ impl AbilityResolver {
                     None => return false,
                 };
 
-                if let Some(ref ct) = effect.card_type_any() {
+                if let Some(ct) = effect.card_type_any() {
                     let type_ok = match *ct {
-                        "member_card" => c.card_type == crate::card::CardType::Member,
-                        "live_card" => c.card_type == crate::card::CardType::Live,
-                        "energy_card" => c.card_type == crate::card::CardType::Energy,
-                        _ => true,
+                        crate::card::CardType::Member => {
+                            c.card_type == crate::card::CardType::Member
+                        }
+                        crate::card::CardType::Live => c.card_type == crate::card::CardType::Live,
+                        crate::card::CardType::Energy => {
+                            c.card_type == crate::card::CardType::Energy
+                        }
                     };
                     if !type_ok {
                         return false;

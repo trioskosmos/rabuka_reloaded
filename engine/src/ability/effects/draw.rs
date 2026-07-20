@@ -254,7 +254,7 @@ impl AbilityResolver {
             effect.target_name(),
             effect.source_or(Zone::Deck.to_str()),
             effect.destination.as_deref().unwrap_or(Zone::Hand.to_str()),
-            effect.card_type_any().as_deref(),
+            effect.card_type_any().map(|ct| ct.as_card_str()),
             effect.per_unit_any().unwrap_or(false),
             effect.per_unit_count_any().unwrap_or(1),
             effect.per_unit_type_any().as_deref(),
@@ -311,7 +311,7 @@ impl AbilityResolver {
                 return Ok(());
             }
         }
-        let source = if effect.card_type_any().as_deref() == Some("member_card")
+        let source = if effect.card_type_any() == Some(&crate::card::CardType::Member)
             && effect.source_any().is_none()
         {
             Zone::Stage.to_str()

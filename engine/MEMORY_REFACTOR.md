@@ -671,29 +671,16 @@ tiny collections.
 
 ---
 
-### P2 — GameState display clone elimination
+### P2 — GameState display clone elimination — ✅ DONE
 
-**Why:** `display.rs:game_state_to_display()` takes `&GameState` and clones strings to build display structs. Called on every `get-state` command.
-
-**Fix:** Refactor display to borrow from GameState where possible (`&str` instead of `String`).
-
-**Trade-offs:**
-- Lifetime management complexity
-- Partial fix: clone only changed fields
-- **Clock cycle win:** Eliminates O(game state) string clones per display
-- **Test risk:** Medium
+Eliminated 10 HashMap clones in display.rs + 1 full GameState clone in web_server.rs.
+PerformanceSnapshot `performance_need_heart_modifiers` flattened from nested HashMap to Vec (~500B per snapshot).
 
 ---
 
-### P2 — AbilityQueueEntry field trimming
+### P2 — AbilityQueueEntry field trimming — ✅ DONE
 
-**Why:** `AbilityQueueEntry` (~600+ bytes) has many fields that are None/empty for most entries.
-
-**Fix:** Move optional-heavy fields behind `Box<AbilityQueueEntryExtras>` — common case (no choice, no pending actions, no condition cache) pays only 16-byte niche-optimized pointer.
-
-**Trade-offs:**
-- Extra pointer hop for uncommon case
-- **Test risk:** Medium
+Removed 3 dead fields: `pending_choice_result`, `snapshot_energy_placed_by_effect`, `snapshot_energy_placed_by_player`. Removed unused `result` param from `resume_with_choice`.
 
 ---
 
