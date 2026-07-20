@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rabuka_engine = { path = "../../engine", default-features = false, features = ["psp"] }
+rabuka_engine = { path = "../../engine", default-features = false, features = ["psp", "bytecode_abilities"] }
 hashbrown = { version = "0.14", default-features = false, features = ["serde"] }
 serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }

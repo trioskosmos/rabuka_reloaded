@@ -16,7 +16,7 @@ impl AbilityRef {
 }
 
 #[cfg(not(feature = "lazy_abilities"))]
-impl std::ops::Deref for AbilityRef {
+impl core::ops::Deref for AbilityRef {
     type Target = Ability;
     fn deref(&self) -> &Ability {
         &self.0
@@ -103,7 +103,7 @@ mod lazy_store {
         }
     }
 
-    impl std::ops::Deref for AbilityRef {
+    impl core::ops::Deref for AbilityRef {
         type Target = Ability;
         fn deref(&self) -> &Ability {
             self.resolve()

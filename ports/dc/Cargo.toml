@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rabuka_engine = { path = "../../engine", default-features = false, features = ["env_logger", "debug_conditions"] }
+rabuka_engine = { path = "../../engine", default-features = false, features = ["env_logger", "debug_conditions", "bytecode_abilities"] }
 hashbrown = { version = "0.14" }
 smallvec = { version = "1" }
 log = "0.4"

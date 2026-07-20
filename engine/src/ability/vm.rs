@@ -2,6 +2,9 @@ use super::abilities_gen::{BYTECODE, NUM_ABILITIES, OFFSETS, STRINGS};
 use crate::ability::enums::ActionType;
 use crate::card::{Ability, AbilityEffect};
 
+#[cfg(feature = "no_std")]
+use alloc::{boxed::Box, string::ToString, vec::Vec};
+
 /// Decode a single `unique_abilities[idx]` entry from the bundled bytecode.
 ///
 /// The bytecode stores each ability as a compact *binary JSON* slice (tagged

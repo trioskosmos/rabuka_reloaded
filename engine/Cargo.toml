@@ -51,7 +51,7 @@ alloc_tracker = []
 # Generic no_std flag — used in cfg gates so ports don't touch engine source
 no_std = []
 # PSP target: no_std + alloc mode for mipsel-sony-psp
-psp = ["no_std", "once_cell", "debug_conditions"]
+psp = ["no_std", "once_cell", "debug_conditions", "bytecode_abilities"]
 # Dreamcast target: no_std + alloc via KallistiOS + rustc_codegen_gcc
 dc = ["no_std", "debug_conditions"]
 # Bytecode abilities: use pre-compiled bytecode instead of JSON serde
