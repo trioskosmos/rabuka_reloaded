@@ -149,28 +149,24 @@ budget when scaled for 4× the cards.
 | Consumer | Current (console) | Target | How | Status |
 |----------|-------------------|--------|-----|--------|
 | Card data | 60 KB (120 cards × 500B) | **1.4 KB** (120 cards × 12B packed structs) | Packed structs + sidecar tables | ✅ PARTIAL (compact_cards gates display-only fields; packed struct DEFERRED) |
-| Ability structs in RAM | **~120 KB** (~30-45 decoded on demand) | **0** (interpret bytecode directly) | Lazy decode + bounded cache (DONE) | ✅ DONE |
-| EffectKind + AbilityEffect | 696B per effect × ~30 triggered | **0** (bytecode IS the effect) | Bytecode interpreter evaluates without materializing structs | 🔲 DEFERRED |
+| Ability structs in RAM | **0** (decoded on demand, dropped after use) | **0** | Decode-on-demand via resolve() + Arc<Ability> | ✅ DONE |
+| EffectKind + AbilityEffect | ~16 KB (~30 triggered × 528B) | **0** (bytecode IS the effect) | Bytecode interpreter evaluates without materializing structs | 🔲 DEFERRED |
 | GameState | 300 KB (HashMaps, Vecs, Logs) | **2.5 KB** (fixed arrays, u16 IDs) | Compact GameState with fixed arrays | ✅ DONE (bounded logs + caps behind compact_state) |
 | String data | ~50 KB | **0** at runtime | u16 indices into compile-time table | 🔲 DEFERRED |
 | **Total** | **~600 KB** | **~150 KB** | | |
 
-### P0 — Eliminate ability decode cache — ⚠️ PARTIAL
+### P0 — Eliminate ability decode cache — ✅ DONE (2026-07-21)
 
-Removed `AbilityStore` OnceLock cache and `lazy_abilities` feature flag.
-Simplified `ability_store.rs` from 127→21 lines.
+**What was done:** Removed the global `HashMap<u16, &'static Arc<Ability>>` cache,
+`Box::leak` infrastructure, and `Deref` impl on `AbilityRef`. Replaced with:
 
-**What changed:** The global cache was deleted. `AbilityRef` now always wraps
-`Arc<Ability>`, decoded eagerly at load time from bytecode.
+- `AbilityRef::resolve() -> Arc<Ability>` — decodes from bytecode on demand
+- `Card::resolved_abilities() -> impl Iterator<Item = Arc<Ability>>` — lazy iteration
+- All ~80 call sites updated to use `.resolve()` or `.resolved_abilities()`
 
-**What did NOT change:** All 800 abilities are still decoded into full structs
-at startup via `build_abilities_map_inner`. Resident RAM is ~2.8MB, not ~19KB.
-The old estimate of "~19KB (only deck cards decoded)" was wrong — ALL abilities
-are decoded because the `unique_abilities` array contains all 800, and the
-loader iterates every one.
-
-**The "absurdly low RAM" path** (150KB target) requires the lazy decode plan
-described in P1.7 below.
+**Result:** Zero leaked memory. Abilities decoded fresh from the 139KB bytecode
+blob, used, then dropped. No persistent cache. ~80 files changed, 174 insertions,
+251 deletions.
 
 ---
 
@@ -1153,7 +1149,8 @@ sets (default, compact_state, bytecode_abilities).
 
 | Step | RAM saved | Effort | Risk | Status |
 |------|-----------|--------|------|--------|
-| 1. Lazy decode | **2.68 MB** | ~1 day | Low | ✅ DONE |
+| 1. Lazy decode | **2.68 MB** | ~1 day | Low | ✅ DONE → evolved into decode-on-demand |
 | 2. Compact cards | **58 KB** | ~2 days | Medium | ✅ PARTIAL (display-only fields gated; packed struct DEFERRED) |
 | 3. Compact GameState | **297 KB** | ~2 days | Medium | ✅ DONE |
+| 4. Decode-on-demand | **120 KB** | ~3 days | Low | ✅ DONE |
 | **Total** | **~3 MB → ~150KB** | **~5 days** | | |
