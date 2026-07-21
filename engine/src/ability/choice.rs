@@ -2953,7 +2953,7 @@ impl super::resolver::AbilityResolver {
                 if let Some(entry) = gs.ability_queue.current_entry() {
                     if let Some(cid) = entry.card_id {
                         let turn = gs.turn_number;
-                        for (idx, ab) in gs
+                        for (idx, ar) in gs
                             .card_database
                             .get_card(cid)
                             .map(|c| &c.abilities)
@@ -2961,7 +2961,7 @@ impl super::resolver::AbilityResolver {
                             .flatten()
                             .enumerate()
                         {
-                            if ab.use_limit.is_some() {
+                            if ar.resolve().use_limit.is_some() {
                                 let key = (cid, idx, turn);
                                 *gs.turn_limited_abilities_used.entry(key).or_insert(0) += 1;
                                 break;

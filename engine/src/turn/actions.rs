@@ -195,7 +195,8 @@ impl super::TurnEngine {
 
         // Find the first ability that can be activated from the current location
         let mut ability_to_activate: Option<AbilityActivation> = None;
-        for (idx, ability) in card.abilities.iter().enumerate() {
+        for (idx, ar) in card.abilities.iter().enumerate() {
+            let ability = ar.resolve();
             if ability
                 .triggers
                 .as_ref()
@@ -267,7 +268,7 @@ impl super::TurnEngine {
                     }
                     ability_to_activate = Some(AbilityActivation {
                         idx,
-                        ability: ability.to_arc(),
+                        ability: ar.resolve(),
                         loc,
                     });
                     break;

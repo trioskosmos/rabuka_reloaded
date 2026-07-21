@@ -123,7 +123,8 @@ pub fn calculate_play_cost_reduction(
 
     // ── 1. Scan the played card's own abilities for a self-reduction ──────────
     let mut cost_reduction: u32 = 0;
-    for ability in &card.abilities {
+    for ar in &card.abilities {
+        let ability = ar.resolve();
         if let Some(ref effect) = ability.effect {
             if let Some(mod_cost) = find_modify_cost(effect, Some("subtract"), Some("hand")) {
                 if !play_cost_reduction_matches(mod_cost, card_id, card, card_db) {
@@ -203,7 +204,8 @@ fn scan_abilities_for_cost_reduction(
     hand_count: usize,
     hand_condition_guard: bool,
 ) -> Option<u32> {
-    for ability in abilities {
+    for ar in abilities {
+        let ability = ar.resolve();
         if let Some(ref effect) = ability.effect {
             if effect.action != ActionType::ModifyCost
                 || effect.operation_any().as_deref() != Some("subtract")
@@ -470,8 +472,8 @@ pub fn card_matches_group_str(
                 // card additional group memberships in all zones. Examples:
                 //   AURORA FLOWER (PL!HS-bp5-018-L) is "スリーズブーケ" /
                 //   "DOLLCHESTRA" / "みらくらぱーく！" everywhere.
-                || c.abilities.iter().any(|ab| {
-                    ab.effect.as_ref().is_some_and(|eff| {
+                || c.abilities.iter().any(|ar| {
+                    ar.resolve().effect.as_ref().is_some_and(|eff| {
                         eff.action == ActionType::SetCardIdentity
                             && eff.identities_any().as_ref().is_some_and(|ids| {
                                 ids.iter().any(|id| id == gn.as_ref() || ((id.contains('\u{FF01}') || id.contains('\u{00B5}')) && norm(id).as_ref() == gn.as_ref()))
@@ -1083,8 +1085,8 @@ impl<'a> CardFilter<'a> {
                         if let Some(excluded) = self.ability_filter_triggers {
                             if !excluded.is_empty() {
                                 // Card passes only if it has NO ability matching any excluded trigger
-                                if card.abilities.iter().any(|a| {
-                                    a.triggers.as_ref().is_some_and(|t| {
+                                if card.abilities.iter().any(|ar| {
+                                    ar.resolve().triggers.as_ref().is_some_and(|t| {
                                         excluded.iter().any(|et| t.starts_with(et.as_str()))
                                     })
                                 }) {
@@ -1097,8 +1099,8 @@ impl<'a> CardFilter<'a> {
                         if let Some(included) = self.ability_filter_triggers {
                             if !included.is_empty() {
                                 // Card passes if it has ANY ability matching included triggers
-                                if !card.abilities.iter().any(|a| {
-                                    a.triggers.as_ref().is_some_and(|t| {
+                                if !card.abilities.iter().any(|ar| {
+                                    ar.resolve().triggers.as_ref().is_some_and(|t| {
                                         included.iter().any(|it| t.starts_with(it.as_str()))
                                     })
                                 }) {
@@ -1127,8 +1129,8 @@ impl<'a> CardFilter<'a> {
                                 if let Some(excluded) = &branch.ability_filter_triggers {
                                     if !excluded.is_empty() {
                                         // Card passes if it has NO ability matching excluded triggers
-                                        !card.abilities.iter().any(|a| {
-                                            a.triggers.as_ref().is_some_and(|t| {
+                                        !card.abilities.iter().any(|ar| {
+                                            ar.resolve().triggers.as_ref().is_some_and(|t| {
                                                 excluded.iter().any(|et| t.starts_with(et))
                                             })
                                         })
@@ -1143,8 +1145,8 @@ impl<'a> CardFilter<'a> {
                                 if let Some(included) = &branch.ability_filter_triggers {
                                     if !included.is_empty() {
                                         // Card passes if it has ANY ability matching included triggers
-                                        card.abilities.iter().any(|a| {
-                                            a.triggers.as_ref().is_some_and(|t| {
+                                        card.abilities.iter().any(|ar| {
+                                            ar.resolve().triggers.as_ref().is_some_and(|t| {
                                                 included.iter().any(|it| t.starts_with(it))
                                             })
                                         })

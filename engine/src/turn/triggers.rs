@@ -65,7 +65,8 @@ impl super::TurnEngine {
                             card_no_clone
                         );
                         if card.card_no.as_ref() == card_no_clone {
-                            for (ability_index, ability) in card.abilities.iter().enumerate() {
+                            for (ability_index, ar) in card.abilities.iter().enumerate() {
+                                let ability = ar.resolve();
                                 let trigger_match = ability.triggers.as_ref().is_some_and(|t| {
                                     t.contains(crate::triggers::DEBUT)
                                         || t.contains(crate::triggers::DEBUT_EN)
@@ -169,7 +170,8 @@ impl super::TurnEngine {
                 continue;
             }
             if let Some(card) = game_state.card_database.get_card(cid) {
-                for ability in &card.abilities {
+                for ar in &card.abilities {
+                    let ability = ar.resolve();
                     if ability
                         .triggers
                         .as_ref()
@@ -195,7 +197,8 @@ impl super::TurnEngine {
                 return false;
             }
             if let Some(card) = game_state.card_database.get_card(card_id) {
-                for ability in &card.abilities {
+                for ar in &card.abilities {
+                    let ability = ar.resolve();
                     if let Some(ref effect) = ability.effect {
                         if effect.action
                             == crate::ability::enums::ActionType::SuppressAbilityTrigger
@@ -278,7 +281,8 @@ impl super::TurnEngine {
                             card.abilities.len()
                         );
                     }
-                    for (aidx, ability) in card.abilities.iter().enumerate() {
+                    for (aidx, ar) in card.abilities.iter().enumerate() {
+                        let ability = ar.resolve();
                         if crate::ability::debug::ABILITY_DEBUG
                             .load(core::sync::atomic::Ordering::Relaxed)
                         {
@@ -334,7 +338,8 @@ impl super::TurnEngine {
                 };
                 if card_id != -1 && !game_state.negated_abilities.contains(&card_id) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
-                        for (aidx, ability) in card.abilities.iter().enumerate() {
+                        for (aidx, ar) in card.abilities.iter().enumerate() {
+                            let ability = ar.resolve();
                             if !crate::zones::check_effect_position(
                                 ability
                                     .effect
@@ -482,7 +487,8 @@ impl super::TurnEngine {
                 if card_id != -1 && !skip_negated(game_state, card_id) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
                         let card_no = card.card_no.to_string();
-                        for (aidx, ability) in card.abilities.iter().enumerate() {
+                        for (aidx, ar) in card.abilities.iter().enumerate() {
+                            let ability = ar.resolve();
                             if !crate::zones::check_effect_position(
                                 ability
                                     .effect
@@ -586,7 +592,8 @@ impl super::TurnEngine {
             for card_id in &player.live_card_zone.cards {
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
                     let card_no = card.card_no.to_string();
-                    for (aidx, ability) in card.abilities.iter().enumerate() {
+                    for (aidx, ar) in card.abilities.iter().enumerate() {
+                        let ability = ar.resolve();
                         let trigger_match = ability.triggers.as_ref().is_some_and(|t| {
                             &**t == crate::triggers::LIVE_SUCCESS
                                 || t.contains(crate::triggers::LIVE_SUCCESS_EN)

@@ -13,8 +13,7 @@ fn maki_sd1_q125_restriction_parsed() {
     let card = db.get_card_id("PL!-sd1-006-SD").expect("Card exists");
     let card_data = db.get_card(card).expect("Maki card should exist");
     let has_restriction = card_data
-        .abilities
-        .iter()
+        .resolved_abilities()
         .any(|a| a.full_text.contains("成功ライブカード"));
     assert!(
         has_restriction,
@@ -68,8 +67,7 @@ fn hanamaru_s3_q155_constant_cost_increase() {
         "Card should have abilities"
     );
     let constant_ability = card_data
-        .abilities
-        .iter()
+        .resolved_abilities()
         .any(|a| a.triggers.as_ref().map_or(false, |t| &**t == "常時"));
     assert!(constant_ability, "Should have at least one 常時 ability");
 }

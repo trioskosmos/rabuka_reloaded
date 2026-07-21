@@ -2027,8 +2027,9 @@ fn test_ability_activation_cost_targeting() {
 
     // Verify the card has activation ability
     let card_info = card_database.get_card(rin_id).expect("Card should exist");
-    let has_activation = card_info.abilities.iter().any(|a| {
-        a.triggers
+    let has_activation = card_info.resolved_abilities().any(|ability| {
+        ability
+            .triggers
             .as_ref()
             .map(|t| t.contains(triggers::ACTIVATION))
             .unwrap_or(false)
@@ -2060,7 +2061,8 @@ fn test_ability_live_success_draw_then_discard() {
         member_card.name, member_card.card_no
     );
     println!("Abilities count: {}", member_card.abilities.len());
-    for (i, a) in member_card.abilities.iter().enumerate() {
+    for (i, ar) in member_card.abilities.iter().enumerate() {
+        let a = ar.resolve();
         println!(
             "  Ability[{}]: triggers={:?}, effect={:?}",
             i,
@@ -2071,8 +2073,7 @@ fn test_ability_live_success_draw_then_discard() {
 
     // Find the ability #1 (live_success)
     let live_success_ability = member_card
-        .abilities
-        .iter()
+        .resolved_abilities()
         .find(|a| a.triggers.as_ref().is_some_and(|t| &**t == "ライブ成功時"))
         .expect("Should have live_success ability");
     println!(
@@ -2397,7 +2398,8 @@ fn test_constant_success_replacement_ability() {
         "Target card: {} ({})",
         target_card.name, target_card.card_no
     );
-    for (i, a) in target_card.abilities.iter().enumerate() {
+    for (i, ar) in target_card.abilities.iter().enumerate() {
+        let a = ar.resolve();
         println!(
             "  Ability[{}]: triggers={:?}, action={:?}",
             i,

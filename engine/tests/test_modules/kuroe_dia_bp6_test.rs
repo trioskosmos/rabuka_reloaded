@@ -7,10 +7,8 @@ fn trigger_live_start_kuroe(game: &mut TestGame, card_id: i16) {
     let pid = game.state.player1.id.clone();
     let card = game.db.get_card(card_id).unwrap();
     let ab = card
-        .abilities
-        .iter()
+        .resolved_abilities()
         .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-        .cloned()
         .unwrap();
     game.state.trigger_auto_ability(
         format!("{}_{}", card.card_no, ab.full_text),

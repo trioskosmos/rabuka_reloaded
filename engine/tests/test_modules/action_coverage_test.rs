@@ -8,7 +8,7 @@ use rabuka_engine::turn::TurnEngine;
 use std::collections::HashSet;
 
 fn has_action(card: &rabuka_engine::card::Card, target: &ActionType) -> bool {
-    for ab in &card.abilities {
+    for ab in card.resolved_abilities() {
         if let Some(ref eff) = ab.effect {
             if eff.action == *target {
                 return true;
@@ -35,7 +35,7 @@ fn all_action_types_fire_without_crash() {
         if !matches!(card.card_type, rabuka_engine::card::CardType::Member) {
             continue;
         }
-        for ab in &card.abilities {
+        for ab in card.resolved_abilities() {
             if let Some(ref eff) = ab.effect {
                 action_types.insert(eff.action);
                 if let Some(ref actions) = eff.compound.actions {

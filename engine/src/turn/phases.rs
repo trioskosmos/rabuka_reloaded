@@ -939,7 +939,7 @@ impl super::TurnEngine {
                                 .get_card(existing_card_id)
                                 .is_some_and(|existing_card| {
                                     existing_card.abilities.iter().any(|a| {
-                                        a.effect.as_ref().is_some_and(|ef| {
+                                        a.resolve().effect.as_ref().is_some_and(|ef| {
                                             if ef.restriction_type_any().as_deref()
                                                 != Some("cannot_baton_touch")
                                             {
@@ -1131,13 +1131,14 @@ impl super::TurnEngine {
                         let bt_card_id = card_id;
                         card.abilities
                             .iter()
-                            .filter(|ability| {
-                                ability
+                            .filter(|ar| {
+                                ar.resolve()
                                     .triggers
                                     .as_ref()
                                     .is_some_and(|t| t.contains(crate::triggers::BATON_TOUCH))
                             })
-                            .map(|ability| {
+                            .map(|ar| {
+                                let ability = ar.resolve();
                                 (
                                     format!("{}_{}", card.card_no, ability.full_text),
                                     card.card_no.to_string(),

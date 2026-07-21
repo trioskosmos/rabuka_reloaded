@@ -1506,7 +1506,8 @@ async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
                 }
 
                 if let Some(card) = card_db.get_card(card_id) {
-                    for (ability_idx, ability) in card.abilities.iter().enumerate() {
+                    for (ability_idx, ar) in card.abilities.iter().enumerate() {
+                        let ability = ar.resolve();
                         if let Some(ref effect) = ability.effect {
                             let condition_fields: [(&str, &Option<Box<crate::card::Condition>>); 3] = [
                                 ("condition", &effect.condition),
@@ -2578,7 +2579,8 @@ fn build_cached_card_registry(card_database: &CardDatabase) -> serde_json::Value
             "card_no": card.card_no,
             "card_type": format!("{:?}", card.card_type),
             "blade": card.blade,
-            "abilities": card.abilities.iter().map(|ability| {
+            "abilities": card.abilities.iter().map(|ar| {
+                let ability = ar.resolve();
                 serde_json::json!({
                     "text": ability.full_text,
                     "trigger": format!("{:?}", ability.triggers),

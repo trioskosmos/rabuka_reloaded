@@ -238,7 +238,8 @@ impl Player {
             );
             // Rule: Cost increase from 常時 abilities (e.g. success_live_zone cards → +cost)
             let mut cost_increase: u32 = 0;
-            for ability in &card.abilities {
+            for ar in &card.abilities {
+                let ability = ar.resolve();
                 if let Some(ref effect) = ability.effect {
                     if effect.action == crate::ability::enums::ActionType::ModifyCost
                         && matches!(
@@ -321,8 +322,8 @@ impl Player {
             if baton_touch_used {
                 if let Some(member_id) = self.stage.get_area(stage_area) {
                     let has_protection = card_db.get_card(member_id).is_some_and(|existing_card| {
-                        existing_card.abilities.iter().any(|a| {
-                            a.effect.as_ref().is_some_and(|ef| {
+                        existing_card.abilities.iter().any(|ar| {
+                            ar.resolve().effect.as_ref().is_some_and(|ef| {
                                 if ef.restriction_type_any().as_deref()
                                     != Some("cannot_baton_touch")
                                 {

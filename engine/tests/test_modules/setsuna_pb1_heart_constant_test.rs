@@ -103,8 +103,7 @@ fn setsuna_pb1_verify_card_metadata() {
 
     // The ability should be the constant (常時) one
     let constant_ability = card
-        .abilities
-        .iter()
+        .resolved_abilities()
         .find(|ab| ab.triggers.as_ref().map_or(false, |t| t.contains("常時")))
         .expect("Should have a 常時 (constant) ability");
 

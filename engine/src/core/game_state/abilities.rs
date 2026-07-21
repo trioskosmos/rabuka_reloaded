@@ -107,9 +107,10 @@ impl GameState {
                 Some(card) => card,
                 None => continue,
             };
-            for ability in &card.abilities {
+            for ar in &card.abilities {
+                let ability = ar.resolve();
                 if Self::ability_matches_trigger(
-                    ability,
+                    &ability,
                     &crate::game_state::AbilityTrigger::Constant,
                 ) {
                     if let Some(ref effect) = ability.effect {
@@ -128,9 +129,10 @@ impl GameState {
                 Some(card) => card,
                 None => continue,
             };
-            for ability in &card.abilities {
+            for ar in &card.abilities {
+                let ability = ar.resolve();
                 if Self::ability_matches_trigger(
-                    ability,
+                    &ability,
                     &crate::game_state::AbilityTrigger::Constant,
                 ) {
                     if let Some(ref effect) = ability.effect {
@@ -252,7 +254,8 @@ impl GameState {
                     continue;
                 }
                 if let Some(card) = self.card_database.get_card(card_id) {
-                    for (ability_idx, ability) in card.abilities.iter().enumerate() {
+                    for (ability_idx, ar) in card.abilities.iter().enumerate() {
+                        let ability = ar.resolve();
                         if !crate::zones::check_effect_position(
                             ability
                                 .effect
@@ -430,7 +433,8 @@ impl GameState {
             // Also scan live cards for AUTO abilities
             for &card_id in &player.live_card_zone.cards {
                 if let Some(card) = self.card_database.get_card(card_id) {
-                    for ability in &card.abilities {
+                    for ar in &card.abilities {
+                        let ability = ar.resolve();
                         if ability
                             .triggers
                             .as_ref()
@@ -525,7 +529,8 @@ impl GameState {
                     if card_owner != player_id_clone {
                         continue; // card belongs to a different player
                     }
-                    for ability in &card.abilities {
+                    for ar in &card.abilities {
+                        let ability = ar.resolve();
                         if ability
                             .triggers
                             .as_ref()
@@ -681,8 +686,8 @@ impl GameState {
                     format!("{}_{}", card_no, ability.full_text)
                 };
                 for (ability_index, ability) in card.abilities.iter().enumerate() {
-                    if Self::ability_matches_trigger(ability, &trigger_type)
-                        && ability_id == expected_id(ability)
+                    if Self::ability_matches_trigger(&ability.resolve(), &trigger_type)
+                        && ability_id == expected_id(&ability.resolve())
                     {
                         let entry = self.build_ability_queue_entry(
                             card_no.clone(),
@@ -846,7 +851,8 @@ impl GameState {
         let mut abilities: Vec<(String, String, i16)> = Vec::new();
         for &card_id in &player.live_card_zone.cards {
             if let Some(card) = self.card_database.get_card(card_id) {
-                for ability in &card.abilities {
+                for ar in &card.abilities {
+                    let ability = ar.resolve();
                     if ability.triggers.as_deref() != Some(crate::triggers::AUTO) {
                         continue;
                     }
@@ -2156,9 +2162,10 @@ impl GameState {
     // but do NOT have unit/group names not written on the card.
     pub fn can_place_card_in_zone(&self, card_id: i16, zone: &str, _player_id: &str) -> bool {
         if let Some(card) = self.card_database.get_card(card_id) {
-            for ability in &card.abilities {
+            for ar in &card.abilities {
+                let ability = ar.resolve();
                 if Self::ability_matches_trigger(
-                    ability,
+                    &ability,
                     &crate::game_state::AbilityTrigger::Constant,
                 ) {
                     if let Some(ref effect) = ability.effect {
@@ -2256,15 +2263,13 @@ impl GameState {
         }
     }
 
-    pub fn get_triggerable_abilities<'a>(
+    pub fn get_triggerable_abilities(
         &self,
-        card: &'a crate::card::Card,
+        card: &crate::card::Card,
         trigger: AbilityTrigger,
         player: &Player,
-    ) -> Vec<&'a crate::card::Ability> {
-        card.abilities
-            .iter()
-            .map(|a| &**a)
+    ) -> Vec<crate::Arc<crate::card::Ability>> {
+        card.resolved_abilities()
             .filter(|ability| {
                 // Skip abilities with null triggers - they should not auto-trigger during any phase
                 if ability.triggers.is_none() {

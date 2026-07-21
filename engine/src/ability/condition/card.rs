@@ -814,8 +814,9 @@ impl<'a> ConditionContext<'a> {
                 } else {
                     card_ids.iter().any(|&id| {
                         card_db.get_card(id).is_some_and(|c| {
-                            c.abilities.iter().any(|a| {
-                                a.triggers
+                            c.abilities.iter().any(|ar| {
+                                ar.resolve()
+                                    .triggers
                                     .as_ref()
                                     .is_some_and(|t| triggers.iter().any(|et| t.contains(et)))
                             })
@@ -3319,8 +3320,9 @@ impl<'a> ConditionContext<'a> {
         if let Some(card_id) = self.game_state.activating_card {
             let card_db = &self.game_state.card_database;
             if let Some(card) = card_db.get_card(card_id) {
-                card.abilities.iter().any(|a| {
-                    a.triggers
+                card.abilities.iter().any(|ar| {
+                    ar.resolve()
+                        .triggers
                         .as_ref()
                         .map(|t| excluded_triggers.iter().any(|et| t.starts_with(et)))
                         .unwrap_or(false)
@@ -3383,8 +3385,9 @@ impl<'a> ConditionContext<'a> {
                                     .as_ref()
                                     .map(|t| t.iter().map(|s| s.as_str()).collect())
                                     .unwrap_or_default();
-                                !c.abilities.iter().any(|a| {
-                                    a.triggers
+                                !c.abilities.iter().any(|ar| {
+                                    ar.resolve()
+                                        .triggers
                                         .as_ref()
                                         .map(|t| {
                                             excluded_triggers.iter().any(|et| t.starts_with(et))

@@ -18,10 +18,8 @@ fn seed_deck(game: &mut TestGame) {
 fn process_live_start_ability(game: &mut TestGame, card_id: i16) {
     let card = game.db.get_card(card_id).unwrap();
     let live_start_ab = card
-        .abilities
-        .iter()
+        .resolved_abilities()
         .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-        .cloned()
         .expect("Card must have LiveStart ability");
 
     let ability_id = format!("{}_{}", card.card_no, live_start_ab.full_text);
@@ -43,10 +41,8 @@ fn process_live_start_ability(game: &mut TestGame, card_id: i16) {
 fn process_live_success_ability(game: &mut TestGame, card_id: i16) {
     let card = game.db.get_card(card_id).unwrap();
     let live_success_ab = card
-        .abilities
-        .iter()
+        .resolved_abilities()
         .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
-        .cloned()
         .expect("Card must have LiveSuccess ability");
 
     let ability_id = format!("{}_{}", card.card_no, live_success_ab.full_text);

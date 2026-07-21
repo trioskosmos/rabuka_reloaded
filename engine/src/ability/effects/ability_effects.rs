@@ -82,9 +82,9 @@ impl AbilityResolver {
                 .map(|c| (c.abilities.clone(), c.name.to_string()));
             if let Some((abilities, cn)) = card_data {
                 if let Some(ref trig) = trigger {
-                    let matching: Vec<&crate::card::Ability> = abilities
+                    let matching: Vec<_> = abilities
                         .iter()
-                        .map(|a| &**a)
+                        .map(|a| a.resolve())
                         .filter(|a| {
                             let at = a
                                 .triggers
@@ -405,7 +405,8 @@ impl AbilityResolver {
 
         for &src_id in &source_cards {
             if let Some(src_card) = card_db.get_card(src_id) {
-                for ability in &src_card.abilities {
+                for ar in &src_card.abilities {
+                    let ability = ar.resolve();
                     let should_copy = match effect.trigger_filter_any().as_ref() {
                         Some(filters) => filters.iter().any(|f| {
                             ability

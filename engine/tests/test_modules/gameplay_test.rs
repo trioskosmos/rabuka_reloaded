@@ -845,20 +845,17 @@ fn ayumu_q62_and_name_has_individual_names() {
 
     // Verify the card has the expected abilities (debut recover + live_start gain_ability)
     let has_debut = ayumu
-        .abilities
-        .iter()
+        .resolved_abilities()
         .any(|a| a.triggers.as_deref() == Some("登場"));
     let has_live_start = ayumu
-        .abilities
-        .iter()
+        .resolved_abilities()
         .any(|a| a.triggers.as_deref() == Some("ライブ開始時"));
     assert!(has_debut, "Card should have a 登場 ability");
     assert!(has_live_start, "Card should have a ライブ開始時 ability");
 
     // Verify the live_start ability targets all 3 named characters specifically
     let live_start = ayumu
-        .abilities
-        .iter()
+        .resolved_abilities()
         .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
         .expect("LiveStart ability exists");
     assert!(live_start.full_text.contains("上原歩夢"));
@@ -2060,7 +2057,7 @@ fn you_q129_cost_reduction_self_only() {
     assert_eq!(keke.cost, Some(20));
 
     // Verify the card has the cost reduction constant ability
-    let has_cost_reduction = keke.abilities.iter().any(|a| {
+    let has_cost_reduction = keke.resolved_abilities().any(|a| {
         a.triggers.as_deref() == Some("常時")
             && a.full_text.contains("コスト")
             && a.full_text.contains("少なくなる")
@@ -2072,8 +2069,7 @@ fn you_q129_cost_reduction_self_only() {
 
     // Verify the card has the cannot_baton_touch constant ability
     let has_baton_block = keke
-        .abilities
-        .iter()
+        .resolved_abilities()
         .any(|a| a.triggers.as_deref() == Some("常時") && a.full_text.contains("バトンタッチ"));
     assert!(
         has_baton_block,
@@ -2532,7 +2528,7 @@ fn hareruya_q64_waitroom_only_five_distinct_liella_condition_met() {
         .db
         .get_card(game.state.player1.live_card_zone.cards[0])
         .expect("live card should exist in database");
-    for ab in &card.abilities {
+    for ab in card.resolved_abilities() {
         if let Some(ref ef) = ab.effect {
             if let Some(ref cond) = ef.condition {
                 eprintln!("[DEBUG] condition: {:?}", cond);
@@ -3387,7 +3383,7 @@ fn hanamaru_score_icon_filter() {
     // Verify the card has the ability with card_property: has_score_icon
     {
         let card_data = game.state.card_database.get_card(hanamaru).unwrap();
-        let has_ability = card_data.abilities.iter().any(|a| {
+        let has_ability = card_data.resolved_abilities().any(|a| {
             a.effect
                 .as_ref()
                 .is_some_and(|e| e.card_property_any() == Some("has_score_icon"))

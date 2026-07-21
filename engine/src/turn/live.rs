@@ -718,7 +718,8 @@ impl super::TurnEngine {
         let mut cards_to_remove = Vec::new();
         for (index, card_id) in player.live_card_zone.cards.iter().enumerate() {
             if let Some(card) = card_db.get_card(*card_id) {
-                let has_restriction = card.abilities.iter().any(|ability| {
+                let has_restriction = card.abilities.iter().any(|ar| {
+                    let ability = ar.resolve();
                     if let Some(ref effect) = ability.effect {
                         let rd_binding = effect.restricted_destination_any();
                         let dest_binding = effect.destination.as_deref();
@@ -921,7 +922,8 @@ impl super::TurnEngine {
         card_id: i16,
     ) -> Option<Vec<String>> {
         let card = game_state.card_database.get_card(card_id)?;
-        for ability in &card.abilities {
+        for ar in &card.abilities {
+            let ability = ar.resolve();
             let is_constant = ability
                 .triggers
                 .as_ref()

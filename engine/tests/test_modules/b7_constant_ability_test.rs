@@ -92,7 +92,7 @@ fn mia_constant_blade_per_energy_under() {
     assert_eq!(game.state.player1.stage.stage[1], mia, "Mia at center");
 
     // Verify the card has abilities
-    let abilities = card.unwrap().abilities.clone();
+    let abilities: Vec<_> = card.unwrap().resolved_abilities().collect();
     eprintln!("[DEBUG] Mia has {} abilities", abilities.len());
     for a in &abilities {
         eprintln!(

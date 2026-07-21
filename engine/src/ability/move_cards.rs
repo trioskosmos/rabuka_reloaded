@@ -2005,9 +2005,10 @@ impl AbilityResolver {
                 gs.player2.debut_count_this_turn += 1;
             }
 
-            for ability in &card.abilities {
+            for ar in &card.abilities {
+                let ability = ar.resolve();
                 if GameState::ability_matches_trigger(
-                    ability,
+                    &ability,
                     &crate::core::types::AbilityTrigger::Debut,
                 ) {
                     let ability_id = format!("{}_{}", card_no, ability.full_text);

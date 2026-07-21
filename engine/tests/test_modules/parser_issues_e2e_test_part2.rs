@@ -241,10 +241,8 @@ fn issue5_kanon_invalidate_other_liella() {
 fn trigger_honoka_live_success(game: &mut TestGame, card_id: i16) {
     let card = game.db.get_card(card_id).unwrap();
     let live_success_ab = card
-        .abilities
-        .iter()
+        .resolved_abilities()
         .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
-        .cloned()
         .expect("Card must have LiveSuccess ability");
 
     let ability_id = format!("{}_{}", card.card_no, live_success_ab.full_text);

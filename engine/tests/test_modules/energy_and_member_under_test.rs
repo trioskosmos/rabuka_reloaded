@@ -433,8 +433,7 @@ fn rina_debit_triggers_with_target_in_discard() {
         .get_card_by_no("PL!N-PR-026-PR")
         .expect("Rina PR card should exist");
     let has_debut = card
-        .abilities
-        .iter()
+        .resolved_abilities()
         .any(|a| a.triggers.as_deref() == Some("登場"));
     assert!(has_debut, "Rina has 登場 ability");
 }
@@ -658,10 +657,8 @@ fn sayaka_live_start_zero_under_still_gets_hand_count() {
 fn trigger_sayaka_live_start(game: &mut TestGame, sayaka: i16) {
     let card = game.db.get_card(sayaka).unwrap();
     let live_start_ab = card
-        .abilities
-        .iter()
+        .resolved_abilities()
         .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-        .cloned()
         .expect("Sayaka must have LiveStart ability");
     let ability_id = format!("{}_{}", card.card_no, live_start_ab.full_text);
     game.state.trigger_auto_ability(

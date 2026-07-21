@@ -111,10 +111,8 @@ fn emma_q163_nijigasaki_member_pays_cost() {
 fn trigger_emma_live_start(game: &mut TestGame, emma: i16) {
     let card = game.db.get_card(emma).unwrap();
     let ab = card
-        .abilities
-        .iter()
+        .resolved_abilities()
         .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-        .cloned()
         .unwrap();
     let pid = game.state.player1.id.clone();
     game.state.trigger_auto_ability(

@@ -1269,7 +1269,8 @@ impl GameState {
                     Some(c) => c.clone(),
                     None => continue,
                 };
-                for ability in &card.abilities {
+                for ar in &card.abilities {
+                    let ability = ar.resolve();
                     let is_constant = ability
                         .triggers
                         .as_ref()

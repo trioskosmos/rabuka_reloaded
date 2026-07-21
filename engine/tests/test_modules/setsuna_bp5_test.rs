@@ -202,8 +202,9 @@ fn landing_action_yeah_surplus_heart_condition() -> rabuka_engine::core::card::C
     let card = db
         .get_card_by_no("PL!S-bp5-020-L")
         .expect("Landing action Yeah!! should exist in the database");
+    let abilities: Vec<_> = card.resolved_abilities().collect();
 
-    card.abilities
+    abilities
         .iter()
         .find_map(|ability| {
             let effect = ability.effect.as_ref()?;
@@ -222,8 +223,9 @@ fn landing_action_yeah_surplus_heart_effect() -> rabuka_engine::core::card::Abil
     let card = db
         .get_card_by_no("PL!S-bp5-020-L")
         .expect("Landing action Yeah!! should exist in the database");
+    let abilities: Vec<_> = card.resolved_abilities().collect();
 
-    card.abilities
+    abilities
         .iter()
         .find_map(|ability| {
             let effect = ability.effect.as_ref()?;

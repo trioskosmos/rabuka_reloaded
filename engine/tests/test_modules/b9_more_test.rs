@@ -115,10 +115,8 @@ fn mijuku_dreamer_no_refresh_no_bonus() {
 
     let card = game.db.get_card(mijuku).unwrap();
     let ab = card
-        .abilities
-        .iter()
+        .resolved_abilities()
         .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
-        .cloned()
         .unwrap();
     let pid = game.state.player1.id.clone();
     game.state.trigger_auto_ability(
@@ -168,10 +166,8 @@ fn mijuku_dreamer_refresh_via_mill_gets_bonus() {
 
     let card = game.db.get_card(mijuku).unwrap();
     let ab = card
-        .abilities
-        .iter()
+        .resolved_abilities()
         .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
-        .cloned()
         .unwrap();
     let pid = game.state.player1.id.clone();
     game.state.trigger_auto_ability(
@@ -207,10 +203,8 @@ fn fill_decks(game: &mut TestGame, filler: i16) {
 fn trigger_live_start(game: &mut TestGame, card_id: i16) {
     let card = game.db.get_card(card_id).unwrap();
     let ab = card
-        .abilities
-        .iter()
+        .resolved_abilities()
         .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-        .cloned()
         .unwrap();
     let pid = game.state.player1.id.clone();
     game.state.trigger_auto_ability(

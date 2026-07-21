@@ -12,10 +12,8 @@ fn deck(game: &mut TestGame, filler: i16) {
 fn trigger(game: &mut TestGame, card_id: i16, trigger_str: &str) {
     let card = game.db.get_card(card_id).unwrap();
     let ab = card
-        .abilities
-        .iter()
+        .resolved_abilities()
         .find(|a| a.triggers.as_deref() == Some(trigger_str))
-        .cloned()
         .unwrap();
     let pid = game.state.player1.id.clone();
     game.state.trigger_auto_ability(

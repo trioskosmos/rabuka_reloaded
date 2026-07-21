@@ -22,7 +22,7 @@ fn love_wing_bell_debug_card_abilities() {
     eprintln!("[TEST_DEBUG] Card series: {}", card.series);
     eprintln!("[TEST_DEBUG] Card group: {}", card.group);
     eprintln!("[TEST_DEBUG] Number of abilities: {}", card.abilities.len());
-    for (i, ab) in card.abilities.iter().enumerate() {
+    for (i, ab) in card.resolved_abilities().enumerate() {
         eprintln!("[TEST_DEBUG]   Ability {}: triggers={:?}", i, ab.triggers);
         if let Some(ref eff) = ab.effect {
             eprintln!(

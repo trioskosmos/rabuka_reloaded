@@ -14,10 +14,8 @@ use rabuka_engine::card::HeartColor;
 fn trigger_debut_for_card(game: &mut TestGame, card_id: i16) {
     let card = game.db.get_card(card_id).unwrap();
     let ab = card
-        .abilities
-        .iter()
+        .resolved_abilities()
         .find(|a| a.triggers.as_deref() == Some("登場"))
-        .cloned()
         .expect("debut ability");
     let pid = game.state.player1.id.clone();
     game.state.trigger_auto_ability(

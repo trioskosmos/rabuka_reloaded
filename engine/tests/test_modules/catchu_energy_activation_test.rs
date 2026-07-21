@@ -52,7 +52,7 @@ fn catchu_basic_two_distinct_activate_2() {
         !card.abilities.is_empty(),
         "mei should have abilities loaded"
     );
-    assert!(card.abilities.iter().any(|a| a
+    assert!(card.resolved_abilities().any(|ability| ability
         .triggers
         .as_ref()
         .is_some_and(|t| t.contains("ライブ開始時"))));

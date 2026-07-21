@@ -67,6 +67,8 @@ compact_cards = []
 # Compact GameState: caps log/application Vecs to bounded sizes instead of
 # unbounded accumulation. Reduces GameState RAM by ~80%+ for console targets.
 compact_state = []
+# Umbrella: enable all console/embedded optimizations at once.
+console = ["compact_cards", "compact_state"]
 
 [dev-dependencies]
 criterion = "0.5"

@@ -968,8 +968,8 @@ fn has_cannot_baton_touch(
     card_id: i16,
     existing_card: &crate::card::Card,
 ) -> bool {
-    existing_card.abilities.iter().any(|a| {
-        a.effect.as_ref().is_some_and(|ef| {
+    existing_card.resolved_abilities().any(|ability| {
+        ability.effect.as_ref().is_some_and(|ef| {
             if ef.restriction_type_any().as_deref() != Some("cannot_baton_touch") {
                 return false;
             }
@@ -1113,8 +1113,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     }
 
                     // Check if this card has play_baton_touch with count > 1 (double baton)
-                    let has_double_baton = card.abilities.iter().any(|a| {
-                        a.effect.as_ref().is_some_and(|ef| {
+                    let has_double_baton = card.resolved_abilities().any(|ability| {
+                        ability.effect.as_ref().is_some_and(|ef| {
                             ef.action == crate::ability::enums::ActionType::PlayBatonTouch
                                 && ef.count.unwrap_or(1) > 1
                         })
@@ -1309,7 +1309,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
         }
         if let Some(card) = game_state.card_database.get_card(card_id) {
             let card_position: MemberArea = area_name.parse().unwrap_or(MemberArea::Center);
-            for (ability_index, ability) in card.abilities.iter().enumerate() {
+            for (ability_index, ar) in card.abilities.iter().enumerate() {
+                let ability = ar.resolve();
                 let can_activate = ability.triggers.as_ref().is_some_and(|t| {
                     t.contains("main")
                         || t.contains(crate::triggers::MAIN)
@@ -1405,7 +1406,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
     // (activation_condition_parsed with location = discard)
     for &card_id in &active_player.waitroom.cards {
         if let Some(card) = game_state.card_database.get_card(card_id) {
-            for (ability_index, ability) in card.abilities.iter().enumerate() {
+            for (ability_index, ar) in card.abilities.iter().enumerate() {
+                let ability = ar.resolve();
                 let is_discard_activation = ability
                     .effect
                     .as_ref()

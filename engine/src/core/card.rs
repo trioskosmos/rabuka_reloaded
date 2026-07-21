@@ -5684,6 +5684,13 @@ impl Card {
         matches!(self.card_type, CardType::Energy)
     }
 
+    /// Iterate abilities, decoding each from bytecode on demand.
+    /// Each call to the iterator decodes one ability. The returned `Arc`s
+    /// are dropped when the iterator or their binding goes out of scope.
+    pub fn resolved_abilities(&self) -> impl Iterator<Item = crate::Arc<Ability>> + '_ {
+        self.abilities.iter().map(|ar| ar.resolve())
+    }
+
     /// Raw ability text for frontend display. Returns `""` when compact_cards
     /// feature is enabled (the text is stripped from the struct).
     pub fn ability_text(&self) -> &str {

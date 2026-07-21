@@ -40,10 +40,8 @@ fn accept_swap_to(game: &mut TestGame, dest: &str) {
 fn trigger_live_success(game: &mut TestGame, card_id: i16) {
     let card = game.db.get_card(card_id).unwrap();
     let ab = card
-        .abilities
-        .iter()
+        .resolved_abilities()
         .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
-        .cloned()
         .unwrap();
     let pid = game.state.player1.id.clone();
     game.state.trigger_auto_ability(

@@ -919,7 +919,7 @@ fn baad_cage_cost_limit_no_match() {
     let card_data = game.state.card_database.get_card(baad_cage);
     assert!(card_data.is_some(), "Baad Cage card should load");
     if let Some(card) = card_data {
-        let has_cost_limit = card.abilities.iter().any(|ab| {
+        let has_cost_limit = card.resolved_abilities().any(|ab| {
             ab.effect.as_ref().is_some_and(|eff| {
                 eff.condition.as_ref().is_some_and(|cond| {
                     cond.get_cost_limit() == Some(10)
