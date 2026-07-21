@@ -305,8 +305,10 @@ pub struct BaseHeart {
 #[derive(Debug, Clone, Serialize)]
 pub struct Card {
     pub card_no: ArcStr,
+    #[cfg(not(feature = "compact_cards"))]
     pub img: Option<ArcStr>,
     pub name: ArcStr,
+    #[cfg(not(feature = "compact_cards"))]
     #[serde(default)]
     pub product: Box<str>,
     #[serde(rename = "type")]
@@ -321,10 +323,13 @@ pub struct Card {
     pub blade_heart: Option<BladeHeart>,
     #[serde(default = "default_blade")]
     pub blade: u32,
+    #[cfg(not(feature = "compact_cards"))]
     #[serde(default)]
     pub rare: Box<str>,
+    #[cfg(not(feature = "compact_cards"))]
     #[serde(default)]
     pub ability: Box<str>,
+    #[cfg(not(feature = "compact_cards"))]
     #[serde(default)]
     pub faq: Vec<FAQEntry>,
     // Live card fields
@@ -503,8 +508,10 @@ impl<'de> Deserialize<'de> for Card {
         #[derive(Debug, Clone, Deserialize)]
         struct CardHelper {
             pub card_no: String,
+            #[cfg(not(feature = "compact_cards"))]
             pub img: Option<ArcStr>,
             pub name: String,
+            #[cfg(not(feature = "compact_cards"))]
             #[serde(default)]
             pub product: String,
             #[serde(rename = "type")]
@@ -517,10 +524,13 @@ impl<'de> Deserialize<'de> for Card {
             pub blade_heart: Option<BladeHeart>,
             #[serde(default = "default_blade")]
             pub blade: u32,
+            #[cfg(not(feature = "compact_cards"))]
             #[serde(default)]
             pub rare: String,
+            #[cfg(not(feature = "compact_cards"))]
             #[serde(default)]
             pub ability: String,
+            #[cfg(not(feature = "compact_cards"))]
             #[serde(default)]
             pub faq: Vec<FAQEntry>,
             pub score: Option<u32>,
@@ -533,8 +543,10 @@ impl<'de> Deserialize<'de> for Card {
 
         Ok(Card {
             card_no: ArcStr::from(helper.card_no),
+            #[cfg(not(feature = "compact_cards"))]
             img: helper.img,
             name: ArcStr::from(helper.name),
+            #[cfg(not(feature = "compact_cards"))]
             product: helper.product.into(),
             card_type: helper.card_type,
             series: helper.series.into(),
@@ -544,8 +556,11 @@ impl<'de> Deserialize<'de> for Card {
             base_heart: helper.base_heart,
             blade_heart: helper.blade_heart,
             blade: helper.blade,
+            #[cfg(not(feature = "compact_cards"))]
             rare: helper.rare.into(),
+            #[cfg(not(feature = "compact_cards"))]
             ability: helper.ability.into(),
+            #[cfg(not(feature = "compact_cards"))]
             faq: helper.faq,
             score: helper.score,
             need_heart: helper.need_heart,
@@ -5667,6 +5682,32 @@ impl Card {
 
     pub fn is_energy(&self) -> bool {
         matches!(self.card_type, CardType::Energy)
+    }
+
+    /// Raw ability text for frontend display. Returns `""` when compact_cards
+    /// feature is enabled (the text is stripped from the struct).
+    pub fn ability_text(&self) -> &str {
+        #[cfg(not(feature = "compact_cards"))]
+        {
+            &self.ability
+        }
+        #[cfg(feature = "compact_cards")]
+        {
+            ""
+        }
+    }
+
+    /// Image URL for frontend display. Returns `None` when compact_cards
+    /// feature is enabled (the field is stripped from the struct).
+    pub fn img_url(&self) -> Option<&str> {
+        #[cfg(not(feature = "compact_cards"))]
+        {
+            self.img.as_deref()
+        }
+        #[cfg(feature = "compact_cards")]
+        {
+            None
+        }
     }
 
     /// Total hearts this card has (printed hearts for member cards).

@@ -61,6 +61,9 @@ bytecode_abilities = []
 # Reduces per-trigger heap allocs from ~15K to ~150. Requires alloc_tracker.
 # NOT in default — enable explicitly for production/profiling builds.
 arena_allocator = ["alloc_tracker"]
+# Compact cards: strips display-only fields (img, product, rare, ability text, faq)
+# from the Card struct to reduce RAM on embedded/console targets.
+compact_cards = []
 
 [dev-dependencies]
 criterion = "0.5"

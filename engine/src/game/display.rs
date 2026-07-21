@@ -576,7 +576,7 @@ pub fn card_to_display(
                 ((card.blade as i32) + blade_modifier).max(0) as u32
             },
             id: card_id,
-            ability_text: Some(card.ability.to_string()),
+            ability_text: Some(card.ability_text().to_string()),
             bonus_blade: blade_modifier,
             bonus_hearts: Vec::new(),
             bonus_score: 0,
@@ -730,7 +730,7 @@ pub fn card_to_display_full(
                 total_blade
             },
             id: card_id,
-            ability_text: Some(card.ability.to_string()),
+            ability_text: Some(card.ability_text().to_string()),
             // ── Additive bonuses (shown with +/- prefix) ──────────────
             // ModifyBlade / GainResource(blade) → icon_blade.png "+N"/"-N"
             bonus_blade: blade_additive,
