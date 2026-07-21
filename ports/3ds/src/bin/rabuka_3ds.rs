@@ -381,20 +381,25 @@ fn main() {
                             } else {
                                 // Game-mode: graphical mode selection screen on top LCD.
                                 // Colors use c2d() byte order: 0xAABBGGRR.
+                                //
+                                // Font scaling reference (citro2d normalizes all fonts):
+                                //   scale * 30.0 = rendered glyph height in pixels.
+                                //   e.g. 0.70 = 21px, 0.85 = 26px, 1.0 = 30px (full).
+                                //   Top screen is 400x240, bottom is 320x240.
                                 _3ds_top_clear();
                                 _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
                                 _3ds_top_queue_text(
                                     100.0,
-                                    15.0,
+                                    10.0,
                                     COL_GOLD,
-                                    0.70f32,
+                                    0.85f32,
                                     "SELECT MODE\0".as_ptr(),
                                 );
                                 for (i, m) in ["Sandbox (2 players)", "VS AI"].iter().enumerate() {
-                                    let y = 55.0 + i as f32 * 80.0;
+                                    let y = 50.0 + i as f32 * 90.0;
                                     let bg = if i == cur { COL_SEL } else { COL_DIM };
                                     unsafe {
-                                        _3ds_top_queue_rect(40.0, y, 320.0, 55.0, bg);
+                                        _3ds_top_queue_rect(40.0, y, 320.0, 65.0, bg);
                                     }
                                     if i == cur {
                                         unsafe {
@@ -402,7 +407,7 @@ fn main() {
                                                 40.0,
                                                 y,
                                                 320.0,
-                                                55.0,
+                                                65.0,
                                                 COL_HIGHLIGHT,
                                             );
                                         }
@@ -410,20 +415,20 @@ fn main() {
                                     let color = if i == cur { COL_GOLD } else { COL_LIGHT };
                                     unsafe {
                                         _3ds_top_queue_text(
-                                            60.0,
-                                            y + 10.0,
+                                            50.0,
+                                            y + 15.0,
                                             color,
-                                            0.55f32,
+                                            0.75f32,
                                             format!("{}\0", m).as_ptr(),
                                         );
                                     }
                                 }
                                 unsafe {
                                     _3ds_top_queue_text(
-                                        60.0,
-                                        220.0,
+                                        50.0,
+                                        225.0,
                                         COL_MED,
-                                        0.45f32,
+                                        0.65f32,
                                         "UP/DOWN=select  A=confirm\0".as_ptr(),
                                     );
                                 }
@@ -492,19 +497,21 @@ fn main() {
                                     _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
                                     _3ds_top_queue_text(
                                         80.0,
-                                        10.0,
+                                        8.0,
                                         COL_GOLD,
-                                        0.65f32,
+                                        0.85f32,
                                         format!("SELECT {}\0", label).as_ptr(),
                                     );
                                 }
-                                let start = cur.saturating_sub(4).min(n.saturating_sub(8));
-                                let end = (start + 8).min(n);
+                                // Show 6 decks max: 240px screen - 30px title - 20px help = 190px
+                                // 190 / 6 = ~32px per row at 0.70 scale (~21px glyph)
+                                let start = cur.saturating_sub(3).min(n.saturating_sub(6));
+                                let end = (start + 6).min(n);
                                 for i in start..end {
-                                    let y = 30.0 + (i - start) as f32 * 22.0;
+                                    let y = 30.0 + (i - start) as f32 * 32.0;
                                     let bg = if i == cur { COL_SEL } else { COL_DIM };
                                     unsafe {
-                                        _3ds_top_queue_rect(20.0, y, 360.0, 20.0, bg);
+                                        _3ds_top_queue_rect(20.0, y, 360.0, 30.0, bg);
                                     }
                                     if i == cur {
                                         unsafe {
@@ -512,7 +519,7 @@ fn main() {
                                                 20.0,
                                                 y,
                                                 360.0,
-                                                20.0,
+                                                30.0,
                                                 COL_HIGHLIGHT,
                                             );
                                         }
@@ -521,9 +528,9 @@ fn main() {
                                     unsafe {
                                         _3ds_top_queue_text(
                                             24.0,
-                                            y + 1.0,
+                                            y + 3.0,
                                             color,
-                                            0.48f32,
+                                            0.70f32,
                                             format!("{}\0", decks[i].name).as_ptr(),
                                         );
                                     }
@@ -531,9 +538,9 @@ fn main() {
                                 unsafe {
                                     _3ds_top_queue_text(
                                         20.0,
-                                        225.0,
+                                        228.0,
                                         COL_MED,
-                                        0.45f32,
+                                        0.65f32,
                                         "UP/DOWN=select  A=confirm\0".as_ptr(),
                                     );
                                 }
@@ -606,19 +613,19 @@ fn main() {
                                     _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
                                     _3ds_top_queue_text(
                                         80.0,
-                                        10.0,
+                                        8.0,
                                         COL_GOLD,
-                                        0.65f32,
+                                        0.85f32,
                                         "SELECT P2 DECK\0".as_ptr(),
                                     );
                                 }
-                                let start = cur.saturating_sub(4).min(n.saturating_sub(8));
-                                let end = (start + 8).min(n);
+                                let start = cur.saturating_sub(3).min(n.saturating_sub(6));
+                                let end = (start + 6).min(n);
                                 for i in start..end {
-                                    let y = 30.0 + (i - start) as f32 * 22.0;
+                                    let y = 30.0 + (i - start) as f32 * 32.0;
                                     let bg = if i == cur { COL_SEL } else { COL_DIM };
                                     unsafe {
-                                        _3ds_top_queue_rect(20.0, y, 360.0, 20.0, bg);
+                                        _3ds_top_queue_rect(20.0, y, 360.0, 30.0, bg);
                                     }
                                     if i == cur {
                                         unsafe {
@@ -626,7 +633,7 @@ fn main() {
                                                 20.0,
                                                 y,
                                                 360.0,
-                                                20.0,
+                                                30.0,
                                                 COL_HIGHLIGHT,
                                             );
                                         }
@@ -635,9 +642,9 @@ fn main() {
                                     unsafe {
                                         _3ds_top_queue_text(
                                             24.0,
-                                            y + 1.0,
+                                            y + 3.0,
                                             color,
-                                            0.48f32,
+                                            0.70f32,
                                             format!("{}\0", decks[i].name).as_ptr(),
                                         );
                                     }
@@ -645,9 +652,9 @@ fn main() {
                                 unsafe {
                                     _3ds_top_queue_text(
                                         20.0,
-                                        225.0,
+                                        228.0,
                                         COL_MED,
-                                        0.45f32,
+                                        0.65f32,
                                         "A=select  B=use same\0".as_ptr(),
                                     );
                                 }
@@ -1398,18 +1405,38 @@ fn main() {
                         }
                     } else {
                         // ===== GAME MODE: graphical rendering =====
+                        //
+                        // FONT SCAPLING REFERENCE (citro2d BCFNT):
+                        // The BCFNT font has native cellHeight=42px. citro2d normalizes
+                        // this so that scale 1.0 always renders at 30px glyph height:
+                        //   rendered_height = user_scale * (30.0 / cellHeight) * cellHeight
+                        //                    = user_scale * 30.0
+                        //
+                        // Scale-to-pixel cheat sheet:
+                        //   0.50 = 15px  (too small, was our old default)
+                        //   0.60 = 18px  (barely readable)
+                        //   0.65 = 20px  (minimum for body text)
+                        //   0.70 = 21px  (good for deck list items)
+                        //   0.75 = 23px  (menu items)
+                        //   0.80 = 24px  (card names)
+                        //   0.85 = 26px  (titles, CLI mode)
+                        //   1.00 = 30px  (full size)
+                        //
+                        // Top screen: 400x240. Bottom screen: 320x240.
+                        // Line advance ≈ ceil(scale * 0.714 * 31) pixels per line.
                         unsafe {
                             _3ds_top_clear();
                         }
-                        // Top screen in game mode: color-coordinated panels with proper \0 terminators
-                        // Stats panel bar at top showing turn/phase/active-player/HP/deck counts
+                        // Top screen in game mode: color-coordinated panels with proper \0 terminators.
+                        // Stats panel bar at top showing turn/phase/active-player/HP/deck counts.
+                        // Font scaling: scale * 30 = glyph height in px. 0.70 = 21px, 0.80 = 24px.
                         unsafe {
-                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 36.0, COL_PANEL);
+                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 40.0, COL_PANEL);
                             _3ds_top_queue_text(
                                 4.0,
-                                3.0,
+                                2.0,
                                 COL_GOLD,
-                                0.50f32,
+                                0.70f32,
                                 format!(
                                     "T{} {:?} [{}]  P1 H:{} E:{}/{} D:{}  P2 H:{} E:{}/{} D:{}\0",
                                     gs.turn_number,
@@ -1428,9 +1455,9 @@ fn main() {
                             );
                             _3ds_top_queue_text(
                                 4.0,
-                                20.0,
+                                22.0,
                                 COL_LIGHT,
-                                0.42f32,
+                                0.60f32,
                                 format!(
                                     "W:{} L:{}  taps:{}  Y=CLI  X=detail\0",
                                     p1.waitroom.cards.len(),
@@ -1445,12 +1472,12 @@ fn main() {
                         if let Some(vcid) = viewing_card {
                             if let Some(card) = gs.card_database.get_card(vcid) {
                                 unsafe {
-                                    _3ds_top_queue_rect(0.0, 38.0, 400.0, 202.0, COL_CARD);
+                                    _3ds_top_queue_rect(0.0, 42.0, 400.0, 198.0, COL_CARD);
                                     _3ds_top_queue_text(
                                         4.0,
-                                        40.0,
+                                        44.0,
                                         COL_BLUE,
-                                        0.55f32,
+                                        0.80f32,
                                         format!(
                                             "[{}] {}\0",
                                             card.card_no,
@@ -1458,22 +1485,22 @@ fn main() {
                                         )
                                         .as_ptr(),
                                     );
-                                    let mut ty = 56.0;
+                                    let mut ty = 66.0;
                                     for ab in card.resolved_abilities() {
                                         let w = wrap_text(&ab.full_text, 45);
                                         for line in w.lines() {
-                                            if ty < 230.0 {
+                                            if ty < 232.0 {
                                                 _3ds_top_queue_text(
                                                     4.0,
                                                     ty,
                                                     COL_LIGHT,
-                                                    0.45f32,
+                                                    0.65f32,
                                                     format!("{}\0", line).as_ptr(),
                                                 );
-                                                ty += 14.0;
+                                                ty += 18.0;
                                             }
                                         }
-                                        ty += 2.0;
+                                        ty += 3.0;
                                     }
                                 }
                             }
@@ -1481,12 +1508,12 @@ fn main() {
                         } else if let Some(entry) = gs.ability_queue.current_entry() {
                             unsafe {
                                 let ab_text = wrap_text(&entry.ability.full_text, 40);
-                                _3ds_top_queue_rect(0.0, 38.0, 400.0, 202.0, COL_ABILITY);
+                                _3ds_top_queue_rect(0.0, 42.0, 400.0, 198.0, COL_ABILITY);
                                 _3ds_top_queue_text(
                                     4.0,
-                                    40.0,
+                                    44.0,
                                     COL_PINK,
-                                    0.50f32,
+                                    0.75f32,
                                     format!(
                                         "[{}] {}\0",
                                         entry.card_no,
@@ -1494,27 +1521,28 @@ fn main() {
                                     )
                                     .as_ptr(),
                                 );
-                                let mut ty = 54.0;
+                                let mut ty = 64.0;
                                 for line in ab_text.lines().skip(1) {
-                                    if ty < 230.0 {
+                                    if ty < 232.0 {
                                         _3ds_top_queue_text(
                                             4.0,
                                             ty,
                                             COL_LIGHT,
-                                            0.45f32,
+                                            0.65f32,
                                             format!("{}\0", line).as_ptr(),
                                         );
-                                        ty += 14.0;
+                                        ty += 18.0;
                                     }
                                 }
                             }
                         }
 
                         // Action overlay on bottom screen (safe per-line copy into C)
+                        // At 24px line height on 240p screen: max ~8 lines visible.
                         let is_ai_turn = *vs_ai && gs.active_player().id != gs.player1.id;
                         if !is_ai_turn && !acts_cache.is_empty() {
                             let n = acts_cache.len();
-                            let max_vis = 6usize;
+                            let max_vis = 8usize;
                             let half = max_vis / 2;
                             let start = if n > max_vis {
                                 (cur as isize - half as isize)

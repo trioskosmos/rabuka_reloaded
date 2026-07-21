@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::fs;
 
-use rabuka_engine::card::{Ability, Card};
+use rabuka_engine::card::Card;
 use rabuka_engine::card_loader::CardLoader;
 
 /// Normalize card number: uppercase ASCII, fullwidth → halfwidth.
@@ -149,13 +149,13 @@ fn main() {
 
                 // Write per-deck card file with abilities pre-attached
                 let deck_filename = format!("deck_{deck_index}_cards.json");
-                let deck_cards_str = if let Some(ref abil_val) = abilities_value {
-                    // Parse into Card structs, attach abilities, re-serialize
-                    let cards: Vec<Card> = deck_cards
+                let deck_cards_str = if abilities_value.is_some() {
+                    // Parse into Card structs, attach bytecode ability indices, re-serialize
+                    let mut cards: Vec<Card> = deck_cards
                         .iter()
                         .map(|v| serde_json::from_value(v.clone()).unwrap())
                         .collect();
-                    let cards: Vec<Card> = CardLoader::attach_abilities(cards, abil_val);
+                    CardLoader::attach_abilities(&mut cards);
                     serde_json::to_string(&cards).unwrap()
                 } else {
                     serde_json::to_string(&deck_cards).unwrap()
@@ -221,29 +221,6 @@ fn main() {
         all_str.len()
     );
 
-    // Pre-bake ability map for ALL deck-referenced cards
-    let abilities_path = repo_root.join("cards/abilities.json");
-    if let Ok(abilities_json) = fs::read_to_string(&abilities_path) {
-        if let Ok(abilities_value) = serde_json::from_str::<serde_json::Value>(&abilities_json) {
-            let full_map: std::collections::HashMap<String, Vec<Ability>> =
-                CardLoader::build_abilities_map(&abilities_value);
-            let filtered: std::collections::HashMap<String, Vec<Ability>> = full_map
-                .into_iter()
-                .filter(|(k, _)| all_needed.contains(k))
-                .collect();
-            let map_str = serde_json::to_string(&filtered).unwrap();
-            fs::write(out.join("ability_map.json"), &map_str).unwrap();
-            println!(
-                "ability_map.json: {} cards, {} bytes",
-                filtered.len(),
-                map_str.len()
-            );
-        } else {
-            println!("WARNING: failed to parse abilities.json");
-            fs::write(out.join("ability_map.json"), "{}").unwrap();
-        }
-    } else {
-        println!("WARNING: abilities.json not found, abilities disabled");
-        fs::write(out.join("ability_map.json"), "{}").unwrap();
-    }
+    // Ability map is no longer needed — abilities are baked as bytecode indices
+    // into each card via CardLoader::attach_abilities().
 }

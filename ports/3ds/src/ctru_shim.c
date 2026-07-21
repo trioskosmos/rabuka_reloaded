@@ -1,4 +1,24 @@
 // Rabuka 3DS — C shim using citro2d for board rendering + text display.
+//
+// FONT SCALING REFERENCE:
+// The BCFNT font (romfs:/font.bcfnt) has native cellHeight=42px.
+// citro2d normalizes ALL fonts via: textScale = 30.0 / cellHeight.
+// The user-supplied scale is then multiplied by textScale internally,
+// so the final rendered glyph height is always: scale * 30.0 pixels.
+//
+//   Scale   Glyph Height   Use Case
+//   -----   --------------   --------
+//   0.50      15px          Too small for 3DS screens
+//   0.60      18px          Barely readable minimum
+//   0.65      20px          Zone labels, body text
+//   0.70      21px          Deck list items, utility counts
+//   0.75      23px          Menu items, ability queue header
+//   0.80      24px          Card names in detail view
+//   0.85      26px          Titles, CLI mode text
+//   1.00      30px          Full system-font size
+//
+// Line advance ≈ ceil(scale * 0.714 * 31) px (depends on font lineFeed).
+// Top screen: 400x240. Bottom screen: 320x240.
 
 #include <stdlib.h>
 #include <string.h>
@@ -149,6 +169,10 @@ void _3ds_init() {
     tmp_text_buf = C2D_TextBufNew(8192);
 }
 
+// Measure per-line height for the custom font at scale 0.85.
+// Parses a two-line string, gets total height, divides by 2.
+// At scale 0.85: ceil(0.85 * (30/42) * 31) = 19px per line.
+// Fallback 30.0px if measurement fails (matches system font at scale 1.0).
 float _3ds_bot_line_height() {
     C2D_Font f = custom_font ? custom_font : NULL;
     C2D_TextBuf tmp = C2D_TextBufNew(128);
@@ -298,6 +322,9 @@ void _3ds_set_cli_mode(bool cli) { cli_mode = cli; }
 bool _3ds_is_cli_mode() { return cli_mode; }
 
 // ---- Top screen draw-op queue (game mode) ----
+// Queued draw ops are rendered in _3ds_swap_buffers. Text ops carry a scale
+// value which citro2d interprets as: glyph_height = scale * 30.0 pixels.
+// This queue is cleared and re-filled every frame by the Rust game loop.
 void _3ds_top_clear() { draw_op_count = 0; }
 
 void _3ds_top_queue_rect(float x, float y, float w, float h, u32 color) {
@@ -462,6 +489,14 @@ void _3ds_draw_dotted_rect(float x, float y, float w, float h, u32 color) {
     }
 }
 
+// Draw a text label at (x,y) with the given color and scale.
+// citro2d normalizes all BCFNT fonts so that scale 1.0 = 30px glyph height.
+// The formula is: rendered_glyph_height = scale * 30.0 pixels.
+//   scale 0.50 = 15px (too small for 3DS screens)
+//   scale 0.65 = 20px (minimum readable)
+//   scale 0.70 = 21px (good for body text)
+//   scale 0.85 = 26px (CLI mode / large titles)
+//   scale 1.0  = 30px (full system-font size)
 void _3ds_draw_label(const char* label, float x, float y, u32 color, float scale) {
     if (!label || label[0] == '\0') return;
     C2D_Font f = custom_font ? custom_font : NULL;
@@ -507,12 +542,15 @@ void _3ds_draw_card_at(CardSlot* slot, float x, float y, float w, float h) {
     }
 }
 
+// Zone height allocation for bottom screen (320x240).
+// With font scale 0.65 (~20px glyph), each zone needs enough height for its
+// label line plus content. Energy gets 15% (was 9%) to fit the "ENERGY" label.
 static void zone_heights(float h, float* live, float* stage, float* energy, float* hand) {
     float u = h - 3.0f;
-    *live   = u * 0.22f;
-    *stage  = u * 0.27f;
-    *energy = u * 0.09f;
-    *hand   = u * 0.42f;
+    *live   = u * 0.20f;
+    *stage  = u * 0.25f;
+    *energy = u * 0.15f;
+    *hand   = u * 0.40f;
 }
 
 static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool flip_cards) {
@@ -546,9 +584,10 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float util_w = W - util_x - M;
 
     // === LIVE ZONE ===
+    // Zone labels: scale 0.65 = ~20px glyph on 240p screen.
     _3ds_draw_rect(M, live_y, W - 2 * M, live_h, COL_ZONE_BG);
     _3ds_draw_border(M, live_y, W - 2 * M, live_h, COL_PINK, 1);
-    _3ds_draw_label("LIVE", M + 2, live_y + 1, COL_TEXT, 0.42f);
+    _3ds_draw_label("LIVE", M + 2, live_y + 1, COL_TEXT, 0.65f);
     float lx = M + 3;
     float live_card_h = live_h - 4;
     float live_slot_w = live_card_h * LANDSCAPE;
@@ -566,7 +605,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float st_card_w = st_slot_h * PORTRAIT;   // portrait card width within landscape slot
     float st_pad_x = (st_slot_w - st_card_w) * 0.5f;  // horizontal padding to center portrait
     float st_pad_y = 1.0f;
-    _3ds_draw_label("STAGE", M + 2, stage_y + 1, COL_TEXT, 0.42f);
+    _3ds_draw_label("STAGE", M + 2, stage_y + 1, COL_TEXT, 0.65f);
     // Stage slots: opponent displayed in reverse (R C L)
     for (int i = 0; i < 3; i++) {
         int si = opponent ? (2 - i) : i;
@@ -593,22 +632,24 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     // Utility counts
     _3ds_draw_rect(util_x, stage_y, util_w, stage_h, COL_ZONE_BG);
     _3ds_draw_border(util_x, stage_y, util_w, stage_h, COL_ZONE_BDR, 1);
+    // Utility counts: scale 0.70 = 21px glyph, 0.65 = 20px fallback.
+    // Line spacing fy += 14 accommodates 21px glyph + 1px gap.
     char buf[40];
-    float fs = stage_h > 40 ? 0.55f : 0.48f;
+    float fs = stage_h > 40 ? 0.70f : 0.65f;
     float fy = stage_y + 1;
     snprintf(buf, sizeof(buf), "D:%d", pb->deck);
-    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 12;
+    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 14;
     snprintf(buf, sizeof(buf), "E:%d", pb->edeck);
-    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 12;
+    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 14;
     snprintf(buf, sizeof(buf), "W:%d", pb->discard);
-    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 12;
+    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 14;
     snprintf(buf, sizeof(buf), "S:%d", pb->success);
     _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs);
 
     // === ENERGY ===
     _3ds_draw_rect(M, energy_y, W - 2 * M, energy_h, COL_ZONE_BG);
     _3ds_draw_border(M, energy_y, W - 2 * M, energy_h, COL_GOLD, 1);
-    _3ds_draw_label("ENERGY", M + 2, energy_y + 1, COL_TEXT, 0.42f);
+    _3ds_draw_label("ENERGY", M + 2, energy_y + 1, COL_TEXT, 0.65f);
     float ex = M + 2;
     float e_sz = energy_h - 4;
     for (int i = 0; i < pb->energy_count && i < MAX_SLOTS; i++) {
@@ -625,7 +666,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     // === HAND ===
     _3ds_draw_rect(M, hand_y, W - 2 * M, hand_h, COL_ZONE_BG);
     _3ds_draw_border(M, hand_y, W - 2 * M, hand_h, COL_TEXT, 1);
-    _3ds_draw_label("HAND", M + 2, hand_y + 1, COL_TEXT, 0.42f);
+    _3ds_draw_label("HAND", M + 2, hand_y + 1, COL_TEXT, 0.65f);
     float hx = M + 2;
     float hand_card_h = hand_h - 4;
     float h_slot_w = hand_card_h * PORTRAIT;
@@ -678,46 +719,48 @@ void _3ds_render_board() {
     }
 
     // HUD overlay bar (game mode only)
+    // HUD overlay bar: scale 0.65 = ~20px glyph. Bar height 22px fits one line.
     if (!cli_mode && hud_turn > 0) {
-        C2D_DrawRectSolid(0, 0, 0.5f, 320, 18, C2D_Color32(0, 0, 0, 180));
+        C2D_DrawRectSolid(0, 0, 0.5f, 320, 22, C2D_Color32(0, 0, 0, 180));
         char hbuf[64];
         snprintf(hbuf, sizeof(hbuf), "T%d %s [%s]", hud_turn, hud_phase, hud_player);
-        _3ds_draw_label(hbuf, 4, 1, COL_SEL, 0.48f);
+        _3ds_draw_label(hbuf, 4, 1, COL_SEL, 0.65f);
     }
 
     // Action overlay panel (game mode, bottom-right)
+    // Action overlay panel: scale 0.60 = 18px glyph, line height 24px.
     if (!cli_mode && overlay_count > 0) {
-        float p_w = 200.0f, p_h = 20.0f * overlay_count + 8.0f;
+        float p_w = 210.0f, p_h = 24.0f * overlay_count + 8.0f;
         float p_x = 320.0f - p_w - 2.0f;
         float p_y = 240.0f - p_h - 2.0f;
         C2D_DrawRectSolid(p_x, p_y, 0.5f, p_w, p_h, C2D_Color32(10, 14, 26, 220));
         _3ds_draw_border(p_x, p_y, p_w, p_h, COL_ZONE_BDR, 1);
         for (int i = 0; i < overlay_count; i++) {
-            float ly = p_y + 4.0f + i * 20.0f;
+            float ly = p_y + 4.0f + i * 24.0f;
             if (i == overlay_selected) {
-                C2D_DrawRectSolid(p_x + 1, ly - 1, 0.5f, p_w - 2, 18.0f, C2D_Color32(80, 100, 80, 100));
+                C2D_DrawRectSolid(p_x + 1, ly - 1, 0.5f, p_w - 2, 22.0f, C2D_Color32(80, 100, 80, 100));
             }
             char line[OVERLAY_LINE_LEN + 2];
             snprintf(line, sizeof(line), "%s%s", i == overlay_selected ? ">" : " ", overlay_lines[i]);
-            _3ds_draw_label(line, p_x + 3, ly, i == overlay_selected ? COL_SEL : COL_TEXT, 0.42f);
+            _3ds_draw_label(line, p_x + 3, ly, i == overlay_selected ? COL_SEL : COL_TEXT, 0.60f);
         }
     }
 
-    // View indicator + hand range (bottom-right, clipped if overlay present)
+    // View indicator + hand range: scale 0.70 = 21px, 0.65 = 20px.
     if (!cli_mode && overlay_count > 0) return; // overlay covers it
     const char* view_label = board_view == 0 ? "YOU" : (board_view == 1 ? "OPP" : "BOTH");
-    _3ds_draw_label(view_label, 280, 220, COL_GOLD, 0.60f);
+    _3ds_draw_label(view_label, 275, 218, COL_GOLD, 0.70f);
     char hbuf2[20];
     int e = (hand_range_off + hand_range_vis) < hand_range_total
               ? (hand_range_off + hand_range_vis) : hand_range_total;
     snprintf(hbuf2, sizeof(hbuf2), "%d-%d/%d", hand_range_off + 1, e, hand_range_total);
-    _3ds_draw_label(hbuf2, 280, 210, COL_TEXT, 0.50f);
+    _3ds_draw_label(hbuf2, 275, 206, COL_TEXT, 0.65f);
     if (hand_range_off > 0 && (hand_range_off + hand_range_vis) < hand_range_total) {
-        _3ds_draw_label("< >", 280, 202, COL_GOLD, 0.50f);
+        _3ds_draw_label("< >", 275, 196, COL_GOLD, 0.65f);
     } else if (hand_range_off > 0) {
-        _3ds_draw_label("<", 280, 202, COL_GOLD, 0.50f);
+        _3ds_draw_label("<", 275, 196, COL_GOLD, 0.65f);
     } else if ((hand_range_off + hand_range_vis) < hand_range_total) {
-        _3ds_draw_label(">", 280, 202, COL_GOLD, 0.50f);
+        _3ds_draw_label(">", 275, 196, COL_GOLD, 0.65f);
     }
 }
 
@@ -741,7 +784,7 @@ void _3ds_swap_buffers() {
 
     // TOP SCREEN
     if (cli_mode) {
-        // CLI/debug mode: green text on black (current behavior)
+        // CLI/debug mode: green text on black at scale 0.85 = 26px glyph.
         C2D_TargetClear(top_target, C2D_Color32(0, 0, 0, 255));
         C2D_SceneBegin(top_target);
         if (top_parsed) {
