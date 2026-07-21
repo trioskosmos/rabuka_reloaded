@@ -731,7 +731,7 @@ impl AbilityResolver {
                             entry.optional_cost_result = Some(false);
                         }
                         let pp = gs.player_prefix();
-                        gs.rule_log.push(format!(
+                        gs.push_rule_log(format!(
                             "{}: [[log_cost_skip:reason=no_active_energy,need=any,active=0]]",
                             pp
                         ));
@@ -772,7 +772,7 @@ impl AbilityResolver {
                             entry.optional_cost_result = Some(false);
                         }
                         let pp = gs.player_prefix();
-                        gs.rule_log.push(format!(
+                        gs.push_rule_log(format!(
                             "{}: [[log_cost_skip:reason=insufficient_energy,need={},active={}]]",
                             pp, energy, active
                         ));

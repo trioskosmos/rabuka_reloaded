@@ -64,6 +64,9 @@ arena_allocator = ["alloc_tracker"]
 # Compact cards: strips display-only fields (img, product, rare, ability text, faq)
 # from the Card struct to reduce RAM on embedded/console targets.
 compact_cards = []
+# Compact GameState: caps log/application Vecs to bounded sizes instead of
+# unbounded accumulation. Reduces GameState RAM by ~80%+ for console targets.
+compact_state = []
 
 [dev-dependencies]
 criterion = "0.5"

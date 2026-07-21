@@ -830,7 +830,7 @@ impl AbilityResolver {
             .map(|c| self.card_name(c))
             .unwrap_or_default();
         let bt_str = blade_type.unwrap_or("none");
-        gs.rule_log.push(format!(
+        gs.push_rule_log(format!(
             "{} {}: [[log_set_blade_type:type={}]]",
             pp, act_name, bt_str
         ));
@@ -923,7 +923,7 @@ impl AbilityResolver {
             other => other,
         };
         let ht = resolved_heart_type.unwrap_or("heart00").to_string();
-        gs.rule_log.push(format!(
+        gs.push_rule_log(format!(
             "{} {}: [[log_set_heart_type:type={}]]",
             pp, act_name, ht
         ));
@@ -973,7 +973,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!(
+        gs.push_rule_log(format!(
             "{} {}: [[log_activation_cost:op={},value={}]]",
             pp, act_name, operation, value
         ));
@@ -1014,7 +1014,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!(
+        gs.push_rule_log(format!(
             "{} {}: [[log_reduce_live_set_limit:n={}]]",
             pp, act_name, count
         ));
@@ -1034,7 +1034,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!(
+        gs.push_rule_log(format!(
             "{} {}: [[log_set_blade_count:n={}]]",
             pp, act_name, value
         ));
@@ -1207,7 +1207,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!(
+        gs.push_rule_log(format!(
             "{} {}: [[log_modify_cost:op={},value={}]]",
             pp, act_name, operation, value
         ));

@@ -237,7 +237,7 @@ impl AbilityResolver {
                 .and_then(|id| gs.card_database.get_card(id))
                 .map(|c| c.name.to_string())
                 .unwrap_or_default();
-            gs.rule_log.push(format!(
+            gs.push_rule_log(format!(
                 "{} {}: [[log_score_modify:op={},value={},applied={}]]",
                 pp, act_name, operation, final_value, count_applied
             ));
@@ -460,7 +460,7 @@ impl AbilityResolver {
         let per_color_value = value;
         for hc in &colors {
             let color = crate::zones::parse_heart_color(hc);
-            gs.rule_log.push(format!(
+            gs.push_rule_log(format!(
                 "{} {}: [[log_required_hearts:op={},value={},color={}]]",
                 pp, act_name, operation, per_color_value, hc
             ));
@@ -519,7 +519,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!(
+        gs.push_rule_log(format!(
             "{} {}: [[log_required_hearts_std:op={},value={}]]",
             pp, act_name, operation, value
         ));
@@ -537,7 +537,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!(
+        gs.push_rule_log(format!(
             "{} {}: [[log_yell_count:op={},n={}]]",
             pp, act_name, operation, count
         ));
@@ -566,7 +566,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!(
+        gs.push_rule_log(format!(
             "{} {}: [[log_stage_limit:op={},n={}]]",
             pp, act_name, operation, count
         ));
@@ -598,7 +598,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!(
+        gs.push_rule_log(format!(
             "{} {}: [[log_success_hearts:op={},value={}]]",
             pp, act_name, operation, value
         ));

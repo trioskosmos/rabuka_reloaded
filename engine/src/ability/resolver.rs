@@ -594,11 +594,11 @@ impl AbilityResolver {
             "{pp} {card_name} [{zone}]: [[log_ability_result:trigger=trigger_{trigger_str},result=result_{}]]",
             result
         );
-        gs.rule_log.push(log_text.clone());
+        gs.push_rule_log(log_text.clone());
         if !crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             return;
         }
-        gs.structured_log.push(LogEntry {
+        gs.push_structured_log(LogEntry {
             text: log_text,
             turn: gs.turn_number,
             player_label: pp.clone(),
@@ -849,7 +849,7 @@ impl AbilityResolver {
                             && ability.triggers.as_deref() != Some(crate::triggers::DEBUT)
                         {
                             let pp2 = gs.player_prefix();
-                            gs.rule_log.push(format!(
+                            gs.push_rule_log(format!(
                                 "{pp2} {card_name}: [[log_position_fail:keyword={kw:?}]]"
                             ));
                         }

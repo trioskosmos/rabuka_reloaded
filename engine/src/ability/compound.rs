@@ -865,7 +865,7 @@ impl AbilityResolver {
                         .energy_zone
                         .active_count() as usize;
                     if active < need {
-                        gs.rule_log.push(format!(
+                        gs.push_rule_log(format!(
                             "{}: [[log_cost_skip:reason=compound_insufficient_energy,need={},active={}]]",
                             pp, need, active
                         ));

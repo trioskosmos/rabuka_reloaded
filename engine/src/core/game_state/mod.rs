@@ -637,11 +637,11 @@ impl GameState {
         source_card_name: Option<String>,
         category: &str,
     ) {
-        self.rule_log.push(text.clone());
+        self.push_rule_log(text.clone());
         if !crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             return;
         }
-        self.structured_log.push(LogEntry {
+        self.push_structured_log(LogEntry {
             text,
             turn: self.turn_number,
             player_label: player_label.to_string(),
@@ -733,6 +733,47 @@ impl GameState {
         }
     }
 
+    /// Push a line to the rule log. When `compact_state` is enabled, capped at 500.
+    pub fn push_rule_log(&mut self, text: String) {
+        Self::push_rule_log_to(&mut self.rule_log, text);
+    }
+
+    /// Push an entry to the structured log. When `compact_state` is enabled, capped at 500.
+    pub fn push_structured_log(&mut self, entry: crate::types::LogEntry) {
+        Self::push_structured_log_to(&mut self.structured_log, entry);
+    }
+
+    /// Field-level helper: push to a rule log Vec with optional cap.
+    pub fn push_rule_log_to(log: &mut Vec<String>, text: String) {
+        #[cfg(feature = "compact_state")]
+        if log.len() >= 500 {
+            log.remove(0);
+        }
+        log.push(text);
+    }
+
+    /// Field-level helper: push to a structured log Vec with optional cap.
+    pub fn push_structured_log_to(
+        log: &mut Vec<crate::types::LogEntry>,
+        entry: crate::types::LogEntry,
+    ) {
+        #[cfg(feature = "compact_state")]
+        if log.len() >= 500 {
+            log.remove(0);
+        }
+        log.push(entry);
+    }
+
+    /// Push a performance snapshot. When `compact_state` is enabled, capped
+    /// at 32 entries (far more than any game's live performances).
+    pub fn push_performance_snapshot(&mut self, snap: crate::types::PerformanceSnapshot) {
+        #[cfg(feature = "compact_state")]
+        if self.performance_snapshots.len() >= 32 {
+            self.performance_snapshots.remove(0);
+        }
+        self.performance_snapshots.push(snap);
+    }
+
     /// Record an ability application for source-tracking in the performance snapshot.
     /// Called from effect handlers after applying a modifier.
     pub fn record_ability_application(
@@ -744,6 +785,10 @@ impl GameState {
         heart_color: Option<usize>,
         amount: i32,
     ) {
+        #[cfg(feature = "compact_state")]
+        if self.ability_applications.len() >= 500 {
+            self.ability_applications.remove(0);
+        }
         self.ability_applications
             .push(crate::types::AbilityApplication {
                 source_card_id,

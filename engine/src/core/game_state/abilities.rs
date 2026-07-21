@@ -1224,11 +1224,11 @@ impl GameState {
             let log_text = format!(
                 "{pp} {card_name} [{zone}]: [[log_ability_result:trigger=trigger_{trigger_str},result=result_skipped_negated]]"
             );
-            self.rule_log.push(log_text.clone());
+            self.push_rule_log(log_text.clone());
             if !crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
                 return;
             }
-            self.structured_log.push(crate::types::LogEntry {
+            self.push_structured_log(crate::types::LogEntry {
                 text: log_text,
                 turn: self.turn_number,
                 player_label: pp.clone(),

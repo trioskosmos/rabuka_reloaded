@@ -676,10 +676,13 @@ impl super::TurnEngine {
                 } else {
                     format!(" [{}]", live_details)
                 };
-                game_state.rule_log.push(format!(
-                    "[Turn {}] {} [[log_performance:score={},result={}]]{}",
-                    snap.turn, player, snap.total_score, perf_result, detail_str,
-                ));
+                GameState::push_rule_log_to(
+                    &mut game_state.rule_log,
+                    format!(
+                        "[Turn {}] {} [[log_performance:score={},result={}]]{}",
+                        snap.turn, player, snap.total_score, perf_result, detail_str,
+                    ),
+                );
             }
         }
 

@@ -30,8 +30,8 @@ impl super::TurnEngine {
     /// Uses [[key]] translatable markers for bilingual frontend rendering.
     fn log_phase(game_state: &mut GameState, marker_key: &str) {
         let text = format!("[[{}]]", marker_key);
-        game_state.rule_log.push(text.clone());
-        game_state.structured_log.push(LogEntry {
+        game_state.push_rule_log(text.clone());
+        game_state.push_structured_log(LogEntry {
             text,
             turn: game_state.turn_number,
             player_label: "SYSTEM".into(),
@@ -46,8 +46,8 @@ impl super::TurnEngine {
     /// Uses [[turn_start:turn=N]] translatable marker.
     fn log_turn_start(game_state: &mut GameState) {
         let text = format!("[[turn_start:turn={}]]", game_state.turn_number);
-        game_state.rule_log.push(text.clone());
-        game_state.structured_log.push(LogEntry {
+        game_state.push_rule_log(text.clone());
+        game_state.push_structured_log(LogEntry {
             text,
             turn: game_state.turn_number,
             player_label: "SYSTEM".into(),
@@ -564,7 +564,7 @@ impl super::TurnEngine {
         snap.member_contributions = mc;
         snap.breakdown = bd;
         snap.triggered_abilities = tas;
-        game_state.performance_snapshots.push(snap);
+        game_state.push_performance_snapshot(snap);
         let pid = perf_player_id;
         Self::trigger_auto_abilities_for_player(game_state, &pid);
         game_state.process_pending_auto_abilities(&pid);
@@ -1219,8 +1219,8 @@ impl super::TurnEngine {
         let p1_name = Self::rps_choice_name(p1);
         let p2_name = Self::rps_choice_name(p2);
         let text = format!("P1: {} vs P2: {} → {}", p1_name, p2_name, winner_str);
-        game_state.rule_log.push(text.clone());
-        game_state.structured_log.push(LogEntry {
+        game_state.push_rule_log(text.clone());
+        game_state.push_structured_log(LogEntry {
             text,
             turn: game_state.turn_number,
             player_label: "SYSTEM".into(),

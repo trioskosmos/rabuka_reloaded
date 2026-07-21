@@ -104,7 +104,7 @@ impl super::TurnEngine {
                                     {
                                         let card_name = &card.name;
                                         let pp = player_id_clone.clone();
-                                        game_state.structured_log.push(LogEntry {
+                                        GameState::push_structured_log_to(&mut game_state.structured_log, LogEntry {
                                             text: format!(
                                                 "{pp} {card_name} [ステージ]: 能力確認 [登場]"
                                             ),
@@ -295,7 +295,7 @@ impl super::TurnEngine {
                                 {
                                     let card_name = &card.name;
                                     let pp = player_id_clone.clone();
-                                    game_state.structured_log.push(LogEntry {
+                                    GameState::push_structured_log_to(&mut game_state.structured_log, LogEntry {
                                         text: format!(
                                             "{pp} {card_name} [ライブ置場]: 能力確認 [ライブ開始時]"
                                         ),
@@ -355,7 +355,7 @@ impl super::TurnEngine {
                                     {
                                         let card_name = &card.name;
                                         let pp = player_id_clone.clone();
-                                        game_state.structured_log.push(LogEntry {
+                                        GameState::push_structured_log_to(&mut game_state.structured_log, LogEntry {
                                             text: format!(
                                                 "{pp} {card_name} [ステージ]: 能力確認 [ライブ開始時]"
                                             ),
@@ -505,7 +505,7 @@ impl super::TurnEngine {
                                 {
                                     let card_name = &card.name;
                                     let pp = player_id_clone.clone();
-                                    game_state.structured_log.push(LogEntry {
+                                    GameState::push_structured_log_to(&mut game_state.structured_log, LogEntry {
                                         text: format!(
                                             "{pp} {card_name} [ステージ]: 能力確認 [ライブ成功時]"
                                         ),
@@ -553,7 +553,7 @@ impl super::TurnEngine {
                                         .load(core::sync::atomic::Ordering::Relaxed)
                                     {
                                         let pp = player_id_clone.clone();
-                                        game_state.structured_log.push(LogEntry {
+                                        GameState::push_structured_log_to(&mut game_state.structured_log, LogEntry {
                                         text: format!(
                                             "{pp} card#{card_id} [ステージ/獲得]: 能力確認 [ライブ成功時]"
                                         ),
@@ -602,25 +602,28 @@ impl super::TurnEngine {
                         {
                             let card_name = &card.name;
                             let pp = player_id_clone.clone();
-                            game_state.structured_log.push(LogEntry {
-                                text: format!(
-                                    "{pp} {card_name} [ライブ置場]: 能力確認 [ライブ成功時]"
-                                ),
-                                turn: game_state.turn_number,
-                                player_label: pp,
-                                source_card_id: Some(*card_id),
-                                source_card_name: Some(card_name.to_string()),
-                                category: "trigger_evaluation".to_string(),
-                                metadata: Some(
-                                    crate::core::types::LogMetadata::TriggerEvaluation {
-                                        trigger: "live_success".to_string(),
-                                        zone: "live_card_zone".to_string(),
-                                        result: "pending".to_string(),
-                                        ability_index: aidx,
-                                        ability_text: ability.full_text.clone(),
-                                    },
-                                ),
-                            });
+                            GameState::push_structured_log_to(
+                                &mut game_state.structured_log,
+                                LogEntry {
+                                    text: format!(
+                                        "{pp} {card_name} [ライブ置場]: 能力確認 [ライブ成功時]"
+                                    ),
+                                    turn: game_state.turn_number,
+                                    player_label: pp,
+                                    source_card_id: Some(*card_id),
+                                    source_card_name: Some(card_name.to_string()),
+                                    category: "trigger_evaluation".to_string(),
+                                    metadata: Some(
+                                        crate::core::types::LogMetadata::TriggerEvaluation {
+                                            trigger: "live_success".to_string(),
+                                            zone: "live_card_zone".to_string(),
+                                            result: "pending".to_string(),
+                                            ability_index: aidx,
+                                            ability_text: ability.full_text.clone(),
+                                        },
+                                    ),
+                                },
+                            );
                         }
                         let ability_id = format!("{}_{}", card_no, ability.full_text);
                         abilities_to_trigger.push((ability_id, card_no.clone(), *card_id));
@@ -640,7 +643,7 @@ impl super::TurnEngine {
                                     .load(core::sync::atomic::Ordering::Relaxed)
                                 {
                                     let pp = player_id_clone.clone();
-                                    game_state.structured_log.push(LogEntry {
+                                    GameState::push_structured_log_to(&mut game_state.structured_log, LogEntry {
                                     text: format!(
                                         "{pp} card#{card_id} [ライブ置場/獲得]: 能力確認 [ライブ成功時]"
                                     ),

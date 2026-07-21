@@ -1759,7 +1759,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!(
+        gs.push_rule_log(format!(
             "{} {}: [[log_gain_resource:n={},type={}]]",
             pp,
             act_name,
@@ -2003,7 +2003,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!(
+        gs.push_rule_log(format!(
             "{} {}: [[log_energy_under:n={}]]",
             pp, act_name, count
         ));
@@ -3406,7 +3406,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!(
+        gs.push_rule_log(format!(
             "{} {}: [[log_discard_until:n={}]]",
             pp, act_name, target_count
         ));
@@ -3509,7 +3509,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!(
+        gs.push_rule_log(format!(
             "{} {}: [[log_activation_restriction:target={}]]",
             pp, act_name, target
         ));
@@ -3527,7 +3527,7 @@ impl AbilityResolver {
             options: None,
         });
         let pp = self.player_prefix(gs);
-        gs.rule_log.push(format!("{}: [[log_heart_select]]", pp));
+        gs.push_rule_log(format!("{}: [[log_heart_select]]", pp));
     }
 
     pub(crate) fn execute_choose_target_player(
@@ -3648,7 +3648,7 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        gs.rule_log.push(format!(
+        gs.push_rule_log(format!(
             "{} {}: [[log_yell_execute:n={}]]",
             pp, act_name, count
         ));

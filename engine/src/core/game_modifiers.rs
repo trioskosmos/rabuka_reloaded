@@ -153,6 +153,10 @@ impl GameModifiers {
         ability_text: &str,
     ) {
         self.add_blade_modifier(card_id, delta);
+        #[cfg(feature = "compact_state")]
+        if trace.len() >= 500 {
+            trace.remove(0);
+        }
         trace.push(AbilityApplication {
             source_card_id,
             ability_text: ability_text.into(),
@@ -223,6 +227,10 @@ impl GameModifiers {
         ability_text: &str,
     ) {
         self.add_heart_modifier(card_id, color, delta);
+        #[cfg(feature = "compact_state")]
+        if trace.len() >= 500 {
+            trace.remove(0);
+        }
         trace.push(AbilityApplication {
             source_card_id,
             ability_text: ability_text.into(),
