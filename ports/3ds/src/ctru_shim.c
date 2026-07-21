@@ -359,6 +359,10 @@ void _3ds_board_set_action_highlight(int zone, int slot) { hl_zone = zone; hl_sl
 void _3ds_board_clear_action_highlight() { hl_zone = -1; hl_slot = -1; }
 
 // ---- Action overlay (safe: copies strings into C buffer) ----
+// action_idx_map[i] = index into the flat action list for display line i.
+// This lets grouped/reordered display lines map back to correct action indices.
+static int action_idx_map[MAX_OVERLAY_LINES];
+
 void _3ds_board_set_action_overlay_state(int count, int selected) {
     overlay_count = count > MAX_OVERLAY_LINES ? MAX_OVERLAY_LINES : (count < 0 ? 0 : count);
     overlay_selected = selected;
@@ -369,9 +373,23 @@ void _3ds_board_set_action_overlay_text(int index, const char* text) {
         overlay_lines[index][OVERLAY_LINE_LEN - 1] = '\0';
     }
 }
+void _3ds_board_set_overlay_action_idx(int display_line, int action_index) {
+    if (display_line >= 0 && display_line < MAX_OVERLAY_LINES) {
+        action_idx_map[display_line] = action_index;
+    }
+}
+int _3ds_board_get_overlay_action_idx(int display_line) {
+    if (display_line >= 0 && display_line < MAX_OVERLAY_LINES) {
+        return action_idx_map[display_line];
+    }
+    return -1;
+}
 void _3ds_board_clear_action_overlay() {
     overlay_count = 0;
     overlay_selected = -1;
+}
+int _3ds_board_get_overlay_selected() {
+    return overlay_selected;
 }
 
 void _3ds_board_set_section_rect(float y0, float h, bool opponent) {
@@ -584,10 +602,8 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float util_w = W - util_x - M;
 
     // === LIVE ZONE ===
-    // Zone labels: scale 0.65 = ~20px glyph on 240p screen.
     _3ds_draw_rect(M, live_y, W - 2 * M, live_h, COL_ZONE_BG);
     _3ds_draw_border(M, live_y, W - 2 * M, live_h, COL_PINK, 1);
-    _3ds_draw_label("LIVE", M + 2, live_y + 1, COL_TEXT, 0.65f);
     float lx = M + 3;
     float live_card_h = live_h - 4;
     float live_slot_w = live_card_h * LANDSCAPE;
@@ -605,7 +621,6 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float st_card_w = st_slot_h * PORTRAIT;   // portrait card width within landscape slot
     float st_pad_x = (st_slot_w - st_card_w) * 0.5f;  // horizontal padding to center portrait
     float st_pad_y = 1.0f;
-    _3ds_draw_label("STAGE", M + 2, stage_y + 1, COL_TEXT, 0.65f);
     // Stage slots: opponent displayed in reverse (R C L)
     for (int i = 0; i < 3; i++) {
         int si = opponent ? (2 - i) : i;
@@ -649,7 +664,6 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     // === ENERGY ===
     _3ds_draw_rect(M, energy_y, W - 2 * M, energy_h, COL_ZONE_BG);
     _3ds_draw_border(M, energy_y, W - 2 * M, energy_h, COL_GOLD, 1);
-    _3ds_draw_label("ENERGY", M + 2, energy_y + 1, COL_TEXT, 0.65f);
     float ex = M + 2;
     float e_sz = energy_h - 4;
     for (int i = 0; i < pb->energy_count && i < MAX_SLOTS; i++) {
@@ -666,7 +680,6 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     // === HAND ===
     _3ds_draw_rect(M, hand_y, W - 2 * M, hand_h, COL_ZONE_BG);
     _3ds_draw_border(M, hand_y, W - 2 * M, hand_h, COL_TEXT, 1);
-    _3ds_draw_label("HAND", M + 2, hand_y + 1, COL_TEXT, 0.65f);
     float hx = M + 2;
     float hand_card_h = hand_h - 4;
     float h_slot_w = hand_card_h * PORTRAIT;
