@@ -328,6 +328,9 @@ fn main() {
         rec.push(special_heart_u8);
         rec.extend_from_slice(&ability_ref.to_le_bytes());
         rec.push(0); // reserved
+        while rec.len() < 20 {
+            rec.push(0);
+        } // pad to 20 bytes
         card_records.push(rec);
     }
 
