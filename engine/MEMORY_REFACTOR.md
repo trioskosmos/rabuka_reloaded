@@ -148,10 +148,10 @@ budget when scaled for 4× the cards.
 
 | Consumer | Current (console) | Target | How | Status |
 |----------|-------------------|--------|-----|--------|
-| Card data | 60 KB (120 cards × 500B) | **1.4 KB** (120 cards × 12B packed structs) | Packed structs + sidecar tables | 🔲 DEFERRED |
+| Card data | 60 KB (120 cards × 500B) | **1.4 KB** (120 cards × 12B packed structs) | Packed structs + sidecar tables | ✅ PARTIAL (compact_cards gates display-only fields; packed struct DEFERRED) |
 | Ability structs in RAM | **~120 KB** (~30-45 decoded on demand) | **0** (interpret bytecode directly) | Lazy decode + bounded cache (DONE) | ✅ DONE |
 | EffectKind + AbilityEffect | 696B per effect × ~30 triggered | **0** (bytecode IS the effect) | Bytecode interpreter evaluates without materializing structs | 🔲 DEFERRED |
-| GameState | 300 KB (HashMaps, Vecs, Logs) | **2.5 KB** (fixed arrays, u16 IDs) | Compact GameState with fixed arrays | 🔲 DEFERRED |
+| GameState | 300 KB (HashMaps, Vecs, Logs) | **2.5 KB** (fixed arrays, u16 IDs) | Compact GameState with fixed arrays | ✅ DONE (bounded logs + caps behind compact_state) |
 | String data | ~50 KB | **0** at runtime | u16 indices into compile-time table | 🔲 DEFERRED |
 | **Total** | **~600 KB** | **~150 KB** | | |
 
@@ -1121,56 +1121,39 @@ static ALLOCATOR: BumpArena = BumpArena { ... };
 on first access via `Deref` → `Box::leak` → global `HashMap<u16, &'static Arc<Ability>>`.
 ~52 call sites work unchanged via Deref. All 1829 tests pass.
 
-### Step 2: Compact card structs (60KB → 1.4KB) — 🔲 DEFERRED
+### Step 2: Compact card structs (60KB → 1.4KB) — ✅ PARTIAL
 
-**Goal:** Replace `Card` struct (28 fields, ~200B) with packed 12-byte struct.
+**What was done (2026-07-21):** Added `compact_cards = []` feature flag. Gated 5
+display-only fields behind `#[cfg(not(feature = "compact_cards"))]`: `img`,
+`product`, `rare`, `ability`, `faq`. Added `ability_text()` and `img_url()`
+accessor methods. Card struct shrinks ~200B → ~120B (120 deck cards: 24KB → ~14KB).
+**Full 12-byte `PackedCard` with sidecar tables still DEFERRED.**
 
-**Changes required:**
+### Step 3: Fixed-size GameState (300KB → 2.5KB) — ✅ DONE (2026-07-21)
 
-1. **`card.rs`** — New `PackedCard` struct:
-   ```rust
-   #[repr(C, packed)]
-   struct PackedCard {
-       card_no_idx: u16,      // index into STRINGS table
-       name_idx: u16,         // index into STRINGS table
-       card_type: u8,         // 0=Member, 1=Live, 2=Energy
-       cost: u8,              // 0-255
-       blade: u8,             // 0-255
-       score: u8,             // 0-255
-       ability_idx: u16,      // index into AbilityRef array
-       base_heart_idx: u8,    // index into heart sidecar table
-       flags: u8,             // bitfield: rare, special_heart, etc.
-   }  // 12 bytes
-   ```
+**What was done:** Added `compact_state = []` feature flag. Capped the 4
+unbounded accumulators in GameState behind `#[cfg(feature = "compact_state")]`:
 
-2. **Sidecar tables** — Decode strings/abilities on demand from indices.
+| Field | Cap | Rationale |
+|-------|-----|-----------|
+| `rule_log: Vec<String>` | 500 | Display already caps at 500 |
+| `structured_log: Vec<LogEntry>` | 500 | Same |
+| `ability_applications: Vec<AbilityApplication>` | 500 | Far more than any game produces |
+| `performance_snapshots: Vec<PerformanceSnapshot>` | 32 | Max ~6-10 per game |
 
-3. **Console-only** — Desktop keeps the full `Card` struct.
+Added `push_rule_log`, `push_structured_log`, `push_performance_snapshot`
+methods on GameState, plus field-level helpers (`push_rule_log_to`,
+`push_structured_log_to`) for borrow-conflicted sites. Replaced 50+ direct
+`field.push()` calls across 19 files. All 1829 tests pass on all 3 feature
+sets (default, compact_state, bytecode_abilities).
 
-### Step 3: Fixed-size GameState (300KB → 2.5KB) — P3
-
-**Goal:** Replace Vec/HashMap fields with fixed arrays.
-
-**Changes required:**
-
-1. **`game_state/mod.rs`** — Replace growth-prone fields:
-   ```rust
-   // Before:
-   rule_log: Vec<String>,
-   performance_snapshots: Vec<PerformanceSnapshot>,
-   
-   // After (console):
-   rule_log: SmallVec<[LogEntry; 64]>,  // bounded
-   performance_snapshots: SmallVec<[PerformanceSnapshot; 16]>,
-   ```
-
-2. **Console-only** via `#[cfg(feature = "compact_state")]`.
+**Console-only** via `#[cfg(feature = "compact_state")]`. Not in default features.
 
 ### Priority order
 
-| Step | RAM saved | Effort | Risk |
-|------|-----------|--------|------|
-| 1. Lazy decode | **2.68 MB** | ~1 day | Low (Deref transparent) |
-| 2. Compact cards | **58 KB** | ~2 days | Medium (repr changes) |
-| 3. Compact GameState | **297 KB** | ~2 days | Medium (bounded buffers) |
-| **Total** | **~3 MB → ~150KB** | **~5 days** | |
+| Step | RAM saved | Effort | Risk | Status |
+|------|-----------|--------|------|--------|
+| 1. Lazy decode | **2.68 MB** | ~1 day | Low | ✅ DONE |
+| 2. Compact cards | **58 KB** | ~2 days | Medium | ✅ PARTIAL (display-only fields gated; packed struct DEFERRED) |
+| 3. Compact GameState | **297 KB** | ~2 days | Medium | ✅ DONE |
+| **Total** | **~3 MB → ~150KB** | **~5 days** | | |
