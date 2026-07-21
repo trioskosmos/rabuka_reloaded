@@ -719,26 +719,6 @@ fn main() {
                                     deck_nos.insert(card.card_no.to_string());
                                 }
                             }
-                            if let Ok(json) = File::open(Path::new("romfs:/abilities.json"))
-                                .and_then(|mut f| {
-                                    let mut v = String::new();
-                                    f.read_to_string(&mut v).map(|_| v)
-                                })
-                            {
-                                if let Ok(a) = CardLoader::load_abilities_from_str(&json) {
-                                    let am = CardLoader::build_abilities_map(&a);
-                                    for (_, card) in Arc::make_mut(&mut db).cards.iter_mut() {
-                                        if deck_nos.contains(&*card.card_no) {
-                                            if let Some(ab) = am.get(&*card.card_no) {
-                                                card.abilities = ab
-                                                    .iter()
-                                                    .map(|a| Arc::new(a.clone()))
-                                                    .collect();
-                                            }
-                                        }
-                                    }
-                                }
-                            }
                             DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db)
                                 .ok();
                             DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db)
@@ -1252,7 +1232,7 @@ fn main() {
                                                         .as_ptr(),
                                                 );
                                             }
-                                            for ab in &card.abilities {
+                                            for ab in card.resolved_abilities() {
                                                 let w = wrap_text(&ab.full_text, 40);
                                                 unsafe {
                                                     _3ds_text_add_top(
@@ -1302,7 +1282,7 @@ fn main() {
                                             .as_ptr(),
                                         );
                                     }
-                                    for ab in &card.abilities {
+                                    for ab in card.resolved_abilities() {
                                         let w = wrap_text(&ab.full_text, 34);
                                         unsafe {
                                             _3ds_text_add_top(format!("{}\n\0", w).as_ptr());
@@ -1398,7 +1378,7 @@ fn main() {
                                     .as_ref()
                                     .and_then(|p| p.card_id)
                                     .and_then(|cid| gs.card_database.get_card(cid))
-                                    .and_then(|card| card.abilities.first())
+                                    .and_then(|card| card.resolved_abilities().next())
                                     .map(|ab| {
                                         wrap_text(&ab.full_text, 34)
                                             .lines()
@@ -1479,7 +1459,7 @@ fn main() {
                                         .as_ptr(),
                                     );
                                     let mut ty = 46.0;
-                                    for ab in &card.abilities {
+                                    for ab in card.resolved_abilities() {
                                         let w = wrap_text(&ab.full_text, 45);
                                         for line in w.lines() {
                                             if ty < 200.0 {

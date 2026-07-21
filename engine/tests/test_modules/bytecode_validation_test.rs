@@ -1,8 +1,6 @@
 #[cfg(feature = "bytecode_abilities")]
 mod bytecode_validation {
-    use rabuka_engine::ability::enums::ActionType;
     use rabuka_engine::ability::vm::{ability_count, get_ability};
-    use rabuka_engine::card::{Ability, AbilityEffect};
 
     /// The bytecode compiler intentionally re-encodes some JSON effects into a
     /// different wire format. Given a JSON effect, return the action string the
@@ -143,11 +141,22 @@ mod bytecode_validation {
     fn bytecode_debug_ability_399() {
         for idx in [545usize] {
             let ab = get_ability(idx).expect("exists");
-            eprintln!("[{}] cost={:?}", idx, ab.cost.as_ref().map(|c| format!("{:?}", c.0.kind.as_ref().map(|k| format!("{:?}", k.as_ref())))));
+            eprintln!(
+                "[{}] cost={:?}",
+                idx,
+                ab.cost.as_ref().map(|c| format!(
+                    "{:?}",
+                    c.0.kind.as_ref().map(|k| format!("{:?}", k.as_ref()))
+                ))
+            );
             if let Some(c) = ab.cost.as_ref() {
                 eprintln!("  cost action={} optional={:?}", c.0.action, c.0.optional);
             }
-            eprintln!("[{}] effect={:?}", idx, ab.effect.as_ref().map(|e| e.action.to_str().to_string()));
+            eprintln!(
+                "[{}] effect={:?}",
+                idx,
+                ab.effect.as_ref().map(|e| e.action.to_str().to_string())
+            );
         }
     }
 
@@ -155,10 +164,20 @@ mod bytecode_validation {
     fn bytecode_debug_ability_399_disabled() {
         let ab = get_ability(399).expect("ability 399 should exist");
         let eff = ab.effect.as_ref().expect("has effect");
-        eprintln!("399 action={} steps={:?} count={:?}", eff.action, eff.effect_steps.as_ref().map(|s| s.len()), eff.count);
+        eprintln!(
+            "399 action={} steps={:?} count={:?}",
+            eff.action,
+            eff.effect_steps.as_ref().map(|s| s.len()),
+            eff.count
+        );
         if let Some(steps) = eff.effect_steps.as_ref() {
             for (i, s) in steps.iter().enumerate() {
-                eprintln!("  step[{}] action={} kind={:?}", i, s.action, s.kind.as_ref().map(|k| format!("{:?}", k)));
+                eprintln!(
+                    "  step[{}] action={} kind={:?}",
+                    i,
+                    s.action,
+                    s.kind.as_ref().map(|k| format!("{:?}", k))
+                );
             }
         }
     }

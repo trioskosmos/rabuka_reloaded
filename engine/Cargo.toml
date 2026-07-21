@@ -43,7 +43,7 @@ debug_conditions = []
 # Optional server feature: enables the web server and async runtime
 server = ["actix-web", "actix-cors", "actix-files", "tokio", "tokio-stream", "local-ip-address", "uuid", "bytes"]
 # 3DS target: disables TLS-based RNG, uses xorshift64 seeded from svcGetSystemTick
-3ds = []
+3ds = ["bytecode_abilities"]
 # Profiling: enables Timer-based instrumentation for flamegraph generation
 profiling = []
 # Alloc tracker: counts every malloc/free, reports via RABUKA_ALLOC_TRACK env var

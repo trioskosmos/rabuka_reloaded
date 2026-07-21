@@ -74,6 +74,8 @@ impl<'de> serde::Deserialize<'de> for CardType {
 }
 
 pub(crate) mod opt_card_type {
+    #[cfg(feature = "no_std")]
+    use alloc::string::String;
     use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<super::CardType>, D::Error>

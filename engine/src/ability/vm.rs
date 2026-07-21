@@ -4,7 +4,7 @@ use crate::card::{Ability, AbilityCost, AbilityEffect};
 use crate::core::types::ArcStr;
 
 #[cfg(feature = "no_std")]
-use alloc::{boxed::Box, string::String, string::ToString, vec, vec::Vec};
+use alloc::{boxed::Box, string::String, string::ToString, vec::Vec};
 
 const TAG_NULL: u8 = 0x00;
 const TAG_FALSE: u8 = 0x01;

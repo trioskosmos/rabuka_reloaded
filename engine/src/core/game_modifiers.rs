@@ -2,10 +2,7 @@ use crate::card::{BladeColor, HeartColor};
 use crate::types::AbilityApplication;
 use crate::HashMap;
 #[cfg(feature = "no_std")]
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{string::String, vec::Vec};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum CardOrientation {

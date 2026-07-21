@@ -12,6 +12,7 @@ use rabuka_engine::game_setup;
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
 
+#[allow(dead_code)]
 fn build_game(json_str: &str) -> Result<GameState, String> {
     let cards = CardLoader::load_cards_from_strs(json_str)?;
     let mut db = Arc::new(CardDatabase::load_or_create(cards));
