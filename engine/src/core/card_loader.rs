@@ -99,7 +99,43 @@ impl CardLoader {
             .collect()
     }
 
-    /// Decode all abilities from bytecode via `vm::get_ability(idx)`.
+    /// Decode ALL abilities from bytecode via `vm::get_ability(idx)`.
+    ///
+    /// # EAGER DECODE — NOT LAZY
+    /// This function iterates all 800 unique abilities and decodes each one
+    /// into a full `Ability` struct at load time. Each ability is ~3.5KB.
+    /// Total: ~2.8MB of decoded Ability structs in RAM.
+    ///
+    /// This is called once from `attach_abilities` during CardLoader::load(),
+    /// which runs inside a `OnceLock` — so it executes exactly once per process.
+    ///
+    /// # TODO: Lazy decode for 150KB target
+    /// Instead of decoding all 800 abilities here, store only the bytecode
+    /// index (u16) on each card. Decode on-demand when ability is first
+    /// triggered. Architecture:
+    ///
+    /// ```text
+    /// fn build_abilities_map_lazy(abilities_data) -> HashMap<String, Vec<AbilityRef>> {
+    ///     // AbilityRef = AbilityRef(u16) — 2 bytes, no decode
+    ///     for (idx, entry) in unique_abilities.iter().enumerate() {
+    ///         for card_no in entry["cards"] {
+    ///             map[card_no].push(AbilityRef::index(idx as u16));
+    ///         }
+    ///     }
+    ///     map
+    /// }
+    /// ```
+    ///
+    /// Then in triggers.rs / abilities.rs, when an ability is first accessed:
+    /// ```text
+    /// let ability = resolver.resolve(*ability_ref);  // decode + cache
+    /// ```
+    ///
+    /// This eliminates ~2.8MB from RAM. Only ~30-45 abilities are actually
+    /// triggered in a typical game, so resident decode is ~120KB instead of
+    /// ~2.8MB.
+    ///
+    /// See MEMORY_REFACTOR.md P1.7 for the full plan and 52 call sites.
     fn build_abilities_map_inner(
         abilities_data: &serde_json::Value,
     ) -> HashMap<String, Vec<Ability>> {

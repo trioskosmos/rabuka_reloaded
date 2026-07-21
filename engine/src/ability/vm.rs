@@ -19,6 +19,26 @@ pub fn ability_count() -> usize {
     NUM_ABILITIES
 }
 
+/// Decode a single ability from the bytecode blob.
+///
+/// This is called eagerly at load time for ALL 800 abilities by
+/// `card_loader::build_abilities_map_inner`. Each call decodes the
+/// bytecode slice into a full `Ability` struct (with nested AbilityEffect,
+/// EffectKind, Condition, etc.) — ~3.5KB per ability.
+///
+/// # TODO: Lazy decode path (150KB target)
+/// For console targets, this function should be called on-demand (only
+/// when an ability is first triggered), not eagerly at load time. The
+/// decoded Ability would be cached in a bounded HashMap<u16, Arc<Ability>>
+/// with LRU eviction. The `decode_ability` path is already fast (~50μs)
+/// so lazy decode adds negligible latency on first trigger.
+///
+/// # TODO: Bytecode interpreter (alternative to lazy decode)
+/// Instead of decoding bytecode → Ability struct → execute, evaluate
+/// bytecode directly via opcode dispatch. This avoids materializing
+/// Ability/AbilityEffect/EffectKind structs entirely. Requires a ~500-line
+/// new module that mirrors the existing handler dispatch but reads fields
+/// from bytecode bytes instead of struct fields.
 pub fn get_ability(idx: usize) -> Option<Ability> {
     if idx >= NUM_ABILITIES {
         return None;

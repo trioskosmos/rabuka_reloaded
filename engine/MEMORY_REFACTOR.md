@@ -146,24 +146,36 @@ budget when scaled for 4× the cards.
 
 ### Current vs target
 
-| Consumer | Current (console) | Target | How |
-|----------|-------------------|--------|-----|
-| Card data | 60 KB (120 cards × 500B) | **1.4 KB** (120 cards × 12B packed structs) |
-| Ability structs in RAM | 283 KB (decoded on demand) | **0** (interpret bytecode directly, no decoded structs) |
-| EffectKind + AbilityEffect | 696B per effect × 1451 | **0** (bytecode IS the effect representation) |
-| GameState | 300 KB (HashMaps, Vecs, Logs) | **2.5 KB** (fixed arrays, u16 IDs, no strings) |
-| String data | ~50 KB | **0** at runtime (u16 indices into compile-time table) |
-| **Total** | **~700 KB** | **~150 KB** |
+| Consumer | Current (console) | Target | How | Status |
+|----------|-------------------|--------|-----|--------|
+| Card data | 60 KB (120 cards × 500B) | **1.4 KB** (120 cards × 12B packed structs) | Packed structs + sidecar tables | 🔲 NOT STARTED |
+| Ability structs in RAM | **2.8 MB** (800 × 3.5KB, decoded eagerly) | **0** (interpret bytecode directly) | Lazy decode + bounded cache OR bytecode interpreter | 🔲 NOT STARTED |
+| EffectKind + AbilityEffect | 696B per effect × 1451 | **0** (bytecode IS the effect) | Bytecode interpreter evaluates without materializing structs | 🔲 NOT STARTED |
+| GameState | 300 KB (HashMaps, Vecs, Logs) | **2.5 KB** (fixed arrays, u16 IDs) | Compact GameState with fixed arrays | 🔲 NOT STARTED |
+| String data | ~50 KB | **0** at runtime | u16 indices into compile-time table | 🔲 NOT STARTED |
+| **Total** | **~3.2 MB** | **~150 KB** | | |
 
-### P0 — Eliminate ability decode cache (283KB → ~19KB) — ✅ DONE
+**Reality check:** The MEMORY_REFACTOR.md claimed lazy loading was done. It is not.
+The bytecode blob saves ROM space (136KB vs 1421KB) but the engine still decodes all
+800 abilities into full structs at startup. Resident RAM is ~3.2MB, not the ~700KB
+the old estimate assumed.
 
-Removed `AbilityStore` (OnceLock cache of 800 abilities = 283KB). `AbilityRef` is
-always `Arc<Ability>`, decoded at load time from bytecode via `vm::get_ability`.
-`lazy_abilities` feature flag deleted. Simplified `ability_store.rs` from 127→20 lines.
+### P0 — Eliminate ability decode cache — ⚠️ PARTIAL
 
-Ability RAM: ~283KB cached → ~19KB (only deck cards decoded at load).
+Removed `AbilityStore` OnceLock cache and `lazy_abilities` feature flag.
+Simplified `ability_store.rs` from 127→21 lines.
 
-**The "absurdly low RAM" path** (150KB target) uses this same approach plus packed card structs and fixed-size GameState. The execution layer (5000 lines of handlers) stays unchanged — the handlers still receive `&AbilityEffect` structs, they just don't persist after execution.
+**What changed:** The global cache was deleted. `AbilityRef` now always wraps
+`Arc<Ability>`, decoded eagerly at load time from bytecode.
+
+**What did NOT change:** All 800 abilities are still decoded into full structs
+at startup via `build_abilities_map_inner`. Resident RAM is ~2.8MB, not ~19KB.
+The old estimate of "~19KB (only deck cards decoded)" was wrong — ALL abilities
+are decoded because the `unique_abilities` array contains all 800, and the
+loader iterates every one.
+
+**The "absurdly low RAM" path** (150KB target) requires the lazy decode plan
+described in P1.7 below.
 
 ---
 
@@ -182,40 +194,36 @@ Ability RAM: ~283KB cached → ~19KB (only deck cards decoded at load).
 
 ---
 
-### P1.7 — Lazy / on-demand ability resolution — ✅ DONE
+### P1.7 — Lazy / on-demand ability resolution — ⚠️ PARTIAL (bytecode decode is done, lazy is not)
 
-**Completed (2026-07-20):**
-- `AbilityRef` newtype in `ability/ability_store.rs`:
-  - Default path: wraps `Arc<Ability>` (thin wrapper, `Deref<Target=Ability>`)
-  - Lazy path: `u16` index into global `AbilityStore`, `Deref` resolves from bytecode
+**What was actually completed (2026-07-20):**
+- `AbilityRef` newtype in `ability/ability_store.rs` (21 lines): wraps `Arc<Ability>`, Deref to Ability
 - `Card.abilities: Vec<Arc<Ability>>` → `Vec<AbilityRef>` (unconditional type change)
 - `CardLoader::build_abilities_map_shared` returns `HashMap<String, Vec<AbilityRef>>`
-- Lazy path: `build_abilities_index_map` stores only u16 indices (no decode)
-- `AbilityStore` global `OnceLock` singleton — decodes on demand via `vm::get_ability`
-- All access sites work unchanged via `Deref` auto-coercion (zero rewrite of 65 sites!)
-- `lazy_abilities` feature added to Cargo.toml (implies `bytecode_abilities`)
-- Store initialized in `attach_abilities` from `unique_abilities.len()`
-- **All 1820 default + 1829 bytecode + 1829 lazy tests pass**
+- Bytecode blob (136KB) is in ROM as `const BYTECODE: &[u8]`
 
-**Measured results:**
-- On lazy path: only abilities actually used by cards in play are decoded
-- Typical game: ~30-45 abilities used (vs 800 eagerly decoded on default)
-- Resident ability RAM: ~167 KB (6 KB store + ~160 KB decoded cache) vs ~2.8 MB default
-- Bytecode blob: 136 KB in ROM (zero runtime cost)
-- **Total ability memory: ~283 KB → well under <1 MB console budget**
+**What is NOT done (the actual lazy part):**
+- `build_abilities_map_inner` (card_loader.rs:103) iterates ALL 800 abilities and calls
+  `vm::get_ability(idx)` for EACH one at load time. Every ability is decoded eagerly
+  into a full `Ability` struct (nested AbilityEffect, EffectKind, Condition, etc.).
+- There is NO on-demand decode path. There is NO bounded cache. There is NO eviction.
+- The `AbilityStore` OnceLock cache was deleted. `ability_store.rs` is just a 21-line
+  wrapper. `init_ability_store()` is a no-op.
+- Resident ability RAM: **~2.8 MB** (800 abilities × ~3.5KB each) — unchanged from before.
+- The bytecode blob saves ROM space (136KB vs 1421KB JSON) but does NOT reduce resident RAM.
 
-**GBC Pokemon Card Game parallel:**
-The Game Boy Color Pokemon Card Game (1998) ran on 32 KB RAM total. It used a
-compact bytecode format where each ability was a few bytes of opcodes, decoded on
-demand during gameplay. No ability was held in decoded form until it was actually
-activated. This is exactly the architecture P1.7 implements: the 136 KB bytecode blob
-is ROM-resident (zero RAM), abilities decode into a bounded cache only when a card
-enters play, and the cache evicts old entries under memory pressure. The GBC game
-proved this approach works for TCG ability systems — the key insight is that most
-abilities in a deck are never triggered in a given game, so decoding all 800 upfront
-is pure waste.
+**What the 150KB target actually requires:**
+1. **Card.abilities stores bytecode indices** (u16, 2 bytes each) instead of decoded structs
+2. **Lazy decode on first access** via a shared resolver with bounded cache + LRU eviction
+3. **52 call sites** that access `card.abilities` need a resolver parameter threaded through
+4. **Compact card structs** (12B packed instead of ~200B) with sidecar tables for strings
+5. **Fixed-size GameState** arrays instead of Vecs/HashMaps
 
-**Estimated effort:** ~1 day.
+**The GBC Pokemon Card Game parallel** is architecturally correct but not yet implemented.
+The game ran on 32KB total with abilities decoded on demand from a compact bytecode format.
+Our bytecode blob exists, but we still decode all 800 abilities eagerly at startup.
+
+**Estimated effort for true lazy loading:** ~2-3 days (1 newtype + 1 resolver + 52 mechanical edits + 1 fuzz test).
 
 ---
 
@@ -1101,3 +1109,103 @@ static ALLOCATOR: BumpArena = BumpArena { ... };
 ```
 
 **Verdict:** Worth implementing for the 3DS build. Not worth the complexity for desktop (0.61s runtime can't be meaningfully improved further).
+
+---
+
+## TODO: Concrete next steps for 150KB target
+
+### Step 1: Lazy ability decode (2.8MB → ~120KB) — P1.7
+
+**Goal:** Don't decode all 800 abilities at startup. Store bytecode indices, decode on demand.
+
+**Changes required:**
+
+1. **`ability_store.rs`** — Add a global `OnceLock<AbilityCache>` with `HashMap<u16, Arc<Ability>>`:
+   ```rust
+   struct AbilityCache {
+       decoded: RefCell<HashMap<u16, Arc<Ability>>>,
+       max_size: usize,  // e.g. 64
+   }
+   impl AbilityCache {
+       fn resolve(&self, idx: u16) -> Arc<Ability> { ... }
+   }
+   ```
+
+2. **`card_loader.rs:build_abilities_map_inner`** — Stop calling `vm::get_ability(idx)`.
+   Instead, store the u16 index:
+   ```rust
+   ability_map.entry(card_no).or_default().push(AbilityRef::index(idx as u16));
+   ```
+
+3. **`ability_store.rs`** — `AbilityRef` stores `u16` instead of `Arc<Ability>`:
+   ```rust
+   pub struct AbilityRef { idx: u16 }
+   impl Deref for AbilityRef {
+       type Target = Ability;
+       fn deref(&self) -> &Ability {
+           GLOBAL_CACHE.resolve(self.idx)  // decode + cache
+       }
+   }
+   ```
+
+4. **52 call sites** — No changes needed! They access `card.abilities` via `Deref`,
+   which now triggers lazy decode transparently.
+
+5. **Test gate** — All 1829 tests must pass. Add a fuzz test that forces tiny cache
+   sizes and verifies correctness.
+
+**Estimated effort:** ~1 day. The 52 call sites are untouched because Deref handles it.
+
+### Step 2: Compact card structs (60KB → 1.4KB) — P2
+
+**Goal:** Replace `Card` struct (28 fields, ~200B) with packed 12-byte struct.
+
+**Changes required:**
+
+1. **`card.rs`** — New `PackedCard` struct:
+   ```rust
+   #[repr(C, packed)]
+   struct PackedCard {
+       card_no_idx: u16,      // index into STRINGS table
+       name_idx: u16,         // index into STRINGS table
+       card_type: u8,         // 0=Member, 1=Live, 2=Energy
+       cost: u8,              // 0-255
+       blade: u8,             // 0-255
+       score: u8,             // 0-255
+       ability_idx: u16,      // index into AbilityRef array
+       base_heart_idx: u8,    // index into heart sidecar table
+       flags: u8,             // bitfield: rare, special_heart, etc.
+   }  // 12 bytes
+   ```
+
+2. **Sidecar tables** — Decode strings/abilities on demand from indices.
+
+3. **Console-only** — Desktop keeps the full `Card` struct.
+
+### Step 3: Fixed-size GameState (300KB → 2.5KB) — P3
+
+**Goal:** Replace Vec/HashMap fields with fixed arrays.
+
+**Changes required:**
+
+1. **`game_state/mod.rs`** — Replace growth-prone fields:
+   ```rust
+   // Before:
+   rule_log: Vec<String>,
+   performance_snapshots: Vec<PerformanceSnapshot>,
+   
+   // After (console):
+   rule_log: SmallVec<[LogEntry; 64]>,  // bounded
+   performance_snapshots: SmallVec<[PerformanceSnapshot; 16]>,
+   ```
+
+2. **Console-only** via `#[cfg(feature = "compact_state")]`.
+
+### Priority order
+
+| Step | RAM saved | Effort | Risk |
+|------|-----------|--------|------|
+| 1. Lazy decode | **2.68 MB** | ~1 day | Low (Deref transparent) |
+| 2. Compact cards | **58 KB** | ~2 days | Medium (repr changes) |
+| 3. Compact GameState | **297 KB** | ~2 days | Medium (bounded buffers) |
+| **Total** | **~3 MB → ~150KB** | **~5 days** | |

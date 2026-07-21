@@ -8,6 +8,31 @@
 // are interned into `STRINGS` so the blob is far smaller than text JSON, while
 // remaining fully data-driven: new action types / fields need zero decoder
 // changes.
+//
+// # Memory layout
+// - NUM_ABILITIES: 800 (constant)
+// - BYTECODE: ~136KB inline byte array (compiled into binary, zero runtime alloc)
+// - OFFSETS: 801 × u32 = 3.2KB (byte offsets into BYTECODE for each ability)
+// - STRINGS: 3592 interned strings (field names + string values, ~50KB compiled)
+//
+// # Current usage (EAGER — not lazy)
+// card_loader::build_abilities_map_inner() calls vm::get_ability(idx) for ALL
+// 800 abilities at load time. Each decode produces a full Ability struct (~3.5KB).
+// Total resident: ~2.8MB. The blob saves ROM space (136KB vs 1421KB JSON) but
+// does NOT reduce resident RAM because all abilities are decoded upfront.
+//
+// # TODO: Lazy decode path
+// For 150KB console target, abilities should be decoded on-demand:
+// 1. Card.abilities stores u16 indices (2 bytes each) instead of Arc<Ability>
+// 2. On first trigger, vm::get_ability(idx) decodes one ability
+// 3. Decoded Ability cached in bounded HashMap<u16, Arc<Ability>>
+// 4. LRU eviction when cache exceeds capacity
+// 5. ~30-45 abilities triggered per game → ~120KB resident vs ~2.8MB eager
+//
+// # TODO: Bytecode interpreter (alternative)
+// Instead of decode → Ability → execute, evaluate bytecode directly via opcode
+// dispatch. Avoids materializing Ability/AbilityEffect/EffectKind entirely.
+// ~500-line new module. The ActionType enum already maps 1:1 to opcodes.
 
 pub const NUM_ABILITIES: usize = 800;
 
