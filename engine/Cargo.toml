@@ -52,6 +52,8 @@ alloc_tracker = []
 no_std = []
 # PSP target: no_std + alloc mode for mipsel-sony-psp
 psp = ["no_std", "once_cell", "debug_conditions", "bytecode_abilities"]
+# DS target: no_std + alloc, minimal features for tight 4MB ROM
+ds = ["no_std", "once_cell", "bytecode_abilities", "compact_cards", "compact_state"]
 # Dreamcast target: no_std + alloc via KallistiOS + rustc_codegen_gcc
 dc = ["no_std", "debug_conditions"]
 # Bytecode abilities: use pre-compiled bytecode instead of JSON serde

@@ -156,9 +156,9 @@ float _3ds_bot_line_height() {
     C2D_TextFontParse(&t, f, tmp, "A\nA\0");
     C2D_TextOptimize(&t);
     float w, h;
-    C2D_TextGetDimensions(&t, 0.75f, 0.75f, &w, &h);
+    C2D_TextGetDimensions(&t, 0.85f, 0.85f, &w, &h);
     C2D_TextBufDelete(tmp);
-    if (h <= 0) return 26.0f;
+    if (h <= 0) return 30.0f;
     return h / 2.0f;
 }
 
@@ -548,7 +548,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     // === LIVE ZONE ===
     _3ds_draw_rect(M, live_y, W - 2 * M, live_h, COL_ZONE_BG);
     _3ds_draw_border(M, live_y, W - 2 * M, live_h, COL_PINK, 1);
-    _3ds_draw_label("LIVE", M + 2, live_y + 1, COL_TEXT, 0.28f);
+    _3ds_draw_label("LIVE", M + 2, live_y + 1, COL_TEXT, 0.42f);
     float lx = M + 3;
     float live_card_h = live_h - 4;
     float live_slot_w = live_card_h * LANDSCAPE;
@@ -566,7 +566,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float st_card_w = st_slot_h * PORTRAIT;   // portrait card width within landscape slot
     float st_pad_x = (st_slot_w - st_card_w) * 0.5f;  // horizontal padding to center portrait
     float st_pad_y = 1.0f;
-    _3ds_draw_label("STAGE", M + 2, stage_y + 1, COL_TEXT, 0.28f);
+    _3ds_draw_label("STAGE", M + 2, stage_y + 1, COL_TEXT, 0.42f);
     // Stage slots: opponent displayed in reverse (R C L)
     for (int i = 0; i < 3; i++) {
         int si = opponent ? (2 - i) : i;
@@ -594,21 +594,21 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     _3ds_draw_rect(util_x, stage_y, util_w, stage_h, COL_ZONE_BG);
     _3ds_draw_border(util_x, stage_y, util_w, stage_h, COL_ZONE_BDR, 1);
     char buf[40];
-    float fs = stage_h > 40 ? 0.45f : 0.35f;
+    float fs = stage_h > 40 ? 0.55f : 0.48f;
     float fy = stage_y + 1;
     snprintf(buf, sizeof(buf), "D:%d", pb->deck);
-    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 9;
+    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 12;
     snprintf(buf, sizeof(buf), "E:%d", pb->edeck);
-    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 9;
+    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 12;
     snprintf(buf, sizeof(buf), "W:%d", pb->discard);
-    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 9;
+    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 12;
     snprintf(buf, sizeof(buf), "S:%d", pb->success);
     _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs);
 
     // === ENERGY ===
     _3ds_draw_rect(M, energy_y, W - 2 * M, energy_h, COL_ZONE_BG);
     _3ds_draw_border(M, energy_y, W - 2 * M, energy_h, COL_GOLD, 1);
-    _3ds_draw_label("ENERGY", M + 2, energy_y + 1, COL_TEXT, 0.28f);
+    _3ds_draw_label("ENERGY", M + 2, energy_y + 1, COL_TEXT, 0.42f);
     float ex = M + 2;
     float e_sz = energy_h - 4;
     for (int i = 0; i < pb->energy_count && i < MAX_SLOTS; i++) {
@@ -625,7 +625,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     // === HAND ===
     _3ds_draw_rect(M, hand_y, W - 2 * M, hand_h, COL_ZONE_BG);
     _3ds_draw_border(M, hand_y, W - 2 * M, hand_h, COL_TEXT, 1);
-    _3ds_draw_label("HAND", M + 2, hand_y + 1, COL_TEXT, 0.28f);
+    _3ds_draw_label("HAND", M + 2, hand_y + 1, COL_TEXT, 0.42f);
     float hx = M + 2;
     float hand_card_h = hand_h - 4;
     float h_slot_w = hand_card_h * PORTRAIT;
@@ -679,45 +679,45 @@ void _3ds_render_board() {
 
     // HUD overlay bar (game mode only)
     if (!cli_mode && hud_turn > 0) {
-        C2D_DrawRectSolid(0, 0, 0.5f, 320, 14, C2D_Color32(0, 0, 0, 180));
+        C2D_DrawRectSolid(0, 0, 0.5f, 320, 18, C2D_Color32(0, 0, 0, 180));
         char hbuf[64];
         snprintf(hbuf, sizeof(hbuf), "T%d %s [%s]", hud_turn, hud_phase, hud_player);
-        _3ds_draw_label(hbuf, 4, 1, COL_SEL, 0.35f);
+        _3ds_draw_label(hbuf, 4, 1, COL_SEL, 0.48f);
     }
 
     // Action overlay panel (game mode, bottom-right)
     if (!cli_mode && overlay_count > 0) {
-        float p_w = 180.0f, p_h = 16.0f * overlay_count + 8.0f;
+        float p_w = 200.0f, p_h = 20.0f * overlay_count + 8.0f;
         float p_x = 320.0f - p_w - 2.0f;
         float p_y = 240.0f - p_h - 2.0f;
         C2D_DrawRectSolid(p_x, p_y, 0.5f, p_w, p_h, C2D_Color32(10, 14, 26, 220));
         _3ds_draw_border(p_x, p_y, p_w, p_h, COL_ZONE_BDR, 1);
         for (int i = 0; i < overlay_count; i++) {
-            float ly = p_y + 4.0f + i * 16.0f;
+            float ly = p_y + 4.0f + i * 20.0f;
             if (i == overlay_selected) {
-                C2D_DrawRectSolid(p_x + 1, ly - 1, 0.5f, p_w - 2, 14.0f, C2D_Color32(80, 100, 80, 100));
+                C2D_DrawRectSolid(p_x + 1, ly - 1, 0.5f, p_w - 2, 18.0f, C2D_Color32(80, 100, 80, 100));
             }
             char line[OVERLAY_LINE_LEN + 2];
             snprintf(line, sizeof(line), "%s%s", i == overlay_selected ? ">" : " ", overlay_lines[i]);
-            _3ds_draw_label(line, p_x + 3, ly, i == overlay_selected ? COL_SEL : COL_TEXT, 0.30f);
+            _3ds_draw_label(line, p_x + 3, ly, i == overlay_selected ? COL_SEL : COL_TEXT, 0.42f);
         }
     }
 
     // View indicator + hand range (bottom-right, clipped if overlay present)
     if (!cli_mode && overlay_count > 0) return; // overlay covers it
     const char* view_label = board_view == 0 ? "YOU" : (board_view == 1 ? "OPP" : "BOTH");
-    _3ds_draw_label(view_label, 280, 220, COL_GOLD, 0.5f);
+    _3ds_draw_label(view_label, 280, 220, COL_GOLD, 0.60f);
     char hbuf2[20];
     int e = (hand_range_off + hand_range_vis) < hand_range_total
               ? (hand_range_off + hand_range_vis) : hand_range_total;
     snprintf(hbuf2, sizeof(hbuf2), "%d-%d/%d", hand_range_off + 1, e, hand_range_total);
-    _3ds_draw_label(hbuf2, 280, 210, COL_TEXT, 0.4f);
+    _3ds_draw_label(hbuf2, 280, 210, COL_TEXT, 0.50f);
     if (hand_range_off > 0 && (hand_range_off + hand_range_vis) < hand_range_total) {
-        _3ds_draw_label("< >", 280, 202, COL_GOLD, 0.4f);
+        _3ds_draw_label("< >", 280, 202, COL_GOLD, 0.50f);
     } else if (hand_range_off > 0) {
-        _3ds_draw_label("<", 280, 202, COL_GOLD, 0.4f);
+        _3ds_draw_label("<", 280, 202, COL_GOLD, 0.50f);
     } else if ((hand_range_off + hand_range_vis) < hand_range_total) {
-        _3ds_draw_label(">", 280, 202, COL_GOLD, 0.4f);
+        _3ds_draw_label(">", 280, 202, COL_GOLD, 0.50f);
     }
 }
 

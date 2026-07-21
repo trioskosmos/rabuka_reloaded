@@ -385,16 +385,16 @@ fn main() {
                                 _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
                                 _3ds_top_queue_text(
                                     100.0,
-                                    20.0,
+                                    15.0,
                                     COL_GOLD,
-                                    0.50f32,
+                                    0.70f32,
                                     "SELECT MODE\0".as_ptr(),
                                 );
                                 for (i, m) in ["Sandbox (2 players)", "VS AI"].iter().enumerate() {
-                                    let y = 60.0 + i as f32 * 70.0;
+                                    let y = 55.0 + i as f32 * 80.0;
                                     let bg = if i == cur { COL_SEL } else { COL_DIM };
                                     unsafe {
-                                        _3ds_top_queue_rect(40.0, y, 320.0, 50.0, bg);
+                                        _3ds_top_queue_rect(40.0, y, 320.0, 55.0, bg);
                                     }
                                     if i == cur {
                                         unsafe {
@@ -402,7 +402,7 @@ fn main() {
                                                 40.0,
                                                 y,
                                                 320.0,
-                                                50.0,
+                                                55.0,
                                                 COL_HIGHLIGHT,
                                             );
                                         }
@@ -413,7 +413,7 @@ fn main() {
                                             60.0,
                                             y + 10.0,
                                             color,
-                                            0.40f32,
+                                            0.55f32,
                                             format!("{}\0", m).as_ptr(),
                                         );
                                     }
@@ -421,9 +421,9 @@ fn main() {
                                 unsafe {
                                     _3ds_top_queue_text(
                                         60.0,
-                                        210.0,
+                                        220.0,
                                         COL_MED,
-                                        0.30f32,
+                                        0.45f32,
                                         "UP/DOWN=select  A=confirm\0".as_ptr(),
                                     );
                                 }
@@ -494,17 +494,17 @@ fn main() {
                                         80.0,
                                         10.0,
                                         COL_GOLD,
-                                        0.45f32,
+                                        0.65f32,
                                         format!("SELECT {}\0", label).as_ptr(),
                                     );
                                 }
-                                let start = cur.saturating_sub(6).min(n.saturating_sub(12));
-                                let end = (start + 12).min(n);
+                                let start = cur.saturating_sub(4).min(n.saturating_sub(8));
+                                let end = (start + 8).min(n);
                                 for i in start..end {
-                                    let y = 30.0 + (i - start) as f32 * 16.0;
+                                    let y = 30.0 + (i - start) as f32 * 22.0;
                                     let bg = if i == cur { COL_SEL } else { COL_DIM };
                                     unsafe {
-                                        _3ds_top_queue_rect(20.0, y, 360.0, 14.0, bg);
+                                        _3ds_top_queue_rect(20.0, y, 360.0, 20.0, bg);
                                     }
                                     if i == cur {
                                         unsafe {
@@ -512,7 +512,7 @@ fn main() {
                                                 20.0,
                                                 y,
                                                 360.0,
-                                                14.0,
+                                                20.0,
                                                 COL_HIGHLIGHT,
                                             );
                                         }
@@ -523,7 +523,7 @@ fn main() {
                                             24.0,
                                             y + 1.0,
                                             color,
-                                            0.32f32,
+                                            0.48f32,
                                             format!("{}\0", decks[i].name).as_ptr(),
                                         );
                                     }
@@ -533,7 +533,7 @@ fn main() {
                                         20.0,
                                         225.0,
                                         COL_MED,
-                                        0.30f32,
+                                        0.45f32,
                                         "UP/DOWN=select  A=confirm\0".as_ptr(),
                                     );
                                 }
@@ -608,17 +608,17 @@ fn main() {
                                         80.0,
                                         10.0,
                                         COL_GOLD,
-                                        0.45f32,
+                                        0.65f32,
                                         "SELECT P2 DECK\0".as_ptr(),
                                     );
                                 }
-                                let start = cur.saturating_sub(6).min(n.saturating_sub(12));
-                                let end = (start + 12).min(n);
+                                let start = cur.saturating_sub(4).min(n.saturating_sub(8));
+                                let end = (start + 8).min(n);
                                 for i in start..end {
-                                    let y = 30.0 + (i - start) as f32 * 16.0;
+                                    let y = 30.0 + (i - start) as f32 * 22.0;
                                     let bg = if i == cur { COL_SEL } else { COL_DIM };
                                     unsafe {
-                                        _3ds_top_queue_rect(20.0, y, 360.0, 14.0, bg);
+                                        _3ds_top_queue_rect(20.0, y, 360.0, 20.0, bg);
                                     }
                                     if i == cur {
                                         unsafe {
@@ -626,7 +626,7 @@ fn main() {
                                                 20.0,
                                                 y,
                                                 360.0,
-                                                14.0,
+                                                20.0,
                                                 COL_HIGHLIGHT,
                                             );
                                         }
@@ -637,7 +637,7 @@ fn main() {
                                             24.0,
                                             y + 1.0,
                                             color,
-                                            0.32f32,
+                                            0.48f32,
                                             format!("{}\0", decks[i].name).as_ptr(),
                                         );
                                     }
@@ -647,7 +647,7 @@ fn main() {
                                         20.0,
                                         225.0,
                                         COL_MED,
-                                        0.30f32,
+                                        0.45f32,
                                         "A=select  B=use same\0".as_ptr(),
                                     );
                                 }
@@ -1404,12 +1404,12 @@ fn main() {
                         // Top screen in game mode: color-coordinated panels with proper \0 terminators
                         // Stats panel bar at top showing turn/phase/active-player/HP/deck counts
                         unsafe {
-                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 26.0, COL_PANEL);
+                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 36.0, COL_PANEL);
                             _3ds_top_queue_text(
                                 4.0,
-                                2.0,
+                                3.0,
                                 COL_GOLD,
-                                0.32f32,
+                                0.50f32,
                                 format!(
                                     "T{} {:?} [{}]  P1 H:{} E:{}/{} D:{}  P2 H:{} E:{}/{} D:{}\0",
                                     gs.turn_number,
@@ -1428,9 +1428,9 @@ fn main() {
                             );
                             _3ds_top_queue_text(
                                 4.0,
-                                14.0,
+                                20.0,
                                 COL_LIGHT,
-                                0.28f32,
+                                0.42f32,
                                 format!(
                                     "W:{} L:{}  taps:{}  Y=CLI  X=detail\0",
                                     p1.waitroom.cards.len(),
@@ -1445,12 +1445,12 @@ fn main() {
                         if let Some(vcid) = viewing_card {
                             if let Some(card) = gs.card_database.get_card(vcid) {
                                 unsafe {
-                                    _3ds_top_queue_rect(0.0, 28.0, 400.0, 212.0, COL_CARD);
+                                    _3ds_top_queue_rect(0.0, 38.0, 400.0, 202.0, COL_CARD);
                                     _3ds_top_queue_text(
                                         4.0,
-                                        30.0,
+                                        40.0,
                                         COL_BLUE,
-                                        0.40f32,
+                                        0.55f32,
                                         format!(
                                             "[{}] {}\0",
                                             card.card_no,
@@ -1458,19 +1458,19 @@ fn main() {
                                         )
                                         .as_ptr(),
                                     );
-                                    let mut ty = 46.0;
+                                    let mut ty = 56.0;
                                     for ab in card.resolved_abilities() {
                                         let w = wrap_text(&ab.full_text, 45);
                                         for line in w.lines() {
-                                            if ty < 200.0 {
+                                            if ty < 230.0 {
                                                 _3ds_top_queue_text(
                                                     4.0,
                                                     ty,
                                                     COL_LIGHT,
-                                                    0.30f32,
+                                                    0.45f32,
                                                     format!("{}\0", line).as_ptr(),
                                                 );
-                                                ty += 11.0;
+                                                ty += 14.0;
                                             }
                                         }
                                         ty += 2.0;
@@ -1481,12 +1481,12 @@ fn main() {
                         } else if let Some(entry) = gs.ability_queue.current_entry() {
                             unsafe {
                                 let ab_text = wrap_text(&entry.ability.full_text, 40);
-                                _3ds_top_queue_rect(0.0, 28.0, 400.0, 212.0, COL_ABILITY);
+                                _3ds_top_queue_rect(0.0, 38.0, 400.0, 202.0, COL_ABILITY);
                                 _3ds_top_queue_text(
                                     4.0,
-                                    30.0,
+                                    40.0,
                                     COL_PINK,
-                                    0.35f32,
+                                    0.50f32,
                                     format!(
                                         "[{}] {}\0",
                                         entry.card_no,
@@ -1494,17 +1494,17 @@ fn main() {
                                     )
                                     .as_ptr(),
                                 );
-                                let mut ty = 44.0;
+                                let mut ty = 54.0;
                                 for line in ab_text.lines().skip(1) {
-                                    if ty < 200.0 {
+                                    if ty < 230.0 {
                                         _3ds_top_queue_text(
                                             4.0,
                                             ty,
                                             COL_LIGHT,
-                                            0.30f32,
+                                            0.45f32,
                                             format!("{}\0", line).as_ptr(),
                                         );
-                                        ty += 11.0;
+                                        ty += 14.0;
                                     }
                                 }
                             }
@@ -1514,7 +1514,7 @@ fn main() {
                         let is_ai_turn = *vs_ai && gs.active_player().id != gs.player1.id;
                         if !is_ai_turn && !acts_cache.is_empty() {
                             let n = acts_cache.len();
-                            let max_vis = 8usize;
+                            let max_vis = 6usize;
                             let half = max_vis / 2;
                             let start = if n > max_vis {
                                 (cur as isize - half as isize)
