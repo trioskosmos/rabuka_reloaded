@@ -1,0 +1,7 @@
+[target.armv5te-nintendo-ds]
+linker = "C:\\devkitPro\\devkitARM\\bin\\arm-none-eabi-gcc.exe"
+rustflags = [
+    "-C", "link-arg=-specs=C:/devkitPro/calico/share/ds9-large.specs",
+    "-C", "link-arg=-Wl,--allow-multiple-definition",
+    "-Zunstable-options",
+]

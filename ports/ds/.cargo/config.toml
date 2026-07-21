@@ -1,5 +1,0 @@
-[target.armv5te-nintendo-ds]
-linker = "C:\\devkitPro\\devkitARM\\bin\\arm-none-eabi-gcc.exe"
-rustflags = [
-    "-C", "link-arg=-specs=ds_arm9.specs",
-]
