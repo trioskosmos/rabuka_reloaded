@@ -15,6 +15,8 @@ fn main() {
     sz!(rabuka_engine::card::AbilityEffect);
     sz!(rabuka_engine::card::EffectKind);
     println!();
+    sz!(rabuka_engine::ability::ability_store::AbilityRef);
+    println!();
     sz!(Option<String>);
     sz!(Option<Box<str>>);
     sz!(Box<str>);

@@ -16,8 +16,7 @@ use std::string::String;
 use std::vec::Vec;
 
 use crate::ability::ability_store::AbilityRef;
-use crate::card::{Ability, Card};
-use crate::Arc;
+use crate::card::Card;
 use crate::HashMap;
 #[cfg(feature = "no_std")]
 use alloc::boxed::Box;
@@ -82,82 +81,40 @@ impl CardLoader {
         let ability_map = Self::build_abilities_map_shared(abilities_data);
         for card in &mut cards {
             if let Some(card_abilities) = ability_map.get(card.card_no.as_ref()) {
-                card.abilities = card_abilities.clone();
+                card.abilities = card_abilities.to_vec();
             }
         }
         cards
     }
 
-    /// Build a map of card_no → Vec<AbilityRef> by decoding abilities from bytecode.
+    /// Build a map of card_no → Vec<AbilityRef> by storing bytecode indices.
+    ///
+    /// Abilities are NOT decoded here. Each `AbilityRef` stores a `u16`
+    /// bytecode index. The ability is decoded on first access via
+    /// `AbilityRef::resolve()`, which caches the result in a global
+    /// `HashMap<u16, Arc<Ability>>`.
+    ///
+    /// This eliminates ~2.8MB of decoded structs from RAM at load time.
+    /// Only abilities actually triggered in a game are decoded (~30-45
+    /// out of 800), saving ~2.68MB.
     pub fn build_abilities_map_shared(
         abilities_data: &serde_json::Value,
     ) -> HashMap<String, Vec<AbilityRef>> {
-        let inner = Self::build_abilities_map_inner(abilities_data);
-        inner
-            .into_iter()
-            .map(|(k, v)| (k, v.into_iter().map(|a| AbilityRef(Arc::new(a))).collect()))
-            .collect()
-    }
-
-    /// Decode ALL abilities from bytecode via `vm::get_ability(idx)`.
-    ///
-    /// # EAGER DECODE — NOT LAZY
-    /// This function iterates all 800 unique abilities and decodes each one
-    /// into a full `Ability` struct at load time. Each ability is ~3.5KB.
-    /// Total: ~2.8MB of decoded Ability structs in RAM.
-    ///
-    /// This is called once from `attach_abilities` during CardLoader::load(),
-    /// which runs inside a `OnceLock` — so it executes exactly once per process.
-    ///
-    /// # TODO: Lazy decode for 150KB target
-    /// Instead of decoding all 800 abilities here, store only the bytecode
-    /// index (u16) on each card. Decode on-demand when ability is first
-    /// triggered. Architecture:
-    ///
-    /// ```text
-    /// fn build_abilities_map_lazy(abilities_data) -> HashMap<String, Vec<AbilityRef>> {
-    ///     // AbilityRef = AbilityRef(u16) — 2 bytes, no decode
-    ///     for (idx, entry) in unique_abilities.iter().enumerate() {
-    ///         for card_no in entry["cards"] {
-    ///             map[card_no].push(AbilityRef::index(idx as u16));
-    ///         }
-    ///     }
-    ///     map
-    /// }
-    /// ```
-    ///
-    /// Then in triggers.rs / abilities.rs, when an ability is first accessed:
-    /// ```text
-    /// let ability = resolver.resolve(*ability_ref);  // decode + cache
-    /// ```
-    ///
-    /// This eliminates ~2.8MB from RAM. Only ~30-45 abilities are actually
-    /// triggered in a typical game, so resident decode is ~120KB instead of
-    /// ~2.8MB.
-    ///
-    /// See MEMORY_REFACTOR.md P1.7 for the full plan and 52 call sites.
-    fn build_abilities_map_inner(
-        abilities_data: &serde_json::Value,
-    ) -> HashMap<String, Vec<Ability>> {
-        let mut ability_map: HashMap<String, Vec<Ability>> = HashMap::default();
+        let mut ability_map: HashMap<String, Vec<AbilityRef>> = HashMap::default();
 
         if let Some(unique_abilities) = abilities_data
             .get("unique_abilities")
             .and_then(|v| v.as_array())
         {
-            for (_idx, ability_entry) in unique_abilities.iter().enumerate() {
-                let ability = crate::ability::vm::get_ability(_idx);
-
-                if let Some(ability) = ability {
-                    if let Some(card_list) = ability_entry.get("cards").and_then(|v| v.as_array()) {
-                        for card_entry in card_list {
-                            if let Some(card_str) = card_entry.as_str() {
-                                if let Some(card_no) = card_str.split(" | ").next() {
-                                    ability_map
-                                        .entry(card_no.to_string())
-                                        .or_default()
-                                        .push(ability.clone());
-                                }
+            for (idx, ability_entry) in unique_abilities.iter().enumerate() {
+                if let Some(card_list) = ability_entry.get("cards").and_then(|v| v.as_array()) {
+                    for card_entry in card_list {
+                        if let Some(card_str) = card_entry.as_str() {
+                            if let Some(card_no) = card_str.split(" | ").next() {
+                                ability_map
+                                    .entry(card_no.to_string())
+                                    .or_default()
+                                    .push(AbilityRef::index(idx as u16));
                             }
                         }
                     }

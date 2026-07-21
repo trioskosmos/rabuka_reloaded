@@ -21,24 +21,20 @@ pub fn ability_count() -> usize {
 
 /// Decode a single ability from the bytecode blob.
 ///
-/// This is called eagerly at load time for ALL 800 abilities by
-/// `card_loader::build_abilities_map_inner`. Each call decodes the
-/// bytecode slice into a full `Ability` struct (with nested AbilityEffect,
-/// EffectKind, Condition, etc.) — ~3.5KB per ability.
+/// This is now called ONLY on demand — when an ability is first accessed
+/// via `AbilityRef::deref()`. The decoded ability is cached in a global
+/// `HashMap<u16, &'static Arc<Ability>>` and never decoded again.
 ///
-/// # TODO: Lazy decode path (150KB target)
-/// For console targets, this function should be called on-demand (only
-/// when an ability is first triggered), not eagerly at load time. The
-/// decoded Ability would be cached in a bounded HashMap<u16, Arc<Ability>>
-/// with LRU eviction. The `decode_ability` path is already fast (~50μs)
-/// so lazy decode adds negligible latency on first trigger.
+/// # Lazy decoding flow
+/// 1. `card_loader` stores only u16 indices (no decode at load time)
+/// 2. On first trigger/access, `AbilityRef::deref()` calls `resolve_arc(idx)`
+/// 3. Cache miss → `get_ability(idx)` decodes from bytecode
+/// 4. Decoded Ability is wrapped in Arc, leaked via Box::leak for 'static lifetime
+/// 5. Subsequent accesses return the cached Arc (pointer deref, no clone)
 ///
-/// # TODO: Bytecode interpreter (alternative to lazy decode)
-/// Instead of decoding bytecode → Ability struct → execute, evaluate
-/// bytecode directly via opcode dispatch. This avoids materializing
-/// Ability/AbilityEffect/EffectKind structs entirely. Requires a ~500-line
-/// new module that mirrors the existing handler dispatch but reads fields
-/// from bytecode bytes instead of struct fields.
+/// # RAM savings
+/// Before: All 800 abilities decoded eagerly at load = ~2.8MB
+/// After: Only ~30-45 abilities triggered per game decoded = ~120KB
 pub fn get_ability(idx: usize) -> Option<Ability> {
     if idx >= NUM_ABILITIES {
         return None;
