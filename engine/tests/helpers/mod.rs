@@ -22,11 +22,7 @@ use rabuka_engine::zones::MemberArea;
 
 /// Embedded card data (compile-time, no file I/O at test startup).
 static CARDS_JSON: &str = include_str!("../../../cards/cards.json");
-static ABILITIES_JSON: &str = include_str!("../../../cards/abilities.json");
 
-/// Pre-seeded database + copy pool, initialised once per process.
-/// The database has 1 copy per template pre-created (enough for unique IDs
-/// within a single test; beyond that the template ID serves as fallback).
 struct PreloadedDb {
     db: CardDatabase,
     pool: HashMap<i16, Vec<i16>>,
@@ -38,8 +34,8 @@ static PRELOADED: OnceLock<PreloadedDb> = OnceLock::new();
 pub fn load_real_database() -> Arc<CardDatabase> {
     PRELOADED.get_or_init(|| {
         let t0 = std::time::Instant::now();
-        let cards = CardLoader::load_cards_from_strs(CARDS_JSON, Some(ABILITIES_JSON))
-            .expect("Failed to load embedded cards");
+        let cards =
+            CardLoader::load_cards_from_strs(CARDS_JSON).expect("Failed to load embedded cards");
         let mut db = CardDatabase::load_or_create(cards);
         let tids: Vec<i16> = db.cards.keys().copied().collect();
         let mut pool: HashMap<i16, Vec<i16>> = HashMap::new();

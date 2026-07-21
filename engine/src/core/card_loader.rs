@@ -15,12 +15,10 @@ use std::string::String;
 #[cfg(not(feature = "no_std"))]
 use std::vec::Vec;
 
+use crate::ability::abilities_gen::{CARD_ABILITY_PAIRS, STRINGS};
 use crate::ability::ability_store::AbilityRef;
 use crate::card::Card;
 use crate::HashMap;
-#[cfg(feature = "no_std")]
-use alloc::boxed::Box;
-use serde_json;
 
 pub struct CardLoader;
 
@@ -32,16 +30,10 @@ impl CardLoader {
         file.read_to_string(&mut contents)
             .map_err(|e| format!("Failed to read file: {}", e))?;
 
-        let abilities_path = path.parent().unwrap().join("abilities.json");
-        let abilities_contents = std::fs::read_to_string(&abilities_path).ok();
-
-        Self::load_cards_from_strs(&contents, abilities_contents.as_deref())
+        Self::load_cards_from_strs(&contents)
     }
 
-    pub fn load_cards_from_strs(
-        cards_json: &str,
-        abilities_json: Option<&str>,
-    ) -> Result<Vec<Card>, String> {
+    pub fn load_cards_from_strs(cards_json: &str) -> Result<Vec<Card>, String> {
         let mut cards: Vec<Card> = match serde_json::from_str::<Vec<Card>>(cards_json) {
             Ok(cards) => cards,
             Err(e1) => {
@@ -51,76 +43,47 @@ impl CardLoader {
             }
         };
 
-        if let Some(abilities_str) = abilities_json {
-            if let Ok(abilities_data) = Self::load_abilities_from_str(abilities_str) {
-                cards = Self::attach_abilities(cards, &abilities_data);
-            }
-        }
+        Self::attach_abilities(&mut cards);
 
         Ok(cards)
     }
 
-    #[cfg(not(feature = "no_std"))]
-    #[allow(dead_code)]
-    fn load_abilities_from_file(path: &Path) -> Result<serde_json::Value, String> {
-        let mut file =
-            File::open(path).map_err(|e| format!("Failed to open abilities file: {}", e))?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)
-            .map_err(|e| format!("Failed to read abilities file: {}", e))?;
-        Self::load_abilities_from_str(&contents)
-    }
-
-    pub fn load_abilities_from_str(contents: &str) -> Result<serde_json::Value, String> {
-        let data: serde_json::Value = serde_json::from_str(contents)
-            .map_err(|e| format!("Failed to parse abilities JSON: {}", e))?;
-        Ok(data)
-    }
-
-    pub fn attach_abilities(mut cards: Vec<Card>, abilities_data: &serde_json::Value) -> Vec<Card> {
-        let ability_map = Self::build_abilities_map_shared(abilities_data);
-        for card in &mut cards {
+    /// Attach ability references to all cards using the embedded CARD_ABILITY_PAIRS.
+    /// No abilities are decoded here — just u16 indices stored on each card.
+    /// Abilities are decoded lazily on first access via AbilityRef::deref().
+    pub fn attach_abilities(cards: &mut [Card]) {
+        let ability_map = Self::build_abilities_map_shared();
+        for card in cards.iter_mut() {
             if let Some(card_abilities) = ability_map.get(card.card_no.as_ref()) {
                 card.abilities = card_abilities.to_vec();
             }
         }
-        cards
     }
 
-    /// Build a map of card_no → Vec<AbilityRef> by storing bytecode indices.
+    /// Build a map of card_no → Vec<AbilityRef> from the embedded CARD_ABILITY_PAIRS
+    /// constant. No abilities.json parsing needed — the mapping is compiled into the
+    /// binary as a flat array of (string_index, ability_index) pairs.
     ///
-    /// Abilities are NOT decoded here. Each `AbilityRef` stores a `u16`
-    /// bytecode index. The ability is decoded on first access via
-    /// `AbilityRef::resolve()`, which caches the result in a global
-    /// `HashMap<u16, Arc<Ability>>`.
-    ///
-    /// This eliminates ~2.8MB of decoded structs from RAM at load time.
-    /// Only abilities actually triggered in a game are decoded (~30-45
-    /// out of 800), saving ~2.68MB.
-    pub fn build_abilities_map_shared(
-        abilities_data: &serde_json::Value,
-    ) -> HashMap<String, Vec<AbilityRef>> {
-        let mut ability_map: HashMap<String, Vec<AbilityRef>> = HashMap::default();
-
-        if let Some(unique_abilities) = abilities_data
-            .get("unique_abilities")
-            .and_then(|v| v.as_array())
-        {
-            for (idx, ability_entry) in unique_abilities.iter().enumerate() {
-                if let Some(card_list) = ability_entry.get("cards").and_then(|v| v.as_array()) {
-                    for card_entry in card_list {
-                        if let Some(card_str) = card_entry.as_str() {
-                            if let Some(card_no) = card_str.split(" | ").next() {
-                                ability_map
-                                    .entry(card_no.to_string())
-                                    .or_default()
-                                    .push(AbilityRef::index(idx as u16));
-                            }
-                        }
-                    }
-                }
+    /// This eliminates ~500KB temporary peak from serde_json::Value DOM creation.
+    pub fn build_abilities_map_shared() -> HashMap<String, Vec<AbilityRef>> {
+        let mut map: HashMap<String, Vec<AbilityRef>> = HashMap::default();
+        let mut i = 0;
+        while i + 1 < CARD_ABILITY_PAIRS.len() {
+            let str_idx = CARD_ABILITY_PAIRS[i] as usize;
+            let ability_idx = CARD_ABILITY_PAIRS[i + 1];
+            if str_idx < STRINGS.len() {
+                let card_no = STRINGS[str_idx];
+                map.entry(card_no.to_string())
+                    .or_default()
+                    .push(AbilityRef::index(ability_idx));
             }
+            i += 2;
         }
-        ability_map
+        map
+    }
+
+    /// Build the ability map for tests that need it directly.
+    pub fn build_abilities_map_shared_for_tests() -> HashMap<String, Vec<AbilityRef>> {
+        Self::build_abilities_map_shared()
     }
 }
