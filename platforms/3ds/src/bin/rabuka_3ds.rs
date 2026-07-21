@@ -1542,7 +1542,7 @@ fn main() {
                     } else {
                         // ===== GAME MODE: graphical rendering =====
                         //
-                        // FONT SCAPLING REFERENCE (citro2d BCFNT):
+                        // FONT SCALING REFERENCE (citro2d BCFNT):
                         // The BCFNT font has native cellHeight=42px. citro2d normalizes
                         // this so that scale 1.0 always renders at 30px glyph height:
                         //   rendered_height = user_scale * (30.0 / cellHeight) * cellHeight
@@ -1563,9 +1563,7 @@ fn main() {
                         unsafe {
                             _3ds_top_clear();
                         }
-                        // Top screen in game mode: color-coordinated panels with proper \0 terminators.
-                        // Stats panel bar at top showing turn/phase/active-player/HP/deck counts.
-                        // Font scaling: scale * 30 = glyph height in px. 0.70 = 21px, 0.80 = 24px.
+                        // Top screen: stats bar (0-40px) + content panel (42-240px).
                         unsafe {
                             _3ds_top_queue_rect(0.0, 0.0, 400.0, 40.0, COL_PANEL);
                             _3ds_top_queue_text(
@@ -1595,7 +1593,7 @@ fn main() {
                                 COL_LIGHT,
                                 0.60f32,
                                 format!(
-                                    "W:{} L:{}  taps:{}  Y=CLI  X=detail\0",
+                                    "W:{} L:{}  taps:{}\0",
                                     p1.waitroom.cards.len(),
                                     p1.success_live_card_zone.cards.len(),
                                     touch_tap_count,
@@ -1604,8 +1602,53 @@ fn main() {
                             );
                         }
 
-                        // Card detail panel when a board card is tapped
-                        if let Some(vcid) = viewing_card {
+                        // Content panel priority: detail_mode > viewing_card > ability_queue > action list
+                        if detail_mode {
+                            // Detail mode: show ability text for the currently selected action's card
+                            if cur < acts_cache.len() {
+                                if let Some(ref p) = acts_cache[cur].parameters {
+                                    if let Some(cid) = p.card_id {
+                                        if let Some(card) = gs.card_database.get_card(cid) {
+                                            unsafe {
+                                                _3ds_top_queue_rect(
+                                                    0.0, 42.0, 400.0, 198.0, COL_CARD,
+                                                );
+                                                _3ds_top_queue_text(
+                                                    4.0,
+                                                    44.0,
+                                                    COL_BLUE,
+                                                    0.80f32,
+                                                    format!(
+                                                        "[{}] {}\0",
+                                                        card.card_no,
+                                                        wrap_text(&card.name, 25)
+                                                    )
+                                                    .as_ptr(),
+                                                );
+                                                let mut ty = 66.0;
+                                                for ab in card.resolved_abilities() {
+                                                    let w = wrap_text(&ab.full_text, 45);
+                                                    for line in w.lines() {
+                                                        if ty < 232.0 {
+                                                            _3ds_top_queue_text(
+                                                                4.0,
+                                                                ty,
+                                                                COL_LIGHT,
+                                                                0.65f32,
+                                                                format!("{}\0", line).as_ptr(),
+                                                            );
+                                                            ty += 18.0;
+                                                        }
+                                                    }
+                                                    ty += 3.0;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else if let Some(vcid) = viewing_card {
+                            // Card tapped on board: show its abilities
                             if let Some(card) = gs.card_database.get_card(vcid) {
                                 unsafe {
                                     _3ds_top_queue_rect(0.0, 42.0, 400.0, 198.0, COL_CARD);
@@ -1640,8 +1683,8 @@ fn main() {
                                     }
                                 }
                             }
-                        // Ability queue entry when an ability is resolving
                         } else if let Some(entry) = gs.ability_queue.current_entry() {
+                            // Ability resolving: show the ability text
                             unsafe {
                                 let ab_text = wrap_text(&entry.ability.full_text, 40);
                                 _3ds_top_queue_rect(0.0, 42.0, 400.0, 198.0, COL_ABILITY);
@@ -1671,178 +1714,120 @@ fn main() {
                                     }
                                 }
                             }
-                        }
-
-                        // Action overlay on bottom screen: grouped by card for readability.
-                        // Uses pre-computed display_order for consistent navigation.
-                        let is_ai_turn = *vs_ai && gs.active_player().id != gs.player1.id;
-                        if !is_ai_turn && !display_order.is_empty() {
-                            // Build display text for each item in display_order
-                            let mut display_texts: Vec<String> = Vec::new();
-                            for &fi in &display_order {
-                                let act = &acts_cache[fi];
-                                match act.action_type {
-                                    game_setup::ActionType::Pass => {
-                                        display_texts.push("Pass".into());
-                                    }
-                                    game_setup::ActionType::PlayMemberToStage => {
-                                        let name = act
-                                            .parameters
-                                            .as_ref()
-                                            .and_then(|p| p.card_name.clone())
-                                            .unwrap_or_default();
-                                        let cn = act
-                                            .parameters
-                                            .as_ref()
-                                            .and_then(|p| p.card_no.clone())
-                                            .unwrap_or_default();
-                                        let cost = act
-                                            .parameters
-                                            .as_ref()
-                                            .and_then(|p| p.final_cost)
-                                            .unwrap_or(0);
-                                        let area = act
-                                            .parameters
-                                            .as_ref()
-                                            .and_then(|p| p.stage_area.clone())
-                                            .unwrap_or_default();
-                                        let is_db = act
-                                            .parameters
-                                            .as_ref()
-                                            .and_then(|p| p.card_indices.as_ref())
-                                            .map(|ci| ci.len() >= 2)
-                                            .unwrap_or(false);
-                                        let area_info = act
-                                            .parameters
-                                            .as_ref()
-                                            .and_then(|p| p.available_areas.as_ref())
-                                            .and_then(|areas| areas.iter().find(|a| a.area == area))
-                                            .map(|a| {
-                                                if a.is_baton_touch {
-                                                    format!(
-                                                        "baton from {}",
-                                                        a.existing_member_name
-                                                            .as_deref()
-                                                            .unwrap_or("?")
-                                                    )
-                                                } else {
-                                                    "open".into()
-                                                }
-                                            })
-                                            .unwrap_or_default();
-                                        // Check if this is the first action for this card (show header)
-                                        let is_first_for_card = act.parameters.as_ref()
-                                            .and_then(|p| p.card_no.clone())
-                                            .map(|cn| {
-                                                acts_cache.iter().enumerate()
-                                                    .filter(|(_, a)| a.action_type == game_setup::ActionType::PlayMemberToStage
-                                                        && a.parameters.as_ref().map(|p| p.card_no.as_deref()) == Some(Some(&cn)))
-                                                    .map(|(i, _)| i)
-                                                    .min()
-                                                    == Some(fi)
-                                            })
-                                            .unwrap_or(false);
-                                        if is_first_for_card {
-                                            // Header line for this card
-                                            display_texts
-                                                .push(format!("[{}] {} c:{}", cn, name, cost));
-                                        }
-                                        // Area sub-line
-                                        let pfx = if is_db { ">>" } else { " " };
-                                        display_texts
-                                            .push(format!("  {} {} ({})", pfx, area, area_info));
-                                    }
-                                    game_setup::ActionType::UseAbility => {
-                                        let name = act
-                                            .parameters
-                                            .as_ref()
-                                            .and_then(|p| p.card_name.clone())
-                                            .unwrap_or_default();
-                                        let desc = act.description.lines().next().unwrap_or("");
-                                        display_texts.push(format!("ABIL {} {}", name, desc));
-                                    }
-                                    _ => {
-                                        let desc = act.description.lines().next().unwrap_or("");
-                                        display_texts.push(desc.to_string());
-                                    }
-                                }
-                            }
-
-                            // Send to C overlay with scrolling centered on display_pos
-                            let n = display_order.len();
-                            let max_vis = 8usize;
-                            let half = max_vis / 2;
-                            let start = if n > max_vis {
-                                (display_pos as isize - half as isize)
-                                    .max(0)
-                                    .min((n - max_vis) as isize)
-                                    as usize
-                            } else {
-                                0
-                            };
-                            let end = (start + max_vis).min(n);
-                            let has_up = start > 0;
-                            let has_down = end < n;
-                            let mut oi = 0i32;
-                            if has_up {
-                                if let Ok(s) =
-                                    std::ffi::CString::new(format!("\u{25b2} +{}", start))
-                                {
-                                    unsafe {
-                                        _3ds_board_set_action_overlay_text(
-                                            oi,
-                                            s.as_ptr() as *const u8,
-                                        );
-                                        _3ds_board_set_overlay_action_idx(oi, -1);
-                                        oi += 1;
-                                    }
-                                }
-                            }
-                            let mut selected_oi = 0i32;
-                            for di in start..end {
-                                let flat_idx = display_order[di];
-                                let is_selected = di == display_pos;
-                                let prefix = if is_selected { ">" } else { " " };
-                                let text = format!("{}{}", prefix, display_texts[di]);
-                                if is_selected {
-                                    selected_oi = oi;
-                                }
-                                if let Ok(s) = std::ffi::CString::new(text) {
-                                    unsafe {
-                                        _3ds_board_set_action_overlay_text(
-                                            oi,
-                                            s.as_ptr() as *const u8,
-                                        );
-                                        _3ds_board_set_overlay_action_idx(oi, flat_idx as i32);
-                                        oi += 1;
-                                    }
-                                }
-                            }
-                            if has_down {
-                                if let Ok(s) =
-                                    std::ffi::CString::new(format!("\u{25bc} +{}", n - end))
-                                {
-                                    unsafe {
-                                        _3ds_board_set_action_overlay_text(
-                                            oi,
-                                            s.as_ptr() as *const u8,
-                                        );
-                                        _3ds_board_set_overlay_action_idx(oi, -1);
-                                        oi += 1;
-                                    }
-                                }
-                            }
-
-                            unsafe {
-                                _3ds_board_set_action_overlay_state(oi, selected_oi);
-                            }
                         } else {
-                            unsafe {
-                                _3ds_board_clear_action_overlay();
+                            // Action list on top screen (was previously on bottom overlay).
+                            let is_ai_turn = *vs_ai && gs.active_player().id != gs.player1.id;
+                            if !is_ai_turn && !display_order.is_empty() {
+                                let mut ty = 44.0f32;
+                                let max_vis = 10usize;
+                                let half = max_vis / 2;
+                                let n = display_order.len();
+                                let start = if n > max_vis {
+                                    (display_pos as isize - half as isize)
+                                        .max(0)
+                                        .min((n - max_vis) as isize)
+                                        as usize
+                                } else {
+                                    0
+                                };
+                                let end = (start + max_vis).min(n);
+                                if start > 0 {
+                                    unsafe {
+                                        _3ds_top_queue_text(
+                                            4.0,
+                                            ty,
+                                            COL_MED,
+                                            0.60f32,
+                                            format!("\u{25b2} +{}\0", start).as_ptr(),
+                                        );
+                                        ty += 18.0;
+                                    }
+                                }
+                                for di in start..end {
+                                    let fi = display_order[di];
+                                    let act = &acts_cache[fi];
+                                    let is_sel = di == display_pos;
+                                    let prefix = if is_sel { "> " } else { "  " };
+                                    if ty > 230.0 {
+                                        break;
+                                    }
+                                    let line = match act.action_type {
+                                        game_setup::ActionType::Pass => "Pass".into(),
+                                        game_setup::ActionType::PlayMemberToStage => {
+                                            let name = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.card_name.clone())
+                                                .unwrap_or_default();
+                                            let cn = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.card_no.clone())
+                                                .unwrap_or_default();
+                                            let cost = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.final_cost)
+                                                .unwrap_or(0);
+                                            let area = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.stage_area.clone())
+                                                .unwrap_or_default();
+                                            let is_db = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.card_indices.as_ref())
+                                                .map(|ci| ci.len() >= 2)
+                                                .unwrap_or(false);
+                                            if is_db {
+                                                format!("[{}] {} >>{} c:{}", cn, name, area, cost)
+                                            } else {
+                                                format!("[{}] {} {} c:{}", cn, name, area, cost)
+                                            }
+                                        }
+                                        game_setup::ActionType::UseAbility => {
+                                            let name = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.card_name.clone())
+                                                .unwrap_or_default();
+                                            let desc = act.description.lines().next().unwrap_or("");
+                                            format!("ABIL {} {}", name, desc)
+                                        }
+                                        _ => {
+                                            act.description.lines().next().unwrap_or("").to_string()
+                                        }
+                                    };
+                                    let color = if is_sel { COL_GOLD } else { COL_LIGHT };
+                                    let scale = if is_sel { 0.70f32 } else { 0.65f32 };
+                                    unsafe {
+                                        _3ds_top_queue_text(
+                                            4.0,
+                                            ty,
+                                            color,
+                                            scale,
+                                            format!("{}{}\0", prefix, wrap_text(&line, 42))
+                                                .as_ptr(),
+                                        );
+                                        ty += 20.0;
+                                    }
+                                }
+                                if end < n {
+                                    unsafe {
+                                        _3ds_top_queue_text(
+                                            4.0,
+                                            ty,
+                                            COL_MED,
+                                            0.60f32,
+                                            format!("\u{25bc} +{}\0", n - end).as_ptr(),
+                                        );
+                                    }
+                                }
                             }
                         }
 
-                        // Clear stale action highlight
+                        // Clear stale action highlight on bottom board
                         unsafe {
                             _3ds_board_clear_action_highlight();
                         }

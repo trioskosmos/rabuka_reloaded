@@ -108,8 +108,8 @@ int nds_key_held(void) {
 
 void nds_wait_vblank(void) {
     volatile u16* vcount = (volatile u16*)0x04000006;
-    while (*vcount < 192) {}
     while (*vcount >= 192) {}
+    while (*vcount < 192) {}
 }
 
 unsigned long long nds_get_tick(void) {
