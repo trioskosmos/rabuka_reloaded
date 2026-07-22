@@ -128,3 +128,8 @@ test = false
 name = "collect_data"
 path = "src/bin/collect_data.rs"
 test = false
+
+[[bin]]
+name = "ppo_collect"
+path = "src/bin/ppo_collect.rs"
+test = false

@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-07-22T22:36:01.443111",
+  "generated_at": "2026-07-22T22:23:54.836524",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "/home/trios/OneDrive/Documents/rabuka_reloaded/cards/cards.json",
   "statistics": {

@@ -62,6 +62,7 @@ if errorlevel 1 (
 
 echo [5/6] Building 3DS binary...
 if exist "%~dp0platforms\3ds\target" rmdir /s /q "%~dp0platforms\3ds\target"
+if exist "C:\rust_targets\armv6k-nintendo-3ds\release\rabuka_3ds.3dsx" del "C:\rust_targets\armv6k-nintendo-3ds\release\rabuka_3ds.3dsx"
 cd /d "%~dp0platforms\3ds"
 set RUSTFLAGS=
 cargo +nightly 3ds build --bin rabuka_3ds --release --features 3ds

@@ -1,76 +1,47 @@
 use crate::game_setup::{Action, ActionType};
 use crate::game_state::GameState;
 
-/// Rollout policy — picks the BEST action by blade/cost ratio.
+/// Pick rollout action by success_delta / turns (clone-and-eval each action).
 pub fn pick_rollout_action(actions: &[Action], state: &GameState) -> Action {
     if actions.len() <= 1 {
         return actions[0].clone();
     }
 
-    let my_energy = state.player1.energy_zone.active_count() as u32;
-    let may_baton = state.player1.stage.stage.iter().all(|&id| id >= 0);
+    let base_s = state.player1.success_live_card_zone.cards.len() as f64
+        - state.player2.success_live_card_zone.cards.len() as f64;
+    let base_t = state.turn_number;
 
-    // Score each playable member by blade/cost ratio
-    let mut best_member: Option<(usize, f64)> = None;
+    let mut best_idx = 0usize;
+    let mut best_score = f64::NEG_INFINITY;
+
     for (i, a) in actions.iter().enumerate() {
-        if a.action_type != ActionType::PlayMemberToStage {
-            continue;
-        }
-        if let Some(ref p) = a.parameters {
-            if let Some(cid) = p.card_id {
-                if let Some(card) = state.card_database.get_card(cid) {
-                    let cost = card.cost.unwrap_or(1);
-                    if cost <= my_energy {
-                        // Check if a slot is available (or if baton touch is ok)
-                        if may_baton || can_play_to(&state.player1.stage.stage, p) {
-                            let score = card.blade as f64 / cost as f64;
-                            if best_member.map_or(true, |(_, s)| score > s) {
-                                best_member = Some((i, score));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    if let Some((idx, _)) = best_member {
-        return actions[idx].clone();
-    }
+        let mut sim = state.clone();
+        let p = a.parameters.clone();
+        let _ = crate::turn::TurnEngine::execute_main_phase_action(
+            &mut sim,
+            &a.action_type,
+            p.as_ref().and_then(|p| p.card_id),
+            p.as_ref().and_then(|p| p.card_indices.clone()),
+            p.as_ref().and_then(|p| {
+                p.stage_area.as_deref().and_then(|s| match s {
+                    "left" => Some(crate::zones::MemberArea::LeftSide),
+                    "center" => Some(crate::zones::MemberArea::Center),
+                    "right" => Some(crate::zones::MemberArea::RightSide),
+                    _ => None,
+                })
+            }),
+            p.as_ref().and_then(|p| p.use_baton_touch),
+        );
+        crate::game_setup::settle_single_player_state(&mut sim);
 
-    // Use abilities
-    for a in actions {
-        if a.action_type == ActionType::UseAbility {
-            return a.clone();
+        let s = sim.player1.success_live_card_zone.cards.len() as f64
+            - sim.player2.success_live_card_zone.cards.len() as f64;
+        let t = (sim.turn_number - base_t).max(1) as f64;
+        let score = (s - base_s) / t;
+        if score > best_score {
+            best_score = score;
+            best_idx = i;
         }
     }
-
-    // Play a member even if we must baton touch
-    for a in actions {
-        if a.action_type == ActionType::PlayMemberToStage {
-            return a.clone();
-        }
-    }
-
-    // Pass
-    for a in actions {
-        if a.action_type == ActionType::Pass {
-            return a.clone();
-        }
-    }
-
-    actions[0].clone()
-}
-
-fn can_play_to(stage: &[i16; 3], p: &crate::game_setup::ActionParameters) -> bool {
-    if let Some(ref area) = p.stage_area {
-        let idx = match area.as_str() {
-            "left" => 0,
-            "center" => 1,
-            "right" => 2,
-            _ => 0,
-        };
-        stage[idx] < 0
-    } else {
-        false
-    }
+    actions[best_idx].clone()
 }

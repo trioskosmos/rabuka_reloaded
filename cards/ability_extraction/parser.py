@@ -778,11 +778,6 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         if isinstance(effect, dict) and "cost" in effect:
             ability["cost"] = effect.pop("cost")
         effect = _normalize_effect_tree(effect, triggerless_text)
-        # Collapse the 4 specialized compound shapes (look_and_select,
-        # conditional_alternative, conditional_on_result, conditional_on_optional)
-        # into the unified `effect_steps` form. The engine dispatches
-        # effect_steps to the sequential handler, so this eliminates
-        # per-shape code paths in the engine.
         effect = _collapse_to_effect_steps(effect)
         if not isinstance(effect, dict):
             effect = {}

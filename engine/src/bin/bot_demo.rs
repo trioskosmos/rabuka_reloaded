@@ -47,7 +47,7 @@ fn main() {
         bot.network.load_weights(&weights_path).unwrap();
     }
 
-    const NUM_GAMES: u32 = 10;
+    const NUM_GAMES: u32 = 100;
     let mut p1_wins = 0u32;
     let mut p2_wins = 0u32;
     let mut draws = 0u32;

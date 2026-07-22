@@ -1,3 +1,4 @@
+#![allow(unused_unsafe)]
 // Rabuka 3DS — interactive card game with direct framebuffer text rendering.
 // Uses the 3DS shared system font (fontGetSystemFont) which includes full
 // Japanese on JPN/USA/EUR consoles. No font files or extra libraries needed.
@@ -88,6 +89,7 @@ macro_rules! dprintln {
 // tprintln! — debug output on TOP screen (timing/status).
 // Appends to top text buffer, rendered in _3ds_swap_buffers().
 #[cfg(feature = "3ds")]
+#[allow(unused_macros)]
 macro_rules! tprintln {
     ($($arg:tt)*) => {{
         let msg = format!($($arg)*);
@@ -452,7 +454,7 @@ fn main() {
         _3ds_init();
     }
 
-    let mut frame: u64 = 0;
+    let mut _frame: u64 = 0;
     let mut step = Step::ReadCardsBin;
 
     while unsafe { _3ds_main_loop() != 0 } {
@@ -460,13 +462,13 @@ fn main() {
             _3ds_scan_input();
         }
         let keys = unsafe { _3ds_keys_down() };
-        let held = unsafe { _3ds_keys_held() };
+        let _held = unsafe { _3ds_keys_held() };
         if keys & 0x00000008 != 0 {
             break;
         }
 
-        let current_step = step_name(&step);
-        frame += 1;
+        let _current_step = step_name(&step);
+        _frame += 1;
 
         step = match step {
             Step::ReadCardsBin => {
@@ -1757,6 +1759,7 @@ fn main() {
                                     19 => game_setup::ActionType::ConfirmLiveCardSet,
                                     20 => game_setup::ActionType::SkipLiveCardSet,
                                     21 => game_setup::ActionType::PassRemaining,
+                                    22 => game_setup::ActionType::Pass,
                                     _ => game_setup::ActionType::Pass,
                                 };
                                 let stage_area = match sync.stage_area {
@@ -1863,7 +1866,8 @@ fn main() {
                             game_setup::ActionType::ConfirmLiveCardSet => 19,
                             game_setup::ActionType::SkipLiveCardSet => 20,
                             game_setup::ActionType::PassRemaining => 21,
-                            _ => 0, // Default to Pass
+                            game_setup::ActionType::Pass => 22,
+                            _ => 0,
                         };
                         let stage_area = match p
                             .as_ref()
@@ -1907,7 +1911,6 @@ fn main() {
                 // Skip when dirty=true: acts_cache is stale from a just-executed human action.
                 // In multiplayer: opponent's turn is handled via UDS receive, not AI
                 let is_ai_turn = *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
-                let is_opponent_turn = is_multiplayer && gs.active_player().id != gs.player1.id;
                 if is_ai_turn && !dirty {
                     if acts_cache.len() > 0 {
                         let ai_idx = (unsafe { _3ds_system_tick() } as usize) % acts_cache.len();
@@ -2311,42 +2314,6 @@ fn main() {
                                 ap_label.as_ptr(),
                             );
                             _3ds_board_set_active_player(ap.id == p1.id);
-                        }
-                        // Show multiplayer status on top screen
-                        if is_multiplayer {
-                            let mp_status = if waiting_for_opponent {
-                                "Waiting for opponent...\0"
-                            } else {
-                                "Your turn!\0"
-                            };
-                            let role_str = if is_host { "HOST\0" } else { "CLIENT\0" };
-                            if cli_mode {
-                                unsafe {
-                                    _3ds_text_add_top(
-                                        format!(
-                                            "[MP {}] {}\n\0",
-                                            if is_host { "HOST" } else { "CLIENT" },
-                                            mp_status
-                                        )
-                                        .as_ptr(),
-                                    );
-                                }
-                            } else {
-                                unsafe {
-                                    _3ds_top_queue_text(
-                                        10.0,
-                                        8.0,
-                                        0x00FF00FF, // green
-                                        0.60f32,
-                                        format!(
-                                            "MP {} | {}\0",
-                                            role_str.trim_end_matches('\0'),
-                                            mp_status.trim_end_matches('\0')
-                                        )
-                                        .as_ptr(),
-                                    );
-                                }
-                            }
                         }
                     }
 
@@ -2940,6 +2907,30 @@ fn main() {
                         // Clear stale action highlight on bottom board
                         unsafe {
                             _3ds_board_clear_action_highlight();
+                        }
+                    }
+
+                    // Multiplayer debug overlay (last thing drawn, never cleared)
+                    if is_multiplayer {
+                        let my_id = if is_host { 0 } else { 1 };
+                        let can_act = mp_can_act(&gs, my_id);
+                        unsafe {
+                            _3ds_top_queue_text(
+                                4.0,
+                                215.0,
+                                0xFFFFFF00,
+                                0.65f32,
+                                format!(
+                                    "MP|ap={} my={} can={} wait={} phase={:?} acts={}\0",
+                                    gs.active_player().id.as_str(),
+                                    if is_host { "HST" } else { "CLT" },
+                                    if can_act { "Y" } else { "N" },
+                                    if waiting_for_opponent { "W" } else { "A" },
+                                    gs.current_phase,
+                                    acts_cache.len(),
+                                )
+                                .as_ptr(),
+                            );
                         }
                     }
 
