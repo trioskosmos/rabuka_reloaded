@@ -36,7 +36,6 @@ from parser import (
     parse_effect,
     extract_phase_gate,
     _normalize_effect_tree,
-    _collapse_to_effect_steps,
     _enrich_effect_type,
 )
 
@@ -393,12 +392,6 @@ def extract_all_abilities(cards_file: Path) -> dict:
             effect = parse_effect(effect_text)
             # Run post-processing normalizer (propagates exclude_self, distinct, position, original_value, etc.)
             effect = _normalize_effect_tree(effect, sample["triggerless_text"])
-            # Collapse the 4 specialized compound shapes (look_and_select,
-            # conditional_alternative, conditional_on_result,
-            # conditional_on_optional) into the unified `effect_steps` form
-            # so the engine can dispatch them through the single sequential
-            # pipeline. This eliminates per-shape code paths.
-            effect = _collapse_to_effect_steps(effect)
             # Check if effect has empty actions array
             if (
                 isinstance(effect, dict)

@@ -778,7 +778,6 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         if isinstance(effect, dict) and "cost" in effect:
             ability["cost"] = effect.pop("cost")
         effect = _normalize_effect_tree(effect, triggerless_text)
-        effect = _collapse_to_effect_steps(effect)
         if not isinstance(effect, dict):
             effect = {}
 
@@ -9398,6 +9397,7 @@ def _collapse_to_effect_steps(effect):
             effect.pop("alternative_effect", None)
             effect.pop("primary_effect", None)
             effect.pop("alternative_condition", None)
+            effect.pop("condition", None)
 
     # --- conditional_on_result → sequential [primary, followup (with result_condition)] ---
     elif action == "conditional_on_result":

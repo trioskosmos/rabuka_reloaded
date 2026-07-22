@@ -44,7 +44,7 @@ fn main() {
         .unwrap_or(200);
     let out_path = std::env::args()
         .nth(2)
-        .unwrap_or_else(|| "../ppo_trajectories.bin".into());
+        .unwrap_or_else(|| "../training/ppo_trajectories.bin".into());
     let weights_path = std::env::args().nth(3);
 
     let mut network = PolicyNet::new();
