@@ -44,7 +44,7 @@ use rabuka_engine::player::Player;
 use rabuka_engine::turn;
 
 #[cfg(feature = "3ds")]
-mod uds;
+use rabuka_3ds::uds;
 const TICK_HZ: u64 = 268_120_000;
 
 /// Reader wrapper that calls aptMainLoop() every `threshold` bytes without
@@ -191,16 +191,16 @@ impl CardAtlas {
 #[cfg(feature = "3ds")]
 #[derive(Clone)]
 enum SetupPhase {
-    PickMode(usize),               // cursor: 0=sandbox, 1=vsAI, 2=AIvsAI, 3=tests, 4=localMP
-    PickDeck(usize, bool, bool),   // cursor, vs_ai flag, is_multiplayer
+    PickMode(usize), // cursor: 0=sandbox, 1=vsAI, 2=AIvsAI, 3=tests, 4=localMP
+    PickDeck(usize, bool, bool), // cursor, vs_ai flag, is_multiplayer
     PickDeck2(usize, usize, bool), // cursor, p1_idx, vs_ai
-    Loading(usize, usize, bool),   // p1_idx, p2_idx, vs_ai
-    Testing,                       // On-device test suite
+    Loading(usize, usize, bool), // p1_idx, p2_idx, vs_ai
+    Testing,         // On-device test suite
     // Multiplayer lobby phases
-    MultiplayerDeck(usize),        // cursor, selecting deck for multiplayer
+    MultiplayerDeck(usize), // cursor, selecting deck for multiplayer
     MultiplayerPickRole(usize, usize), // deck_idx, role_cursor (0=Host, 1=Client)
-    MultiplayerHostWait(usize),    // p1_idx: host waiting for client to connect
-    MultiplayerClientScan(usize),  // p1_idx: client scanning for host network
+    MultiplayerHostWait(usize), // p1_idx: host waiting for client to connect
+    MultiplayerClientScan(usize), // p1_idx: client scanning for host network
     MultiplayerSyncDeck(usize, usize, bool), // p1_idx, p2_idx, is_host
     MultiplayerLoading(usize, usize, bool), // p1_idx, p2_idx, is_host
 }
@@ -497,10 +497,15 @@ fn main() {
                             if _3ds_is_cli_mode() {
                                 _3ds_clear_top();
                                 _3ds_text_add_top("SELECT MODE\n\0".as_ptr());
-                                for (i, m) in
-                                    ["Sandbox (2 players)", "VS AI", "AI vs AI", "Run Tests", "Local Multiplayer"]
-                                        .iter()
-                                        .enumerate()
+                                for (i, m) in [
+                                    "Sandbox (2 players)",
+                                    "VS AI",
+                                    "AI vs AI",
+                                    "Run Tests",
+                                    "Local Multiplayer",
+                                ]
+                                .iter()
+                                .enumerate()
                                 {
                                     let arrow = if i == cur { ">" } else { " " };
                                     _3ds_text_add_top(
@@ -518,9 +523,10 @@ fn main() {
                                     0.85f32,
                                     "SELECT MODE\0".as_ptr(),
                                 );
-                                for (i, m) in ["Sandbox", "VS AI", "AI vs AI", "Run Tests", "Local MP"]
-                                    .iter()
-                                    .enumerate()
+                                for (i, m) in
+                                    ["Sandbox", "VS AI", "AI vs AI", "Run Tests", "Local MP"]
+                                        .iter()
+                                        .enumerate()
                                 {
                                     let y = 48.0 + i as f32 * 48.0;
                                     let bg = if i == cur { COL_SEL } else { COL_DIM };
@@ -1048,12 +1054,8 @@ fn main() {
                                     _3ds_text_add_top("Client = join network\n\n\0".as_ptr());
                                     let arrow_h = if cur == 0 { ">" } else { " " };
                                     let arrow_c = if cur == 1 { ">" } else { " " };
-                                    _3ds_text_add_top(
-                                        format!("{} Host\n\0", arrow_h).as_ptr(),
-                                    );
-                                    _3ds_text_add_top(
-                                        format!("{} Client\n\0", arrow_c).as_ptr(),
-                                    );
+                                    _3ds_text_add_top(format!("{} Host\n\0", arrow_h).as_ptr());
+                                    _3ds_text_add_top(format!("{} Client\n\0", arrow_c).as_ptr());
                                     _3ds_text_add_top("\nUP/DOWN=select A=confirm\0".as_ptr());
                                 }
                             } else {
@@ -1124,12 +1126,7 @@ fn main() {
                             )
                         } else if keys & 0x00000002 != 0 {
                             // B = back to PickMode
-                            Step::Setup(
-                                cards.clone(),
-                                decks.clone(),
-                                SetupPhase::PickMode(4),
-                                true,
-                            )
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(4), true)
                         } else if keys & 0x00000001 != 0 {
                             // A = select role
                             // deck_idx is the deck index from MultiplayerDeck
@@ -1170,7 +1167,9 @@ fn main() {
                                     if unsafe { _3ds_is_cli_mode() } {
                                         unsafe {
                                             _3ds_clear_top();
-                                            _3ds_text_add_top("HOST: Network created!\n\0".as_ptr());
+                                            _3ds_text_add_top(
+                                                "HOST: Network created!\n\0".as_ptr(),
+                                            );
                                             _3ds_text_add_top("Waiting for client...\n\0".as_ptr());
                                             _3ds_text_add_top("B = cancel\n\0".as_ptr());
                                         }
@@ -1266,7 +1265,9 @@ fn main() {
                                         unsafe {
                                             _3ds_clear_top();
                                             _3ds_text_add_top("CLIENT: Scanning...\n\0".as_ptr());
-                                            _3ds_text_add_top("Looking for host network\n\0".as_ptr());
+                                            _3ds_text_add_top(
+                                                "Looking for host network\n\0".as_ptr(),
+                                            );
                                             _3ds_text_add_top("B = cancel\n\0".as_ptr());
                                         }
                                     } else {
@@ -1378,10 +1379,10 @@ fn main() {
                                 // Build deck sync message
                                 let sync = uds::DeckSync {
                                     seed,
-                                    p1_main: pd1.main_deck.clone(),
-                                    p1_energy: pd1.energy_deck.clone(),
-                                    p2_main: pd2.main_deck.clone(),
-                                    p2_energy: pd2.energy_deck.clone(),
+                                    p1_main: pd1.main_deck.clone().into(),
+                                    p1_energy: pd1.energy_deck.clone().into(),
+                                    p2_main: pd2.main_deck.clone().into(),
+                                    p2_energy: pd2.energy_deck.clone().into(),
                                 };
                                 let data = sync.to_bytes();
                                 uds::uds_send(&data).map_err(|e| format!("Send: {}", e))?;
@@ -1521,8 +1522,8 @@ fn main() {
                                     0,
                                     0,
                                     None,
-                                    true,  // is_multiplayer
-                                    is_host, // is_host
+                                    true,     // is_multiplayer
+                                    is_host,  // is_host
                                     !is_host, // waiting_for_opponent: client waits, host acts first
                                 )
                             }
@@ -1696,19 +1697,25 @@ fn main() {
                                     1 => game_setup::ActionType::PaperChoice,
                                     2 => game_setup::ActionType::ScissorsChoice,
                                     3 => game_setup::ActionType::ChooseFirstAttacker,
-                                    4 => game_setup::ActionType::MulliganYes,
-                                    5 => game_setup::ActionType::MulliganNo,
-                                    6 => game_setup::ActionType::PlayCard,
-                                    7 => game_setup::ActionType::SetCard,
-                                    8 => game_setup::ActionType::EndMainPhase,
-                                    9 => game_setup::ActionType::DeclareAttack,
-                                    10 => game_setup::ActionType::DeclareBlock,
-                                    11 => game_setup::ActionType::DeclareNoBlock,
-                                    12 => game_setup::ActionType::ConfirmDamage,
-                                    13 => game_setup::ActionType::BatonTouch,
-                                    14 => game_setup::ActionType::NoBatonTouch,
-                                    15 => game_setup::ActionType::AbilityChoice,
-                                    _ => game_setup::ActionType::EndMainPhase,
+                                    4 => game_setup::ActionType::SelectMulligan,
+                                    5 => game_setup::ActionType::SkipMulligan,
+                                    6 => game_setup::ActionType::PlayMemberToStage,
+                                    7 => game_setup::ActionType::SetLiveCard,
+                                    8 => game_setup::ActionType::FinishLiveCardSet,
+                                    9 => game_setup::ActionType::EnergyCharge,
+                                    10 => game_setup::ActionType::ChoiceDecision,
+                                    11 => game_setup::ActionType::ChoiceSelect,
+                                    12 => game_setup::ActionType::ChoiceSkip,
+                                    13 => game_setup::ActionType::ChoiceOption,
+                                    14 => game_setup::ActionType::ChoicePosition,
+                                    15 => game_setup::ActionType::UseAbility,
+                                    _ => game_setup::ActionType::Pass,
+                                };
+                                let stage_area = match sync.stage_area {
+                                    1 => Some(rabuka_engine::zones::MemberArea::LeftSide),
+                                    2 => Some(rabuka_engine::zones::MemberArea::Center),
+                                    3 => Some(rabuka_engine::zones::MemberArea::RightSide),
+                                    _ => None,
                                 };
                                 let _ = turn::TurnEngine::execute_main_phase_action(
                                     &mut gs,
@@ -1719,13 +1726,12 @@ fn main() {
                                     } else {
                                         Some(sync.card_indices.clone())
                                     },
-                                    match sync.stage_area {
-                                        1 => Some(rabuka_engine::core::game_state::types::StageArea::Left),
-                                        2 => Some(rabuka_engine::core::game_state::types::StageArea::Center),
-                                        3 => Some(rabuka_engine::core::game_state::types::StageArea::Right),
-                                        _ => None,
+                                    stage_area,
+                                    if sync.use_baton_touch {
+                                        Some(true)
+                                    } else {
+                                        None
                                     },
-                                    if sync.use_baton_touch { Some(true) } else { None },
                                 );
                                 gs.reset_loop_detection();
                                 waiting_for_opponent = false;
@@ -1738,7 +1744,6 @@ fn main() {
                     // If no data received, just continue (non-blocking)
                     // Don't process local input while waiting
                 } else
-
                 // A button executes selected action.
                 // cur is always the correct flat action index (mapped from display_pos).
                 if keys & 0x00000001 != 0 && cur < acts_cache.len() {
@@ -1788,32 +1793,42 @@ fn main() {
                             game_setup::ActionType::PaperChoice => 1,
                             game_setup::ActionType::ScissorsChoice => 2,
                             game_setup::ActionType::ChooseFirstAttacker => 3,
-                            game_setup::ActionType::MulliganYes => 4,
-                            game_setup::ActionType::MulliganNo => 5,
-                            game_setup::ActionType::PlayCard => 6,
-                            game_setup::ActionType::SetCard => 7,
-                            game_setup::ActionType::EndMainPhase => 8,
-                            game_setup::ActionType::DeclareAttack => 9,
-                            game_setup::ActionType::DeclareBlock => 10,
-                            game_setup::ActionType::DeclareNoBlock => 11,
-                            game_setup::ActionType::ConfirmDamage => 12,
-                            game_setup::ActionType::BatonTouch => 13,
-                            game_setup::ActionType::NoBatonTouch => 14,
-                            game_setup::ActionType::AbilityChoice => 15,
-                            _ => 8, // Default to EndMainPhase
+                            game_setup::ActionType::SelectMulligan => 4,
+                            game_setup::ActionType::SkipMulligan => 5,
+                            game_setup::ActionType::PlayMemberToStage => 6,
+                            game_setup::ActionType::SetLiveCard => 7,
+                            game_setup::ActionType::FinishLiveCardSet => 8,
+                            game_setup::ActionType::EnergyCharge => 9,
+                            game_setup::ActionType::ChoiceDecision => 10,
+                            game_setup::ActionType::ChoiceSelect => 11,
+                            game_setup::ActionType::ChoiceSkip => 12,
+                            game_setup::ActionType::ChoiceOption => 13,
+                            game_setup::ActionType::ChoicePosition => 14,
+                            game_setup::ActionType::UseAbility => 15,
+                            _ => 0, // Default to Pass
                         };
-                        let stage_area = match p.as_ref().and_then(|x| x.stage_area.as_ref()).map(|s| s.as_str()) {
-                            Some("Left") => 1u8,
-                            Some("Center") => 2,
-                            Some("Right") => 3,
+                        let stage_area = match p
+                            .as_ref()
+                            .and_then(|x| x.stage_area.as_ref())
+                            .map(|s| s.as_str())
+                        {
+                            Some("left") => 1u8,
+                            Some("center") => 2,
+                            Some("right") => 3,
                             _ => 0,
                         };
                         let sync = uds::ActionSync {
                             action_tag,
                             card_id: p.as_ref().and_then(|x| x.card_id),
-                            card_indices: p.as_ref().and_then(|x| x.card_indices.clone()).unwrap_or_default(),
+                            card_indices: p
+                                .as_ref()
+                                .and_then(|x| x.card_indices.clone())
+                                .unwrap_or_default(),
                             stage_area,
-                            use_baton_touch: p.as_ref().and_then(|x| x.use_baton_touch).unwrap_or(false),
+                            use_baton_touch: p
+                                .as_ref()
+                                .and_then(|x| x.use_baton_touch)
+                                .unwrap_or(false),
                             ability_index: None,
                         };
                         let data = sync.to_bytes();
@@ -2184,7 +2199,12 @@ fn main() {
                             _3ds_board_set_opp_hand_count(0);
                             for i in 0..visible_hand_slots() as i32 {
                                 _3ds_board_set_opp_hand(
-                                    i, false, std::ptr::null(), 0, false, false,
+                                    i,
+                                    false,
+                                    std::ptr::null(),
+                                    0,
+                                    false,
+                                    false,
                                 );
                             }
                         }
@@ -2241,7 +2261,12 @@ fn main() {
                             if cli_mode {
                                 unsafe {
                                     _3ds_text_add_top(
-                                        format!("[MP {}] {}\n\0", if is_host { "HOST" } else { "CLIENT" }, mp_status).as_ptr(),
+                                        format!(
+                                            "[MP {}] {}\n\0",
+                                            if is_host { "HOST" } else { "CLIENT" },
+                                            mp_status
+                                        )
+                                        .as_ptr(),
                                     );
                                 }
                             } else {
@@ -2251,7 +2276,12 @@ fn main() {
                                         8.0,
                                         0x00FF00FF, // green
                                         0.60f32,
-                                        format!("MP {} | {}\0", role_str.trim_end_matches('\0'), mp_status.trim_end_matches('\0')).as_ptr(),
+                                        format!(
+                                            "MP {} | {}\0",
+                                            role_str.trim_end_matches('\0'),
+                                            mp_status.trim_end_matches('\0')
+                                        )
+                                        .as_ptr(),
                                     );
                                 }
                             }
@@ -2358,7 +2388,8 @@ fn main() {
                             }
                             let is_ai_turn =
                                 *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
-                            let is_opponent_turn_mp = is_multiplayer && gs.active_player().id != gs.player1.id;
+                            let is_opponent_turn_mp =
+                                is_multiplayer && gs.active_player().id != gs.player1.id;
                             if is_ai_turn {
                                 unsafe {
                                     _3ds_text_add_top("AI is thinking...\n\0".as_ptr());
@@ -2699,7 +2730,8 @@ fn main() {
                             // Action list on top screen (was previously on bottom overlay).
                             let is_ai_turn =
                                 *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
-                            let is_opponent_turn_mp = is_multiplayer && gs.active_player().id != gs.player1.id;
+                            let is_opponent_turn_mp =
+                                is_multiplayer && gs.active_player().id != gs.player1.id;
                             if !is_ai_turn && !is_opponent_turn_mp && !display_order.is_empty() {
                                 let mut ty = 44.0f32;
                                 let max_vis = 10usize;
