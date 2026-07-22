@@ -564,10 +564,10 @@ fn main() {
                                         .iter()
                                         .enumerate()
                                 {
-                                    let y = 48.0 + i as f32 * 48.0;
+                                    let y = 40.0 + i as f32 * 38.0;
                                     let bg = if i == cur { COL_SEL } else { COL_DIM };
                                     unsafe {
-                                        _3ds_top_queue_rect(40.0, y, 320.0, 42.0, bg);
+                                        _3ds_top_queue_rect(40.0, y, 320.0, 36.0, bg);
                                     }
                                     if i == cur {
                                         unsafe {
@@ -575,7 +575,7 @@ fn main() {
                                                 40.0,
                                                 y,
                                                 320.0,
-                                                42.0,
+                                                36.0,
                                                 COL_HIGHLIGHT,
                                             );
                                         }
@@ -584,9 +584,9 @@ fn main() {
                                     unsafe {
                                         _3ds_top_queue_text(
                                             50.0,
-                                            y + 8.0,
+                                            y + 6.0,
                                             color,
-                                            0.70f32,
+                                            0.65f32,
                                             format!("{}\0", m).as_ptr(),
                                         );
                                     }
@@ -1568,7 +1568,7 @@ fn main() {
                                     None,
                                     true,     // is_multiplayer
                                     is_host,  // is_host
-                                    !is_host, // waiting_for_opponent: client waits, host acts first
+                                    !is_host, // waiting_for_opponent will be recalculated after settle
                                 )
                             }
                             Err(e) => Step::Done(Err(e)),
@@ -1728,14 +1728,12 @@ fn main() {
                     redraw = true;
                 }
 
-                // Multiplayer: If waiting for opponent, ignore local input and try to receive
-                if is_multiplayer && waiting_for_opponent {
-                    // Try to receive action from opponent
+                // Multiplayer: always try to receive data from opponent (non-blocking)
+                if is_multiplayer {
                     let mut recv_buf = [0u8; 256];
                     if let Ok(n) = uds::uds_recv(&mut recv_buf) {
                         if n > 0 {
                             if let Some(sync) = uds::ActionSync::from_bytes(&recv_buf[..n]) {
-                                // Reconstruct action from sync
                                 let action_type = match sync.action_tag {
                                     0 => game_setup::ActionType::RockChoice,
                                     1 => game_setup::ActionType::PaperChoice,
@@ -1753,6 +1751,12 @@ fn main() {
                                     13 => game_setup::ActionType::ChoiceOption,
                                     14 => game_setup::ActionType::ChoicePosition,
                                     15 => game_setup::ActionType::UseAbility,
+                                    16 => game_setup::ActionType::ChooseSecondAttacker,
+                                    17 => game_setup::ActionType::ConfirmMulligan,
+                                    18 => game_setup::ActionType::SelectLiveCard,
+                                    19 => game_setup::ActionType::ConfirmLiveCardSet,
+                                    20 => game_setup::ActionType::SkipLiveCardSet,
+                                    21 => game_setup::ActionType::PassRemaining,
                                     _ => game_setup::ActionType::Pass,
                                 };
                                 let stage_area = match sync.stage_area {
@@ -1778,14 +1782,17 @@ fn main() {
                                     },
                                 );
                                 gs.reset_loop_detection();
-                                waiting_for_opponent = false;
+                                let my_id = if is_host { 0 } else { 1 };
+                                waiting_for_opponent = !mp_can_act(&gs, my_id);
                                 cur = 0;
                                 dirty = true;
                                 redraw = true;
                             }
                         }
                     }
-                    // If no data received, just continue (non-blocking)
+                }
+                // If waiting for opponent, skip local input after processing
+                if is_multiplayer && waiting_for_opponent {
                     // Don't process local input while waiting
                 } else
                 // A button executes selected action.
@@ -1832,13 +1839,16 @@ fn main() {
                     }
                     // Multiplayer: Send action to opponent
                     if is_multiplayer {
+                        let my_player_id = if is_host { 0 } else { 1 };
                         let action_tag = match action.action_type {
                             game_setup::ActionType::RockChoice => 0u16,
                             game_setup::ActionType::PaperChoice => 1,
                             game_setup::ActionType::ScissorsChoice => 2,
                             game_setup::ActionType::ChooseFirstAttacker => 3,
+                            game_setup::ActionType::ChooseSecondAttacker => 16,
                             game_setup::ActionType::SelectMulligan => 4,
                             game_setup::ActionType::SkipMulligan => 5,
+                            game_setup::ActionType::ConfirmMulligan => 17,
                             game_setup::ActionType::PlayMemberToStage => 6,
                             game_setup::ActionType::SetLiveCard => 7,
                             game_setup::ActionType::FinishLiveCardSet => 8,
@@ -1849,6 +1859,10 @@ fn main() {
                             game_setup::ActionType::ChoiceOption => 13,
                             game_setup::ActionType::ChoicePosition => 14,
                             game_setup::ActionType::UseAbility => 15,
+                            game_setup::ActionType::SelectLiveCard => 18,
+                            game_setup::ActionType::ConfirmLiveCardSet => 19,
+                            game_setup::ActionType::SkipLiveCardSet => 20,
+                            game_setup::ActionType::PassRemaining => 21,
                             _ => 0, // Default to Pass
                         };
                         let stage_area = match p
@@ -1877,7 +1891,7 @@ fn main() {
                         };
                         let data = sync.to_bytes();
                         let _ = uds::uds_send(&data);
-                        waiting_for_opponent = true;
+                        waiting_for_opponent = !mp_can_act(&gs, my_player_id);
                     }
                     cur = 0;
                     dirty = true;
@@ -1922,6 +1936,10 @@ fn main() {
                     && game_setup::is_automatic_phase(&gs);
                 if auto {
                     settle_3ds(&mut gs);
+                    if is_multiplayer {
+                        let my_id = if is_host { 0 } else { 1 };
+                        waiting_for_opponent = !mp_can_act(&gs, my_id);
+                    }
                     cur = 0;
                     dirty = true;
                 }
