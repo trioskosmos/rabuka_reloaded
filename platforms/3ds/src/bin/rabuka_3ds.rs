@@ -1643,6 +1643,53 @@ fn main() {
                     }
                     order
                 };
+                // For PlayMemberToStage: map display_pos → [flat indices for each area]
+                let mut group_areas: Vec<Vec<usize>> = Vec::new();
+                // group_sel: which area (0=L,1=C,2=R) is selected within current group
+                let mut group_sel: usize = 0;
+                {
+                    let mut i = 0usize;
+                    while i < display_order.len() {
+                        let fi = display_order[i];
+                        let act = &acts_cache[fi];
+                        if act.action_type == game_setup::ActionType::PlayMemberToStage {
+                            let cn = act
+                                .parameters
+                                .as_ref()
+                                .and_then(|p| p.card_no.clone())
+                                .unwrap_or_default();
+                            let mut group = vec![fi];
+                            let mut j = i + 1;
+                            while j < display_order.len() {
+                                let fj = display_order[j];
+                                let a2 = &acts_cache[fj];
+                                if a2.action_type != game_setup::ActionType::PlayMemberToStage {
+                                    break;
+                                }
+                                let cn2 = a2
+                                    .parameters
+                                    .as_ref()
+                                    .and_then(|p| p.card_no.clone())
+                                    .unwrap_or_default();
+                                if cn2 != cn {
+                                    break;
+                                }
+                                group.push(fj);
+                                j += 1;
+                            }
+                            // Remove all but first entry from display_order
+                            for _ in i + 1..j {
+                                // Remove subsequent entries (j-1 down to i+1)
+                                let remove_at = i + 1;
+                                display_order.remove(remove_at);
+                            }
+                            group_areas.push(group);
+                        } else {
+                            group_areas.push(vec![fi]);
+                        }
+                        i += 1;
+                    }
+                }
                 let mut display_pos = display_order.iter().position(|&fi| fi == cur).unwrap_or(0);
 
                 // Input handling
@@ -1681,6 +1728,25 @@ fn main() {
                     redraw = true;
                 }
 
+                // DPAD LEFT/RIGHT: cycle area selection within a PlayMemberToStage group,
+                // or scroll hand view if not on a grouped action.
+                let cur_group = display_pos < group_areas.len() && group_areas.len() > 0;
+                let has_areas = cur_group && group_areas[display_pos].len() > 1;
+                if has_areas && (keys & 0x00000020 != 0) {
+                    // LEFT: previous area
+                    if group_sel > 0 {
+                        group_sel -= 1;
+                        cur = group_areas[display_pos][group_sel];
+                        redraw = true;
+                    }
+                } else if has_areas && (keys & 0x00000010 != 0) {
+                    // RIGHT: next area
+                    if group_sel + 1 < group_areas[display_pos].len() {
+                        group_sel += 1;
+                        cur = group_areas[display_pos][group_sel];
+                        redraw = true;
+                    }
+                } else
                 // DPAD LEFT/RIGHT: scroll hand view (0x10 = RIGHT, 0x20 = LEFT)
                 if !detail_mode {
                     let vis = visible_hand_slots();

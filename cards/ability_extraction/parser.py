@@ -5065,6 +5065,136 @@ def infer_count_from_icons(d, text):
         return
 
 
+def _fill_move_cards_defaults(action, text, cached_source, cached_dest):
+    a = action.get("action")
+    if action.get("destination") == "hand" and "source" not in action:
+        action["source"] = "discard"
+    if "source" not in action:
+        s = cached_source if cached_source is not None else extract_source(text)
+        if s:
+            action["source"] = s
+    if action.get("source") is None and "控え室から" in text:
+        action["source"] = "discard"
+    if "source" not in action:
+        dest = action.get("destination", "")
+        if "それらのカード" in text:
+            action["source"] = "revealed_cards"
+        elif "それら" in text:
+            action["source"] = "selected_cards"
+        elif dest in ("deck_top", "deck_bottom", "deck"):
+            if "メンバー" not in text and "選ぶ" not in text and "選び" not in text:
+                action["source"] = "hand"
+        elif dest in ("discard",):
+            if "このカード" in text:
+                action["source"] = "deck_top"
+            elif "そのカード" in text:
+                action["source"] = "looked_at"
+            elif "エネルギー" not in text:
+                action["source"] = "hand"
+    if "destination" not in action:
+        d = cached_dest if cached_dest is not None else extract_destination(text)
+        if d:
+            action["destination"] = d
+    if (
+        action.get("source") == "discard"
+        and action.get("destination") == "same_area"
+        and "そのメンバーのコストに" in text
+        and "足した数に等しいコスト" in text
+    ):
+        m = re.search(r"コストに(\d+)を足した数に等しいコスト", text)
+        if m:
+            action["cost_reference"] = "previous_moved_card"
+            action["cost_offset"] = int(m.group(1))
+            action.setdefault("cost_limit_operator", "=")
+    if "card_type" not in action and "or_card_types" not in action:
+        ct = _infer_card_type(text, action)
+        if ct:
+            action["card_type"] = ct
+    if "card_property" not in action:
+        if "ブレードハートを持たない" in text:
+            action["card_property"] = "has_blade_heart"
+            action["negation"] = True
+        elif "ブレードハートを持つ" in text:
+            action["card_property"] = "has_blade_heart"
+        elif "{{icon_score.png|スコア}}を持つ" in text:
+            action["card_property"] = "has_score_icon"
+    if "state_change" not in action and "ウェイト状態" in text:
+        action["state_change"] = "wait"
+    has_source = action.get("source") is not None
+    has_dest = action.get("destination") is not None
+    dest_val = action.get("destination", "")
+    zone_only_dest = (
+        dest_val in ("live_card_zone", "success_live_zone", "stage") and not has_source
+    )
+    if (not has_source and not has_dest) or zone_only_dest:
+        action["action"] = "custom"
+        a = "custom"
+    ctk = [
+        ("live_card", "ライブカード"),
+        ("member_card", "メンバーカード"),
+        ("energy_card", "エネルギーカード"),
+    ]
+    if action.get("card_type") and re.search(
+        r"(ライブカード|メンバーカード|エネルギーカード).*か.*(ライブカード|メンバーカード|エネルギーカード)",
+        text,
+    ):
+        or_types = [t for t, kw in ctk if kw in text]
+        if len(or_types) >= 2:
+            action["or_card_types"] = or_types
+            action.pop("card_type", None)
+    if action.get("card_type") and re.search(
+        r"(ライブカード|メンバーカード|エネルギーカード).*と.*(ライブカード|メンバーカード|エネルギーカード)",
+        text,
+    ):
+        and_types = [
+            t
+            for kw, t in sorted(
+                ctk, key=lambda x: text.index(x[0]) if x[0] in text else 999
+            )
+        ]
+        if len(and_types) >= 2 and action.get("source") and action.get("destination"):
+            subs = [
+                {
+                    "text": action.get("text", ""),
+                    "action": "move_cards",
+                    "source": action["source"],
+                    "destination": action["destination"],
+                    "card_type": ct,
+                    "count": action.get("count", 1),
+                    "max": True,
+                    "target": action.get("target", "self"),
+                }
+                for ct in and_types
+            ]
+            for sub in subs:
+                if action.get("optional") is not None:
+                    sub["optional"] = action["optional"]
+            action["action"] = "sequential"
+            action["actions"] = subs
+            action.pop("card_type", None)
+            action.pop("multiple_targets", None)
+    if (
+        "cost_limit" not in action
+        and "cost_total" not in action
+        and "cost_limit_min" not in action
+    ):
+        cl = extract_cost_limit(text)
+        if cl:
+            action["cost_limit"] = cl
+            if "cost_limit_operator" not in action:
+                action["cost_limit_operator"] = (
+                    "<="
+                    if "以下" in text
+                    else ">="
+                    if "以上" in text
+                    else "<"
+                    if "未満" in text
+                    else ">"
+                    if "より大きい" in text
+                    else "="
+                )
+
+
 def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
     """Consolidated post-dispatch normalization. Fills defaults every action needs."""
     # Use the action's own text field if available — it may be trimmed of condition/duration
@@ -5188,151 +5318,8 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
             if kw in text:
                 action["position"] = pos
                 break
-    if (
-        a == "move_cards"
-        and action.get("destination") == "hand"
-        and "source" not in action
-    ):
-        action["source"] = "discard"
     if a == "move_cards":
-        if "source" not in action:
-            s = _cached_source if _cached_source is not None else extract_source(text)
-            if s:
-                action["source"] = s
-        # Handle explicit "控え室から" even when extract_source missed due to
-        # the action body being a sub-expression after "加える".
-        if action.get("source") is None and "控え室から" in text:
-            action["source"] = "discard"
-        if "source" not in action:
-            # Fallback: infer source from destination common patterns
-            dest = action.get("destination", "")
-            # "それらのカード" refers to cards from a preceding reveal/yell
-            if "それらのカード" in text:
-                action["source"] = "revealed_cards"
-            elif "それら" in text:
-                action["source"] = "selected_cards"
-            elif dest in ("deck_top", "deck_bottom", "deck"):
-                if "メンバー" not in text and "選ぶ" not in text and "選び" not in text:
-                    action["source"] = "hand"
-            elif dest in ("discard",):
-                if "このカード" in text:
-                    action["source"] = "deck_top"
-                elif "そのカード" in text:
-                    action["source"] = "looked_at"
-                elif "エネルギー" not in text:
-                    action["source"] = "hand"
-        if "destination" not in action:
-            d = _cached_dest if _cached_dest is not None else extract_destination(text)
-            if d:
-                action["destination"] = d
-        # Relative cost search: "そのメンバーのコストに2を足した数に等しいコスト"
-        # This references the card moved by the previous sub-action.
-        if (
-            action.get("source") == "discard"
-            and action.get("destination") == "same_area"
-            and "そのメンバーのコストに" in text
-            and "足した数に等しいコスト" in text
-        ):
-            m = re.search(r"コストに(\d+)を足した数に等しいコスト", text)
-            if m:
-                action["cost_reference"] = "previous_moved_card"
-                action["cost_offset"] = int(m.group(1))
-                action.setdefault("cost_limit_operator", "=")
-        if "card_type" not in action and "or_card_types" not in action:
-            ct = _infer_card_type(text, action)
-            if ct:
-                action["card_type"] = ct
-        if "card_property" not in action:
-            if "ブレードハートを持たない" in text:
-                action["card_property"] = "has_blade_heart"
-                action["negation"] = True
-            elif "ブレードハートを持つ" in text:
-                action["card_property"] = "has_blade_heart"
-            elif "{{icon_score.png|スコア}}を持つ" in text:
-                action["card_property"] = "has_score_icon"
-        if "state_change" not in action and "ウェイト状態" in text:
-            action["state_change"] = "wait"
-        # If after inference source and destination are both missing/None,
-        # or destination is a zone-only reference without source,
-        # this isn't really a move_cards — demote to custom
-        has_source = action.get("source") is not None
-        has_dest = action.get("destination") is not None
-        dest_val = action.get("destination", "")
-        zone_only_dest = (
-            dest_val in ("live_card_zone", "success_live_zone", "stage")
-            and not has_source
-        )
-        if (not has_source and not has_dest) or zone_only_dest:
-            action["action"] = "custom"
-            a = "custom"
-        card_type_kws = [
-            ("live_card", "ライブカード"),
-            ("member_card", "メンバーカード"),
-            ("energy_card", "エネルギーカード"),
-        ]
-        if action.get("card_type") and re.search(
-            r"(ライブカード|メンバーカード|エネルギーカード).*か.*(ライブカード|メンバーカード|エネルギーカード)",
-            text,
-        ):
-            or_types = [t for t, kw in card_type_kws if kw in text]
-            if len(or_types) >= 2:
-                action["or_card_types"] = or_types
-                action.pop("card_type", None)
-        # AND card types: "ライブカードとメンバーカード" → split into sequential sub-actions
-        if action.get("card_type") and re.search(
-            r"(ライブカード|メンバーカード|エネルギーカード).*と.*(ライブカード|メンバーカード|エネルギーカード)",
-            text,
-        ):
-            and_types = [
-                t
-                for kw, t in sorted(
-                    [(kw, t) for t, kw in card_type_kws if kw in text],
-                    key=lambda x: text.index(x[0]),
-                )
-            ]
-            if (
-                len(and_types) >= 2
-                and action.get("source")
-                and action.get("destination")
-            ):
-                sub_actions = []
-                for ct in and_types:
-                    sub = {
-                        "text": action.get("text", ""),
-                        "action": "move_cards",
-                        "source": action["source"],
-                        "destination": action["destination"],
-                        "card_type": ct,
-                        "count": action.get("count", 1),
-                        "max": True,
-                        "target": action.get("target", "self"),
-                    }
-                    if action.get("optional") is not None:
-                        sub["optional"] = action["optional"]
-                    sub_actions.append(sub)
-                action["action"] = "sequential"
-                action["actions"] = sub_actions
-                action.pop("card_type", None)
-                action.pop("multiple_targets", None)
-        if (
-            "cost_limit" not in action
-            and "cost_total" not in action
-            and "cost_limit_min" not in action
-        ):
-            cl = extract_cost_limit(text)
-            if cl:
-                action["cost_limit"] = cl
-                if "cost_limit_operator" not in action:
-                    if "以下" in text:
-                        action["cost_limit_operator"] = "<="
-                    elif "以上" in text:
-                        action["cost_limit_operator"] = ">="
-                    elif "未満" in text:
-                        action["cost_limit_operator"] = "<"
-                    elif "より大きい" in text:
-                        action["cost_limit_operator"] = ">"
-                    else:
-                        action["cost_limit_operator"] = "="
+        _fill_move_cards_defaults(action, text, _cached_source, _cached_dest)
     # OR card types for ALL action types (not just move_cards/select)
     if a not in ("move_cards", "select") and "or_card_types" not in action:
         card_type_kws = [
@@ -9206,77 +9193,67 @@ def _normalize_effect_tree(effect, original_text=None):
     """Post-processing pass to fix common parser artifacts:
     - Remove do_nothing actions between real actions
     - Propagate fields from parent to sub-actions
+    - Collapse position_change + gain_resource into timing_condition
     - Extract activation position from parenthetical text & main text
     - Propagate exclude_self, all, position from text to sub-actions
     """
     if not effect or not isinstance(effect, dict):
         return effect
-
-    # Scan the full text once for field hints
     _full_text = effect.get("text") or original_text or ""
-
     effect = _walk(effect, _full_text, original_text, original_text)
-
-    # Collapse position_change + gain_resource into gain_resource with timing_condition
-    def _collapse_position_changes(node):
-        if isinstance(node, dict):
-            # Recurse into children FIRST so they're collapsed before parent processes them
-            for v in node.values():
-                _collapse_position_changes(v)
-            if node.get("action") == "sequential":
-                acts = node.get("actions", [])
-                collapsed = []
-                skip_next = False
-                for i, act in enumerate(acts):
-                    if skip_next:
-                        skip_next = False
-                        continue
-                    if isinstance(act, dict) and act.get("action") == "position_change":
-                        if (
-                            i + 1 < len(acts)
-                            and isinstance(acts[i + 1], dict)
-                            and acts[i + 1].get("action") == "gain_resource"
-                        ):
-                            gr = dict(acts[i + 1])
-                            gr["timing_condition"] = "moved_this_turn"
-                            for f in ("card_type", "all", "target"):
-                                if f == "target" and not gr.get("target"):
-                                    gr["target"] = "self"
-                                elif act.get(f) and not gr.get(f):
-                                    gr[f] = act[f]
-                            collapsed.append(gr)
-                            skip_next = True
-                            continue
-                    if isinstance(act, dict) and act.get("action") == "sequential":
-                        sub_acts = act.get("actions", [])
-                        if len(sub_acts) == 1:
-                            item = dict(sub_acts[0])
-                            for f in ("duration", "all", "card_type", "target"):
-                                if act.get(f) and not item.get(f):
-                                    item[f] = act[f]
-                            collapsed.append(item)
-                            continue
-                    collapsed.append(act)
-                node["actions"] = collapsed
-        elif isinstance(node, list):
-            for item in node:
-                _collapse_position_changes(item)
-        return node
-
     effect = _collapse_position_changes(effect)
+    _enrich_gain_abilities(effect)
+    _enrich_characters(effect)
+    _clean_gain_resource(effect)
+    return effect
 
-    # Enrich gain_ability nodes with parsed gained_effect (one level deep only)
-    def _collect_gain(d, nodes):
-        if isinstance(d, dict):
-            if d.get("action") == "gain_ability" and d.get("ability_gain"):
-                nodes.append(d)
-            for v in d.values():
-                if isinstance(v, dict):
-                    _collect_gain(v, nodes)
-                elif isinstance(v, list):
-                    for item in v:
-                        _collect_gain(item, nodes)
 
+def _collapse_position_changes(node):
+    if isinstance(node, dict):
+        for v in node.values():
+            _collapse_position_changes(v)
+        if node.get("action") == "sequential":
+            acts = node.get("actions", [])
+            collapsed = []
+            skip_next = False
+            for i, act in enumerate(acts):
+                if skip_next:
+                    skip_next = False
+                    continue
+                if isinstance(act, dict) and act.get("action") == "position_change":
+                    if (
+                        i + 1 < len(acts)
+                        and isinstance(acts[i + 1], dict)
+                        and acts[i + 1].get("action") == "gain_resource"
+                    ):
+                        gr = dict(acts[i + 1])
+                        gr["timing_condition"] = "moved_this_turn"
+                        for f in ("card_type", "all", "target"):
+                            if f == "target" and not gr.get("target"):
+                                gr["target"] = "self"
+                            elif act.get(f) and not gr.get(f):
+                                gr[f] = act[f]
+                        collapsed.append(gr)
+                        skip_next = True
+                        continue
+                if isinstance(act, dict) and act.get("action") == "sequential":
+                    sub_acts = act.get("actions", [])
+                    if len(sub_acts) == 1:
+                        item = dict(sub_acts[0])
+                        for f in ("duration", "all", "card_type", "target"):
+                            if act.get(f) and not item.get(f):
+                                item[f] = act[f]
+                        collapsed.append(item)
+                        continue
+                collapsed.append(act)
+            node["actions"] = collapsed
+    elif isinstance(node, list):
+        for item in node:
+            _collapse_position_changes(item)
+    return node
+
+
+def _enrich_gain_abilities(effect):
     gain_nodes = []
     _collect_gain(effect, gain_nodes)
     for node in gain_nodes:
@@ -9286,158 +9263,53 @@ def _normalize_effect_tree(effect, original_text=None):
             if gained and gained.get("action") and gained.get("action") != "custom":
                 node["gained_effect"] = gained
 
-    # Fallback: extract character names from 「X」か「Y」か「Z」のメンバーカード patterns
-    # and card names from カード名が「X」/カード名に「X」 patterns
-    # in any sub-dict that lacks the appropriate field.
-    def _enrich_characters(d):
-        if isinstance(d, dict):
-            # Skip compound action containers — their children handle their own enrichment
-            if d.get("action") in (
-                "sequential",
-                "conditional_on_optional",
-                "conditional_on_result",
-                "conditional_alternative",
-                "look_and_select",
-            ):
-                pass
-            elif "text" in d:
-                text = d["text"]
-                if not d.get("characters"):
-                    cm = re.search(
-                        r"((?:「[^」]+」[か、]? ?)+)の(?:メンバーカード|ライブカード)",
-                        text,
-                    )
-                    if cm:
-                        names = re.findall(r"「([^」]+)」", cm.group(1))
-                        if names:
-                            d["characters"] = names
-                if not d.get("card_names"):
-                    cn = re.search(r"カード名(?:に|が)「([^」]+)」", text)
-                    if cn:
-                        d["card_names"] = [cn.group(1)]
-            for v in d.values():
-                if isinstance(v, (dict, list)):
-                    _enrich_characters(v)
-        elif isinstance(d, list):
-            for item in d:
-                if isinstance(item, (dict, list)):
-                    _enrich_characters(item)
 
-    _enrich_characters(effect)
+def _collect_gain(d, nodes):
+    if isinstance(d, dict):
+        if d.get("action") == "gain_ability" and d.get("ability_gain"):
+            nodes.append(d)
+        for v in d.values():
+            if isinstance(v, dict):
+                _collect_gain(v, nodes)
+            elif isinstance(v, list):
+                for item in v:
+                    _collect_gain(item, nodes)
 
-    # Clean gain_resource nodes (remove inappropriate fields)
-    _clean_gain_resource(effect)
 
-    return effect
+def _enrich_characters(d):
+    if isinstance(d, dict):
+        if d.get("action") in (
+            "sequential",
+            "conditional_on_optional",
+            "conditional_on_result",
+            "conditional_alternative",
+            "look_and_select",
+        ):
+            pass
+        elif "text" in d:
+            text = d["text"]
+            if not d.get("characters"):
+                cm = re.search(
+                    r"((?:「[^」]+」[か、]? ?)+)の(?:メンバーカード|ライブカード)", text
+                )
+                if cm:
+                    names = re.findall(r"「([^」]+)」", cm.group(1))
+                    if names:
+                        d["characters"] = names
+            if not d.get("card_names"):
+                cn = re.search(r"カード名(?:に|が)「([^」]+)」", text)
+                if cn:
+                    d["card_names"] = [cn.group(1)]
+        for v in d.values():
+            if isinstance(v, (dict, list)):
+                _enrich_characters(v)
+    elif isinstance(d, list):
+        for item in d:
+            if isinstance(item, (dict, list)):
+                _enrich_characters(item)
 
 
 # ====================================================================
-# POST-PROCESSING NORMALIZERS
-# ====================================================================
-# These run AFTER the initial parsing to normalize effect trees:
-#   _normalize_effect_tree  — fixes artifacts, propagates fields
-#   _collapse_to_effect_steps — STUB (engine handles legacy shapes)
-#   _validate_effect        — sanity checks
-# ====================================================================
-
-
-def _collapse_to_effect_steps(effect):
-    """Convert 4 legacy compound shapes into unified `effect_steps` pipeline.
-
-    The engine dispatches `Sequential` effects that carry `effect_steps`
-    through the generic sequential pipeline, eliminating per-shape code
-    paths.  Mirrors the Rust ``AbilityEffect::normalized_steps()``
-    method in ``engine/src/core/card.rs``.
-
-    Converts:
-      look_and_select        → sequential [look_action, select_action, ...]
-      conditional_alternative→ sequential [alternative (with condition), primary]
-      conditional_on_result  → sequential [primary, followup (with result_condition)]
-      conditional_on_optional→ sequential [single conditional_optional step]
-    """
-    if not isinstance(effect, dict):
-        return effect
-
-    action = effect.get("action")
-
-    # --- look_and_select → sequential [look_action, select_action, ...] ---
-    if action == "look_and_select":
-        steps = []
-        if effect.get("look_action"):
-            steps.append(effect["look_action"])
-        if effect.get("select_action"):
-            steps.append(effect["select_action"])
-        if effect.get("followup_action"):
-            steps.append(effect["followup_action"])
-        if steps:
-            effect["action"] = "sequential"
-            effect["effect_steps"] = steps
-            # Remove legacy compound fields so the engine uses effect_steps
-            effect.pop("look_action", None)
-            effect.pop("select_action", None)
-            # followup_action kept for backward compat (other code reads it)
-
-    # --- conditional_alternative → sequential [alternative (with condition), primary] ---
-    elif action == "conditional_alternative":
-        steps = []
-        alt = effect.get("alternative_effect")
-        if alt is not None:
-            # Apply the stricter alternative_condition first, else the base condition
-            cond = effect.get("alternative_condition") or effect.get("condition")
-            if cond and isinstance(alt, dict):
-                alt = dict(alt)  # shallow copy to avoid mutating original
-                alt["condition"] = cond
-            steps.append(alt)
-        primary = effect.get("primary_effect")
-        if primary is not None:
-            steps.append(primary)
-        if steps:
-            effect["action"] = "sequential"
-            effect["effect_steps"] = steps
-            effect.pop("alternative_effect", None)
-            effect.pop("primary_effect", None)
-            effect.pop("alternative_condition", None)
-            effect.pop("condition", None)
-
-    # --- conditional_on_result → sequential [primary, followup (with result_condition)] ---
-    elif action == "conditional_on_result":
-        steps = []
-        primary = effect.get("primary_effect")
-        if primary is not None:
-            steps.append(primary)
-        followup = effect.get("followup_action")
-        if followup is not None:
-            result_cond = effect.get("result_condition")
-            if result_cond and isinstance(followup, dict):
-                followup = dict(followup)
-                followup["condition"] = result_cond
-            steps.append(followup)
-        if steps:
-            effect["action"] = "sequential"
-            effect["effect_steps"] = steps
-            effect.pop("primary_effect", None)
-            effect.pop("followup_action", None)
-            effect.pop("result_condition", None)
-
-    # --- conditional_on_optional → sequential [single conditional_optional step] ---
-    elif action == "conditional_on_optional":
-        step = {"action": "conditional_optional"}
-        if effect.get("optional_action"):
-            step["optional_action"] = effect["optional_action"]
-            step["text"] = effect["optional_action"].get("text", effect.get("text", ""))
-        if effect.get("conditional_action"):
-            step["conditional_action"] = effect["conditional_action"]
-        if effect.get("conditional_negation") is not None:
-            step["conditional_negation"] = effect["conditional_negation"]
-        effect["action"] = "sequential"
-        effect["effect_steps"] = [step]
-        effect.pop("optional_action", None)
-        effect.pop("conditional_action", None)
-        effect.pop("conditional_negation", None)
-
-    return effect
-
-
 # ====================================================================
 # PROCESSING: process_abilities() & parse_ability()
 # ====================================================================
