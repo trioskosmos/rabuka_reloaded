@@ -80,19 +80,22 @@ impl Display {
     }
 
     pub fn write_screen(&mut self, rows: &[alloc::string::String]) {
+        // Wait for VBlank to avoid tearing, then write all rows
+        unsafe { nds_wait_vblank() }
+
         let mut tiles: [u16; 32] = [0; 32];
         for row_idx in 0..(rows.len().min(ROWS as usize)) {
             let bytes = rows[row_idx].as_bytes();
             let mut ti = 0usize;
             let mut si = 0usize;
             while si < bytes.len() && ti < 32 {
-                let b = bytes[si];
-                tiles[ti] = b as u16;
+                // For ASCII text, byte value = tile index (console default font)
+                tiles[ti] = bytes[si] as u16;
                 ti += 1;
                 si += 1;
             }
             while ti < 32 {
-                tiles[ti] = 0x20; // space character
+                tiles[ti] = 0x20; // space tile
                 ti += 1;
             }
             unsafe { nds_write_tile_row(row_idx as i32, tiles.as_ptr()) }
@@ -102,11 +105,31 @@ impl Display {
     }
 
     pub fn draw_menu(&mut self, items: &[&str], selected: usize, title: &str) {
-        self.clear();
-        self.println(title);
+        let mut rows = alloc::vec![alloc::string::String::new(); 24];
+        let mut ri = 0usize;
+        fn push(r: &mut [alloc::string::String], i: &mut usize, t: &str) {
+            if *i < r.len() {
+                r[*i].clear();
+                let mut n = 0usize;
+                for ch in t.chars() {
+                    if n >= 32 {
+                        break;
+                    }
+                    r[*i].push(ch);
+                    n += 1;
+                }
+                while n < 32 {
+                    r[*i].push(' ');
+                    n += 1;
+                }
+                *i += 1;
+            }
+        }
+        push(&mut rows, &mut ri, title);
         for (i, item) in items.iter().enumerate() {
             let prefix = if i == selected { ">" } else { " " };
-            self.println(&alloc::format!("{prefix} {item}"));
+            push(&mut rows, &mut ri, &alloc::format!("{prefix} {item}"));
         }
+        self.write_screen(&rows);
     }
 }

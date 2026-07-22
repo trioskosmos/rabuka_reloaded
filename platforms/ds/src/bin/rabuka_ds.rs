@@ -720,42 +720,99 @@ fn human_turn(
     actions: &[game_setup::Action],
 ) -> bool {
     let mut sel = 0usize;
+    let mut scroll_offset = 0usize;
+    let mut last_sel = usize::MAX;
+    let mut last_scroll = usize::MAX;
+    let mut first = true;
     const VISIBLE_ACTIONS: usize = 10;
+    const COLS: usize = 32;
+    let mut buf = alloc::vec![alloc::string::String::with_capacity(COLS); 24];
+
     loop {
-        display.clear();
-        display.println(&alloc::format!(
-            "Turn {} | {:?}",
-            gs.turn_number,
-            gs.current_phase
-        ));
-        let p1 = &gs.player1;
-        let p2 = &gs.player2;
-        let is_p1 = gs.active_player().id == "p1";
-        display.println(&alloc::format!(
-            "{}P1 h:{} e:{} dk:{}",
-            if is_p1 { ">>" } else { "  " },
-            p1.hand.cards.len(),
-            p1.energy_zone.active_count(),
-            p1.main_deck.cards.len()
-        ));
-        display.println(&alloc::format!(
-            "{}P2 h:{} e:{} dk:{}",
-            if !is_p1 { ">>" } else { "  " },
-            p2.hand.cards.len(),
-            p2.energy_zone.active_count(),
-            p2.main_deck.cards.len()
-        ));
-        display.println("--------------------------------");
-        let end = actions.len().min(VISIBLE_ACTIONS);
-        for i in 0..end {
-            let p = if i == sel { ">" } else { " " };
-            let line = actions[i].description.lines().next().unwrap_or("");
-            display.println(&alloc::format!("{p}[{}] {}", i, line));
+        if first || sel != last_sel || scroll_offset != last_scroll {
+            let p1 = &gs.player1;
+            let p2 = &gs.player2;
+            let is_p1 = gs.active_player().id == "p1";
+
+            if sel < scroll_offset {
+                scroll_offset = sel;
+            }
+            if sel >= scroll_offset + VISIBLE_ACTIONS {
+                scroll_offset = sel + 1 - VISIBLE_ACTIONS;
+            }
+
+            // Build screen buffer
+            for b in buf.iter_mut() {
+                b.clear();
+            }
+            let mut ri = 0usize;
+            fn put(buf: &mut [alloc::string::String], ri: &mut usize, txt: &str) {
+                if *ri < buf.len() {
+                    buf[*ri].clear();
+                    let mut n = 0usize;
+                    for ch in txt.chars() {
+                        if n >= COLS {
+                            break;
+                        }
+                        buf[*ri].push(ch);
+                        n += 1;
+                    }
+                    while n < COLS {
+                        buf[*ri].push(' ');
+                        n += 1;
+                    }
+                    *ri += 1;
+                }
+            }
+            put(
+                &mut buf,
+                &mut ri,
+                &alloc::format!("Turn {} | {:?}", gs.turn_number, gs.current_phase),
+            );
+            put(
+                &mut buf,
+                &mut ri,
+                &alloc::format!(
+                    "{}P1 h:{} e:{} dk:{}",
+                    if is_p1 { ">>" } else { "  " },
+                    p1.hand.cards.len(),
+                    p1.energy_zone.active_count(),
+                    p1.main_deck.cards.len()
+                ),
+            );
+            put(
+                &mut buf,
+                &mut ri,
+                &alloc::format!(
+                    "{}P2 h:{} e:{} dk:{}",
+                    if !is_p1 { ">>" } else { "  " },
+                    p2.hand.cards.len(),
+                    p2.energy_zone.active_count(),
+                    p2.main_deck.cards.len()
+                ),
+            );
+            put(&mut buf, &mut ri, "--------------------------------");
+
+            let end = (scroll_offset + VISIBLE_ACTIONS).min(actions.len());
+            for i in scroll_offset..end {
+                let p = if i == sel { ">" } else { " " };
+                let line = actions[i].description.lines().next().unwrap_or("");
+                put(&mut buf, &mut ri, &alloc::format!("{p}[{}] {}", i, line));
+            }
+            if actions.len() > end {
+                put(
+                    &mut buf,
+                    &mut ri,
+                    &alloc::format!("  .. {} more", actions.len() - end),
+                );
+            }
+
+            display.write_screen(&buf);
+            last_sel = sel;
+            last_scroll = scroll_offset;
+            first = false;
         }
-        if actions.len() > end {
-            display.println(&alloc::format!("  .. {} more", actions.len() - end));
-        }
-        display.swap_buffers();
+
         wait_frames(2);
         input.poll();
         if input.just_pressed(Button::Down) {
@@ -1020,6 +1077,11 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
             }
             let sel = menu_select(display, input, &items, &description, false).unwrap_or(0);
             TurnEngine::resume_with_choice(gs, None, Some(vec![sel])).ok();
+            true
+        }
+        _ => {
+            // Auto-complete any unexpected choice type (let the game progress)
+            TurnEngine::resume_with_choice(gs, Some(0), None).ok();
             true
         }
     }

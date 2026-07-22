@@ -178,8 +178,17 @@ int nds_key_held(void) {
 }
 
 void nds_wait_vblank(void) {
-    volatile int i;
-    for (i = 0; i < 5000; i++) {}
+    volatile u16* vcount = (volatile u16*)0x04000006;
+    int timeout = 0;
+    // Wait for VCount to drop below 192 (VBlank active)
+    while (*vcount >= 192) {
+        if (++timeout > 500000) { break; }
+    }
+    timeout = 0;
+    // Wait for VCount to go back above 192 (VBlank ended)
+    while (*vcount < 192) {
+        if (++timeout > 500000) { break; }
+    }
 }
 
 unsigned long long nds_get_tick(void) {
