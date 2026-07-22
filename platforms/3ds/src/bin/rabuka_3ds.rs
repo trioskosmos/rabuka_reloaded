@@ -205,6 +205,7 @@ enum SetupPhase {
     MultiplayerClientScan(usize), // p1_idx: client scanning for host network
     MultiplayerSyncDeck(usize, usize, bool), // p1_idx, p2_idx, is_host
     MultiplayerLoading(usize, usize, bool, Option<Vec<u8>>), // p1_idx, p2_idx, is_host, deck_sync_bytes
+    QrScan,                                                  // QR code scanning for deck import
 }
 
 #[cfg(feature = "3ds")]
@@ -541,6 +542,7 @@ fn main() {
                                     "AI vs AI",
                                     "Run Tests",
                                     "Local Multiplayer",
+                                    "QR (3DS etc.)",
                                 ]
                                 .iter()
                                 .enumerate()
@@ -561,10 +563,16 @@ fn main() {
                                     0.85f32,
                                     "SELECT MODE\0".as_ptr(),
                                 );
-                                for (i, m) in
-                                    ["Sandbox", "VS AI", "AI vs AI", "Run Tests", "Local MP"]
-                                        .iter()
-                                        .enumerate()
+                                for (i, m) in [
+                                    "Sandbox",
+                                    "VS AI",
+                                    "AI vs AI",
+                                    "Run Tests",
+                                    "Local MP",
+                                    "QR Scan",
+                                ]
+                                .iter()
+                                .enumerate()
                                 {
                                     let y = 40.0 + i as f32 * 38.0;
                                     let bg = if i == cur { COL_SEL } else { COL_DIM };
@@ -630,6 +638,9 @@ fn main() {
                                     SetupPhase::MultiplayerDeck(0),
                                     true,
                                 )
+                            } else if cur == 5 {
+                                // "QR (3DS etc.)" — scan QR code
+                                Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan, true)
                             } else if n == 0 {
                                 Step::Done(Err("No decks!".into()))
                             } else {
@@ -1079,6 +1090,87 @@ fn main() {
                             Step::Done(Ok(()))
                         } else {
                             Step::Setup(cards.clone(), decks.clone(), SetupPhase::Testing, false)
+                        }
+                    }
+                    SetupPhase::QrScan => {
+                        if was_dirty {
+                            if unsafe { _3ds_is_cli_mode() } {
+                                unsafe {
+                                    _3ds_clear_top();
+                                    _3ds_text_add_top("QR SCAN\n\0".as_ptr());
+                                    _3ds_text_add_top("A=scan  B=back\0".as_ptr());
+                                }
+                            } else {
+                                unsafe {
+                                    _3ds_top_clear();
+                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                    _3ds_top_queue_text(
+                                        100.0,
+                                        8.0,
+                                        COL_GOLD,
+                                        0.85f32,
+                                        "QR SCAN\0".as_ptr(),
+                                    );
+                                    _3ds_top_queue_text(
+                                        40.0,
+                                        60.0,
+                                        COL_LIGHT,
+                                        0.70f32,
+                                        "Point camera at deck QR code\non your phone screen\0"
+                                            .as_ptr(),
+                                    );
+                                    _3ds_top_queue_text(
+                                        40.0,
+                                        230.0,
+                                        COL_MED,
+                                        0.60f32,
+                                        "A=scan  B=back\0".as_ptr(),
+                                    );
+                                }
+                            }
+                        }
+                        if keys & 0x00000002 != 0 {
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::PickMode(5), true)
+                        } else if keys & 0x00000001 != 0 {
+                            let r_init = unsafe { _3ds_qr_init() };
+                            if r_init != 0 {
+                                unsafe {
+                                    _3ds_clear_both();
+                                    _3ds_text_add_top(
+                                        format!("Camera init failed: {}\0", r_init).as_ptr(),
+                                    );
+                                    _3ds_text_add_top("B=back\0".as_ptr());
+                                }
+                            } else {
+                                let mut buf = [0u8; 2048];
+                                let r_scan =
+                                    unsafe { _3ds_qr_scan(buf.as_mut_ptr(), buf.len() as u32) };
+                                unsafe { _3ds_qr_exit() };
+                                if r_scan > 0 {
+                                    let text = String::from_utf8_lossy(&buf[..r_scan as usize])
+                                        .to_string();
+                                    let cards_read = DeckParser::parse_deck_content(&text);
+                                    unsafe {
+                                        _3ds_clear_both();
+                                        _3ds_text_add_top(
+                                            format!("QR: {} cards read!\n\0", cards_read.len())
+                                                .as_ptr(),
+                                        );
+                                        _3ds_text_add_top("B=back\0".as_ptr());
+                                    }
+                                } else {
+                                    unsafe {
+                                        _3ds_clear_both();
+                                        _3ds_text_add_top(
+                                            format!("Scan failed: {}\0", r_scan).as_ptr(),
+                                        );
+                                        _3ds_text_add_top("B=back\0".as_ptr());
+                                    }
+                                }
+                            }
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan, true)
+                        } else {
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan, false)
                         }
                     }
                     // Multiplayer: Host or Client?
@@ -3339,6 +3431,10 @@ extern "C" {
     fn _3ds_board_get_overlay_action_idx(display_line: i32) -> i32;
     fn _3ds_board_get_overlay_selected() -> i32;
     fn _3ds_board_clear_action_overlay();
+    // QR code scanning (camera + quirc, same tech used by FBI installer)
+    fn _3ds_qr_init() -> i32;
+    fn _3ds_qr_exit();
+    fn _3ds_qr_scan(out_text: *mut u8, out_max: u32) -> i32;
 }
 
 #[cfg(not(feature = "3ds"))]

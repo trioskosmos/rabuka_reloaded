@@ -1072,3 +1072,114 @@ int _3ds_uds_recv(unsigned char *buf, unsigned int buf_len, unsigned int *out_le
 int _3ds_uds_is_connected() {
     return uds_connected ? 1 : 0;
 }
+
+// ── QR Code Scanning (camera + quirc) ──
+// Many 3DS homebrew apps (FBI, etc.) scan QR codes successfully.
+// The camera API is complex but well-documented in libctru examples.
+
+#include "quirc.h"
+#include <3ds/services/cam.h>
+
+static bool cam_initialized = false;
+static Handle cam_event = 0;
+#define CAM_BUF_SIZE (400 * 240 * 2)
+static u8 *cam_buf = NULL;
+
+int _3ds_qr_init(void) {
+    if (cam_initialized) return 0;
+
+    Result r = camInit();
+    if (R_FAILED(r)) return -1;
+
+    // Rear camera (SELECT_OUT1), top LCD resolution (400×240), RGB565
+    r = CAMU_SetSize(SELECT_OUT1, SIZE_CTR_TOP_LCD, CONTEXT_BOTH);
+    if (R_FAILED(r)) { camExit(); return -2; }
+    r = CAMU_SetOutputFormat(SELECT_OUT1, OUTPUT_RGB_565, CONTEXT_BOTH);
+    if (R_FAILED(r)) { camExit(); return -3; }
+    r = CAMU_SetFrameRate(SELECT_OUT1, 30);
+    if (R_FAILED(r)) { camExit(); return -4; }
+    r = CAMU_SetNoiseFilter(SELECT_OUT1, true);
+    if (R_FAILED(r)) { camExit(); return -5; }
+    r = CAMU_Activate(SELECT_OUT1);
+    if (R_FAILED(r)) { camExit(); return -6; }
+
+    cam_buf = (u8*)linearAlloc(CAM_BUF_SIZE);
+    if (!cam_buf) { camExit(); return -7; }
+
+    cam_initialized = true;
+    return 0;
+}
+
+void _3ds_qr_exit(void) {
+    if (!cam_initialized) return;
+    CAMU_StopCapture(SELECT_OUT1);
+    camExit();
+    if (cam_buf) { linearFree(cam_buf); cam_buf = NULL; }
+    cam_initialized = false;
+}
+
+// Capture one frame from the rear camera and decode any QR code found.
+// Returns number of bytes written to out_text (positive), or negative on error.
+int _3ds_qr_scan(char *out_text, unsigned int out_max) {
+    if (!cam_initialized) return -1;
+
+    // Set up receive buffer and start capture
+    cam_event = 0;
+    s16 transferUnit = -1; // auto
+    Result r = CAMU_SetReceiving(&cam_event, cam_buf, SELECT_OUT1, CAM_BUF_SIZE, transferUnit);
+    if (R_FAILED(r)) return -10;
+
+    r = CAMU_StartCapture(SELECT_OUT1);
+    if (R_FAILED(r)) return -11;
+
+    // Wait for the frame synchronisation event (up to 1 second)
+    int waitResult = svcWaitSynchronization(cam_event, 1000000000LL);
+    CAMU_StopCapture(SELECT_OUT1);
+    if (waitResult != 0) return -12; // timeout
+
+    int w = 400, h = 240;
+    size_t gray_size = (size_t)(w * h);
+    u8 *gray = (u8*)linearAlloc(gray_size);
+    if (!gray) return -13;
+
+    // Convert RGB565 from camera to grayscale for quirc
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            u16 rgb565 = *(u16*)&cam_buf[(y * w + x) * 2];
+            u8 r_ = (rgb565 >> 11) & 0x1F;
+            u8 g_ = (rgb565 >> 5) & 0x3F;
+            u8 b_ = rgb565 & 0x1F;
+            gray[y * w + x] = (r_ * 77 + g_ * 150 + b_ * 29) >> 8;
+        }
+    }
+
+    // Run quirc QR decoder
+    struct quirc *qr = quirc_new();
+    if (!qr) { linearFree(gray); return -14; }
+    quirc_resize(qr, w, h);
+    u8 *qr_img = quirc_begin(qr, NULL, NULL);
+    memcpy(qr_img, gray, gray_size);
+    quirc_end(qr);
+
+    int result;
+    if (quirc_count(qr) > 0) {
+        struct quirc_code code;
+        struct quirc_data data;
+        quirc_extract(qr, 0, &code);
+        if (quirc_decode(&code, &data) == QUIRC_SUCCESS) {
+            int len = data.payload_len;
+            if (len > (int)out_max - 1) len = out_max - 1;
+            memcpy(out_text, data.payload, len);
+            out_text[len] = '\0';
+            result = len;
+        } else {
+            result = -5; // decode failed
+        }
+    } else {
+        result = -6; // no QR found
+    }
+
+    quirc_destroy(qr);
+    linearFree(gray);
+    return result;
+}

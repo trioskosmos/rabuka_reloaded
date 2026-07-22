@@ -140,6 +140,7 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
       </div>
       <div class="deck-actions">
         <button id="export-deck" data-i18n="export">&#128203; Export</button>
+        <button id="qr-deck" data-i18n="qr_code">&#128247; Show QR</button>
         <button id="clear-deck" data-i18n="clear_deck">&#128465; Clear</button>
       </div>
       <div id="import-area" class="hidden">
@@ -150,16 +151,19 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
         </div>
         <div style="margin-top:4px;font-size:9px;color:#808090;text-align:center;">
           <a href="tutorial.html" target="_blank" style="color:#e94560;" data-i18n="decklog_guide">How to get a deck from Deck Log</a>
-        </div>
-      </div>
-    </div>
   </div>
 </div>
 
-<div id="tooltip"></div>
-<div id="toast"></div>
+<!-- QR Code Modal -->
+<div id="qr-modal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:999;">
+  <div style="background:#1a1a2e;padding:20px;border-radius:8px;text-align:center;border:1px solid #0f3460;">
+    <div id="qr-canvas" style="margin:0 auto;"></div>
+    <p style="margin-top:8px;font-size:12px;color:#8888a0;word-break:break-all;max-width:300px;" id="qr-deck-name"></p>
+    <button id="qr-close" class="primary" style="margin-top:12px;padding:6px 24px;cursor:pointer;">Close</button>
+  </div>
+</div>
 
-<script>
+<script src="js/qrcode.min.js"></script>
 // ── i18n ──
 let cbLang = localStorage.getItem('card_browser_lang') || 'en';
 async function loadCbLang(lang) {
@@ -1034,6 +1038,8 @@ function initDeckCreator() {
   document.getElementById('mode-browser').addEventListener('click', () => setDeckMode(false));
   document.getElementById('mode-deck').addEventListener('click', () => setDeckMode(true));
   document.getElementById('export-deck').addEventListener('click', exportDeck);
+  document.getElementById('qr-deck').addEventListener('click', showQR);
+  document.getElementById('qr-close').addEventListener('click', () => document.getElementById('qr-modal').classList.add('hidden'));
   document.getElementById('clear-deck').addEventListener('click', clearDeck);
   document.getElementById('deck-name').addEventListener('input', function() {
     deckState.name = this.value;
@@ -1061,6 +1067,29 @@ function initDeckCreator() {
     origRender(cards);
     if (deckMode) rebindCardClicks();
   };
+}
+
+// Show QR code for current deck
+function showQR() {
+  if (deckState.cards.size === 0) { toast('Deck is empty'); return; }
+  const name = document.getElementById('deck-name').value || 'deck';
+  const lines = [];
+  const entries = [...deckState.cards.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [cardNo, entry] of entries) {
+    lines.push(`${cardNo} x ${entry.qty}`);
+  }
+  const text = lines.join('\n');
+  document.getElementById('qr-deck-name').textContent = name;
+  document.getElementById('qr-canvas').innerHTML = '';
+  new QRCode(document.getElementById('qr-canvas'), {
+    text: text,
+    width: 200,
+    height: 200,
+    colorDark: '#e94560',
+    colorLight: '#1a1a2e',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+  document.getElementById('qr-modal').classList.remove('hidden');
 }
 
 // Load i18n then init

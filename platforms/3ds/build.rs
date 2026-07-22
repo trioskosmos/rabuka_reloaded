@@ -9,41 +9,67 @@ fn main() {
 
     let cc = format!("{}/bin/arm-none-eabi-gcc", devkitarm);
     let ar = format!("{}/bin/arm-none-eabi-ar", devkitarm);
-    let obj = out_dir.join("ctru_shim.o");
+    let _obj = out_dir.join("ctru_shim.o");
     let archive = out_dir.join("libctru_shim.a");
 
-    // Compile the C file to an object
-    let status = Command::new(&cc)
-        .args(&[
-            "-c",
-            "-o",
-            obj.to_str().unwrap(),
-            "src/ctru_shim.c",
-            &format!("-I{}/libctru/include", devkitpro),
-            &format!("-I{}/arm-none-eabi/include", devkitarm),
-            &format!("-I{}/lib/gcc/arm-none-eabi/16.1.0/include", devkitarm),
-            "-march=armv6k",
-            "-mtune=mpcore",
-            "-mfloat-abi=hard",
-            "-mfpu=vfp",
-            "-mtp=soft",
-            "-DARM11",
-            "-D__3DS__",
-            "-O3",
-        ])
-        .status()
-        .expect("failed to compile ctru_shim.c");
-    assert!(status.success(), "ctru_shim.c compilation failed");
+    let objs = [
+        "ctru_shim.c",
+        "quirc.c",
+        "decode.c",
+        "identify.c",
+        "version_db.c",
+    ];
+    for src in &objs {
+        let src_path = format!("src/{}", src);
+        let obj_file = out_dir.join(src.replace(".c", ".o"));
+        let status = Command::new(&cc)
+            .args(&[
+                "-c",
+                "-o",
+                obj_file.to_str().unwrap(),
+                &src_path,
+                &format!("-I{}/libctru/include", devkitpro),
+                &format!("-I{}/arm-none-eabi/include", devkitarm),
+                &format!("-I{}/lib/gcc/arm-none-eabi/16.1.0/include", devkitarm),
+                "-I",
+                "src/", // for quirc.h, quirc_internal.h
+                "-march=armv6k",
+                "-mtune=mpcore",
+                "-mfloat-abi=hard",
+                "-mfpu=vfp",
+                "-mtp=soft",
+                "-DARM11",
+                "-D__3DS__",
+                "-O3",
+            ])
+            .status()
+            .expect(&format!("failed to compile {}", src));
+        assert!(status.success(), "{} compilation failed", src);
+    }
 
-    // Create a static archive from the object
+    // Create a static archive from the objects
+    let mut ar_obj_paths: Vec<String> = Vec::new();
+    for src in &objs {
+        ar_obj_paths.push(
+            out_dir
+                .join(src.replace(".c", ".o"))
+                .to_string_lossy()
+                .to_string(),
+        );
+    }
+    let mut ar_args: Vec<&str> = vec!["crs", archive.to_str().unwrap()];
+    for p in &ar_obj_paths {
+        ar_args.push(p);
+    }
     let status = Command::new(&ar)
-        .args(&["crs", archive.to_str().unwrap(), obj.to_str().unwrap()])
+        .args(&ar_args)
         .status()
         .expect("failed to create archive");
     assert!(status.success(), "archive creation failed");
 
     // Tell cargo to rerun this build script if the C source changes
     println!("cargo:rerun-if-changed=src/ctru_shim.c");
+    println!("cargo:rerun-if-changed=src/quirc.c");
 
     // Allow-multiple-definition for pthread_atfork:
     // - libsysbase (linked via -lc) defines pthread_atfork but returns ENOSYS
