@@ -529,7 +529,7 @@ fn main() {
             Step::Setup(ref cards, ref decks, ref phase, ref dirty) => {
                 let n = decks.len();
                 let was_dirty = *dirty;
-                let new_step = match phase {
+                let new_step = match phase.clone() {
                     SetupPhase::PickMode(cur) => unsafe {
                         if was_dirty {
                             if _3ds_is_cli_mode() {
