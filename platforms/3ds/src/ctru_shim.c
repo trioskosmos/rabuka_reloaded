@@ -105,13 +105,30 @@ typedef struct {
     float x, y, w, h;
     u32 color;
     float scale;
-    char text[64];
+    const char *text;  // points into string_pool — no per-op buffer needed
 } DrawOp;
 #define OP_RECT 0
 #define OP_TEXT 1
 static DrawOp draw_ops[MAX_DRAW_OPS];
 static int   draw_op_count = 0;
 static int   draw_op_types[MAX_DRAW_OPS];
+
+// String pool: one 32KB slab reused every frame.  Draw ops borrow pointers
+// into this pool.  _3ds_top_clear() resets the pool each frame.
+#define STRING_POOL_SIZE (32 * 1024)
+static char string_pool[STRING_POOL_SIZE];
+static int   string_pool_pos = 0;
+static const char* pool_strdup(const char* s) {
+    if (!s) return "";
+    int len = 0;
+    while (s[len]) len++;
+    len++;  /* include NUL */
+    if (string_pool_pos + len > STRING_POOL_SIZE) return "";
+    char* dest = &string_pool[string_pool_pos];
+    memcpy(dest, s, len);
+    string_pool_pos += len;
+    return dest;
+}
 static u32   COL_TOP_BG = 0xFF0A0E1A; // very dark navy
 
 // ---- Board HUD overlay state ----
@@ -325,7 +342,7 @@ bool _3ds_is_cli_mode() { return cli_mode; }
 // Queued draw ops are rendered in _3ds_swap_buffers. Text ops carry a scale
 // value which citro2d interprets as: glyph_height = scale * 30.0 pixels.
 // This queue is cleared and re-filled every frame by the Rust game loop.
-void _3ds_top_clear() { draw_op_count = 0; }
+void _3ds_top_clear() { draw_op_count = 0; string_pool_pos = 0; }
 
 void _3ds_top_queue_rect(float x, float y, float w, float h, u32 color) {
     if (draw_op_count >= MAX_DRAW_OPS) return;
@@ -342,7 +359,7 @@ void _3ds_top_queue_text(float x, float y, u32 color, float scale, const char* t
     draw_op_types[i] = OP_TEXT;
     draw_ops[i].x = x; draw_ops[i].y = y;
     draw_ops[i].color = color; draw_ops[i].scale = scale;
-    strncpy(draw_ops[i].text, text, 63); draw_ops[i].text[63] = '\0';
+    draw_ops[i].text = pool_strdup(text);
 }
 
 // ---- Board HUD ----
@@ -899,4 +916,159 @@ ssize_t getrandom(void *buf, size_t buflen, unsigned int flags) {
         b[i] = (uint8_t)state;
     }
     return buflen;
+}
+
+// ---- UDS local wireless multiplayer ----
+
+#define UDS_WLAN_COMM_ID  0xFF150848
+#define UDS_DATA_CHANNEL  1
+#define UDS_MAX_NODES     2
+
+static u32 uds_sharedmem_size = 0x3000;
+static u32 uds_recv_buf_size = UDS_DEFAULT_RECVBUFSIZE;
+static u8 uds_data_channel = UDS_DATA_CHANNEL;
+static udsNetworkStruct uds_netstruct;
+static udsBindContext uds_bindctx;
+static bool uds_initialized = false;
+static bool uds_is_host = false;
+static bool uds_connected = false;
+
+// App data for network identification (first 4 bytes = magic, rest = random)
+static u8 uds_appdata[0x14] = {0x52, 0x42, 0x4B, 0x00}; // "RBK" + padding
+
+int _3ds_uds_init(int is_host) {
+    if (uds_initialized) return -1;
+
+    Result ret = udsInit(uds_sharedmem_size, NULL);
+    if (R_FAILED(ret)) return -2;
+
+    uds_is_host = (is_host != 0);
+
+    if (uds_is_host) {
+        // Generate a random passphrase from the appdata
+        char passphrase[0x14];
+        memset(passphrase, 0, sizeof(passphrase));
+        strncpy(passphrase, (char*)uds_appdata + 4, 12);
+
+        udsGenerateDefaultNetworkStruct(&uds_netstruct, UDS_WLAN_COMM_ID, 0, UDS_MAX_NODES);
+
+        ret = udsCreateNetwork(&uds_netstruct, passphrase, strlen(passphrase) + 1,
+                               &uds_bindctx, uds_data_channel, uds_recv_buf_size);
+        if (R_FAILED(ret)) {
+            udsExit();
+            return -3;
+        }
+
+        ret = udsSetApplicationData(uds_appdata, sizeof(uds_appdata));
+        if (R_FAILED(ret)) {
+            udsDestroyNetwork();
+            udsUnbind(&uds_bindctx);
+            udsExit();
+            return -4;
+        }
+
+        // No spectators
+        udsEjectSpectator();
+
+        uds_initialized = true;
+        uds_connected = true; // host is always "connected" once network is created
+        return 0;
+    } else {
+        // Client: scan for networks
+        u32 tmpbuf_size = 0x4000;
+        u32 *tmpbuf = (u32*)malloc(tmpbuf_size);
+        if (!tmpbuf) {
+            udsExit();
+            return -5;
+        }
+        memset(tmpbuf, 0, tmpbuf_size);
+
+        size_t total_networks = 0;
+        udsNetworkScanInfo *networks = NULL;
+
+        // Scan up to 10 times
+        for (int i = 0; i < 10; i++) {
+            ret = udsScanBeacons(tmpbuf, tmpbuf_size, &networks, &total_networks,
+                                 UDS_WLAN_COMM_ID, 0, NULL, false);
+            if (total_networks > 0) break;
+        }
+
+        free(tmpbuf);
+
+        if (total_networks == 0) {
+            udsExit();
+            return -6; // no networks found
+        }
+
+        // Connect to first matching network
+        char passphrase[0x14];
+        memset(passphrase, 0, sizeof(passphrase));
+        strncpy(passphrase, (char*)uds_appdata + 4, 12);
+
+        bool connected = false;
+        for (size_t i = 0; i < total_networks; i++) {
+            udsNetworkStruct *net = &networks[i].network;
+            // Check if it's our app (first 4 bytes of appdata match)
+            if (memcmp(net->appdata, uds_appdata, 4) == 0) {
+                for (int attempt = 0; attempt < 10; attempt++) {
+                    ret = udsConnectNetwork(net, passphrase, strlen(passphrase) + 1,
+                                            &uds_bindctx, UDS_BROADCAST_NETWORKNODEID,
+                                            UDSCONTYPE_Client, uds_data_channel,
+                                            uds_recv_buf_size);
+                    if (R_SUCCEEDED(ret)) {
+                        connected = true;
+                        break;
+                    }
+                }
+                if (connected) break;
+            }
+        }
+
+        free(networks);
+
+        if (!connected) {
+            udsExit();
+            return -7;
+        }
+
+        uds_initialized = true;
+        uds_connected = true;
+        return 0;
+    }
+}
+
+void _3ds_uds_exit() {
+    if (!uds_initialized) return;
+    if (uds_is_host) {
+        udsDestroyNetwork();
+    } else {
+        udsDisconnectNetwork();
+    }
+    udsUnbind(&uds_bindctx);
+    udsExit();
+    uds_initialized = false;
+    uds_connected = false;
+}
+
+int _3ds_uds_send(const unsigned char *data, unsigned int len) {
+    if (!uds_connected) return -1;
+    Result ret = udsSendTo(UDS_BROADCAST_NETWORKNODEID, uds_data_channel,
+                           UDS_SENDFLAG_Default, (void*)data, len);
+    if (R_FAILED(ret)) return -2;
+    return (int)len;
+}
+
+int _3ds_uds_recv(unsigned char *buf, unsigned int buf_len, unsigned int *out_len) {
+    if (!uds_connected) return -1;
+    u16 src_node = 0;
+    Result ret = udsPullPacket(&uds_bindctx, buf, buf_len, (size_t*)out_len, &src_node);
+    if (R_FAILED(ret)) {
+        *out_len = 0;
+        return -2;
+    }
+    return 0;
+}
+
+int _3ds_uds_is_connected() {
+    return uds_connected ? 1 : 0;
 }

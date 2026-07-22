@@ -9,7 +9,6 @@ use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::hash::{BuildHasher, Hasher};
 
 use psp::dprintln;
 use psp::sys::*;
@@ -26,53 +25,9 @@ use rabuka_engine::player::Player;
 use rabuka_engine::rng;
 use rabuka_engine::turn::TurnEngine;
 
-#[derive(Default, Clone, Copy)]
-struct PspHasher(u64);
-
-impl Hasher for PspHasher {
-    fn write(&mut self, bytes: &[u8]) {
-        for &b in bytes {
-            self.0 = self.0.wrapping_mul(131).wrapping_add(b as u64);
-        }
-    }
-    fn finish(&self) -> u64 {
-        self.0
-    }
-}
-
-impl BuildHasher for PspHasher {
-    type Hasher = PspHasher;
-    fn build_hasher(&self) -> PspHasher {
-        PspHasher(0)
-    }
-}
-
 psp::module!("rabuka", 1, 0);
 
-macro_rules! deck_cards {
-    ($n:literal) => {
-        include_str!(concat!("../../baked/deck_", $n, "_cards.json"))
-    };
-}
-
-const DECK_CARDS: &[&str] = &[
-    deck_cards!("0"),
-    deck_cards!("1"),
-    deck_cards!("2"),
-    deck_cards!("3"),
-    deck_cards!("4"),
-    deck_cards!("5"),
-    deck_cards!("6"),
-    deck_cards!("7"),
-    deck_cards!("8"),
-    deck_cards!("9"),
-    deck_cards!("10"),
-    deck_cards!("11"),
-    deck_cards!("12"),
-    deck_cards!("13"),
-    deck_cards!("14"),
-    deck_cards!("15"),
-];
+const CARDS_ALL_JSON: &str = include_str!("../../baked/cards_all.json");
 const DECKS_JSON: &str = include_str!("../../baked/decks.json");
 
 /// Truncate string to at most `max_chars` characters (not bytes).
@@ -102,12 +57,19 @@ fn psp_main() {
     let deck_names: Vec<&str> = decks.iter().map(|d| d.name.as_str()).collect();
 
     // Mode select
-    let modes = ["VS AI", "2 Player"];
+    let modes = ["VS AI", "2 Player", "AI vs AI", "Run Tests"];
     let mode_idx = select(&mut display, &mut input, &modes, "Mode");
     let vs_ai = mode_idx == 0;
+    let ai_vs_ai = mode_idx == 2;
+    let run_tests = mode_idx == 3;
+
+    if run_tests {
+        run_on_device_tests(&mut display, &mut input);
+        return;
+    }
 
     let deck1_idx = select(&mut display, &mut input, &deck_names, "Your Deck");
-    let deck2_idx = if vs_ai {
+    let deck2_idx = if vs_ai || ai_vs_ai {
         rng::rand_range(decks.len())
     } else {
         select(&mut display, &mut input, &deck_names, "P2 Deck")
@@ -117,34 +79,18 @@ fn psp_main() {
     display.println("Loading...");
     display.swap_buffers();
 
-    display.println("Parsing deck 1 cards...");
+    display.println("Parsing all cards...");
     display.swap_buffers();
-    let cards1: Vec<Card> =
-        serde_json::from_str(DECK_CARDS[deck1_idx]).expect("Failed to parse deck cards");
+    let mut all_cards: Vec<Card> =
+        serde_json::from_str(CARDS_ALL_JSON).expect("Failed to parse cards_all.json");
 
-    display.println("Parsing deck 2 cards...");
+    display.println("Attaching abilities...");
     display.swap_buffers();
-    let cards2: Vec<Card> =
-        serde_json::from_str(DECK_CARDS[deck2_idx]).expect("Failed to parse deck cards");
-
-    // Merge and deduplicate by card_no
-    display.println("Merging cards...");
-    display.swap_buffers();
-    let mut card_map: hashbrown::HashMap<String, Card, PspHasher> =
-        hashbrown::HashMap::with_hasher(PspHasher(0));
-    for c in cards1.into_iter().chain(cards2.into_iter()) {
-        let key = c.card_no.to_string();
-        if !card_map.contains_key(&key) {
-            let mut card = c;
-            card_map.insert(key, card);
-        }
-    }
+    CardLoader::attach_abilities(&mut all_cards);
 
     display.println("Building database...");
     display.swap_buffers();
-    let mut cards: Vec<Card> = card_map.into_values().collect();
-    CardLoader::attach_abilities(&mut cards);
-    let mut db = Arc::new(CardDatabase::load_or_create(cards));
+    let mut db = Arc::new(CardDatabase::load_or_create(all_cards));
 
     // Build decks using DeckBuilder
     display.println("Building decks...");
@@ -200,7 +146,7 @@ fn psp_main() {
             continue;
         }
 
-        let is_ai = vs_ai && gs.active_player().id != gs.player1.id;
+        let is_ai = ai_vs_ai || (vs_ai && gs.active_player().id != gs.player1.id);
         let ok = if is_ai {
             ai_turn(&mut display, &mut gs, &actions)
         } else {
@@ -628,6 +574,162 @@ fn init_rng() {
         sceRtcGetCurrentTick(&mut tick);
     }
     rng::seed(if tick == 0 { 1 } else { tick as u32 });
+}
+
+/// On-device test suite for PSP. Accessed via "Run Tests" menu.
+fn run_on_device_tests(display: &mut Display, input: &mut Input) {
+    display.clear();
+    display.println("=== PSP ON-DEVICE TESTS ===");
+    display.println("Loading baked card data...");
+    display.swap_buffers();
+    wait_frames(30);
+
+    // Test 1: Deck JSON parses
+    let decks: Result<Vec<DeckEntry>, _> = serde_json::from_str(DECKS_JSON);
+    match &decks {
+        Ok(d) => display.println(&format!("DECKS: {} ok", d.len())),
+        Err(e) => display.println(&format!("DECKS: FAIL - {}", e)),
+    }
+    display.swap_buffers();
+    wait_frames(30);
+
+    let mut passed = 0u32;
+    let mut failed = 0u32;
+
+    // Test 2: Load all cards, check abilities
+    display.println("Loading all cards...");
+    display.swap_buffers();
+    wait_frames(15);
+    let mut cards: Vec<Card> =
+        serde_json::from_str(CARDS_ALL_JSON).expect("Failed to parse cards_all.json");
+    CardLoader::attach_abilities(&mut cards);
+    let wa = cards.iter().filter(|c| !c.abilities.is_empty()).count();
+    display.println(&format!("ALL CARDS: {} total", cards.len()));
+    display.println(&format!("ABILITIES: {} cards have them", wa));
+    if wa > 0 {
+        passed += 1;
+    } else {
+        failed += 1;
+    }
+
+    // Test 3: Energy card check
+    let has_energy = cards.iter().any(|c| c.card_no.contains("LL-E-005"));
+    display.println(if has_energy {
+        "ENERGY: found"
+    } else {
+        "ENERGY: missing"
+    });
+    if has_energy {
+        passed += 1;
+    } else {
+        failed += 1;
+    }
+
+    display.swap_buffers();
+    wait_frames(30);
+
+    // Test 4: Try AI vs AI if we have enough decks
+    if let Ok(ref d) = decks {
+        if d.len() >= 2 {
+            display.println("AI PLAY: 5 turns...");
+            display.swap_buffers();
+            wait_frames(15);
+            match test_ai_vs_ai_psp() {
+                Ok(n) => {
+                    display.println(&format!("AI PLAY: {} actions (OK)", n));
+                    passed += 1;
+                }
+                Err(e) => {
+                    display.println(&format!("AI PLAY: {}", e));
+                    failed += 1;
+                }
+            }
+            display.swap_buffers();
+            wait_frames(30);
+        }
+    }
+
+    display.println(&alloc::format!(
+        "RESULTS: {} passed, {} failed",
+        passed,
+        failed
+    ));
+    display.println("START=exit");
+    display.swap_buffers();
+    loop {
+        input.poll();
+        if input.just_pressed(Button::Start) || input.just_pressed(Button::Cross) {
+            break;
+        }
+        wait_frames(2);
+    }
+}
+
+/// Mini AI vs AI test for PSP: uses baked decks[0] vs decks[1].
+fn test_ai_vs_ai_psp() -> Result<usize, alloc::string::String> {
+    let decks: Vec<DeckEntry> =
+        serde_json::from_str(DECKS_JSON).map_err(|e| alloc::format!("JSON: {}", e))?;
+    if decks.len() < 2 {
+        return Err("need 2+ decks".into());
+    }
+
+    let mut all_cards: Vec<Card> =
+        serde_json::from_str(CARDS_ALL_JSON).map_err(|e| alloc::format!("Cards: {}", e))?;
+    CardLoader::attach_abilities(&mut all_cards);
+    let mut db = Arc::new(CardDatabase::load_or_create(all_cards));
+
+    let nums1: Vec<alloc::string::String> = decks[0].cards.clone();
+    let nums2: Vec<alloc::string::String> = decks[1].cards.clone();
+    let mut pd1 = deck_builder::DeckBuilder::build_deck_from_database(&mut db, nums1)
+        .map_err(|e| alloc::format!("D1build: {}", e))?;
+    deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
+    let mut pd2 = deck_builder::DeckBuilder::build_deck_from_database(&mut db, nums2)
+        .map_err(|e| alloc::format!("D2build: {}", e))?;
+    deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
+    pd1.shuffle_main_deck();
+    pd1.shuffle_energy_deck();
+    pd2.shuffle_main_deck();
+    pd2.shuffle_energy_deck();
+
+    let mut p1 = Player::new("p1".into(), "P1".into(), true);
+    p1.set_main_deck(pd1.main_deck);
+    p1.set_energy_deck(pd1.energy_deck);
+    let mut p2 = Player::new("p2".into(), "P2".into(), false);
+    p2.set_main_deck(pd2.main_deck);
+    p2.set_energy_deck(pd2.energy_deck);
+    let mut gs = GameState::new(p1, p2, db);
+    game_setup::setup_game(&mut gs);
+
+    let mut count = 0usize;
+    let mut turns = 0u32;
+    while gs.game_result == GameResult::Ongoing && turns < 10 {
+        let acts = game_setup::generate_possible_actions(&gs);
+        if acts.is_empty() {
+            TurnEngine::advance_phase(&mut gs);
+            turns += 1;
+            continue;
+        }
+        let a = acts[0].clone();
+        let p = a.parameters.clone();
+        let _ = TurnEngine::execute_main_phase_action(
+            &mut gs,
+            &a.action_type,
+            p.as_ref().and_then(|x| x.card_id),
+            p.as_ref().and_then(|x| x.card_indices.clone()),
+            p.as_ref()
+                .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
+            p.as_ref().and_then(|x| x.use_baton_touch),
+        );
+        count += 1;
+        while gs.game_result == GameResult::Ongoing && game_setup::is_automatic_phase(&gs) {
+            TurnEngine::advance_phase(&mut gs);
+            turns += 1;
+        }
+        if gs.current_phase == Phase::Active || gs.current_phase == Phase::Draw {
+            turns += 1;
+        }
+    }
+    Ok(count)
 }
 
 fn wait_frames(n: u32) {

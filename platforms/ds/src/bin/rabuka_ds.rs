@@ -91,7 +91,7 @@ impl BuildHasher for DsHasher {
 }
 
 // Flat binary card database (zero-copy, no heap allocation for parsing)
-const CARDS_DB: &[u8] = include_bytes!("../../../psp/baked/cards_database.bin");
+const CARDS_DB: &[u8] = include_bytes!("../../../output/cards_database.bin");
 
 struct DsCardDb<'a> {
     data: &'a [u8],
@@ -322,9 +322,16 @@ pub extern "C" fn main() {
 
     let card_db = DsCardDb::new(CARDS_DB);
 
-    let modes = ["VS AI", "2 Player"];
+    let modes = ["VS AI", "2 Player", "AI vs AI", "Run Tests"];
     let mode_idx = select(&mut display, &mut input, &modes, "Mode");
     let vs_ai = mode_idx == 0;
+    let ai_vs_ai = mode_idx == 2;
+    let run_tests = mode_idx == 3;
+
+    if run_tests {
+        run_on_device_tests_ds(&mut display, &mut input, &card_db);
+        return;
+    }
 
     let deck_count = card_db.deck_count() as usize;
     let mut deck_names: Vec<&str> = Vec::new();
@@ -333,7 +340,7 @@ pub extern "C" fn main() {
     }
 
     let deck1_idx = select(&mut display, &mut input, &deck_names, "Your Deck");
-    let deck2_idx = if vs_ai {
+    let deck2_idx = if vs_ai || ai_vs_ai {
         rng::rand_range(deck_count)
     } else {
         select(&mut display, &mut input, &deck_names, "P2 Deck")
@@ -426,7 +433,7 @@ pub extern "C" fn main() {
             continue;
         }
 
-        let is_ai = vs_ai && gs.active_player().id != gs.player1.id;
+        let is_ai = ai_vs_ai || (vs_ai && gs.active_player().id != gs.player1.id);
         let ok = if is_ai {
             ai_turn(&mut display, &mut gs, &actions)
         } else {
@@ -438,6 +445,170 @@ pub extern "C" fn main() {
         settle_auto(&mut gs);
     }
 }
+
+// ── DS On-Device Tests ──────────────────────────────────────────
+
+fn run_on_device_tests_ds(display: &mut Display, input: &mut Input, card_db: &DsCardDb) {
+    use rabuka_engine::card_loader::CardLoader;
+    display.clear();
+    display.println("=== DS ON-DEVICE TESTS ===");
+    display.swap_buffers();
+    wait_frames(20);
+
+    let mut passed = 0u32;
+    let mut failed = 0u32;
+
+    // Test 1: Card count from binary DB
+    let cc = card_db.card_count();
+    display.println(&alloc::format!("CARDS: {} in RBCD", cc));
+    if cc > 0 {
+        passed += 1;
+    } else {
+        failed += 1;
+    }
+    display.swap_buffers();
+    wait_frames(20);
+
+    // Test 2: Deck count
+    let dc = card_db.deck_count();
+    display.println(&alloc::format!("DECKS: {}", dc));
+    if dc >= 2 {
+        passed += 1;
+    } else {
+        failed += 1;
+        display.println("(need 2+ for AI test)");
+    }
+    display.swap_buffers();
+    wait_frames(20);
+
+    // Test 3: Verify ability refs on first few cards
+    let mut ab_count = 0u32;
+    for i in 0..cc.min(50) {
+        let c = card_db.build_card(i);
+        if !c.abilities.is_empty() {
+            ab_count += 1;
+        }
+    }
+    display.println(&alloc::format!("ABILITIES: {} cards (of 50)", ab_count));
+    if ab_count > 0 {
+        passed += 1;
+    } else {
+        failed += 1;
+    }
+    display.swap_buffers();
+    wait_frames(20);
+
+    // Test 4: AI vs AI (5 turns) if enough decks
+    if dc >= 2 {
+        display.println("AI PLAY: 5 turns...");
+        display.swap_buffers();
+        wait_frames(10);
+        match test_ai_vs_ai_ds(card_db, 0, 1) {
+            Ok(n) => {
+                display.println(&alloc::format!("AI PLAY: {} actions (OK)", n));
+                passed += 1;
+            }
+            Err(e) => {
+                display.println(&alloc::format!("AI PLAY: {}", e));
+                failed += 1;
+            }
+        }
+        display.swap_buffers();
+        wait_frames(30);
+    }
+
+    display.println(&alloc::format!(
+        "RESULTS: {} passed, {} failed",
+        passed,
+        failed
+    ));
+    display.println("START=exit");
+    display.swap_buffers();
+    loop {
+        input.poll();
+        if input.just_pressed(Button::Start) || input.just_pressed(Button::Cross) {
+            break;
+        }
+        wait_frames(2);
+    }
+}
+
+fn test_ai_vs_ai_ds(card_db: &DsCardDb, d1: u16, d2: u16) -> Result<usize, alloc::string::String> {
+    let mut seen: hashbrown::HashSet<u16, DsHasher> = hashbrown::HashSet::with_hasher(DsHasher(0));
+    let mut cards: Vec<Card> = Vec::new();
+    let mut nums1: Vec<String> = Vec::new();
+    let mut nums2: Vec<String> = Vec::new();
+    let cc1 = card_db.deck_card_count(d1) as usize;
+    for i in 0..cc1 {
+        let ci = card_db.deck_card_index(d1, i);
+        nums1.push(String::from(card_db.card_no(ci)));
+        if seen.insert(ci) {
+            cards.push(card_db.build_card(ci));
+        }
+    }
+    let cc2 = card_db.deck_card_count(d2) as usize;
+    for i in 0..cc2 {
+        let ci = card_db.deck_card_index(d2, i);
+        nums2.push(String::from(card_db.card_no(ci)));
+        if seen.insert(ci) {
+            cards.push(card_db.build_card(ci));
+        }
+    }
+
+    let mut db = Arc::new(CardDatabase::load_or_create(cards));
+    let mut pd1 = deck_builder::DeckBuilder::build_deck_from_database(&mut db, nums1)
+        .map_err(|e| alloc::format!("D1:{}", e))?;
+    deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
+    let mut pd2 = deck_builder::DeckBuilder::build_deck_from_database(&mut db, nums2)
+        .map_err(|e| alloc::format!("D2:{}", e))?;
+    deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
+    pd1.shuffle_main_deck();
+    pd1.shuffle_energy_deck();
+    pd2.shuffle_main_deck();
+    pd2.shuffle_energy_deck();
+
+    let mut p1 = Player::new("p1".into(), "P1".into(), true);
+    p1.set_main_deck(pd1.main_deck);
+    p1.set_energy_deck(pd1.energy_deck);
+    let mut p2 = Player::new("p2".into(), "P2".into(), false);
+    p2.set_main_deck(pd2.main_deck);
+    p2.set_energy_deck(pd2.energy_deck);
+    let mut gs = GameState::new(p1, p2, db);
+    game_setup::setup_game(&mut gs);
+
+    let mut count = 0usize;
+    let mut turns = 0u32;
+    while gs.game_result == GameResult::Ongoing && turns < 10 {
+        let acts = game_setup::generate_possible_actions(&gs);
+        if acts.is_empty() {
+            TurnEngine::advance_phase(&mut gs);
+            turns += 1;
+            continue;
+        }
+        let a = acts[0].clone();
+        let p = a.parameters.clone();
+        let _ = TurnEngine::execute_main_phase_action(
+            &mut gs,
+            &a.action_type,
+            p.as_ref().and_then(|x| x.card_id),
+            p.as_ref().and_then(|x| x.card_indices.clone()),
+            p.as_ref()
+                .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
+            p.as_ref().and_then(|x| x.use_baton_touch),
+        );
+        count += 1;
+        while gs.game_result == GameResult::Ongoing && game_setup::is_automatic_phase(&gs) {
+            TurnEngine::advance_phase(&mut gs);
+            turns += 1;
+        }
+        if gs.current_phase == Phase::Active || gs.current_phase == Phase::Draw {
+            turns += 1;
+        }
+    }
+    Ok(count)
+}
+
+// ── End of tests ─────────────────────────────────────────────────
 
 fn select(display: &mut Display, input: &mut Input, items: &[&str], title: &str) -> usize {
     let mut sel = 0usize;

@@ -181,7 +181,6 @@ name = "rabuka_psp"
 version = "0.1.0"
 dependencies = [
  "embedded-graphics",
- "hashbrown",
  "log",
  "psp",
  "rabuka_engine",

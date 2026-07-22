@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 rabuka_engine = { path = "../../engine", default-features = false, features = ["psp", "bytecode_abilities"] }
 psp = { version = "0.3", features = ["embedded-graphics"], optional = true }
-hashbrown = { version = "0.14", default-features = false, features = ["serde"] }
 smallvec = { version = "1", default-features = false }
 embedded-graphics = { version = "0.8", optional = true }
 log = { version = "0.4", default-features = false }

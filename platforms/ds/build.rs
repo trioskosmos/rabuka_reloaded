@@ -2,7 +2,19 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
-    let devkitpro = std::env::var("DEVKITPRO").unwrap_or_else(|_| "C:/devkitPro".to_string());
+    let devkitpro_raw = std::env::var("DEVKITPRO").unwrap_or_else(|_| "C:/devkitPro".to_string());
+    // Convert MSYS2 paths (e.g. /opt/devkitpro) to Windows paths (C:/devkitPro)
+    let devkitpro = if devkitpro_raw.starts_with('/') || devkitpro_raw.starts_with('\\') {
+        // Try common Windows install locations
+        let candidates = ["C:/devkitPro", "D:/devkitPro"];
+        candidates
+            .iter()
+            .find(|c| std::path::Path::new(c).exists())
+            .map(|s| s.to_string())
+            .unwrap_or(devkitpro_raw)
+    } else {
+        devkitpro_raw
+    };
     let devkitarm =
         std::env::var("DEVKITARM").unwrap_or_else(|_| format!("{}/devkitARM", devkitpro));
 

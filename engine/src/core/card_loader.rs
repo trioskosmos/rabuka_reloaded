@@ -33,6 +33,8 @@ impl CardLoader {
         Self::load_cards_from_strs(&contents)
     }
 
+    /// Load cards from serde_json str — internally calls attach_abilities().
+    /// This is the single entry point that all ports should use.
     pub fn load_cards_from_strs(cards_json: &str) -> Result<Vec<Card>, String> {
         let mut cards: Vec<Card> = match serde_json::from_str::<Vec<Card>>(cards_json) {
             Ok(cards) => cards,
@@ -42,9 +44,19 @@ impl CardLoader {
                 card_map.into_values().collect()
             }
         };
-
         Self::attach_abilities(&mut cards);
+        Ok(cards)
+    }
 
+    /// Load cards from MessagePack bytes — internally calls attach_abilities().
+    /// Used by the 3DS port (cards.bin is MessagePack format).
+    /// Requires the `rmp-serde` feature on the engine crate.
+    #[cfg(feature = "rmp-serde")]
+    pub fn load_cards_from_msgpack(bytes: &[u8]) -> Result<Vec<Card>, String> {
+        let map: crate::HashMap<String, Card> = rmp_serde::from_read(bytes)
+            .map_err(|e| format!("MessagePack deserialization failed: {}", e))?;
+        let mut cards: Vec<Card> = map.into_values().collect();
+        Self::attach_abilities(&mut cards);
         Ok(cards)
     }
 
@@ -85,5 +97,36 @@ impl CardLoader {
     /// Build the ability map for tests that need it directly.
     pub fn build_abilities_map_shared_for_tests() -> HashMap<String, Vec<AbilityRef>> {
         Self::build_abilities_map_shared()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ability_map_is_non_empty() {
+        let map = CardLoader::build_abilities_map_shared_for_tests();
+        assert!(
+            !map.is_empty(),
+            "ability map should contain at least one card"
+        );
+    }
+
+    #[test]
+    fn ability_refs_all_have_valid_indices() {
+        let map = CardLoader::build_abilities_map_shared_for_tests();
+        for (card_no, refs) in map.iter() {
+            for r in refs {
+                let idx = r.idx();
+                assert!(
+                    idx < crate::ability::abilities_gen::NUM_ABILITIES as u16,
+                    "card {} has ability index {} >= {}",
+                    card_no,
+                    idx,
+                    crate::ability::abilities_gen::NUM_ABILITIES
+                );
+            }
+        }
     }
 }

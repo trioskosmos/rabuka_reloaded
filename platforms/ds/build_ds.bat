@@ -11,6 +11,10 @@ set TARGET_JSON=armv5te-nintendo-ds.json
 set RUST_TARGETS=C:\rust_targets
 
 echo Building Rabuka DS...
+echo.
+echo NOTE: The DS binary embeds cards_database.bin from output/cards_database.bin.
+echo       Run 'cargo run --release -- ds' from tools/bake first if the binary is stale.
+
 cargo %NIGHTLY% build --release -Zbuild-std=core,alloc -Zjson-target-spec --target %TARGET_JSON%
 if %ERRORLEVEL% neq 0 exit /b %ERRORLEVEL%
 

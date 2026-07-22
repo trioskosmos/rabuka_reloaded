@@ -71,6 +71,7 @@ version = "0.1.0"
 dependencies = [
  "hashbrown",
  "log",
+ "rmp-serde",
  "serde",
  "serde_json",
  "smallvec",

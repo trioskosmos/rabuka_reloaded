@@ -113,7 +113,8 @@ fn run_game() {
         }
     }
 
-    let cards: Vec<Card> = card_map.into_values().collect();
+    let mut cards: Vec<Card> = card_map.into_values().collect();
+    rabuka_engine::card_loader::CardLoader::attach_abilities(&mut cards);
     let mut db = Arc::new(rabuka_engine::card::CardDatabase::load_or_create(cards));
 
     let nums1: Vec<String> = decks[deck1_idx].cards.clone();

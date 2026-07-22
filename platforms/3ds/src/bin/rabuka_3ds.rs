@@ -39,11 +39,12 @@ use rabuka_engine::deck_builder::DeckBuilder;
 use rabuka_engine::deck_parser::DeckList;
 use rabuka_engine::deck_parser::DeckParser;
 use rabuka_engine::game_setup;
-use rabuka_engine::game_state::{GameResult, GameState};
+use rabuka_engine::game_state::{GameResult, GameState, Phase};
 use rabuka_engine::player::Player;
 use rabuka_engine::turn;
 
 #[cfg(feature = "3ds")]
+mod uds;
 const TICK_HZ: u64 = 268_120_000;
 
 /// Reader wrapper that calls aptMainLoop() every `threshold` bytes without
@@ -99,6 +100,13 @@ macro_rules! tprintln {
 /// Word-wrap text to fit within `max_chars` per line, breaking at spaces.
 /// Inserts `\n` to split long lines. Works with multi-byte UTF-8.
 #[cfg(feature = "3ds")]
+fn cn_or_empty(act: &game_setup::Action) -> String {
+    act.parameters
+        .as_ref()
+        .and_then(|p| p.card_no.clone())
+        .unwrap_or_default()
+}
+
 fn wrap_text(s: &str, max_chars: usize) -> String {
     let mut out = String::with_capacity(s.len() + 32);
     for line in s.lines() {
@@ -183,10 +191,18 @@ impl CardAtlas {
 #[cfg(feature = "3ds")]
 #[derive(Clone)]
 enum SetupPhase {
-    PickMode(usize),               // cursor: 0=sandbox, 1=vsAI
-    PickDeck(usize, bool),         // cursor, vs_ai flag
+    PickMode(usize),               // cursor: 0=sandbox, 1=vsAI, 2=AIvsAI, 3=tests, 4=localMP
+    PickDeck(usize, bool, bool),   // cursor, vs_ai flag, is_multiplayer
     PickDeck2(usize, usize, bool), // cursor, p1_idx, vs_ai
     Loading(usize, usize, bool),   // p1_idx, p2_idx, vs_ai
+    Testing,                       // On-device test suite
+    // Multiplayer lobby phases
+    MultiplayerDeck(usize),        // cursor, selecting deck for multiplayer
+    MultiplayerPickRole(usize, usize), // deck_idx, role_cursor (0=Host, 1=Client)
+    MultiplayerHostWait(usize),    // p1_idx: host waiting for client to connect
+    MultiplayerClientScan(usize),  // p1_idx: client scanning for host network
+    MultiplayerSyncDeck(usize, usize, bool), // p1_idx, p2_idx, is_host
+    MultiplayerLoading(usize, usize, bool), // p1_idx, p2_idx, is_host
 }
 
 #[cfg(feature = "3ds")]
@@ -202,15 +218,125 @@ enum Step {
         bool, // dirty
         bool, // redraw
         CardAtlas,
-        bool,        // vs_ai
+        bool,        // vs_ai (human vs AI)
+        bool,        // ai_vs_ai (spectator: both AI)
         bool,        // cli_mode
         bool,        // detail_mode
         usize,       // hand_offset (P1)
         usize,       // hand_offset_p2
         u32,         // touch_tap_count
         Option<i16>, // viewing_card_id
+        bool,        // is_multiplayer
+        bool,        // is_host (true = P1/host, false = P2/client)
+        bool,        // waiting_for_opponent
     ),
     Done(Result<(), String>),
+}
+
+/// On-device test suite — runs QA checks in limited 3DS memory.
+/// Accessed via "Run Tests" menu. Each test returns a result line.
+#[cfg(feature = "3ds")]
+fn run_on_device_tests(cards: Arc<Vec<Card>>, decks: Vec<DeckList>) -> Vec<String> {
+    use crate::game_setup;
+    use crate::turn;
+    let mut r: Vec<String> = Vec::new();
+    let t0 = unsafe { _3ds_system_tick() };
+    r.push(format!("CARDS: {}", cards.len()));
+    let mut cards_vec = (*cards).clone();
+    CardLoader::attach_abilities(&mut cards_vec);
+    let wa = cards_vec.iter().filter(|c| !c.abilities.is_empty()).count();
+    r.push(if wa > 0 {
+        format!("ABILITIES: {} (OK)", wa)
+    } else {
+        "ABILITIES: NONE (FAIL!)".into()
+    });
+    r.push(format!("DECKS: {}", decks.len()));
+    if let Some(c) = cards.first() {
+        let nl = c.name.len();
+        r.push(format!("CARD[0]: {} ({}ch) OK", &c.name[..nl.min(20)], nl));
+    } else {
+        r.push("CARD[0]: NONE (FAIL!)".into());
+    }
+    let he = cards.iter().any(|c| {
+        let cn: &str = &c.card_no;
+        cn.contains("LL-E-005")
+    });
+    r.push(if he {
+        "ENERGY: found (OK)".into()
+    } else {
+        "ENERGY: missing (FAIL!)".into()
+    });
+    if decks.len() >= 2 {
+        match test_ai_vs_ai(&cards_vec, &decks[0], &decks[1], 5) {
+            Ok(n) => r.push(format!("AI PLAY: {} actions (OK)", n)),
+            Err(e) => r.push(format!("AI PLAY: FAIL {}", e)),
+        }
+    } else {
+        r.push("AI PLAY: skip (need 2 decks)".into());
+    }
+    let ms = ticks_to_ms(unsafe { _3ds_system_tick() } - t0);
+    r.push(format!("TIME: {}ms", ms));
+    r.push("=== DONE ===".into());
+    r
+}
+
+/// Mini AI vs AI test: sets up game, runs 5 turns with random AI.
+#[cfg(feature = "3ds")]
+fn test_ai_vs_ai(cards: &[Card], d1: &DeckList, d2: &DeckList, mt: u32) -> Result<usize, String> {
+    use rabuka_engine::card::CardDatabase;
+    use std::sync::Arc;
+    let mut db = Arc::new(CardDatabase::load_or_create(cards.to_vec()));
+    let n1 = DeckParser::deck_list_to_card_numbers(d1);
+    let n2 = DeckParser::deck_list_to_card_numbers(d2);
+    let mut pd1 =
+        DeckBuilder::build_deck_from_database(&mut db, n1).map_err(|e| format!("D1:{}", e))?;
+    DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
+    let mut pd2 =
+        DeckBuilder::build_deck_from_database(&mut db, n2).map_err(|e| format!("D2:{}", e))?;
+    DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
+    pd1.shuffle_main_deck();
+    pd1.shuffle_energy_deck();
+    pd2.shuffle_main_deck();
+    pd2.shuffle_energy_deck();
+    let mut p1 = Player::new("p1".into(), "P1".into(), true);
+    p1.set_main_deck(pd1.main_deck);
+    p1.set_energy_deck(pd1.energy_deck);
+    let mut p2 = Player::new("p2".into(), "P2".into(), false);
+    p2.set_main_deck(pd2.main_deck);
+    p2.set_energy_deck(pd2.energy_deck);
+    let mut gs = GameState::new(p1, p2, db);
+    game_setup::setup_game(&mut gs);
+    let mut c = 0usize;
+    let mut tu = 0u32;
+    let max_iter = (mt * 40) as usize;
+    while gs.game_result == GameResult::Ongoing && tu < mt * 2 && c < max_iter {
+        let acts = game_setup::generate_possible_actions(&gs);
+        if acts.is_empty() {
+            break;
+        }
+        let a = acts[0].clone();
+        let p = a.parameters.clone();
+        let _ = turn::TurnEngine::execute_main_phase_action(
+            &mut gs,
+            &a.action_type,
+            p.as_ref().and_then(|x| x.card_id),
+            p.as_ref().and_then(|x| x.card_indices.clone()),
+            p.as_ref()
+                .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
+            p.as_ref().and_then(|x| x.use_baton_touch),
+        );
+        gs.reset_loop_detection();
+        gs.reset_loop_detection();
+        c += 1;
+        while gs.game_result == GameResult::Ongoing && game_setup::is_automatic_phase(&gs) {
+            turn::TurnEngine::advance_phase(&mut gs);
+            tu += 1;
+        }
+        if gs.current_phase == Phase::Active || gs.current_phase == Phase::Draw {
+            tu += 1;
+        }
+    }
+    Ok(c)
 }
 
 #[cfg(feature = "3ds")]
@@ -371,7 +497,11 @@ fn main() {
                             if _3ds_is_cli_mode() {
                                 _3ds_clear_top();
                                 _3ds_text_add_top("SELECT MODE\n\0".as_ptr());
-                                for (i, m) in ["Sandbox (2 players)", "VS AI"].iter().enumerate() {
+                                for (i, m) in
+                                    ["Sandbox (2 players)", "VS AI", "AI vs AI", "Run Tests", "Local Multiplayer"]
+                                        .iter()
+                                        .enumerate()
+                                {
                                     let arrow = if i == cur { ">" } else { " " };
                                     _3ds_text_add_top(
                                         format!("{} [{}] {}\n\0", arrow, i, m).as_ptr(),
@@ -379,27 +509,23 @@ fn main() {
                                 }
                                 _3ds_text_add_top("\nUP/DOWN=select A=confirm\0".as_ptr());
                             } else {
-                                // Game-mode: graphical mode selection screen on top LCD.
-                                // Colors use c2d() byte order: 0xAABBGGRR.
-                                //
-                                // Font scaling reference (citro2d normalizes all fonts):
-                                //   scale * 30.0 = rendered glyph height in pixels.
-                                //   e.g. 0.70 = 21px, 0.85 = 26px, 1.0 = 30px (full).
-                                //   Top screen is 400x240, bottom is 320x240.
                                 _3ds_top_clear();
                                 _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
                                 _3ds_top_queue_text(
                                     100.0,
-                                    10.0,
+                                    8.0,
                                     COL_GOLD,
                                     0.85f32,
                                     "SELECT MODE\0".as_ptr(),
                                 );
-                                for (i, m) in ["Sandbox (2 players)", "VS AI"].iter().enumerate() {
-                                    let y = 50.0 + i as f32 * 90.0;
+                                for (i, m) in ["Sandbox", "VS AI", "AI vs AI", "Run Tests", "Local MP"]
+                                    .iter()
+                                    .enumerate()
+                                {
+                                    let y = 48.0 + i as f32 * 48.0;
                                     let bg = if i == cur { COL_SEL } else { COL_DIM };
                                     unsafe {
-                                        _3ds_top_queue_rect(40.0, y, 320.0, 65.0, bg);
+                                        _3ds_top_queue_rect(40.0, y, 320.0, 42.0, bg);
                                     }
                                     if i == cur {
                                         unsafe {
@@ -407,7 +533,7 @@ fn main() {
                                                 40.0,
                                                 y,
                                                 320.0,
-                                                65.0,
+                                                42.0,
                                                 COL_HIGHLIGHT,
                                             );
                                         }
@@ -416,9 +542,9 @@ fn main() {
                                     unsafe {
                                         _3ds_top_queue_text(
                                             50.0,
-                                            y + 15.0,
+                                            y + 8.0,
                                             color,
-                                            0.75f32,
+                                            0.70f32,
                                             format!("{}\0", m).as_ptr(),
                                         );
                                     }
@@ -426,9 +552,9 @@ fn main() {
                                 unsafe {
                                     _3ds_top_queue_text(
                                         50.0,
-                                        225.0,
+                                        230.0,
                                         COL_MED,
-                                        0.65f32,
+                                        0.60f32,
                                         "UP/DOWN=select  A=confirm\0".as_ptr(),
                                     );
                                 }
@@ -441,7 +567,7 @@ fn main() {
                                 SetupPhase::PickMode(cur - 1),
                                 true,
                             )
-                        } else if keys & 0x00000080 != 0 && cur + 1 < 2 {
+                        } else if keys & 0x00000080 != 0 && cur + 1 < 5 {
                             Step::Setup(
                                 cards.clone(),
                                 decks.clone(),
@@ -449,13 +575,24 @@ fn main() {
                                 true,
                             )
                         } else if keys & 0x00000001 != 0 {
-                            if n == 0 {
+                            if cur == 3 {
+                                // "Run Tests" — skip deck selection
+                                Step::Setup(cards.clone(), decks.clone(), SetupPhase::Testing, true)
+                            } else if cur == 4 {
+                                // "Local Multiplayer" — pick deck then connect
+                                Step::Setup(
+                                    cards.clone(),
+                                    decks.clone(),
+                                    SetupPhase::MultiplayerDeck(0),
+                                    true,
+                                )
+                            } else if n == 0 {
                                 Step::Done(Err("No decks!".into()))
                             } else {
                                 Step::Setup(
                                     cards.clone(),
                                     decks.clone(),
-                                    SetupPhase::PickDeck(0, cur == 1),
+                                    SetupPhase::PickDeck(0, cur == 1 || cur == 2, false),
                                     true,
                                 )
                             }
@@ -468,7 +605,7 @@ fn main() {
                             )
                         }
                     },
-                    SetupPhase::PickDeck(cur, vs_ai) => {
+                    SetupPhase::PickDeck(cur, vs_ai, is_multiplayer) => {
                         if was_dirty {
                             let label = if !vs_ai { "P1 DECK" } else { "YOUR DECK" };
                             if unsafe { _3ds_is_cli_mode() } {
@@ -550,18 +687,26 @@ fn main() {
                             Step::Setup(
                                 cards.clone(),
                                 decks.clone(),
-                                SetupPhase::PickDeck(cur - 1, vs_ai),
+                                SetupPhase::PickDeck(cur - 1, vs_ai, is_multiplayer),
                                 true,
                             )
                         } else if keys & 0x00000080 != 0 && cur + 1 < n {
                             Step::Setup(
                                 cards.clone(),
                                 decks.clone(),
-                                SetupPhase::PickDeck(cur + 1, vs_ai),
+                                SetupPhase::PickDeck(cur + 1, vs_ai, is_multiplayer),
                                 true,
                             )
                         } else if keys & 0x00000001 != 0 {
-                            if vs_ai {
+                            if is_multiplayer {
+                                // Local Multiplayer: go to role selection
+                                Step::Setup(
+                                    cards.clone(),
+                                    decks.clone(),
+                                    SetupPhase::MultiplayerPickRole(cur, 0),
+                                    true,
+                                )
+                            } else if vs_ai {
                                 Step::Setup(
                                     cards.clone(),
                                     decks.clone(),
@@ -580,7 +725,113 @@ fn main() {
                             Step::Setup(
                                 cards.clone(),
                                 decks.clone(),
-                                SetupPhase::PickDeck(cur, vs_ai),
+                                SetupPhase::PickDeck(cur, vs_ai, is_multiplayer),
+                                false,
+                            )
+                        }
+                    }
+                    SetupPhase::MultiplayerDeck(cur) => {
+                        if was_dirty {
+                            if unsafe { _3ds_is_cli_mode() } {
+                                unsafe {
+                                    _3ds_clear_top();
+                                }
+                                unsafe {
+                                    _3ds_text_add_top("SELECT YOUR DECK\n\0".as_ptr());
+                                }
+                                for i in cur.saturating_sub(6).min(n.saturating_sub(12))
+                                    ..(0usize.min(n) + 12).min(n)
+                                {
+                                    let arrow = if i == cur { ">" } else { " " };
+                                    unsafe {
+                                        _3ds_text_add_top(
+                                            format!("{} {}\n\0", arrow, decks[i].name).as_ptr(),
+                                        );
+                                    }
+                                }
+                                unsafe {
+                                    _3ds_text_add_top("\nA=select\0".as_ptr());
+                                }
+                            } else {
+                                unsafe {
+                                    _3ds_top_clear();
+                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                    _3ds_top_queue_text(
+                                        80.0,
+                                        8.0,
+                                        COL_GOLD,
+                                        0.85f32,
+                                        "SELECT YOUR DECK\0".as_ptr(),
+                                    );
+                                }
+                                let start = cur.saturating_sub(3).min(n.saturating_sub(6));
+                                let end = (start + 6).min(n);
+                                for i in start..end {
+                                    let y = 30.0 + (i - start) as f32 * 32.0;
+                                    let bg = if i == cur { COL_SEL } else { COL_DIM };
+                                    unsafe {
+                                        _3ds_top_queue_rect(20.0, y, 360.0, 30.0, bg);
+                                    }
+                                    if i == cur {
+                                        unsafe {
+                                            _3ds_top_queue_rect(
+                                                20.0,
+                                                y,
+                                                360.0,
+                                                30.0,
+                                                COL_HIGHLIGHT,
+                                            );
+                                        }
+                                    }
+                                    let color = if i == cur { COL_GOLD } else { COL_LIGHT };
+                                    unsafe {
+                                        _3ds_top_queue_text(
+                                            24.0,
+                                            y + 3.0,
+                                            color,
+                                            0.70f32,
+                                            format!("{}\0", decks[i].name).as_ptr(),
+                                        );
+                                    }
+                                }
+                                unsafe {
+                                    _3ds_top_queue_text(
+                                        20.0,
+                                        228.0,
+                                        COL_MED,
+                                        0.65f32,
+                                        "UP/DOWN=select  A=confirm\0".as_ptr(),
+                                    );
+                                }
+                            }
+                        }
+                        if keys & 0x00000040 != 0 && cur > 0 {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::MultiplayerDeck(cur - 1),
+                                true,
+                            )
+                        } else if keys & 0x00000080 != 0 && cur + 1 < n {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::MultiplayerDeck(cur + 1),
+                                true,
+                            )
+                        } else if keys & 0x00000001 != 0 {
+                            // A = select deck, go to role selection with deck index
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::MultiplayerPickRole(cur, 0), // deck_idx=cur, role_cursor=0
+                                true,
+                            )
+                        } else {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::MultiplayerDeck(cur),
                                 false,
                             )
                         }
@@ -699,7 +950,9 @@ fn main() {
                     }
                     SetupPhase::Loading(p1_idx, p2_idx, vs_ai) => {
                         let r = (|| -> Result<(GameState, CardAtlas), String> {
-                            let mut db = Arc::new(CardDatabase::load_or_create((**cards).clone()));
+                            let mut cards_vec = (**cards).clone();
+                            CardLoader::attach_abilities(&mut cards_vec);
+                            let mut db = Arc::new(CardDatabase::load_or_create(cards_vec));
                             let nums1 = DeckParser::deck_list_to_card_numbers(&decks[p1_idx]);
                             let nums2 = if p1_idx == p2_idx {
                                 nums1.clone()
@@ -753,12 +1006,524 @@ fn main() {
                                     true,
                                     atlas,
                                     vs_ai,
+                                    false, // ai_vs_ai
                                     false, // cli_mode (start in game mode)
                                     false, // detail_mode
                                     0,
                                     0,
                                     0,
                                     None,
+                                    false, // is_multiplayer
+                                    false, // is_host
+                                    false, // waiting_for_opponent
+                                )
+                            }
+                            Err(e) => Step::Done(Err(e)),
+                        }
+                    }
+                    SetupPhase::Testing => {
+                        let results = run_on_device_tests(cards.clone(), decks.clone());
+                        unsafe {
+                            _3ds_clear_both();
+                            _3ds_text_add_top("=== ON-DEVICE TESTS ===\n\0".as_ptr());
+                            for line in &results {
+                                _3ds_text_add_top(format!("{}\n\0", line).as_ptr());
+                            }
+                            _3ds_text_add_top("\nSTART=exit\0".as_ptr());
+                        }
+                        if keys & 0x00000008 != 0 {
+                            Step::Done(Ok(()))
+                        } else {
+                            Step::Setup(cards.clone(), decks.clone(), SetupPhase::Testing, false)
+                        }
+                    }
+                    // Multiplayer: Host or Client?
+                    SetupPhase::MultiplayerPickRole(deck_idx, cur) => {
+                        if was_dirty {
+                            if unsafe { _3ds_is_cli_mode() } {
+                                unsafe {
+                                    _3ds_clear_top();
+                                    _3ds_text_add_top("MULTIPLAYER\n\0".as_ptr());
+                                    _3ds_text_add_top("Host = create network\n\0".as_ptr());
+                                    _3ds_text_add_top("Client = join network\n\n\0".as_ptr());
+                                    let arrow_h = if cur == 0 { ">" } else { " " };
+                                    let arrow_c = if cur == 1 { ">" } else { " " };
+                                    _3ds_text_add_top(
+                                        format!("{} Host\n\0", arrow_h).as_ptr(),
+                                    );
+                                    _3ds_text_add_top(
+                                        format!("{} Client\n\0", arrow_c).as_ptr(),
+                                    );
+                                    _3ds_text_add_top("\nUP/DOWN=select A=confirm\0".as_ptr());
+                                }
+                            } else {
+                                unsafe {
+                                    _3ds_top_clear();
+                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                    _3ds_top_queue_text(
+                                        100.0,
+                                        8.0,
+                                        COL_GOLD,
+                                        0.85f32,
+                                        "MULTIPLAYER\0".as_ptr(),
+                                    );
+                                }
+                                let labels = ["HOST (create network)", "CLIENT (join network)"];
+                                for (i, m) in labels.iter().enumerate() {
+                                    let y = 60.0 + i as f32 * 64.0;
+                                    let bg = if i == cur { COL_SEL } else { COL_DIM };
+                                    unsafe {
+                                        _3ds_top_queue_rect(40.0, y, 320.0, 50.0, bg);
+                                    }
+                                    if i == cur {
+                                        unsafe {
+                                            _3ds_top_queue_rect(
+                                                40.0,
+                                                y,
+                                                320.0,
+                                                50.0,
+                                                COL_HIGHLIGHT,
+                                            );
+                                        }
+                                    }
+                                    let color = if i == cur { COL_GOLD } else { COL_LIGHT };
+                                    unsafe {
+                                        _3ds_top_queue_text(
+                                            50.0,
+                                            y + 12.0,
+                                            color,
+                                            0.70f32,
+                                            format!("{}\0", m).as_ptr(),
+                                        );
+                                    }
+                                }
+                                unsafe {
+                                    _3ds_top_queue_text(
+                                        50.0,
+                                        230.0,
+                                        COL_MED,
+                                        0.60f32,
+                                        "UP/DOWN=select  A=confirm  B=back\0".as_ptr(),
+                                    );
+                                }
+                            }
+                        }
+                        if keys & 0x00000040 != 0 && cur > 0 {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::MultiplayerPickRole(deck_idx, cur - 1),
+                                true,
+                            )
+                        } else if keys & 0x00000080 != 0 && cur + 1 < 2 {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::MultiplayerPickRole(deck_idx, cur + 1),
+                                true,
+                            )
+                        } else if keys & 0x00000002 != 0 {
+                            // B = back to PickMode
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::PickMode(4),
+                                true,
+                            )
+                        } else if keys & 0x00000001 != 0 {
+                            // A = select role
+                            // deck_idx is the deck index from MultiplayerDeck
+                            // cur is the role cursor (0=Host, 1=Client)
+                            if cur == 0 {
+                                // Host
+                                Step::Setup(
+                                    cards.clone(),
+                                    decks.clone(),
+                                    SetupPhase::MultiplayerHostWait(deck_idx),
+                                    true,
+                                )
+                            } else {
+                                // Client
+                                Step::Setup(
+                                    cards.clone(),
+                                    decks.clone(),
+                                    SetupPhase::MultiplayerClientScan(deck_idx),
+                                    true,
+                                )
+                            }
+                        } else {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::MultiplayerPickRole(deck_idx, cur),
+                                false,
+                            )
+                        }
+                    }
+                    // Multiplayer: Host waiting for client
+                    SetupPhase::MultiplayerHostWait(p1_idx) => {
+                        // Initialize UDS as host on first entry
+                        if was_dirty {
+                            let init_result = uds::uds_init(true);
+                            match init_result {
+                                Ok(()) => {
+                                    if unsafe { _3ds_is_cli_mode() } {
+                                        unsafe {
+                                            _3ds_clear_top();
+                                            _3ds_text_add_top("HOST: Network created!\n\0".as_ptr());
+                                            _3ds_text_add_top("Waiting for client...\n\0".as_ptr());
+                                            _3ds_text_add_top("B = cancel\n\0".as_ptr());
+                                        }
+                                    } else {
+                                        unsafe {
+                                            _3ds_top_clear();
+                                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                            _3ds_top_queue_text(
+                                                80.0,
+                                                8.0,
+                                                COL_GOLD,
+                                                0.85f32,
+                                                "HOST: Network created!\0".as_ptr(),
+                                            );
+                                            _3ds_top_queue_text(
+                                                50.0,
+                                                100.0,
+                                                COL_LIGHT,
+                                                0.70f32,
+                                                "Waiting for client to connect\n\0".as_ptr(),
+                                            );
+                                            _3ds_top_queue_text(
+                                                50.0,
+                                                230.0,
+                                                COL_MED,
+                                                0.60f32,
+                                                "B=cancel\0".as_ptr(),
+                                            );
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    if unsafe { _3ds_is_cli_mode() } {
+                                        unsafe {
+                                            _3ds_clear_top();
+                                            _3ds_text_add_top(
+                                                format!("UDS INIT FAILED: {}\n\0", e).as_ptr(),
+                                            );
+                                            _3ds_text_add_top("B = back\n\0".as_ptr());
+                                        }
+                                    } else {
+                                        unsafe {
+                                            _3ds_top_clear();
+                                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                            _3ds_top_queue_text(
+                                                80.0,
+                                                8.0,
+                                                0xFF0000FF,
+                                                0.85f32,
+                                                format!("UDS INIT FAILED: {}\0", e).as_ptr(),
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // Poll for client connection
+                        let connected = uds::uds_is_connected();
+                        if connected && was_dirty {
+                            // Client connected! Move to deck sync
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::MultiplayerSyncDeck(p1_idx, 0, true),
+                                true,
+                            )
+                        } else if keys & 0x00000002 != 0 {
+                            // B = cancel
+                            uds::uds_exit();
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::MultiplayerPickRole(p1_idx, 0),
+                                true,
+                            )
+                        } else {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::MultiplayerHostWait(p1_idx),
+                                false,
+                            )
+                        }
+                    }
+                    // Multiplayer: Client scanning for host
+                    SetupPhase::MultiplayerClientScan(p1_idx) => {
+                        // Initialize UDS as client on first entry
+                        if was_dirty {
+                            let init_result = uds::uds_init(false);
+                            match init_result {
+                                Ok(()) => {
+                                    if unsafe { _3ds_is_cli_mode() } {
+                                        unsafe {
+                                            _3ds_clear_top();
+                                            _3ds_text_add_top("CLIENT: Scanning...\n\0".as_ptr());
+                                            _3ds_text_add_top("Looking for host network\n\0".as_ptr());
+                                            _3ds_text_add_top("B = cancel\n\0".as_ptr());
+                                        }
+                                    } else {
+                                        unsafe {
+                                            _3ds_top_clear();
+                                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                            _3ds_top_queue_text(
+                                                80.0,
+                                                8.0,
+                                                COL_GOLD,
+                                                0.85f32,
+                                                "CLIENT: Scanning...\0".as_ptr(),
+                                            );
+                                            _3ds_top_queue_text(
+                                                50.0,
+                                                100.0,
+                                                COL_LIGHT,
+                                                0.70f32,
+                                                "Looking for host network\n\0".as_ptr(),
+                                            );
+                                            _3ds_top_queue_text(
+                                                50.0,
+                                                230.0,
+                                                COL_MED,
+                                                0.60f32,
+                                                "B=cancel\0".as_ptr(),
+                                            );
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    if unsafe { _3ds_is_cli_mode() } {
+                                        unsafe {
+                                            _3ds_clear_top();
+                                            _3ds_text_add_top(
+                                                format!("UDS INIT FAILED: {}\n\0", e).as_ptr(),
+                                            );
+                                            _3ds_text_add_top("B = back\n\0".as_ptr());
+                                        }
+                                    } else {
+                                        unsafe {
+                                            _3ds_top_clear();
+                                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                            _3ds_top_queue_text(
+                                                80.0,
+                                                8.0,
+                                                0xFF0000FF,
+                                                0.85f32,
+                                                format!("UDS INIT FAILED: {}\0", e).as_ptr(),
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // Poll for host connection
+                        let connected = uds::uds_is_connected();
+                        if connected && was_dirty {
+                            // Host found! Move to deck sync
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::MultiplayerSyncDeck(p1_idx, 0, false),
+                                true,
+                            )
+                        } else if keys & 0x00000002 != 0 {
+                            // B = cancel
+                            uds::uds_exit();
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::MultiplayerPickRole(p1_idx, 0),
+                                true,
+                            )
+                        } else {
+                            Step::Setup(
+                                cards.clone(),
+                                decks.clone(),
+                                SetupPhase::MultiplayerClientScan(p1_idx),
+                                false,
+                            )
+                        }
+                    }
+                    // Multiplayer: Syncing deck data
+                    SetupPhase::MultiplayerSyncDeck(p1_idx, p2_idx, is_host) => {
+                        if is_host {
+                            // Host: Build decks, shuffle, send order to client
+                            let r = (|| -> Result<(), String> {
+                                use rabuka_engine::card::CardDatabase;
+                                let mut cards_vec = (**cards).clone();
+                                CardLoader::attach_abilities(&mut cards_vec);
+                                let mut db = Arc::new(CardDatabase::load_or_create(cards_vec));
+                                let nums1 = DeckParser::deck_list_to_card_numbers(&decks[p1_idx]);
+                                let nums2 = if p1_idx == p2_idx {
+                                    nums1.clone()
+                                } else {
+                                    DeckParser::deck_list_to_card_numbers(&decks[p2_idx])
+                                };
+                                let mut pd1 = DeckBuilder::build_deck_from_database(&mut db, nums1)
+                                    .map_err(|e| format!("Deck: {}", e))?;
+                                let mut pd2 = DeckBuilder::build_deck_from_database(&mut db, nums2)
+                                    .map_err(|e| format!("Deck: {}", e))?;
+                                // Use a random seed for deterministic shuffle
+                                let seed = unsafe { _3ds_system_tick() } as u64;
+                                pd1.shuffle_main_deck();
+                                pd1.shuffle_energy_deck();
+                                pd2.shuffle_main_deck();
+                                pd2.shuffle_energy_deck();
+                                // Build deck sync message
+                                let sync = uds::DeckSync {
+                                    seed,
+                                    p1_main: pd1.main_deck.clone(),
+                                    p1_energy: pd1.energy_deck.clone(),
+                                    p2_main: pd2.main_deck.clone(),
+                                    p2_energy: pd2.energy_deck.clone(),
+                                };
+                                let data = sync.to_bytes();
+                                uds::uds_send(&data).map_err(|e| format!("Send: {}", e))?;
+                                Ok(())
+                            })();
+                            match r {
+                                Ok(()) => Step::Setup(
+                                    cards.clone(),
+                                    decks.clone(),
+                                    SetupPhase::MultiplayerLoading(p1_idx, p2_idx, true),
+                                    true,
+                                ),
+                                Err(e) => {
+                                    uds::uds_exit();
+                                    Step::Done(Err(format!("Deck sync failed: {}", e)))
+                                }
+                            }
+                        } else {
+                            // Client: Receive deck order from host
+                            if was_dirty {
+                                if unsafe { _3ds_is_cli_mode() } {
+                                    unsafe {
+                                        _3ds_clear_top();
+                                        _3ds_text_add_top("Receiving deck data...\n\0".as_ptr());
+                                    }
+                                } else {
+                                    unsafe {
+                                        _3ds_top_clear();
+                                        _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                        _3ds_top_queue_text(
+                                            80.0,
+                                            8.0,
+                                            COL_GOLD,
+                                            0.85f32,
+                                            "Receiving deck data...\0".as_ptr(),
+                                        );
+                                    }
+                                }
+                            }
+                            // Try to receive deck sync
+                            let mut recv_buf = [0u8; 4096];
+                            match uds::uds_recv(&mut recv_buf) {
+                                Ok(n) if n > 0 => {
+                                    if let Some(sync) = uds::DeckSync::from_bytes(&recv_buf[..n]) {
+                                        // Store deck data for loading phase
+                                        // For now, proceed to loading (deck data will be used there)
+                                        Step::Setup(
+                                            cards.clone(),
+                                            decks.clone(),
+                                            SetupPhase::MultiplayerLoading(p1_idx, p2_idx, false),
+                                            true,
+                                        )
+                                    } else {
+                                        Step::Setup(
+                                            cards.clone(),
+                                            decks.clone(),
+                                            SetupPhase::MultiplayerSyncDeck(p1_idx, p2_idx, false),
+                                            false,
+                                        )
+                                    }
+                                }
+                                _ => {
+                                    // No data yet, keep waiting
+                                    Step::Setup(
+                                        cards.clone(),
+                                        decks.clone(),
+                                        SetupPhase::MultiplayerSyncDeck(p1_idx, p2_idx, false),
+                                        false,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    // Multiplayer: Loading game with multiplayer flag
+                    SetupPhase::MultiplayerLoading(p1_idx, p2_idx, is_host) => {
+                        let r = (|| -> Result<(GameState, CardAtlas), String> {
+                            let mut cards_vec = (**cards).clone();
+                            CardLoader::attach_abilities(&mut cards_vec);
+                            let mut db = Arc::new(CardDatabase::load_or_create(cards_vec));
+                            let nums1 = DeckParser::deck_list_to_card_numbers(&decks[p1_idx]);
+                            let nums2 = if p1_idx == p2_idx {
+                                nums1.clone()
+                            } else {
+                                DeckParser::deck_list_to_card_numbers(&decks[p2_idx])
+                            };
+                            let mut pd1 = DeckBuilder::build_deck_from_database(&mut db, nums1)
+                                .map_err(|e| format!("Deck: {}", e))?;
+                            let mut pd2 = DeckBuilder::build_deck_from_database(&mut db, nums2)
+                                .map_err(|e| format!("Deck: {}", e))?;
+                            pd1.shuffle_main_deck();
+                            pd1.shuffle_energy_deck();
+                            pd2.shuffle_main_deck();
+                            pd2.shuffle_energy_deck();
+                            let mut deck_nos: HashSet<String> = HashSet::new();
+                            for cid in pd1
+                                .main_deck
+                                .iter()
+                                .chain(pd1.energy_deck.iter())
+                                .chain(pd2.main_deck.iter())
+                                .chain(pd2.energy_deck.iter())
+                            {
+                                if let Some(card) = db.get_card(*cid) {
+                                    deck_nos.insert(card.card_no.to_string());
+                                }
+                            }
+                            DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db)
+                                .ok();
+                            DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db)
+                                .ok();
+                            let mut p1 = Player::new("p1".into(), "P1".into(), true);
+                            p1.set_main_deck(pd1.main_deck);
+                            p1.set_energy_deck(pd1.energy_deck);
+                            let mut p2 = Player::new("p2".into(), "P2".into(), false);
+                            p2.set_main_deck(pd2.main_deck);
+                            p2.set_energy_deck(pd2.energy_deck);
+                            let mut gs = GameState::new(p1, p2, db);
+                            game_setup::setup_game(&mut gs);
+                            Ok((gs, CardAtlas::load()))
+                        })();
+                        match r {
+                            Ok((gs, atlas)) => {
+                                unsafe {
+                                    _3ds_board_enable(true);
+                                }
+                                Step::Play(
+                                    gs,
+                                    0,
+                                    Vec::new(),
+                                    true,
+                                    true,
+                                    atlas,
+                                    false, // vs_ai (this is multiplayer)
+                                    false, // ai_vs_ai
+                                    false, // cli_mode (start in game mode)
+                                    false, // detail_mode
+                                    0,
+                                    0,
+                                    0,
+                                    None,
+                                    true,  // is_multiplayer
+                                    is_host, // is_host
+                                    !is_host, // waiting_for_opponent: client waits, host acts first
                                 )
                             }
                             Err(e) => Step::Done(Err(e)),
@@ -775,12 +1540,16 @@ fn main() {
                 mut redraw,
                 ref atlas,
                 ref vs_ai,
+                ref ai_vs_ai,
                 mut cli_mode,
                 mut detail_mode,
                 mut hand_offset,
                 mut hand_offset_p2,
                 mut touch_tap_count,
                 mut viewing_card,
+                is_multiplayer,
+                is_host,
+                mut waiting_for_opponent,
             ) => {
                 // Build display order from current acts_cache for navigation.
                 // This will be rebuilt after acts_cache regeneration if dirty/redraw.
@@ -914,6 +1683,62 @@ fn main() {
                     redraw = true;
                 }
 
+                // Multiplayer: If waiting for opponent, ignore local input and try to receive
+                if is_multiplayer && waiting_for_opponent {
+                    // Try to receive action from opponent
+                    let mut recv_buf = [0u8; 256];
+                    if let Ok(n) = uds::uds_recv(&mut recv_buf) {
+                        if n > 0 {
+                            if let Some(sync) = uds::ActionSync::from_bytes(&recv_buf[..n]) {
+                                // Reconstruct action from sync
+                                let action_type = match sync.action_tag {
+                                    0 => game_setup::ActionType::RockChoice,
+                                    1 => game_setup::ActionType::PaperChoice,
+                                    2 => game_setup::ActionType::ScissorsChoice,
+                                    3 => game_setup::ActionType::ChooseFirstAttacker,
+                                    4 => game_setup::ActionType::MulliganYes,
+                                    5 => game_setup::ActionType::MulliganNo,
+                                    6 => game_setup::ActionType::PlayCard,
+                                    7 => game_setup::ActionType::SetCard,
+                                    8 => game_setup::ActionType::EndMainPhase,
+                                    9 => game_setup::ActionType::DeclareAttack,
+                                    10 => game_setup::ActionType::DeclareBlock,
+                                    11 => game_setup::ActionType::DeclareNoBlock,
+                                    12 => game_setup::ActionType::ConfirmDamage,
+                                    13 => game_setup::ActionType::BatonTouch,
+                                    14 => game_setup::ActionType::NoBatonTouch,
+                                    15 => game_setup::ActionType::AbilityChoice,
+                                    _ => game_setup::ActionType::EndMainPhase,
+                                };
+                                let _ = turn::TurnEngine::execute_main_phase_action(
+                                    &mut gs,
+                                    &action_type,
+                                    sync.card_id,
+                                    if sync.card_indices.is_empty() {
+                                        None
+                                    } else {
+                                        Some(sync.card_indices.clone())
+                                    },
+                                    match sync.stage_area {
+                                        1 => Some(rabuka_engine::core::game_state::types::StageArea::Left),
+                                        2 => Some(rabuka_engine::core::game_state::types::StageArea::Center),
+                                        3 => Some(rabuka_engine::core::game_state::types::StageArea::Right),
+                                        _ => None,
+                                    },
+                                    if sync.use_baton_touch { Some(true) } else { None },
+                                );
+                                gs.reset_loop_detection();
+                                waiting_for_opponent = false;
+                                cur = 0;
+                                dirty = true;
+                                redraw = true;
+                            }
+                        }
+                    }
+                    // If no data received, just continue (non-blocking)
+                    // Don't process local input while waiting
+                } else
+
                 // A button executes selected action.
                 // cur is always the correct flat action index (mapped from display_pos).
                 if keys & 0x00000001 != 0 && cur < acts_cache.len() {
@@ -934,7 +1759,67 @@ fn main() {
                         }
                     }
                     gs.reset_loop_detection();
-                    gs.reset_loop_detection();
+                    // In VS AI mode, after human picks RPS for P1, AI auto-picks for P2
+                    if *vs_ai
+                        && !*ai_vs_ai
+                        && gs.current_phase == Phase::RockPaperScissors
+                        && gs.player1_rps_choice.is_some()
+                        && gs.player2_rps_choice.is_none()
+                    {
+                        let ai_choice = (unsafe { _3ds_system_tick() } as usize) % 3;
+                        let ai_action = match ai_choice {
+                            0 => game_setup::ActionType::RockChoice,
+                            1 => game_setup::ActionType::PaperChoice,
+                            _ => game_setup::ActionType::ScissorsChoice,
+                        };
+                        let _ = turn::TurnEngine::execute_main_phase_action(
+                            &mut gs, &ai_action, None, None, None, None,
+                        );
+                        gs.reset_loop_detection();
+                        // If both choices are None again, it was a draw
+                        if gs.player1_rps_choice.is_none() && gs.player2_rps_choice.is_none() {
+                            dprintln!("DRAW! Same choice — pick again.\n");
+                        }
+                    }
+                    // Multiplayer: Send action to opponent
+                    if is_multiplayer {
+                        let action_tag = match action.action_type {
+                            game_setup::ActionType::RockChoice => 0u16,
+                            game_setup::ActionType::PaperChoice => 1,
+                            game_setup::ActionType::ScissorsChoice => 2,
+                            game_setup::ActionType::ChooseFirstAttacker => 3,
+                            game_setup::ActionType::MulliganYes => 4,
+                            game_setup::ActionType::MulliganNo => 5,
+                            game_setup::ActionType::PlayCard => 6,
+                            game_setup::ActionType::SetCard => 7,
+                            game_setup::ActionType::EndMainPhase => 8,
+                            game_setup::ActionType::DeclareAttack => 9,
+                            game_setup::ActionType::DeclareBlock => 10,
+                            game_setup::ActionType::DeclareNoBlock => 11,
+                            game_setup::ActionType::ConfirmDamage => 12,
+                            game_setup::ActionType::BatonTouch => 13,
+                            game_setup::ActionType::NoBatonTouch => 14,
+                            game_setup::ActionType::AbilityChoice => 15,
+                            _ => 8, // Default to EndMainPhase
+                        };
+                        let stage_area = match p.as_ref().and_then(|x| x.stage_area.as_ref()).map(|s| s.as_str()) {
+                            Some("Left") => 1u8,
+                            Some("Center") => 2,
+                            Some("Right") => 3,
+                            _ => 0,
+                        };
+                        let sync = uds::ActionSync {
+                            action_tag,
+                            card_id: p.as_ref().and_then(|x| x.card_id),
+                            card_indices: p.as_ref().and_then(|x| x.card_indices.clone()).unwrap_or_default(),
+                            stage_area,
+                            use_baton_touch: p.as_ref().and_then(|x| x.use_baton_touch).unwrap_or(false),
+                            ability_index: None,
+                        };
+                        let data = sync.to_bytes();
+                        let _ = uds::uds_send(&data);
+                        waiting_for_opponent = true;
+                    }
                     cur = 0;
                     dirty = true;
                     redraw = true;
@@ -946,8 +1831,11 @@ fn main() {
                 }
 
                 // AI: auto-pick when it's the AI's turn (before human input, covers all phases)
-                let is_ai_turn = *vs_ai && gs.active_player().id != gs.player1.id;
-                if is_ai_turn {
+                // Skip when dirty=true: acts_cache is stale from a just-executed human action.
+                // In multiplayer: opponent's turn is handled via UDS receive, not AI
+                let is_ai_turn = *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
+                let is_opponent_turn = is_multiplayer && gs.active_player().id != gs.player1.id;
+                if is_ai_turn && !dirty {
                     if acts_cache.len() > 0 {
                         let ai_idx = (unsafe { _3ds_system_tick() } as usize) % acts_cache.len();
                         let action = acts_cache[ai_idx].clone();
@@ -1290,17 +2178,45 @@ fn main() {
                         _3ds_board_set_utility,
                         hand_offset
                     );
-                    fill_player_board!(
-                        p2,
-                        _3ds_board_set_opp_stage,
-                        _3ds_board_set_opp_live,
-                        _3ds_board_set_opp_energy,
-                        _3ds_board_set_opp_energy_count,
-                        _3ds_board_set_opp_hand,
-                        _3ds_board_set_opp_hand_count,
-                        _3ds_board_set_opp_utility,
-                        hand_offset_p2
-                    );
+                    if is_multiplayer {
+                        // Hide opponent's hand in multiplayer
+                        unsafe {
+                            _3ds_board_set_opp_hand_count(0);
+                            for i in 0..visible_hand_slots() as i32 {
+                                _3ds_board_set_opp_hand(
+                                    i, false, std::ptr::null(), 0, false, false,
+                                );
+                            }
+                        }
+                        // Show opponent stage/live/energy normally
+                        fill_player_board!(
+                            p2,
+                            _3ds_board_set_opp_stage,
+                            _3ds_board_set_opp_live,
+                            _3ds_board_set_opp_energy,
+                            _3ds_board_set_opp_energy_count,
+                            _3ds_board_set_opp_hand,
+                            _3ds_board_set_opp_hand_count,
+                            _3ds_board_set_opp_utility,
+                            hand_offset_p2
+                        );
+                        // Re-clear opp hand after fill
+                        unsafe {
+                            _3ds_board_set_opp_hand_count(0);
+                        }
+                    } else {
+                        fill_player_board!(
+                            p2,
+                            _3ds_board_set_opp_stage,
+                            _3ds_board_set_opp_live,
+                            _3ds_board_set_opp_energy,
+                            _3ds_board_set_opp_energy_count,
+                            _3ds_board_set_opp_hand,
+                            _3ds_board_set_opp_hand_count,
+                            _3ds_board_set_opp_utility,
+                            hand_offset_p2
+                        );
+                    }
 
                     // Set HUD + active player (always, so toggle works smoothly)
                     {
@@ -1313,6 +2229,32 @@ fn main() {
                                 ap_label.as_ptr(),
                             );
                             _3ds_board_set_active_player(ap.id == p1.id);
+                        }
+                        // Show multiplayer status on top screen
+                        if is_multiplayer {
+                            let mp_status = if waiting_for_opponent {
+                                "Waiting for opponent...\0"
+                            } else {
+                                "Your turn!\0"
+                            };
+                            let role_str = if is_host { "HOST\0" } else { "CLIENT\0" };
+                            if cli_mode {
+                                unsafe {
+                                    _3ds_text_add_top(
+                                        format!("[MP {}] {}\n\0", if is_host { "HOST" } else { "CLIENT" }, mp_status).as_ptr(),
+                                    );
+                                }
+                            } else {
+                                unsafe {
+                                    _3ds_top_queue_text(
+                                        10.0,
+                                        8.0,
+                                        0x00FF00FF, // green
+                                        0.60f32,
+                                        format!("MP {} | {}\0", role_str.trim_end_matches('\0'), mp_status.trim_end_matches('\0')).as_ptr(),
+                                    );
+                                }
+                            }
                         }
                     }
 
@@ -1414,10 +2356,16 @@ fn main() {
                                     }
                                 }
                             }
-                            let is_ai_turn = *vs_ai && gs.active_player().id != gs.player1.id;
+                            let is_ai_turn =
+                                *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
+                            let is_opponent_turn_mp = is_multiplayer && gs.active_player().id != gs.player1.id;
                             if is_ai_turn {
                                 unsafe {
                                     _3ds_text_add_top("AI is thinking...\n\0".as_ptr());
+                                }
+                            } else if is_opponent_turn_mp {
+                                unsafe {
+                                    _3ds_text_add_top("Waiting for opponent...\n\0".as_ptr());
                                 }
                             } else {
                                 // Render grouped list using display_order
@@ -1460,7 +2408,7 @@ fn main() {
                                             let cost = act
                                                 .parameters
                                                 .as_ref()
-                                                .and_then(|p| p.final_cost)
+                                                .and_then(|p| p.base_cost)
                                                 .unwrap_or(0);
                                             let area = act
                                                 .parameters
@@ -1485,8 +2433,41 @@ fn main() {
                                                 .as_ref()
                                                 .and_then(|p| p.card_name.clone())
                                                 .unwrap_or_default();
-                                            let desc = act.description.lines().next().unwrap_or("");
-                                            format!("ABIL {} {}", name, desc)
+                                            let cost = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.base_cost)
+                                                .unwrap_or(0);
+                                            let area = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.stage_area.clone())
+                                                .unwrap_or_default();
+                                            let abil = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.source_ability.clone())
+                                                .unwrap_or_default();
+                                            let abil_short: String =
+                                                abil.chars().take(36).collect();
+                                            if cost > 0 {
+                                                format!(
+                                                    "[{}] {} {} c:{} {}",
+                                                    cn_or_empty(act),
+                                                    name,
+                                                    area,
+                                                    cost,
+                                                    abil_short
+                                                )
+                                            } else {
+                                                format!(
+                                                    "[{}] {} {} {}",
+                                                    cn_or_empty(act),
+                                                    name,
+                                                    area,
+                                                    abil_short
+                                                )
+                                            }
                                         }
                                         _ => {
                                             act.description.lines().next().unwrap_or("").to_string()
@@ -1716,8 +2697,10 @@ fn main() {
                             }
                         } else {
                             // Action list on top screen (was previously on bottom overlay).
-                            let is_ai_turn = *vs_ai && gs.active_player().id != gs.player1.id;
-                            if !is_ai_turn && !display_order.is_empty() {
+                            let is_ai_turn =
+                                *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
+                            let is_opponent_turn_mp = is_multiplayer && gs.active_player().id != gs.player1.id;
+                            if !is_ai_turn && !is_opponent_turn_mp && !display_order.is_empty() {
                                 let mut ty = 44.0f32;
                                 let max_vis = 10usize;
                                 let half = max_vis / 2;
@@ -1767,7 +2750,7 @@ fn main() {
                                             let cost = act
                                                 .parameters
                                                 .as_ref()
-                                                .and_then(|p| p.final_cost)
+                                                .and_then(|p| p.base_cost)
                                                 .unwrap_or(0);
                                             let area = act
                                                 .parameters
@@ -1792,8 +2775,41 @@ fn main() {
                                                 .as_ref()
                                                 .and_then(|p| p.card_name.clone())
                                                 .unwrap_or_default();
-                                            let desc = act.description.lines().next().unwrap_or("");
-                                            format!("ABIL {} {}", name, desc)
+                                            let cost = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.base_cost)
+                                                .unwrap_or(0);
+                                            let area = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.stage_area.clone())
+                                                .unwrap_or_default();
+                                            let abil = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.source_ability.clone())
+                                                .unwrap_or_default();
+                                            let abil_short: String =
+                                                abil.chars().take(28).collect();
+                                            if cost > 0 {
+                                                format!(
+                                                    "[{}] {} {} c:{} {}",
+                                                    cn_or_empty(act),
+                                                    name,
+                                                    area,
+                                                    cost,
+                                                    abil_short
+                                                )
+                                            } else {
+                                                format!(
+                                                    "[{}] {} {} {}",
+                                                    cn_or_empty(act),
+                                                    name,
+                                                    area,
+                                                    abil_short
+                                                )
+                                            }
                                         }
                                         _ => {
                                             act.description.lines().next().unwrap_or("").to_string()
@@ -1844,12 +2860,16 @@ fn main() {
                     redraw,
                     atlas.clone(),
                     *vs_ai,
+                    *ai_vs_ai,
                     cli_mode,
                     detail_mode,
                     hand_offset,
                     hand_offset_p2,
                     touch_tap_count,
                     viewing_card,
+                    is_multiplayer,
+                    is_host,
+                    waiting_for_opponent,
                 )
             }
             Step::Done(ref r) => {
@@ -1930,7 +2950,7 @@ fn step_name(s: &Step) -> &'static str {
         Step::ReadCardsBin => "ReadCards",
         Step::ParseCards(_) => "ParseCards",
         Step::Setup(_, _, _, _) => "Setup",
-        Step::Play(_, _, _, _, _, _, _, _, _, _, _, _, _) => "Play",
+        Step::Play(_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => "Play",
         Step::Done(_) => "Done",
     }
 }

@@ -4,9 +4,9 @@ setlocal enabledelayedexpansion
 echo === Rabuka PSP Build Script ===
 echo.
 
-echo [1/3] Baking card data...
+echo [1/3] Baking card data (PSP)...
 cd /d "%~dp0tools\bake"
-cargo run --release
+cargo run --release -- psp
 cd /d "%~dp0"
 if %ERRORLEVEL% neq 0 (
     echo [FAIL] Bake failed.
