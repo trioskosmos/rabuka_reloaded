@@ -112,9 +112,6 @@ void nds_init(void) {
     
     consoleDemoInit();
     iprintf("\x1b[2J");
-    iprintf("Rabuka DS\n");
-    iprintf("==========\n");
-    iprintf("Boot OK!\n");
     REG_TM0CNT = 0;
     REG_TM0DATA = 0;
     REG_TM0CNT = TIMER_ENABLE | TIMER_PRESCALER_64;
@@ -143,6 +140,35 @@ void nds_set_cursor(int row, int col) {
     iprintf("\x1b[%d;%dH", row + 1, col + 1);
 }
 
+// Access to console tile map for direct rendering
+u16* nds_get_tilemap(void) {
+    return consoleGetDefault()->fontBgMap;
+}
+
+u16* nds_get_tilegfx(void) {
+    return consoleGetDefault()->fontBgGfx;
+}
+
+// Write a row of 32 tile indices directly to the tile map (flicker-free)
+void nds_write_tile_row(int row, const u16* tiles) {
+    u16* map = nds_get_tilemap();
+    if (!map) return;
+    int base = row * 32;
+    for (int i = 0; i < 32; i++) {
+        map[base + i] = tiles[i];
+    }
+}
+
+// Clear one tile map row
+void nds_clear_tile_row(int row) {
+    u16* map = nds_get_tilemap();
+    if (!map) return;
+    int base = row * 32;
+    for (int i = 0; i < 32; i++) {
+        map[base + i] = 0;
+    }
+}
+
 void nds_scan_keys(void) {
     scanKeys();
 }
@@ -152,9 +178,8 @@ int nds_key_held(void) {
 }
 
 void nds_wait_vblank(void) {
-    volatile u16* vcount = (volatile u16*)0x04000006;
-    while (*vcount >= 192) {}
-    while (*vcount < 192) {}
+    volatile int i;
+    for (i = 0; i < 5000; i++) {}
 }
 
 unsigned long long nds_get_tick(void) {

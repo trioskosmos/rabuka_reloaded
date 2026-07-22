@@ -348,6 +348,7 @@ pub extern "C" fn main() {
     let mut input = Input::new();
     init_rng();
 
+    display.clear();
     display.println("Loading...");
     display.swap_buffers();
 
@@ -395,6 +396,9 @@ pub extern "C" fn main() {
             cards.push(card_db.build_card(ci));
         }
     }
+    display.println(&format!("1: {} cards", nums1.len()));
+    display.swap_buffers();
+
     let cc2 = card_db.deck_card_count(deck2_idx) as usize;
     for i in 0..cc2 {
         let ci = card_db.deck_card_index(deck2_idx, i);
@@ -403,6 +407,8 @@ pub extern "C" fn main() {
             cards.push(card_db.build_card(ci));
         }
     }
+    display.println(&format!("2: {} cards", nums2.len()));
+    display.swap_buffers();
 
     let mut card_map: hashbrown::HashMap<String, Card, DsHasher> =
         hashbrown::HashMap::with_hasher(DsHasher(0));
@@ -412,9 +418,13 @@ pub extern "C" fn main() {
             card_map.insert(key, c);
         }
     }
+    display.println(&format!("map: {}", card_map.len()));
+    display.swap_buffers();
 
     let cards: Vec<Card> = card_map.into_values().collect();
     let mut db = Arc::new(CardDatabase::load_or_create(cards));
+    display.println(&format!("db ok"));
+    display.swap_buffers();
 
     let mut pd1 = deck_builder::DeckBuilder::build_deck_from_database(&mut db, nums1)
         .expect("Failed to build P1 deck");
@@ -426,6 +436,8 @@ pub extern "C" fn main() {
     pd1.shuffle_energy_deck();
     pd2.shuffle_main_deck();
     pd2.shuffle_energy_deck();
+    display.println(&format!("decks built"));
+    display.swap_buffers();
 
     let mut p1 = Player::new("p1".into(), "Player 1".into(), true);
     p1.set_main_deck(pd1.main_deck);
@@ -433,11 +445,23 @@ pub extern "C" fn main() {
     let mut p2 = Player::new("p2".into(), "Player 2".into(), false);
     p2.set_main_deck(pd2.main_deck);
     p2.set_energy_deck(pd2.energy_deck);
+    display.println(&format!("players ready"));
+    display.swap_buffers();
 
     let mut gs = GameState::new(p1, p2, db);
     game_setup::setup_game(&mut gs);
+    display.println(&format!("game ready: {:?}", gs.current_phase));
+    display.swap_buffers();
 
     loop {
+        display.println(&format!(
+            "Loop: ph={:?} ch={} rs={:?}",
+            gs.current_phase,
+            gs.has_pending_choice(),
+            gs.game_result
+        ));
+        display.swap_buffers();
+
         TurnEngine::check_victory_condition(&mut gs);
         if gs.game_result != GameResult::Ongoing {
             show_result(&mut display, &mut input, &gs);
@@ -450,13 +474,6 @@ pub extern "C" fn main() {
             break;
         }
 
-        let actions = game_setup::generate_possible_actions(&gs);
-        if actions.is_empty() {
-            TurnEngine::advance_phase(&mut gs);
-            wait_frames(15);
-            continue;
-        }
-
         if gs.has_pending_choice() {
             if !handle_choice(&mut display, &mut input, &mut gs) {
                 break;
@@ -464,7 +481,28 @@ pub extern "C" fn main() {
             continue;
         }
 
+        let actions = game_setup::generate_possible_actions(&gs);
+        display.println(&format!("actions: {}", actions.len()));
+        display.swap_buffers();
+
+        if actions.is_empty() {
+            display.println("empty → advance");
+            display.swap_buffers();
+            TurnEngine::advance_phase(&mut gs);
+            wait_frames(30);
+            continue;
+        }
+
+        // Show first action for debugging
+        if let Some(a) = actions.first() {
+            display.println(&format!("act0: {:?}", a.action_type));
+            display.swap_buffers();
+        }
+
         let is_ai = ai_vs_ai || (vs_ai && gs.active_player().id != gs.player1.id);
+        display.println(&format!("is_ai={} act={}", is_ai, gs.active_player().id));
+        display.swap_buffers();
+
         let ok = if is_ai {
             ai_turn(&mut display, &mut gs, &actions)
         } else {
@@ -473,7 +511,18 @@ pub extern "C" fn main() {
         if !ok {
             break;
         }
-        // Let the player see what happened before auto-advancing
+        // In RPS, after P1 picks, let AI pick for P2 immediately
+        if gs.current_phase == Phase::RockPaperScissors
+            && gs.player1_rps_choice.is_some()
+            && gs.player2_rps_choice.is_none()
+        {
+            display.println("AI picks RPS...");
+            display.swap_buffers();
+            let ai_actions = game_setup::generate_possible_actions(&gs);
+            if !ai_actions.is_empty() {
+                ai_turn(&mut display, &mut gs, &ai_actions);
+            }
+        }
         wait_frames(15);
         settle_auto(&mut gs);
     }
@@ -671,85 +720,42 @@ fn human_turn(
     actions: &[game_setup::Action],
 ) -> bool {
     let mut sel = 0usize;
-    let mut scroll_offset = 0usize;
-    let mut last_sel = usize::MAX;
-    let mut last_scroll = usize::MAX;
-    let mut first = true;
     const VISIBLE_ACTIONS: usize = 10;
-    const HEADER_ROWS: u32 = 5;
-
     loop {
-        if first || sel != last_sel || scroll_offset != last_scroll {
-            let p1 = &gs.player1;
-            let p2 = &gs.player2;
-            let is_p1 = gs.active_player().id == "p1";
-
-            // Draw header rows
-            display.overwrite_row(
-                0,
-                &format!("Turn {} | {:?}", gs.turn_number, gs.current_phase),
-            );
-            display.overwrite_row(
-                1,
-                &format!(
-                    "{}P1 h:{} e:{} dk:{}",
-                    if is_p1 { ">>" } else { "  " },
-                    p1.hand.cards.len(),
-                    p1.energy_zone.active_count(),
-                    p1.main_deck.cards.len()
-                ),
-            );
-            display.overwrite_row(
-                2,
-                &format!(
-                    "{}P2 h:{} e:{} dk:{}",
-                    if !is_p1 { ">>" } else { "  " },
-                    p2.hand.cards.len(),
-                    p2.energy_zone.active_count(),
-                    p2.main_deck.cards.len()
-                ),
-            );
-            display.overwrite_row(3, "");
-            display.overwrite_row(4, "────────────────────────────");
-
-            if sel < scroll_offset {
-                scroll_offset = sel;
-            }
-            if sel >= scroll_offset + VISIBLE_ACTIONS {
-                scroll_offset = sel + 1 - VISIBLE_ACTIONS;
-            }
-
-            let end = (scroll_offset + VISIBLE_ACTIONS).min(actions.len());
-            // Clear any stale action rows from previous frame
-            for r in HEADER_ROWS + 1..HEADER_ROWS + 1 + VISIBLE_ACTIONS as u32 + 1 {
-                display.overwrite_row(r, "");
-            }
-            for i in scroll_offset..end {
-                let row = HEADER_ROWS + 1 + (i - scroll_offset) as u32;
-                let p = if i == sel { ">" } else { " " };
-                let line = actions[i].description.lines().next().unwrap_or("");
-                let card_tag = match &actions[i].parameters {
-                    Some(params) => params
-                        .card_no
-                        .as_ref()
-                        .map(|no| alloc::format!(" [{}]", no))
-                        .unwrap_or_default(),
-                    None => alloc::string::String::new(),
-                };
-                let desc_max = 25usize.saturating_sub(card_tag.len());
-                let truncated = truncate_chars(line, desc_max);
-                display.overwrite_row(row, &format!("{p}[{}] {truncated}{card_tag}", i));
-            }
-            if actions.len() > end {
-                let more_row = HEADER_ROWS + 1 + VISIBLE_ACTIONS as u32;
-                display.overwrite_row(more_row, &format!("  .. {} more", actions.len() - end));
-            }
-            display.swap_buffers();
-            last_sel = sel;
-            last_scroll = scroll_offset;
-            first = false;
+        display.clear();
+        display.println(&alloc::format!(
+            "Turn {} | {:?}",
+            gs.turn_number,
+            gs.current_phase
+        ));
+        let p1 = &gs.player1;
+        let p2 = &gs.player2;
+        let is_p1 = gs.active_player().id == "p1";
+        display.println(&alloc::format!(
+            "{}P1 h:{} e:{} dk:{}",
+            if is_p1 { ">>" } else { "  " },
+            p1.hand.cards.len(),
+            p1.energy_zone.active_count(),
+            p1.main_deck.cards.len()
+        ));
+        display.println(&alloc::format!(
+            "{}P2 h:{} e:{} dk:{}",
+            if !is_p1 { ">>" } else { "  " },
+            p2.hand.cards.len(),
+            p2.energy_zone.active_count(),
+            p2.main_deck.cards.len()
+        ));
+        display.println("--------------------------------");
+        let end = actions.len().min(VISIBLE_ACTIONS);
+        for i in 0..end {
+            let p = if i == sel { ">" } else { " " };
+            let line = actions[i].description.lines().next().unwrap_or("");
+            display.println(&alloc::format!("{p}[{}] {}", i, line));
         }
-
+        if actions.len() > end {
+            display.println(&alloc::format!("  .. {} more", actions.len() - end));
+        }
+        display.swap_buffers();
         wait_frames(2);
         input.poll();
         if input.just_pressed(Button::Down) {
@@ -1024,12 +1030,7 @@ fn settle_auto(gs: &mut GameState) {
         if gs.has_pending_choice() || gs.game_result != GameResult::Ongoing {
             break;
         }
-        if game_setup::is_automatic_phase(gs)
-            || matches!(
-                gs.current_phase,
-                Phase::RockPaperScissors | Phase::ChooseFirstAttacker
-            )
-        {
+        if game_setup::is_automatic_phase(gs) {
             TurnEngine::advance_phase(gs);
         } else {
             break;

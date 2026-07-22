@@ -421,17 +421,8 @@ impl super::TurnEngine {
             game_state.re_yell_occurred = false;
         }
 
-        // Capture current heart modifiers (includes ability-granted hearts from
-        // the 8.3.13 check timing) for use during the live success check.
-        // Only heart_modifiers needs a flat copy (type conversion); others borrow directly.
-        let current_hm: HashMap<i16, HashMap<crate::card::HeartColor, i32>> = game_state
-            .mods
-            .heart_modifiers
-            .iter()
-            .map(|(&k, colors)| (k, colors.iter().map(|(&c, e)| (c, e.total())).collect()))
-            .collect();
-
         // Rule 8.3.14-8.3.16: Heart calculation + live success check.
+        // hm (captured above from player_perform_live) is reused here — same data.
         let perf_data = {
             let current_ho = &game_state.mods.heart_override;
             let current_hcm = &game_state.mods.heart_color_multiplier;
@@ -446,7 +437,7 @@ impl super::TurnEngine {
                 &game_state.card_database,
                 &nhm,
                 current_ho,
-                &current_hm,
+                &hm,
                 current_hcm,
                 &yell_data.live_card_ids,
                 &yell_data.allocations,

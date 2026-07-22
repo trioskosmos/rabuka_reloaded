@@ -204,7 +204,7 @@ enum SetupPhase {
     MultiplayerHostWait(usize), // p1_idx: host waiting for client to connect
     MultiplayerClientScan(usize), // p1_idx: client scanning for host network
     MultiplayerSyncDeck(usize, usize, bool), // p1_idx, p2_idx, is_host
-    MultiplayerLoading(usize, usize, bool), // p1_idx, p2_idx, is_host
+    MultiplayerLoading(usize, usize, bool, Option<Vec<u8>>), // p1_idx, p2_idx, is_host, deck_sync_bytes
 }
 
 #[cfg(feature = "3ds")]
@@ -529,7 +529,7 @@ fn main() {
             Step::Setup(ref cards, ref decks, ref phase, ref dirty) => {
                 let n = decks.len();
                 let was_dirty = *dirty;
-                let new_step = match *phase {
+                let new_step = match phase {
                     SetupPhase::PickMode(cur) => unsafe {
                         if was_dirty {
                             if _3ds_is_cli_mode() {
@@ -1438,7 +1438,7 @@ fn main() {
                                 Ok(()) => Step::Setup(
                                     cards.clone(),
                                     decks.clone(),
-                                    SetupPhase::MultiplayerLoading(p1_idx, p2_idx, true),
+                                    SetupPhase::MultiplayerLoading(p1_idx, p2_idx, true, None),
                                     true,
                                 ),
                                 Err(e) => {
@@ -1472,13 +1472,18 @@ fn main() {
                             let mut recv_buf = [0u8; 4096];
                             match uds::uds_recv(&mut recv_buf) {
                                 Ok(n) if n > 0 => {
-                                    if let Some(sync) = uds::DeckSync::from_bytes(&recv_buf[..n]) {
-                                        // Store deck data for loading phase
-                                        // For now, proceed to loading (deck data will be used there)
+                                    if uds::DeckSync::from_bytes(&recv_buf[..n]).is_some() {
+                                        // Store the raw sync bytes for the loading phase
+                                        let sync_bytes = recv_buf[..n].to_vec();
                                         Step::Setup(
                                             cards.clone(),
                                             decks.clone(),
-                                            SetupPhase::MultiplayerLoading(p1_idx, p2_idx, false),
+                                            SetupPhase::MultiplayerLoading(
+                                                p1_idx,
+                                                p2_idx,
+                                                false,
+                                                Some(sync_bytes),
+                                            ),
                                             true,
                                         )
                                     } else {
@@ -1503,11 +1508,43 @@ fn main() {
                         }
                     }
                     // Multiplayer: Loading game with multiplayer flag
-                    SetupPhase::MultiplayerLoading(p1_idx, p2_idx, is_host) => {
+                    SetupPhase::MultiplayerLoading(p1_idx, p2_idx, is_host, deck_sync_bytes) => {
                         let r = (|| -> Result<(GameState, CardAtlas), String> {
                             let mut cards_vec = (**cards).clone();
                             CardLoader::attach_abilities(&mut cards_vec);
                             let mut db = Arc::new(CardDatabase::load_or_create(cards_vec));
+                            // If we have deck sync data from host, use it directly
+                            if let Some(ref sync_bytes) = deck_sync_bytes {
+                                let sync = uds::DeckSync::from_bytes(sync_bytes)
+                                    .ok_or("Invalid deck sync data")?;
+                                // Build players from received card IDs (already shuffled)
+                                let mut d1 = rabuka_engine::deck_builder::Deck {
+                                    main_deck: std::collections::VecDeque::from(sync.p1_main),
+                                    energy_deck: std::collections::VecDeque::from(sync.p1_energy),
+                                };
+                                let mut d2 = rabuka_engine::deck_builder::Deck {
+                                    main_deck: std::collections::VecDeque::from(sync.p2_main),
+                                    energy_deck: std::collections::VecDeque::from(sync.p2_energy),
+                                };
+                                DeckBuilder::add_default_energy_cards_from_database(
+                                    &mut d1, &mut db,
+                                )
+                                .ok();
+                                DeckBuilder::add_default_energy_cards_from_database(
+                                    &mut d2, &mut db,
+                                )
+                                .ok();
+                                let mut p1 = Player::new("p1".into(), "P1".into(), true);
+                                p1.set_main_deck(d1.main_deck);
+                                p1.set_energy_deck(d1.energy_deck);
+                                let mut p2 = Player::new("p2".into(), "P2".into(), false);
+                                p2.set_main_deck(d2.main_deck);
+                                p2.set_energy_deck(d2.energy_deck);
+                                let mut gs = GameState::new(p1, p2, db);
+                                game_setup::setup_game(&mut gs);
+                                return Ok((gs, CardAtlas::load()));
+                            }
+                            // No deck sync: build from local files (host or non-multiplayer)
                             let nums1 = DeckParser::deck_list_to_card_numbers(&decks[p1_idx]);
                             let nums2 = if p1_idx == p2_idx {
                                 nums1.clone()
@@ -1728,6 +1765,27 @@ fn main() {
                     }
                 }
 
+                // L/R shoulder buttons: cycle area selection within a PlayMemberToStage group
+                {
+                    let cur_group = display_pos < group_areas.len() && group_areas.len() > 0;
+                    let has_areas = cur_group && group_areas[display_pos].len() > 1;
+                    if has_areas && (keys & 0x00000100 != 0) {
+                        // L: previous area
+                        if group_sel > 0 {
+                            group_sel -= 1;
+                            cur = group_areas[display_pos][group_sel];
+                            redraw = true;
+                        }
+                    } else if has_areas && (keys & 0x00000200 != 0) {
+                        // R: next area
+                        if group_sel + 1 < group_areas[display_pos].len() {
+                            group_sel += 1;
+                            cur = group_areas[display_pos][group_sel];
+                            redraw = true;
+                        }
+                    }
+                }
+
                 // SELECT cycles board view: player / opponent / both
                 if keys & 0x00000004 != 0 {
                     unsafe {
@@ -1736,25 +1794,6 @@ fn main() {
                     redraw = true;
                 }
 
-                // DPAD LEFT/RIGHT: cycle area selection within a PlayMemberToStage group,
-                // or scroll hand view if not on a grouped action.
-                let cur_group = display_pos < group_areas.len() && group_areas.len() > 0;
-                let has_areas = cur_group && group_areas[display_pos].len() > 1;
-                if has_areas && (keys & 0x00000020 != 0) {
-                    // LEFT: previous area
-                    if group_sel > 0 {
-                        group_sel -= 1;
-                        cur = group_areas[display_pos][group_sel];
-                        redraw = true;
-                    }
-                } else if has_areas && (keys & 0x00000010 != 0) {
-                    // RIGHT: next area
-                    if group_sel + 1 < group_areas[display_pos].len() {
-                        group_sel += 1;
-                        cur = group_areas[display_pos][group_sel];
-                        redraw = true;
-                    }
-                } else
                 // DPAD LEFT/RIGHT: scroll hand view (0x10 = RIGHT, 0x20 = LEFT)
                 if !detail_mode {
                     let vis = visible_hand_slots();
@@ -1774,7 +1813,8 @@ fn main() {
                             hand_offset_p2 -= 1;
                         }
                         redraw = true;
-                    } else if keys & 0x00000010 != 0 && off < max {
+                    }
+                    if keys & 0x00000010 != 0 && off + vis < max + vis {
                         if is_p1 {
                             hand_offset += 1;
                         } else {

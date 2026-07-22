@@ -225,13 +225,25 @@ fn bake_ds(repo_root: &Path) {
         if let Ok(content) = fs::read_to_string(&path) {
             if let Ok(cards) = serde_json::from_str::<Vec<Card>>(&content) {
                 for card in cards {
-                    let cn = card.card_no.to_string();
+                    let cn = normalize_card_no(&card.card_no);
                     if !card_idx_map.contains_key(&cn) {
                         let idx = unique_cards.len() as u16;
                         card_idx_map.insert(cn.clone(), idx);
                         unique_cards.push((cn, card));
                     }
                 }
+            }
+        }
+    }
+
+    // Ensure the default energy card is always in the database (used as deck filler)
+    let default_energy_no = "LL-E-001-SD";
+    if !card_idx_map.contains_key(default_energy_no) {
+        if let Some(val) = normalized_map.get(default_energy_no) {
+            if let Ok(card) = serde_json::from_value::<Card>(val.clone()) {
+                let idx = unique_cards.len() as u16;
+                card_idx_map.insert(normalize_card_no(default_energy_no), idx);
+                unique_cards.push((normalize_card_no(default_energy_no), card));
             }
         }
     }
@@ -291,7 +303,7 @@ fn bake_ds(repo_root: &Path) {
 
     // Build deck index entries
     let mut deck_index_entries: Vec<Vec<u8>> = Vec::new();
-    for (i, entry) in deck_entries.iter().enumerate() {
+    for (_i, entry) in deck_entries.iter().enumerate() {
         let deck_name = entry
             .get("name")
             .and_then(|v| v.as_str())
@@ -304,18 +316,25 @@ fn bake_ds(repo_root: &Path) {
             .and_then(|v| v.as_array())
             .map(|arr| {
                 arr.iter()
-                    .filter_map(|v| v.as_str().map(String::from))
+                    .filter_map(|v| v.as_str().map(normalize_card_no))
                     .collect()
             })
             .unwrap_or_default();
+        // Find default energy card index for fallback
+        let default_energy_idx = card_idx_map.get("LL-E-001-SD").copied().unwrap_or(0);
+
         let mut entry_bin = Vec::new();
         entry_bin.extend_from_slice(&name_off.to_le_bytes());
         entry_bin.extend_from_slice(&(card_nos.len() as u16).to_le_bytes());
         for cn in &card_nos {
-            let idx = card_idx_map.get(cn).copied().unwrap_or(0);
+            let idx = card_idx_map
+                .get(cn.as_str())
+                .copied()
+                .unwrap_or_else(|| default_energy_idx);
             entry_bin.extend_from_slice(&idx.to_le_bytes());
         }
         deck_index_entries.push(entry_bin);
+        println!("  Deck[{}] {}: {} cards", _i, deck_name, card_nos.len(),);
     }
 
     // Serialize everything
