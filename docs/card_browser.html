@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ラブカ ! | Card Browser</title>
+<link rel="stylesheet" href="css/deck_validation.css">
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ctAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAABklJREFUeNrs3b9PG2cAxvFLC1IYGlGGVAoLEh5BnUDNAtnISEa2whgW/BeEqhkbwUIGBhgYyIAUMiDVU4OHBuGhqfAIUhYzMBA2OiC173P1tcflPfsw94u77yeyLGLOr/H7+H3vfe/es+MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAArtXpxPVl2qLpm7Fd7W5K2srtyzvP+/mbsnCRddNWWvxvVkX8X84r4nGoUXax3HFkDz6Rs0d7PUT+HNtus6dy3gprkNUj+FN9iu61j0xdDyjbRf0BPqplSt4Nv2/uCnTAJoXsCyuZsmeOUNYTuI7839vgnictpd8AvCh3YGXuRlFAwQQBBAgACCAAIEEAQQIIDIn76sX8DE5IQzNTXlDA8Puz+fHJ84+/V9p3nU7Ljd0NCQMzMz44yNjzkDAwPO+fm5u02tVnMuLy9vVKa2q9frzvHxccft9Pvazl9mo9Fw6vv1rmXOPDWvdWzsxmUSwATNzc25YfAbrYy6t8Zhw9ne3g4NwvPF524I/IGcmp5yn+/VL6/ccNgsLi66z++nQOmm8NZ+rVm30+MLCwv2D4EJ1uu119YQ6jXqtXrBC5apv1F/K11wyrywdGqlVEFhFeoPX/BxBTusFQqG79rjJkyVSuVGz+l9IILh9D9nMHzBD6GtTAKYdABNV9bN5MSktSUKC5+/FbVVepQybb+jD0OUMtUi2rbtuhsyMUEA02arLFvYetnOC0Rwu24hkkfDj774v8popae/SS1blDKj/k0E8A4JVnyUIIT9XtRtcYcCGDZI8NOIOKjbaNMTHEW3Wq1I29rKPGoeRSoz+PxRR7hR3gsCGDNNX3R2Dj8cjszYuwWJIVNtyBNe/RSpsLcrUwF11ZmlBFulPeCAMZM0x22CvNXnK3yFISw6Rnv8Tfbb6yPab6uW5m2+Ue1ULu7ux3LDHtc/9+pTL2mMs8Fft3rho9/eLx828I//P7BXZnsHyB4la05uTBnZ2dOs9l0HnzzwHn43cNrAdra2nIft7m6unI+/vHRvfeXqYDs7e11LPO0deqcnJy423mDBgVPz7e+vh3ajfrL1Mi8v7//vzJ3dnYitco2BwcHP1nq5EdzN5JFkGyvJ4qeF6ZXl6p/swudnQwXpkd+PaUeBYN9QBSAjlglOQ1FABHK3d/9dijy1BcBRKx0nLrXQRIBxK27Xm9WggAi9a5XZ/HYJuUJIBI3vzDvDjy6nRRMAJHIfp8mzKMcfiSAiJXOXfTOX2ydtlIps4+3Hd6gY3b2/+uLdjp+TQAR64BDwQue/Ds+Np7KPiABLCkFTiELWzKg/9c+oOYBk5yKIYAFb910uz9w3x1Y6KiGlhx0WiQV7JZ1U3es8x0v/7r8994EM64uOtMAapWaFgGV+ZR3VejGxkaiI07v/VUYo4bPo9bv8/lnN3xJtIR9WYZPk51lp8VT2gfrdJJtrxQYf2hq5p/CqO5V733YB18fCk1CpzEVk1kAoyyRLFNXmRZ3v659JYfgWmd1q+9236V6hnZmAWSl2fWWKm3uCHfu+s9qhdOYfGYQkiNqdTqtN0mKf19Q4dN+aBZyFUDvgj1lEedo8qa8BfgqP4n9zzsZQB3+KfvVotKiqz3oA7C5sZl6t+vHseCSDno0Ea2uP+tF8QSwhDQNo92dPFwWLlddsHsRoKfFG2R4Rw/ywrueYR7kKoDexSmLONh4+fPLXIRQrV+Uq8jSBReI5jy9NRZ52P9L4ywXAgirsEsQE8CCy2q+L+84EpIw70r6eer2CGBY99DhKvUoJrpgEEAQQIAADtznHEEGIRnyFsGUhY5GaHSskwLydKiOLrgkvPUZ/gA">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; }
+
+#app { position: fixed; inset: 0; display: flex; }
+
+#sidebar {
+  width: 280px; overflow-y: auto; background: #16213e;
+  border-right: 1px solid #0f3460; padding: 12px 14px 14px; flex-shrink: 0;
+}
+#sidebar h1 { font-size: 14px; margin-bottom: 8px; color: #e94560; display: flex; align-items: center; gap: 6px; }
+#sidebar h1 span { font-size: 16px; }
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-track { background: transparent; }
+#sidebar::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 2px; }
+
+.filter-group { margin-bottom: 5px; }
+.filter-group label.filter-label { display: flex; align-items: center; gap: 3px; font-size: 10px; color: #8888a0; margin-bottom: 1px; text-transform: uppercase; letter-spacing: 0.2px; }
+.filter-group label img.icon { width: 12px; height: 12px; object-fit: contain; }
+.filter-group select, .filter-group input[type="number"] {
+  width: 100%; padding: 3px 5px; background: #1a1a2e; color: #e0e0e0; border: 1px solid #0f3460;
+  border-radius: 3px; font-size: 11px; outline: none;
+}
+.filter-group select:focus, .filter-group input[type="number"]:focus { border-color: #e94560; }
+.filter-group input[type="number"] { width: 65px; }
+.filter-group .checkbox-group { display: flex; flex-wrap: wrap; gap: 3px 8px; padding: 1px 0; }
+.filter-group .checkbox-group label { display: flex; align-items: center; gap: 3px; text-transform: none; letter-spacing: 0; font-size: 11px; color: #c0c0d0; cursor: pointer; }
+.filter-group .checkbox-group input[type="checkbox"] { accent-color: #e94560; width: 11px; height: 11px; }
+
+#panel-count { padding: 2px 0 6px; font-size: 11px; color: #808090; text-align: center; flex: 0 0 100%; }
+.btn-group { display: flex; flex-wrap: wrap; gap: 3px; }
+.btn-opt {
+  padding: 3px 8px; background: #1a1a2e; color: #8888a0; border: 1px solid #0f3460;
+  border-radius: 3px; font-size: 10px; cursor: pointer; transition: 0.1s;
+}
+.btn-opt:hover { border-color: #555; color: #ccc; }
+.btn-opt.active { background: #e94560; color: #fff; border-color: #e94560; }
+
+#result-count { margin-top: 4px; padding-top: 5px; border-top: 1px solid #0f3460; font-size: 11px; color: #808090; text-align: center; }
+
+#card-panel {
+  flex: 1; overflow-y: scroll;
+  padding: 8px; display: flex; flex-wrap: wrap; gap: 5px; align-content: start;
+}
+#card-panel::-webkit-scrollbar { width: 6px; }
+#card-panel::-webkit-scrollbar-track { background: transparent; }
+#card-panel::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+
+#empty-state {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  text-align: center; color: #505060; font-size: 13px; line-height: 1.6;
+  z-index: -1;
+}
+
+.card-item {
+  position: relative; border-radius: 4px; overflow: hidden;
+  cursor: pointer; background: #0d1b2a; width: 110px; flex: 0 0 110px;
+}
+.card-item:hover { box-shadow: 0 2px 10px rgba(233,69,96,0.25); }
+.card-item img { width: 100%; display: block; object-fit: contain; }
+.card-item .card-name {
+  padding: 2px 4px; font-size: 9px; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; color: #b0b0c0;
+}
+.card-item .copy-badge {
+  position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.7);
+  color: #fff; font-size: 8px; padding: 1px 4px; border-radius: 2px; opacity: 0;
+  transition: opacity 0.1s; pointer-events: none;
+}
+.card-item:hover .copy-badge { opacity: 1; }
+.card-item .type-badge {
+  position: absolute; bottom: 18px; left: 2px;
+  background: rgba(0,0,0,0.55); color: #bbb; font-size: 7px;
+  padding: 1px 3px; border-radius: 2px;
+}
+
+#tooltip {
+  position: fixed; z-index: 9999; pointer-events: none;
+  max-width: 340px; background: #0d1b2a; border: 1px solid #0f3460;
+  border-radius: 6px; padding: 10px 12px; font-size: 12px;
+  color: #e0e0e0; line-height: 1.5; opacity: 0;
+  transition: opacity 0.15s; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+#tooltip.show { opacity: 1; }
+#tooltip .tt-name { font-weight: bold; color: #fff; font-size: 13px; margin-bottom: 4px; }
+#tooltip .tt-id { color: #e94560; font-size: 10px; margin-bottom: 6px; }
+#tooltip .tt-ability { color: #c0c0d0; font-size: 11px; margin-top: 4px; padding-top: 4px; border-top: 1px solid #0f3460; }
+#tooltip .tt-ability img.tt-icon { height: 1.1em; vertical-align: middle; display: inline; }
+
+#toast {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  background: #e94560; color: #fff; padding: 6px 16px; border-radius: 5px;
+  font-size: 11px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 99999;
+}
+#toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <aside id="sidebar">
+    <h1><span>&#128269;</span> <span id="sidebar-title" data-i18n="card_browser">Card Browser</span></h1>
+    <div class="mode-toggle">
+      <button class="mode-btn active" data-mode="browser" id="mode-browser" data-i18n="browse">&#128269; Browse</button>
+      <button class="mode-btn" data-mode="deck" id="mode-deck" data-i18n="deck">&#127183; Deck</button>
+      <button id="help-btn" style="margin-left:auto;padding:4px 8px;background:transparent;color:#8888a0;border:1px solid #0f3460;border-radius:3px;font-size:10px;cursor:pointer;" title="Help / Tutorial" onclick="window.open('tutorial.html','_blank')">&#10067;</button>
+      <button id="lang-btn-cb" style="padding:4px 8px;background:transparent;color:#8888a0;border:1px solid #0f3460;border-radius:3px;font-size:10px;cursor:pointer;">English</button>
+    </div>
+    <div id="search-bar" style="display:flex;gap:4px;margin-bottom:6px;">
+      <input type="search" data-fid="search" placeholder="" data-i18n-placeholder="search_placeholder"
+             style="flex:1;padding:6px 8px;background:#1a1a2e;color:#e0e0e0;border:1px solid #0f3460;border-radius:4px;font-size:12px;outline:none;">
+      <button id="clear-all" style="padding:6px 10px;background:#e94560;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;white-space:nowrap;" data-i18n="clear">Clear</button>
+    </div>
+    <div id="filters"></div>
+    <div id="result-count" data-i18n="select_filters">Select filters to browse</div>
+  </aside>
+  <div id="card-panel">
+    <div id="panel-count"></div>
+    <div id="empty-state" data-i18n="empty_state">&#128270; Select filters to browse cards</div>
+  </div>
+  <div id="deck-panel" class="hidden">
+    <div class="deck-panel-inner">
+      <div class="deck-header">
+        <h2 data-i18n="deck_creator">&#127183; Deck Creator</h2>
+        <input type="text" id="deck-name" placeholder="" data-i18n-placeholder="deck_name_placeholder" value="My Deck">
+      </div>
+      <div class="deck-stats" id="deck-stats"></div>
+      <div id="checklist"><div class="checklist-title" data-i18n="validation">Validation</div></div>
+      <div class="deck-card-section">
+        <div class="deck-list-title" data-i18n="cards_label">Cards (<span id="deck-total">0</span>)</div>
+        <div id="deck-card-list"></div>
+      </div>
+      <div class="deck-actions">
+        <button id="export-deck" data-i18n="export">&#128203; Export</button>
+        <button id="qr-deck" data-i18n="qr_code">&#128247; Show QR</button>
+        <button id="clear-deck" data-i18n="clear_deck">&#128465; Clear</button>
+      </div>
+      <div id="import-area" class="hidden">
+        <textarea id="import-text" placeholder="" data-i18n-placeholder="import_placeholder"></textarea>
+        <div class="deck-actions" style="margin-top:3px;">
+          <button id="import-btn" class="primary" data-i18n="import_btn">Import</button>
+          <button id="import-cancel" data-i18n="cancel">Cancel</button>
+        </div>
+        <div style="margin-top:4px;font-size:9px;color:#808090;text-align:center;">
+          <a href="tutorial.html" target="_blank" style="color:#e94560;" data-i18n="decklog_guide">How to get a deck from Deck Log</a>
+  </div>
+</div>
+
+<!-- QR Code Modal -->
+<div id="qr-modal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:999;">
+  <div style="background:#1a1a2e;padding:20px;border-radius:8px;text-align:center;border:1px solid #0f3460;">
+    <div id="qr-canvas" style="margin:0 auto;"></div>
+    <p style="margin-top:8px;font-size:12px;color:#8888a0;word-break:break-all;max-width:300px;" id="qr-deck-name"></p>
+    <button id="qr-close" class="primary" style="margin-top:12px;padding:6px 24px;cursor:pointer;">Close</button>
+  </div>
+</div>
+
+<script src="js/qrcode.min.js"></script>
+// ── i18n ──
+let cbLang = localStorage.getItem('card_browser_lang') || 'en';
+async function loadCbLang(lang) {
+  cbLang = lang;
+  localStorage.setItem('card_browser_lang', lang);
+  const mod = await import('./js/i18n/translator.js');
+  await mod.loadTranslations(lang);
+  const ui = mod.getCurrentTranslations()?.ui || {};
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (ui[key]) el.textContent = ui[key];
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (ui[key]) el.placeholder = ui[key];
+  });
+  const btn = document.getElementById('lang-btn-cb');
+  if (btn) btn.textContent = lang === 'jp' ? 'English' : '日本語';
+}
+document.getElementById('lang-btn-cb')?.addEventListener('click', () => loadCbLang(cbLang === 'jp' ? 'en' : 'jp'));
+
+const TEXT_ICONS = {
+  heart: 'img/texticon/heart_01.png',
+  blade: 'img/texticon/icon_blade.png',
+  score: 'img/texticon/icon_score.png',
+  energy: 'img/texticon/icon_energy.png',
+  kidou: 'img/texticon/kidou.png',
+  turn1: 'img/texticon/turn1.png',
+};
+
+const filtersEl = document.getElementById('filters');
+const cardPanel = document.getElementById('card-panel');
+const emptyEl = document.getElementById('empty-state');
+const countEl = document.getElementById('result-count');
+const tooltipEl = document.getElementById('tooltip');
+const toastEl = document.getElementById('toast');
+
+let allCardsArr = [];
+let abilityIndex = null;
+let abilityTextIndex = null;
+let filterActive = false;
+
+function iconImg(src, alt) {
+  return `<img class="icon" src="${src}" alt="${alt}" loading="lazy">`;
+}
+
+function buildFilter(id, label, icon, innerHtml) {
+  const labelHtml = label ? `<label class="filter-label">${icon ? iconImg(icon, label) : ''}${label}</label>` : '';
+  return `<div class="filter-group" data-fgroup="${id}">${labelHtml}${innerHtml}</div>`;
+}
+
+function buildSelect(id, label, icon, options, selected) {
+  const opts = options.map(o =>
+    `<option value="${o}"${o === selected ? ' selected' : ''}>${o}</option>`
+  ).join('');
+  return buildFilter(id, label, icon, `<select data-fid="${id}">${opts}</select>`);
+}
+
+function buildBtnGroup(id, label, icon, options) {
+  const btns = options.map(o =>
+    `<button class="btn-opt${o === 'All' ? ' active' : ''}" data-fid="${id}" data-value="${o}">${o}</button>`
+  ).join('');
+  return buildFilter(id, label, icon, `<div class="btn-group" data-fid="${id}">${btns}</div>`);
+}
+
+function enrichText(text) {
+  if (!text) return '';
+  return text.replace(/\{\{(.*?)\|(.*?)\}\}/g, (match, img, alt) => {
+    const src = img.endsWith('.png') && !img.includes('/') ? 'img/texticon/' + img : 'img/' + img;
+    let style = 'height:1.1em;vertical-align:middle;';
+    if (img.includes('live_start') || img.includes('live_success')) style += 'min-width:3.2em;';
+    return `<img class="tt-icon" src="${src}" alt="${alt}" style="${style}">`;
+  });
+}
+
+function getBtnVal(id) {
+  const active = document.querySelector(`.btn-group[data-fid="${id}"] .btn-opt.active`);
+  return active ? active.dataset.value : 'All';
+}
+
+function isDefaultFilters() {
+  const els = document.querySelectorAll('[data-fid]');
+  for (const el of els) {
+    if (el.tagName === 'SELECT' && el.value !== 'All') return false;
+    if (el.tagName === 'INPUT' && el.type === 'number' && el.value !== '' && el.value !== '0') return false;
+    if (el.tagName === 'INPUT' && el.type === 'search' && el.value.trim() !== '') return false;
+    if (el.classList.contains('btn-group') && getBtnVal(el.dataset.fid) !== 'All') return false;
+  }
+  const cbs = document.querySelectorAll('input[type="checkbox"]');
+  for (const cb of cbs) {
+    if (cb.checked) return false;
+  }
+  return true;
+}
+
+function clearAllFilters() {
+  document.querySelectorAll('[data-fid]').forEach(el => {
+    if (el.tagName === 'SELECT') el.value = 'All';
+    if (el.tagName === 'INPUT' && (el.type === 'number' || el.type === 'search')) el.value = '';
+  });
+  document.querySelectorAll('.btn-opt').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.btn-group').forEach(g => {
+    const first = g.querySelector('.btn-opt');
+    if (first) first.classList.add('active');
+  });
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+  onFilterChange();
+}
+
+function applyFilters() {
+  if (!filterActive) {
+    emptyEl.style.display = '';
+    emptyEl.textContent = '\u{1F50D} Select filters to browse cards';
+    countEl.textContent = 'Select filters to browse';
+    cardPanel.querySelectorAll('.card-item').forEach(el => el.remove());
+    return;
+  }
+
+  const vals = {};
+  document.querySelectorAll('[data-fid]').forEach(el => {
+    if (el.tagName === 'SELECT' || (el.tagName === 'INPUT' && (el.type === 'number' || el.type === 'text' || el.type === 'search'))) {
+      vals[el.dataset.fid] = el.value;
+    }
+    if (el.classList.contains('btn-group')) {
+      vals[el.dataset.fid] = getBtnVal(el.dataset.fid);
+    }
+  });
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    vals[cb.name] = cb.checked;
+  });
+
+  const searchQ = (vals.search || '').trim().toLowerCase();
+
+  let results = allCardsArr.filter(card => {
+    if (vals.type && vals.type !== 'All' && card.type !== vals.type) return false;
+    if (vals.series && vals.series !== 'All' && card.series !== vals.series) return false;
+    if (vals.unit && vals.unit !== 'All' && (card.unit || '') !== vals.unit) return false;
+    if (vals.rarity && vals.rarity !== 'All' && card.rare !== vals.rarity) return false;
+    if (vals.product && vals.product !== 'All' && card.product !== vals.product) return false;
+    if (vals.hasAbility && vals.hasAbility !== 'All') {
+      const has = abilityIndex && abilityIndex.has(card.card_no);
+      if (vals.hasAbility === 'Yes' && !has) return false;
+      if (vals.hasAbility === 'No' && has) return false;
+    }
+    const costMin = parseInt(vals.costMin);
+    if (!isNaN(costMin) && (card.cost === undefined || card.cost < costMin)) return false;
+    const scoreMin = parseInt(vals.scoreMin);
+    if (!isNaN(scoreMin) && (card.score === undefined || card.score < scoreMin)) return false;
+    const heartMin = parseInt(vals.heartMin);
+    if (!isNaN(heartMin)) {
+      let total = 0;
+      if (card.base_heart) total += Object.values(card.base_heart).reduce((a,b) => a + b, 0);
+      if (card.need_heart) total += Object.values(card.need_heart).reduce((a,b) => a + b, 0);
+      if (total < heartMin) return false;
+    }
+    if (vals.noHearts) {
+      const has = (card.base_heart && Object.keys(card.base_heart).length > 0) ||
+                  (card.need_heart && Object.keys(card.need_heart).length > 0);
+      if (has) return false;
+    }
+    if (vals.hasBlade && !(card.blade && card.blade > 0)) return false;
+    if (vals.hasBladeHeart && !(card.blade_heart && Object.keys(card.blade_heart).length > 0)) return false;
+    if (vals.trigger && vals.trigger !== 'All') {
+      const info = abilityIndex && abilityIndex.get(card.card_no);
+      if (!info || !info.some(a => a.triggers.includes(vals.trigger))) return false;
+    }
+    if (vals.costAction && vals.costAction !== 'All') {
+      const info = abilityIndex && abilityIndex.get(card.card_no);
+      if (!info || !info.some(a => a.costAction === vals.costAction)) return false;
+    }
+    if (vals.effectAction && vals.effectAction !== 'All') {
+      const info = abilityIndex && abilityIndex.get(card.card_no);
+      if (!info || !info.some(a => a.effectAction === vals.effectAction)) return false;
+    }
+    if (vals.useLimit && vals.useLimit !== 'All') {
+      const limit = parseInt(vals.useLimit);
+      const info = abilityIndex && abilityIndex.get(card.card_no);
+      if (!info || !info.some(a => a.useLimit === limit)) return false;
+    }
+    if (searchQ) {
+      const inId = (card.card_no || '').toLowerCase().includes(searchQ);
+      const inName = (card.name || '').toLowerCase().includes(searchQ);
+      if (!inId && !inName) return false;
+      card._searchScore = (inId ? 2 : 0) + (inName ? 1 : 0);
+    } else {
+      card._searchScore = 0;
+    }
+    return true;
+  });
+
+  if (searchQ) {
+    results.sort((a, b) => b._searchScore - a._searchScore);
+  }
+
+  if (vals.hasPoints) {
+    results = results.filter(c => !!POINT_MAP[getBaseCardNo(c.card_no)]);
+  }
+  const sortBy = vals.sortBy || '';
+  if (sortBy === 'pts-high') {
+    results.sort((a, b) => (POINT_MAP[getBaseCardNo(b.card_no)] || 0) - (POINT_MAP[getBaseCardNo(a.card_no)] || 0));
+  } else if (sortBy === 'pts-low') {
+    results.sort((a, b) => (POINT_MAP[getBaseCardNo(a.card_no)] || 0) - (POINT_MAP[getBaseCardNo(b.card_no)] || 0));
+  } else if (sortBy === 'pts-only') {
+    results = results.filter(c => !!POINT_MAP[getBaseCardNo(c.card_no)]);
+  }
+
+  let displayCards = results;
+  if (!vals.showAllRarities) {
+    const seen = new Set();
+    const deduped = [];
+    for (const card of results) {
+      const baseNo = card.card_no ? card.card_no.replace(/-[^-]+$/, '') : card.card_no;
+      const key = baseNo + '|' + card.type + '|' + (card.series || '');
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(card);
+      }
+    }
+    displayCards = deduped;
+  }
+
+  renderCards(displayCards);
+}
+
+function renderCards(cards) {
+  cardPanel.querySelectorAll('.card-item').forEach(el => el.remove());
+  emptyEl.style.display = 'none';
+  const pc = document.getElementById('panel-count');
+
+  if (cards.length === 0) {
+    emptyEl.textContent = 'No cards match the current filters';
+    emptyEl.style.display = '';
+    countEl.textContent = 'Results: 0 cards';
+    if (pc) pc.textContent = '';
+    return;
+  }
+
+  countEl.textContent = `Results: ${cards.length} card${cards.length !== 1 ? 's' : ''}`;
+  if (pc) pc.textContent = `Showing ${cards.length} card${cards.length !== 1 ? 's' : ''}`;
+
+  const fragment = document.createDocumentFragment();
+  for (const card of cards) {
+    const div = document.createElement('div');
+    div.className = 'card-item';
+    div.dataset.cardNo = card.card_no;
+
+    const img = document.createElement('img');
+    img.src = `img/cards_webp/${card.card_no}.webp`;
+    img.alt = card.name;
+    img.loading = 'lazy';
+    img.onerror = function() { this.src = 'img/texticon/lltcg-back.png'; };
+
+    const name = document.createElement('div');
+    name.className = 'card-name';
+    name.textContent = card.name;
+
+    const badge = document.createElement('div');
+    badge.className = 'copy-badge';
+    badge.textContent = 'COPY';
+
+    const tBadge = document.createElement('div');
+    tBadge.className = 'type-badge';
+    const typeMap = { 'メンバー': 'M', 'ライブ': 'L', 'エネルギー': 'E' };
+    tBadge.textContent = typeMap[card.type] || card.type;
+
+    div.appendChild(img);
+    div.appendChild(name);
+    div.appendChild(badge);
+    div.appendChild(tBadge);
+
+    div.addEventListener('click', () => copyToClipboard(card.card_no));
+    div.addEventListener('mouseenter', showTooltip);
+    div.addEventListener('mouseleave', hideTooltip);
+    div.addEventListener('mousemove', moveTooltip);
+    fragment.appendChild(div);
+  }
+  cardPanel.appendChild(fragment);
+}
+
+function showTooltip(e) {
+  const cardNo = e.currentTarget.dataset.cardNo;
+  const card = allCardsArr.find(c => c.card_no === cardNo);
+  if (!card) return;
+
+  let html = `<div class="tt-name">${card.name}</div>`;
+  html += `<div class="tt-id">${card.card_no}</div>`;
+
+  const abilities = abilityTextIndex ? abilityTextIndex.get(cardNo) : null;
+  if (abilities && abilities.length > 0) {
+    html += abilities.map(a => `<div class="tt-ability">${enrichText(a)}</div>`).join('');
+  } else if (card.ability) {
+    html += `<div class="tt-ability">${enrichText(card.ability)}</div>`;
+  }
+
+  tooltipEl.innerHTML = html;
+  tooltipEl.classList.add('show');
+  positionTooltip(e);
+}
+
+function hideTooltip() {
+  tooltipEl.classList.remove('show');
+}
+
+function moveTooltip(e) { positionTooltip(e); }
+
+function positionTooltip(e) {
+  const x = e.clientX + 14, y = e.clientY + 14;
+  const tw = tooltipEl.offsetWidth, th = tooltipEl.offsetHeight;
+  tooltipEl.style.left = (x + tw > window.innerWidth ? e.clientX - tw - 14 : x) + 'px';
+  tooltipEl.style.top = (y + th > window.innerHeight ? e.clientY - th - 14 : y) + 'px';
+}
+
+let toastTimeout = null;
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => toastEl.classList.remove('show'), 2000);
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    toastEl.textContent = `Copied: ${text}`;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => toastEl.classList.remove('show'), 2000);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toastEl.textContent = `Copied: ${text}`;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => toastEl.classList.remove('show'), 2000);
+  });
+}
+
+function onFilterChange() {
+  filterActive = !isDefaultFilters();
+  applyFilters();
+}
+
+function populateFilters() {
+  const seriesSet = new Set(), unitSet = new Set(), raritySet = new Set();
+  const productSet = new Set(), triggerSet = new Set();
+  const costActionSet = new Set(), effectActionSet = new Set();
+
+  for (const card of allCardsArr) {
+    if (card.series) card.series.split('\n').forEach(s => { if (s.trim()) seriesSet.add(s.trim()); });
+    if (card.unit) unitSet.add(card.unit);
+    if (card.rare) raritySet.add(card.rare);
+    if (card.product) productSet.add(card.product);
+  }
+
+  abilityIndex = new Map();
+  abilityTextIndex = new Map();
+  if (window._uniqueAbilities) {
+    for (const entry of window._uniqueAbilities) {
+      const triggers = (entry.triggers || '').split(/, ?/).filter(Boolean);
+      const costAction = entry.cost?.action || null;
+      const effectAction = entry.effect?.action || null;
+      const fullText = entry.full_text || '';
+      if (!entry.cards) continue;
+      for (const cardStr of entry.cards) {
+        const cardNo = cardStr.split(' | ')[0];
+        if (!cardNo) continue;
+        if (!abilityIndex.has(cardNo)) abilityIndex.set(cardNo, []);
+        abilityIndex.get(cardNo).push({ triggers, useLimit: entry.use_limit, costAction, effectAction });
+        if (!abilityTextIndex.has(cardNo)) abilityTextIndex.set(cardNo, []);
+        if (fullText && !abilityTextIndex.get(cardNo).includes(fullText)) {
+          abilityTextIndex.get(cardNo).push(fullText);
+        }
+        triggers.forEach(t => triggerSet.add(t));
+        if (costAction) costActionSet.add(costAction);
+        if (effectAction) effectActionSet.add(effectAction);
+      }
+    }
+  }
+
+  const sorted = (set) => ['All', ...[...set].sort()];
+
+  let html = '';
+  html += buildBtnGroup('type', 'Type', null, ['All', 'メンバー', 'ライブ', 'エネルギー']);
+  html += buildSelect('series', 'Series', null, sorted(seriesSet));
+  html += buildSelect('unit', 'Unit', null, sorted(unitSet));
+  html += buildSelect('rarity', 'Rarity', null, sorted(raritySet));
+  html += buildFilter('allRarities', null, null,
+    '<div class="checkbox-group"><label><input type="checkbox" name="showAllRarities"> Show all rarities</label></div>');
+  html += buildSelect('product', 'Product', null, sorted(productSet));
+  html += buildBtnGroup('hasAbility', 'Has Ability', null, ['All', 'Yes', 'No']);
+
+  html += buildFilter('costMin', 'Cost >=', TEXT_ICONS.energy,
+    '<input type="number" data-fid="costMin" min="0" max="30" placeholder="Any">');
+  html += buildFilter('scoreMin', 'Score >=', TEXT_ICONS.score,
+    '<input type="number" data-fid="scoreMin" min="0" max="30" placeholder="Any">');
+
+  html += buildFilter('heartMin', 'Min Hearts', TEXT_ICONS.heart,
+    '<input type="number" data-fid="heartMin" min="0" max="20" placeholder="0">');
+  html += buildFilter('noHearts', null, null,
+    '<div class="checkbox-group"><label><input type="checkbox" name="noHearts"> No hearts wanted</label></div>');
+
+  html += buildFilter('blade', null, TEXT_ICONS.blade,
+    '<div class="checkbox-group"><label><input type="checkbox" name="hasBlade"> Has blade</label><label><input type="checkbox" name="hasBladeHeart"> Has blade_heart</label></div>');
+
+  const sortedTriggers = [...triggerSet].sort();
+  const triggerOpts = ['<option value="All">All</option>'];
+  sortedTriggers.forEach(t => triggerOpts.push(`<option value="${t}">${t}</option>`));
+  html += buildFilter('trigger', 'Trigger', TEXT_ICONS.kidou,
+    `<select data-fid="trigger">${triggerOpts.join('')}</select>`);
+  html += buildFilter('costAction', 'Cost Action', null,
+    `<select data-fid="costAction">${sorted(costActionSet).map(v => `<option value="${v}">${v}</option>`).join('')}</select>`);
+  html += buildFilter('effectAction', 'Effect Action', null,
+    `<select data-fid="effectAction">${sorted(effectActionSet).map(v => `<option value="${v}">${v}</option>`).join('')}</select>`);
+  html += buildBtnGroup('useLimit', 'Use Limit', TEXT_ICONS.turn1, ['All', '1', '2']);
+  html += buildFilter('rabukaPoints', 'Rabuka Points', null,
+    '<div class="checkbox-group" style="margin-bottom:2px"><label><input type="checkbox" name="hasPoints"> Has points</label></div>' +
+    '<select data-fid="sortBy" style="width:100%;padding:3px 5px;background:#1a1a2e;color:#e0e0e0;border:1px solid #0f3460;border-radius:3px;font-size:10px;outline:none;">' +
+      '<option value="">Default order</option>' +
+      '<option value="pts-high">Points: high→low</option>' +
+      '<option value="pts-low">Points: low→high</option>' +
+      '<option value="pts-only">Points: only cards with points</option>' +
+    '</select>');
+
+  filtersEl.innerHTML = html;
+
+  filtersEl.querySelectorAll('select, input[type="number"], input[type="checkbox"]').forEach(el => {
+    el.addEventListener('change', onFilterChange);
+    el.addEventListener('input', onFilterChange);
+  });
+  filtersEl.addEventListener('click', e => {
+    const btn = e.target.closest('.btn-opt');
+    if (!btn) return;
+    const grp = btn.closest('.btn-group');
+    if (!grp) return;
+    grp.querySelectorAll('.btn-opt').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    onFilterChange();
+  });
+
+  const searchInput = document.querySelector('[data-fid="search"]');
+  if (searchInput) {
+    searchInput.addEventListener('input', onFilterChange);
+  }
+  const clearBtn = document.getElementById('clear-all');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', clearAllFilters);
+  }
+
+  filterActive = false;
+  applyFilters();
+}
+
+async function init() {
+  try {
+    const [cardsResp, abilitiesResp] = await Promise.all([
+      fetch('/cards/cards.json'), fetch('/cards/abilities.json')
+    ]);
+    if (!cardsResp.ok) throw new Error('Failed to load cards.json: ' + cardsResp.status);
+    allCardsArr = Object.values(await cardsResp.json()).filter(c => c && c.card_no);
+    if (abilitiesResp.ok) window._uniqueAbilities = (await abilitiesResp.json()).unique_abilities || [];
+    populateFilters();
+  } catch (err) {
+    filtersEl.innerHTML = `<div style="color:#e94560;padding:10px;font-size:12px;">Failed: ${err.message}</div>`;
+  }
+}
+
+// ══════════════════════════════════════════════
+// Deck Creator
+// ══════════════════════════════════════════════
+
+let deckMode = false;
+let deckState = { name: 'My Deck', cards: new Map() };
+
+function getBaseCardNo(cardNo) {
+  const i = cardNo.lastIndexOf('-');
+  return i > 0 ? cardNo.slice(0, i) : cardNo;
+}
+
+// Rabuka Point System (ラブカポイントシステム)
+// Updated 2026-04-03: total points of point-assigned cards in deck must be ≤ 9
+const POINT_MAP = {
+  'PL!N-bp1-003': 4,
+  'PL!N-bp1-012': 3,
+  'LL-bp2-001': 3,
+  'PL!N-bp1-002': 2,
+  'PL!N-sd1-008': 2,
+  'PL!HS-bp2-014': 2,
+  'PL!SP-bp1-005': 1,
+  'PL!N-bp1-029': 1,
+  'PL!SP-sd1-019': 1,
+  'PL!SP-sd1-020': 1,
+  'PL!SP-pb1-014': 1,
+  'PL!SP-bp2-024': 1,
+};
+
+function deckCardLookup(cardNo) {
+  return allCardsArr.find(c => c.card_no === cardNo) || null;
+}
+
+function addToDeck(cardNo) {
+  const card = deckCardLookup(cardNo);
+  if (!card) return;
+  const entry = deckState.cards.get(cardNo) || { card, qty: 0 };
+  entry.qty = Math.min((entry.qty || 0) + 1, 99);
+  deckState.cards.set(cardNo, entry);
+  deckState.cards = new Map(deckState.cards);
+  updateDeckUI();
+}
+function removeFromDeck(cardNo) {
+  const entry = deckState.cards.get(cardNo);
+  if (!entry) return;
+  if (entry.qty <= 1) { deckState.cards.delete(cardNo); }
+  else { entry.qty--; }
+  deckState.cards = new Map(deckState.cards);
+  updateDeckUI();
+}
+function setDeckQty(cardNo, qty) {
+  qty = Math.max(0, Math.min(99, qty));
+  if (qty === 0) { deckState.cards.delete(cardNo); }
+  else {
+    const card = deckCardLookup(cardNo);
+    if (card) deckState.cards.set(cardNo, { card, qty });
+  }
+  deckState.cards = new Map(deckState.cards);
+  updateDeckUI();
+}
+function clearDeck() {
+  if (deckState.cards.size === 0) return;
+  if (!confirm('Clear the entire deck?')) return;
+  deckState.cards = new Map();
+  updateDeckUI();
+}
+function exportDeck() {
+  if (deckState.cards.size === 0) { toast('Deck is empty'); return; }
+  const name = document.getElementById('deck-name').value || 'deck';
+  const lines = [];
+  const entries = [...deckState.cards.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [cardNo, entry] of entries) {
+    lines.push(`${cardNo} x ${entry.qty}`);
+  }
+  const text = lines.join('\n');
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${name}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  navigator.clipboard.writeText(text).then(() => {
+    toast(`Exported & copied ${deckState.cards.size} card types`);
+  }).catch(() => {
+    toast(`Exported ${deckState.cards.size} card types`);
+  });
+}
+function normalizeCode(code) {
+  if (!code) return '';
+  return code.replace(/＋/g, '+').replace(/－/g, '-').replace(/ー/g, '-').trim().toUpperCase();
+}
+function extractCardId(title) {
+  const parts = title.split(/\s*:\s*/);
+  return normalizeCode(parts[0]);
+}
+function importDeckText(text) {
+  const newCards = new Map();
+  let imported = 0;
+
+  // Try Deck Log HTML format first (<span title="ID : Name">...<span class="num">QTY</span>)
+  const decklogRe = /<span\s+title="([^"]+)"[^>]*>\s*<\/span>\s*<span[^>]*class="num"[^>]*>(\d+)<\/span>/g;
+  let m, htmlMatch = false;
+  while ((m = decklogRe.exec(text)) !== null) {
+    const cardId = extractCardId(m[1]);
+    const qty = parseInt(m[2], 10);
+    if (cardId && qty > 0 && deckCardLookup(cardId)) {
+      newCards.set(cardId, { card: deckCardLookup(cardId), qty: (newCards.get(cardId)?.qty || 0) + qty });
+      imported++; htmlMatch = true;
+    }
+  }
+
+  // Fallback: plain text per-line
+  if (!htmlMatch) {
+    for (let raw of text.split('\n')) {
+      raw = raw.trim();
+      if (!raw || raw.startsWith('//')) continue;
+      let cardNo, qty = 1;
+      const parts = raw.split(' x ');
+      if (parts.length === 2) {
+        const a = parts[0].trim(), b = parts[1].trim();
+        if (/^\d+$/.test(a)) { qty = parseInt(a); cardNo = b; }
+        else if (/^\d+$/.test(b)) { qty = parseInt(b); cardNo = a; }
+        else continue;
+      } else if (raw.includes('-')) {
+        cardNo = raw;
+      } else continue;
+      if (!cardNo) continue;
+      const card = deckCardLookup(cardNo);
+      if (!card) continue;
+      const existing = newCards.get(cardNo);
+      newCards.set(cardNo, { card, qty: (existing ? existing.qty : 0) + qty });
+      imported++;
+    }
+  }
+
+  if (imported === 0) { toast('No valid cards found in import'); return; }
+  deckState.cards = newCards;
+  document.getElementById('import-area').classList.add('hidden');
+  document.getElementById('import-text').value = '';
+  updateDeckUI();
+  toast(`Imported ${imported} card types`);
+}
+
+// ── Validation ──
+
+const DECK_CHECKS = [
+  {
+    id: 'member48', type: 'count',
+    label: 'Main deck has exactly 48 Member cards',
+    qa: 'Q3', rule: '§6.1.1.1',
+    eval: d => {
+      const v = d.memberCount;
+      return { pass: v === 48, current: `${v}/48`,
+        detail: v === 48 ? 'Correct number of Member cards.' :
+                v < 48 ? `Need ${48-v} more Member cards.` : `Too many! Max 48.` };
+    }
+  },
+  {
+    id: 'live12', type: 'count',
+    label: 'Main deck has exactly 12 Live cards',
+    qa: 'Q3', rule: '§6.1.1.1',
+    eval: d => {
+      const v = d.liveCount;
+      return { pass: v === 12, current: `${v}/12`,
+        detail: v === 12 ? 'Correct number of Live cards.' :
+                v < 12 ? `Need ${12-v} more Live cards.` : `Too many! Max 12.` };
+    }
+  },
+  {
+    id: 'total60', type: 'count',
+    label: 'Main deck total = 60 (48M + 12L)',
+    qa: 'Q3', rule: '§6.1.1.1',
+    eval: d => {
+      const v = d.mainTotal;
+      return { pass: v === 60, current: `${v}/60`,
+        detail: v === 60 ? 'Main deck is exactly 60 cards.' :
+                v < 60 ? `Need ${60-v} more cards total.` : `Too many! Max 60.` };
+    }
+  },
+  {
+    id: 'max4', type: 'violations',
+    label: 'Max 4 copies per card number',
+    qa: 'Q4,Q5', rule: '§6.1.1.2',
+    eval: d => {
+      const violations = [];
+      const baseMap = new Map();
+      for (const [cardNo, entry] of deckState.cards) {
+        const base = getBaseCardNo(cardNo);
+        baseMap.set(base, (baseMap.get(base) || 0) + entry.qty);
+      }
+      for (const [base, total] of baseMap) {
+        if (total > 4) violations.push({ base, total });
+      }
+      return { pass: violations.length === 0, violations,
+        detail: violations.length === 0 ? 'All cards within copy limit.' :
+                `${violations.length} card(s) exceed 4 copies across rarities.` };
+    }
+  },
+  {
+    id: 'sameCardRarity', type: 'info',
+    label: 'Same card_no across rarities counts toward same limit',
+    qa: 'Q5', rule: 'Shared limit',
+    eval: d => ({ pass: null, detail: 'e.g. PL!SP-bp1-005-R and PL!SP-bp1-005-P share the same 4-card limit.' })
+  },
+  {
+    id: 'diffCardDiff', type: 'info',
+    label: 'Different card_no = separate 4-card limit',
+    qa: 'Q6', rule: 'Separate limit',
+    eval: d => ({ pass: null, detail: 'Different card numbers are treated as separate cards for the 4-card limit.' })
+  },
+  {
+    id: 'energy12', type: 'count',
+    label: 'Energy deck: 12 Energy cards',
+    qa: 'Q7', rule: '§6.1.1.3',
+    eval: d => {
+      const v = d.energyCount;
+      return { pass: v === 12, current: `${v}/12`,
+        detail: v === 12 ? 'Correct number of Energy cards.' :
+                v < 12 ? `Need ${12-v} more Energy cards.` : `Too many! Max 12.` };
+    }
+  },
+  {
+    id: 'totalScore', type: 'info',
+    label: 'Total Live card score',
+    qa: 'Points', rule: 'Live §8.4',
+    eval: d => ({
+      pass: null, current: `${d.totalScore} pts`,
+      detail: `Sum of all Live card scores in deck. Score is used during Live performance to determine the winner of each live round (higher wins).`
+    })
+  },
+  {
+    id: 'rabukaPoints', type: 'points',
+    label: 'Rabuka Point System: total ≤ 9',
+    qa: 'Official', rule: 'Point System',
+    eval: d => {
+      const v = d.pointTotal;
+      const violations = d.pointCards.filter(p => p.total > 0);
+      const detail = violations.length === 0
+        ? 'No point-assigned cards in deck. Passes automatically.'
+        : `${violations.length} card type(s) with points. Total: ${v}/9. ` +
+          violations.map(p => `${p.base} (${p.pt}pt × ${p.qty})`).join(', ');
+      return { pass: v <= 9, current: `${v}/9 points`, detail };
+    }
+  },
+];
+
+function validateDeck() {
+  let memberCount = 0, liveCount = 0, energyCount = 0, totalScore = 0;
+  let pointTotal = 0;
+  const pointCardsMap = new Map(); // base -> { pt, qty }
+  for (const entry of deckState.cards.values()) {
+    const q = entry.qty;
+    switch (entry.card.type) {
+      case 'メンバー': memberCount += q; break;
+      case 'ライブ': liveCount += q; totalScore += (entry.card.score || 0) * q; break;
+      case 'エネルギー': energyCount += q; break;
+    }
+    const base = getBaseCardNo(entry.card.card_no);
+    const pt = POINT_MAP[base];
+    if (pt) {
+      if (!pointCardsMap.has(base)) pointCardsMap.set(base, { base, pt, qty: 0 });
+      pointCardsMap.get(base).qty += q;
+      pointTotal += pt * q;
+    }
+  }
+  const pointCards = [...pointCardsMap.values()];
+  const mainTotal = memberCount + liveCount;
+  const data = { memberCount, liveCount, energyCount, mainTotal, totalScore, pointTotal, pointCards };
+  const results = DECK_CHECKS.map(c => ({ ...c, result: c.eval(data) }));
+  return { data, results };
+}
+function renderChecklist(results) {
+  const el = document.getElementById('checklist');
+  let html = '<div class="checklist-title">Validation</div>';
+  for (const c of results) {
+    const r = c.result;
+    const cls = r.pass === true ? 'pass' : r.pass === false ? 'fail' : 'info';
+    const icon = r.pass === true ? '\u2705' : r.pass === false ? '\u274C' : '\u2139\uFE0F';
+    const cur = r.current ? `<span class="rule-current">${r.current}</span>` : '';
+    const src = c.qa ? `<span class="rule-source">${c.qa}</span>` : '';
+    html += `<div class="checklist-item ${cls}">
+      <span class="status-icon">${icon}</span>
+      <div class="rule-body">
+        <div class="rule-label">${c.label} ${src}</div>
+        <div class="rule-detail">${r.detail} ${cur}</div>
+      </div>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+function renderDeckStats(data) {
+  const el = document.getElementById('deck-stats');
+  const memberCls = data.memberCount === 48 ? 'pass' : data.memberCount > 48 ? 'fail' : 'info';
+  const liveCls = data.liveCount === 12 ? 'pass' : data.liveCount > 12 ? 'fail' : 'info';
+  const energyCls = data.energyCount === 12 ? 'pass' : data.energyCount > 12 ? 'fail' : 'info';
+  const totalCls = data.mainTotal === 60 ? 'pass' : data.mainTotal > 60 ? 'fail' : 'info';
+  const ptCls = data.pointTotal <= 9 ? 'pass' : 'fail';
+  el.innerHTML = `
+    <span class="deck-stat ${memberCls}">M: ${data.memberCount}/48</span>
+    <span class="deck-stat ${liveCls}">L: ${data.liveCount}/12</span>
+    <span class="deck-stat ${totalCls}">Main: ${data.mainTotal}/60</span>
+    <span class="deck-stat ${energyCls}">E: ${data.energyCount}/12</span>
+    <span class="deck-stat ${ptCls}">pts: ${data.pointTotal}/9</span>
+    <span class="deck-stat info">Score: ${data.totalScore}</span>
+  `;
+}
+function renderDeckList() {
+  const el = document.getElementById('deck-card-list');
+  const totalEl = document.getElementById('deck-total');
+  const entries = [...deckState.cards.entries()].sort((a, b) => {
+    const order = { 'メンバー': 0, 'ライブ': 1, 'エネルギー': 2 };
+    const ta = order[a[1].card.type] || 9, tb = order[b[1].card.type] || 9;
+    return ta - tb || a[0].localeCompare(b[0]);
+  });
+  let total = 0;
+  let html = '';
+  const typeShort = { 'メンバー': 'M', 'ライブ': 'L', 'エネルギー': 'E' };
+  const baseQty = new Map();
+  for (const [, e] of entries) {
+    const base = getBaseCardNo(e.card.card_no);
+    baseQty.set(base, (baseQty.get(base) || 0) + e.qty);
+  }
+  for (const [cardNo, entry] of entries) {
+    total += entry.qty;
+    const base = getBaseCardNo(cardNo);
+    const over = baseQty.get(base) > 4 ? '\u26A0\uFE0F' : '';
+    const scoreInfo = entry.card.type === 'ライブ' && entry.card.score != null ? ` S:${entry.card.score}` : '';
+    const pt = POINT_MAP[getBaseCardNo(cardNo)];
+    const ptBadge = pt ? `<span class="dc-pt">${pt}pt</span>` : '';
+    html += `<div class="deck-card-row" data-card="${cardNo}">
+      <img class="dc-img" src="img/cards_webp/${cardNo}.webp" alt="" loading="lazy"
+        onerror="this.style.display='none'">
+      <span class="dc-qty">${entry.qty}x</span>
+      ${ptBadge}
+      <span class="dc-name">${entry.card.name || cardNo}${scoreInfo}</span>
+      ${over ? `<span class="dc-violation">${over}</span>` : ''}
+      <span class="dc-remove">\u00D7</span>
+    </div>`;
+  }
+  el.innerHTML = html || '<div style="padding:10px;text-align:center;color:#505060;font-size:11px;">\u270D\uFE0F Click cards to build your deck</div>';
+  totalEl.textContent = total;
+  el.querySelectorAll('.deck-card-row').forEach(row => {
+    row.addEventListener('click', () => removeFromDeck(row.dataset.card));
+    row.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      setDeckQty(row.dataset.card, 0);
+    });
+  });
+}
+function updateDeckUI() {
+  const { data, results } = validateDeck();
+  renderChecklist(results);
+  renderDeckStats(data);
+  renderDeckList();
+  document.getElementById('deck-name').value = deckState.name;
+  // Update grid card indicators
+  document.querySelectorAll('.card-item').forEach(el => {
+    const no = el.dataset.cardNo;
+    const entry = deckState.cards.get(no);
+    const base = getBaseCardNo(no);
+    let totalForBase = 0;
+    for (const [cn, e] of deckState.cards) {
+      if (getBaseCardNo(cn) === base) totalForBase += e.qty;
+    }
+    el.classList.toggle('in-deck', !!entry);
+    el.classList.toggle('at-limit', totalForBase >= 4);
+  });
+}
+
+// ── Mode Toggle ──
+
+function setDeckMode(enabled) {
+  deckMode = enabled;
+  document.getElementById('mode-browser').classList.toggle('active', !enabled);
+  document.getElementById('mode-deck').classList.toggle('active', enabled);
+  document.getElementById('deck-panel').classList.toggle('hidden', !enabled);
+  const ui = window._cbUi || {};
+  document.getElementById('sidebar-title').textContent = enabled ? (ui.deck_creator || 'Deck Creator') : (ui.card_browser || 'Card Browser');
+  document.getElementById('empty-state').innerHTML = enabled
+    ? '&#127183; ' + (ui.deck_mode_hint || 'Switch to Browse mode to search cards, or click cards here to add to deck')
+    : '&#128270; ' + (ui.browse_mode_hint || 'Switch to Deck mode to build a deck list');
+  // Re-bind card clicks
+  rebindCardClicks();
+}
+
+function rebindCardClicks() {
+  document.querySelectorAll('.card-item').forEach(el => {
+    const newEl = el.cloneNode(true);
+    el.parentNode.replaceChild(newEl, el);
+    newEl.addEventListener('click', () => {
+      if (deckMode) addToDeck(newEl.dataset.cardNo);
+      else copyToClipboard(newEl.dataset.cardNo);
+    });
+    newEl.addEventListener('mouseenter', showTooltip);
+    newEl.addEventListener('mouseleave', hideTooltip);
+    newEl.addEventListener('mousemove', moveTooltip);
+  });
+  updateDeckUI();
+}
+
+// ── Init Deck Creator UI ──
+
+function initDeckCreator() {
+  document.getElementById('mode-browser').addEventListener('click', () => setDeckMode(false));
+  document.getElementById('mode-deck').addEventListener('click', () => setDeckMode(true));
+  document.getElementById('export-deck').addEventListener('click', exportDeck);
+  document.getElementById('qr-deck').addEventListener('click', showQR);
+  document.getElementById('qr-close').addEventListener('click', () => document.getElementById('qr-modal').classList.add('hidden'));
+  document.getElementById('clear-deck').addEventListener('click', clearDeck);
+  document.getElementById('deck-name').addEventListener('input', function() {
+    deckState.name = this.value;
+  });
+
+  // Import: show/hide textarea
+  const importBtn = document.createElement('button');
+  importBtn.id = 'show-import';
+  importBtn.textContent = '\uD83D\uDCE5 Import';
+  importBtn.style.cssText = 'flex:1;padding:4px 6px;background:#1a1a2e;color:#8888a0;border:1px solid #0f3460;border-radius:3px;font-size:10px;cursor:pointer;';
+  document.querySelector('.deck-actions').appendChild(importBtn);
+  importBtn.addEventListener('click', () => {
+    document.getElementById('import-area').classList.toggle('hidden');
+  });
+  document.getElementById('import-btn').addEventListener('click', () => {
+    importDeckText(document.getElementById('import-text').value);
+  });
+  document.getElementById('import-cancel').addEventListener('click', () => {
+    document.getElementById('import-area').classList.add('hidden');
+  });
+
+  // Override card clicks after all cards render
+  const origRender = renderCards;
+  renderCards = function(cards) {
+    origRender(cards);
+    if (deckMode) rebindCardClicks();
+  };
+}
+
+// Show QR code for current deck
+function showQR() {
+  if (deckState.cards.size === 0) { toast('Deck is empty'); return; }
+  const name = document.getElementById('deck-name').value || 'deck';
+  const lines = [];
+  const entries = [...deckState.cards.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [cardNo, entry] of entries) {
+    lines.push(`${cardNo} x ${entry.qty}`);
+  }
+  const text = lines.join('\n');
+  document.getElementById('qr-deck-name').textContent = name;
+  document.getElementById('qr-canvas').innerHTML = '';
+  new QRCode(document.getElementById('qr-canvas'), {
+    text: text,
+    width: 200,
+    height: 200,
+    colorDark: '#e94560',
+    colorLight: '#1a1a2e',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+  document.getElementById('qr-modal').classList.remove('hidden');
+}
+
+// Load i18n then init
+(async () => {
+  await loadCbLang(cbLang);
+  const mod = await import('./js/i18n/translator.js');
+  window._cbUi = mod.getCurrentTranslations()?.ui || {};
+  init();
+  initDeckCreator();
+})();
+</script>
+</body>
+</html>

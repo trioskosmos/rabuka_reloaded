@@ -1,0 +1,562 @@
+/* --- Mobile Modal Styles --- */
+
+/* Selection modal - compact padding like sidebar panel (all screen sizes) */
+.selection-modal-content {
+    padding: 12px;
+}
+.selection-modal-content .modal-header {
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+}
+.selection-modal-content .modal-body {
+    padding: 4px;
+    max-height: 60vh;
+}
+.selection-modal-content .modal-title {
+    font-size: 1rem;
+}
+
+#selection-content .choice-cards-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: stretch;
+}
+
+/* Full-screen modals on phone */
+@media (orientation: portrait), (max-aspect-ratio: 13/9) {
+    .modal-content.card-detail-content,
+    .modal-content.play-action-content,
+    .modal-content.stage-ability-content,
+    .modal-content.ability-queue-content {
+        width: 95vw;
+        max-width: 95vw;
+        height: 90dvh;
+        max-height: 90dvh;
+        display: flex;
+        flex-direction: column;
+        padding: 12px;
+    }
+
+    .modal-content.play-action-content {
+        height: auto;
+        max-height: 85dvh;
+    }
+    .play-action-card-preview {
+        max-height: 30vh;
+    }
+    .play-action-card-preview img {
+        max-height: 30vh;
+    }
+
+    .modal-content.card-detail-content .modal-body,
+    .modal-content.stage-ability-content .modal-body,
+    .modal-content.ability-queue-content .modal-body {
+        flex: 1;
+        overflow: hidden;
+        max-height: none;
+    }
+
+    .card-detail-content .modal-header {
+        padding: 6px 8px;
+        min-height: 36px;
+    }
+    .card-detail-content .modal-header .modal-title {
+        font-size: 0.85rem;
+    }
+    .card-detail-content .nav-btn {
+        font-size: 0.8rem;
+        padding: 2px 6px;
+    }
+
+    .card-detail-layout.layout-portrait {
+        flex-direction: column;
+        height: auto;
+    }
+    .card-detail-layout.layout-landscape {
+        flex-direction: column;
+        height: auto;
+    }
+    .card-detail-layout:not(.layout-portrait):not(.layout-landscape) {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .card-detail-image img {
+        max-width: 100%;
+        width: auto;
+        height: auto;
+    }
+
+    .card-detail-info {
+        max-height: none;
+        flex: 1;
+        min-height: 0;
+    }
+
+    .play-action-card-preview {
+        max-height: 25vh;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        background: rgba(0,0,0,0.15);
+        border-radius: 6px;
+        margin-bottom: 8px;
+    }
+
+    .play-action-card-preview img {
+        max-height: 25vh;
+        object-fit: contain;
+    }
+
+    .stage-ability-card-preview {
+        max-height: 35vh;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        background: rgba(0,0,0,0.15);
+        border-radius: 6px;
+        margin-bottom: 8px;
+    }
+
+    .stage-ability-card-preview img {
+        max-height: 35vh;
+        object-fit: contain;
+    }
+
+    .stage-ability-card-text {
+        padding: 6px 8px;
+        font-size: 0.8rem;
+        background: rgba(0,0,0,0.08);
+        border-radius: 6px;
+        margin-bottom: 8px;
+        max-height: 25vh;
+        overflow-y: auto;
+    }
+
+    /* Pending choice modal - full width each component */
+    .selection-modal-content {
+        width: 95vw;
+        max-width: 95vw;
+        height: 85dvh;
+        max-height: 85dvh;
+        display: flex;
+        flex-direction: column;
+        padding: 8px;
+    }
+
+    .selection-modal-content .modal-header {
+        padding-bottom: 6px;
+        margin-bottom: 6px;
+    }
+
+    .selection-modal-content .modal-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 4px;
+        max-height: none;
+    }
+
+    .selection-modal-content .modal-title {
+        font-size: 1rem;
+    }
+
+    #selection-content.selection-grid,
+    #selection-content .selection-grid {
+        grid-template-columns: 1fr !important;
+        gap: 4px;
+        padding: 4px;
+    }
+
+    #selection-content .choice-cards-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        align-items: start;
+    }
+
+    #selection-content .choice-cards-row > .card {
+        width: 100%;
+        height: auto !important;
+        aspect-ratio: unset !important;
+        min-width: 0;
+        overflow: visible;
+        flex-shrink: 0;
+    }
+
+    #selection-content .choice-cards-row > .card img {
+        width: 100%;
+        height: auto;
+        object-fit: contain;
+    }
+
+    #selection-content .choice-cards-row > .choice-item {
+        grid-column: 1 / -1;
+    }
+
+    #selection-content .action-btn,
+    #selection-content .choice-item,
+    #selection-content .selection-card-item {
+        width: 100%;
+        min-width: 0;
+    }
+
+    /* UI mode toggle badge */
+    #ui-mode-toggle {
+        font-size: 0.75rem;
+        padding: 3px 8px;
+        min-width: 50px;
+        text-align: center;
+    }
+
+    /* Choice reopen button */
+    .action-group-buttons .action-btn {
+        min-height: 44px;
+        padding: 10px 6px !important;
+        font-size: 0.85rem !important;
+    }
+
+    /* Touch-friendly: prevent 300ms tap delay on mobile */
+    .modal-content,
+    .choice-item,
+    .action-btn,
+    .mobile-toggle-btn,
+    .card-area[style*="cursor: pointer"] {
+        touch-action: manipulation;
+    }
+
+    /* Ability queue mobile */
+    .ability-queue-entry {
+        font-size: 0.85rem;
+    }
+
+    /* Card detail stats badges */
+    .stat-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        margin: 2px;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 4px;
+        font-size: 0.75rem;
+    }
+}
+
+/* Desktop modal sizing - keep compact */
+.modal-content.card-detail-content {
+    max-width: 650px;
+    width: 90%;
+}
+
+.modal-content.play-action-content {
+    max-width: 420px;
+}
+
+.modal-content.stage-ability-content {
+    max-width: 420px;
+}
+
+.stage-ability-card-text {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+    background: rgba(0,0,0,0.08);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    max-height: 25vh;
+    overflow-y: auto;
+}
+
+.modal-content.ability-queue-content {
+    max-width: 500px;
+}
+
+/* Card detail layout */
+.card-detail-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: 100%;
+    overflow-y: auto;
+}
+
+/* Image: full width, capped at 50% of modal height */
+.card-detail-image {
+    width: 100%;
+    max-height: 50%;
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0,0,0,0.15);
+    border-radius: 6px;
+}
+
+.card-detail-image img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    display: block;
+    border-radius: 4px;
+}
+
+.card-detail-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-y: auto;
+    height: 100%;
+}
+
+/* Hide scrollbar on card detail info */
+.card-detail-info::-webkit-scrollbar { display: none; }
+.card-detail-info { scrollbar-width: none; -ms-overflow-style: none; }
+
+.card-detail-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+/* Nav buttons */
+.nav-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--text, #fff);
+    font-size: 1rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    line-height: 1;
+    transition: background 0.15s;
+}
+.nav-btn:hover { background: rgba(255,255,255,0.2); }
+.nav-btn:active { background: rgba(255,255,255,0.3); }
+
+.card-detail-header-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+}
+
+.card-detail-header-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.card-detail-header-left .modal-title {
+    font-size: 0.9rem;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    word-break: break-word;
+}
+
+.card-detail-meta {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    margin-bottom: 6px;
+}
+
+.card-detail-ability {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: rgba(255,255,255,0.85);
+}
+
+.card-detail-text {
+    overflow-y: auto;
+}
+.card-detail-text::-webkit-scrollbar { display: none; }
+.card-detail-text { scrollbar-width: none; }
+
+.card-detail-actions {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+}
+.card-detail-actions-label {
+    font-size: 0.75em;
+    opacity: 0.5;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.card-detail-play-group {
+    margin-bottom: 6px;
+}
+.card-detail-play-header {
+    font-size: 0.85rem;
+    margin-bottom: 4px;
+    opacity: 0.8;
+}
+
+#card-detail-footer {
+    padding-top: 4px;
+    margin-top: 2px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    font-size: 0.75rem;
+}
+
+/* Play action modal header nav */
+#play-action-modal .modal-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#play-action-modal .modal-header .modal-title {
+    flex: 1;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+#play-action-modal .modal-header .nav-btn {
+    font-size: 0.85rem;
+    padding: 3px 6px;
+}
+
+/* Extra narrow: image still full width */
+@media (max-width: 360px) {
+    .card-detail-image img {
+        max-width: 100%;
+    }
+}
+
+#play-action-buttons .action-group-buttons {
+    display: flex;
+    margin-bottom: 8px;
+    margin-top: 4px;
+}
+
+#play-action-buttons .grid-3 {
+    display: flex;
+    width: 100%;
+}
+
+/* Pending choice card items */
+.selection-card-item {
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.selection-card-item:active {
+    transform: scale(0.95);
+}
+
+/* View mode highlight */
+.selection-card-item.view-only {
+    cursor: help;
+}
+
+/* RPS modal: disabled state after choice made */
+#rps-modal .rps-btn:disabled,
+#rps-modal .action-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* --- Bottom Footer Bar (all modals) --- */
+.modal-footer-bar {
+    display: none;
+    flex-shrink: 0;
+}
+
+@media (orientation: portrait), (max-aspect-ratio: 13/9) {
+    .modal-footer-bar {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        border-top: 1px solid rgba(255,255,255,0.08);
+        flex-shrink: 0;
+    }
+
+    .modal-footer-bar .nav-btn {
+        flex: 0 0 auto;
+        padding: 8px 12px;
+        font-size: 0.9rem;
+        background: rgba(255,255,255,0.04);
+        border: none;
+        border-right: 1px solid rgba(255,255,255,0.08);
+        color: var(--text, #fff);
+        cursor: pointer;
+        touch-action: manipulation;
+        line-height: 1;
+    }
+    .modal-footer-bar .nav-btn:disabled {
+        opacity: 0.25;
+        cursor: not-allowed;
+    }
+    .modal-footer-bar .nav-btn:active:not(:disabled) {
+        background: rgba(255,255,255,0.12);
+    }
+
+    .modal-footer-bar .btn-view-card {
+        flex: 1;
+        padding: 8px 14px;
+        font-size: 0.85rem;
+        background: rgba(153,102,255,0.12);
+        border: none;
+        border-right: 1px solid rgba(255,255,255,0.08);
+        color: #cc88ff;
+        cursor: pointer;
+        touch-action: manipulation;
+        font-weight: 600;
+    }
+    .modal-footer-bar .btn-view-card:disabled {
+        opacity: 0.25;
+        cursor: not-allowed;
+        color: #cc88ff;
+    }
+    .modal-footer-bar .btn-view-card:active:not(:disabled) {
+        background: rgba(153,102,255,0.25);
+    }
+
+    .modal-footer-bar .btn-select-card {
+        flex: 1;
+        padding: 8px 14px;
+        font-size: 0.85rem;
+        background: rgba(120,208,139,0.15);
+        border: none;
+        border-right: 1px solid rgba(255,255,255,0.08);
+        color: #78d08b;
+        cursor: pointer;
+        touch-action: manipulation;
+        font-weight: 600;
+    }
+    .modal-footer-bar .btn-select-card:disabled {
+        opacity: 0.25;
+        cursor: not-allowed;
+    }
+    .modal-footer-bar .btn-select-card:active:not(:disabled) {
+        background: rgba(120,208,139,0.3);
+    }
+
+    .modal-footer-bar .btn-close-bottom {
+        flex: 1;
+        padding: 8px 14px;
+        font-size: 0.85rem;
+        background: transparent;
+        border: none;
+        color: rgba(255,255,255,0.5);
+        cursor: pointer;
+        touch-action: manipulation;
+    }
+    .modal-footer-bar .btn-close-bottom:active {
+        background: rgba(255,255,255,0.08);
+    }
+
+    /* Selected card highlight in discard/choice modals */
+    #discard-modal-cards .selected,
+    #selection-content .selected {
+        outline: 2px solid #9966ff;
+        outline-offset: 2px;
+        box-shadow: 0 0 8px rgba(153,102,255,0.4);
+    }
+}

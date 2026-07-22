@@ -1,0 +1,71 @@
+export const Phase = {
+    ROCK_PAPER_SCISSORS: "RockPaperScissors",
+    CHOOSE_FIRST_ATTACKER: "ChooseFirstAttacker",
+    MULLIGAN_P1: "MulliganFirstAttacker",
+    MULLIGAN_P2: "MulliganSecondAttacker",
+    MULLIGAN: "Mulligan",
+    ACTIVE: "Active",
+    ENERGY: "Energy",
+    DRAW: "Draw",
+    MAIN: "Main",
+    LIVE_CARD_SET_FIRST_ATTACKER: "LiveCardSetFirstAttacker",
+    LIVE_CARD_SET_SECOND_ATTACKER: "LiveCardSetSecondAttacker",
+    FIRST_ATTACKER_PERFORMANCE: "FirstAttackerPerformance",
+    SECOND_ATTACKER_PERFORMANCE: "SecondAttackerPerformance",
+    LIVE_VICTORY_DETERMINATION: "LiveVictoryDetermination",
+    RESPONSE: "Response",
+};
+
+export const isMulliganPhase = (phase) => {
+    if (!phase) return false;
+    const lower = String(phase).toLowerCase();
+    return lower === "mulligan" ||
+        lower === "mulliganp1turn" || lower === "mulliganp2turn" ||
+        lower === "mulliganfirstattacker" || lower === "mulligansecondattacker";
+};
+
+export const isLiveCardSetPhase = (phase) => {
+    if (!phase) return false;
+    const lower = String(phase).toLowerCase();
+    return lower === "livecardsetfirstattacker" || lower === "livecardsetsecondattacker";
+};
+
+const isStaticHost = window.location.hostname.includes('github.io') ||
+    (window.location.protocol === 'file:') ||
+    (window.location.hostname === '' && !window.location.port);
+
+export const getAppBaseUrl = () => {
+    const loc = window.location;
+    if (loc.hostname.includes('github.io')) {
+        const parts = loc.pathname.split('/');
+        if (parts.length > 2 && parts[1]) {
+            return `/${parts[1]}/`;
+        }
+    }
+    return '/';
+};
+
+export const fixImg = (path) => {
+    if (!path) return 'img/texticon/icon_energy.png';
+    let url = path;
+
+    if (url.startsWith('/')) url = url.substring(1);
+
+    if (!url.startsWith('img/') && !url.startsWith('http')) {
+        url = 'img/' + url;
+    }
+
+    const isGithub = window.location.hostname.includes('github') || window.location.hostname.includes('rabukasim');
+
+    // Don't convert texticon or cards_webp to .webp - they already have correct format
+    if (isGithub && url.toLowerCase().endsWith('.png') && !url.toLowerCase().includes('.webp') && !url.includes('texticon') && !url.includes('cards_webp')) {
+        url = url.replace(/\.png$/i, '.webp');
+    }
+
+    const base = getAppBaseUrl();
+    if (base !== '/' && !url.startsWith('http')) {
+        url = base + url;
+    }
+
+    return url;
+};

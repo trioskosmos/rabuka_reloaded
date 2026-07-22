@@ -1,0 +1,325 @@
+.game-state-modal-content {
+    width: 85vw;
+    max-width: 1100px;
+    max-height: 90vh;
+}
+
+.game-state-modal-content .modal-body {
+    overflow-y: auto;
+    max-height: calc(90vh - 100px);
+}
+
+/* Board-like spacing: consistent gaps between sections */
+.gs-tab-content {
+    padding: 12px 4px;
+    display: grid;
+    gap: 16px;
+}
+
+.gs-section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 8px);
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gs-section-header {
+    font-weight: bold;
+    font-size: 0.8rem;
+    color: var(--accent-gold);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.gs-section-header .gs-badge {
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.1);
+    color: var(--text-dim);
+    font-weight: normal;
+}
+
+/* Key-value grid — like board stat items */
+.gs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 6px 16px;
+}
+
+.gs-grid-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 6px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+.gs-grid-item .gs-label {
+    color: var(--text-dim);
+}
+
+.gs-grid-item .gs-value {
+    color: var(--text);
+    font-weight: 500;
+    text-align: right;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.75rem;
+    max-width: 55%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gs-value.true  { color: var(--accent-green); }
+.gs-value.false { color: var(--text-muted); }
+
+/* Player card row — like board card spacing */
+.gs-player-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.gs-player-panel {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 8px);
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.02);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gs-player-panel.p0 {
+    border-left: 3px solid var(--accent-blue);
+}
+
+.gs-player-panel.p1 {
+    border-left: 3px solid var(--accent-pink);
+}
+
+.gs-player-title {
+    font-weight: bold;
+    font-size: 0.85rem;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Card row — mimic board card spacing */
+.gs-card-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.gs-card-slot {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 6px;
+    padding: 6px 10px;
+    min-width: 140px;
+    flex: 1 0 auto;
+    font-size: 0.7rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.gs-card-slot .card-name {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 0.75rem;
+}
+
+.gs-card-slot .card-sub {
+    color: var(--text-dim);
+    font-size: 0.65rem;
+}
+
+.gs-card-slot .card-hearts {
+    display: flex;
+    gap: 2px;
+    flex-wrap: wrap;
+    font-size: 0.65rem;
+    color: var(--accent-pink);
+}
+
+.gs-card-slot .card-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.08);
+    color: var(--text-dim);
+}
+.gs-card-slot .card-badge.moved {
+    background: rgba(250, 204, 21, 0.2);
+    color: #facc15;
+}
+.gs-card-slot .card-badge.negated {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+.gs-card-slot .card-badge.active-state {
+    background: rgba(74, 222, 128, 0.2);
+    color: #4ade80;
+}
+.gs-card-slot .card-badge.wait-state {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fbbf24;
+}
+
+/* Zone rows on the zones tab */
+.gs-zone-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+}
+
+.gs-zone-box {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.7rem;
+}
+
+.gs-zone-box .zone-name {
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: var(--accent-blue);
+    display: flex;
+    justify-content: space-between;
+}
+
+.gs-zone-box .zone-cards {
+    margin-top: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+}
+
+.gs-zone-box .zone-card-chip {
+    font-size: 0.6rem;
+    padding: 1px 5px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Tracking tab — raw data as compact grid */
+.gs-tracking-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 10px;
+}
+
+.gs-tracking-box {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
+.gs-tracking-box h4 {
+    font-size: 0.75rem;
+    color: var(--accent-gold);
+    margin: 0 0 4px 0;
+    padding-bottom: 3px;
+    border-bottom: 1px solid var(--border);
+}
+
+.gs-tracking-box .gs-track-item {
+    font-size: 0.7rem;
+    padding: 1px 0;
+    color: var(--text-dim);
+    font-family: 'Consolas', 'Courier New', monospace;
+}
+
+.gs-track-item .track-kv {
+    display: flex;
+    justify-content: space-between;
+}
+
+.gs-track-item .track-kv .tv {
+    color: var(--text);
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+}
+
+/* Perf/GS button row */
+.perf-gs-btn-row {
+    display: flex;
+    gap: 4px;
+    width: 100%;
+}
+
+.gs-btn {
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1;
+    padding: 2px 6px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-dim);
+}
+.gs-btn:hover {
+    color: var(--text);
+    border-color: var(--accent-gold);
+    background: rgba(245, 158, 11, 0.1);
+}
+
+/* Zone card chip type colors */
+.zone-card-chip.member { background: rgba(74, 158, 255, 0.15); color: #7dd3fc; }
+.zone-card-chip.live { background: rgba(255, 85, 170, 0.15); color: #f9a8d4; }
+.zone-card-chip.energy { background: rgba(46, 204, 113, 0.15); color: #6ee7b7; }
+
+/* Generic badge style (for orientations, states) */
+.gs-card-slot .badge, .badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.08);
+    color: var(--text-dim);
+}
+.gs-card-slot .badge.active-state, .badge.active-state { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+.gs-card-slot .badge.wait-state, .badge.wait-state { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+.gs-card-slot .badge.moved, .badge.moved { background: rgba(250, 204, 21, 0.2); color: #facc15; }
+.gs-card-slot .badge.negated, .badge.negated { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.gs-card-slot .badge.member, .badge.member { background: rgba(74, 158, 255, 0.2); color: #7dd3fc; }
+.gs-card-slot .badge.live, .badge.live { background: rgba(255, 85, 170, 0.2); color: #f9a8d4; }
+.gs-card-slot .badge.energy, .badge.energy { background: rgba(46, 204, 113, 0.2); color: #6ee7b7; }
+
+/* Ability queue entry highlight */
+.gs-track-item.highlight-queue {
+    background: rgba(245, 158, 11, 0.08);
+    border-left: 2px solid var(--accent-gold);
+    padding: 2px 6px;
+}
+
+/* Section header button style */
+.log-container h3 .gs-btn {
+    float: right;
+    margin-top: -2px;
+}
