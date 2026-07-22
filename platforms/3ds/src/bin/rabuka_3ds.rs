@@ -1712,10 +1712,18 @@ fn main() {
                     if keys & 0x00000040 != 0 && display_pos > 0 {
                         display_pos -= 1;
                         cur = display_order[display_pos];
+                        group_sel = group_areas
+                            .get(display_pos)
+                            .and_then(|g| g.iter().position(|&fi| fi == cur))
+                            .unwrap_or(0);
                         redraw = true;
                     } else if keys & 0x00000080 != 0 && display_pos + 1 < display_order.len() {
                         display_pos += 1;
                         cur = display_order[display_pos];
+                        group_sel = group_areas
+                            .get(display_pos)
+                            .and_then(|g| g.iter().position(|&fi| fi == cur))
+                            .unwrap_or(0);
                         redraw = true;
                     }
                 }
@@ -2869,31 +2877,65 @@ fn main() {
                                                 .as_ref()
                                                 .and_then(|p| p.card_name.clone())
                                                 .unwrap_or_default();
-                                            let cn = act
-                                                .parameters
-                                                .as_ref()
-                                                .and_then(|p| p.card_no.clone())
-                                                .unwrap_or_default();
-                                            let cost = act
-                                                .parameters
-                                                .as_ref()
-                                                .and_then(|p| p.base_cost)
-                                                .unwrap_or(0);
-                                            let area = act
-                                                .parameters
-                                                .as_ref()
-                                                .and_then(|p| p.stage_area.clone())
-                                                .unwrap_or_default();
-                                            let is_db = act
-                                                .parameters
-                                                .as_ref()
-                                                .and_then(|p| p.card_indices.as_ref())
-                                                .map(|ci| ci.len() >= 2)
-                                                .unwrap_or(false);
-                                            if is_db {
-                                                format!("[{}] {} >>{} c:{}", cn, name, area, cost)
+                                            let areas =
+                                                group_areas.get(di).cloned().unwrap_or_default();
+                                            if areas.len() > 1 {
+                                                let area_labels = ["L", "C", "R"];
+                                                let mut s = format!("{} ", name);
+                                                for (ai, afi) in areas.iter().enumerate() {
+                                                    let act2 = &acts_cache[*afi];
+                                                    let a = act2
+                                                        .parameters
+                                                        .as_ref()
+                                                        .and_then(|p| p.stage_area.clone())
+                                                        .unwrap_or_default();
+                                                    let area_cost = act2
+                                                        .parameters
+                                                        .as_ref()
+                                                        .and_then(|p| p.available_areas.as_ref())
+                                                        .and_then(|aa| {
+                                                            aa.iter()
+                                                                .find(|x| x.area == a)
+                                                                .map(|x| x.cost)
+                                                        })
+                                                        .or_else(|| {
+                                                            act2.parameters
+                                                                .as_ref()
+                                                                .and_then(|p| p.base_cost)
+                                                        })
+                                                        .unwrap_or(0);
+                                                    let bracket =
+                                                        if ai == group_sel { '[' } else { ' ' };
+                                                    let close =
+                                                        if ai == group_sel { ']' } else { ' ' };
+                                                    s.push_str(&format!(
+                                                        "{}{}:{}{} ",
+                                                        bracket, area_labels[ai], area_cost, close
+                                                    ));
+                                                }
+                                                s
                                             } else {
-                                                format!("[{}] {} {} c:{}", cn, name, area, cost)
+                                                let area = act
+                                                    .parameters
+                                                    .as_ref()
+                                                    .and_then(|p| p.stage_area.clone())
+                                                    .unwrap_or_default();
+                                                let area_cost = act
+                                                    .parameters
+                                                    .as_ref()
+                                                    .and_then(|p| p.available_areas.as_ref())
+                                                    .and_then(|aa| {
+                                                        aa.iter()
+                                                            .find(|x| x.area == area)
+                                                            .map(|x| x.cost)
+                                                    })
+                                                    .or_else(|| {
+                                                        act.parameters
+                                                            .as_ref()
+                                                            .and_then(|p| p.base_cost)
+                                                    })
+                                                    .unwrap_or(0);
+                                                format!("{} {} c:{}", name, area, area_cost)
                                             }
                                         }
                                         game_setup::ActionType::UseAbility => {
@@ -2905,7 +2947,7 @@ fn main() {
                                             let cost = act
                                                 .parameters
                                                 .as_ref()
-                                                .and_then(|p| p.base_cost)
+                                                .and_then(|p| p.final_cost.or(p.base_cost))
                                                 .unwrap_or(0);
                                             let area = act
                                                 .parameters
@@ -2919,27 +2961,48 @@ fn main() {
                                                 .unwrap_or_default();
                                             let abil_short: String =
                                                 abil.chars().take(28).collect();
-                                            if cost > 0 {
-                                                format!(
-                                                    "[{}] {} {} c:{} {}",
-                                                    cn_or_empty(act),
-                                                    name,
-                                                    area,
-                                                    cost,
-                                                    abil_short
-                                                )
+                                            let cn = cn_or_empty(act);
+                                            if !cn.is_empty() {
+                                                if cost > 0 {
+                                                    format!(
+                                                        "[{}] {} {} c:{} {}",
+                                                        cn, name, area, cost, abil_short
+                                                    )
+                                                } else {
+                                                    format!(
+                                                        "[{}] {} {} {}",
+                                                        cn, name, area, abil_short
+                                                    )
+                                                }
                                             } else {
-                                                format!(
-                                                    "[{}] {} {} {}",
-                                                    cn_or_empty(act),
-                                                    name,
-                                                    area,
-                                                    abil_short
-                                                )
+                                                if cost > 0 {
+                                                    format!(
+                                                        "{} {} c:{} {}",
+                                                        name, area, cost, abil_short
+                                                    )
+                                                } else {
+                                                    format!("{} {} {}", name, area, abil_short)
+                                                }
                                             }
                                         }
                                         _ => {
-                                            act.description.lines().next().unwrap_or("").to_string()
+                                            let cn = cn_or_empty(act);
+                                            let name = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.card_name.clone())
+                                                .unwrap_or_default();
+                                            let desc = act
+                                                .description
+                                                .lines()
+                                                .next()
+                                                .unwrap_or("")
+                                                .to_string();
+                                            if !cn.is_empty() && !name.is_empty() {
+                                                format!("[{}] {} {}", cn, name, desc)
+                                            } else {
+                                                desc
+                                            }
                                         }
                                     };
                                     let color = if is_sel { COL_GOLD } else { COL_LIGHT };

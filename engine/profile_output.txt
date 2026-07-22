@@ -1,0 +1,87 @@
+    Blocking waiting for file lock on build directory
+   Compiling rabuka_engine v0.1.0 (C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine)
+warning: unused import: `ActionType`
+ --> src\bot\evaluation.rs:1:33
+  |
+1 | use crate::game_setup::{Action, ActionType};
+  |                                 ^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `GameState`
+ --> src\bot\ismcts.rs:2:37
+  |
+2 | use crate::game_state::{GameResult, GameState};
+  |                                     ^^^^^^^^^
+
+warning: unused imports: `ActionEncoding` and `action_target_zone`
+  --> src\bot\mod.rs:20:16
+   |
+20 | use encoding::{action_target_zone, ActionEncoding};
+   |                ^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+
+warning: function `action_type_idx` is never used
+  --> src\bot\mod.rs:89:4
+   |
+89 | fn action_type_idx(t: &ActionType) -> u8 {
+   |    ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+memory allocation of 1172400 bytes failed
+stack backtrace:
+   0:     0x7ffc2afcfec9 - std::backtrace_rs::backtrace::win64::trace
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\std\src\..\..\backtrace\src\backtrace\win64.rs:85
+   1:     0x7ffc2afcfec9 - std::backtrace_rs::backtrace::trace_unsynchronized
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\std\src\..\..\backtrace\src\backtrace\mod.rs:66
+   2:     0x7ffc2afcfec9 - std::sys::backtrace::_print_fmt
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\std\src\sys\backtrace.rs:74
+   3:     0x7ffc2afcfec9 - std::sys::backtrace::impl$0::print::impl$0::fmt
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\std\src\sys\backtrace.rs:44
+   4:     0x7ffc2aff8f31 - core::fmt::write
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\core\src\fmt\mod.rs:0
+   5:     0x7ffc2afdfda4 - core::io::write::default_write_fmt
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\core\src\io\write.rs:402
+   6:     0x7ffc2afdfda4 - core::io::write::Write::write_fmt<std::sys::stdio::windows::Stderr>
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\core\src\io\write.rs:335
+   7:     0x7ffc2afc1dfc - std::sys::backtrace::BacktraceLock::print
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\std\src\sys\backtrace.rs:47
+   8:     0x7ffc2afc1dfc - std::alloc::default_alloc_error_hook
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\std\src\alloc.rs:397
+   9:     0x7ffc2afa655c - std::alloc::rust_oom::closure$0
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\std\src\alloc.rs:428
+  10:     0x7ffc2afa3b8f - std::sys::backtrace::__rust_end_short_backtrace<std::alloc::rust_oom::closure_env$0,never$>
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\std\src\sys\backtrace.rs:182
+  11:     0x7ffc2afc1e9b - std::alloc::rust_oom
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\std\src\alloc.rs:424
+  12:     0x7ffc2afa7398 - std::alloc::_::__rust_alloc_error_handler
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\std\src\alloc.rs:423
+  13:     0x7ffc2f37b5e9 - alloc::alloc::handle_alloc_error::rt_error
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\alloc\src\alloc.rs:551
+  14:     0x7ffc2f37b5e9 - alloc::alloc::handle_alloc_error
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\alloc\src\alloc.rs:557
+  15:     0x7ffc2f37b606 - alloc::raw_vec::handle_error
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\alloc\src\raw_vec\mod.rs:894
+  16:     0x7ffc2b5e6eaa - <rustc_mir_transform[78d9042d9ba98943]::gvn::GVN as rustc_mir_transform[78d9042d9ba98943]::pass_manager::MirPass>::run_pass
+  17:     0x7ffc2b4f83c2 - rustc_mir_transform[78d9042d9ba98943]::mir_const_qualif
+  18:     0x7ffc2b4f5198 - rustc_mir_transform[78d9042d9ba98943]::optimized_mir
+  19:     0x7ffc2bf1e790 - rustc_query_impl[df51a0c798a5866d]::dep_kind_vtables::make_dep_kind_vtables
+  20:     0x7ffc2be4be3c - RINvMs6_NtCsipH3PgIa0bX_9hashbrown3rawINtB6_8RawTableTTNtNtNtCscFijQH7AuCv_12rustc_middle2ty8instance8InstanceNtNtBX_4mono14CollectionModeETINtNtNtBX_5query5erase10ErasedDataAhj20_ENtNtNtBX_9dep_graph5graph12DepNodeIndexEEE14reserve_rehashNCNvMs1_NtCslhZ4E
+  21:     0x7ffc2bf1e831 - rustc_query_impl[df51a0c798a5866d]::dep_kind_vtables::make_dep_kind_vtables
+  22:     0x7ffc2c3296ce - <rustc_metadata[6225867fe22c01ca]::creader::CStore>::from_tcx
+  23:     0x7ffc2ac7badf - RINvNtNtNtCsktyKsOhwOZM_4core5slice4sort6stable14driftsort_mainTNtNtCsh3UW2bYY7bF_9rustc_abi6layout10VariantIdxNtNtCscFijQH7AuCv_12rustc_middle2ty10VariantDefENCINvMNtCshnuO7vFehM9_5alloc5sliceSBZ_11sort_by_keyB10_NCNvMsr_NtNtCs8qqMssewbKo_14rustc_metadata
+  24:     0x7ffc2ac983db - rustc_metadata[6225867fe22c01ca]::rmeta::encoder::encode_metadata
+  25:     0x7ffc2ac93761 - rustc_metadata[6225867fe22c01ca]::fs::encode_and_write_metadata
+  26:     0x7ffc2833f22c - <rustc_interface[9828b7e70cd2c1ea]::queries::Linker>::codegen_and_build_linker
+  27:     0x7ffc283114b6 - std[9e9710fefbcd6341]::sys::backtrace::__rust_begin_short_backtrace::<std[9e9710fefbcd6341]::thread::lifecycle::spawn_unchecked<ctrlc[7a2e38bd851655ca]::set_handler_inner<rustc_driver_impl[cb2fdeb6e13f493a]::install_ctrlc_handler::{closure#0}>::{closure#0}, ()>::{closure#1}::{closure#0}::{closure#0}, ()>
+  28:     0x7ffc2830b385 - RINvNtNtCsdCaCQNVoCNp_3std3sys9backtrace28___rust_begin_short_backtraceNCNCINvNtCsd3WdQkUIdPW_15rustc_interface4util26run_in_thread_with_globalsNCINvB1e_31run_in_thread_pool_with_globalsNCINvNtB1g_9interface12run_compileruNCNvCshryH4fc0qPm_17rustc_driver_i
+  29:     0x7ffc283157a7 - std[9e9710fefbcd6341]::sys::backtrace::__rust_begin_short_backtrace::<std[9e9710fefbcd6341]::thread::lifecycle::spawn_unchecked<ctrlc[7a2e38bd851655ca]::set_handler_inner<rustc_driver_impl[cb2fdeb6e13f493a]::install_ctrlc_handler::{closure#0}>::{closure#0}, ()>::{closure#1}::{closure#0}::{closure#0}, ()>
+  30:     0x7ffc2afccbb3 - std::sys::thread::windows::impl$0::new::thread_start
+                               at /rustc/d0babd8b6b05ef9bb65d42f928cef4129d64cf65/library\std\src\sys\thread\windows.rs:58
+  31:     0x7ffd3f17e957 - BaseThreadInitThunk
+  32:     0x7ffd3fb6ad6c - RtlUserThreadStart
+warning: `rabuka_engine` (lib) generated 4 warnings (run `cargo fix --lib -p rabuka_engine` to apply 3 suggestions)
+error: could not compile `rabuka_engine` (lib); 4 warnings emitted
+
+Caused by:
+  process didn't exit successfully: `C:\Users\trios\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\bin\rustc.exe --crate-name rabuka_engine --edition=2021 src\lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=3 -C embed-bitcode=no --cfg "feature=\"alloc_tracker\"" --cfg "feature=\"bytecode_abilities\"" --cfg "feature=\"debug_conditions\"" --cfg "feature=\"default\"" --cfg "feature=\"env_logger\"" --cfg "feature=\"profiling\"" --cfg "feature=\"rand\"" --cfg "feature=\"rmp-serde\"" --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values(\"3ds\", \"actix-cors\", \"actix-files\", \"actix-web\", \"alloc_tracker\", \"arena_allocator\", \"bytecode_abilities\", \"bytes\", \"compact_card_data\", \"compact_cards\", \"compact_state\", \"console\", \"dc\", \"debug_conditions\", \"default\", \"ds\", \"env_logger\", \"local-ip-address\", \"no_std\", \"once_cell\", \"profiling\", \"psp\", \"rand\", \"rmp-serde\", \"server\", \"tokio\", \"tokio-stream\", \"uuid\"))" -C metadata=a0c051d1d4fc8d18 -C extra-filename=-ad45024db6a33d01 --out-dir C:/rust_targets\release\deps -C strip=debuginfo -L dependency=C:/rust_targets\release\deps --extern env_logger=C:/rust_targets\release\deps\libenv_logger-e784e2773544e811.rmeta --extern hashbrown=C:/rust_targets\release\deps\libhashbrown-c659ed0c31ec6f83.rmeta --extern log=C:/rust_targets\release\deps\liblog-3ee1fff5315e3411.rmeta --extern rand=C:/rust_targets\release\deps\librand-1f8ff8c0c95d2a0f.rmeta --extern rmp_serde=C:/rust_targets\release\deps\librmp_serde-4eaf731844da6d28.rmeta --extern serde=C:/rust_targets\release\deps\libserde-4761d688aeb3dc16.rmeta --extern serde_json=C:/rust_targets\release\deps\libserde_json-bb048f20001031ad.rmeta --extern smallvec=C:/rust_targets\release\deps\libsmallvec-83202240375a17cc.rmeta` (exit code: 0xc0000409, STATUS_STACK_BUFFER_OVERRUN)

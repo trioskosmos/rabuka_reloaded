@@ -80,6 +80,8 @@ impl super::TurnEngine {
         {
             match game_state.current_phase {
                 Phase::Active => {
+                    #[cfg(not(feature = "no_std"))]
+                    let _t = crate::timer::Timer::start("advance_phase::active");
                     tdbg!("PHASE_ACTIVE:0");
                     game_state.reset_keyword_tracking();
                     tdbg!("PHASE_ACTIVE:1 reset_keyword_tracking OK");
@@ -138,6 +140,8 @@ impl super::TurnEngine {
                     tdbg!("PHASE_ACTIVE:DONE");
                 }
                 Phase::Energy => {
+                    #[cfg(not(feature = "no_std"))]
+                    let _t = crate::timer::Timer::start("advance_phase::energy");
                     tdbg!("PHASE_ENERGY:0");
                     let _drawn_card = game_state.active_player_mut().draw_energy();
                     game_state.mark_constants_dirty();
@@ -146,6 +150,8 @@ impl super::TurnEngine {
                     game_state.current_phase = Phase::Draw;
                 }
                 Phase::Draw => {
+                    #[cfg(not(feature = "no_std"))]
+                    let _t = crate::timer::Timer::start("advance_phase::draw");
                     Self::check_timing(game_state);
                     let _drawn = game_state.active_player_mut().draw_card();
                     // recalculate_constants skipped — check_timing below calls it
@@ -181,6 +187,8 @@ impl super::TurnEngine {
                 // Q104: When discarding N from top of deck with fewer than N cards,
                 // refresh in between (handled by draw/peek functions automatically).
                 Phase::LiveCardSetSecondAttacker => {
+                    #[cfg(not(feature = "no_std"))]
+                    let _t = crate::timer::Timer::start("advance_phase::live_card_set");
                     game_state.player1.live_card_set_limit_reduction = 0;
                     game_state.player2.live_card_set_limit_reduction = 0;
                     tdbg!("PHASE_LIVE:0");
@@ -208,12 +216,18 @@ impl super::TurnEngine {
                     }
                 }
                 Phase::FirstAttackerPerformance => {
+                    #[cfg(not(feature = "no_std"))]
+                    let _t = crate::timer::Timer::start("advance_phase::first_performance");
                     Self::execute_performance_phase(game_state, true);
                 }
                 Phase::SecondAttackerPerformance => {
+                    #[cfg(not(feature = "no_std"))]
+                    let _t = crate::timer::Timer::start("advance_phase::second_performance");
                     Self::execute_performance_phase(game_state, false);
                 }
                 Phase::LiveVictoryDetermination => {
+                    #[cfg(not(feature = "no_std"))]
+                    let _t = crate::timer::Timer::start("advance_phase::live_victory");
                     Self::execute_live_victory_determination(game_state);
                     if game_state.has_pending_choice() {
                         return;
@@ -239,6 +253,8 @@ impl super::TurnEngine {
     }
 
     fn execute_performance_phase(game_state: &mut GameState, is_first: bool) {
+        #[cfg(not(feature = "no_std"))]
+        let _t = crate::timer::Timer::start("execute_performance_phase");
         let mut resolution_zone = core::mem::take(&mut game_state.resolution_zone);
         // Take snapshots of modifier state BEFORE auto-ability triggers
         // (these are type-converted flat copies, not references — no borrow conflict)

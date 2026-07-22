@@ -264,6 +264,9 @@ fn bake_ds(repo_root: &Path) {
             .unwrap_or(0);
 
         let ability_ref = card.abilities.first().map(|ar| ar.idx()).unwrap_or(0);
+        let group_u8 = group_to_u8(&card.group);
+        let series_u8 = series_to_u8(&card.series);
+        let unit_u8 = card.unit.as_ref().map(|_| 1u8).unwrap_or(0);
 
         let mut rec = Vec::with_capacity(20);
         rec.extend_from_slice(&card_no_off.to_le_bytes());
@@ -273,9 +276,9 @@ fn bake_ds(repo_root: &Path) {
         rec.push(card.blade as u8);
         rec.push(card.score.unwrap_or(0) as u8);
         rec.push(base_heart_u8);
-        rec.push(0); // group (reconstructed from series if needed)
-        rec.push(0); // series (reconstructed from group if needed)
-        rec.push(0); // unit
+        rec.push(group_u8);
+        rec.push(series_u8);
+        rec.push(unit_u8);
         rec.push(blade_heart_u8);
         rec.push(special_heart_u8);
         rec.extend_from_slice(&ability_ref.to_le_bytes());
@@ -294,17 +297,17 @@ fn bake_ds(repo_root: &Path) {
             .and_then(|v| v.as_str())
             .unwrap_or("Unknown");
         let name_off = add_str(deck_name, &mut str_bytes, &mut str_offsets);
-        let filename = format!("deck_{i}_cards.json");
-        let path = tmp.join(&filename);
-        let card_nos: Vec<String> = if let Ok(content) = fs::read_to_string(&path) {
-            if let Ok(cards) = serde_json::from_str::<Vec<Card>>(&content) {
-                cards.iter().map(|c| c.card_no.to_string()).collect()
-            } else {
-                Vec::new()
-            }
-        } else {
-            Vec::new()
-        };
+        // Use the original card_nos list from the deck entry (has duplicates)
+        // deck_N_cards.json only has unique cards per deck, NOT the full list
+        let card_nos: Vec<String> = entry
+            .get("cards")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default();
         let mut entry_bin = Vec::new();
         entry_bin.extend_from_slice(&name_off.to_le_bytes());
         entry_bin.extend_from_slice(&(card_nos.len() as u16).to_le_bytes());
@@ -635,6 +638,30 @@ fn first_heart_u8(map: &rabuka_engine::card::HeartMap) -> u8 {
         .next()
         .map(|c| heart_color_to_u8(*c))
         .unwrap_or(0)
+}
+
+fn series_to_u8(series: &str) -> u8 {
+    // Take the first series if multiple (separated by newline)
+    let primary = series.split('\n').next().unwrap_or(series);
+    match primary {
+        "ラブライブ！" => 1,
+        "ラブライブ！サンシャイン!!" => 2,
+        "ラブライブ！虹ヶ咲学園スクールアイドル同好会" => 3,
+        "ラブライブ！スーパースター!!" => 4,
+        "蓮ノ空女学院スクールアイドルクラブ" => 5,
+        _ => 0,
+    }
+}
+
+fn group_to_u8(group: &str) -> u8 {
+    match group {
+        "μ's" => 1,
+        "Aqours" => 2,
+        "虹ヶ咲" => 3,
+        "Liella!" => 4,
+        "蓮ノ空" => 5,
+        _ => 0,
+    }
 }
 
 // ---------------------------------------------------------------------------

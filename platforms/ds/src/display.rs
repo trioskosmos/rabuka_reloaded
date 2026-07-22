@@ -78,6 +78,16 @@ impl Display {
         }
     }
 
+    pub fn overwrite_row(&mut self, row: u32, text: &str) {
+        if row < ROWS {
+            let padded = alloc::format!("{text:32.32}");
+            self.cursor_x = 0;
+            self.cursor_y = row as i32;
+            unsafe { nds_set_cursor(self.cursor_y, 0) }
+            self.print(&padded);
+        }
+    }
+
     pub fn draw_menu(&mut self, items: &[&str], selected: usize, title: &str) {
         self.clear();
         self.println(title);

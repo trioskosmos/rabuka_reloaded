@@ -57,6 +57,51 @@ int __atomic_compare_exchange_4(int* ptr, int* expected, int desired, int weak, 
     }
 }
 
+unsigned char __atomic_load_1(unsigned char* ptr, int memorder) {
+    (void)memorder;
+    return *ptr;
+}
+
+void __atomic_store_1(unsigned char* ptr, unsigned char val, int memorder) {
+    (void)memorder;
+    *ptr = val;
+}
+
+unsigned char __atomic_exchange_1(unsigned char* ptr, unsigned char val, int memorder) {
+    (void)memorder;
+    unsigned char tmp = *ptr;
+    *ptr = val;
+    return tmp;
+}
+
+int __atomic_compare_exchange_1(unsigned char* ptr, unsigned char* expected, unsigned char desired, int weak, int success_memorder, int failure_memorder) {
+    (void)weak;
+    (void)success_memorder;
+    (void)failure_memorder;
+    unsigned char cur = *ptr;
+    if (cur == *expected) {
+        *ptr = desired;
+        return 1;
+    } else {
+        *expected = cur;
+        return 0;
+    }
+}
+
+int __atomic_fetch_add_1(unsigned char* ptr, unsigned char val, int memorder) {
+    (void)memorder;
+    unsigned char tmp = *ptr;
+    *ptr = tmp + val;
+    return tmp;
+}
+
+int __atomic_fetch_sub_1(unsigned char* ptr, unsigned char val, int memorder) {
+    (void)memorder;
+    unsigned char tmp = *ptr;
+    *ptr = tmp - val;
+    return tmp;
+}
+
 void nds_init(void) {
     videoSetMode(MODE_0_2D);
     videoSetModeSub(MODE_0_2D);

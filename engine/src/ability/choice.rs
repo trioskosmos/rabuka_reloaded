@@ -1050,10 +1050,9 @@ impl super::resolver::AbilityResolver {
                     p.hand.cards.to_vec()
                 };
                 let mut all_hand_idxs = hand_idx.to_vec();
-                let prev_ids: Vec<i16> = self.selected_cards.clone();
-                if !prev_ids.is_empty() {
+                if !self.selected_cards.is_empty() {
                     for (hidx, cid) in hand_cards.iter().enumerate() {
-                        if prev_ids.contains(cid) && !all_hand_idxs.contains(&hidx) {
+                        if self.selected_cards.contains(cid) && !all_hand_idxs.contains(&hidx) {
                             all_hand_idxs.push(hidx);
                         }
                     }
@@ -1180,8 +1179,7 @@ impl super::resolver::AbilityResolver {
                 return Ok(());
             }
             let mut all_idxs = hand_idx.to_vec();
-            let selected_ids = self.selected_cards.clone();
-            if !selected_ids.is_empty() {
+            if !self.selected_cards.is_empty() {
                 let target = ctx
                     .target_player_id
                     .as_deref()
@@ -1192,7 +1190,7 @@ impl super::resolver::AbilityResolver {
                     p.hand.cards.to_vec()
                 };
                 for (hidx, cid) in hand_cards.iter().enumerate() {
-                    if selected_ids.contains(cid) && !all_idxs.contains(&hidx) {
+                    if self.selected_cards.contains(cid) && !all_idxs.contains(&hidx) {
                         all_idxs.push(hidx);
                     }
                 }
@@ -1849,9 +1847,8 @@ impl super::resolver::AbilityResolver {
                     let p = gs.resolve_target_player_mut(&target);
                     p.waitroom.cards.to_vec()
                 };
-                let already_selected = self.selected_cards.clone();
                 let filtered_idxs: Vec<usize> = (0..waitroom_cards.len())
-                    .filter(|&i| !already_selected.contains(&waitroom_cards[i]))
+                    .filter(|&i| !self.selected_cards.contains(&waitroom_cards[i]))
                     .collect();
                 let remaining_count = filtered_idxs.len();
                 let fi = if filtered_idxs.is_empty() {
@@ -1899,10 +1896,9 @@ impl super::resolver::AbilityResolver {
                     p.waitroom.cards.to_vec()
                 };
                 let mut filtered_idxs: Vec<usize> = Vec::new();
-                let prev_ids = self.selected_cards.clone();
-                if !prev_ids.is_empty() {
+                if !self.selected_cards.is_empty() {
                     for (idx, cid) in waitroom_cards.iter().enumerate() {
-                        if prev_ids.contains(cid) && !filtered_idxs.contains(&idx) {
+                        if self.selected_cards.contains(cid) && !filtered_idxs.contains(&idx) {
                             filtered_idxs.push(idx);
                         }
                     }

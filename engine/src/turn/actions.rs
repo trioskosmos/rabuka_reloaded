@@ -1053,14 +1053,21 @@ impl super::TurnEngine {
             tdbg!("CHECK_TIMING:2b p2 refresh shuffled");
         }
         tdbg!("CHECK_TIMING:3 refresh done");
-        Self::check_victory_condition(game_state);
+        {
+            #[cfg(not(feature = "no_std"))]
+            let _t = crate::timer::Timer::start("check_timing::check_victory_condition");
+            Self::check_victory_condition(game_state);
+        }
         tdbg!("CHECK_TIMING:4 victory OK");
         let p1_id = game_state.player1.id.clone();
         let p2_id = game_state.player2.id.clone();
-        Self::check_invalid_live_cards(game_state, &p1_id);
+        {
+            #[cfg(not(feature = "no_std"))]
+            let _t = crate::timer::Timer::start("check_timing::check_invalid_live_cards");
+            Self::check_invalid_live_cards(game_state, &p1_id);
+            Self::check_invalid_live_cards(game_state, &p2_id);
+        }
         tdbg!("CHECK_TIMING:5 invalid live p1 OK");
-        Self::check_invalid_live_cards(game_state, &p2_id);
-        tdbg!("CHECK_TIMING:6 invalid live p2 OK");
         let _e1 =
             Self::check_invalid_energy_cards(&mut game_state.player1, &game_state.card_database);
         let _e2 =
@@ -1077,7 +1084,11 @@ impl super::TurnEngine {
             game_state.mark_constants_dirty();
         }
         tdbg!("CHECK_TIMING:8 orphaned under OK");
-        game_state.recalculate_constants();
+        {
+            #[cfg(not(feature = "no_std"))]
+            let _t = crate::timer::Timer::start("check_timing::recalculate_constants");
+            game_state.recalculate_constants();
+        }
         tdbg!("CHECK_TIMING:9 recalc_constants OK");
         Self::check_invalid_resolution_zone(game_state);
         tdbg!("CHECK_TIMING:10 invalid resolution OK");
@@ -1086,10 +1097,18 @@ impl super::TurnEngine {
             game_state.game_ended = true;
         }
         tdbg!("CHECK_TIMING:11 perm_loop OK");
-        Self::check_victory_condition(game_state);
+        {
+            #[cfg(not(feature = "no_std"))]
+            let _t = crate::timer::Timer::start("check_timing::check_victory_condition");
+            Self::check_victory_condition(game_state);
+        }
         tdbg!("CHECK_TIMING:12 victory2 OK");
         let active_player_id = game_state.active_player().id.clone();
-        game_state.process_pending_auto_abilities(&active_player_id);
+        {
+            #[cfg(not(feature = "no_std"))]
+            let _t = crate::timer::Timer::start("check_timing::process_pending_auto_abilities");
+            game_state.process_pending_auto_abilities(&active_player_id);
+        }
         tdbg!("CHECK_TIMING:13 auto_abilities OK");
     }
 

@@ -1068,6 +1068,8 @@ impl super::TurnEngine {
         heart_color_multiplier: &HashMap<i16, HeartColor>,
         cannot_live: bool,
     ) -> LivePerformanceData {
+        #[cfg(not(feature = "no_std"))]
+        let _t = crate::timer::Timer::start("player_perform_live");
         // Q68/Rule: "cannot_live" discards live cards during performance; no yell, no live.
         if cannot_live {
             let moved: Vec<i16> = player.live_card_zone.cards.iter().copied().collect();

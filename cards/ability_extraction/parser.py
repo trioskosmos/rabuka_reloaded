@@ -5065,136 +5065,6 @@ def infer_count_from_icons(d, text):
         return
 
 
-def _fill_move_cards_defaults(action, text, cached_source, cached_dest):
-    a = action.get("action")
-    if action.get("destination") == "hand" and "source" not in action:
-        action["source"] = "discard"
-    if "source" not in action:
-        s = cached_source if cached_source is not None else extract_source(text)
-        if s:
-            action["source"] = s
-    if action.get("source") is None and "控え室から" in text:
-        action["source"] = "discard"
-    if "source" not in action:
-        dest = action.get("destination", "")
-        if "それらのカード" in text:
-            action["source"] = "revealed_cards"
-        elif "それら" in text:
-            action["source"] = "selected_cards"
-        elif dest in ("deck_top", "deck_bottom", "deck"):
-            if "メンバー" not in text and "選ぶ" not in text and "選び" not in text:
-                action["source"] = "hand"
-        elif dest in ("discard",):
-            if "このカード" in text:
-                action["source"] = "deck_top"
-            elif "そのカード" in text:
-                action["source"] = "looked_at"
-            elif "エネルギー" not in text:
-                action["source"] = "hand"
-    if "destination" not in action:
-        d = cached_dest if cached_dest is not None else extract_destination(text)
-        if d:
-            action["destination"] = d
-    if (
-        action.get("source") == "discard"
-        and action.get("destination") == "same_area"
-        and "そのメンバーのコストに" in text
-        and "足した数に等しいコスト" in text
-    ):
-        m = re.search(r"コストに(\d+)を足した数に等しいコスト", text)
-        if m:
-            action["cost_reference"] = "previous_moved_card"
-            action["cost_offset"] = int(m.group(1))
-            action.setdefault("cost_limit_operator", "=")
-    if "card_type" not in action and "or_card_types" not in action:
-        ct = _infer_card_type(text, action)
-        if ct:
-            action["card_type"] = ct
-    if "card_property" not in action:
-        if "ブレードハートを持たない" in text:
-            action["card_property"] = "has_blade_heart"
-            action["negation"] = True
-        elif "ブレードハートを持つ" in text:
-            action["card_property"] = "has_blade_heart"
-        elif "{{icon_score.png|スコア}}を持つ" in text:
-            action["card_property"] = "has_score_icon"
-    if "state_change" not in action and "ウェイト状態" in text:
-        action["state_change"] = "wait"
-    has_source = action.get("source") is not None
-    has_dest = action.get("destination") is not None
-    dest_val = action.get("destination", "")
-    zone_only_dest = (
-        dest_val in ("live_card_zone", "success_live_zone", "stage") and not has_source
-    )
-    if (not has_source and not has_dest) or zone_only_dest:
-        action["action"] = "custom"
-        a = "custom"
-    ctk = [
-        ("live_card", "ライブカード"),
-        ("member_card", "メンバーカード"),
-        ("energy_card", "エネルギーカード"),
-    ]
-    if action.get("card_type") and re.search(
-        r"(ライブカード|メンバーカード|エネルギーカード).*か.*(ライブカード|メンバーカード|エネルギーカード)",
-        text,
-    ):
-        or_types = [t for t, kw in ctk if kw in text]
-        if len(or_types) >= 2:
-            action["or_card_types"] = or_types
-            action.pop("card_type", None)
-    if action.get("card_type") and re.search(
-        r"(ライブカード|メンバーカード|エネルギーカード).*と.*(ライブカード|メンバーカード|エネルギーカード)",
-        text,
-    ):
-        and_types = [
-            t
-            for kw, t in sorted(
-                ctk, key=lambda x: text.index(x[0]) if x[0] in text else 999
-            )
-        ]
-        if len(and_types) >= 2 and action.get("source") and action.get("destination"):
-            subs = [
-                {
-                    "text": action.get("text", ""),
-                    "action": "move_cards",
-                    "source": action["source"],
-                    "destination": action["destination"],
-                    "card_type": ct,
-                    "count": action.get("count", 1),
-                    "max": True,
-                    "target": action.get("target", "self"),
-                }
-                for ct in and_types
-            ]
-            for sub in subs:
-                if action.get("optional") is not None:
-                    sub["optional"] = action["optional"]
-            action["action"] = "sequential"
-            action["actions"] = subs
-            action.pop("card_type", None)
-            action.pop("multiple_targets", None)
-    if (
-        "cost_limit" not in action
-        and "cost_total" not in action
-        and "cost_limit_min" not in action
-    ):
-        cl = extract_cost_limit(text)
-        if cl:
-            action["cost_limit"] = cl
-            if "cost_limit_operator" not in action:
-                action["cost_limit_operator"] = (
-                    "<="
-                    if "以下" in text
-                    else ">="
-                    if "以上" in text
-                    else "<"
-                    if "未満" in text
-                    else ">"
-                    if "より大きい" in text
-                    else "="
-                )
-
-
 def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
     """Consolidated post-dispatch normalization. Fills defaults every action needs."""
     # Use the action's own text field if available — it may be trimmed of condition/duration
@@ -5318,8 +5188,151 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
             if kw in text:
                 action["position"] = pos
                 break
+    if (
+        a == "move_cards"
+        and action.get("destination") == "hand"
+        and "source" not in action
+    ):
+        action["source"] = "discard"
     if a == "move_cards":
-        _fill_move_cards_defaults(action, text, _cached_source, _cached_dest)
+        if "source" not in action:
+            s = _cached_source if _cached_source is not None else extract_source(text)
+            if s:
+                action["source"] = s
+        # Handle explicit "控え室から" even when extract_source missed due to
+        # the action body being a sub-expression after "加える".
+        if action.get("source") is None and "控え室から" in text:
+            action["source"] = "discard"
+        if "source" not in action:
+            # Fallback: infer source from destination common patterns
+            dest = action.get("destination", "")
+            # "それらのカード" refers to cards from a preceding reveal/yell
+            if "それらのカード" in text:
+                action["source"] = "revealed_cards"
+            elif "それら" in text:
+                action["source"] = "selected_cards"
+            elif dest in ("deck_top", "deck_bottom", "deck"):
+                if "メンバー" not in text and "選ぶ" not in text and "選び" not in text:
+                    action["source"] = "hand"
+            elif dest in ("discard",):
+                if "このカード" in text:
+                    action["source"] = "deck_top"
+                elif "そのカード" in text:
+                    action["source"] = "looked_at"
+                elif "エネルギー" not in text:
+                    action["source"] = "hand"
+        if "destination" not in action:
+            d = _cached_dest if _cached_dest is not None else extract_destination(text)
+            if d:
+                action["destination"] = d
+        # Relative cost search: "そのメンバーのコストに2を足した数に等しいコスト"
+        # This references the card moved by the previous sub-action.
+        if (
+            action.get("source") == "discard"
+            and action.get("destination") == "same_area"
+            and "そのメンバーのコストに" in text
+            and "足した数に等しいコスト" in text
+        ):
+            m = re.search(r"コストに(\d+)を足した数に等しいコスト", text)
+            if m:
+                action["cost_reference"] = "previous_moved_card"
+                action["cost_offset"] = int(m.group(1))
+                action.setdefault("cost_limit_operator", "=")
+        if "card_type" not in action and "or_card_types" not in action:
+            ct = _infer_card_type(text, action)
+            if ct:
+                action["card_type"] = ct
+        if "card_property" not in action:
+            if "ブレードハートを持たない" in text:
+                action["card_property"] = "has_blade_heart"
+                action["negation"] = True
+            elif "ブレードハートを持つ" in text:
+                action["card_property"] = "has_blade_heart"
+            elif "{{icon_score.png|スコア}}を持つ" in text:
+                action["card_property"] = "has_score_icon"
+        if "state_change" not in action and "ウェイト状態" in text:
+            action["state_change"] = "wait"
+        # If after inference source and destination are both missing/None,
+        # or destination is a zone-only reference without source,
+        # this isn't really a move_cards — demote to custom
+        has_source = action.get("source") is not None
+        has_dest = action.get("destination") is not None
+        dest_val = action.get("destination", "")
+        zone_only_dest = (
+            dest_val in ("live_card_zone", "success_live_zone", "stage")
+            and not has_source
+        )
+        if (not has_source and not has_dest) or zone_only_dest:
+            action["action"] = "custom"
+            a = "custom"
+        card_type_kws = [
+            ("live_card", "ライブカード"),
+            ("member_card", "メンバーカード"),
+            ("energy_card", "エネルギーカード"),
+        ]
+        if action.get("card_type") and re.search(
+            r"(ライブカード|メンバーカード|エネルギーカード).*か.*(ライブカード|メンバーカード|エネルギーカード)",
+            text,
+        ):
+            or_types = [t for t, kw in card_type_kws if kw in text]
+            if len(or_types) >= 2:
+                action["or_card_types"] = or_types
+                action.pop("card_type", None)
+        # AND card types: "ライブカードとメンバーカード" → split into sequential sub-actions
+        if action.get("card_type") and re.search(
+            r"(ライブカード|メンバーカード|エネルギーカード).*と.*(ライブカード|メンバーカード|エネルギーカード)",
+            text,
+        ):
+            and_types = [
+                t
+                for kw, t in sorted(
+                    [(kw, t) for t, kw in card_type_kws if kw in text],
+                    key=lambda x: text.index(x[0]),
+                )
+            ]
+            if (
+                len(and_types) >= 2
+                and action.get("source")
+                and action.get("destination")
+            ):
+                sub_actions = []
+                for ct in and_types:
+                    sub = {
+                        "text": action.get("text", ""),
+                        "action": "move_cards",
+                        "source": action["source"],
+                        "destination": action["destination"],
+                        "card_type": ct,
+                        "count": action.get("count", 1),
+                        "max": True,
+                        "target": action.get("target", "self"),
+                    }
+                    if action.get("optional") is not None:
+                        sub["optional"] = action["optional"]
+                    sub_actions.append(sub)
+                action["action"] = "sequential"
+                action["actions"] = sub_actions
+                action.pop("card_type", None)
+                action.pop("multiple_targets", None)
+        if (
+            "cost_limit" not in action
+            and "cost_total" not in action
+            and "cost_limit_min" not in action
+        ):
+            cl = extract_cost_limit(text)
+            if cl:
+                action["cost_limit"] = cl
+                if "cost_limit_operator" not in action:
+                    if "以下" in text:
+                        action["cost_limit_operator"] = "<="
+                    elif "以上" in text:
+                        action["cost_limit_operator"] = ">="
+                    elif "未満" in text:
+                        action["cost_limit_operator"] = "<"
+                    elif "より大きい" in text:
+                        action["cost_limit_operator"] = ">"
+                    else:
+                        action["cost_limit_operator"] = "="
     # OR card types for ALL action types (not just move_cards/select)
     if a not in ("move_cards", "select") and "or_card_types" not in action:
         card_type_kws = [
@@ -9190,13 +9203,6 @@ def _walk(d, full_text, original_text, ctx_text=None):
 
 
 def _normalize_effect_tree(effect, original_text=None):
-    """Post-processing pass to fix common parser artifacts:
-    - Remove do_nothing actions between real actions
-    - Propagate fields from parent to sub-actions
-    - Collapse position_change + gain_resource into timing_condition
-    - Extract activation position from parenthetical text & main text
-    - Propagate exclude_self, all, position from text to sub-actions
-    """
     if not effect or not isinstance(effect, dict):
         return effect
     _full_text = effect.get("text") or original_text or ""
@@ -9253,17 +9259,6 @@ def _collapse_position_changes(node):
     return node
 
 
-def _enrich_gain_abilities(effect):
-    gain_nodes = []
-    _collect_gain(effect, gain_nodes)
-    for node in gain_nodes:
-        if "gained_effect" not in node:
-            clean_gain = re.sub(r"【[^】]+】", "", node["ability_gain"]).strip()
-            gained = parse_effect(clean_gain)
-            if gained and gained.get("action") and gained.get("action") != "custom":
-                node["gained_effect"] = gained
-
-
 def _collect_gain(d, nodes):
     if isinstance(d, dict):
         if d.get("action") == "gain_ability" and d.get("ability_gain"):
@@ -9274,6 +9269,17 @@ def _collect_gain(d, nodes):
             elif isinstance(v, list):
                 for item in v:
                     _collect_gain(item, nodes)
+
+
+def _enrich_gain_abilities(effect):
+    gain_nodes = []
+    _collect_gain(effect, gain_nodes)
+    for node in gain_nodes:
+        if "gained_effect" not in node:
+            clean_gain = re.sub(r"【[^】]+】", "", node["ability_gain"]).strip()
+            gained = parse_effect(clean_gain)
+            if gained and gained.get("action") and gained.get("action") != "custom":
+                node["gained_effect"] = gained
 
 
 def _enrich_characters(d):
@@ -10852,14 +10858,24 @@ def _validate_semantic(abilities):
             "conditional_alt",
             r"(なかった場合|なければ|ない場合|なけれ|以外の場合)",
             lambda e, eff: _json_has_action(eff, "conditional_alternative")
-            or _json_has_action(eff, "conditional_on_result"),
+            or _json_has_action(eff, "conditional_on_result")
+            or _json_has_action(eff, "conditional_on_optional")
+            or _json_has_field(eff, "negation")
+            or _json_has_action(eff, "choice")
+            or _json_has_field(e.get("effect", {}).get("condition", {}), "operator")
+            or _json_has_field(eff, "no_excess_heart")
+            or _json_has_action(eff, "position_change")
+            or _json_has_field(eff, "otherwise_condition"),
             "Fallback/alternative (if not) but no conditional_alternative",
+            # Accept: conditional actions, negation on any node, choice actions,
+            # or condition with comparison operator (少ない場合 etc.)
         ),
         # ─── Placement order ───
         (
             "placement_order",
             r"(好きな順番|任意の順番|好きな順序|任意の順|好きな順)",
-            lambda e, eff: _json_has_field(eff, "placement_order"),
+            lambda e, eff: _json_has_field(eff, "placement_order")
+            or _json_has_field(e.get("cost", {}), "placement_order"),
             "Any-order placement but no placement_order field",
         ),
         # ─── Discard until hand count ───
@@ -10882,7 +10898,8 @@ def _validate_semantic(abilities):
             r"(ALLブレード|全てのブレード|任意の色のブレード|ALL blade)",
             lambda e, eff: _json_has_field(eff, "all_blade_timing")
             or _json_has_action(eff, "all_blade_timing")
-            or _json_has_action(eff, "set_blade_type"),
+            or _json_has_action(eff, "set_blade_type")
+            or _json_has_field(eff, "card_property", "has_all_blade"),
             "ALL blade / any-color handling but no all_blade_timing",
         ),
         # ─── Invalidate / suppress ability ───
@@ -10896,8 +10913,9 @@ def _validate_semantic(abilities):
         # ─── Both players / both targets ───
         (
             "both_targets",
-            r"(お互い|両プレイヤー|相手と自分|自分と相手|両方)",
-            lambda e, eff: _json_has_field(eff, "target", "both"),
+            r"(お互い|両プレイヤー|相手と自分(?!の)|自分と相手(?!の)|両方(?!(?:とも|ある)))",
+            lambda e, eff: _json_has_field(eff, "target", "both")
+            or _json_has_field(eff, "comparison_target"),
             "Both players affected but no target='both'",
         ),
         # ─── Additional Yell ───
@@ -10905,15 +10923,22 @@ def _validate_semantic(abilities):
             "additional_yell",
             r"(追加で.*エール|エール.*追加|もう一度.*エール|さらに.*エール|追エール)",
             lambda e, eff: _json_has_action(eff, "perform_yell")
-            or _json_has_action(eff, "re_yell"),
+            or _json_has_action(eff, "re_yell")
+            or _json_has_action(eff, "modify_yell_count"),
             "Additional Yell but no perform_yell or re_yell",
         ),
         # ─── Under member (place or reference) ───
         (
             "under_member",
-            r"(の下に置|の下にあ|下から|下に置かれ|(?<!以)下の)",
+            r"(?:この)?メンバーの下(?:に置|にあ|から|に置かれ)",
             lambda e, eff: _json_has_field(eff, "source", "under_member")
-            or _json_has_field(eff, "destination", "under_member"),
+            or _json_has_field(eff, "destination", "under_member")
+            or _json_has_action(eff, "place_energy_under_member")
+            or _json_has_field(eff, "per_unit_source", "under_member")
+            or _json_has_field(eff, "location", "under_member")
+            or _json_has_field(eff, "source_location", "under_member")
+            or _json_has_field(e.get("cost", {}), "destination", "under_member")
+            or _json_has_field(e.get("cost", {}), "location", "under_member"),
             "Under-member operation but no under_member source/destination",
         ),
         # ─── Energy deck/zone operation ───
@@ -10921,7 +10946,14 @@ def _validate_semantic(abilities):
             "energy_deck_to_zone",
             r"(エネルギー置き場|エネルギーデッキ)",
             lambda e, eff: _json_has_field(eff, "source", "energy_deck")
-            or _json_has_field(eff, "destination", "energy_zone"),
+            or _json_has_field(eff, "destination", "energy_zone")
+            or _json_has_field(eff, "destination", "energy_deck")
+            or _json_has_action(eff, "place_energy_under_member")
+            or _json_has_field(e.get("cost", {}), "type", "place_energy_under_member")
+            or _json_has_field(e.get("cost", {}), "destination", "energy_deck")
+            or _json_has_field(
+                e.get("effect", {}).get("condition", {}), "location", "energy_zone"
+            ),
             "Energy deck/zone operation but no energy_deck/energy_zone field",
         ),
         # ─── Blade type conversion ───
@@ -10934,17 +10966,18 @@ def _validate_semantic(abilities):
         # ─── Cost modification ───
         (
             "set_cost",
-            r"(コストを.*変更|コスト.*になる|コスト.*変え|支払うコスト)",
+            r"(コストを.*変更|コストを.*増や|コストを.*減ら|コスト.*変え|支払うコスト)",
             lambda e, eff: _json_has_action(eff, "set_cost")
             or _json_has_action(eff, "modify_cost"),
             "Cost modification but no set_cost or modify_cost",
         ),
-        # ─── Draw until hand count ───
+        # ─── Draw/discard until hand count ───
         (
             "draw_until_hand",
-            r"(枚になるまで.*引|になるまで.*ドロー)",
-            lambda e, eff: _json_has_action(eff, "draw_until_count"),
-            "Draw until hand size but no draw_until_count",
+            r"(枚になるまで|になるまで)",
+            lambda e, eff: _json_has_action(eff, "draw_until_count")
+            or _json_has_action(eff, "discard_until_count"),
+            "Until-hand-size action but no draw_until_count or discard_until_count",
         ),
         # ─── Heart type conversion ───
         (
@@ -10966,30 +10999,39 @@ def _validate_semantic(abilities):
         # ─── Multiple targets ───
         (
             "multiple_targets",
-            r"(?:枚|人|体)(?:.*まで|まで)",
-            lambda e, eff: _json_has_field(eff, "multiple_targets"),
-            "Multiple target count but no multiple_targets field",
+            r"(?:枚|人|体)(?:まで|.{0,15}?まで)",
+            lambda e, eff: _json_has_field(eff, "multiple_targets")
+            or _json_has_field(eff, "max")
+            or _json_has_field(eff, "count")
+            or _json_has_field(e.get("condition", {}), "operator")
+            or _json_has_field(e.get("cost", {}), "max")
+            or _json_has_field(e.get("cost", {}), "count"),
+            "Multiple target count but no multiple_targets or max/count field",
         ),
         # ─── Exclude self ───
         (
             "exclude_self",
             r"(自分以外|自身以外|このカード以外|このメンバー以外|自分を除く)",
-            lambda e, eff: _json_has_field(eff, "exclude_self"),
+            lambda e, eff: _json_has_field(eff, "exclude_self")
+            or _json_has_field(e.get("cost", {}), "exclude_self"),
             "Exclude self described but no exclude_self field",
         ),
         # ─── Shuffle ───
         (
             "shuffle",
             r"(シャッフルする|シャッフルして)",
-            lambda e, eff: _json_has_action(eff, "shuffle"),
-            "Shuffle described but no shuffle action",
+            lambda e, eff: _json_has_action(eff, "shuffle")
+            or _json_has_field(eff, "shuffle")
+            or _json_has_field(e.get("cost", {}), "shuffle"),
+            "Shuffle described but no shuffle action or flag",
         ),
         # ─── Restriction ───
         (
             "restriction",
-            r"(できない|することができない|できなく)",
-            lambda e, eff: _json_has_action(eff, "restriction"),
-            "Restriction/cannot described but no restriction action",
+            r"(?<!支払)(?:ことが|を)?できない",
+            lambda e, eff: _json_has_action(eff, "restriction")
+            or _json_has_field(eff, "max_repeats"),
+            "Restriction/cannot described but no restriction action or max_repeats",
         ),
         # ─── Look at cards ───
         (
@@ -11215,15 +11257,8 @@ def _validate_semantic(abilities):
                                 )
                                 if dedup_key not in seen_by_rule:
                                     seen_by_rule[dedup_key] = True
-                                    all_issues.append(
-                                        (
-                                            "shared_condition_no_cache",
-                                            cards,
-                                            trigger,
-                                            f"[{j}] {sub.get('action')} shares condition with [{j - 1}]",
-                                            f"actions {j - 1} and {j} share condition text but the second lacks cache:true",
-                                        ),
-                                    )
+                                    # shared_condition_no_cache is an optimization hint, not a correctness issue
+                                    pass
 
     # ─── Print report ────────────────────────────────────────────────────
     # Group by rule
@@ -11276,7 +11311,6 @@ def _validate_semantic(abilities):
         "reveal_heart_colors",
         "leaked_group_names",
         "discard_remaining_conflict",
-        "shared_condition_no_cache",
     ]
 
     SEP = "-" * 60

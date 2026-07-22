@@ -6,6 +6,7 @@ extern crate alloc;
 use core::alloc::{GlobalAlloc, Layout};
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
@@ -20,6 +21,7 @@ use rabuka_engine::ability::ability_store::AbilityRef;
 use rabuka_engine::card::{
     BaseHeart, BladeHeart, Card, CardDatabase, CardType, HeartColor, HeartMap, SpecialHeart,
 };
+use rabuka_engine::core::types::ArcStr;
 use rabuka_engine::game::deck_builder;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
@@ -91,7 +93,7 @@ impl BuildHasher for DsHasher {
 }
 
 // Flat binary card database (zero-copy, no heap allocation for parsing)
-const CARDS_DB: &[u8] = include_bytes!("../../../output/cards_database.bin");
+const CARDS_DB: &[u8] = include_bytes!("../../../../output/cards_database.bin");
 
 struct DsCardDb<'a> {
     data: &'a [u8],
@@ -205,6 +207,9 @@ impl<'a> DsCardDb<'a> {
         let blade_val = self.data[rec + 6];
         let score_val = self.data[rec + 7];
         let base_heart_val = self.data[rec + 8];
+        let group_val = self.data[rec + 9];
+        let series_val = self.data[rec + 10];
+        let unit_val = self.data[rec + 11];
         let blade_heart_val = self.data[rec + 12];
         let special_heart_val = self.data[rec + 13];
         let ability_ref_val = u16::from_le_bytes([self.data[rec + 14], self.data[rec + 15]]);
@@ -228,9 +233,13 @@ impl<'a> DsCardDb<'a> {
             card_no: String::from(self.str_at(card_no_off)).into(),
             name: String::from(self.str_at(name_off)).into(),
             card_type: ct,
-            series: "".into(),
-            group: "".into(),
-            unit: None,
+            series: series_from_u8(series_val),
+            group: group_from_u8(group_val),
+            unit: if unit_val != 0 {
+                Some(ArcStr::from(""))
+            } else {
+                None
+            },
             cost: if cost_val > 0 {
                 Some(cost_val as u32)
             } else {
@@ -291,6 +300,28 @@ fn make_special_heart_from_u8(v: u8) -> Option<SpecialHeart> {
     let mut hearts = HeartMap::new();
     hearts.insert(color, 1);
     Some(SpecialHeart { hearts })
+}
+
+fn series_from_u8(v: u8) -> Box<str> {
+    match v {
+        1 => Box::from("ラブライブ！"),
+        2 => Box::from("ラブライブ！サンシャイン!!"),
+        3 => Box::from("ラブライブ！虹ヶ咲学園スクールアイドル同好会"),
+        4 => Box::from("ラブライブ！スーパースター!!"),
+        5 => Box::from("蓮ノ空女学院スクールアイドルクラブ"),
+        _ => Box::from(""),
+    }
+}
+
+fn group_from_u8(v: u8) -> Box<str> {
+    match v {
+        1 => Box::from("μ's"),
+        2 => Box::from("Aqours"),
+        3 => Box::from("虹ヶ咲"),
+        4 => Box::from("Liella!"),
+        5 => Box::from("蓮ノ空"),
+        _ => Box::from(""),
+    }
 }
 
 fn truncate_chars(s: &str, max_chars: usize) -> &str {
@@ -422,7 +453,7 @@ pub extern "C" fn main() {
         let actions = game_setup::generate_possible_actions(&gs);
         if actions.is_empty() {
             TurnEngine::advance_phase(&mut gs);
-            wait_frames(10);
+            wait_frames(15);
             continue;
         }
 
@@ -442,6 +473,8 @@ pub extern "C" fn main() {
         if !ok {
             break;
         }
+        // Let the player see what happened before auto-advancing
+        wait_frames(15);
         settle_auto(&mut gs);
     }
 }
@@ -449,7 +482,6 @@ pub extern "C" fn main() {
 // ── DS On-Device Tests ──────────────────────────────────────────
 
 fn run_on_device_tests_ds(display: &mut Display, input: &mut Input, card_db: &DsCardDb) {
-    use rabuka_engine::card_loader::CardLoader;
     display.clear();
     display.println("=== DS ON-DEVICE TESTS ===");
     display.swap_buffers();
@@ -526,7 +558,7 @@ fn run_on_device_tests_ds(display: &mut Display, input: &mut Input, card_db: &Ds
     display.swap_buffers();
     loop {
         input.poll();
-        if input.just_pressed(Button::Start) || input.just_pressed(Button::Cross) {
+        if input.just_pressed(Button::Start) || input.just_pressed(Button::B) {
             break;
         }
         wait_frames(2);
@@ -538,17 +570,17 @@ fn test_ai_vs_ai_ds(card_db: &DsCardDb, d1: u16, d2: u16) -> Result<usize, alloc
     let mut cards: Vec<Card> = Vec::new();
     let mut nums1: Vec<String> = Vec::new();
     let mut nums2: Vec<String> = Vec::new();
-    let cc1 = card_db.deck_card_count(d1) as usize;
+    let cc1 = card_db.deck_card_count(d1 as usize) as usize;
     for i in 0..cc1 {
-        let ci = card_db.deck_card_index(d1, i);
+        let ci = card_db.deck_card_index(d1 as usize, i);
         nums1.push(String::from(card_db.card_no(ci)));
         if seen.insert(ci) {
             cards.push(card_db.build_card(ci));
         }
     }
-    let cc2 = card_db.deck_card_count(d2) as usize;
+    let cc2 = card_db.deck_card_count(d2 as usize) as usize;
     for i in 0..cc2 {
-        let ci = card_db.deck_card_index(d2, i);
+        let ci = card_db.deck_card_index(d2 as usize, i);
         nums2.push(String::from(card_db.card_no(ci)));
         if seen.insert(ci) {
             cards.push(card_db.build_card(ci));
@@ -640,60 +672,85 @@ fn human_turn(
 ) -> bool {
     let mut sel = 0usize;
     let mut scroll_offset = 0usize;
+    let mut last_sel = usize::MAX;
+    let mut last_scroll = usize::MAX;
+    let mut first = true;
     const VISIBLE_ACTIONS: usize = 10;
+    const HEADER_ROWS: u32 = 5;
+
     loop {
-        display.clear();
-        display.println(&format!("Turn {} | {:?}", gs.turn_number, gs.current_phase));
+        if first || sel != last_sel || scroll_offset != last_scroll {
+            let p1 = &gs.player1;
+            let p2 = &gs.player2;
+            let is_p1 = gs.active_player().id == "p1";
 
-        let p1 = &gs.player1;
-        let p2 = &gs.player2;
-        let is_p1 = gs.active_player().id == "p1";
-        let tag = |active: bool| if active { ">>" } else { "  " };
-        display.println(&format!(
-            "{} P1 h:{} e:{} dk:{}",
-            tag(is_p1),
-            p1.hand.cards.len(),
-            p1.energy_zone.active_count(),
-            p1.main_deck.cards.len()
-        ));
-        display.println(&format!(
-            "{} P2 h:{} e:{} dk:{}",
-            tag(!is_p1),
-            p2.hand.cards.len(),
-            p2.energy_zone.active_count(),
-            p2.main_deck.cards.len()
-        ));
-        display.println("");
+            // Draw header rows
+            display.overwrite_row(
+                0,
+                &format!("Turn {} | {:?}", gs.turn_number, gs.current_phase),
+            );
+            display.overwrite_row(
+                1,
+                &format!(
+                    "{}P1 h:{} e:{} dk:{}",
+                    if is_p1 { ">>" } else { "  " },
+                    p1.hand.cards.len(),
+                    p1.energy_zone.active_count(),
+                    p1.main_deck.cards.len()
+                ),
+            );
+            display.overwrite_row(
+                2,
+                &format!(
+                    "{}P2 h:{} e:{} dk:{}",
+                    if !is_p1 { ">>" } else { "  " },
+                    p2.hand.cards.len(),
+                    p2.energy_zone.active_count(),
+                    p2.main_deck.cards.len()
+                ),
+            );
+            display.overwrite_row(3, "");
+            display.overwrite_row(4, "────────────────────────────");
 
-        if sel < scroll_offset {
-            scroll_offset = sel;
-        }
-        if sel >= scroll_offset + VISIBLE_ACTIONS {
-            scroll_offset = sel + 1 - VISIBLE_ACTIONS;
+            if sel < scroll_offset {
+                scroll_offset = sel;
+            }
+            if sel >= scroll_offset + VISIBLE_ACTIONS {
+                scroll_offset = sel + 1 - VISIBLE_ACTIONS;
+            }
+
+            let end = (scroll_offset + VISIBLE_ACTIONS).min(actions.len());
+            // Clear any stale action rows from previous frame
+            for r in HEADER_ROWS + 1..HEADER_ROWS + 1 + VISIBLE_ACTIONS as u32 + 1 {
+                display.overwrite_row(r, "");
+            }
+            for i in scroll_offset..end {
+                let row = HEADER_ROWS + 1 + (i - scroll_offset) as u32;
+                let p = if i == sel { ">" } else { " " };
+                let line = actions[i].description.lines().next().unwrap_or("");
+                let card_tag = match &actions[i].parameters {
+                    Some(params) => params
+                        .card_no
+                        .as_ref()
+                        .map(|no| alloc::format!(" [{}]", no))
+                        .unwrap_or_default(),
+                    None => alloc::string::String::new(),
+                };
+                let desc_max = 25usize.saturating_sub(card_tag.len());
+                let truncated = truncate_chars(line, desc_max);
+                display.overwrite_row(row, &format!("{p}[{}] {truncated}{card_tag}", i));
+            }
+            if actions.len() > end {
+                let more_row = HEADER_ROWS + 1 + VISIBLE_ACTIONS as u32;
+                display.overwrite_row(more_row, &format!("  .. {} more", actions.len() - end));
+            }
+            display.swap_buffers();
+            last_sel = sel;
+            last_scroll = scroll_offset;
+            first = false;
         }
 
-        let end = (scroll_offset + VISIBLE_ACTIONS).min(actions.len());
-        for i in scroll_offset..end {
-            let p = if i == sel { ">" } else { " " };
-            let line = actions[i].description.lines().next().unwrap_or("");
-            let card_tag = match &actions[i].parameters {
-                Some(params) => params
-                    .card_no
-                    .as_ref()
-                    .map(|no| alloc::format!(" [{}]", no))
-                    .unwrap_or_default(),
-                None => alloc::string::String::new(),
-            };
-            let desc_max = 28usize.saturating_sub(card_tag.len());
-            let truncated = truncate_chars(line, desc_max);
-            display.println(&format!("{p}[{i}] {truncated}{card_tag}"));
-        }
-        if actions.len() > end {
-            display.println(&format!("  .. {} more", actions.len() - end));
-        }
-        display.swap_buffers();
         wait_frames(2);
-
         input.poll();
         if input.just_pressed(Button::Down) {
             sel = (sel + 1).min(actions.len().saturating_sub(1));
@@ -963,7 +1020,7 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
 }
 
 fn settle_auto(gs: &mut GameState) {
-    for _ in 0..500 {
+    for _ in 0..10 {
         if gs.has_pending_choice() || gs.game_result != GameResult::Ongoing {
             break;
         }

@@ -46,26 +46,16 @@ impl GameState {
         let mut jyouji_statuses: Vec<crate::types::ConstantAbilityStatus> = Vec::new();
         tdbg!("RC:3 VEC_HASHMAP_INIT_OK");
 
-        // Compute stage positions for all entries before creating resolver
         let mut entry_positions: HashMap<i16, Option<usize>> = HashMap::default();
-        for &cid in self
-            .player1
-            .stage
-            .stage
-            .iter()
-            .chain(self.player2.stage.stage.iter())
-        {
-            if cid == -1 {
-                continue;
+        for (pos, &cid) in self.player1.stage.stage.iter().enumerate() {
+            if cid != -1 {
+                entry_positions.insert(cid, Some(pos));
             }
-            let pos = self
-                .player1
-                .stage
-                .stage
-                .iter()
-                .position(|&c| c == cid)
-                .or_else(|| self.player2.stage.stage.iter().position(|&c| c == cid));
-            entry_positions.insert(cid, pos);
+        }
+        for (pos, &cid) in self.player2.stage.stage.iter().enumerate() {
+            if cid != -1 {
+                entry_positions.entry(cid).or_insert(Some(pos));
+            }
         }
         tdbg!("RC:4 ENTRY_POSITIONS_DONE count={}", entry_positions.len());
 
@@ -672,21 +662,15 @@ impl GameState {
         &mut self,
         stage_entries: &[(i16, crate::card::AbilityEffect)],
     ) {
-        let mut cost_abilities: Vec<(i16, crate::card::AbilityEffect)> = stage_entries
-            .iter()
-            .cloned()
-            .filter(|(_, effect)| effect.action == crate::ability::enums::ActionType::ModifyCost)
-            .collect();
-        let hand_cost_abilities = self
-            .collect_constant_hand_effects()
-            .into_iter()
-            .filter(|(_, effect)| effect.action == crate::ability::enums::ActionType::ModifyCost);
-        cost_abilities.extend(hand_cost_abilities);
-
         let mut expected: HashMap<i16, i32> = HashMap::default();
+        let hand_effects = self.collect_constant_hand_effects();
         {
             let ctx = crate::ability::condition::ConditionContext::new(self);
-            for &(cid, ref effect) in &cost_abilities {
+            for &(cid, ref effect) in stage_entries
+                .iter()
+                .chain(hand_effects.iter())
+                .filter(|(_, e)| e.action == crate::ability::enums::ActionType::ModifyCost)
+            {
                 let cond_met = effect
                     .condition
                     .as_ref()

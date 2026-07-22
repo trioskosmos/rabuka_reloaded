@@ -316,6 +316,8 @@ fn make_choice_pair(action_type: ActionType, yes_text: &str, no_text: &str) -> V
 }
 
 fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> Vec<Action> {
+    #[cfg(not(feature = "no_std"))]
+    let _timer = crate::timer::Timer::start("generate_pending_choice_actions");
     match choice {
         Choice::SelectTarget {
             target,
@@ -1487,6 +1489,8 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 }
 
 fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
+    #[cfg(not(feature = "no_std"))]
+    let _timer = crate::timer::Timer::start("generate_live_card_set_actions");
     let active_player = game_state.active_player();
 
     let is_first = matches!(

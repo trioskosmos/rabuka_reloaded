@@ -2,6 +2,8 @@ use super::card::{BaseHeart, BladeHeart, Card, CardType, HeartColor, HeartMap, S
 use super::cards_gen::{CARD_BLOB, CARD_STRINGS};
 use crate::core::types::ArcStr;
 use crate::{HashMap, HashSet};
+#[cfg(feature = "no_std")]
+use alloc::{boxed::Box, string::String, string::ToString, vec::Vec};
 
 const MAGIC: &[u8; 4] = b"CARD";
 
@@ -59,10 +61,22 @@ pub fn decode_card_from_blob(idx: usize) -> Option<Card> {
     let series_idx = u16::from_le_bytes(data[4..6].try_into().ok()?);
     let group_idx = u16::from_le_bytes(data[6..8].try_into().ok()?);
     let unit_idx = u16::from_le_bytes(data[8..10].try_into().ok()?);
+    #[cfg(not(feature = "compact_cards"))]
     let img_idx = u16::from_le_bytes(data[10..12].try_into().ok()?);
+    #[cfg(feature = "compact_cards")]
+    let _img_idx = u16::from_le_bytes(data[10..12].try_into().ok()?);
+    #[cfg(not(feature = "compact_cards"))]
     let product_idx = u16::from_le_bytes(data[12..14].try_into().ok()?);
+    #[cfg(feature = "compact_cards")]
+    let _product_idx = u16::from_le_bytes(data[12..14].try_into().ok()?);
+    #[cfg(not(feature = "compact_cards"))]
     let rare_idx = u16::from_le_bytes(data[14..16].try_into().ok()?);
+    #[cfg(feature = "compact_cards")]
+    let _rare_idx = u16::from_le_bytes(data[14..16].try_into().ok()?);
+    #[cfg(not(feature = "compact_cards"))]
     let ability_idx = u16::from_le_bytes(data[16..18].try_into().ok()?);
+    #[cfg(feature = "compact_cards")]
+    let _ability_idx = u16::from_le_bytes(data[16..18].try_into().ok()?);
     let type_flags = data[18];
     let cost_val = data[19];
     let blade_val = data[20];
@@ -127,6 +141,12 @@ pub fn decode_card_from_blob(idx: usize) -> Option<Card> {
     Some(Card {
         card_no,
         name,
+        #[cfg(not(feature = "compact_cards"))]
+        img: if img_idx != 0 {
+            Some(get_str(img_idx).into())
+        } else {
+            None
+        },
         series,
         group,
         card_type,
@@ -160,18 +180,17 @@ pub fn decode_card_from_blob(idx: usize) -> Option<Card> {
             Some(BaseHeart { hearts: need_heart })
         },
         special_heart,
-        img: if img_idx != 0 {
-            Some(get_str(img_idx).into())
-        } else {
-            None
-        },
+        #[cfg(not(feature = "compact_cards"))]
         product: get_str(product_idx).into(),
+        #[cfg(not(feature = "compact_cards"))]
         rare: get_str(rare_idx).into(),
+        #[cfg(not(feature = "compact_cards"))]
         ability: if ability_idx != 0xFFFF {
             get_str(ability_idx).into()
         } else {
             Box::from("")
         },
+        #[cfg(not(feature = "compact_cards"))]
         faq: Vec::new(),
         abilities: Vec::new(),
     })
