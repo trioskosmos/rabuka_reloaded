@@ -507,6 +507,25 @@ def main():
     _validate_output(result)
     print("Validation complete.")
 
+    # Auto-regenerate bytecode so abilities_gen.rs stays in sync
+    import subprocess, sys
+
+    compile_script = Path(__file__).parent.parent / "compile_abilities.py"
+    if compile_script.exists():
+        bin_file = compile_script.parent / "build" / "abilities.bin"
+        if bin_file.exists():
+            bin_file.unlink()
+        result = subprocess.run(
+            [sys.executable, str(compile_script)],
+            cwd=compile_script.parent,
+        )
+        if result.returncode == 0:
+            print("Bytecode regenerated.")
+            if bin_file.exists():
+                bin_file.unlink()
+            for line in (result.stdout or "").splitlines()[-5:]:
+                print(f"  {line}")
+
 
 def _validate_output(result):
     """Post-extraction validation -- check for known parser gaps in output."""
