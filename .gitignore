@@ -44,3 +44,10 @@ engine_ds/
 
 # Rust ICE dumps
 engine/rustc-ice-*.txt
+
+# Stray emulator source files (accidentally left in root)
+/message.cpp
+/message.h
+/network.h
+/room.h
+/file_util.cpp

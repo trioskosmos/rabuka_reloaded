@@ -1145,12 +1145,52 @@ sets (default, compact_state, bytecode_abilities).
 
 **Console-only** via `#[cfg(feature = "compact_state")]`. Not in default features.
 
+### Compact card data — `compact_card_data` feature (2026-07-22)
+
+**Problem:** `CardLoader::load_cards_from_file` loads ALL 2280 cards from `cards.json` into a `HashMap<i16, Card>` in RAM. Each `Card` with `compact_cards` is ~120 bytes → **273 KB for all cards**. For a game with ~100 deck cards, only 12 KB is actually needed.
+
+**Solution:** Pre-compile `cards.json` into a compact binary blob stored in rodata/ROM. At game start, only deck cards are decoded into RAM.
+
+**Key files:**
+- `cards/compile_cards.py` — compiler that reads `cards.json` and generates `cards_gen.rs`
+- `engine/src/core/cards_gen.rs` — auto-generated: `CARD_BLOB` (539 KB) + `CARD_STRINGS` (5675 interned strings)
+- `engine/src/core/card_binary.rs` — on-demand decoder: `decode_card_from_blob(idx)`, `load_cards_from_blob(indices)`, `find_card_index_by_no()`
+
+**Binary blob format (little-endian):**
+```
+[Header: 12B]       magic=b"CARD", num_cards, strtab_len
+[String table]      interned card_no, name, series, unit, img, product, rare, ability
+[Offset table]      u32 offsets per card → O(1) random access
+[Card data]         20B fixed header + variable heart data (~29 B/card avg)
+```
+
+**RAM savings:**
+| Cards loaded | Before | After |
+|-------------|--------|-------|
+| All 2280 | 273 KB | 539 KB (ROM only) + zero RAM |
+| 100 deck cards | 12 KB | 3 KB (from blob) |
+| On-demand lookup | N/A | 29 B/card, decode from ROM |
+
+Blob stored in ROM (539 KB), only deck cards occupy RAM (~3 KB for 100 cards).
+
+**Usage:**
+```rust
+// At game start, resolve deck card_nos to blob indices, load only those
+let indices = resolve_deck_indices(&["PL!-sd1-001-SD", "LL-E-001-SD", ...]);
+let card_db = load_cards_from_blob(&indices);  // ~100 cards in RAM
+```
+
+**Validation:** First 100 cards verified field-by-field matching JSON output (card_no, name, type, series, unit, cost, blade, score, all heart types, special_heart). All 1829 tests pass with the feature enabled.
+
+**Feature gate:** `#[cfg(feature = "compact_card_data")]`. Included in the `ds` feature set.
+
 ### Priority order
 
 | Step | RAM saved | Effort | Risk | Status |
 |------|-----------|--------|------|--------|
 | 1. Lazy decode | **2.68 MB** | ~1 day | Low | ✅ DONE → evolved into decode-on-demand |
-| 2. Compact cards | **58 KB** | ~2 days | Medium | ✅ PARTIAL (display-only fields gated; packed struct DEFERRED) |
+| 2. Compact cards | **58 KB** | ~2 days | Medium | ✅ PARTIAL (display-only fields gated; packed blob DONE) |
 | 3. Compact GameState | **297 KB** | ~2 days | Medium | ✅ DONE |
 | 4. Decode-on-demand | **120 KB** | ~3 days | Low | ✅ DONE |
+| 5. Compact card blob | **260 KB** | ~6 hours | Low | ✅ DONE (deck-load only; blob in ROM) |
 | **Total** | **~3 MB → ~150KB** | **~5 days** | | |

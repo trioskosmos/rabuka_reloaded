@@ -53,7 +53,7 @@ no_std = []
 # PSP target: no_std + alloc mode for mipsel-sony-psp
 psp = ["no_std", "once_cell", "debug_conditions", "bytecode_abilities"]
 # DS target: no_std + alloc, minimal features for tight 4MB ROM
-ds = ["no_std", "once_cell", "bytecode_abilities", "compact_cards", "compact_state"]
+ds = ["no_std", "once_cell", "bytecode_abilities", "compact_cards", "compact_card_data", "compact_state"]
 # Dreamcast target: no_std + alloc via KallistiOS + rustc_codegen_gcc
 dc = ["no_std", "debug_conditions"]
 # Bytecode abilities: use pre-compiled bytecode instead of JSON serde
@@ -66,6 +66,9 @@ arena_allocator = ["alloc_tracker"]
 # Compact cards: strips display-only fields (img, product, rare, ability text, faq)
 # from the Card struct to reduce RAM on embedded/console targets.
 compact_cards = []
+# Compact card data: embeds a binary card blob in rodata and loads only deck
+# cards into RAM. Dramatically reduces RAM for embedded/console targets (GBA).
+compact_card_data = []
 # Compact GameState: caps log/application Vecs to bounded sizes instead of
 # unbounded accumulation. Reduces GameState RAM by ~80%+ for console targets.
 compact_state = []

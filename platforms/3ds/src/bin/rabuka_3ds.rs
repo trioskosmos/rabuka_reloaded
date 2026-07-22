@@ -237,8 +237,6 @@ enum Step {
 /// Accessed via "Run Tests" menu. Each test returns a result line.
 #[cfg(feature = "3ds")]
 fn run_on_device_tests(cards: Arc<Vec<Card>>, decks: Vec<DeckList>) -> Vec<String> {
-    use crate::game_setup;
-    use crate::turn;
     let mut r: Vec<String> = Vec::new();
     let t0 = unsafe { _3ds_system_tick() };
     r.push(format!("CARDS: {}", cards.len()));
@@ -375,6 +373,44 @@ const COL_CARD: u32 = 0x22231A22; // c2d(34,26,35,34)    card detail semi-transp
 const COL_ABILITY: u32 = 0x33231A2A; // c2d(42,26,51,51)    ability queue semi-transparent
 const COL_BLUE: u32 = 0xFFFF9E4A; // c2d(74,158,255,255) blue accent text
 const COL_PINK: u32 = 0xFFAA55FF; // c2d(255,85,170,255) pink accent text
+
+/// Phase-aware multiplayer turn check.
+/// Returns true if the given player (0=P1, 1=P2) should be able to act.
+fn mp_can_act(gs: &GameState, player_id: i32) -> bool {
+    use rabuka_engine::core::game_state::Phase;
+    let pid_str = || if player_id == 0 { "p1" } else { "p2" };
+    if gs.has_pending_choice() {
+        if let Some(cpid) = gs.get_pending_choice_player_id() {
+            return cpid == pid_str();
+        }
+    }
+    match gs.current_phase {
+        Phase::RockPaperScissors => {
+            if player_id == 0 {
+                gs.player1_rps_choice.is_none()
+            } else {
+                gs.player2_rps_choice.is_none()
+            }
+        }
+        Phase::ChooseFirstAttacker => gs.rps_winner == Some(if player_id == 0 { 1 } else { 2 }),
+        Phase::MulliganFirstAttacker
+        | Phase::LiveCardSetFirstAttacker
+        | Phase::FirstAttackerPerformance => {
+            (gs.player1.is_first_attacker && player_id == 0)
+                || (!gs.player1.is_first_attacker && player_id == 1)
+        }
+        Phase::MulliganSecondAttacker
+        | Phase::LiveCardSetSecondAttacker
+        | Phase::SecondAttackerPerformance => {
+            (gs.player1.is_first_attacker && player_id == 1)
+                || (!gs.player1.is_first_attacker && player_id == 0)
+        }
+        _ => {
+            let active = gs.active_player();
+            (active.id == gs.player1.id) == (player_id == 0)
+        }
+    }
+}
 
 #[cfg(feature = "3ds")]
 fn main() {
@@ -1226,32 +1262,37 @@ fn main() {
                                 }
                             }
                         }
-                        // Poll for client connection
-                        let connected = uds::uds_is_connected();
-                        if connected && was_dirty {
-                            // Client connected! Move to deck sync
-                            Step::Setup(
-                                cards.clone(),
-                                decks.clone(),
-                                SetupPhase::MultiplayerSyncDeck(p1_idx, 0, true),
-                                true,
-                            )
-                        } else if keys & 0x00000002 != 0 {
-                            // B = cancel
-                            uds::uds_exit();
-                            Step::Setup(
-                                cards.clone(),
-                                decks.clone(),
-                                SetupPhase::MultiplayerPickRole(p1_idx, 0),
-                                true,
-                            )
-                        } else {
-                            Step::Setup(
-                                cards.clone(),
-                                decks.clone(),
-                                SetupPhase::MultiplayerHostWait(p1_idx),
-                                false,
-                            )
+                        // Poll for client connection: try to receive a hello packet
+                        let mut hello = [0u8; 4];
+                        match uds::uds_recv(&mut hello) {
+                            Ok(n) if n > 0 => {
+                                // Client connected! Move to deck sync
+                                Step::Setup(
+                                    cards.clone(),
+                                    decks.clone(),
+                                    SetupPhase::MultiplayerSyncDeck(p1_idx, 0, true),
+                                    true,
+                                )
+                            }
+                            _ => {
+                                if keys & 0x00000002 != 0 {
+                                    // B = cancel
+                                    uds::uds_exit();
+                                    Step::Setup(
+                                        cards.clone(),
+                                        decks.clone(),
+                                        SetupPhase::MultiplayerPickRole(p1_idx, 0),
+                                        true,
+                                    )
+                                } else {
+                                    Step::Setup(
+                                        cards.clone(),
+                                        decks.clone(),
+                                        SetupPhase::MultiplayerHostWait(p1_idx),
+                                        false,
+                                    )
+                                }
+                            }
                         }
                     }
                     // Multiplayer: Client scanning for host
@@ -1325,7 +1366,10 @@ fn main() {
                         }
                         // Poll for host connection
                         let connected = uds::uds_is_connected();
-                        if connected && was_dirty {
+                        if connected {
+                            // Send hello so host knows we're here
+                            let hello = [0xAAu8];
+                            let _ = uds::uds_send(&hello);
                             // Host found! Move to deck sync
                             Step::Setup(
                                 cards.clone(),
@@ -2389,7 +2433,7 @@ fn main() {
                             let is_ai_turn =
                                 *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
                             let is_opponent_turn_mp =
-                                is_multiplayer && gs.active_player().id != gs.player1.id;
+                                is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 });
                             if is_ai_turn {
                                 unsafe {
                                     _3ds_text_add_top("AI is thinking...\n\0".as_ptr());
@@ -2731,7 +2775,7 @@ fn main() {
                             let is_ai_turn =
                                 *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
                             let is_opponent_turn_mp =
-                                is_multiplayer && gs.active_player().id != gs.player1.id;
+                                is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 });
                             if !is_ai_turn && !is_opponent_turn_mp && !display_order.is_empty() {
                                 let mut ty = 44.0f32;
                                 let max_vis = 10usize;

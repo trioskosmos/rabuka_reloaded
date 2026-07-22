@@ -8,3 +8,9 @@ pub mod player;
 pub mod pool;
 pub mod types;
 pub mod zones;
+
+/// Compact card binary format for RAM-constrained targets (GBA, DS).
+#[cfg(feature = "compact_card_data")]
+pub mod card_binary;
+#[cfg(feature = "compact_card_data")]
+pub mod cards_gen;
