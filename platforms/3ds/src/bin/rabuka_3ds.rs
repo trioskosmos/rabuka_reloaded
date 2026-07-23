@@ -3282,11 +3282,19 @@ fn main() {
                                     m
                                 };
                                 // Image mode: render choice cards on the top screen
-                                let mut ix = 4.0f32;
+                                let cw = 84.0f32;
+                                let ch = cw / 0.711;
+                                let ih = ch + 20.0;
                                 let iy = 42.0f32;
-                                let iw = 88.0f32;
-                                let ih = 124.0f32;
-                                for &fi in &display_order {
+                                let cols = ((400.0 - 8.0) / (cw + 4.0)) as usize;
+                                for (di, &fi) in display_order.iter().enumerate() {
+                                    let col = di % cols;
+                                    let row = di / cols;
+                                    let ix = 4.0 + col as f32 * (cw + 4.0);
+                                    let iy_card = iy + row as f32 * (ih + 4.0);
+                                    if iy_card + ih > 230.0 {
+                                        break;
+                                    }
                                     let act = &acts_cache[fi];
                                     let real_cid = act
                                         .parameters
@@ -3301,29 +3309,35 @@ fn main() {
                                             if let Some((atl, idx)) = atlas.lookup(cn.as_str()) {
                                                 let c_str = std::ffi::CString::new(atl.as_bytes())
                                                     .unwrap_or_default();
+                                                let cursor_color = if di == display_pos {
+                                                    COL_GOLD
+                                                } else {
+                                                    COL_CARD
+                                                };
                                                 unsafe {
-                                                    _3ds_top_queue_rect(ix, iy, iw, ih, COL_CARD);
+                                                    _3ds_top_queue_rect(
+                                                        ix,
+                                                        iy_card,
+                                                        cw,
+                                                        ih,
+                                                        cursor_color,
+                                                    );
                                                     _3ds_top_queue_card(
                                                         c_str.as_ptr(),
                                                         *idx as i32,
-                                                        ix + 2.0,
-                                                        iy + 2.0,
-                                                        iw - 4.0,
-                                                        ih - 24.0,
+                                                        ix + 1.0,
+                                                        iy_card + 1.0,
+                                                        cw - 2.0,
+                                                        ch,
                                                     );
                                                     _3ds_top_queue_text(
-                                                        ix + 2.0,
-                                                        iy + ih - 20.0,
+                                                        ix + 1.0,
+                                                        iy_card + ch + 1.0,
                                                         COL_LIGHT,
-                                                        0.55f32,
+                                                        0.50f32,
                                                         format!("{}\0", cn).as_ptr(),
                                                     );
                                                 }
-                                                ix += iw + 4.0;
-                                                if ix + iw > 400.0 {
-                                                    break;
-                                                }
-                                                continue;
                                             }
                                         }
                                     }
