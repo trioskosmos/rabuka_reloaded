@@ -618,11 +618,7 @@ pub extern "C" fn main() {
         }
 
         if is_current_player_ai {
-            let idx = if ai_vs_ai {
-                0
-            } else {
-                rng::rand_range(actions.len())
-            };
+            let idx = rng::rand_range(actions.len());
             if !execute_action(&mut gs, &actions[idx]) {
                 break;
             }
