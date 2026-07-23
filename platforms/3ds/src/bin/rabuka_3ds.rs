@@ -2282,11 +2282,11 @@ fn main() {
                                 {
                                     match ((tx_f - ux) / 36.0) as usize {
                                         2 => Some((
-                                            "W: Waitroom".into(),
+                                            "Waitroom".into(),
                                             pb.waitroom.cards.iter().copied().collect::<Vec<i16>>(),
                                         )),
                                         3 => Some((
-                                            "S: Live Success".into(),
+                                            "Live Success".into(),
                                             pb.success_live_card_zone
                                                 .cards
                                                 .iter()
@@ -3466,281 +3466,288 @@ fn main() {
                                 *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
                             let is_opponent_turn_mp =
                                 is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 });
-                            if is_image_choice {
-                                let opt_map: std::collections::HashMap<i16, i16> = {
-                                    let mut m = std::collections::HashMap::new();
-                                    if let Some(c) = gs.get_pending_choice() {
-                                        use rabuka_engine::ability::types::Choice;
-                                        if let Choice::SelectAutoAbility { options, .. } = c {
-                                            for (i, opt) in options.iter().enumerate() {
-                                                if let Some(cid) = opt.card_id {
-                                                    m.insert(i as i16, cid);
+                            if zone_viewer.is_none() {
+                                if is_image_choice {
+                                    let opt_map: std::collections::HashMap<i16, i16> = {
+                                        let mut m = std::collections::HashMap::new();
+                                        if let Some(c) = gs.get_pending_choice() {
+                                            use rabuka_engine::ability::types::Choice;
+                                            if let Choice::SelectAutoAbility { options, .. } = c {
+                                                for (i, opt) in options.iter().enumerate() {
+                                                    if let Some(cid) = opt.card_id {
+                                                        m.insert(i as i16, cid);
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
-                                    m
-                                };
-                                let cw = 80.0f32;
-                                let ch = cw / 0.711;
-                                let gap = 4.0f32;
-                                let cols = ((400.0 - 8.0) / (cw + gap)) as usize;
-                                let row_h = ch + 20.0 + gap;
-                                let base_y = content_y.max(42.0);
-                                let rows_vis = ((230.0 - base_y) / row_h) as usize + 1;
-                                let total_rows = (display_order.len() + cols - 1) / cols;
-                                let sr = if cols > 0 && rows_vis > 0 {
-                                    let c = display_pos / cols;
-                                    let half = rows_vis / 2;
-                                    if total_rows > rows_vis {
-                                        c.saturating_sub(half).min(total_rows - rows_vis)
+                                        m
+                                    };
+                                    let cw = 80.0f32;
+                                    let ch = cw / 0.711;
+                                    let gap = 4.0f32;
+                                    let cols = ((400.0 - 8.0) / (cw + gap)) as usize;
+                                    let row_h = ch + 20.0 + gap;
+                                    let base_y = content_y.max(42.0);
+                                    let rows_vis = ((230.0 - base_y) / row_h) as usize + 1;
+                                    let total_rows = (display_order.len() + cols - 1) / cols;
+                                    let sr = if cols > 0 && rows_vis > 0 {
+                                        let c = display_pos / cols;
+                                        let half = rows_vis / 2;
+                                        if total_rows > rows_vis {
+                                            c.saturating_sub(half).min(total_rows - rows_vis)
+                                        } else {
+                                            0
+                                        }
                                     } else {
                                         0
-                                    }
-                                } else {
-                                    0
-                                };
-                                let iy = base_y - sr as f32 * row_h;
-                                let mut ty = iy;
-                                for (di, &fi) in display_order.iter().enumerate() {
-                                    let act = &acts_cache[fi];
-                                    let is_disabled = act
-                                        .parameters
-                                        .as_ref()
-                                        .and_then(|p| p.disabled)
-                                        .unwrap_or(false);
-                                    let col = di % cols;
-                                    let row = di / cols;
-                                    let ix = 4.0 + col as f32 * (cw + gap);
-                                    let iy_card = iy + row as f32 * (ch + 20.0 + gap);
-                                    if iy_card + ch + 20.0 > 230.0 {
-                                        break;
-                                    }
-                                    let real_cid = act
-                                        .parameters
-                                        .as_ref()
-                                        .and_then(|p| p.card_id)
-                                        .and_then(|idx| opt_map.get(&idx).copied())
-                                        .or_else(|| {
-                                            act.parameters.as_ref().and_then(|p| p.card_id)
-                                        });
-                                    if let Some(cid) = real_cid {
-                                        if let Some(cn) = card_no(cid) {
-                                            if let Some((atl, idx)) = atlas.lookup(cn.as_str()) {
-                                                let c_str = std::ffi::CString::new(atl.as_bytes())
-                                                    .unwrap_or_default();
-                                                let border = if di == display_pos {
-                                                    COL_GOLD
-                                                } else {
-                                                    COL_CARD
-                                                };
-                                                unsafe {
-                                                    _3ds_top_queue_rect(
-                                                        ix,
-                                                        iy_card,
-                                                        cw,
-                                                        ch + 20.0,
-                                                        border,
-                                                    );
-                                                    _3ds_top_queue_card(
-                                                        c_str.as_ptr(),
-                                                        *idx as i32,
-                                                        ix + 1.0,
-                                                        iy_card + 1.0,
-                                                        cw - 2.0,
-                                                        ch,
-                                                    );
-                                                    if is_disabled {
+                                    };
+                                    let iy = base_y - sr as f32 * row_h;
+                                    let mut ty = iy;
+                                    for (di, &fi) in display_order.iter().enumerate() {
+                                        let act = &acts_cache[fi];
+                                        let is_disabled = act
+                                            .parameters
+                                            .as_ref()
+                                            .and_then(|p| p.disabled)
+                                            .unwrap_or(false);
+                                        let col = di % cols;
+                                        let row = di / cols;
+                                        let ix = 4.0 + col as f32 * (cw + gap);
+                                        let iy_card = iy + row as f32 * (ch + 20.0 + gap);
+                                        if iy_card + ch + 20.0 > 230.0 {
+                                            break;
+                                        }
+                                        let real_cid = act
+                                            .parameters
+                                            .as_ref()
+                                            .and_then(|p| p.card_id)
+                                            .and_then(|idx| opt_map.get(&idx).copied())
+                                            .or_else(|| {
+                                                act.parameters.as_ref().and_then(|p| p.card_id)
+                                            });
+                                        if let Some(cid) = real_cid {
+                                            if let Some(cn) = card_no(cid) {
+                                                if let Some((atl, idx)) = atlas.lookup(cn.as_str())
+                                                {
+                                                    let c_str =
+                                                        std::ffi::CString::new(atl.as_bytes())
+                                                            .unwrap_or_default();
+                                                    let border = if di == display_pos {
+                                                        COL_GOLD
+                                                    } else {
+                                                        COL_CARD
+                                                    };
+                                                    unsafe {
                                                         _3ds_top_queue_rect(
+                                                            ix,
+                                                            iy_card,
+                                                            cw,
+                                                            ch + 20.0,
+                                                            border,
+                                                        );
+                                                        _3ds_top_queue_card(
+                                                            c_str.as_ptr(),
+                                                            *idx as i32,
                                                             ix + 1.0,
                                                             iy_card + 1.0,
                                                             cw - 2.0,
                                                             ch,
-                                                            0xAA000000,
+                                                        );
+                                                        if is_disabled {
+                                                            _3ds_top_queue_rect(
+                                                                ix + 1.0,
+                                                                iy_card + 1.0,
+                                                                cw - 2.0,
+                                                                ch,
+                                                                0xAA000000,
+                                                            );
+                                                        }
+                                                        _3ds_top_queue_text(
+                                                            ix + 1.0,
+                                                            iy_card + ch + 1.0,
+                                                            COL_LIGHT,
+                                                            0.50f32,
+                                                            format!("{}\0", cn).as_ptr(),
                                                         );
                                                     }
-                                                    _3ds_top_queue_text(
-                                                        ix + 1.0,
-                                                        iy_card + ch + 1.0,
-                                                        COL_LIGHT,
-                                                        0.50f32,
-                                                        format!("{}\0", cn).as_ptr(),
-                                                    );
+                                                    ty = iy_card + ch + 20.0 + gap;
+                                                    continue;
                                                 }
-                                                ty = iy_card + ch + 20.0 + gap;
-                                                continue;
                                             }
                                         }
+                                        // Non-card actions (skip etc.): render as text
+                                        let desc = act
+                                            .description
+                                            .lines()
+                                            .next()
+                                            .unwrap_or("")
+                                            .to_string();
+                                        if !desc.is_empty() {
+                                            let c = if is_disabled { COL_MED } else { COL_LIGHT };
+                                            unsafe {
+                                                _3ds_top_queue_text(
+                                                    4.0,
+                                                    ty,
+                                                    c,
+                                                    0.65f32,
+                                                    format!("{}\0", desc).as_ptr(),
+                                                );
+                                            }
+                                            ty += 18.0;
+                                        }
                                     }
-                                    // Non-card actions (skip etc.): render as text
-                                    let desc =
-                                        act.description.lines().next().unwrap_or("").to_string();
-                                    if !desc.is_empty() {
-                                        let c = if is_disabled { COL_MED } else { COL_LIGHT };
+                                } else if !is_ai_turn
+                                    && !is_opponent_turn_mp
+                                    && !display_order.is_empty()
+                                    && content_y < 240.0
+                                {
+                                    let mut ty = content_y;
+                                    let max_vis = ((230.0 - content_y) / 20.0) as usize + 1;
+                                    let half = max_vis / 2;
+                                    let n = display_order.len();
+                                    let start = if n > max_vis {
+                                        (display_pos as isize - half as isize)
+                                            .max(0)
+                                            .min((n - max_vis) as isize)
+                                            as usize
+                                    } else {
+                                        0
+                                    };
+                                    let end = (start + max_vis).min(n);
+                                    if start > 0 {
                                         unsafe {
                                             _3ds_top_queue_text(
                                                 4.0,
                                                 ty,
-                                                c,
-                                                0.65f32,
-                                                format!("{}\0", desc).as_ptr(),
+                                                COL_MED,
+                                                0.60f32,
+                                                format!("\u{25b2} +{}\0", start).as_ptr(),
                                             );
+                                            ty += 18.0;
                                         }
-                                        ty += 18.0;
                                     }
-                                }
-                            } else if !is_ai_turn
-                                && !is_opponent_turn_mp
-                                && !display_order.is_empty()
-                                && content_y < 240.0
-                            {
-                                let mut ty = content_y;
-                                let max_vis = ((230.0 - content_y) / 20.0) as usize + 1;
-                                let half = max_vis / 2;
-                                let n = display_order.len();
-                                let start = if n > max_vis {
-                                    (display_pos as isize - half as isize)
-                                        .max(0)
-                                        .min((n - max_vis) as isize)
-                                        as usize
-                                } else {
-                                    0
-                                };
-                                let end = (start + max_vis).min(n);
-                                if start > 0 {
-                                    unsafe {
-                                        _3ds_top_queue_text(
-                                            4.0,
-                                            ty,
-                                            COL_MED,
-                                            0.60f32,
-                                            format!("\u{25b2} +{}\0", start).as_ptr(),
-                                        );
-                                        ty += 18.0;
-                                    }
-                                }
-                                for di in start..end {
-                                    let fi = display_order[di];
-                                    let act = &acts_cache[fi];
-                                    let is_sel = di == display_pos;
-                                    let is_disabled = act
-                                        .parameters
-                                        .as_ref()
-                                        .and_then(|p| p.disabled)
-                                        .unwrap_or(false);
-                                    let prefix = if is_disabled {
-                                        "· "
-                                    } else if is_sel {
-                                        "> "
-                                    } else {
-                                        "  "
-                                    };
-                                    if ty > 230.0 {
-                                        break;
-                                    }
-                                    let line = match act.action_type {
-                                        game_setup::ActionType::Pass => "Pass".into(),
-                                        game_setup::ActionType::PlayMemberToStage => {
-                                            let cn = cn_or_empty(act);
-                                            let name = act
-                                                .parameters
-                                                .as_ref()
-                                                .and_then(|p| p.card_name.clone())
-                                                .unwrap_or_default();
-                                            let area = act
-                                                .parameters
-                                                .as_ref()
-                                                .and_then(|p| p.stage_area.clone())
-                                                .unwrap_or_default();
-                                            let area_cost = act
-                                                .parameters
-                                                .as_ref()
-                                                .and_then(|p| p.available_areas.as_ref())
-                                                .and_then(|aa| {
-                                                    aa.iter()
-                                                        .find(|x| x.area == area)
-                                                        .map(|x| x.cost)
-                                                })
-                                                .or_else(|| {
-                                                    act.parameters
-                                                        .as_ref()
-                                                        .and_then(|p| p.base_cost)
-                                                })
-                                                .unwrap_or(0);
-                                            if !cn.is_empty() {
-                                                format!(
-                                                    "[{}] {} {} c:{}",
-                                                    cn, name, area, area_cost
-                                                )
-                                            } else {
-                                                format!("{} {} c:{}", name, area, area_cost)
-                                            }
+                                    for di in start..end {
+                                        let fi = display_order[di];
+                                        let act = &acts_cache[fi];
+                                        let is_sel = di == display_pos;
+                                        let is_disabled = act
+                                            .parameters
+                                            .as_ref()
+                                            .and_then(|p| p.disabled)
+                                            .unwrap_or(false);
+                                        let prefix = if is_disabled {
+                                            "· "
+                                        } else if is_sel {
+                                            "> "
+                                        } else {
+                                            "  "
+                                        };
+                                        if ty > 230.0 {
+                                            break;
                                         }
-                                        game_setup::ActionType::UseAbility => {
-                                            let name = act
-                                                .parameters
-                                                .as_ref()
-                                                .and_then(|p| p.card_name.clone())
-                                                .unwrap_or_default();
-                                            let cost = act
-                                                .parameters
-                                                .as_ref()
-                                                .and_then(|p| p.final_cost.or(p.base_cost))
-                                                .unwrap_or(0);
-                                            let area = act
-                                                .parameters
-                                                .as_ref()
-                                                .and_then(|p| p.stage_area.clone())
-                                                .unwrap_or_default();
-                                            let abil = act
-                                                .parameters
-                                                .as_ref()
-                                                .and_then(|p| p.source_ability.clone())
-                                                .unwrap_or_default();
-                                            let abil_short: String =
-                                                abil.chars().take(28).collect();
-                                            let cn = cn_or_empty(act);
-                                            if !cn.is_empty() {
-                                                if cost > 0 {
+                                        let line = match act.action_type {
+                                            game_setup::ActionType::Pass => "Pass".into(),
+                                            game_setup::ActionType::PlayMemberToStage => {
+                                                let cn = cn_or_empty(act);
+                                                let name = act
+                                                    .parameters
+                                                    .as_ref()
+                                                    .and_then(|p| p.card_name.clone())
+                                                    .unwrap_or_default();
+                                                let area = act
+                                                    .parameters
+                                                    .as_ref()
+                                                    .and_then(|p| p.stage_area.clone())
+                                                    .unwrap_or_default();
+                                                let area_cost = act
+                                                    .parameters
+                                                    .as_ref()
+                                                    .and_then(|p| p.available_areas.as_ref())
+                                                    .and_then(|aa| {
+                                                        aa.iter()
+                                                            .find(|x| x.area == area)
+                                                            .map(|x| x.cost)
+                                                    })
+                                                    .or_else(|| {
+                                                        act.parameters
+                                                            .as_ref()
+                                                            .and_then(|p| p.base_cost)
+                                                    })
+                                                    .unwrap_or(0);
+                                                if !cn.is_empty() {
                                                     format!(
-                                                        "[{}] {} {} c:{} {}",
-                                                        cn, name, area, cost, abil_short
+                                                        "[{}] {} {} c:{}",
+                                                        cn, name, area, area_cost
                                                     )
                                                 } else {
-                                                    format!(
-                                                        "[{}] {} {} {}",
-                                                        cn, name, area, abil_short
-                                                    )
-                                                }
-                                            } else {
-                                                if cost > 0 {
-                                                    format!(
-                                                        "{} {} c:{} {}",
-                                                        name, area, cost, abil_short
-                                                    )
-                                                } else {
-                                                    format!("{} {} {}", name, area, abil_short)
+                                                    format!("{} {} c:{}", name, area, area_cost)
                                                 }
                                             }
-                                        }
-                                        _ => {
-                                            let cn = cn_or_empty(act);
-                                            let name = act
-                                                .parameters
-                                                .as_ref()
-                                                .and_then(|p| p.card_name.clone())
-                                                .unwrap_or_default();
-                                            let desc = act
-                                                .description
-                                                .lines()
-                                                .next()
-                                                .unwrap_or("")
-                                                .to_string();
-                                            // For ChoiceOption from SelectAutoAbility, show ability text
-                                            let ability_text = if act.action_type
-                                                == game_setup::ActionType::ChoiceOption
-                                            {
-                                                gs.get_pending_choice()
+                                            game_setup::ActionType::UseAbility => {
+                                                let name = act
+                                                    .parameters
+                                                    .as_ref()
+                                                    .and_then(|p| p.card_name.clone())
+                                                    .unwrap_or_default();
+                                                let cost = act
+                                                    .parameters
+                                                    .as_ref()
+                                                    .and_then(|p| p.final_cost.or(p.base_cost))
+                                                    .unwrap_or(0);
+                                                let area = act
+                                                    .parameters
+                                                    .as_ref()
+                                                    .and_then(|p| p.stage_area.clone())
+                                                    .unwrap_or_default();
+                                                let abil = act
+                                                    .parameters
+                                                    .as_ref()
+                                                    .and_then(|p| p.source_ability.clone())
+                                                    .unwrap_or_default();
+                                                let abil_short: String =
+                                                    abil.chars().take(28).collect();
+                                                let cn = cn_or_empty(act);
+                                                if !cn.is_empty() {
+                                                    if cost > 0 {
+                                                        format!(
+                                                            "[{}] {} {} c:{} {}",
+                                                            cn, name, area, cost, abil_short
+                                                        )
+                                                    } else {
+                                                        format!(
+                                                            "[{}] {} {} {}",
+                                                            cn, name, area, abil_short
+                                                        )
+                                                    }
+                                                } else {
+                                                    if cost > 0 {
+                                                        format!(
+                                                            "{} {} c:{} {}",
+                                                            name, area, cost, abil_short
+                                                        )
+                                                    } else {
+                                                        format!("{} {} {}", name, area, abil_short)
+                                                    }
+                                                }
+                                            }
+                                            _ => {
+                                                let cn = cn_or_empty(act);
+                                                let name = act
+                                                    .parameters
+                                                    .as_ref()
+                                                    .and_then(|p| p.card_name.clone())
+                                                    .unwrap_or_default();
+                                                let desc = act
+                                                    .description
+                                                    .lines()
+                                                    .next()
+                                                    .unwrap_or("")
+                                                    .to_string();
+                                                // For ChoiceOption from SelectAutoAbility, show ability text
+                                                let ability_text = if act.action_type
+                                                    == game_setup::ActionType::ChoiceOption
+                                                {
+                                                    gs.get_pending_choice()
                                                     .and_then(|c| {
                                                         use rabuka_engine::ability::types::Choice;
                                                         if let Choice::SelectAutoAbility {
@@ -3760,60 +3767,61 @@ fn main() {
                                                         }
                                                     })
                                                     .unwrap_or_default()
-                                            } else {
-                                                String::new()
-                                            };
-                                            let display = if !ability_text.is_empty() {
-                                                &ability_text
-                                            } else {
-                                                &desc
-                                            };
-                                            if !cn.is_empty() && !name.is_empty() {
-                                                format!("[{}] {} {}", cn, name, display)
-                                            } else if !cn.is_empty() {
-                                                format!("[{}] {}", cn, display)
-                                            } else {
-                                                display.to_string()
+                                                } else {
+                                                    String::new()
+                                                };
+                                                let display = if !ability_text.is_empty() {
+                                                    &ability_text
+                                                } else {
+                                                    &desc
+                                                };
+                                                if !cn.is_empty() && !name.is_empty() {
+                                                    format!("[{}] {} {}", cn, name, display)
+                                                } else if !cn.is_empty() {
+                                                    format!("[{}] {}", cn, display)
+                                                } else {
+                                                    display.to_string()
+                                                }
                                             }
+                                        };
+                                        let color = if is_disabled {
+                                            COL_MED
+                                        } else if is_sel {
+                                            COL_GOLD
+                                        } else {
+                                            COL_LIGHT
+                                        };
+                                        let scale = if is_sel { 0.70f32 } else { 0.65f32 };
+                                        for (li, l) in wrap_text(&line, 55).lines().enumerate() {
+                                            if ty > 230.0 {
+                                                break;
+                                            }
+                                            let pfx = if li == 0 { prefix } else { "   " };
+                                            unsafe {
+                                                _3ds_top_queue_text(
+                                                    4.0,
+                                                    ty,
+                                                    color,
+                                                    scale,
+                                                    format!("{}{}\0", pfx, l).as_ptr(),
+                                                );
+                                            }
+                                            ty += 20.0;
                                         }
-                                    };
-                                    let color = if is_disabled {
-                                        COL_MED
-                                    } else if is_sel {
-                                        COL_GOLD
-                                    } else {
-                                        COL_LIGHT
-                                    };
-                                    let scale = if is_sel { 0.70f32 } else { 0.65f32 };
-                                    for (li, l) in wrap_text(&line, 55).lines().enumerate() {
-                                        if ty > 230.0 {
-                                            break;
-                                        }
-                                        let pfx = if li == 0 { prefix } else { "   " };
+                                    }
+                                    if end < n {
                                         unsafe {
                                             _3ds_top_queue_text(
                                                 4.0,
                                                 ty,
-                                                color,
-                                                scale,
-                                                format!("{}{}\0", pfx, l).as_ptr(),
+                                                COL_MED,
+                                                0.60f32,
+                                                format!("\u{25bc} +{}\0", n - end).as_ptr(),
                                             );
                                         }
-                                        ty += 20.0;
                                     }
                                 }
-                                if end < n {
-                                    unsafe {
-                                        _3ds_top_queue_text(
-                                            4.0,
-                                            ty,
-                                            COL_MED,
-                                            0.60f32,
-                                            format!("\u{25bc} +{}\0", n - end).as_ptr(),
-                                        );
-                                    }
-                                }
-                            }
+                            } // closes if zone_viewer.is_none()
                         }
 
                         // Clear stale action highlight on bottom board
@@ -3871,7 +3879,7 @@ fn main() {
                     }
 
                     // Multiplayer debug overlay (last thing drawn, never cleared)
-                    if is_multiplayer {
+                    if zone_viewer.is_none() && is_multiplayer {
                         let my_id = if is_host { 0 } else { 1 };
                         let can_act = mp_can_act(&gs, my_id);
                         unsafe {
