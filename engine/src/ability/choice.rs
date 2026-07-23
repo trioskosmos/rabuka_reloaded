@@ -119,7 +119,7 @@ impl super::resolver::AbilityResolver {
             }
         }
         // Feed the next repeat action + "Repeat?" prompt, one at a time.
-        eprintln!(
+        log::debug!(
             "[RPA_REPEAT] pending_repeat={} pending_choice={:?}",
             self.pending_repeat_actions.len(),
             self.pending_choice.is_some()
@@ -487,7 +487,7 @@ impl super::resolver::AbilityResolver {
                 .target_player_id(tpid)
         };
 
-        eprintln!(
+        log::debug!(
             "[KANAN_DEBUG] check hand-cost block: zone={} is_hand={} has_cost={} effect_started={}",
             zone,
             Zone::from_str(zone) == Some(Zone::Hand),
@@ -521,7 +521,7 @@ impl super::resolver::AbilityResolver {
                 .filter(|&cid| validate_card(cid))
                 .collect();
             if !new_card_ids.is_empty() {
-                eprintln!(
+                log::debug!(
                     "[KANAN_DEBUG] moving cards: count={} new_card_ids={:?}",
                     count, new_card_ids
                 );
@@ -550,7 +550,7 @@ impl super::resolver::AbilityResolver {
             }
             if new_card_ids.is_empty() {
                 if !self.moved_cards.is_empty() {
-                    eprintln!("[KANAN_DEBUG] cost finalize: moved_cards={:?}, setting optional_cost_result=true", self.moved_cards);
+                    log::debug!("[KANAN_DEBUG] cost finalize: moved_cards={:?}, setting optional_cost_result=true", self.moved_cards);
                     gs.mods.last_cost_discard_count = self.moved_cards.len() as u32;
                     gs.mods.last_cost_moved_card_ids = self.moved_cards.clone();
                     gs.recently_moved_cards = Some(self.moved_cards.clone());
@@ -560,7 +560,7 @@ impl super::resolver::AbilityResolver {
                         entry.optional_cost_result = Some(true);
                     }
                 } else if allow_skip {
-                    eprintln!("[KANAN_DEBUG] cost finalize: NO moved cards, setting optional_cost_result=false");
+                    log::debug!("[KANAN_DEBUG] cost finalize: NO moved cards, setting optional_cost_result=false");
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
                         entry.cost_paid = true;
                         entry.optional_cost_result = Some(false);
@@ -685,7 +685,7 @@ impl super::resolver::AbilityResolver {
                 .map(|c| c as usize)
                 .unwrap_or(usize::MAX);
             if count == 0 && allow_skip && self.moved_cards.len() < cost_max_cap {
-                eprintln!("[KANAN_DEBUG] any_number re-prompt: count={} allow_skip={} new_card_ids.len={} moved_cards={:?}", count, allow_skip, new_card_ids.len(), self.moved_cards);
+                log::debug!("[KANAN_DEBUG] any_number re-prompt: count={} allow_skip={} new_card_ids.len={} moved_cards={:?}", count, allow_skip, new_card_ids.len(), self.moved_cards);
                 let hand_now: Vec<i16> = {
                     let p = gs.resolve_target_player_mut(&target);
                     p.hand.cards.to_vec()

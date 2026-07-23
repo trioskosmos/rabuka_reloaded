@@ -876,7 +876,7 @@ impl AbilityResolver {
             .ability_queue
             .current_entry()
             .is_some_and(|e| e.optional_cost_result == Some(false));
-        eprintln!(
+        log::debug!(
             "[KANAN_DEBUG] cost_was_skipped={} optional_cost_result={:?}",
             cost_was_skipped,
             gs.ability_queue

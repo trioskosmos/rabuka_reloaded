@@ -133,8 +133,8 @@ fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32, ic
             if let Some(bar) = inner.find('|') {
                 let file = &inner[..bar];
                 let iw = icon_h * 0.711;
-                let atlas_name = format!("icon_{}.png.t3x\0", file);
-                let c_str = std::ffi::CString::new(atlas_name.as_bytes()).unwrap_or_default();
+                let atlas_name = format!("icon_{}.png.t3x", file);
+                let c_str = std::ffi::CString::new(atlas_name.as_str()).unwrap_or_default();
                 unsafe {
                     _3ds_top_queue_card(c_str.as_ptr(), 0, cx, y, iw, icon_h);
                 }

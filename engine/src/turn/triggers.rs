@@ -256,7 +256,7 @@ impl super::TurnEngine {
 
     pub fn trigger_live_start_abilities(game_state: &mut GameState, player_id: &str) {
         if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            eprintln!(
+            log::debug!(
                 "[TLS_ENTER] player={} phase={:?} turn_phase={:?}",
                 player_id, game_state.current_phase, game_state.current_turn_phase
             );
@@ -282,7 +282,7 @@ impl super::TurnEngine {
                 &game_state.player2
             };
             if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-                eprintln!(
+                log::debug!(
                     "[TLS_LIVE] player={} live_zone_cards={:?} stage={:?}",
                     player_id, player.live_card_zone.cards, player.stage.stage
                 );
@@ -290,7 +290,7 @@ impl super::TurnEngine {
             for card_id in &player.live_card_zone.cards {
                 if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed)
                 {
-                    eprintln!(
+                    log::debug!(
                         "[TLS_LIVE] checking card={} negated={}",
                         card_id,
                         game_state.negated_abilities.contains(card_id)
@@ -303,7 +303,7 @@ impl super::TurnEngine {
                     if crate::ability::debug::ABILITY_DEBUG
                         .load(core::sync::atomic::Ordering::Relaxed)
                     {
-                        eprintln!(
+                        log::debug!(
                             "[TLS_LIVE] card_id={} card_no={} abilities={}",
                             card_id,
                             card.card_no,
@@ -315,7 +315,7 @@ impl super::TurnEngine {
                         if crate::ability::debug::ABILITY_DEBUG
                             .load(core::sync::atomic::Ordering::Relaxed)
                         {
-                            eprintln!("[TLS_LIVE]   aidx={} triggers={:?}", aidx, ability.triggers);
+                            log::debug!("[TLS_LIVE]   aidx={} triggers={:?}", aidx, ability.triggers);
                         }
                         if ability
                             .triggers

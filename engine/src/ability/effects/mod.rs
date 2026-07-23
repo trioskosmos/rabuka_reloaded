@@ -27,7 +27,7 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         let mut dbg = AbDebug::new();
-        eprintln!(
+        log::debug!(
             "[DEBUG_EXEC] execute_effect: action={} effect_ptr={:p}",
             effect.action, effect
         );
@@ -209,7 +209,7 @@ impl AbilityResolver {
         // for the case where effect_steps is absent.
         let action_type = effect.action;
         if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
-            eprintln!(
+            log::debug!(
                 "[EXEC_ACTION] action_type={:?} has_steps={} has_actions={}",
                 action_type,
                 effect.effect_steps.is_some(),
@@ -229,7 +229,7 @@ impl AbilityResolver {
             let steps = effect.normalized_steps();
             if !steps.is_empty() {
                 if action_type == ActionType::Sequential {
-                    eprintln!(
+                    log::debug!(
                         "[DEBUG_STEPS] sequential: n_steps={} actions=[{}] effect.action={}",
                         steps.len(),
                         steps

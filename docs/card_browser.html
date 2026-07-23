@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ラブカ ! | Card Browser</title>
+<link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/deck_validation.css">
 <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ctAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAABklJREFUeNrs3b9PG2cAxvFLC1IYGlGGVAoLEh5BnUDNAtnISEa2whgW/BeEqhkbwUIGBhgYyIAUMiDVU4OHBuGhqfAIUhYzMBA2OiC173P1tcflPfsw94u77yeyLGLOr/H7+H3vfe/es+MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAArtXpxPVl2qLpm7Fd7W5K2srtyzvP+/mbsnCRddNWWvxvVkX8X84r4nGoUXax3HFkDz6Rs0d7PUT+HNtus6dy3gprkNUj+FN9iu61j0xdDyjbRf0BPqplSt4Nv2/uCnTAJoXsCyuZsmeOUNYTuI7839vgnictpd8AvCh3YGXuRlFAwQQBBAgACCAAIEEAQQIIDIn76sX8DE5IQzNTXlDA8Puz+fHJ84+/V9p3nU7Ljd0NCQMzMz44yNjzkDAwPO+fm5u02tVnMuLy9vVKa2q9frzvHxccft9Pvazl9mo9Fw6vv1rmXOPDWvdWzsxmUSwATNzc25YfAbrYy6t8Zhw9ne3g4NwvPF524I/IGcmp5yn+/VL6/ccNgsLi66z++nQOmm8NZ+rVm30+MLCwv2D4EJ1uu119YQ6jXqtXrBC5apv1F/K11wyrywdGqlVEFhFeoPX/BxBTusFQqG79rjJkyVSuVGz+l9IILh9D9nMHzBD6GtTAKYdABNV9bN5MSktSUKC5+/FbVVepQybb+jD0OUMtUi2rbtuhsyMUEA02arLFvYetnOC0Rwu24hkkfDj774v8popae/SS1blDKj/k0E8A4JVnyUIIT9XtRtcYcCGDZI8NOIOKjbaNMTHEW3Wq1I29rKPGoeRSoz+PxRR7hR3gsCGDNNX3R2Dj8cjszYuwWJIVNtyBNe/RSpsLcrUwF11ZmlBFulPeCAMZM0x22CvNXnK3yFISw6Rnv8Tfbb6yPab6uW5m2+Ue1ULu7ux3LDHtc/9+pTL2mMs8Fft3rho9/eLx828I//P7BXZnsHyB4la05uTBnZ2dOs9l0HnzzwHn43cNrAdra2nIft7m6unI+/vHRvfeXqYDs7e11LPO0deqcnJy423mDBgVPz7e+vh3ajfrL1Mi8v7//vzJ3dnYitco2BwcHP1nq5EdzN5JFkGyvJ4qeF6ZXl6p/swudnQwXpkd+PaUeBYN9QBSAjlglOQ1FABHK3d/9dijy1BcBRKx0nLrXQRIBxK27Xm9WggAi9a5XZ/HYJuUJIBI3vzDvDjy6nRRMAJHIfp8mzKMcfiSAiJXOXfTOX2ydtlIps4+3Hd6gY3b2/+uLdjp+TQAR64BDwQue/Ds+Np7KPiABLCkFTiELWzKg/9c+oOYBk5yKIYAFb910uz9w3x1Y6KiGlhx0WiQV7JZ1U3es8x0v/7r8994EM64uOtMAapWaFgGV+ZR3VejGxkaiI07v/VUYo4bPo9bv8/lnN3xJtIR9WYZPk51lp8VT2gfrdJJtrxQYf2hq5p/CqO5V733YB18fCk1CpzEVk1kAoyyRLFNXmRZ3v659JYfgWmd1q+9236V6hnZmAWSl2fWWKm3uCHfu+s9qhdOYfGYQkiNqdTqtN0mKf19Q4dN+aBZyFUDvgj1lEedo8qa8BfgqP4n9zzsZQB3+KfvVotKiqz3oA7C5sZl6t+vHseCSDno0Ea2uP+tF8QSwhDQNo92dPFwWLlddsHsRoKfFG2R4Rw/ywrueYR7kKoDexSmLONh4+fPLXIRQrV+Uq8jSBReI5jy9NRZ52P9L4ywXAgirsEsQE8CCy2q+L+84EpIw70r6eer2CGBY99DhKvUoJrpgEEAQQIAADtznHEEGIRnyFsGUhY5GaHSskwLydKiOLrgkvPUZ/gA">
 <style>
@@ -166,7 +167,18 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
 <script src="js/qrcode.min.js"></script>
 <script>
 document.title = document.title + ' [JS running]';
-(function(){ var e = document.getElementById('result-count'); if(e) e.textContent = '✓ script loaded at ' + new Date().toLocaleTimeString(); })();
+(function(){
+  console.log('DEBUG: script executing');
+  var e = document.getElementById('result-count');
+  console.log('DEBUG: result-count element:', e);
+  if(e) {
+    e.textContent = '✓ script loaded at ' + new Date().toLocaleTimeString();
+  } else {
+    // Try to find it differently
+    var all = document.querySelectorAll('[id]');
+    console.log('DEBUG: all ids:', Array.from(all).map(function(el){ return el.id; }));
+  }
+})();
 // ── i18n ──
 let cbLang = localStorage.getItem('card_browser_lang') || 'en';
 async function loadCbLang(lang) {
@@ -745,14 +757,28 @@ function importDeckText(text) {
   let imported = 0;
 
   // Try Deck Log HTML format first (<span title="ID : Name">...<span class="num">QTY</span>)
-  const decklogRe = /<span\s+title="([^"]+)"[^>]*>\s*<\/span>\s*<span[^>]*class="num"[^>]*>(\d+)<\/span>/g;
+  const decklogRe = /<span\s+title="([^"]*)"[^>]*>\s*<\/span>\s*<span[^>]*class\s*=\s*["']num["'][^>]*>(\d+)<\/span>/gi;
   let m, htmlMatch = false;
   while ((m = decklogRe.exec(text)) !== null) {
-    const cardId = extractCardId(m[1]);
+    const cardId = normalizeCode(extractCardId(m[1]));
     const qty = parseInt(m[2], 10);
-    if (cardId && qty > 0 && deckCardLookup(cardId)) {
-      newCards.set(cardId, { card: deckCardLookup(cardId), qty: (newCards.get(cardId)?.qty || 0) + qty });
+    const card = deckCardLookup(cardId);
+    if (cardId && qty > 0 && card) {
+      newCards.set(cardId, { card, qty: (newCards.get(cardId)?.qty || 0) + qty });
       imported++; htmlMatch = true;
+    }
+  }
+
+  // Also try alternative HTML format: <img ... title="ID" ...>
+  if (!htmlMatch) {
+    const altRe = /<img[^>]+title\s*=\s*["']([^"']+)["'][^>]*>/gi;
+    while ((m = altRe.exec(text)) !== null) {
+      const cardId = normalizeCode(m[1]);
+      const card = deckCardLookup(cardId);
+      if (cardId && card && !newCards.has(cardId)) {
+        newCards.set(cardId, { card, qty: 1 });
+        imported++; htmlMatch = true;
+      }
     }
   }
 
@@ -762,15 +788,15 @@ function importDeckText(text) {
       raw = raw.trim();
       if (!raw || raw.startsWith('//')) continue;
       let cardNo, qty = 1;
-      const parts = raw.split(' x ');
-      if (parts.length === 2) {
-        const a = parts[0].trim(), b = parts[1].trim();
-        if (/^\d+$/.test(a)) { qty = parseInt(a); cardNo = b; }
-        else if (/^\d+$/.test(b)) { qty = parseInt(b); cardNo = a; }
-        else continue;
-      } else if (raw.includes('-')) {
-        cardNo = raw;
-      } else continue;
+      const parts = raw.split(/\s*[x×]\s*/i);
+      if (parts.length >= 2) {
+        const a = parts[0].trim(), b = parts[parts.length - 1].trim();
+        if (/^\d+$/.test(a)) { qty = parseInt(a, 10); cardNo = normalizeCode(b); }
+        else if (/^\d+$/.test(b)) { qty = parseInt(b, 10); cardNo = normalizeCode(a); }
+        else { cardNo = normalizeCode(raw); }
+      } else {
+        cardNo = normalizeCode(raw);
+      }
       if (!cardNo) continue;
       const card = deckCardLookup(cardNo);
       if (!card) continue;
@@ -954,6 +980,7 @@ function renderDeckStats(data) {
 function renderDeckList() {
   const el = document.getElementById('deck-card-list');
   const totalEl = document.getElementById('deck-total');
+  if (!totalEl) { console.error('deck-total element not found in DOM'); return; }
   const entries = [...deckState.cards.entries()].sort((a, b) => {
     const order = { 'メンバー': 0, 'ライブ': 1, 'エネルギー': 2 };
     const ta = order[a[1].card.type] || 9, tb = order[b[1].card.type] || 9;
