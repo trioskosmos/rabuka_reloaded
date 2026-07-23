@@ -221,18 +221,20 @@ enum Step {
         bool, // dirty
         bool, // redraw
         CardAtlas,
-        bool,        // vs_ai (human vs AI)
-        bool,        // ai_vs_ai (spectator: both AI)
-        bool,        // cli_mode
-        bool,        // detail_mode
-        bool,        // choice_image_mode
-        usize,       // hand_offset (P1)
-        usize,       // hand_offset_p2
-        u32,         // touch_tap_count
-        Option<i16>, // viewing_card_id
-        bool,        // is_multiplayer
-        bool,        // is_host (true = P1/host, false = P2/client)
-        bool,        // waiting_for_opponent
+        bool,                       // vs_ai (human vs AI)
+        bool,                       // ai_vs_ai (spectator: both AI)
+        bool,                       // cli_mode
+        bool,                       // detail_mode
+        bool,                       // choice_image_mode
+        usize,                      // hand_offset (P1)
+        usize,                      // hand_offset_p2
+        u32,                        // touch_tap_count
+        Option<i16>,                // viewing_card_id
+        Option<(String, Vec<i16>)>, // zone_viewer (label, card_ids)
+        usize,                      // zone_viewer_offset
+        bool,                       // is_multiplayer
+        bool,                       // is_host (true = P1/host, false = P2/client)
+        bool,                       // waiting_for_opponent
     ),
     Done(Result<(), String>),
 }
@@ -1038,6 +1040,8 @@ fn main() {
                                     0,
                                     0,
                                     None,
+                                    None,  // zone_viewer
+                                    0,     // zone_viewer_offset
                                     false, // is_multiplayer
                                     false, // is_host
                                     false, // waiting_for_opponent
@@ -1668,6 +1672,8 @@ fn main() {
                                     0,
                                     0,
                                     None,
+                                    None,     // zone_viewer
+                                    0,        // zone_viewer_offset
                                     true,     // is_multiplayer
                                     is_host,  // is_host
                                     !is_host, // waiting_for_opponent will be recalculated after settle
@@ -1695,6 +1701,8 @@ fn main() {
                 mut hand_offset_p2,
                 mut touch_tap_count,
                 mut viewing_card,
+                mut zone_viewer,
+                mut zone_viewer_offset,
                 is_multiplayer,
                 is_host,
                 mut waiting_for_opponent,
@@ -1807,6 +1815,25 @@ fn main() {
                         }
                     }
                     redraw = true;
+                }
+
+                // Zone viewer controls: B dismiss, UP/DOWN scroll
+                if zone_viewer.is_some() {
+                    if keys & 0x00000002 != 0 {
+                        zone_viewer = None;
+                        redraw = true;
+                    }
+                    if keys & 0x00000040 != 0 {
+                        zone_viewer_offset = zone_viewer_offset.saturating_sub(1);
+                        redraw = true;
+                    }
+                    if keys & 0x00000080 != 0 {
+                        let max_off = zone_viewer
+                            .as_ref()
+                            .map_or(0, |z| z.1.len().saturating_sub(1));
+                        zone_viewer_offset = zone_viewer_offset.saturating_add(1).min(max_off);
+                        redraw = true;
+                    }
                 }
 
                 // R toggles choice image mode (board highlights vs text action list)
@@ -2166,6 +2193,41 @@ fn main() {
                             } else {
                                 None
                             };
+                            // Utility zone tap (right of stage slots): open zone viewer
+                            if tapped.is_none() {
+                                let tx_f = tx as f32;
+                                let ux = 2.0 + 3.0 * (st_slot_w + 2.0) + 5.0;
+                                let uw = 320.0 - ux - 2.0;
+                                let zoned = if (ty as i32) >= stage_y
+                                    && (ty as i32) < (stage_y + stage_h)
+                                    && tx_f >= ux
+                                    && tx_f < ux + uw
+                                {
+                                    match ((tx_f - ux) / 36.0) as usize {
+                                        2 => Some((
+                                            "W: Waitroom".into(),
+                                            pb.waitroom.cards.iter().copied().collect::<Vec<i16>>(),
+                                        )),
+                                        3 => Some((
+                                            "S: Live Success".into(),
+                                            pb.success_live_card_zone
+                                                .cards
+                                                .iter()
+                                                .copied()
+                                                .collect::<Vec<i16>>(),
+                                        )),
+                                        _ => None,
+                                    }
+                                } else {
+                                    None
+                                };
+                                if let Some((zl, zc)) = zoned {
+                                    viewing_card = None;
+                                    zone_viewer = Some((zl, zc));
+                                    zone_viewer_offset = 0;
+                                    redraw = true;
+                                }
+                            }
                             if let Some(cid) = tapped {
                                 // Choice image mode: board tap executes the choice directly
                                 let handled = if choice_image_mode && gs.has_pending_choice() {
@@ -2898,7 +2960,54 @@ fn main() {
                         //   otherwise = action list only
                         let mut content_y: f32 = 42.0;
 
-                        if detail_mode {
+                        if let Some((ref zlabel, ref zcards)) = zone_viewer {
+                            let vis = 12usize;
+                            let n = zcards.len();
+                            let start = zone_viewer_offset.min(n.saturating_sub(vis));
+                            unsafe {
+                                _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                                _3ds_top_queue_text(
+                                    4.0,
+                                    4.0,
+                                    COL_GOLD,
+                                    0.70f32,
+                                    format!("{}  (B=close)\0", zlabel).as_ptr(),
+                                );
+                            }
+                            for i in start..n.min(start + vis) {
+                                let cid = zcards[i];
+                                let y = 28.0 + (i - start) as f32 * 17.0;
+                                let cn: &str = gs
+                                    .card_database
+                                    .get_card(cid)
+                                    .map_or("?", |c| c.card_no.as_ref());
+                                let nm: &str = gs
+                                    .card_database
+                                    .get_card(cid)
+                                    .map_or("?", |c| c.name.as_ref());
+                                unsafe {
+                                    _3ds_top_queue_text(
+                                        4.0,
+                                        y,
+                                        COL_LIGHT,
+                                        0.60f32,
+                                        format!("[{}] {}\0", cn, nm).as_ptr(),
+                                    );
+                                }
+                            }
+                            if n > vis {
+                                unsafe {
+                                    _3ds_top_queue_text(
+                                        300.0,
+                                        4.0,
+                                        COL_MED,
+                                        0.50f32,
+                                        format!("{}-{}/{}\0", start + 1, (start + vis).min(n), n)
+                                            .as_ptr(),
+                                    );
+                                }
+                            }
+                        } else if detail_mode {
                             let (rect_h, cont_y) = if viewing_card.is_some() {
                                 (110.0, 158.0)
                             } else {
@@ -3599,6 +3708,8 @@ fn main() {
                     hand_offset_p2,
                     touch_tap_count,
                     viewing_card,
+                    zone_viewer,
+                    zone_viewer_offset,
                     is_multiplayer,
                     is_host,
                     waiting_for_opponent,
@@ -3706,7 +3817,7 @@ fn step_name(s: &Step) -> &'static str {
         Step::ReadCardsBin => "ReadCards",
         Step::ParseCards(_) => "ParseCards",
         Step::Setup(_, _, _, _) => "Setup",
-        Step::Play(_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => "Play",
+        Step::Play(_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => "Play",
         Step::Done(_) => "Done",
     }
 }

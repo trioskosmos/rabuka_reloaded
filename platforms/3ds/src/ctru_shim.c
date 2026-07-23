@@ -703,15 +703,15 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     // Line spacing fy += 14 accommodates 21px glyph + 1px gap.
     char buf[40];
     float fs = stage_h > 40 ? 0.70f : 0.65f;
-    float fy = stage_y + 1;
+    float fx = util_x + 1;
     snprintf(buf, sizeof(buf), "D:%d", pb->deck);
-    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 14;
+    _3ds_draw_label(buf, fx, stage_y + 1, COL_TEXT, fs); fx += 36;
     snprintf(buf, sizeof(buf), "E:%d", pb->edeck);
-    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 14;
+    _3ds_draw_label(buf, fx, stage_y + 1, COL_TEXT, fs); fx += 36;
     snprintf(buf, sizeof(buf), "W:%d", pb->discard);
-    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs); fy += 14;
+    _3ds_draw_label(buf, fx, stage_y + 1, COL_TEXT, fs); fx += 36;
     snprintf(buf, sizeof(buf), "S:%d", pb->success);
-    _3ds_draw_label(buf, util_x + 1, fy, COL_TEXT, fs);
+    _3ds_draw_label(buf, fx, stage_y + 1, COL_TEXT, fs);
 
     // === ENERGY ===
     _3ds_draw_rect(M, energy_y, W - 2 * M, energy_h, COL_ZONE_BG);
@@ -879,7 +879,7 @@ void _3ds_swap_buffers() {
                     draw_ops[i].color,
                     390.0f);
             } else if (draw_op_types[i] == OP_CARD) {
-                C2D_Image img = _atlas_get_image(draw_ops[i].atlas, draw_ops[i].atlas_idx);
+                C2D_Image img = _3ds_get_card_image(draw_ops[i].atlas, draw_ops[i].atlas_idx);
                 if (img.tex != NULL) {
                     float sx = draw_ops[i].w / (float)img.subtex->width;
                     float sy = draw_ops[i].h / (float)img.subtex->height;
