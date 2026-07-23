@@ -2482,6 +2482,56 @@ fn main() {
                         }
                     }
 
+                    // Game over: show winner on top screen
+                    if gs.game_result != GameResult::Ongoing {
+                        let winner = match gs.game_result {
+                            GameResult::FirstAttackerWins => {
+                                if gs.player1.is_first_attacker {
+                                    "P1"
+                                } else {
+                                    "P2"
+                                }
+                            }
+                            GameResult::SecondAttackerWins => {
+                                if gs.player1.is_first_attacker {
+                                    "P2"
+                                } else {
+                                    "P1"
+                                }
+                            }
+                            _ => "Draw",
+                        };
+                        unsafe {
+                            _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
+                            _3ds_top_queue_text(
+                                4.0,
+                                100.0,
+                                COL_GOLD,
+                                1.2f32,
+                                format!("{} wins!\0", winner).as_ptr(),
+                            );
+                            _3ds_top_queue_text(
+                                4.0,
+                                140.0,
+                                COL_LIGHT,
+                                0.65f32,
+                                format!(
+                                    "Score: {} vs {}\0",
+                                    gs.player1.success_live_card_zone.cards.len(),
+                                    gs.player2.success_live_card_zone.cards.len()
+                                )
+                                .as_ptr(),
+                            );
+                            _3ds_top_queue_text(
+                                4.0,
+                                170.0,
+                                COL_MED,
+                                0.55f32,
+                                "Press START to exit\0".as_ptr(),
+                            );
+                        }
+                    }
+
                     if cli_mode {
                         // ===== CLI MODE: existing text-based rendering =====
                         unsafe {
@@ -3107,17 +3157,37 @@ fn main() {
                             let is_opponent_turn_mp =
                                 is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 });
                             if is_image_choice {
+                                // Build option-index → real card_id map (for ChoiceOption from SelectAutoAbility)
+                                let opt_map: std::collections::HashMap<i16, i16> = {
+                                    let mut m = std::collections::HashMap::new();
+                                    if let Some(c) = gs.get_pending_choice() {
+                                        use rabuka_engine::ability::types::Choice;
+                                        if let Choice::SelectAutoAbility { options, .. } = c {
+                                            for (i, opt) in options.iter().enumerate() {
+                                                if let Some(cid) = opt.card_id {
+                                                    m.insert(i as i16, cid);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    m
+                                };
                                 // Image mode: render choice cards on the top screen
                                 let mut ix = 4.0f32;
                                 let iy = 42.0f32;
                                 let iw = 88.0f32;
                                 let ih = 124.0f32;
-                                let mut has_non_card = false;
                                 for &fi in &display_order {
                                     let act = &acts_cache[fi];
-                                    if let Some(cid) =
-                                        act.parameters.as_ref().and_then(|p| p.card_id)
-                                    {
+                                    let real_cid = act
+                                        .parameters
+                                        .as_ref()
+                                        .and_then(|p| p.card_id)
+                                        .and_then(|idx| opt_map.get(&idx).copied())
+                                        .or_else(|| {
+                                            act.parameters.as_ref().and_then(|p| p.card_id)
+                                        });
+                                    if let Some(cid) = real_cid {
                                         if let Some(cn) = card_no(cid) {
                                             if let Some((atl, idx)) = atlas.lookup(cn.as_str()) {
                                                 let c_str = std::ffi::CString::new(atl.as_bytes())
@@ -3144,35 +3214,64 @@ fn main() {
                                                 if ix + iw > 400.0 {
                                                     break;
                                                 }
+                                                continue;
                                             }
                                         }
-                                    } else {
-                                        has_non_card = true;
                                     }
                                 }
-                                if has_non_card {
-                                    // Render non-card actions (skip, etc.) as text below the cards
-                                    let mut ty = iy + ih + 8.0;
-                                    for &fi in &display_order {
-                                        let act = &acts_cache[fi];
-                                        if act.parameters.as_ref().and_then(|p| p.card_id).is_none()
-                                        {
-                                            let desc = act
-                                                .description
-                                                .lines()
-                                                .next()
-                                                .unwrap_or("")
-                                                .to_string();
-                                            unsafe {
-                                                _3ds_top_queue_text(
-                                                    4.0,
-                                                    ty,
-                                                    COL_LIGHT,
-                                                    0.65f32,
-                                                    format!("{}\0", desc).as_ptr(),
-                                                );
-                                            }
-                                            ty += 18.0;
+                                // Text: render descriptions for all choice actions below the cards
+                                let mut ty = iy + ih + 8.0;
+                                for &fi in &display_order {
+                                    let act = &acts_cache[fi];
+                                    let line = if act.action_type
+                                        == game_setup::ActionType::ChoiceOption
+                                    {
+                                        // Show ability text from the pending SelectAutoAbility option
+                                        let opt_text = gs
+                                            .get_pending_choice()
+                                            .and_then(|c| {
+                                                use rabuka_engine::ability::types::Choice;
+                                                if let Choice::SelectAutoAbility {
+                                                    options, ..
+                                                } = c
+                                                {
+                                                    act.parameters
+                                                        .as_ref()
+                                                        .and_then(|p| p.card_id)
+                                                        .and_then(|idx| options.get(idx as usize))
+                                                        .map(|o| o.ability_text.clone())
+                                                } else {
+                                                    None
+                                                }
+                                            })
+                                            .unwrap_or_default();
+                                        let desc = act
+                                            .description
+                                            .lines()
+                                            .next()
+                                            .unwrap_or("")
+                                            .to_string();
+                                        if !opt_text.is_empty() {
+                                            opt_text
+                                        } else {
+                                            desc
+                                        }
+                                    } else {
+                                        act.description.lines().next().unwrap_or("").to_string()
+                                    };
+                                    if !line.is_empty() {
+                                        unsafe {
+                                            _3ds_top_queue_text(
+                                                4.0,
+                                                ty,
+                                                COL_LIGHT,
+                                                0.60f32,
+                                                format!("{}\0", line).as_ptr(),
+                                            );
+                                        }
+                                        ty += 16.0;
+                                        if ty > 230.0 {
+                                            break;
                                         }
                                     }
                                 }
@@ -3182,7 +3281,7 @@ fn main() {
                                 && content_y < 240.0
                             {
                                 let mut ty = content_y;
-                                let max_vis = 10usize;
+                                let max_vis = ((230.0 - content_y) / 20.0) as usize + 1;
                                 let half = max_vis / 2;
                                 let n = display_order.len();
                                 let start = if n > max_vis {
@@ -3323,12 +3422,44 @@ fn main() {
                                                 .next()
                                                 .unwrap_or("")
                                                 .to_string();
-                                            if !cn.is_empty() && !name.is_empty() {
-                                                format!("[{}] {} {}", cn, name, desc)
-                                            } else if !cn.is_empty() {
-                                                format!("[{}] {}", cn, desc)
+                                            // For ChoiceOption from SelectAutoAbility, show ability text
+                                            let ability_text = if act.action_type
+                                                == game_setup::ActionType::ChoiceOption
+                                            {
+                                                gs.get_pending_choice()
+                                                    .and_then(|c| {
+                                                        use rabuka_engine::ability::types::Choice;
+                                                        if let Choice::SelectAutoAbility {
+                                                            options,
+                                                            ..
+                                                        } = c
+                                                        {
+                                                            act.parameters
+                                                                .as_ref()
+                                                                .and_then(|p| p.card_id)
+                                                                .and_then(|idx| {
+                                                                    options.get(idx as usize)
+                                                                })
+                                                                .map(|o| o.ability_text.clone())
+                                                        } else {
+                                                            None
+                                                        }
+                                                    })
+                                                    .unwrap_or_default()
                                             } else {
-                                                desc
+                                                String::new()
+                                            };
+                                            let display = if !ability_text.is_empty() {
+                                                &ability_text
+                                            } else {
+                                                &desc
+                                            };
+                                            if !cn.is_empty() && !name.is_empty() {
+                                                format!("[{}] {} {}", cn, name, display)
+                                            } else if !cn.is_empty() {
+                                                format!("[{}] {}", cn, display)
+                                            } else {
+                                                display.to_string()
                                             }
                                         }
                                     };
