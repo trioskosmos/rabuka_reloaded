@@ -3685,7 +3685,7 @@ fn main() {
                                             ty += 18.0;
                                         }
                                     }
-                                    let mut prev_cn = String::new();
+                                    let mut prev_cid = -1i16;
                                     for di in start..end {
                                         let fi = display_order[di];
                                         let act = &acts_cache[fi];
@@ -3695,10 +3695,15 @@ fn main() {
                                             .as_ref()
                                             .and_then(|p| p.disabled)
                                             .unwrap_or(false);
+                                        let this_cid = act
+                                            .parameters
+                                            .as_ref()
+                                            .and_then(|p| p.card_id)
+                                            .unwrap_or(-1);
                                         let is_grouped = act.action_type
                                             == game_setup::ActionType::PlayMemberToStage
-                                            && cn_or_empty(act) == prev_cn
-                                            && !prev_cn.is_empty();
+                                            && this_cid == prev_cid
+                                            && prev_cid != -1;
                                         let prefix = if is_sel {
                                             "> "
                                         } else if is_disabled {
@@ -3881,7 +3886,7 @@ fn main() {
                                             }
                                             ty += 20.0;
                                         }
-                                        prev_cn = cn_or_empty(act);
+                                        prev_cid = this_cid;
                                     }
                                     if end < n {
                                         unsafe {
