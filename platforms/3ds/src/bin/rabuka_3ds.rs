@@ -133,7 +133,8 @@ fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32, ic
             if let Some(bar) = inner.find('|') {
                 let file = &inner[..bar];
                 let iw = icon_h * 0.711;
-                let atlas_name = format!("icon_{}.png.t3x", file);
+                let icon_name = file.strip_suffix(".png").unwrap_or(file);
+                let atlas_name = format!("icon_{}.png.t3x", icon_name);
                 let c_str = std::ffi::CString::new(atlas_name.as_str()).unwrap_or_default();
                 unsafe {
                     _3ds_top_queue_card(c_str.as_ptr(), 0, cx, y, iw, icon_h);
@@ -1834,8 +1835,8 @@ fn main() {
                     }
                 }
 
-                // Image mode: grid navigation with wrap-around (disabled in zone viewer)
-                let img_cols = ((400.0 - 8.0) / (80.0 + 4.0)) as usize;
+                // Image mode: navigation with wrap-around (disabled in zone viewer)
+                let img_cols = 5usize;
                 let is_img_choice = choice_image_mode && gs.has_pending_choice();
                 if zone_viewer.is_none() && is_img_choice {
                     let n = display_order.len();
@@ -3582,38 +3583,24 @@ fn main() {
                                         }
                                         m
                                     };
-                                    let cw = 80.0f32;
+                                    let cw = 72.0f32;
                                     let ch = cw / 0.711;
                                     let gap = 4.0f32;
-                                    let cols = ((400.0 - 8.0) / (cw + gap)) as usize;
-                                    let row_h = ch + 20.0 + gap;
-                                    let base_y = content_y.max(42.0);
-                                    let rows_vis = ((230.0 - base_y) / row_h) as usize + 1;
-                                    let total_rows = (display_order.len() + cols - 1) / cols;
-                                    let sr = if cols > 0 && rows_vis > 0 {
-                                        let c = display_pos / cols;
-                                        let half = rows_vis / 2;
-                                        if total_rows > rows_vis {
-                                            c.saturating_sub(half).min(total_rows - rows_vis)
-                                        } else {
-                                            0
-                                        }
-                                    } else {
-                                        0
-                                    };
-                                    let iy = base_y - sr as f32 * row_h;
+                                    let cols = 5usize;
+                                    let iy = content_y.max(42.0).min(140.0);
                                     let mut ty = iy;
                                     for (di, &fi) in display_order.iter().enumerate() {
+                                        if di >= cols {
+                                            break;
+                                        }
                                         let act = &acts_cache[fi];
                                         let is_disabled = act
                                             .parameters
                                             .as_ref()
                                             .and_then(|p| p.disabled)
                                             .unwrap_or(false);
-                                        let col = di % cols;
-                                        let row = di / cols;
-                                        let ix = 4.0 + col as f32 * (cw + gap);
-                                        let iy_card = iy + row as f32 * (ch + 20.0 + gap);
+                                        let ix = 4.0 + di as f32 * (cw + gap);
+                                        let iy_card = iy;
                                         if iy_card + ch + 20.0 > 230.0 {
                                             break;
                                         }
@@ -3683,15 +3670,29 @@ fn main() {
                                             .unwrap_or("")
                                             .to_string();
                                         if !desc.is_empty() {
-                                            let c = if is_disabled { COL_MED } else { COL_LIGHT };
-                                            unsafe {
-                                                _3ds_top_queue_text(
-                                                    4.0,
-                                                    ty,
-                                                    c,
-                                                    0.65f32,
-                                                    format!("{}\0", desc).as_ptr(),
+                                            let c = if is_disabled {
+                                                COL_MED
+                                            } else if di == display_pos {
+                                                COL_GOLD
+                                            } else {
+                                                COL_LIGHT
+                                            };
+                                            let pfx = if di == display_pos { "> " } else { "  " };
+                                            let txt = format!("{}{}", pfx, desc);
+                                            if txt.contains("{{") {
+                                                render_text_with_icons(
+                                                    4.0, ty, &txt, c, 0.65, 14.0,
                                                 );
+                                            } else {
+                                                unsafe {
+                                                    _3ds_top_queue_text(
+                                                        4.0,
+                                                        ty,
+                                                        c,
+                                                        0.65f32,
+                                                        format!("{}\0", txt).as_ptr(),
+                                                    );
+                                                }
                                             }
                                             ty += 18.0;
                                         }

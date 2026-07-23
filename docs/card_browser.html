@@ -154,6 +154,11 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
           <a href="tutorial.html" target="_blank" style="color:#e94560;" data-i18n="decklog_guide">How to get a deck from Deck Log</a>
   </div>
 </div>
+</div>
+</div>
+
+<!-- Toast notification -->
+<div id="toast"></div>
 
 <!-- QR Code Modal -->
 <div id="qr-modal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:999;">
@@ -980,7 +985,14 @@ function renderDeckStats(data) {
 function renderDeckList() {
   const el = document.getElementById('deck-card-list');
   const totalEl = document.getElementById('deck-total');
-  if (!totalEl) { console.error('deck-total element not found in DOM'); return; }
+  if (!totalEl) {
+    console.error('deck-total element not found');
+    // Check if parent containers exist
+    console.error('deck-panel:', document.getElementById('deck-panel'));
+    console.error('deck-card-list:', document.getElementById('deck-card-list'));
+    console.error('All elements with id containing deck:', Array.from(document.querySelectorAll('[id*="deck"]')).map(function(e){ return e.id; }));
+    return;
+  }
   const entries = [...deckState.cards.entries()].sort((a, b) => {
     const order = { 'メンバー': 0, 'ライブ': 1, 'エネルギー': 2 };
     const ta = order[a[1].card.type] || 9, tb = order[b[1].card.type] || 9;
