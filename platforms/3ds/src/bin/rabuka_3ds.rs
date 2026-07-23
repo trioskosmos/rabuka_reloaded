@@ -3501,8 +3501,18 @@ fn main() {
                             }
                         }
 
-                        // Choice image mode: show card images (with text fallback for non-card actions)
-                        let is_image_choice = choice_image_mode && gs.has_pending_choice();
+                        // Choice image mode: show card images where possible, text for rest
+                        let has_card_imgs = choice_image_mode
+                            && gs.has_pending_choice()
+                            && display_order.iter().any(|&fi| {
+                                let act = &acts_cache[fi];
+                                let cid = act.parameters.as_ref().and_then(|p| p.card_id);
+                                cid.and_then(card_no)
+                                    .and_then(|cn| atlas.lookup(cn.as_str()))
+                                    .is_some()
+                            });
+                        let is_image_choice =
+                            choice_image_mode && gs.has_pending_choice() && has_card_imgs;
                         {
                             // Action list on top screen (was previously on bottom overlay).
                             let is_ai_turn =
@@ -3683,12 +3693,10 @@ fn main() {
                                             == game_setup::ActionType::PlayMemberToStage
                                             && cn_or_empty(act) == prev_cn
                                             && !prev_cn.is_empty();
-                                        let prefix = if is_grouped {
-                                            "  "
+                                        let prefix = if is_sel {
+                                            "> "
                                         } else if is_disabled {
                                             "· "
-                                        } else if is_sel {
-                                            "> "
                                         } else {
                                             "  "
                                         };
@@ -3696,7 +3704,6 @@ fn main() {
                                             break;
                                         }
                                         let line = if is_grouped {
-                                            // Grouped: just show the area option
                                             let area = act
                                                 .parameters
                                                 .as_ref()
@@ -3717,7 +3724,7 @@ fn main() {
                                                         .and_then(|p| p.base_cost)
                                                 })
                                                 .unwrap_or(0);
-                                            format!("  {} c:{}", area, cost)
+                                            format!("  {}:{}", area, cost)
                                         } else {
                                             match act.action_type {
                                                 game_setup::ActionType::Pass => "Pass".into(),
@@ -3728,33 +3735,15 @@ fn main() {
                                                         .as_ref()
                                                         .and_then(|p| p.card_name.clone())
                                                         .unwrap_or_default();
-                                                    let area = act
+                                                    let base_cost = act
                                                         .parameters
                                                         .as_ref()
-                                                        .and_then(|p| p.stage_area.clone())
-                                                        .unwrap_or_default();
-                                                    let area_cost = act
-                                                        .parameters
-                                                        .as_ref()
-                                                        .and_then(|p| p.available_areas.as_ref())
-                                                        .and_then(|aa| {
-                                                            aa.iter()
-                                                                .find(|x| x.area == area)
-                                                                .map(|x| x.cost)
-                                                        })
-                                                        .or_else(|| {
-                                                            act.parameters
-                                                                .as_ref()
-                                                                .and_then(|p| p.base_cost)
-                                                        })
+                                                        .and_then(|p| p.base_cost)
                                                         .unwrap_or(0);
                                                     if !cn.is_empty() {
-                                                        format!(
-                                                            "[{}] {} {} c:{}",
-                                                            cn, name, area, area_cost
-                                                        )
+                                                        format!("[{}] {} c:{}", cn, name, base_cost)
                                                     } else {
-                                                        format!("{} {} c:{}", name, area, area_cost)
+                                                        format!("{} c:{}", name, base_cost)
                                                     }
                                                 }
                                                 game_setup::ActionType::UseAbility => {
