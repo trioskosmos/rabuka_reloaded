@@ -1761,6 +1761,38 @@ fn main() {
                     }
                 }
 
+                // Image mode grid navigation (LEFT/RIGHT/UP/DOWN)
+                let img_cols = ((400.0 - 8.0) / (80.0 + 4.0)) as usize;
+                let is_img_choice = choice_image_mode && gs.has_pending_choice();
+                if is_img_choice {
+                    if keys & 0x00000040 != 0 {
+                        let n = display_order.len();
+                        if display_pos >= img_cols {
+                            display_pos -= img_cols;
+                        }
+                        cur = display_order[display_pos];
+                        redraw = true;
+                    }
+                    if keys & 0x00000080 != 0 {
+                        let n = display_order.len();
+                        if display_pos + img_cols < n {
+                            display_pos += img_cols;
+                        }
+                        cur = display_order[display_pos];
+                        redraw = true;
+                    }
+                    if keys & 0x00000020 != 0 && display_pos > 0 {
+                        display_pos -= 1;
+                        cur = display_order[display_pos];
+                        redraw = true;
+                    }
+                    if keys & 0x00000010 != 0 && display_pos + 1 < display_order.len() {
+                        display_pos += 1;
+                        cur = display_order[display_pos];
+                        redraw = true;
+                    }
+                }
+
                 // SELECT cycles board view: player / opponent / both
                 if keys & 0x00000004 != 0 {
                     unsafe {
@@ -3435,7 +3467,6 @@ fn main() {
                             let is_opponent_turn_mp =
                                 is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 });
                             if is_image_choice {
-                                // Build option-index → real card_id map (for ChoiceOption from SelectAutoAbility)
                                 let opt_map: std::collections::HashMap<i16, i16> = {
                                     let mut m = std::collections::HashMap::new();
                                     if let Some(c) = gs.get_pending_choice() {
@@ -3450,21 +3481,41 @@ fn main() {
                                     }
                                     m
                                 };
-                                // Image mode: render choice cards on the top screen
-                                let cw = 84.0f32;
+                                let cw = 80.0f32;
                                 let ch = cw / 0.711;
-                                let ih = ch + 20.0;
-                                let iy = 42.0f32;
-                                let cols = ((400.0 - 8.0) / (cw + 4.0)) as usize;
+                                let gap = 4.0f32;
+                                let cols = ((400.0 - 8.0) / (cw + gap)) as usize;
+                                let row_h = ch + 20.0 + gap;
+                                let base_y = content_y.max(42.0);
+                                let rows_vis = ((230.0 - base_y) / row_h) as usize + 1;
+                                let total_rows = (display_order.len() + cols - 1) / cols;
+                                let sr = if cols > 0 && rows_vis > 0 {
+                                    let c = display_pos / cols;
+                                    let half = rows_vis / 2;
+                                    if total_rows > rows_vis {
+                                        c.saturating_sub(half).min(total_rows - rows_vis)
+                                    } else {
+                                        0
+                                    }
+                                } else {
+                                    0
+                                };
+                                let iy = base_y - sr as f32 * row_h;
+                                let mut ty = iy;
                                 for (di, &fi) in display_order.iter().enumerate() {
+                                    let act = &acts_cache[fi];
+                                    let is_disabled = act
+                                        .parameters
+                                        .as_ref()
+                                        .and_then(|p| p.disabled)
+                                        .unwrap_or(false);
                                     let col = di % cols;
                                     let row = di / cols;
-                                    let ix = 4.0 + col as f32 * (cw + 4.0);
-                                    let iy_card = iy + row as f32 * (ih + 4.0);
-                                    if iy_card + ih > 230.0 {
+                                    let ix = 4.0 + col as f32 * (cw + gap);
+                                    let iy_card = iy + row as f32 * (ch + 20.0 + gap);
+                                    if iy_card + ch + 20.0 > 230.0 {
                                         break;
                                     }
-                                    let act = &acts_cache[fi];
                                     let real_cid = act
                                         .parameters
                                         .as_ref()
@@ -3478,7 +3529,7 @@ fn main() {
                                             if let Some((atl, idx)) = atlas.lookup(cn.as_str()) {
                                                 let c_str = std::ffi::CString::new(atl.as_bytes())
                                                     .unwrap_or_default();
-                                                let cursor_color = if di == display_pos {
+                                                let border = if di == display_pos {
                                                     COL_GOLD
                                                 } else {
                                                     COL_CARD
@@ -3488,8 +3539,8 @@ fn main() {
                                                         ix,
                                                         iy_card,
                                                         cw,
-                                                        ih,
-                                                        cursor_color,
+                                                        ch + 20.0,
+                                                        border,
                                                     );
                                                     _3ds_top_queue_card(
                                                         c_str.as_ptr(),
@@ -3499,6 +3550,15 @@ fn main() {
                                                         cw - 2.0,
                                                         ch,
                                                     );
+                                                    if is_disabled {
+                                                        _3ds_top_queue_rect(
+                                                            ix + 1.0,
+                                                            iy_card + 1.0,
+                                                            cw - 2.0,
+                                                            ch,
+                                                            0xAA000000,
+                                                        );
+                                                    }
                                                     _3ds_top_queue_text(
                                                         ix + 1.0,
                                                         iy_card + ch + 1.0,
@@ -3507,64 +3567,26 @@ fn main() {
                                                         format!("{}\0", cn).as_ptr(),
                                                     );
                                                 }
+                                                ty = iy_card + ch + 20.0 + gap;
+                                                continue;
                                             }
                                         }
                                     }
-                                }
-                                // Text: render descriptions for all choice actions below the cards
-                                let mut ty = iy + ih + 8.0;
-                                for &fi in &display_order {
-                                    let act = &acts_cache[fi];
-                                    let line = if act.action_type
-                                        == game_setup::ActionType::ChoiceOption
-                                    {
-                                        // Show ability text from the pending SelectAutoAbility option
-                                        let opt_text = gs
-                                            .get_pending_choice()
-                                            .and_then(|c| {
-                                                use rabuka_engine::ability::types::Choice;
-                                                if let Choice::SelectAutoAbility {
-                                                    options, ..
-                                                } = c
-                                                {
-                                                    act.parameters
-                                                        .as_ref()
-                                                        .and_then(|p| p.card_id)
-                                                        .and_then(|idx| options.get(idx as usize))
-                                                        .map(|o| o.ability_text.clone())
-                                                } else {
-                                                    None
-                                                }
-                                            })
-                                            .unwrap_or_default();
-                                        let desc = act
-                                            .description
-                                            .lines()
-                                            .next()
-                                            .unwrap_or("")
-                                            .to_string();
-                                        if !opt_text.is_empty() {
-                                            opt_text
-                                        } else {
-                                            desc
-                                        }
-                                    } else {
-                                        act.description.lines().next().unwrap_or("").to_string()
-                                    };
-                                    if !line.is_empty() {
+                                    // Non-card actions (skip etc.): render as text
+                                    let desc =
+                                        act.description.lines().next().unwrap_or("").to_string();
+                                    if !desc.is_empty() {
+                                        let c = if is_disabled { COL_MED } else { COL_LIGHT };
                                         unsafe {
                                             _3ds_top_queue_text(
                                                 4.0,
                                                 ty,
-                                                COL_LIGHT,
-                                                0.60f32,
-                                                format!("{}\0", line).as_ptr(),
+                                                c,
+                                                0.65f32,
+                                                format!("{}\0", desc).as_ptr(),
                                             );
                                         }
-                                        ty += 16.0;
-                                        if ty > 230.0 {
-                                            break;
-                                        }
+                                        ty += 18.0;
                                     }
                                 }
                             } else if !is_ai_turn

@@ -33,6 +33,7 @@ extern "C" {
 }
 
 use core::alloc::{GlobalAlloc, Layout};
+use core::cell::UnsafeCell;
 use core::ptr;
 
 extern "C" {
@@ -41,11 +42,11 @@ extern "C" {
 
 const HEAP_END: usize = 0x0240_0000;
 const ALIGN: usize = 8;
-use core::cell::UnsafeCell;
-use linked_list_allocator::Heap;
-
+// Bump allocator: simple, fast, no free list to corrupt.
+// dealloc rewinds the bump pointer for LIFO-freed blocks (format! strings).
 struct DsAllocator {
-    inner: UnsafeCell<Option<Heap>>,
+    ptr: UnsafeCell<usize>,
+    end: UnsafeCell<usize>,
     oom_count: UnsafeCell<u32>,
 }
 
@@ -58,7 +59,8 @@ unsafe impl Sync for DsAllocator {}
 impl DsAllocator {
     const fn new() -> Self {
         DsAllocator {
-            inner: UnsafeCell::new(None),
+            ptr: UnsafeCell::new(0),
+            end: UnsafeCell::new(0),
             oom_count: UnsafeCell::new(0),
         }
     }
@@ -68,63 +70,52 @@ impl DsAllocator {
     }
 
     unsafe fn ensure_init(&self) {
-        let inner = self.inner.get();
-        if (*inner).is_some() {
+        if *self.end.get() != 0 {
             return;
         }
         let start = &__heap_start_ntr as *const u8 as usize;
         let aligned = align_up(start, ALIGN);
-        let size = HEAP_END.saturating_sub(aligned);
-        if size > 0 {
-            ptr::write_bytes(aligned as *mut u8, 0, size);
-            let heap = Heap::new(aligned as *mut u8, size);
-            *inner = Some(heap);
-        }
+        *self.ptr.get() = aligned;
+        *self.end.get() = HEAP_END;
     }
 }
 
 unsafe impl GlobalAlloc for DsAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         self.ensure_init();
-        let inner = &mut *self.inner.get();
-        if let Some(ref mut heap) = inner {
-            heap.allocate_first_fit(layout)
-                .ok()
-                .map(|ptr| ptr.as_ptr())
-                .unwrap_or_else(|| {
-                    *self.oom_count.get() += 1;
-                    ptr::null_mut()
-                })
-        } else {
-            ptr::null_mut()
+        let size = align_up(layout.size(), ALIGN).max(ALIGN);
+        let p = *self.ptr.get();
+        let next_p = p + size;
+        if next_p > *self.end.get() {
+            *self.oom_count.get() += 1;
+            return ptr::null_mut();
         }
+        *self.ptr.get() = next_p;
+        p as *mut u8
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        if ptr.is_null() {
-            return;
-        }
-        let inner = &mut *self.inner.get();
-        if let Some(ref mut heap) = inner {
-            heap.deallocate(core::ptr::NonNull::new_unchecked(ptr), layout);
+        // LIFO rewind: if this is the most recent alloc, rewind
+        let size = align_up(layout.size(), ALIGN).max(ALIGN);
+        if (ptr as usize) + size == *self.ptr.get() {
+            *self.ptr.get() = ptr as usize;
         }
     }
 
     unsafe fn realloc(&self, ptr: *mut u8, old_layout: Layout, new_size: usize) -> *mut u8 {
-        if ptr.is_null() {
-            return self.alloc(Layout::from_size_align_unchecked(
-                new_size,
-                old_layout.align(),
-            ));
+        let old_size = align_up(old_layout.size(), ALIGN).max(ALIGN);
+        let new_alloc = align_up(new_size, ALIGN).max(ALIGN);
+        if new_alloc <= old_size {
+            return ptr;
         }
-        let new_ptr = self.alloc(Layout::from_size_align_unchecked(
-            new_size,
-            old_layout.align(),
-        ));
+        if (ptr as usize) + old_size == *self.ptr.get() {
+            *self.ptr.get() = (ptr as usize) + new_alloc;
+            return ptr;
+        }
+        let new_layout = Layout::from_size_align_unchecked(new_size, old_layout.align());
+        let new_ptr = self.alloc(new_layout);
         if !new_ptr.is_null() {
-            let copy_size = old_layout.size().min(new_size);
-            ptr::copy_nonoverlapping(ptr, new_ptr, copy_size);
-            self.dealloc(ptr, old_layout);
+            ptr::copy_nonoverlapping(ptr, new_ptr, old_size);
         }
         new_ptr
     }
@@ -132,7 +123,8 @@ unsafe impl GlobalAlloc for DsAllocator {
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
         let ptr = self.alloc(layout);
         if !ptr.is_null() {
-            ptr::write_bytes(ptr, 0, layout.size());
+            let sz = align_up(layout.size(), ALIGN).max(ALIGN);
+            ptr::write_bytes(ptr, 0, sz);
         }
         ptr
     }
