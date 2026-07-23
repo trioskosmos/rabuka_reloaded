@@ -464,7 +464,7 @@ pub extern "C" fn main() {
             break;
         }
 
-        settle_auto(&mut gs);
+        settle_auto(&mut display, &mut gs);
         if gs.game_result != GameResult::Ongoing {
             show_result(&mut display, &mut input, &gs);
             break;
@@ -632,7 +632,7 @@ pub extern "C" fn main() {
             }
         }
 
-        settle_auto(&mut gs);
+        settle_auto(&mut display, &mut gs);
     }
 }
 
@@ -1135,16 +1135,22 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
     }
 }
 
-fn settle_auto(gs: &mut GameState) {
+fn settle_auto(display: &mut Display, gs: &mut GameState) {
     let mut iters = 0u32;
     loop {
         iters += 1;
-        // Yield VBlank every 8 iterations so the DS hardware timer/DMA
-        // doesn't stall. Same principle as aptMainLoop() in settle_3ds.
-        if iters % 8 == 0 {
-            unsafe { nds_wait_vblank() };
+        if iters % 4 == 0 {
+            display.clear();
+            display.println(&format!("Settling... [{}]", iters));
+            display.println(&format!("Phase: {:?}", gs.current_phase));
+            display.println(&format!("Pending: {}", gs.has_pending_choice()));
+            display.swap_buffers();
         }
         if iters > 500 {
+            display.clear();
+            display.println("ERROR: Settle timeout (>500 iters)");
+            display.swap_buffers();
+            wait_frames(60);
             break;
         }
         if gs.has_pending_choice() || gs.game_result != GameResult::Ongoing {

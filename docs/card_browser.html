@@ -165,6 +165,7 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
 
 <script src="js/qrcode.min.js"></script>
 <script>
+document.title = document.title + ' [JS running]';
 (function(){ var e = document.getElementById('result-count'); if(e) e.textContent = '✓ script loaded at ' + new Date().toLocaleTimeString(); })();
 // ── i18n ──
 let cbLang = localStorage.getItem('card_browser_lang') || 'en';

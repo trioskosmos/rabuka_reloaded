@@ -109,64 +109,52 @@ fn cn_or_empty(act: &game_setup::Action) -> String {
         .unwrap_or_default()
 }
 
-/// Replace `{{file.png|label}}` icon markup with a short symbol for display.
-/// Hearts → `♥`, blade → `⚔`, energy → `⚡`, score → `★`, triggers use Japanese label.
-fn strip_icons(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut rest = s;
+/// Render text with inline `{{icon.png|label}}` icon images.
+/// Uses _3ds_top_queue_card to render the actual icon T3X files.
+fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32, icon_h: f32) {
+    let mut cx = x;
+    let mut rest = text;
     while let Some(start) = rest.find("{{") {
-        out.push_str(&rest[..start]);
+        if start > 0 {
+            unsafe {
+                _3ds_top_queue_text(
+                    cx,
+                    y,
+                    color,
+                    scale,
+                    format!("{}\0", &rest[..start]).as_ptr(),
+                );
+            }
+            cx += start as f32 * scale * 8.0;
+        }
         let after = &rest[start + 2..];
         if let Some(end) = after.find("}}") {
             let inner = &after[..end];
             if let Some(bar) = inner.find('|') {
-                let label = &inner[bar + 1..];
-                // Use short symbols for known icon types
-                let sym = if inner.starts_with("heart_") {
-                    "♥"
-                } else if inner.starts_with("icon_blade") {
-                    "⚔"
-                } else if inner.starts_with("icon_energy") {
-                    "⚡"
-                } else if inner.starts_with("icon_score") {
-                    "★"
-                } else if inner.starts_with("icon_all") {
-                    "❤"
-                } else if inner.starts_with("icon_b_all") {
-                    "⛏"
-                } else if inner.starts_with("icon_draw") {
-                    "⇄"
-                } else if inner.starts_with("live_start") {
-                    "▶"
-                } else if inner.starts_with("live_success") {
-                    "✓"
-                } else if inner.starts_with("center") {
-                    "◎"
-                } else if inner.starts_with("leftside") {
-                    "◁"
-                } else if inner.starts_with("rightside") {
-                    "▷"
-                } else {
-                    "□"
-                };
-                out.push_str(sym);
-                rest = &after[end + 2..];
-            } else {
-                out.push_str("□");
-                rest = &after[end + 2..];
+                let file = &inner[..bar];
+                let iw = icon_h * 0.711;
+                let atlas_name = format!("icon_{}.png.t3x\0", file);
+                let c_str = std::ffi::CString::new(atlas_name.as_bytes()).unwrap_or_default();
+                unsafe {
+                    _3ds_top_queue_card(c_str.as_ptr(), 0, cx, y, iw, icon_h);
+                }
+                cx += iw + 2.0;
             }
+            rest = &after[end + 2..];
         } else {
-            out.push_str(&rest[start..]);
-            rest = "";
+            break;
         }
     }
-    out.push_str(rest);
-    out
+    if !rest.is_empty() {
+        unsafe {
+            _3ds_top_queue_text(cx, y, color, scale, format!("{}\0", rest).as_ptr());
+        }
+    }
 }
 
-/// Strip icon markup and wrap text — convenience wrapper for ability text display.
+/// Wrap ability text — keeps `{{...}}` icon markers for later inline rendering.
 fn wrap_ability_text(s: &str, max_chars: usize) -> String {
-    wrap_text(&strip_icons(s), max_chars)
+    wrap_text(s, max_chars)
 }
 
 fn wrap_text(s: &str, max_chars: usize) -> String {
@@ -3529,11 +3517,12 @@ fn main() {
                                 content_y = 126.0;
                             } else if let Some(entry) = gs.ability_queue.current_entry() {
                                 // Ability queue overlay with full text
-                                let ab_lines: Vec<String> = wrap_ability_text(&entry.ability.full_text, 50)
-                                    .lines()
-                                    .take(4)
-                                    .map(|l| l.to_string())
-                                    .collect();
+                                let ab_lines: Vec<String> =
+                                    wrap_ability_text(&entry.ability.full_text, 50)
+                                        .lines()
+                                        .take(4)
+                                        .map(|l| l.to_string())
+                                        .collect();
                                 let n_lines = ab_lines.len();
                                 let h = 22.0 + n_lines as f32 * 14.0;
                                 unsafe {
@@ -4021,19 +4010,22 @@ fn main() {
                                                 if ty > 230.0 {
                                                     break;
                                                 }
-                                                unsafe {
-                                                    _3ds_top_queue_text(
-                                                        4.0,
-                                                        ty,
-                                                        color,
-                                                        scale,
-                                                        format!(
-                                                            "{}{}\0",
-                                                            if li == 0 { prefix } else { "   " },
-                                                            l
-                                                        )
-                                                        .as_ptr(),
+                                                let pfx = if li == 0 { prefix } else { "   " };
+                                                let txt = format!("{}{}", pfx, l);
+                                                if txt.contains("{{") {
+                                                    render_text_with_icons(
+                                                        4.0, ty, &txt, color, scale, 14.0,
                                                     );
+                                                } else {
+                                                    unsafe {
+                                                        _3ds_top_queue_text(
+                                                            4.0,
+                                                            ty,
+                                                            color,
+                                                            scale,
+                                                            format!("{}\0", txt).as_ptr(),
+                                                        );
+                                                    }
                                                 }
                                                 ty += 20.0;
                                             }

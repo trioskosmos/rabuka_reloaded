@@ -165,7 +165,19 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
 
 <script src="js/qrcode.min.js"></script>
 <script>
-(function(){ var e = document.getElementById('result-count'); if(e) e.textContent = '✓ script loaded at ' + new Date().toLocaleTimeString(); })();
+document.title = document.title + ' [JS running]';
+(function(){
+  console.log('DEBUG: script executing');
+  var e = document.getElementById('result-count');
+  console.log('DEBUG: result-count element:', e);
+  if(e) {
+    e.textContent = '✓ script loaded at ' + new Date().toLocaleTimeString();
+  } else {
+    // Try to find it differently
+    var all = document.querySelectorAll('[id]');
+    console.log('DEBUG: all ids:', Array.from(all).map(function(el){ return el.id; }));
+  }
+})();
 // ── i18n ──
 let cbLang = localStorage.getItem('card_browser_lang') || 'en';
 async function loadCbLang(lang) {
