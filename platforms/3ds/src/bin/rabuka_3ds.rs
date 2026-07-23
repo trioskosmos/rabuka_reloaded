@@ -1786,10 +1786,10 @@ fn main() {
                     }
                 }
 
-                // Image mode: grid navigation with wrap-around
+                // Image mode: grid navigation with wrap-around (disabled in zone viewer)
                 let img_cols = ((400.0 - 8.0) / (80.0 + 4.0)) as usize;
                 let is_img_choice = choice_image_mode && gs.has_pending_choice();
-                if is_img_choice {
+                if zone_viewer.is_none() && is_img_choice {
                     let n = display_order.len();
                     if n > 0 {
                         if keys & 0x00000040 != 0 {
@@ -2043,8 +2043,9 @@ fn main() {
                 if (is_multiplayer && waiting_for_opponent) || (*vs_ai && !mp_can_act(&gs, 0)) {
                     // Don't process local input while waiting
                 } else
-                // A button executes selected action (skip disabled actions).
-                if keys & 0x00000001 != 0 && cur < acts_cache.len() {
+                // A button executes selected action (skip disabled actions, disabled in zone viewer).
+                if zone_viewer.is_none() && keys & 0x00000001 != 0 && cur < acts_cache.len()
+                {
                     let is_disabled = acts_cache[cur]
                         .parameters
                         .as_ref()
@@ -3088,11 +3089,11 @@ fn main() {
 
                         if let Some((ref zlabel, ref zcards)) = zone_viewer {
                             if viewing_card.is_none() {
-                                let cw = 72.0f32;
-                                let ch = cw / 0.711;
                                 let gap = 4.0f32;
-                                let cols = ((400.0 - 8.0) / (cw + gap)) as usize;
-                                let rows = 2usize;
+                                let cols = 5usize;
+                                let cw = ((400.0 - 8.0) / cols as f32) - gap;
+                                let ch = cw / 0.711;
+                                let rows = 1usize;
                                 let pp = cols * rows;
                                 let page = zone_viewer_offset / pp * pp;
                                 let n = zcards.len();
@@ -3110,7 +3111,7 @@ fn main() {
                                     let col = (i - page) % cols;
                                     let row = (i - page) / cols;
                                     let ix = 4.0 + col as f32 * (cw + gap);
-                                    let iy = 28.0 + row as f32 * (ch + gap);
+                                    let iy = 28.0 + row as f32 * (ch + 14.0 + gap);
                                     let cid = zcards[i];
                                     let border = if i == zone_viewer_offset {
                                         COL_GOLD
@@ -3118,7 +3119,7 @@ fn main() {
                                         COL_CARD
                                     };
                                     unsafe {
-                                        _3ds_top_queue_rect(ix, iy, cw, ch + 18.0, border);
+                                        _3ds_top_queue_rect(ix, iy, cw, ch + 14.0, border);
                                     }
                                     let cn = gs
                                         .card_database
