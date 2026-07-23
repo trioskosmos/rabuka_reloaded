@@ -3293,12 +3293,8 @@ fn main() {
                                             let w = wrap_ability_text(&ab.full_text, 38);
                                             for line in w.lines() {
                                                 if ty < 190.0 {
-                                                    _3ds_top_queue_text(
-                                                        44.0,
-                                                        ty,
-                                                        COL_LIGHT,
-                                                        0.55f32,
-                                                        format!("{}\0", line).as_ptr(),
+                                                    render_text_with_icons(
+                                                        44.0, ty, line, COL_LIGHT, 0.55, 14.0,
                                                     );
                                                     ty += 16.0;
                                                 }
@@ -3402,12 +3398,8 @@ fn main() {
                                             let w = wrap_ability_text(&ab.full_text, 45);
                                             for line in w.lines() {
                                                 if ty < 232.0 {
-                                                    _3ds_top_queue_text(
-                                                        4.0,
-                                                        ty,
-                                                        COL_LIGHT,
-                                                        0.65f32,
-                                                        format!("{}\0", line).as_ptr(),
+                                                    render_text_with_icons(
+                                                        4.0, ty, line, COL_LIGHT, 0.65, 14.0,
                                                     );
                                                     ty += 18.0;
                                                 }
@@ -3505,12 +3497,13 @@ fn main() {
                                                 .next()
                                                 .unwrap_or("")
                                                 .to_string();
-                                            _3ds_top_queue_text(
+                                            render_text_with_icons(
                                                 4.0,
                                                 82.0,
+                                                &first_line,
                                                 COL_LIGHT,
-                                                0.60f32,
-                                                format!("{}\0", first_line).as_ptr(),
+                                                0.60,
+                                                14.0,
                                             );
                                         }
                                     }
@@ -3528,20 +3521,22 @@ fn main() {
                                 let h = 22.0 + n_lines as f32 * 14.0;
                                 unsafe {
                                     _3ds_top_queue_rect(0.0, 42.0, 400.0, h, COL_ABILITY);
-                                    _3ds_top_queue_text(
+                                    render_text_with_icons(
                                         4.0,
                                         44.0,
+                                        &format!("[{}] {}", entry.card_no, ab_lines[0]),
                                         COL_LIGHT,
-                                        0.65f32,
-                                        format!("[{}] {}\0", entry.card_no, ab_lines[0]).as_ptr(),
+                                        0.65,
+                                        14.0,
                                     );
                                     for (li, line) in ab_lines.iter().enumerate().skip(1) {
-                                        _3ds_top_queue_text(
+                                        render_text_with_icons(
                                             8.0,
-                                            44.0 + li as f32 * 16.0,
+                                            44.0 + li as f32 * 14.0,
+                                            line,
                                             COL_LIGHT,
-                                            0.65f32,
-                                            format!("{}\0", line).as_ptr(),
+                                            0.65,
+                                            14.0,
                                         );
                                     }
                                 }
