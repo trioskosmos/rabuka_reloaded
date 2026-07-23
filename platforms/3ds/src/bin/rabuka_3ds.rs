@@ -1817,22 +1817,67 @@ fn main() {
                     redraw = true;
                 }
 
-                // Zone viewer controls: B dismiss, UP/DOWN scroll
+                // Zone viewer controls
                 if zone_viewer.is_some() {
+                    let cols_vis = 5; // must match rendering
+                    let pp = cols_vis * 2;
+                    // B: close detail overlay first, then viewer
                     if keys & 0x00000002 != 0 {
-                        zone_viewer = None;
+                        if viewing_card.is_some() {
+                            viewing_card = None;
+                        } else {
+                            zone_viewer = None;
+                        }
                         redraw = true;
                     }
-                    if keys & 0x00000040 != 0 {
-                        zone_viewer_offset = zone_viewer_offset.saturating_sub(1);
-                        redraw = true;
+                    // A: show card detail for selected card
+                    if keys & 0x00000001 != 0 && viewing_card.is_none() {
+                        if let Some((_, ref cards)) = zone_viewer {
+                            if zone_viewer_offset < cards.len() {
+                                viewing_card = Some(cards[zone_viewer_offset]);
+                                redraw = true;
+                            }
+                        }
                     }
-                    if keys & 0x00000080 != 0 {
-                        let max_off = zone_viewer
-                            .as_ref()
-                            .map_or(0, |z| z.1.len().saturating_sub(1));
-                        zone_viewer_offset = zone_viewer_offset.saturating_add(1).min(max_off);
-                        redraw = true;
+                    // UP/DOWN: move cursor by row
+                    if viewing_card.is_none() {
+                        if keys & 0x00000040 != 0 {
+                            zone_viewer_offset = if zone_viewer_offset >= cols_vis {
+                                zone_viewer_offset - cols_vis
+                            } else {
+                                0
+                            };
+                            if zone_viewer_offset < zone_viewer_offset / pp * pp {
+                                zone_viewer_offset = zone_viewer_offset / pp * pp;
+                            }
+                            redraw = true;
+                        }
+                        if keys & 0x00000080 != 0 {
+                            let m = zone_viewer
+                                .as_ref()
+                                .map_or(0, |z| z.1.len().saturating_sub(1));
+                            zone_viewer_offset = zone_viewer_offset.saturating_add(cols_vis).min(m);
+                            redraw = true;
+                        }
+                        // LEFT/RIGHT: move cursor by 1
+                        if keys & 0x00000020 != 0 {
+                            if zone_viewer_offset > 0 {
+                                zone_viewer_offset -= 1;
+                                if zone_viewer_offset < zone_viewer_offset / pp * pp {
+                                    zone_viewer_offset = zone_viewer_offset / pp * pp;
+                                }
+                            }
+                            redraw = true;
+                        }
+                        if keys & 0x00000010 != 0 {
+                            let m = zone_viewer
+                                .as_ref()
+                                .map_or(0, |z| z.1.len().saturating_sub(1));
+                            if zone_viewer_offset < m {
+                                zone_viewer_offset += 1;
+                            }
+                            redraw = true;
+                        }
                     }
                 }
 
@@ -2961,50 +3006,174 @@ fn main() {
                         let mut content_y: f32 = 42.0;
 
                         if let Some((ref zlabel, ref zcards)) = zone_viewer {
-                            let vis = 12usize;
-                            let n = zcards.len();
-                            let start = zone_viewer_offset.min(n.saturating_sub(vis));
-                            unsafe {
-                                _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
-                                _3ds_top_queue_text(
-                                    4.0,
-                                    4.0,
-                                    COL_GOLD,
-                                    0.70f32,
-                                    format!("{}  (B=close)\0", zlabel).as_ptr(),
-                                );
-                            }
-                            for i in start..n.min(start + vis) {
-                                let cid = zcards[i];
-                                let y = 28.0 + (i - start) as f32 * 17.0;
-                                let cn: &str = gs
-                                    .card_database
-                                    .get_card(cid)
-                                    .map_or("?", |c| c.card_no.as_ref());
-                                let nm: &str = gs
-                                    .card_database
-                                    .get_card(cid)
-                                    .map_or("?", |c| c.name.as_ref());
+                            if viewing_card.is_none() {
+                                let cw = 72.0f32;
+                                let ch = cw / 0.711;
+                                let gap = 4.0f32;
+                                let cols = ((400.0 - 8.0) / (cw + gap)) as usize;
+                                let rows = 2usize;
+                                let pp = cols * rows;
+                                let page = zone_viewer_offset / pp * pp;
+                                let n = zcards.len();
                                 unsafe {
+                                    _3ds_top_queue_rect(0.0, 0.0, 400.0, 240.0, COL_TOP_BG);
                                     _3ds_top_queue_text(
                                         4.0,
-                                        y,
-                                        COL_LIGHT,
-                                        0.60f32,
-                                        format!("[{}] {}\0", cn, nm).as_ptr(),
+                                        4.0,
+                                        COL_GOLD,
+                                        0.70f32,
+                                        format!("{}  (B=close, A=detail)\0", zlabel).as_ptr(),
                                     );
                                 }
-                            }
-                            if n > vis {
-                                unsafe {
-                                    _3ds_top_queue_text(
-                                        300.0,
-                                        4.0,
-                                        COL_MED,
-                                        0.50f32,
-                                        format!("{}-{}/{}\0", start + 1, (start + vis).min(n), n)
+                                for i in page..n.min(page + pp) {
+                                    let col = (i - page) % cols;
+                                    let row = (i - page) / cols;
+                                    let ix = 4.0 + col as f32 * (cw + gap);
+                                    let iy = 28.0 + row as f32 * (ch + gap);
+                                    let cid = zcards[i];
+                                    let border = if i == zone_viewer_offset {
+                                        COL_GOLD
+                                    } else {
+                                        COL_CARD
+                                    };
+                                    unsafe {
+                                        _3ds_top_queue_rect(ix, iy, cw, ch + 18.0, border);
+                                    }
+                                    let cn = gs
+                                        .card_database
+                                        .get_card(cid)
+                                        .map(|c| c.card_no.as_ref())
+                                        .unwrap_or("?");
+                                    if let Some((atl, idx)) = atlas.lookup(cn) {
+                                        let c_str = std::ffi::CString::new(atl.as_bytes())
+                                            .unwrap_or_default();
+                                        unsafe {
+                                            _3ds_top_queue_card(
+                                                c_str.as_ptr(),
+                                                *idx as i32,
+                                                ix + 1.0,
+                                                iy + 1.0,
+                                                cw - 2.0,
+                                                ch,
+                                            );
+                                            _3ds_top_queue_text(
+                                                ix + 1.0,
+                                                iy + ch + 1.0,
+                                                COL_LIGHT,
+                                                0.45f32,
+                                                format!("{}\0", cn).as_ptr(),
+                                            );
+                                        }
+                                    }
+                                }
+                                if n > pp {
+                                    let page_n = page / pp + 1;
+                                    let total_p = (n + pp - 1) / pp;
+                                    unsafe {
+                                        _3ds_top_queue_text(
+                                            300.0,
+                                            4.0,
+                                            COL_MED,
+                                            0.50f32,
+                                            format!("{}/{}\0", page_n, total_p).as_ptr(),
+                                        );
+                                    }
+                                }
+                            } else {
+                                // Active card detail overlay within zone viewer
+                                let vcid = viewing_card.unwrap();
+                                if let Some(card) = gs.card_database.get_card(vcid) {
+                                    let is_tapped = gs
+                                        .mods
+                                        .orientation_modifiers
+                                        .get(&vcid)
+                                        .map(|o| o.as_str() == "wait")
+                                        .unwrap_or(false);
+                                    let bt = card.blade;
+                                    let bm = gs
+                                        .mods
+                                        .blade_modifiers
+                                        .get(&vcid)
+                                        .map(|m| m.total())
+                                        .unwrap_or(0);
+                                    let tb = if is_tapped {
+                                        0
+                                    } else {
+                                        (bt as i32 + bm).max(0)
+                                    };
+                                    let sc = card.score.unwrap_or(0) as i32
+                                        + gs.mods
+                                            .score_modifiers
+                                            .get(&vcid)
+                                            .map(|m| m.total())
+                                            .unwrap_or(0);
+                                    let co = card.cost.unwrap_or(0);
+                                    let hr = card
+                                        .base_heart
+                                        .as_ref()
+                                        .map(|bh| {
+                                            bh.hearts
+                                                .iter()
+                                                .map(|(c, v)| {
+                                                    let code = c.short_label();
+                                                    let bonus = gs
+                                                        .mods
+                                                        .heart_modifiers
+                                                        .get(&vcid)
+                                                        .and_then(|hm| hm.get(c))
+                                                        .map(|m| m.total())
+                                                        .unwrap_or(0);
+                                                    if bonus != 0 {
+                                                        format!("{}{}+{}", code, v, bonus)
+                                                    } else {
+                                                        format!("{}{}", code, v)
+                                                    }
+                                                })
+                                                .collect::<Vec<_>>()
+                                                .join(" ")
+                                        })
+                                        .unwrap_or_default();
+                                    unsafe {
+                                        _3ds_top_queue_rect(40.0, 40.0, 320.0, 160.0, COL_CARD);
+                                        _3ds_top_queue_text(
+                                            44.0,
+                                            44.0,
+                                            COL_BLUE,
+                                            0.70f32,
+                                            format!("[{}] {}\0", card.card_no, card.name).as_ptr(),
+                                        );
+                                        _3ds_top_queue_text(
+                                            44.0,
+                                            66.0,
+                                            COL_LIGHT,
+                                            0.60f32,
+                                            format!(
+                                                "B:{} H:{} S:{} C:{}{}\0",
+                                                tb,
+                                                hr,
+                                                sc,
+                                                co,
+                                                if is_tapped { " [TAP]" } else { "" }
+                                            )
                                             .as_ptr(),
-                                    );
+                                        );
+                                        let mut ty = 86.0;
+                                        for ab in card.resolved_abilities() {
+                                            let w = wrap_text(&ab.full_text, 38);
+                                            for line in w.lines() {
+                                                if ty < 190.0 {
+                                                    _3ds_top_queue_text(
+                                                        44.0,
+                                                        ty,
+                                                        COL_LIGHT,
+                                                        0.55f32,
+                                                        format!("{}\0", line).as_ptr(),
+                                                    );
+                                                    ty += 16.0;
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         } else if detail_mode {
