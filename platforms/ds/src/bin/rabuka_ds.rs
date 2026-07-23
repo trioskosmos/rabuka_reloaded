@@ -619,18 +619,32 @@ pub extern "C" fn main() {
 
         if is_current_player_ai {
             let idx = rng::rand_range(actions.len());
-            if !execute_action(&mut gs, &actions[idx]) {
-                break;
-            }
+            let p = actions[idx].parameters.clone();
+            let _ = TurnEngine::execute_main_phase_action(
+                &mut gs,
+                &actions[idx].action_type,
+                p.as_ref().and_then(|x| x.card_id),
+                p.as_ref().and_then(|x| x.card_indices.clone()),
+                p.as_ref()
+                    .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
+                p.as_ref().and_then(|x| x.use_baton_touch),
+            );
+            gs.reset_loop_detection();
             frame_count += 1;
-            // Settle auto phases (same pattern as test_ai_vs_ai_ds)
-            let mut sa = 0u32;
-            while gs.game_result == GameResult::Ongoing
+            // Settle auto phases (matching 3DS settle_3ds: check pending choice before each)
+            if !gs.has_pending_choice()
+                && gs.game_result == GameResult::Ongoing
                 && game_setup::is_automatic_phase(&gs)
-                && sa < 500
             {
-                TurnEngine::advance_phase(&mut gs);
-                sa += 1;
+                let mut sa = 0u32;
+                while gs.game_result == GameResult::Ongoing
+                    && !gs.has_pending_choice()
+                    && game_setup::is_automatic_phase(&gs)
+                    && sa < 500
+                {
+                    TurnEngine::advance_phase(&mut gs);
+                    sa += 1;
+                }
             }
             if ai_vs_ai {
                 display.clear();
@@ -640,6 +654,7 @@ pub extern "C" fn main() {
                 display_heap_stats(&mut display);
                 display.swap_buffers();
             }
+            // Let loop continue to RPS auto-pick + bottom settle_auto
         } else {
             let ok = human_turn(&mut display, &mut input, &mut gs, &actions);
             if !ok {
