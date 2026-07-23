@@ -200,7 +200,7 @@ impl super::TurnEngine {
             if ability
                 .triggers
                 .as_ref()
-                .is_some_and(|t| &**t == crate::triggers::ACTIVATION)
+                .is_some_and(|t| t.contains(crate::triggers::ACTIVATION))
             {
                 let loc = ability
                     .effect
@@ -286,7 +286,7 @@ impl super::TurnEngine {
                         .find(|(_, a)| {
                             a.triggers
                                 .as_ref()
-                                .is_some_and(|t| &**t == crate::triggers::ACTIVATION)
+                                .is_some_and(|t| t.contains(crate::triggers::ACTIVATION))
                         })
                         .map(|(i, a)| (i, a.clone()))
                 })

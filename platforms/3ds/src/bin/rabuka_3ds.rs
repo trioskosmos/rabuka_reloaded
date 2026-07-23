@@ -3263,115 +3263,106 @@ fn main() {
                             } else {
                                 (198.0, 300.0)
                             };
-                            if cur < acts_cache.len() {
-                                if let Some(ref p) = acts_cache[cur].parameters {
-                                    if let Some(cid) = p.card_id {
-                                        if let Some(card) = gs.card_database.get_card(cid) {
-                                            unsafe {
-                                                _3ds_top_queue_rect(
-                                                    0.0, 42.0, 400.0, rect_h, COL_CARD,
-                                                );
-                                                _3ds_top_queue_text(
-                                                    4.0,
-                                                    44.0,
-                                                    COL_BLUE,
-                                                    0.80f32,
-                                                    format!(
-                                                        "[{}] {}\0",
-                                                        card.card_no,
-                                                        wrap_text(&card.name, 25)
-                                                    )
-                                                    .as_ptr(),
-                                                );
-                                                let is_tapped = gs
-                                                    .mods
-                                                    .orientation_modifiers
-                                                    .get(&cid)
-                                                    .map(|o| o.as_str() == "wait")
-                                                    .unwrap_or(false);
-                                                let base_blade = card.blade;
-                                                let blade_mod = gs
-                                                    .mods
-                                                    .blade_modifiers
-                                                    .get(&cid)
-                                                    .map(|m| m.total())
-                                                    .unwrap_or(0);
-                                                let total_blade = if is_tapped {
-                                                    0
-                                                } else {
-                                                    (base_blade as i32 + blade_mod).max(0)
-                                                };
-                                                let score = card.score.unwrap_or(0) as i32
-                                                    + gs.mods
-                                                        .score_modifiers
-                                                        .get(&cid)
-                                                        .map(|m| m.total())
-                                                        .unwrap_or(0);
-                                                let cost = card.cost.unwrap_or(0);
-                                                let heart_str = card
-                                                    .base_heart
-                                                    .as_ref()
-                                                    .map(|bh| {
-                                                        let parts: Vec<String> = bh
-                                                            .hearts
-                                                            .iter()
-                                                            .map(|(c, v)| {
-                                                                let code = c.short_label();
-                                                                let bonus = gs
-                                                                    .mods
-                                                                    .heart_modifiers
-                                                                    .get(&cid)
-                                                                    .and_then(|hm| hm.get(c))
-                                                                    .map(|m| m.total())
-                                                                    .unwrap_or(0);
-                                                                if bonus != 0 {
-                                                                    format!(
-                                                                        "{}{}+{}",
-                                                                        code, v, bonus
-                                                                    )
-                                                                } else {
-                                                                    format!("{}{}", code, v)
-                                                                }
-                                                            })
-                                                            .collect();
-                                                        parts.join(" ")
-                                                    })
-                                                    .unwrap_or_default();
-                                                let tap_str =
-                                                    if is_tapped { " [TAPPED]" } else { "" };
-                                                _3ds_top_queue_text(
-                                                    4.0,
-                                                    66.0,
-                                                    COL_LIGHT,
-                                                    0.65f32,
-                                                    format!(
-                                                        "B:{}  H:{}  S:{}  C:{}{}\0",
-                                                        total_blade,
-                                                        heart_str,
-                                                        score,
-                                                        cost,
-                                                        tap_str
-                                                    )
-                                                    .as_ptr(),
-                                                );
-                                                let mut ty = 86.0;
-                                                for ab in card.resolved_abilities() {
-                                                    let w = wrap_text(&ab.full_text, 45);
-                                                    for line in w.lines() {
-                                                        if ty < 232.0 {
-                                                            _3ds_top_queue_text(
-                                                                4.0,
-                                                                ty,
-                                                                COL_LIGHT,
-                                                                0.65f32,
-                                                                format!("{}\0", line).as_ptr(),
-                                                            );
-                                                            ty += 18.0;
+                            let detail_cid = viewing_card.or_else(|| {
+                                acts_cache
+                                    .get(cur)
+                                    .and_then(|a| a.parameters.as_ref().and_then(|p| p.card_id))
+                            });
+                            if let Some(cid) = detail_cid {
+                                if let Some(card) = gs.card_database.get_card(cid) {
+                                    unsafe {
+                                        _3ds_top_queue_rect(0.0, 42.0, 400.0, rect_h, COL_CARD);
+                                        _3ds_top_queue_text(
+                                            4.0,
+                                            44.0,
+                                            COL_BLUE,
+                                            0.80f32,
+                                            format!(
+                                                "[{}] {}\0",
+                                                card.card_no,
+                                                wrap_text(&card.name, 25)
+                                            )
+                                            .as_ptr(),
+                                        );
+                                        let is_tapped = gs
+                                            .mods
+                                            .orientation_modifiers
+                                            .get(&cid)
+                                            .map(|o| o.as_str() == "wait")
+                                            .unwrap_or(false);
+                                        let base_blade = card.blade;
+                                        let blade_mod = gs
+                                            .mods
+                                            .blade_modifiers
+                                            .get(&cid)
+                                            .map(|m| m.total())
+                                            .unwrap_or(0);
+                                        let total_blade = if is_tapped {
+                                            0
+                                        } else {
+                                            (base_blade as i32 + blade_mod).max(0)
+                                        };
+                                        let score = card.score.unwrap_or(0) as i32
+                                            + gs.mods
+                                                .score_modifiers
+                                                .get(&cid)
+                                                .map(|m| m.total())
+                                                .unwrap_or(0);
+                                        let cost = card.cost.unwrap_or(0);
+                                        let heart_str = card
+                                            .base_heart
+                                            .as_ref()
+                                            .map(|bh| {
+                                                let parts: Vec<String> = bh
+                                                    .hearts
+                                                    .iter()
+                                                    .map(|(c, v)| {
+                                                        let code = c.short_label();
+                                                        let bonus = gs
+                                                            .mods
+                                                            .heart_modifiers
+                                                            .get(&cid)
+                                                            .and_then(|hm| hm.get(c))
+                                                            .map(|m| m.total())
+                                                            .unwrap_or(0);
+                                                        if bonus != 0 {
+                                                            format!("{}{}+{}", code, v, bonus)
+                                                        } else {
+                                                            format!("{}{}", code, v)
                                                         }
-                                                    }
-                                                    ty += 3.0;
+                                                    })
+                                                    .collect();
+                                                parts.join(" ")
+                                            })
+                                            .unwrap_or_default();
+                                        let tap_str = if is_tapped { " [TAPPED]" } else { "" };
+                                        _3ds_top_queue_text(
+                                            4.0,
+                                            66.0,
+                                            COL_LIGHT,
+                                            0.65f32,
+                                            format!(
+                                                "B:{}  H:{}  S:{}  C:{}{}\0",
+                                                total_blade, heart_str, score, cost, tap_str
+                                            )
+                                            .as_ptr(),
+                                        );
+                                        let mut ty = 86.0;
+                                        for ab in card.resolved_abilities() {
+                                            let w = wrap_text(&ab.full_text, 45);
+                                            for line in w.lines() {
+                                                if ty < 232.0 {
+                                                    _3ds_top_queue_text(
+                                                        4.0,
+                                                        ty,
+                                                        COL_LIGHT,
+                                                        0.65f32,
+                                                        format!("{}\0", line).as_ptr(),
+                                                    );
+                                                    ty += 18.0;
                                                 }
                                             }
+                                            ty += 3.0;
                                         }
                                     }
                                 }
@@ -3685,8 +3676,8 @@ fn main() {
                                             ty += 18.0;
                                         }
                                     }
-                                    let mut prev_cid = -1i16;
-                                    for di in start..end {
+                                    let mut di = start;
+                                    while di < end {
                                         let fi = display_order[di];
                                         let act = &acts_cache[fi];
                                         let is_sel = di == display_pos;
@@ -3700,44 +3691,152 @@ fn main() {
                                             .as_ref()
                                             .and_then(|p| p.card_id)
                                             .unwrap_or(-1);
-                                        let is_grouped = act.action_type
-                                            == game_setup::ActionType::PlayMemberToStage
-                                            && this_cid == prev_cid
-                                            && prev_cid != -1;
-                                        let prefix = if is_sel {
-                                            "> "
+                                        let is_pmts = act.action_type
+                                            == game_setup::ActionType::PlayMemberToStage;
+                                        let mut ge = di + 1;
+                                        if is_pmts && this_cid != -1 {
+                                            while ge < end {
+                                                let n = &acts_cache[display_order[ge]];
+                                                if n.action_type
+                                                    == game_setup::ActionType::PlayMemberToStage
+                                                    && n.parameters.as_ref().and_then(|p| p.card_id)
+                                                        == Some(this_cid)
+                                                {
+                                                    ge += 1;
+                                                } else {
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        let is_group = ge > di + 1;
+                                        let group_sel =
+                                            is_group && (di..ge).any(|i| i == display_pos);
+                                        let line_color = if group_sel || is_sel {
+                                            COL_GOLD
                                         } else if is_disabled {
-                                            "· "
+                                            COL_MED
                                         } else {
-                                            "  "
+                                            COL_LIGHT
                                         };
+                                        let line_scale: f32 =
+                                            if group_sel || is_sel { 0.70 } else { 0.65 };
                                         if ty > 230.0 {
                                             break;
                                         }
-                                        let line = if is_grouped {
-                                            let area = act
+                                        if is_group {
+                                            let cn = cn_or_empty(act);
+                                            let name = act
                                                 .parameters
                                                 .as_ref()
-                                                .and_then(|p| p.stage_area.clone())
+                                                .and_then(|p| p.card_name.clone())
                                                 .unwrap_or_default();
-                                            let cost = act
+                                            let base_cost = act
                                                 .parameters
                                                 .as_ref()
-                                                .and_then(|p| p.available_areas.as_ref())
-                                                .and_then(|aa| {
-                                                    aa.iter()
-                                                        .find(|x| x.area == area)
-                                                        .map(|x| x.cost)
-                                                })
-                                                .or_else(|| {
-                                                    act.parameters
-                                                        .as_ref()
-                                                        .and_then(|p| p.base_cost)
-                                                })
+                                                .and_then(|p| p.base_cost)
                                                 .unwrap_or(0);
-                                            format!("  {}:{}", area, cost)
+                                            let hdr = if !cn.is_empty() {
+                                                format!("[{}] {} c:{}", cn, name, base_cost)
+                                            } else {
+                                                format!("{} c:{}", name, base_cost)
+                                            };
+                                            let mut areas = String::new();
+                                            for i in di..ge {
+                                                let gact = &acts_cache[display_order[i]];
+                                                let area = gact
+                                                    .parameters
+                                                    .as_ref()
+                                                    .and_then(|p| p.stage_area.clone())
+                                                    .unwrap_or("?".into());
+                                                let cost = gact
+                                                    .parameters
+                                                    .as_ref()
+                                                    .and_then(|p| p.available_areas.as_ref())
+                                                    .and_then(|aa| {
+                                                        aa.iter()
+                                                            .find(|x| x.area == area)
+                                                            .map(|x| x.cost)
+                                                    })
+                                                    .or_else(|| {
+                                                        gact.parameters
+                                                            .as_ref()
+                                                            .and_then(|p| p.base_cost)
+                                                    })
+                                                    .unwrap_or(0);
+                                                if i == display_pos {
+                                                    areas
+                                                        .push_str(&format!("[{}:{}] ", area, cost));
+                                                } else {
+                                                    areas.push_str(&format!("{}:{} ", area, cost));
+                                                }
+                                            }
+                                            for (li, l) in wrap_text(&hdr, 55).lines().enumerate() {
+                                                if ty > 230.0 {
+                                                    break;
+                                                }
+                                                unsafe {
+                                                    _3ds_top_queue_text(
+                                                        4.0,
+                                                        ty,
+                                                        line_color,
+                                                        line_scale,
+                                                        format!(
+                                                            "{}{}\0",
+                                                            if li == 0 {
+                                                                if is_sel {
+                                                                    "> "
+                                                                } else {
+                                                                    "  "
+                                                                }
+                                                            } else {
+                                                                "   "
+                                                            },
+                                                            l
+                                                        )
+                                                        .as_ptr(),
+                                                    );
+                                                }
+                                                ty += 20.0;
+                                            }
+                                            for (li, l) in wrap_text(&areas, 55).lines().enumerate()
+                                            {
+                                                if ty > 230.0 {
+                                                    break;
+                                                }
+                                                unsafe {
+                                                    _3ds_top_queue_text(
+                                                        4.0,
+                                                        ty,
+                                                        line_color,
+                                                        line_scale,
+                                                        format!(
+                                                            "{}{}\0",
+                                                            if li == 0 {
+                                                                if group_sel {
+                                                                    "> "
+                                                                } else {
+                                                                    "  "
+                                                                }
+                                                            } else {
+                                                                "   "
+                                                            },
+                                                            l
+                                                        )
+                                                        .as_ptr(),
+                                                    );
+                                                }
+                                                ty += 20.0;
+                                            }
+                                            di = ge;
                                         } else {
-                                            match act.action_type {
+                                            let prefix = if is_sel {
+                                                "> "
+                                            } else if is_disabled {
+                                                "· "
+                                            } else {
+                                                "  "
+                                            };
+                                            let line = match act.action_type {
                                                 game_setup::ActionType::Pass => "Pass".into(),
                                                 game_setup::ActionType::PlayMemberToStage => {
                                                     let cn = cn_or_empty(act);
@@ -3820,30 +3919,17 @@ fn main() {
                                                         .next()
                                                         .unwrap_or("")
                                                         .to_string();
-                                                    // For ChoiceOption from SelectAutoAbility, show ability text
                                                     let ability_text = if act.action_type
                                                         == game_setup::ActionType::ChoiceOption
                                                     {
-                                                        gs.get_pending_choice()
-                                                    .and_then(|c| {
-                                                        use rabuka_engine::ability::types::Choice;
-                                                        if let Choice::SelectAutoAbility {
-                                                            options,
-                                                            ..
-                                                        } = c
-                                                        {
-                                                            act.parameters
-                                                                .as_ref()
-                                                                .and_then(|p| p.card_id)
-                                                                .and_then(|idx| {
-                                                                    options.get(idx as usize)
-                                                                })
-                                                                .map(|o| o.ability_text.clone())
-                                                        } else {
-                                                            None
-                                                        }
-                                                    })
-                                                    .unwrap_or_default()
+                                                        gs.get_pending_choice().and_then(|c| {
+                                                            use rabuka_engine::ability::types::Choice;
+                                                            if let Choice::SelectAutoAbility { options, .. } = c {
+                                                                act.parameters.as_ref().and_then(|p| p.card_id)
+                                                                    .and_then(|idx| options.get(idx as usize))
+                                                                    .map(|o| o.ability_text.clone())
+                                                            } else { None }
+                                                        }).unwrap_or_default()
                                                     } else {
                                                         String::new()
                                                     };
@@ -3860,33 +3946,38 @@ fn main() {
                                                         display.to_string()
                                                     }
                                                 }
+                                            };
+                                            let color = if is_disabled {
+                                                COL_MED
+                                            } else if is_sel {
+                                                COL_GOLD
+                                            } else {
+                                                COL_LIGHT
+                                            };
+                                            let scale: f32 = if is_sel { 0.70 } else { 0.65 };
+                                            for (li, l) in wrap_text(&line, 55).lines().enumerate()
+                                            {
+                                                if ty > 230.0 {
+                                                    break;
+                                                }
+                                                unsafe {
+                                                    _3ds_top_queue_text(
+                                                        4.0,
+                                                        ty,
+                                                        color,
+                                                        scale,
+                                                        format!(
+                                                            "{}{}\0",
+                                                            if li == 0 { prefix } else { "   " },
+                                                            l
+                                                        )
+                                                        .as_ptr(),
+                                                    );
+                                                }
+                                                ty += 20.0;
                                             }
-                                        };
-                                        let color = if is_disabled {
-                                            COL_MED
-                                        } else if is_sel {
-                                            COL_GOLD
-                                        } else {
-                                            COL_LIGHT
-                                        };
-                                        let scale = if is_sel { 0.70f32 } else { 0.65f32 };
-                                        for (li, l) in wrap_text(&line, 55).lines().enumerate() {
-                                            if ty > 230.0 {
-                                                break;
-                                            }
-                                            let pfx = if li == 0 { prefix } else { "   " };
-                                            unsafe {
-                                                _3ds_top_queue_text(
-                                                    4.0,
-                                                    ty,
-                                                    color,
-                                                    scale,
-                                                    format!("{}{}\0", pfx, l).as_ptr(),
-                                                );
-                                            }
-                                            ty += 20.0;
+                                            di += 1;
                                         }
-                                        prev_cid = this_cid;
                                     }
                                     if end < n {
                                         unsafe {

@@ -356,8 +356,9 @@ fn decode_ability_cost(bc: &mut BcReader) -> Option<Option<Box<AbilityCost>>> {
             let mut map = collect_json_map(bc, count)?;
             normalize_cost_keys(&mut map);
             let map_val = serde_json::Value::Object(map);
-            let mut inner: AbilityEffect = serde_json::from_value(map_val.clone()).ok()?;
-            inner.populate_from_json(&map_val);
+            let map_clone = map_val.clone();
+            let mut inner: AbilityEffect = serde_json::from_value(map_val).ok()?;
+            inner.populate_from_json(&map_clone);
             Some(Some(Box::new(AbilityCost(inner))))
         }
         _ => None,
@@ -462,15 +463,16 @@ fn decode_ability_effect_from_object(bc: &mut BcReader) -> Option<AbilityEffect>
     }
 
     let map_val = serde_json::Value::Object(map);
+    let map_clone = map_val.clone();
 
     // Phase 2: deserialize AbilityEffect via serde.
     // This handles text, action, source, destination, count, target, condition,
     // compound (look_action, select_action, actions, etc.), and all other fields
     // including #[serde(flatten)] CompoundBranch.
-    let mut effect: AbilityEffect = serde_json::from_value(map_val.clone()).ok()?;
+    let mut effect: AbilityEffect = serde_json::from_value(map_val).ok()?;
 
     // Phase 3: populate EffectKind and recurse into sub-effects.
-    effect.populate_from_json(&map_val);
+    effect.populate_from_json(&map_clone);
 
     // Phase 4: draw-count fix (mirror decode_like_json)
     if let Some(ref actions) = effect.compound.actions {

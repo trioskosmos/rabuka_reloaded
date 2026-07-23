@@ -115,7 +115,7 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
       <button id="lang-btn-cb" style="padding:4px 8px;background:transparent;color:#8888a0;border:1px solid #0f3460;border-radius:3px;font-size:10px;cursor:pointer;">English</button>
     </div>
     <div id="search-bar" style="display:flex;gap:4px;margin-bottom:6px;">
-      <input type="search" data-fid="search" placeholder="" data-i18n-placeholder="search_placeholder"
+      <input type="search" id="search" data-fid="search" placeholder="" data-i18n-placeholder="search_placeholder"
              style="flex:1;padding:6px 8px;background:#1a1a2e;color:#e0e0e0;border:1px solid #0f3460;border-radius:4px;font-size:12px;outline:none;">
       <button id="clear-all" style="padding:6px 10px;background:#e94560;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;white-space:nowrap;" data-i18n="clear">Clear</button>
     </div>
@@ -164,6 +164,7 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
 </div>
 
 <script src="js/qrcode.min.js"></script>
+<script>
 // ── i18n ──
 let cbLang = localStorage.getItem('card_browser_lang') || 'en';
 async function loadCbLang(lang) {
@@ -211,7 +212,7 @@ function iconImg(src, alt) {
 }
 
 function buildFilter(id, label, icon, innerHtml) {
-  const labelHtml = label ? `<label class="filter-label">${icon ? iconImg(icon, label) : ''}${label}</label>` : '';
+  const labelHtml = label ? `<label class="filter-label" for="${id}">${icon ? iconImg(icon, label) : ''}${label}</label>` : '';
   return `<div class="filter-group" data-fgroup="${id}">${labelHtml}${innerHtml}</div>`;
 }
 
@@ -219,7 +220,7 @@ function buildSelect(id, label, icon, options, selected) {
   const opts = options.map(o =>
     `<option value="${o}"${o === selected ? ' selected' : ''}>${o}</option>`
   ).join('');
-  return buildFilter(id, label, icon, `<select data-fid="${id}">${opts}</select>`);
+  return buildFilter(id, label, icon, `<select id="${id}" data-fid="${id}">${opts}</select>`);
 }
 
 function buildBtnGroup(id, label, icon, options) {
@@ -553,36 +554,38 @@ function populateFilters() {
   html += buildSelect('unit', 'Unit', null, sorted(unitSet));
   html += buildSelect('rarity', 'Rarity', null, sorted(raritySet));
   html += buildFilter('allRarities', null, null,
-    '<div class="checkbox-group"><label><input type="checkbox" name="showAllRarities"> Show all rarities</label></div>');
+    '<div class="checkbox-group"><label for="showAllRarities"><input type="checkbox" id="showAllRarities" name="showAllRarities"> Show all rarities</label></div>');
   html += buildSelect('product', 'Product', null, sorted(productSet));
   html += buildBtnGroup('hasAbility', 'Has Ability', null, ['All', 'Yes', 'No']);
 
   html += buildFilter('costMin', 'Cost >=', TEXT_ICONS.energy,
-    '<input type="number" data-fid="costMin" min="0" max="30" placeholder="Any">');
+    '<input type="number" id="costMin" data-fid="costMin" min="0" max="30" placeholder="Any">');
   html += buildFilter('scoreMin', 'Score >=', TEXT_ICONS.score,
-    '<input type="number" data-fid="scoreMin" min="0" max="30" placeholder="Any">');
+    '<input type="number" id="scoreMin" data-fid="scoreMin" min="0" max="30" placeholder="Any">');
 
   html += buildFilter('heartMin', 'Min Hearts', TEXT_ICONS.heart,
-    '<input type="number" data-fid="heartMin" min="0" max="20" placeholder="0">');
+    '<input type="number" id="heartMin" data-fid="heartMin" min="0" max="20" placeholder="0">');
   html += buildFilter('noHearts', null, null,
-    '<div class="checkbox-group"><label><input type="checkbox" name="noHearts"> No hearts wanted</label></div>');
+    '<div class="checkbox-group"><label for="noHearts"><input type="checkbox" id="noHearts" name="noHearts"> No hearts wanted</label></div>');
 
   html += buildFilter('blade', null, TEXT_ICONS.blade,
-    '<div class="checkbox-group"><label><input type="checkbox" name="hasBlade"> Has blade</label><label><input type="checkbox" name="hasBladeHeart"> Has blade_heart</label></div>');
+    '<div class="checkbox-group"><label for="hasBlade"><input type="checkbox" id="hasBlade" name="hasBlade"> Has blade</label><label for="hasBladeHeart"><input type="checkbox" id="hasBladeHeart" name="hasBladeHeart"> Has blade_heart</label></div>');
 
   const sortedTriggers = [...triggerSet].sort();
   const triggerOpts = ['<option value="All">All</option>'];
   sortedTriggers.forEach(t => triggerOpts.push(`<option value="${t}">${t}</option>`));
   html += buildFilter('trigger', 'Trigger', TEXT_ICONS.kidou,
-    `<select data-fid="trigger">${triggerOpts.join('')}</select>`);
+    `<select id="trigger" data-fid="trigger">${triggerOpts.join('')}</select>`);
   html += buildFilter('costAction', 'Cost Action', null,
-    `<select data-fid="costAction">${sorted(costActionSet).map(v => `<option value="${v}">${v}</option>`).join('')}</select>`);
+    `<select id="costAction" data-fid="costAction">${sorted(costActionSet).map(v => `<option value="${v}">${v}</option>`).join('')}</select>`);
   html += buildFilter('effectAction', 'Effect Action', null,
-    `<select data-fid="effectAction">${sorted(effectActionSet).map(v => `<option value="${v}">${v}</option>`).join('')}</select>`);
+    `<select id="effectAction" data-fid="effectAction">${sorted(effectActionSet).map(v => `<option value="${v}">${v}</option>`).join('')}</select>`);
   html += buildBtnGroup('useLimit', 'Use Limit', TEXT_ICONS.turn1, ['All', '1', '2']);
-  html += buildFilter('rabukaPoints', 'Rabuka Points', null,
-    '<div class="checkbox-group" style="margin-bottom:2px"><label><input type="checkbox" name="hasPoints"> Has points</label></div>' +
-    '<select data-fid="sortBy" style="width:100%;padding:3px 5px;background:#1a1a2e;color:#e0e0e0;border:1px solid #0f3460;border-radius:3px;font-size:10px;outline:none;">' +
+  html += buildFilter('rabukaPoints', null, null,
+    '<label class="filter-label">Rabuka Points</label>' +
+    '<div class="checkbox-group" style="margin-bottom:2px"><label for="hasPoints"><input type="checkbox" id="hasPoints" name="hasPoints"> Has points</label></div>' +
+    '<label for="sortBy" style="display:none;">Sort by</label>' +
+    '<select id="sortBy" data-fid="sortBy" style="width:100%;padding:3px 5px;background:#1a1a2e;color:#e0e0e0;border:1px solid #0f3460;border-radius:3px;font-size:10px;outline:none;">' +
       '<option value="">Default order</option>' +
       '<option value="pts-high">Points: high→low</option>' +
       '<option value="pts-low">Points: low→high</option>' +
@@ -1094,11 +1097,19 @@ function showQR() {
 
 // Load i18n then init
 (async () => {
-  await loadCbLang(cbLang);
-  const mod = await import('./js/i18n/translator.js');
-  window._cbUi = mod.getCurrentTranslations()?.ui || {};
-  init();
-  initDeckCreator();
+  try {
+    await loadCbLang(cbLang);
+  } catch (e) {
+    console.warn('loadCbLang failed, continuing:', e);
+  }
+  try {
+    const mod = await import('./js/i18n/translator.js');
+    window._cbUi = mod.getCurrentTranslations()?.ui || {};
+  } catch (e) {
+    console.warn('translator import failed, continuing:', e);
+  }
+  try { init(); } catch (e) { console.error('init failed:', e); }
+  try { initDeckCreator(); } catch (e) { console.error('initDeckCreator failed:', e); }
 })();
 </script>
 </body>

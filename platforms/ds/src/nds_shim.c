@@ -197,4 +197,22 @@ unsigned long long nds_get_tick(void) {
     return (unsigned long long)REG_TM0DATA;
 }
 
+// newlib heap: _sbrk + malloc/free/realloc wrappers
+extern char __heap_start_ntr;
+static char* _brk = &__heap_start_ntr;
+
+void* _sbrk(int incr) {
+    char* prev = _brk;
+    // HEAP_END = 0x02400000
+    if ((unsigned int)(_brk + incr) > 0x02400000) {
+        return (void*)-1;
+    }
+    _brk += incr;
+    return prev;
+}
+
+void* ds_malloc(unsigned int size) { return malloc(size); }
+void ds_free(void* ptr) { free(ptr); }
+void* ds_realloc(void* ptr, unsigned int size) { return realloc(ptr, size); }
+
 
