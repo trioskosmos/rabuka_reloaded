@@ -42,15 +42,11 @@ extern "C" {
 
 const HEAP_END: usize = 0x0240_0000;
 const ALIGN: usize = 8;
-const MIN_BLOCK: usize = 8;
+use linked_list_allocator::Heap;
 
-// Simple bump allocator: alloc from heap_start, dealloc is no-op.
-// Heap reset between turns discards all temporary allocations.
 struct DsAllocator {
-    ptr: UnsafeCell<usize>,
-    end: UnsafeCell<usize>,
-    watermark: UnsafeCell<usize>, // highest ptr so alloc from setup persists
-    oom_count: UnsafeCell<u32>,
+    inner: core::cell::UnsafeCell<Option<Heap>>,
+    oom_count: core::cell::UnsafeCell<u32>,
 }
 
 unsafe impl Sync for DsAllocator {}
@@ -58,10 +54,8 @@ unsafe impl Sync for DsAllocator {}
 impl DsAllocator {
     const fn new() -> Self {
         DsAllocator {
-            ptr: UnsafeCell::new(0),
-            end: UnsafeCell::new(0),
-            watermark: UnsafeCell::new(0),
-            oom_count: UnsafeCell::new(0),
+            inner: core::cell::UnsafeCell::new(None),
+            oom_count: core::cell::UnsafeCell::new(0),
         }
     }
 
@@ -69,28 +63,18 @@ impl DsAllocator {
         unsafe { *self.oom_count.get() }
     }
 
-    /// Record current bump position as the watermark. Allocations done
-    /// before this call are "permanent" and won't be lost on reset.
-    unsafe fn set_watermark(&self) {
-        *self.watermark.get() = *self.ptr.get();
-    }
-
-    /// Reset the bump pointer to the watermark, discarding all temporary
-    /// allocations made after the last set_watermark().
-    unsafe fn reset(&self) {
-        *self.ptr.get() = *self.watermark.get();
-    }
-
     unsafe fn ensure_init(&self) {
-        if *self.end.get() != 0 {
+        let inner = self.inner.get();
+        if (*inner).is_some() {
             return;
         }
         let start = &__heap_start_ntr as *const u8 as usize;
         let aligned = align_up(start, ALIGN);
-        *self.ptr.get() = aligned;
-        *self.end.get() = HEAP_END;
-        // Initial watermark: everything before game setup is permanent
-        *self.watermark.get() = aligned;
+        let size = HEAP_END.saturating_sub(aligned);
+        if size > 0 {
+            let heap = Heap::new(aligned as *mut u8, size);
+            *inner = Some(heap);
+        }
     }
 }
 
@@ -101,37 +85,45 @@ fn align_up(x: usize, a: usize) -> usize {
 unsafe impl GlobalAlloc for DsAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         self.ensure_init();
-        let size = align_up(layout.size(), ALIGN).max(ALIGN);
-        let p = *self.ptr.get();
-        let next_p = p + size;
-        if next_p > *self.end.get() {
-            *self.oom_count.get() += 1;
-            return ptr::null_mut();
+        let inner = &mut *self.inner.get();
+        if let Some(ref mut heap) = inner {
+            heap.allocate_first_fit(layout)
+                .ok()
+                .map(|ptr| ptr.as_ptr())
+                .unwrap_or_else(|| {
+                    *self.oom_count.get() += 1;
+                    ptr::null_mut()
+                })
+        } else {
+            ptr::null_mut()
         }
-        *self.ptr.get() = next_p;
-        p as *mut u8
     }
 
-    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
-        // No-op: bump allocator never frees individual allocations.
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        if ptr.is_null() {
+            return;
+        }
+        let inner = &mut *self.inner.get();
+        if let Some(ref mut heap) = inner {
+            heap.deallocate(core::ptr::NonNull::new_unchecked(ptr), layout);
+        }
     }
 
     unsafe fn realloc(&self, ptr: *mut u8, old_layout: Layout, new_size: usize) -> *mut u8 {
-        let old_size = align_up(old_layout.size(), ALIGN).max(ALIGN);
-        let new_alloc = align_up(new_size, ALIGN).max(ALIGN);
-        if new_alloc <= old_size {
-            return ptr;
+        if ptr.is_null() {
+            return self.alloc(Layout::from_size_align_unchecked(
+                new_size,
+                old_layout.align(),
+            ));
         }
-        // Check if the current bump pointer is right after ptr (we can extend in place)
-        if (ptr as usize) + old_size == *self.ptr.get() {
-            *self.ptr.get() = (ptr as usize) + new_alloc;
-            return ptr;
-        }
-        // Otherwise allocate new, copy, discard old
-        let new_layout = Layout::from_size_align_unchecked(new_size, old_layout.align());
-        let new_ptr = self.alloc(new_layout);
+        let new_ptr = self.alloc(Layout::from_size_align_unchecked(
+            new_size,
+            old_layout.align(),
+        ));
         if !new_ptr.is_null() {
-            ptr::copy_nonoverlapping(ptr, new_ptr, old_size);
+            let copy_size = old_layout.size().min(new_size);
+            ptr::copy_nonoverlapping(ptr, new_ptr, copy_size);
+            self.dealloc(ptr, old_layout);
         }
         new_ptr
     }
@@ -139,7 +131,183 @@ unsafe impl GlobalAlloc for DsAllocator {
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
         let ptr = self.alloc(layout);
         if !ptr.is_null() {
-            let sz = align_up(layout.size(), ALIGN).max(ALIGN);
+            ptr::write_bytes(ptr, 0, layout.size());
+        }
+        ptr
+    }
+}
+
+#[repr(C)]
+struct FreeNode {
+    next: *mut FreeNode,
+    size: usize,
+}
+
+const MIN_BLOCK: usize = core::mem::size_of::<FreeNode>();
+
+unsafe impl Sync for DsAllocator {}
+
+impl DsAllocator {
+    const fn new() -> Self {
+        DsAllocator {
+            head: UnsafeCell::new(ptr::null_mut()),
+            oom_count: UnsafeCell::new(0),
+        }
+    }
+
+    fn oom(&self) -> u32 {
+        unsafe { *self.oom_count.get() }
+    }
+
+    unsafe fn alloc_size(layout: &Layout) -> usize {
+        // Round up to ALIGN and ensure at least MIN_BLOCK
+        let s = align_up(layout.size(), ALIGN);
+        if s < MIN_BLOCK {
+            MIN_BLOCK
+        } else {
+            s
+        }
+    }
+
+    unsafe fn ensure_init(&self) {
+        let head = self.head.get();
+        if *head != ptr::null_mut() {
+            return;
+        }
+        let start = &__heap_start_ntr as *const u8 as usize;
+        let aligned = align_up(start, ALIGN);
+        let total = HEAP_END.saturating_sub(aligned);
+        if total >= MIN_BLOCK {
+            let node = aligned as *mut FreeNode;
+            (*node).next = ptr::null_mut();
+            (*node).size = total;
+            *head = node;
+        }
+    }
+}
+
+fn align_up(x: usize, a: usize) -> usize {
+    (x + a - 1) & !(a - 1)
+}
+
+unsafe impl GlobalAlloc for DsAllocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        self.ensure_init();
+        let alloc_size = Self::alloc_size(&layout);
+        let head = self.head.get();
+        let mut node = *head;
+        let mut prev: *mut FreeNode = ptr::null_mut();
+        while !node.is_null() {
+            let block_size = (*node).size;
+            if block_size >= alloc_size {
+                let remaining = block_size - alloc_size;
+                if remaining >= MIN_BLOCK {
+                    // Split: remaining stays as free node
+                    let new_node = (node as usize + alloc_size) as *mut FreeNode;
+                    (*new_node).next = (*node).next;
+                    (*new_node).size = remaining;
+                    if prev.is_null() {
+                        *head = new_node;
+                    } else {
+                        (*prev).next = new_node;
+                    }
+                } else {
+                    // Give the whole block (remaining < MIN_BLOCK)
+                    if prev.is_null() {
+                        *head = (*node).next;
+                    } else {
+                        (*prev).next = (*node).next;
+                    }
+                }
+                return node as *mut u8;
+            }
+            prev = node;
+            node = (*node).next;
+        }
+        *self.oom_count.get() += 1;
+        ptr::null_mut()
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        if ptr.is_null() {
+            return;
+        }
+        let size = Self::alloc_size(&layout);
+        let node = ptr as *mut FreeNode;
+        (*node).next = ptr::null_mut();
+        (*node).size = size;
+        // Guard: if the address already exists in free list, skip (double-free protection)
+        {
+            let mut c = *self.head.get();
+            while !c.is_null() {
+                if c == node {
+                    return; // Already freed, skip
+                }
+                c = (*c).next;
+            }
+        }
+        let head = self.head.get();
+        let mut prev: *mut FreeNode = ptr::null_mut();
+        let mut curr = *head;
+        // Walk to find insertion point (sorted by address)
+        while !curr.is_null() && (curr as usize) < (node as usize) {
+            // Check if curr ends where node starts → merge into curr
+            if (curr as usize) + (*curr).size == node as usize {
+                // Merge node INTO curr
+                (*curr).size += size;
+                // Also merge with next if adjacent
+                let nxt = (*curr).next;
+                if !nxt.is_null() && (curr as usize) + (*curr).size == nxt as usize {
+                    (*curr).size += (*nxt).size;
+                    (*curr).next = (*nxt).next;
+                }
+                return;
+            }
+            prev = curr;
+            curr = (*curr).next;
+        }
+        // Insert node between prev and curr
+        // Check merge with curr (node ends where curr starts)
+        if !curr.is_null() && (node as usize) + size == curr as usize {
+            (*node).size += (*curr).size;
+            (*node).next = (*curr).next;
+        } else {
+            (*node).next = curr;
+        }
+        // Link prev → node
+        if prev.is_null() {
+            *head = node;
+        } else {
+            // Check merge with prev (prev ends where node starts)
+            if (prev as usize) + (*prev).size == node as usize {
+                // Merge node INTO prev
+                (*prev).size += (*node).size;
+                (*prev).next = (*node).next;
+            } else {
+                (*prev).next = node;
+            }
+        }
+    }
+
+    unsafe fn realloc(&self, ptr: *mut u8, old_layout: Layout, new_size: usize) -> *mut u8 {
+        let old_alloc = Self::alloc_size(&old_layout);
+        let new_alloc = align_up(new_size, ALIGN).max(MIN_BLOCK);
+        if new_alloc <= old_alloc {
+            return ptr;
+        }
+        let new_layout = Layout::from_size_align_unchecked(new_size, old_layout.align());
+        let new_ptr = self.alloc(new_layout);
+        if !new_ptr.is_null() {
+            ptr::copy_nonoverlapping(ptr, new_ptr, old_alloc);
+            self.dealloc(ptr, old_layout);
+        }
+        new_ptr
+    }
+
+    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+        let ptr = self.alloc(layout);
+        if !ptr.is_null() {
+            let sz = Self::alloc_size(&layout);
             ptr::write_bytes(ptr, 0, sz);
         }
         ptr
@@ -219,28 +387,27 @@ impl<'a> DsCardDb<'a> {
         self.str_at(off)
     }
 
-    fn card_name(&self, card_idx: u16) -> &str {
-        let rec = 12 + card_idx as usize * 20;
-        let off = u16::from_le_bytes([self.data[rec + 2], self.data[rec + 3]]);
-        self.str_at(off)
-    }
-
+    #[allow(dead_code)]
     fn card_type(&self, card_idx: u16) -> u8 {
         self.data[12 + card_idx as usize * 20 + 4]
     }
 
+    #[allow(dead_code)]
     fn card_cost(&self, card_idx: u16) -> u8 {
         self.data[12 + card_idx as usize * 20 + 5]
     }
 
+    #[allow(dead_code)]
     fn card_blade(&self, card_idx: u16) -> u8 {
         self.data[12 + card_idx as usize * 20 + 6]
     }
 
+    #[allow(dead_code)]
     fn card_score(&self, card_idx: u16) -> u8 {
         self.data[12 + card_idx as usize * 20 + 7]
     }
 
+    #[allow(dead_code)]
     fn card_ability_ref(&self, card_idx: u16) -> u16 {
         let rec = 12 + card_idx as usize * 20 + 14;
         u16::from_le_bytes([self.data[rec], self.data[rec + 1]])
@@ -291,6 +458,10 @@ impl<'a> DsCardDb<'a> {
         let blade_heart_val = self.data[rec + 12];
         let special_heart_val = self.data[rec + 13];
         let ability_ref_val = u16::from_le_bytes([self.data[rec + 14], self.data[rec + 15]]);
+        // Note: ability_ref_val may be stale if RBCD was baked with old abilities_gen.rs.
+        // If the index is >= NUM_ABILITIES, get_ability returns None and unwrap_or_default()
+        // creates a default Ability (no triggers). Re-run `cargo run --release -- ds` in
+        // tools/bake to regenerate the RBCD with current ability indices.
 
         let ct = match card_type_val {
             1 => CardType::Live,
@@ -301,11 +472,11 @@ impl<'a> DsCardDb<'a> {
         let base_heart = make_base_heart_from_u8(base_heart_val);
         let blade_heart = make_blade_heart_from_u8(blade_heart_val);
         let special_heart = make_special_heart_from_u8(special_heart_val);
-
-        let mut abilities = Vec::new();
-        if ability_ref_val > 0 {
-            abilities.push(AbilityRef::index(ability_ref_val));
-        }
+        let abilities = if ability_ref_val > 0 {
+            vec![AbilityRef::index(ability_ref_val)]
+        } else {
+            vec![]
+        };
 
         Card {
             card_no: String::from(self.str_at(card_no_off)).into(),
@@ -402,17 +573,6 @@ fn group_from_u8(v: u8) -> Box<str> {
     }
 }
 
-fn truncate_chars(s: &str, max_chars: usize) -> &str {
-    let mut char_count = 0;
-    for (i, _) in s.char_indices() {
-        if char_count >= max_chars {
-            return &s[..i];
-        }
-        char_count += 1;
-    }
-    s
-}
-
 #[no_mangle]
 pub extern "C" fn main() {
     unsafe {
@@ -494,9 +654,6 @@ pub extern "C" fn main() {
 
     let cards: Vec<Card> = card_map.into_values().collect();
     let mut db = Arc::new(CardDatabase::load_or_create(cards));
-    unsafe {
-        ALLOCATOR.set_watermark();
-    }
     display.println(&format!("db ok"));
     display.swap_buffers();
 
@@ -528,15 +685,7 @@ pub extern "C" fn main() {
     display.swap_buffers();
 
     let mut frame_count = 0u32;
-    let mut last_turn = 0u32;
     loop {
-        // Reset bump allocator at turn boundaries to reclaim temporary memory
-        if gs.turn_number != last_turn {
-            unsafe {
-                ALLOCATOR.reset();
-            }
-            last_turn = gs.turn_number;
-        }
         TurnEngine::check_victory_condition(&mut gs);
         if gs.game_result != GameResult::Ongoing {
             show_result(&mut display, &mut input, &gs);
@@ -591,91 +740,6 @@ pub extern "C" fn main() {
                 display.swap_buffers();
             }
             let p = actions[idx].parameters.clone();
-            if ai_vs_ai && actions[idx].action_type == game_setup::ActionType::PlayMemberToStage {
-                display.clear();
-                display.println(">>> BEFORE PLAY_MEMBER <<<");
-                display.println(&alloc::format!(
-                    "cid:{:?}",
-                    p.as_ref().and_then(|x| x.card_id)
-                ));
-                display.println(&alloc::format!(
-                    "cn:{:?}",
-                    p.as_ref().and_then(|x| x.card_no.as_deref())
-                ));
-                display.println(&alloc::format!(
-                    "area:{:?}",
-                    p.as_ref().and_then(|x| x.stage_area.as_deref())
-                ));
-                display.println(&alloc::format!(
-                    "bt:{:?}",
-                    p.as_ref().and_then(|x| x.use_baton_touch)
-                ));
-                display.println(&alloc::format!(
-                    "step:{}",
-                    rabuka_engine::turn::phases::HANDLE_PLAY_STEP
-                        .load(core::sync::atomic::Ordering::Relaxed)
-                ));
-                display.swap_buffers();
-                let _ = TurnEngine::execute_main_phase_action(
-                    &mut gs,
-                    &actions[idx].action_type,
-                    p.as_ref().and_then(|x| x.card_id),
-                    p.as_ref().and_then(|x| x.card_indices.clone()),
-                    p.as_ref()
-                        .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
-                    p.as_ref().and_then(|x| x.use_baton_touch),
-                );
-                display.clear();
-                display.println(">>> AFTER PLAY_MEMBER <<<");
-                let pc = gs.has_pending_choice();
-                display.println(&alloc::format!("pc:{} oom:{}", pc, ALLOCATOR.oom()));
-                display.println(&alloc::format!("P:{:?}", gs.current_phase));
-                display.println(&alloc::format!(
-                    "step:{}",
-                    rabuka_engine::turn::phases::HANDLE_PLAY_STEP
-                        .load(core::sync::atomic::Ordering::Relaxed)
-                ));
-                display.swap_buffers();
-                let _ = TurnEngine::execute_main_phase_action(
-                    &mut gs,
-                    &actions[idx].action_type,
-                    p.as_ref().and_then(|x| x.card_id),
-                    p.as_ref().and_then(|x| x.card_indices.clone()),
-                    p.as_ref()
-                        .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
-                    p.as_ref().and_then(|x| x.use_baton_touch),
-                );
-                display.clear();
-                display.println(">>> AFTER PLAY_MEMBER <<<");
-                let pc = gs.has_pending_choice();
-                display.println(&alloc::format!("pc:{} oom:{}", pc, ALLOCATOR.oom()));
-                display.println(&alloc::format!("P:{:?}", gs.current_phase));
-                display.swap_buffers();
-            } else {
-                let _ = TurnEngine::execute_main_phase_action(
-                    &mut gs,
-                    &actions[idx].action_type,
-                    p.as_ref().and_then(|x| x.card_id),
-                    p.as_ref().and_then(|x| x.card_indices.clone()),
-                    p.as_ref()
-                        .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
-                    p.as_ref().and_then(|x| x.use_baton_touch),
-                );
-            }
-            gs.reset_loop_detection();
-            frame_count += 1;
-            if ai_vs_ai {
-                display.clear();
-                display.println(&alloc::format!(
-                    "f{} P:{:?} oom:{}",
-                    frame_count,
-                    gs.current_phase,
-                    ALLOCATOR.oom()
-                ));
-                display.println(&alloc::format!("pc:{}", gs.has_pending_choice()));
-                display_heap_stats(&mut display);
-                display.swap_buffers();
-            }
             let _ = TurnEngine::execute_main_phase_action(
                 &mut gs,
                 &actions[idx].action_type,
@@ -958,11 +1022,6 @@ fn select(display: &mut Display, input: &mut Input, items: &[&str], title: &str)
             return sel;
         }
     }
-}
-
-fn ai_turn(_display: &mut Display, gs: &mut GameState, actions: &[game_setup::Action]) -> bool {
-    let idx = rng::rand_range(actions.len());
-    execute_action(gs, &actions[idx])
 }
 
 fn human_turn(
@@ -1275,11 +1334,6 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
             }
             let sel = menu_select(display, input, &items, &description, false).unwrap_or(0);
             TurnEngine::resume_with_choice(gs, None, Some(vec![sel])).ok();
-            true
-        }
-        _ => {
-            // Auto-complete any unexpected choice type (let the game progress)
-            TurnEngine::resume_with_choice(gs, Some(0), None).ok();
             true
         }
     }

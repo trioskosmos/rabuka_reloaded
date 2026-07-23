@@ -165,6 +165,7 @@ pub struct AutoAbilityOption {
     pub card_name: String,
     pub ability_text: String,
     pub queue_index: usize,
+    pub card_id: Option<i16>,
 }
 
 #[derive(Debug, Clone)]
@@ -959,5 +960,4 @@ impl StepState {
         self.last_draw_count = 0;
         self.looked_at_total_count = 0;
     }
-
 }

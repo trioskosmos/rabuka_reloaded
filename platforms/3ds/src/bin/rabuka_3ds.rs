@@ -225,6 +225,7 @@ enum Step {
         bool,        // ai_vs_ai (spectator: both AI)
         bool,        // cli_mode
         bool,        // detail_mode
+        bool,        // choice_image_mode
         usize,       // hand_offset (P1)
         usize,       // hand_offset_p2
         u32,         // touch_tap_count
@@ -1032,6 +1033,7 @@ fn main() {
                                     false, // ai_vs_ai
                                     false, // cli_mode (start in game mode)
                                     false, // detail_mode
+                                    true,  // choice_image_mode
                                     0,
                                     0,
                                     0,
@@ -1661,6 +1663,7 @@ fn main() {
                                     false, // ai_vs_ai
                                     false, // cli_mode (start in game mode)
                                     false, // detail_mode
+                                    true,  // choice_image_mode
                                     0,
                                     0,
                                     0,
@@ -1687,6 +1690,7 @@ fn main() {
                 ref ai_vs_ai,
                 mut cli_mode,
                 mut detail_mode,
+                mut choice_image_mode,
                 mut hand_offset,
                 mut hand_offset_p2,
                 mut touch_tap_count,
@@ -1802,6 +1806,12 @@ fn main() {
                             _3ds_text_set_scroll_y(0);
                         }
                     }
+                    redraw = true;
+                }
+
+                // R toggles choice image mode (board highlights vs text action list)
+                if keys & 0x00000100 != 0 {
+                    choice_image_mode = !choice_image_mode;
                     redraw = true;
                 }
 
@@ -2157,19 +2167,78 @@ fn main() {
                                 None
                             };
                             if let Some(cid) = tapped {
-                                if Some(cid) == viewing_card {
-                                    viewing_card = None;
-                                    detail_mode = false;
-                                } else {
-                                    viewing_card = Some(cid);
-                                    detail_mode = true;
-                                    // Navigate cursor to the first action referencing this card
-                                    if !acts_cache.is_empty() {
-                                        if let Some(pos) = acts_cache.iter().position(|act| {
+                                // Choice image mode: board tap executes the choice directly
+                                let handled = if choice_image_mode && gs.has_pending_choice() {
+                                    let mut act_idx: Option<usize> =
+                                        acts_cache.iter().position(|act| {
                                             act.parameters.as_ref().and_then(|p| p.card_id)
                                                 == Some(cid)
-                                        }) {
-                                            cur = pos;
+                                                && matches!(
+                                                    act.action_type,
+                                                    game_setup::ActionType::ChoiceSelect
+                                                        | game_setup::ActionType::ChoiceDecision
+                                                )
+                                        });
+                                    if act_idx.is_none() {
+                                        if let Some(c) = gs.get_pending_choice() {
+                                            use rabuka_engine::ability::types::Choice;
+                                            if let Choice::SelectAutoAbility { options, .. } = c {
+                                                if let Some(opt_idx) = options
+                                                    .iter()
+                                                    .position(|o| o.card_id == Some(cid))
+                                                {
+                                                    act_idx = acts_cache.iter().position(|act| {
+                                                        act.parameters.as_ref().and_then(|p| p.card_id) == Some(opt_idx as i16)
+                                                            && act.action_type == game_setup::ActionType::ChoiceOption
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if let Some(idx) = act_idx {
+                                        let action = acts_cache[idx].clone();
+                                        let p = action.parameters.clone();
+                                        let result = turn::TurnEngine::execute_main_phase_action(
+                                            &mut gs,
+                                            &action.action_type,
+                                            p.as_ref().and_then(|x| x.card_id),
+                                            p.as_ref().and_then(|x| x.card_indices.clone()),
+                                            p.as_ref().and_then(|x| {
+                                                x.stage_area.as_ref().and_then(|s| s.parse().ok())
+                                            }),
+                                            p.as_ref().and_then(|x| x.use_baton_touch),
+                                        );
+                                        if let Err(ref e) = result {
+                                            unsafe {
+                                                _3ds_debug_print(
+                                                    format!("[ERR] {}\n\0", e).as_ptr(),
+                                                );
+                                            }
+                                        }
+                                        gs.reset_loop_detection();
+                                        cur = 0;
+                                        dirty = true;
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                };
+                                if !handled {
+                                    if Some(cid) == viewing_card {
+                                        viewing_card = None;
+                                        detail_mode = false;
+                                    } else {
+                                        viewing_card = Some(cid);
+                                        detail_mode = true;
+                                        if !acts_cache.is_empty() {
+                                            if let Some(pos) = acts_cache.iter().position(|act| {
+                                                act.parameters.as_ref().and_then(|p| p.card_id)
+                                                    == Some(cid)
+                                            }) {
+                                                cur = pos;
+                                            }
                                         }
                                     }
                                 }
@@ -3023,14 +3092,16 @@ fn main() {
                             }
                         }
 
-                        // Action list (always renders unless detail_mode blocks it)
+                        // Action list (hidden in image mode when a choice is pending)
+                        let is_image_choice = choice_image_mode && gs.has_pending_choice();
                         {
                             // Action list on top screen (was previously on bottom overlay).
                             let is_ai_turn =
                                 *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
                             let is_opponent_turn_mp =
                                 is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 });
-                            if !is_ai_turn
+                            if !is_image_choice
+                                && !is_ai_turn
                                 && !is_opponent_turn_mp
                                 && !display_order.is_empty()
                                 && content_y < 240.0
@@ -3229,6 +3300,54 @@ fn main() {
                         unsafe {
                             _3ds_board_clear_action_highlight();
                         }
+
+                        // Choice image mode: highlight board cards for the pending choice
+                        if choice_image_mode && gs.has_pending_choice() {
+                            let mut card_ids: Vec<i16> = Vec::new();
+                            let opt_map: Vec<(i16, i16)> = {
+                                use rabuka_engine::ability::types::Choice;
+                                let mut m = Vec::new();
+                                if let Some(c) = gs.get_pending_choice() {
+                                    if let Choice::SelectAutoAbility { options, .. } = c {
+                                        for (i, opt) in options.iter().enumerate() {
+                                            if let Some(cid) = opt.card_id {
+                                                m.push((i as i16, cid));
+                                            }
+                                        }
+                                    }
+                                }
+                                m
+                            };
+                            for act in &acts_cache {
+                                if matches!(
+                                    act.action_type,
+                                    game_setup::ActionType::ChoiceSelect
+                                        | game_setup::ActionType::ChoiceDecision
+                                ) {
+                                    if let Some(cid) =
+                                        act.parameters.as_ref().and_then(|p| p.card_id)
+                                    {
+                                        if !card_ids.contains(&cid) {
+                                            card_ids.push(cid);
+                                        }
+                                    }
+                                }
+                            }
+                            if !opt_map.is_empty() {
+                                for &(_, cid) in &opt_map {
+                                    if !card_ids.contains(&cid) {
+                                        card_ids.push(cid);
+                                    }
+                                }
+                            }
+                            for &cid in &card_ids {
+                                if let Some((zone, slot)) = find_card_zone_slot(&gs, cid) {
+                                    unsafe {
+                                        _3ds_board_set_action_highlight(zone, slot);
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // Multiplayer debug overlay (last thing drawn, never cleared)
@@ -3269,6 +3388,7 @@ fn main() {
                     *ai_vs_ai,
                     cli_mode,
                     detail_mode,
+                    choice_image_mode,
                     hand_offset,
                     hand_offset_p2,
                     touch_tap_count,
@@ -3341,6 +3461,30 @@ fn settle_3ds(gs: &mut GameState) {
 }
 
 #[cfg(feature = "3ds")]
+fn find_card_zone_slot(gs: &GameState, cid: i16) -> Option<(i32, i32)> {
+    for p in [&gs.player1, &gs.player2] {
+        if let Some(idx) = p.stage.stage.iter().position(|&id| id == cid) {
+            return Some((1, idx as i32));
+        }
+        if let Some(idx) = p.hand.cards.iter().position(|&id| id == cid) {
+            return Some((3, idx as i32));
+        }
+        if let Some(idx) = p
+            .success_live_card_zone
+            .cards
+            .iter()
+            .position(|&id| id == cid)
+        {
+            return Some((0, idx as i32));
+        }
+        if let Some(idx) = p.energy_zone.cards.iter().position(|&id| id == cid) {
+            return Some((2, idx as i32));
+        }
+    }
+    None
+}
+
+#[cfg(feature = "3ds")]
 fn visible_hand_slots() -> usize {
     let hand_h = 240.0 * 0.42;
     let card_h = hand_h - 4.0;
@@ -3356,7 +3500,7 @@ fn step_name(s: &Step) -> &'static str {
         Step::ReadCardsBin => "ReadCards",
         Step::ParseCards(_) => "ParseCards",
         Step::Setup(_, _, _, _) => "Setup",
-        Step::Play(_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => "Play",
+        Step::Play(_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => "Play",
         Step::Done(_) => "Done",
     }
 }

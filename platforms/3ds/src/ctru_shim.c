@@ -139,9 +139,11 @@ static char  hud_player[8] = "";
 // ---- Active-player highlight ----
 static bool active_is_p1 = true;
 
-// ---- Action highlight on board slots ----
-static int hl_zone = -1;
-static int hl_slot = -1;
+// ---- Action highlight on board slots (multiple) ----
+#define MAX_HIGHLIGHTS 16
+static int hl_count = 0;
+static int hl_zones[MAX_HIGHLIGHTS];
+static int hl_slots[MAX_HIGHLIGHTS];
 
 // ---- Action overlay (Phase 2: show actions on bottom screen) ----
 #define MAX_OVERLAY_LINES 16
@@ -182,7 +184,7 @@ void _3ds_init() {
     overlay_count = 0;
     hud_turn = 0; hud_phase[0] = '\0'; hud_player[0] = '\0';
     active_is_p1 = true;
-    hl_zone = -1; hl_slot = -1;
+    hl_count = 0;
     tmp_text_buf = C2D_TextBufNew(8192);
 }
 
@@ -372,8 +374,20 @@ void _3ds_board_set_hud(int turn, const char* phase, const char* player) {
 void _3ds_board_set_active_player(bool is_p1) { active_is_p1 = is_p1; }
 
 // ---- Action highlight ----
-void _3ds_board_set_action_highlight(int zone, int slot) { hl_zone = zone; hl_slot = slot; }
-void _3ds_board_clear_action_highlight() { hl_zone = -1; hl_slot = -1; }
+void _3ds_board_set_action_highlight(int zone, int slot) {
+    if (hl_count < MAX_HIGHLIGHTS) {
+        hl_zones[hl_count] = zone;
+        hl_slots[hl_count] = slot;
+        hl_count++;
+    }
+}
+void _3ds_board_clear_action_highlight() { hl_count = 0; }
+static bool _is_highlighted(int zone, int slot) {
+    for (int i = 0; i < hl_count; i++) {
+        if (hl_zones[i] == zone && hl_slots[i] == slot) return true;
+    }
+    return false;
+}
 
 // ---- Action overlay (safe: copies strings into C buffer) ----
 // action_idx_map[i] = index into the flat action list for display line i.
@@ -626,7 +640,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float live_slot_w = live_card_h * LANDSCAPE;
     for (int i = 0; i < 3; i++) {
         _3ds_draw_rect(lx, live_y + 1, live_slot_w, live_card_h, 0x33000000);
-        if (!cli_mode && hl_zone == 0 && hl_slot == i) {
+        if (!cli_mode && _is_highlighted(0, i)) {
             _3ds_draw_border(lx, live_y + 1, live_slot_w, live_card_h, COL_SEL, 2);
         }
         if (pb->live[i].active) _3ds_draw_card_at(&pb->live[i], lx, live_y + 1, live_slot_w, live_card_h);
@@ -646,7 +660,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
         // Portrait card slot (solid border, centered)
         float psx = st_x + st_pad_x;
         _3ds_draw_border(psx, sy + st_pad_y, st_card_w, st_slot_h - 2, COL_BLUE, 1);
-        if (!cli_mode && hl_zone == 1 && hl_slot == si) {
+        if (!cli_mode && _is_highlighted(1, si)) {
             _3ds_draw_border(st_x, sy, st_slot_w, st_slot_h, COL_SEL, 2);
         }
         if (pb->stage[si].active) {
@@ -685,7 +699,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float e_sz = energy_h - 4;
     for (int i = 0; i < pb->energy_count && i < MAX_SLOTS; i++) {
         float e_w = e_sz * LANDSCAPE;
-        if (!cli_mode && hl_zone == 2 && hl_slot == i) {
+        if (!cli_mode && _is_highlighted(2, i)) {
             _3ds_draw_border(ex, energy_y + 2, e_w, e_sz, COL_SEL, 2);
         }
         if (pb->energy[i].active) _3ds_draw_card_at(&pb->energy[i], ex, energy_y + 2, e_w, e_sz);
@@ -701,7 +715,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float hand_card_h = hand_h - 4;
     float h_slot_w = hand_card_h * PORTRAIT;
     for (int i = 0; i < pb->hand_count && i < MAX_SLOTS; i++) {
-        if (!cli_mode && hl_zone == 3 && hl_slot == i) {
+        if (!cli_mode && _is_highlighted(3, i)) {
             _3ds_draw_border(hx, hand_y + 2, h_slot_w, hand_card_h, COL_SEL, 2);
         }
         if (pb->hand[i].active) _3ds_draw_card_at(&pb->hand[i], hx, hand_y + 2, h_slot_w, hand_card_h);

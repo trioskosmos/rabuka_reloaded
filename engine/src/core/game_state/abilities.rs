@@ -984,6 +984,7 @@ impl GameState {
                             card_name,
                             ability_text: entry.ability.full_text.clone(),
                             queue_index: idx,
+                            card_id: entry.card_id,
                         })
                     })
                     .collect();

@@ -287,6 +287,7 @@ fn decode_ability(bc: &mut BcReader) -> Option<Ability> {
 
     #[cfg(feature = "ds_debug")]
     ds_print("DA:LOOP");
+    #[allow(unused_variables)]
     for i in 0..count {
         #[cfg(feature = "ds_debug")]
         if i % 10 == 0 {
