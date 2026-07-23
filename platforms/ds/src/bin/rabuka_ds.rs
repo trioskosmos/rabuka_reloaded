@@ -36,7 +36,7 @@ extern "C" {
     fn nds_wait_vblank();
 }
 
-const HEAP_END: usize = 0x0238_0000;
+const HEAP_END: usize = 0x023B_0000;
 
 struct DsAllocator {
     next: AtomicUsize,
@@ -454,14 +454,6 @@ pub extern "C" fn main() {
     display.swap_buffers();
 
     loop {
-        display.println(&format!(
-            "Loop: ph={:?} ch={} rs={:?}",
-            gs.current_phase,
-            gs.has_pending_choice(),
-            gs.game_result
-        ));
-        display.swap_buffers();
-
         TurnEngine::check_victory_condition(&mut gs);
         if gs.game_result != GameResult::Ongoing {
             show_result(&mut display, &mut input, &gs);
@@ -482,48 +474,27 @@ pub extern "C" fn main() {
         }
 
         let actions = game_setup::generate_possible_actions(&gs);
-        display.println(&format!("actions: {}", actions.len()));
-        display.swap_buffers();
 
         if actions.is_empty() {
-            display.println("empty → advance");
-            display.swap_buffers();
             TurnEngine::advance_phase(&mut gs);
-            wait_frames(30);
             continue;
         }
 
-        // Show first action for debugging
-        if let Some(a) = actions.first() {
-            display.println(&format!("act0: {:?}", a.action_type));
-            display.swap_buffers();
-        }
-
         let is_ai = ai_vs_ai || (vs_ai && gs.active_player().id != gs.player1.id);
-        display.println(&format!("is_ai={} act={}", is_ai, gs.active_player().id));
-        display.swap_buffers();
 
-        let ok = if is_ai {
-            ai_turn(&mut display, &mut gs, &actions)
-        } else {
-            human_turn(&mut display, &mut input, &mut gs, &actions)
-        };
-        if !ok {
-            break;
-        }
-        // In RPS, after P1 picks, let AI pick for P2 immediately
-        if gs.current_phase == Phase::RockPaperScissors
-            && gs.player1_rps_choice.is_some()
-            && gs.player2_rps_choice.is_none()
-        {
-            display.println("AI picks RPS...");
-            display.swap_buffers();
-            let ai_actions = game_setup::generate_possible_actions(&gs);
-            if !ai_actions.is_empty() {
-                ai_turn(&mut display, &mut gs, &ai_actions);
+        if is_ai {
+            let idx = rng::rand_range(actions.len());
+            if !execute_action(&mut gs, &actions[idx]) {
+                break;
             }
+        } else {
+            let ok = human_turn(&mut display, &mut input, &mut gs, &actions);
+            if !ok {
+                break;
+            }
+            wait_frames(8);
         }
-        wait_frames(15);
+
         settle_auto(&mut gs);
     }
 }
@@ -782,16 +753,8 @@ fn execute_action(gs: &mut GameState, action: &game_setup::Action) -> bool {
             .and_then(|p| p.stage_area.as_ref().and_then(|s| s.parse().ok())),
         params.as_ref().and_then(|p| p.use_baton_touch),
     );
-    match result {
-        Ok(_) => {
-            gs.reset_loop_detection();
-            true
-        }
-        Err(_e) => {
-            gs.reset_loop_detection();
-            true
-        }
-    }
+    gs.reset_loop_detection();
+    result.is_ok()
 }
 
 fn menu_select(

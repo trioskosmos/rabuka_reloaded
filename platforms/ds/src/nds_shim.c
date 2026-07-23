@@ -102,6 +102,8 @@ int __atomic_fetch_sub_1(unsigned char* ptr, unsigned char val, int memorder) {
     return tmp;
 }
 
+static u16* _tile_map = NULL;
+
 void nds_init(void) {
     videoSetMode(MODE_0_2D);
     videoSetModeSub(MODE_0_2D);
@@ -110,7 +112,15 @@ void nds_init(void) {
     irqSet(IRQ_VBLANK, NULL);
     irqEnable(IRQ_VBLANK);
     
-    consoleDemoInit();
+    // consoleDemoInit returns the ACTIVE console (not the static default),
+    // which has fontBgMap correctly set after bgInit.
+    PrintConsole* con = consoleDemoInit();
+    if (con) {
+        _tile_map = con->fontBgMap;
+    } else {
+        // Fallback: sub BG0 after consoleInit(..., mapBase=22)
+        _tile_map = bgGetMapPtr(4);
+    }
     iprintf("\x1b[2J");
     REG_TM0CNT = 0;
     REG_TM0DATA = 0;
@@ -142,11 +152,12 @@ void nds_set_cursor(int row, int col) {
 
 // Access to console tile map for direct rendering
 u16* nds_get_tilemap(void) {
-    return consoleGetDefault()->fontBgMap;
+    return _tile_map;
 }
 
 u16* nds_get_tilegfx(void) {
-    return consoleGetDefault()->fontBgGfx;
+    // The default console's fontBgGfx is also 0 — not currently used.
+    return NULL;
 }
 
 // Write a row of 32 tile indices directly to the tile map (flicker-free)
@@ -178,8 +189,7 @@ int nds_key_held(void) {
 }
 
 void nds_wait_vblank(void) {
-    volatile int i;
-    for (i = 0; i < 15000; i++) {}
+    swiWaitForVBlank();
 }
 
 unsigned long long nds_get_tick(void) {

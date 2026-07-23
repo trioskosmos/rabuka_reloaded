@@ -248,6 +248,17 @@ fn bake_ds(repo_root: &Path) {
         }
     }
 
+    // Attach abilities before building binary records
+    // Cards deserialized from deck JSON have empty abilities (serde(skip)).
+    {
+        let mut all_cards: Vec<Card> = unique_cards.iter().map(|(_, c)| c.clone()).collect();
+        CardLoader::attach_abilities(&mut all_cards);
+        // Rewrite unique_cards with ability-attached cards
+        for ((_cn, card), attached) in unique_cards.iter_mut().zip(all_cards.into_iter()) {
+            *card = attached;
+        }
+    }
+
     // Build binary card records
     let mut card_records: Vec<Vec<u8>> = Vec::new();
     for (cn, card) in &unique_cards {
