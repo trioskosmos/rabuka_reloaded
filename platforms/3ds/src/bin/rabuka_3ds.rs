@@ -132,7 +132,7 @@ fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32, ic
             let inner = &after[..end];
             if let Some(bar) = inner.find('|') {
                 let file = &inner[..bar];
-                let iw = icon_h * 0.711;
+                let iw = icon_width_for(file, icon_h);
                 let icon_name = file.strip_suffix(".png").unwrap_or(file);
                 let atlas_name = format!("icon_{}.png.t3x", icon_name);
                 let c_str = std::ffi::CString::new(atlas_name.as_str()).unwrap_or_default();
@@ -151,6 +151,34 @@ fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32, ic
             _3ds_top_queue_text(cx, y, color, scale, format!("{}\0", rest).as_ptr());
         }
     }
+}
+
+/// Look up the display width for an icon at the given height, maintaining aspect ratio.
+fn icon_width_for(file: &str, h: f32) -> f32 {
+    // Known icon dimensions (from docs/img/texticon/*.png)
+    // Square icons (160x160): hearts, blades, energy, score, etc.
+    // Rectangular: triggers and position icons
+    let (w, ih) = match file {
+        // Triggers: ~378x160 for kidou/jidou/jyouji/toujyou
+        f if f.starts_with("kidou")
+            || f.starts_with("jidou")
+            || f.starts_with("jyouji")
+            || f.starts_with("toujyou") =>
+        {
+            (378.0, 160.0)
+        }
+        // Live start/success: 833x160
+        f if f.starts_with("live_start") || f.starts_with("live_success") => (833.0, 160.0),
+        // Position: 667x160 for center, 833x204 for sides
+        f if f.starts_with("center") => (667.0, 160.0),
+        f if f.starts_with("leftside") || f.starts_with("rightside") => (833.0, 200.0),
+        // Turn1: 677x160, Turn2: 300x60
+        f if f.starts_with("turn1") => (677.0, 160.0),
+        f if f.starts_with("turn2") => (300.0, 60.0),
+        // Everything else (hearts, resources): 160x160 square
+        _ => (160.0, 160.0),
+    };
+    h * w / ih
 }
 
 /// Wrap ability text — keeps `{{...}}` icon markers for later inline rendering.
@@ -3549,6 +3577,11 @@ fn main() {
                             && gs.has_pending_choice()
                             && display_order.iter().any(|&fi| {
                                 let act = &acts_cache[fi];
+                                if act.action_type != game_setup::ActionType::ChoiceSelect
+                                    && act.action_type != game_setup::ActionType::ChoiceDecision
+                                {
+                                    return false;
+                                }
                                 let cid = act.parameters.as_ref().and_then(|p| p.card_id);
                                 cid.and_then(card_no)
                                     .and_then(|cn| atlas.lookup(cn.as_str()))
@@ -3959,12 +3992,7 @@ fn main() {
                                                         .as_ref()
                                                         .and_then(|p| p.card_name.clone())
                                                         .unwrap_or_default();
-                                                    let desc = act
-                                                        .description
-                                                        .lines()
-                                                        .next()
-                                                        .unwrap_or("")
-                                                        .to_string();
+                                                    let desc = act.description.to_string();
                                                     let ability_text = if act.action_type
                                                         == game_setup::ActionType::ChoiceOption
                                                     {
