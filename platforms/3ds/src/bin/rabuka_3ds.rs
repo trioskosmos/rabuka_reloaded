@@ -232,6 +232,7 @@ enum Step {
         Option<i16>,                // viewing_card_id
         Option<(String, Vec<i16>)>, // zone_viewer (label, card_ids)
         usize,                      // zone_viewer_offset
+        bool,                       // was_touching (edge detect for touch screen)
         bool,                       // is_multiplayer
         bool,                       // is_host (true = P1/host, false = P2/client)
         bool,                       // waiting_for_opponent
@@ -1030,6 +1031,7 @@ fn main() {
                                     None,
                                     None,  // zone_viewer
                                     0,     // zone_viewer_offset
+                                    false, // was_touching
                                     false, // is_multiplayer
                                     false, // is_host
                                     false, // waiting_for_opponent
@@ -1662,6 +1664,7 @@ fn main() {
                                     None,
                                     None,     // zone_viewer
                                     0,        // zone_viewer_offset
+                                    false,    // was_touching
                                     true,     // is_multiplayer
                                     is_host,  // is_host
                                     !is_host, // waiting_for_opponent will be recalculated after settle
@@ -1691,6 +1694,7 @@ fn main() {
                 mut viewing_card,
                 mut zone_viewer,
                 mut zone_viewer_offset,
+                mut was_touching,
                 is_multiplayer,
                 is_host,
                 mut waiting_for_opponent,
@@ -2198,7 +2202,8 @@ fn main() {
                 }
 
                 // Touch: tap board zones to view card details, or overlay to select action
-                if unsafe { _3ds_touch_down() } {
+                let touching = unsafe { _3ds_touch_down() };
+                if touching && !was_touching {
                     touch_tap_count += 1;
                     let mut tx: u32 = 0;
                     let mut ty: u32 = 0;
@@ -2431,6 +2436,7 @@ fn main() {
                         } // end h > 0 guard
                     }
                 }
+                was_touching = touching;
 
                 if dirty || redraw {
                     acts_cache = game_setup::generate_possible_actions(&gs);
@@ -3991,6 +3997,7 @@ fn main() {
                     viewing_card,
                     zone_viewer,
                     zone_viewer_offset,
+                    was_touching,
                     is_multiplayer,
                     is_host,
                     waiting_for_opponent,
@@ -4098,7 +4105,7 @@ fn step_name(s: &Step) -> &'static str {
         Step::ReadCardsBin => "ReadCards",
         Step::ParseCards(_) => "ParseCards",
         Step::Setup(_, _, _, _) => "Setup",
-        Step::Play(_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => "Play",
+        Step::Play(_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => "Play",
         Step::Done(_) => "Done",
     }
 }
