@@ -3669,6 +3669,7 @@ fn main() {
                                             ty += 18.0;
                                         }
                                     }
+                                    let mut prev_cn = String::new();
                                     for di in start..end {
                                         let fi = display_order[di];
                                         let act = &acts_cache[fi];
@@ -3678,7 +3679,13 @@ fn main() {
                                             .as_ref()
                                             .and_then(|p| p.disabled)
                                             .unwrap_or(false);
-                                        let prefix = if is_disabled {
+                                        let is_grouped = act.action_type
+                                            == game_setup::ActionType::PlayMemberToStage
+                                            && cn_or_empty(act) == prev_cn
+                                            && !prev_cn.is_empty();
+                                        let prefix = if is_grouped {
+                                            "  "
+                                        } else if is_disabled {
                                             "· "
                                         } else if is_sel {
                                             "> "
@@ -3688,109 +3695,136 @@ fn main() {
                                         if ty > 230.0 {
                                             break;
                                         }
-                                        let line = match act.action_type {
-                                            game_setup::ActionType::Pass => "Pass".into(),
-                                            game_setup::ActionType::PlayMemberToStage => {
-                                                let cn = cn_or_empty(act);
-                                                let name = act
-                                                    .parameters
-                                                    .as_ref()
-                                                    .and_then(|p| p.card_name.clone())
-                                                    .unwrap_or_default();
-                                                let area = act
-                                                    .parameters
-                                                    .as_ref()
-                                                    .and_then(|p| p.stage_area.clone())
-                                                    .unwrap_or_default();
-                                                let area_cost = act
-                                                    .parameters
-                                                    .as_ref()
-                                                    .and_then(|p| p.available_areas.as_ref())
-                                                    .and_then(|aa| {
-                                                        aa.iter()
-                                                            .find(|x| x.area == area)
-                                                            .map(|x| x.cost)
-                                                    })
-                                                    .or_else(|| {
-                                                        act.parameters
-                                                            .as_ref()
-                                                            .and_then(|p| p.base_cost)
-                                                    })
-                                                    .unwrap_or(0);
-                                                if !cn.is_empty() {
-                                                    format!(
-                                                        "[{}] {} {} c:{}",
-                                                        cn, name, area, area_cost
-                                                    )
-                                                } else {
-                                                    format!("{} {} c:{}", name, area, area_cost)
-                                                }
-                                            }
-                                            game_setup::ActionType::UseAbility => {
-                                                let name = act
-                                                    .parameters
-                                                    .as_ref()
-                                                    .and_then(|p| p.card_name.clone())
-                                                    .unwrap_or_default();
-                                                let cost = act
-                                                    .parameters
-                                                    .as_ref()
-                                                    .and_then(|p| p.final_cost.or(p.base_cost))
-                                                    .unwrap_or(0);
-                                                let area = act
-                                                    .parameters
-                                                    .as_ref()
-                                                    .and_then(|p| p.stage_area.clone())
-                                                    .unwrap_or_default();
-                                                let abil = act
-                                                    .parameters
-                                                    .as_ref()
-                                                    .and_then(|p| p.source_ability.clone())
-                                                    .unwrap_or_default();
-                                                let abil_short: String =
-                                                    abil.chars().take(28).collect();
-                                                let cn = cn_or_empty(act);
-                                                if !cn.is_empty() {
-                                                    if cost > 0 {
+                                        let line = if is_grouped {
+                                            // Grouped: just show the area option
+                                            let area = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.stage_area.clone())
+                                                .unwrap_or_default();
+                                            let cost = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.available_areas.as_ref())
+                                                .and_then(|aa| {
+                                                    aa.iter()
+                                                        .find(|x| x.area == area)
+                                                        .map(|x| x.cost)
+                                                })
+                                                .or_else(|| {
+                                                    act.parameters
+                                                        .as_ref()
+                                                        .and_then(|p| p.base_cost)
+                                                })
+                                                .unwrap_or(0);
+                                            format!("  {} c:{}", area, cost)
+                                        } else {
+                                            match act.action_type {
+                                                game_setup::ActionType::Pass => "Pass".into(),
+                                                game_setup::ActionType::PlayMemberToStage => {
+                                                    let cn = cn_or_empty(act);
+                                                    let name = act
+                                                        .parameters
+                                                        .as_ref()
+                                                        .and_then(|p| p.card_name.clone())
+                                                        .unwrap_or_default();
+                                                    let area = act
+                                                        .parameters
+                                                        .as_ref()
+                                                        .and_then(|p| p.stage_area.clone())
+                                                        .unwrap_or_default();
+                                                    let area_cost = act
+                                                        .parameters
+                                                        .as_ref()
+                                                        .and_then(|p| p.available_areas.as_ref())
+                                                        .and_then(|aa| {
+                                                            aa.iter()
+                                                                .find(|x| x.area == area)
+                                                                .map(|x| x.cost)
+                                                        })
+                                                        .or_else(|| {
+                                                            act.parameters
+                                                                .as_ref()
+                                                                .and_then(|p| p.base_cost)
+                                                        })
+                                                        .unwrap_or(0);
+                                                    if !cn.is_empty() {
                                                         format!(
-                                                            "[{}] {} {} c:{} {}",
-                                                            cn, name, area, cost, abil_short
+                                                            "[{}] {} {} c:{}",
+                                                            cn, name, area, area_cost
                                                         )
                                                     } else {
-                                                        format!(
-                                                            "[{}] {} {} {}",
-                                                            cn, name, area, abil_short
-                                                        )
-                                                    }
-                                                } else {
-                                                    if cost > 0 {
-                                                        format!(
-                                                            "{} {} c:{} {}",
-                                                            name, area, cost, abil_short
-                                                        )
-                                                    } else {
-                                                        format!("{} {} {}", name, area, abil_short)
+                                                        format!("{} {} c:{}", name, area, area_cost)
                                                     }
                                                 }
-                                            }
-                                            _ => {
-                                                let cn = cn_or_empty(act);
-                                                let name = act
-                                                    .parameters
-                                                    .as_ref()
-                                                    .and_then(|p| p.card_name.clone())
-                                                    .unwrap_or_default();
-                                                let desc = act
-                                                    .description
-                                                    .lines()
-                                                    .next()
-                                                    .unwrap_or("")
-                                                    .to_string();
-                                                // For ChoiceOption from SelectAutoAbility, show ability text
-                                                let ability_text = if act.action_type
-                                                    == game_setup::ActionType::ChoiceOption
-                                                {
-                                                    gs.get_pending_choice()
+                                                game_setup::ActionType::UseAbility => {
+                                                    let name = act
+                                                        .parameters
+                                                        .as_ref()
+                                                        .and_then(|p| p.card_name.clone())
+                                                        .unwrap_or_default();
+                                                    let cost = act
+                                                        .parameters
+                                                        .as_ref()
+                                                        .and_then(|p| p.final_cost.or(p.base_cost))
+                                                        .unwrap_or(0);
+                                                    let area = act
+                                                        .parameters
+                                                        .as_ref()
+                                                        .and_then(|p| p.stage_area.clone())
+                                                        .unwrap_or_default();
+                                                    let abil = act
+                                                        .parameters
+                                                        .as_ref()
+                                                        .and_then(|p| p.source_ability.clone())
+                                                        .unwrap_or_default();
+                                                    let abil_short: String =
+                                                        abil.chars().take(28).collect();
+                                                    let cn = cn_or_empty(act);
+                                                    if !cn.is_empty() {
+                                                        if cost > 0 {
+                                                            format!(
+                                                                "[{}] {} {} c:{} {}",
+                                                                cn, name, area, cost, abil_short
+                                                            )
+                                                        } else {
+                                                            format!(
+                                                                "[{}] {} {} {}",
+                                                                cn, name, area, abil_short
+                                                            )
+                                                        }
+                                                    } else {
+                                                        if cost > 0 {
+                                                            format!(
+                                                                "{} {} c:{} {}",
+                                                                name, area, cost, abil_short
+                                                            )
+                                                        } else {
+                                                            format!(
+                                                                "{} {} {}",
+                                                                name, area, abil_short
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                                _ => {
+                                                    let cn = cn_or_empty(act);
+                                                    let name = act
+                                                        .parameters
+                                                        .as_ref()
+                                                        .and_then(|p| p.card_name.clone())
+                                                        .unwrap_or_default();
+                                                    let desc = act
+                                                        .description
+                                                        .lines()
+                                                        .next()
+                                                        .unwrap_or("")
+                                                        .to_string();
+                                                    // For ChoiceOption from SelectAutoAbility, show ability text
+                                                    let ability_text = if act.action_type
+                                                        == game_setup::ActionType::ChoiceOption
+                                                    {
+                                                        gs.get_pending_choice()
                                                     .and_then(|c| {
                                                         use rabuka_engine::ability::types::Choice;
                                                         if let Choice::SelectAutoAbility {
@@ -3810,20 +3844,21 @@ fn main() {
                                                         }
                                                     })
                                                     .unwrap_or_default()
-                                                } else {
-                                                    String::new()
-                                                };
-                                                let display = if !ability_text.is_empty() {
-                                                    &ability_text
-                                                } else {
-                                                    &desc
-                                                };
-                                                if !cn.is_empty() && !name.is_empty() {
-                                                    format!("[{}] {} {}", cn, name, display)
-                                                } else if !cn.is_empty() {
-                                                    format!("[{}] {}", cn, display)
-                                                } else {
-                                                    display.to_string()
+                                                    } else {
+                                                        String::new()
+                                                    };
+                                                    let display = if !ability_text.is_empty() {
+                                                        &ability_text
+                                                    } else {
+                                                        &desc
+                                                    };
+                                                    if !cn.is_empty() && !name.is_empty() {
+                                                        format!("[{}] {} {}", cn, name, display)
+                                                    } else if !cn.is_empty() {
+                                                        format!("[{}] {}", cn, display)
+                                                    } else {
+                                                        display.to_string()
+                                                    }
                                                 }
                                             }
                                         };
@@ -3851,6 +3886,7 @@ fn main() {
                                             }
                                             ty += 20.0;
                                         }
+                                        prev_cn = cn_or_empty(act);
                                     }
                                     if end < n {
                                         unsafe {

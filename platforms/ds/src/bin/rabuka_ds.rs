@@ -45,6 +45,7 @@ const ALIGN: usize = 8;
 // Bump allocator: simple, fast, no free list to corrupt.
 // dealloc rewinds the bump pointer for LIFO-freed blocks (format! strings).
 struct DsAllocator {
+    start: UnsafeCell<usize>,
     ptr: UnsafeCell<usize>,
     end: UnsafeCell<usize>,
     oom_count: UnsafeCell<u32>,
@@ -59,6 +60,7 @@ unsafe impl Sync for DsAllocator {}
 impl DsAllocator {
     const fn new() -> Self {
         DsAllocator {
+            start: UnsafeCell::new(0),
             ptr: UnsafeCell::new(0),
             end: UnsafeCell::new(0),
             oom_count: UnsafeCell::new(0),
@@ -69,12 +71,22 @@ impl DsAllocator {
         unsafe { *self.oom_count.get() }
     }
 
+    fn used(&self) -> usize {
+        unsafe {
+            if *self.end.get() == 0 {
+                return 0;
+            }
+            *self.ptr.get() - *self.start.get()
+        }
+    }
+
     unsafe fn ensure_init(&self) {
         if *self.end.get() != 0 {
             return;
         }
         let start = &__heap_start_ntr as *const u8 as usize;
         let aligned = align_up(start, ALIGN);
+        *self.start.get() = aligned;
         *self.ptr.get() = aligned;
         *self.end.get() = HEAP_END;
     }
@@ -1195,7 +1207,8 @@ fn show_result(display: &mut Display, input: &mut Input, gs: &GameState) {
 
 fn display_heap_stats(display: &mut Display) {
     let oom = ALLOCATOR.oom();
-    display.println(&alloc::format!("oom:{}", oom));
+    let used = ALLOCATOR.used();
+    display.println(&alloc::format!("oom:{} used:{}KB", oom, used / 1024));
 }
 
 fn init_rng() {
