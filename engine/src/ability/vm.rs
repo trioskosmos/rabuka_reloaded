@@ -6,6 +6,21 @@ use crate::core::types::ArcStr;
 #[cfg(feature = "no_std")]
 use alloc::{boxed::Box, string::String, string::ToString, vec::Vec};
 
+// DS debug screen print
+#[cfg(feature = "ds_debug")]
+extern "C" {
+    fn nds_println(text: *const u8);
+}
+#[cfg(feature = "ds_debug")]
+fn ds_print(s: &str) {
+    use alloc::string::ToString;
+    let mut msg = s.to_string();
+    msg.push('\0');
+    unsafe {
+        nds_println(msg.as_ptr());
+    }
+}
+
 const TAG_NULL: u8 = 0x00;
 const TAG_FALSE: u8 = 0x01;
 const TAG_TRUE: u8 = 0x02;
@@ -45,6 +60,21 @@ pub fn get_ability(idx: usize) -> Option<Ability> {
         return Some(Ability::default());
     }
     let slice = &BYTECODE[start..end];
+    #[cfg(feature = "ds_debug")]
+    {
+        extern "C" {
+            fn nds_println(t: *const u8);
+        }
+        let mut m = alloc::string::String::new();
+        m.push_str("IDX:");
+        m.push_str(&alloc::string::ToString::to_string(&idx));
+        m.push_str(" sz:");
+        m.push_str(&alloc::string::ToString::to_string(&(end - start)));
+        m.push('\0');
+        unsafe {
+            nds_println(m.as_ptr());
+        }
+    }
     let mut bc = BcReader::new(slice);
     decode_ability(&mut bc).or_else(|| {
         log::error!(
@@ -243,6 +273,8 @@ fn decode_ability(bc: &mut BcReader) -> Option<Ability> {
         return None;
     }
     let count = bc.u32()? as usize;
+    #[cfg(feature = "ds_debug")]
+    ds_print(&alloc::format!("DA:c={}", count));
 
     let mut full_text = String::new();
     let mut triggerless_text: Option<String> = None;
@@ -253,11 +285,19 @@ fn decode_ability(bc: &mut BcReader) -> Option<Ability> {
     let mut effect: Option<Box<AbilityEffect>> = None;
     let mut keywords: Option<Vec<crate::card::Keyword>> = None;
 
-    for _ in 0..count {
+    #[cfg(feature = "ds_debug")]
+    ds_print("DA:LOOP");
+    for i in 0..count {
+        #[cfg(feature = "ds_debug")]
+        if i % 10 == 0 {
+            ds_print(&alloc::format!("DA:i={}", i));
+        }
         let key = bc.key()?;
         match key {
             "full_text" => {
                 full_text = bc.read_string_value()?;
+                #[cfg(feature = "ds_debug")]
+                ds_print("DA:ft");
             }
             "triggerless_text" => {
                 triggerless_text = bc.read_string_value();
@@ -273,9 +313,13 @@ fn decode_ability(bc: &mut BcReader) -> Option<Ability> {
             }
             "cost" => {
                 cost = decode_ability_cost(bc)?;
+                #[cfg(feature = "ds_debug")]
+                ds_print("DA:cost");
             }
             "effect" => {
                 effect = decode_ability_effect(bc)?.map(Box::new);
+                #[cfg(feature = "ds_debug")]
+                ds_print("DA:eff");
             }
             "keywords" => {
                 keywords = decode_keywords(bc)?;
@@ -285,6 +329,8 @@ fn decode_ability(bc: &mut BcReader) -> Option<Ability> {
             }
         }
     }
+    #[cfg(feature = "ds_debug")]
+    ds_print("DA:OK");
 
     Some(Ability {
         full_text,

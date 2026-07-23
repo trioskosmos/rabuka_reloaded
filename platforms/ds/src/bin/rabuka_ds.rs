@@ -44,15 +44,12 @@ const HEAP_END: usize = 0x0240_0000;
 const ALIGN: usize = 8;
 const MIN_BLOCK: usize = 8;
 
-#[repr(C, align(8))]
-struct FreeNode {
-    next: *mut FreeNode,
-    size: usize,
-}
-
+// Simple bump allocator: alloc from heap_start, dealloc is no-op.
+// Heap reset between turns discards all temporary allocations.
 struct DsAllocator {
-    head: UnsafeCell<*mut FreeNode>,
-    init_done: UnsafeCell<bool>,
+    ptr: UnsafeCell<usize>,
+    end: UnsafeCell<usize>,
+    watermark: UnsafeCell<usize>, // highest ptr so alloc from setup persists
     oom_count: UnsafeCell<u32>,
 }
 
@@ -61,8 +58,9 @@ unsafe impl Sync for DsAllocator {}
 impl DsAllocator {
     const fn new() -> Self {
         DsAllocator {
-            head: UnsafeCell::new(ptr::null_mut()),
-            init_done: UnsafeCell::new(false),
+            ptr: UnsafeCell::new(0),
+            end: UnsafeCell::new(0),
+            watermark: UnsafeCell::new(0),
             oom_count: UnsafeCell::new(0),
         }
     }
@@ -71,24 +69,28 @@ impl DsAllocator {
         unsafe { *self.oom_count.get() }
     }
 
-    unsafe fn alloc_size(layout: &Layout) -> usize {
-        align_up(layout.size(), ALIGN).max(MIN_BLOCK)
+    /// Record current bump position as the watermark. Allocations done
+    /// before this call are "permanent" and won't be lost on reset.
+    unsafe fn set_watermark(&self) {
+        *self.watermark.get() = *self.ptr.get();
+    }
+
+    /// Reset the bump pointer to the watermark, discarding all temporary
+    /// allocations made after the last set_watermark().
+    unsafe fn reset(&self) {
+        *self.ptr.get() = *self.watermark.get();
     }
 
     unsafe fn ensure_init(&self) {
-        if *self.init_done.get() {
+        if *self.end.get() != 0 {
             return;
         }
         let start = &__heap_start_ntr as *const u8 as usize;
         let aligned = align_up(start, ALIGN);
-        let total = HEAP_END.saturating_sub(aligned);
-        if total >= MIN_BLOCK {
-            let node = aligned as *mut FreeNode;
-            (*node).next = ptr::null_mut();
-            (*node).size = total;
-            *self.head.get() = node;
-        }
-        *self.init_done.get() = true;
+        *self.ptr.get() = aligned;
+        *self.end.get() = HEAP_END;
+        // Initial watermark: everything before game setup is permanent
+        *self.watermark.get() = aligned;
     }
 }
 
@@ -99,104 +101,37 @@ fn align_up(x: usize, a: usize) -> usize {
 unsafe impl GlobalAlloc for DsAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         self.ensure_init();
-        let alloc_size = Self::alloc_size(&layout);
-        let head = self.head.get();
-        let mut node = *head;
-        let mut prev: *mut FreeNode = ptr::null_mut();
-        let mut walk_guard = 0usize;
-        while !node.is_null() {
-            walk_guard += 1;
-            if walk_guard > 1000000 {
-                // Free list likely has a cycle — abort
-                break;
-            }
-            let block_size = (*node).size;
-            if block_size >= alloc_size {
-                let remaining = block_size - alloc_size;
-                if remaining >= MIN_BLOCK {
-                    let new_node = (node as usize + alloc_size) as *mut FreeNode;
-                    (*new_node).next = (*node).next;
-                    (*new_node).size = remaining;
-                    if prev.is_null() {
-                        *head = new_node;
-                    } else {
-                        (*prev).next = new_node;
-                    }
-                } else {
-                    if prev.is_null() {
-                        *head = (*node).next;
-                    } else {
-                        (*prev).next = (*node).next;
-                    }
-                }
-                return node as *mut u8;
-            }
-            prev = node;
-            node = (*node).next;
+        let size = align_up(layout.size(), ALIGN).max(ALIGN);
+        let p = *self.ptr.get();
+        let next_p = p + size;
+        if next_p > *self.end.get() {
+            *self.oom_count.get() += 1;
+            return ptr::null_mut();
         }
-        *self.oom_count.get() += 1;
-        ptr::null_mut()
+        *self.ptr.get() = next_p;
+        p as *mut u8
     }
 
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        if ptr.is_null() {
-            return;
-        }
-        let size = Self::alloc_size(&layout);
-        let node = ptr as *mut FreeNode;
-        (*node).next = ptr::null_mut();
-        (*node).size = size;
-        let head = self.head.get();
-        let mut prev: *mut FreeNode = ptr::null_mut();
-        let mut curr = *head;
-        while !curr.is_null() && curr < node {
-            if (curr as usize) + (*curr).size == node as usize {
-                (*curr).size += size;
-                let next = (*curr).next;
-                if !next.is_null() && (curr as usize) + (*curr).size == next as usize {
-                    (*curr).size += (*next).size;
-                    (*curr).next = (*next).next;
-                }
-                return;
-            }
-            prev = curr;
-            curr = (*curr).next;
-        }
-        if !curr.is_null() && (node as usize) + size == curr as usize {
-            (*node).size += (*curr).size;
-            (*node).next = (*curr).next;
-        } else {
-            (*node).next = curr;
-        }
-        if !prev.is_null() && (prev as usize) + (*prev).size == node as usize {
-            (*prev).size += (*node).size;
-            (*prev).next = (*node).next;
-        } else {
-            if prev.is_null() {
-                *head = node;
-            } else {
-                (*prev).next = node;
-            }
-        }
+    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
+        // No-op: bump allocator never frees individual allocations.
     }
 
     unsafe fn realloc(&self, ptr: *mut u8, old_layout: Layout, new_size: usize) -> *mut u8 {
-        if ptr.is_null() {
-            return self.alloc(Layout::from_size_align_unchecked(
-                new_size,
-                old_layout.align(),
-            ));
-        }
-        let old_alloc = Self::alloc_size(&old_layout);
-        let new_alloc = align_up(new_size, ALIGN).max(MIN_BLOCK);
-        if new_alloc <= old_alloc {
+        let old_size = align_up(old_layout.size(), ALIGN).max(ALIGN);
+        let new_alloc = align_up(new_size, ALIGN).max(ALIGN);
+        if new_alloc <= old_size {
             return ptr;
         }
+        // Check if the current bump pointer is right after ptr (we can extend in place)
+        if (ptr as usize) + old_size == *self.ptr.get() {
+            *self.ptr.get() = (ptr as usize) + new_alloc;
+            return ptr;
+        }
+        // Otherwise allocate new, copy, discard old
         let new_layout = Layout::from_size_align_unchecked(new_size, old_layout.align());
         let new_ptr = self.alloc(new_layout);
         if !new_ptr.is_null() {
-            ptr::copy_nonoverlapping(ptr, new_ptr, old_alloc);
-            self.dealloc(ptr, old_layout);
+            ptr::copy_nonoverlapping(ptr, new_ptr, old_size);
         }
         new_ptr
     }
@@ -204,7 +139,7 @@ unsafe impl GlobalAlloc for DsAllocator {
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
         let ptr = self.alloc(layout);
         if !ptr.is_null() {
-            let sz = Self::alloc_size(&layout);
+            let sz = align_up(layout.size(), ALIGN).max(ALIGN);
             ptr::write_bytes(ptr, 0, sz);
         }
         ptr
@@ -559,6 +494,9 @@ pub extern "C" fn main() {
 
     let cards: Vec<Card> = card_map.into_values().collect();
     let mut db = Arc::new(CardDatabase::load_or_create(cards));
+    unsafe {
+        ALLOCATOR.set_watermark();
+    }
     display.println(&format!("db ok"));
     display.swap_buffers();
 
@@ -590,7 +528,15 @@ pub extern "C" fn main() {
     display.swap_buffers();
 
     let mut frame_count = 0u32;
+    let mut last_turn = 0u32;
     loop {
+        // Reset bump allocator at turn boundaries to reclaim temporary memory
+        if gs.turn_number != last_turn {
+            unsafe {
+                ALLOCATOR.reset();
+            }
+            last_turn = gs.turn_number;
+        }
         TurnEngine::check_victory_condition(&mut gs);
         if gs.game_result != GameResult::Ongoing {
             show_result(&mut display, &mut input, &gs);
@@ -663,6 +609,31 @@ pub extern "C" fn main() {
                 display.println(&alloc::format!(
                     "bt:{:?}",
                     p.as_ref().and_then(|x| x.use_baton_touch)
+                ));
+                display.println(&alloc::format!(
+                    "step:{}",
+                    rabuka_engine::turn::phases::HANDLE_PLAY_STEP
+                        .load(core::sync::atomic::Ordering::Relaxed)
+                ));
+                display.swap_buffers();
+                let _ = TurnEngine::execute_main_phase_action(
+                    &mut gs,
+                    &actions[idx].action_type,
+                    p.as_ref().and_then(|x| x.card_id),
+                    p.as_ref().and_then(|x| x.card_indices.clone()),
+                    p.as_ref()
+                        .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
+                    p.as_ref().and_then(|x| x.use_baton_touch),
+                );
+                display.clear();
+                display.println(">>> AFTER PLAY_MEMBER <<<");
+                let pc = gs.has_pending_choice();
+                display.println(&alloc::format!("pc:{} oom:{}", pc, ALLOCATOR.oom()));
+                display.println(&alloc::format!("P:{:?}", gs.current_phase));
+                display.println(&alloc::format!(
+                    "step:{}",
+                    rabuka_engine::turn::phases::HANDLE_PLAY_STEP
+                        .load(core::sync::atomic::Ordering::Relaxed)
                 ));
                 display.swap_buffers();
                 let _ = TurnEngine::execute_main_phase_action(
@@ -762,14 +733,43 @@ pub extern "C" fn main() {
             && gs.player2_rps_choice.is_none()
         {
             let ai_actions = game_setup::generate_possible_actions(&gs);
-            // Pin P2's RPS choice so it never ties (P2 always wins)
-            let idx = match gs.player1_rps_choice {
-                Some(0) => 1, // Rock → Paper (index 1 beats index 0)
-                Some(1) => 2, // Paper → Scissors (2 beats 1)
-                _ => 0,       // Scissors/other → Rock (0 beats 2)
+            // P2 always picks the winning move — no ties possible
+            let rps_idx: usize = match gs.player1_rps_choice {
+                Some(0) => 1, // P1 Rock → P2 Paper (beats Rock)
+                Some(1) => 2, // P1 Paper → P2 Scissors (beats Paper)
+                _ => 0,       // P1 Scissors → P2 Rock (beats Scissors)
             };
-            if idx < ai_actions.len() {
-                let _ = execute_action(&mut gs, &ai_actions[idx]);
+            if rps_idx < ai_actions.len() {
+                let act = ai_actions[rps_idx].clone();
+                let p = act.parameters.clone();
+                let _ = TurnEngine::execute_main_phase_action(
+                    &mut gs,
+                    &act.action_type,
+                    p.as_ref().and_then(|x| x.card_id),
+                    p.as_ref().and_then(|x| x.card_indices.clone()),
+                    p.as_ref()
+                        .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
+                    p.as_ref().and_then(|x| x.use_baton_touch),
+                );
+                gs.reset_loop_detection();
+            }
+            if ai_vs_ai {
+                display.clear();
+                display.println(&alloc::format!(
+                    "P2 act={} ph={:?}",
+                    rps_idx,
+                    gs.current_phase
+                ));
+                display.println(&alloc::format!(
+                    "p1:{:?} p2:{:?} w:{:?}",
+                    gs.player1_rps_choice,
+                    gs.player2_rps_choice,
+                    gs.rps_winner
+                ));
+                display.swap_buffers();
+            }
+            if gs.current_phase == Phase::RockPaperScissors {
+                panic!("RPS STUCK");
             }
         }
 

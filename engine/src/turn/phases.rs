@@ -12,7 +12,28 @@ extern "C" {
     fn _3ds_tdbg(msg: *const u8);
 }
 
-#[cfg(feature = "3ds")]
+/// Debug trace step counter — incremented at key points in handle_play_member_to_stage.
+/// The DS reads this via C FFI to determine where it hangs.
+#[cfg(feature = "ds_debug")]
+#[no_mangle]
+pub static HANDLE_PLAY_STEP: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+
+/// Direct screen print for DS debug. Uses the C shim's nds_println.
+#[cfg(feature = "ds_debug")]
+extern "C" {
+    fn nds_println(text: *const u8);
+}
+
+#[cfg(feature = "ds_debug")]
+fn ds_print(s: &str) {
+    // Append null terminator and call C function
+    let mut msg = alloc::string::String::from(s);
+    msg.push('\0');
+    unsafe {
+        nds_println(msg.as_ptr());
+    }
+}
+
 macro_rules! tdbg {
     ($($arg:tt)*) => {{
         let msg = format!($($arg)*);
@@ -831,6 +852,20 @@ impl super::TurnEngine {
 
         let card_db = game_state.card_database.clone();
 
+        // DS debug: step 1 = entered function
+        #[cfg(feature = "ds_debug")]
+        {
+            HANDLE_PLAY_STEP.store(1, core::sync::atomic::Ordering::Relaxed);
+            ds_print("HPM:1");
+        }
+
+        // DS debug: step 2 = before cost/move
+        #[cfg(feature = "ds_debug")]
+        {
+            HANDLE_PLAY_STEP.store(2, core::sync::atomic::Ordering::Relaxed);
+            ds_print("HPM:2");
+        }
+
         // Recalculate constant cost modifiers (hand-based cost reductions, etc.)
         // BEFORE paying cost, so the modifiers are in effect.
         tdbg!("PHASE_EXEC:0 recalc");
@@ -1104,6 +1139,11 @@ impl super::TurnEngine {
         // Track area move for movement_condition "moves"
         log::debug!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
 
+        #[cfg(feature = "ds_debug")]
+        {
+            HANDLE_PLAY_STEP.store(3, core::sync::atomic::Ordering::Relaxed);
+            ds_print("HPM:3");
+        }
         Self::trigger_debut_abilities(
             game_state,
             &player_id,
@@ -1111,6 +1151,11 @@ impl super::TurnEngine {
             cost_paid,
             baton_touch_used,
         );
+        #[cfg(feature = "ds_debug")]
+        {
+            HANDLE_PLAY_STEP.store(4, core::sync::atomic::Ordering::Relaxed);
+            ds_print("HPM:4");
+        }
         Self::trigger_auto_abilities_for_player(game_state, &player_id);
         let sb_opponent_id = if player_id == game_state.player1.id {
             game_state.player2.id.clone()
@@ -1121,6 +1166,11 @@ impl super::TurnEngine {
         // Process ALL queued abilities now: movement-triggered (baton_touch, etc.)
         // are ahead of appearance-triggered in the queue, so they resolve first.
         game_state.process_pending_auto_abilities(&player_id);
+        #[cfg(feature = "ds_debug")]
+        {
+            HANDLE_PLAY_STEP.store(5, core::sync::atomic::Ordering::Relaxed);
+            ds_print("HPM:5");
+        }
         tdbg!("PHASE_AUTO2:0 recalc");
         game_state.mark_constants_dirty();
         game_state.recalculate_constants();
@@ -1177,6 +1227,13 @@ impl super::TurnEngine {
         // inside trigger_auto_abilities_for_player_with_event.
         if replaced_member_id.is_some() {
             game_state.process_pending_auto_abilities(&player_id);
+        }
+
+        // DS debug: step 6 = success, about to return
+        #[cfg(feature = "ds_debug")]
+        {
+            HANDLE_PLAY_STEP.store(6, core::sync::atomic::Ordering::Relaxed);
+            ds_print("HPM:6");
         }
 
         Ok(())

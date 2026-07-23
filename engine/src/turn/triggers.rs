@@ -7,6 +7,19 @@ use alloc::{
     vec::Vec,
 };
 
+#[cfg(feature = "ds_debug")]
+extern "C" {
+    fn nds_println(text: *const u8);
+}
+#[cfg(feature = "ds_debug")]
+fn ds_print(s: &str) {
+    let mut msg = alloc::string::String::from(s);
+    msg.push('\0');
+    unsafe {
+        nds_println(msg.as_ptr());
+    }
+}
+
 impl super::TurnEngine {
     pub(crate) fn trigger_debut_abilities(
         game_state: &mut GameState,
@@ -65,8 +78,14 @@ impl super::TurnEngine {
                             card_no_clone
                         );
                         if card.card_no.as_ref() == card_no_clone {
+                            #[cfg(feature = "ds_debug")]
+                            ds_print("TD:FOUND");
                             for (ability_index, ar) in card.abilities.iter().enumerate() {
+                                #[cfg(feature = "ds_debug")]
+                                ds_print("TD:RESOLVE");
                                 let ability = ar.resolve();
+                                #[cfg(feature = "ds_debug")]
+                                ds_print("TD:DONE");
                                 let trigger_match = ability.triggers.as_ref().is_some_and(|t| {
                                     t.contains(crate::triggers::DEBUT)
                                         || t.contains(crate::triggers::DEBUT_EN)
@@ -130,6 +149,8 @@ impl super::TurnEngine {
                                         card_no_clone.clone(),
                                         card_id,
                                     ));
+                                    #[cfg(feature = "ds_debug")]
+                                    ds_print("TD:PUSH");
                                 }
                             }
                             break;
@@ -139,8 +160,12 @@ impl super::TurnEngine {
             }
         }
 
+        #[cfg(feature = "ds_debug")]
+        ds_print("TD:TRIG");
         let moved_snapshot = game_state.recently_moved_cards.clone();
         for (ability_id, card_no, stage_card_id) in abilities_to_trigger {
+            #[cfg(feature = "ds_debug")]
+            ds_print("TD:CALL");
             game_state.trigger_auto_ability(
                 ability_id,
                 AbilityTrigger::Debut,
@@ -150,7 +175,11 @@ impl super::TurnEngine {
                 moved_snapshot.clone(),
                 None,
             );
+            #[cfg(feature = "ds_debug")]
+            ds_print("TD:CALLDONE");
         }
+        #[cfg(feature = "ds_debug")]
+        ds_print("TD:DONE");
     }
 
     /// Count how many stage members have an ability with a trigger containing the given substring.

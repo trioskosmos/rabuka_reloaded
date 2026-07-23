@@ -20,6 +20,19 @@ fn _prohibition_destination_blocks(prohibition: &str, zone: &str) -> bool {
         || (dest_zone == Some(Zone::SuccessLiveZone) && target_zone == Some(Zone::LiveCardZone))
 }
 
+#[cfg(feature = "ds_debug")]
+extern "C" {
+    fn nds_println(text: *const u8);
+}
+#[cfg(feature = "ds_debug")]
+fn ds_print(s: &str) {
+    let mut msg = alloc::string::String::from(s);
+    msg.push('\0');
+    unsafe {
+        nds_println(msg.as_ptr());
+    }
+}
+
 impl GameState {
     fn stage_card_ids(&self) -> impl Iterator<Item = i16> + '_ {
         self.player1
@@ -674,18 +687,30 @@ impl GameState {
         trigger_moved_cards: Option<Vec<i16>>,
         triggering_member_id: Option<i16>,
     ) {
+        #[cfg(feature = "ds_debug")]
+        ds_print(&alloc::format!("TAA:cid={:?}", source_card_id));
         if let Some(ref card_no) = source_card_id {
+            #[cfg(feature = "ds_debug")]
+            ds_print("TAA:GET");
             let (card, card_id) = if let Some(cid) = explicit_card_id {
+                #[cfg(feature = "ds_debug")]
+                ds_print("TAA:DBGET");
                 (self.card_database.get_card(cid).cloned(), Some(cid))
             } else {
                 self.find_card_by_number_for_player(card_no, &player_id)
             };
+            #[cfg(feature = "ds_debug")]
+            ds_print("TAA:GOT");
             if let Some(card) = card {
+                #[cfg(feature = "ds_debug")]
+                ds_print("TAA:ITER");
                 // Check original abilities
                 let expected_id = |ability: &crate::card::Ability| -> String {
                     format!("{}_{}", card_no, ability.full_text)
                 };
                 for (ability_index, ability) in card.abilities.iter().enumerate() {
+                    #[cfg(feature = "ds_debug")]
+                    ds_print("TAA:RES");
                     if Self::ability_matches_trigger(&ability.resolve(), &trigger_type)
                         && ability_id == expected_id(&ability.resolve())
                     {

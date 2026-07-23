@@ -27,6 +27,19 @@ impl AbilityRef {
     /// Unlike the old Deref-based lazy cache, this decodes fresh each time
     /// and the caller drops the Arc when done — no memory leak.
     pub fn resolve(&self) -> Arc<Ability> {
+        #[cfg(feature = "ds_debug")]
+        {
+            extern "C" {
+                fn nds_println(text: *const u8);
+            }
+            let mut msg = alloc::string::String::new();
+            msg.push_str("ARES:");
+            msg.push_str(&alloc::string::ToString::to_string(&self.0));
+            msg.push('\0');
+            unsafe {
+                nds_println(msg.as_ptr());
+            }
+        }
         Arc::new(crate::ability::vm::get_ability(self.0 as usize).unwrap_or_default())
     }
 

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rabuka_engine = { path = "../../engine", default-features = false, features = ["ds"] }
+rabuka_engine = { path = "../../engine", default-features = false, features = ["ds", "ds_debug"] }
 hashbrown = { version = "0.14", default-features = false }
 log = { version = "0.4", default-features = false }
 
