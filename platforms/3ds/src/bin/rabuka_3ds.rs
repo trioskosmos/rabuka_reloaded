@@ -3080,8 +3080,8 @@ fn main() {
                                     _3ds_top_queue_text(
                                         4.0,
                                         44.0,
-                                        COL_PINK,
-                                        0.70f32,
+                                        COL_LIGHT,
+                                        0.65f32,
                                         format!("[{}] {}\0", entry.card_no, ab_lines[0]).as_ptr(),
                                     );
                                     for (li, line) in ab_lines.iter().enumerate().skip(1) {
@@ -3089,7 +3089,7 @@ fn main() {
                                             8.0,
                                             44.0 + li as f32 * 16.0,
                                             COL_LIGHT,
-                                            0.60f32,
+                                            0.65f32,
                                             format!("{}\0", line).as_ptr(),
                                         );
                                     }
