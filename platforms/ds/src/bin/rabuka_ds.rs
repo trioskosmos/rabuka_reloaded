@@ -756,14 +756,19 @@ pub extern "C" fn main() {
             wait_frames(8);
         }
 
-        // After human picks in RPS, let AI pick for P2
+        // AI auto-pick for P2 in RPS: always pick the winning response
         if gs.current_phase == Phase::RockPaperScissors
             && gs.player1_rps_choice.is_some()
             && gs.player2_rps_choice.is_none()
         {
             let ai_actions = game_setup::generate_possible_actions(&gs);
-            if !ai_actions.is_empty() {
-                let idx = rng::rand_range(ai_actions.len());
+            // Pin P2's RPS choice so it never ties (P2 always wins)
+            let idx = match gs.player1_rps_choice {
+                Some(0) => 1, // Rock → Paper (index 1 beats index 0)
+                Some(1) => 2, // Paper → Scissors (2 beats 1)
+                _ => 0,       // Scissors/other → Rock (0 beats 2)
+            };
+            if idx < ai_actions.len() {
                 let _ = execute_action(&mut gs, &ai_actions[idx]);
             }
         }
