@@ -1734,8 +1734,29 @@ fn main() {
                 let mut display_pos = display_order.iter().position(|&fi| fi == cur).unwrap_or(0);
 
                 // Input handling
-                if detail_mode {
-                    // In detail mode: DPAD scrolls text
+                if detail_mode && viewing_card.is_some() {
+                    // Detail+card: DPAD navigates the filtered action list
+                    let n = display_order.len();
+                    if keys & 0x00000040 != 0 && n > 0 {
+                        display_pos = if display_pos > 0 {
+                            display_pos - 1
+                        } else {
+                            n - 1
+                        };
+                        cur = display_order[display_pos];
+                        redraw = true;
+                    }
+                    if keys & 0x00000080 != 0 && n > 0 {
+                        display_pos = if display_pos + 1 < n {
+                            display_pos + 1
+                        } else {
+                            0
+                        };
+                        cur = display_order[display_pos];
+                        redraw = true;
+                    }
+                } else if detail_mode {
+                    // Detail alone (no specific card): DPAD scrolls text
                     if keys & 0x00000040 != 0 {
                         let sy = unsafe { _3ds_text_get_scroll_y() };
                         unsafe {
@@ -1749,46 +1770,80 @@ fn main() {
                         }
                     }
                 } else {
-                    // Navigate in display space
-                    if keys & 0x00000040 != 0 && display_pos > 0 {
-                        display_pos -= 1;
-                        cur = display_order[display_pos];
-                        redraw = true;
-                    } else if keys & 0x00000080 != 0 && display_pos + 1 < display_order.len() {
-                        display_pos += 1;
-                        cur = display_order[display_pos];
-                        redraw = true;
+                    // Navigate in display space with wrap-around
+                    let n = display_order.len();
+                    if n > 0 {
+                        if keys & 0x00000040 != 0 {
+                            display_pos = if display_pos > 0 {
+                                display_pos - 1
+                            } else {
+                                n - 1
+                            };
+                            cur = display_order[display_pos];
+                            redraw = true;
+                        }
+                        if keys & 0x00000080 != 0 {
+                            display_pos = if display_pos + 1 < n {
+                                display_pos + 1
+                            } else {
+                                0
+                            };
+                            cur = display_order[display_pos];
+                            redraw = true;
+                        }
                     }
                 }
 
-                // Image mode grid navigation (LEFT/RIGHT/UP/DOWN)
+                // Image mode: grid navigation with wrap-around
                 let img_cols = ((400.0 - 8.0) / (80.0 + 4.0)) as usize;
                 let is_img_choice = choice_image_mode && gs.has_pending_choice();
                 if is_img_choice {
-                    if keys & 0x00000040 != 0 {
-                        let n = display_order.len();
-                        if display_pos >= img_cols {
-                            display_pos -= img_cols;
+                    let n = display_order.len();
+                    if n > 0 {
+                        if keys & 0x00000040 != 0 {
+                            display_pos = if display_pos >= img_cols {
+                                display_pos - img_cols
+                            } else {
+                                n - 1
+                            };
+                            cur = display_order[display_pos];
+                            redraw = true;
                         }
-                        cur = display_order[display_pos];
-                        redraw = true;
-                    }
-                    if keys & 0x00000080 != 0 {
-                        let n = display_order.len();
-                        if display_pos + img_cols < n {
-                            display_pos += img_cols;
+                        if keys & 0x00000080 != 0 {
+                            display_pos = if display_pos + img_cols < n {
+                                display_pos + img_cols
+                            } else {
+                                0
+                            };
+                            cur = display_order[display_pos];
+                            redraw = true;
                         }
-                        cur = display_order[display_pos];
-                        redraw = true;
+                        if keys & 0x00000020 != 0 {
+                            display_pos = if display_pos > 0 {
+                                display_pos - 1
+                            } else {
+                                n - 1
+                            };
+                            cur = display_order[display_pos];
+                            redraw = true;
+                        }
+                        if keys & 0x00000010 != 0 {
+                            display_pos = if display_pos + 1 < n {
+                                display_pos + 1
+                            } else {
+                                0
+                            };
+                            cur = display_order[display_pos];
+                            redraw = true;
+                        }
                     }
-                    if keys & 0x00000020 != 0 && display_pos > 0 {
-                        display_pos -= 1;
-                        cur = display_order[display_pos];
-                        redraw = true;
-                    }
-                    if keys & 0x00000010 != 0 && display_pos + 1 < display_order.len() {
-                        display_pos += 1;
-                        cur = display_order[display_pos];
+                }
+
+                // B dismisses viewing_card / detail_mode
+                if keys & 0x00000002 != 0 {
+                    if viewing_card.is_some() {
+                        viewing_card = None;
+                        detail_mode = false;
                         redraw = true;
                     }
                 }
