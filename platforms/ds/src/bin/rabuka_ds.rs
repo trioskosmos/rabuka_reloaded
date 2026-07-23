@@ -476,8 +476,31 @@ pub extern "C" fn main() {
             if is_current_player_ai {
                 // AI: auto-pick first option on pending choices
                 TurnEngine::resume_with_choice(&mut gs, Some(0), None).ok();
-            } else if !handle_choice(&mut display, &mut input, &mut gs) {
-                break;
+            } else {
+                // Auto-resolve SelectAutoAbility when only one option exists
+                // (no meaningful user choice to make). This avoids stalling the
+                // game loop waiting for input when the engine has already determined
+                // the only valid ability order.
+                use rabuka_engine::ability::types::Choice;
+                let auto_resolved = if let Some(c) = gs.get_pending_choice() {
+                    if let Choice::SelectAutoAbility { ref options, .. } = c.clone() {
+                        if options.len() <= 1 {
+                            TurnEngine::resume_with_choice(&mut gs, Some(0), None).ok();
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+                if !auto_resolved {
+                    if !handle_choice(&mut display, &mut input, &mut gs) {
+                        break;
+                    }
+                }
             }
             continue;
         }
@@ -531,10 +554,7 @@ pub extern "C" fn main() {
             }
             gs.reset_loop_detection();
             frame_count += 1;
-            // Settle auto phases (matching 3DS settle_3ds: check pending choice before each)
-            if !gs.has_pending_choice()
-                && gs.game_result == GameResult::Ongoing
-                && game_setup::is_automatic_phase(&gs)
+            // Settle auto phases — yield VBlank every 8 iters to prevent DS stall
             {
                 let mut sa = 0u32;
                 while gs.game_result == GameResult::Ongoing
@@ -542,8 +562,11 @@ pub extern "C" fn main() {
                     && game_setup::is_automatic_phase(&gs)
                     && sa < 500
                 {
-                    TurnEngine::advance_phase(&mut gs);
                     sa += 1;
+                    if sa % 8 == 0 {
+                        unsafe { nds_wait_vblank() };
+                    }
+                    TurnEngine::advance_phase(&mut gs);
                 }
             }
             if ai_vs_ai {
@@ -1113,7 +1136,17 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
 }
 
 fn settle_auto(gs: &mut GameState) {
-    for _ in 0..500 {
+    let mut iters = 0u32;
+    loop {
+        iters += 1;
+        // Yield VBlank every 8 iterations so the DS hardware timer/DMA
+        // doesn't stall. Same principle as aptMainLoop() in settle_3ds.
+        if iters % 8 == 0 {
+            unsafe { nds_wait_vblank() };
+        }
+        if iters > 500 {
+            break;
+        }
         if gs.has_pending_choice() || gs.game_result != GameResult::Ongoing {
             break;
         }

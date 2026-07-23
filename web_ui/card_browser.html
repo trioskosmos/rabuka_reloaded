@@ -165,24 +165,32 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
 
 <script src="js/qrcode.min.js"></script>
 <script>
+(function(){ var e = document.getElementById('result-count'); if(e) e.textContent = '✓ script loaded at ' + new Date().toLocaleTimeString(); })();
 // ── i18n ──
 let cbLang = localStorage.getItem('card_browser_lang') || 'en';
 async function loadCbLang(lang) {
   cbLang = lang;
   localStorage.setItem('card_browser_lang', lang);
-  const mod = await import('./js/i18n/translator.js');
-  await mod.loadTranslations(lang);
-  const ui = mod.getCurrentTranslations()?.ui || {};
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.getAttribute('data-i18n');
-    if (ui[key]) el.textContent = ui[key];
-  });
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-    const key = el.getAttribute('data-i18n-placeholder');
-    if (ui[key]) el.placeholder = ui[key];
-  });
-  const btn = document.getElementById('lang-btn-cb');
-  if (btn) btn.textContent = lang === 'jp' ? 'English' : '日本語';
+  try {
+    const mod = await import('./js/i18n/translator.js');
+    await mod.loadTranslations(lang);
+    const ui = mod.getCurrentTranslations()?.ui || {};
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      if (ui[key]) el.textContent = ui[key];
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      const key = el.getAttribute('data-i18n-placeholder');
+      if (ui[key]) el.placeholder = ui[key];
+    });
+    const btn = document.getElementById('lang-btn-cb');
+    if (btn) btn.textContent = lang === 'jp' ? 'English' : '日本語';
+    var e = document.getElementById('result-count');
+    if (e) e.textContent += ' | i18n OK';
+  } catch (err) {
+    var e = document.getElementById('result-count');
+    if (e) e.textContent += ' | i18n FAIL: ' + err.message;
+  }
 }
 document.getElementById('lang-btn-cb')?.addEventListener('click', () => loadCbLang(cbLang === 'jp' ? 'en' : 'jp'));
 
@@ -1098,19 +1106,32 @@ function showQR() {
 
 // Load i18n then init
 (async () => {
+  var _s = function(msg){ var e = document.getElementById('result-count'); if(e) e.textContent += ' | ' + msg; };
+  _s('IIFE start');
   try {
     await loadCbLang(cbLang);
   } catch (e) {
-    console.warn('loadCbLang failed, continuing:', e);
+    _s('loadCbLang ERR: ' + e.message);
   }
   try {
     const mod = await import('./js/i18n/translator.js');
     window._cbUi = mod.getCurrentTranslations()?.ui || {};
+    _s('import OK');
   } catch (e) {
-    console.warn('translator import failed, continuing:', e);
+    _s('import FAIL: ' + e.message);
   }
-  try { await init(); } catch (e) { console.error('init failed:', e); }
-  try { initDeckCreator(); } catch (e) { console.error('initDeckCreator failed:', e); }
+  try {
+    await init();
+    _s('init OK');
+  } catch (e) {
+    _s('init FAIL: ' + e.message);
+  }
+  try {
+    initDeckCreator();
+    _s('deckCreator OK');
+  } catch (e) {
+    _s('deckCreator FAIL: ' + e.message);
+  }
 })();
 </script>
 </body>

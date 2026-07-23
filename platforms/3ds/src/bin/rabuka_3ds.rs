@@ -109,6 +109,66 @@ fn cn_or_empty(act: &game_setup::Action) -> String {
         .unwrap_or_default()
 }
 
+/// Replace `{{file.png|label}}` icon markup with a short symbol for display.
+/// Hearts → `♥`, blade → `⚔`, energy → `⚡`, score → `★`, triggers use Japanese label.
+fn strip_icons(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut rest = s;
+    while let Some(start) = rest.find("{{") {
+        out.push_str(&rest[..start]);
+        let after = &rest[start + 2..];
+        if let Some(end) = after.find("}}") {
+            let inner = &after[..end];
+            if let Some(bar) = inner.find('|') {
+                let label = &inner[bar + 1..];
+                // Use short symbols for known icon types
+                let sym = if inner.starts_with("heart_") {
+                    "♥"
+                } else if inner.starts_with("icon_blade") {
+                    "⚔"
+                } else if inner.starts_with("icon_energy") {
+                    "⚡"
+                } else if inner.starts_with("icon_score") {
+                    "★"
+                } else if inner.starts_with("icon_all") {
+                    "❤"
+                } else if inner.starts_with("icon_b_all") {
+                    "⛏"
+                } else if inner.starts_with("icon_draw") {
+                    "⇄"
+                } else if inner.starts_with("live_start") {
+                    "▶"
+                } else if inner.starts_with("live_success") {
+                    "✓"
+                } else if inner.starts_with("center") {
+                    "◎"
+                } else if inner.starts_with("leftside") {
+                    "◁"
+                } else if inner.starts_with("rightside") {
+                    "▷"
+                } else {
+                    "□"
+                };
+                out.push_str(sym);
+                rest = &after[end + 2..];
+            } else {
+                out.push_str("□");
+                rest = &after[end + 2..];
+            }
+        } else {
+            out.push_str(&rest[start..]);
+            rest = "";
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Strip icon markup and wrap text — convenience wrapper for ability text display.
+fn wrap_ability_text(s: &str, max_chars: usize) -> String {
+    wrap_text(&strip_icons(s), max_chars)
+}
+
 fn wrap_text(s: &str, max_chars: usize) -> String {
     let mut out = String::with_capacity(s.len() + 32);
     for line in s.lines() {
@@ -2742,7 +2802,7 @@ fn main() {
                                                 );
                                             }
                                             for ab in card.resolved_abilities() {
-                                                let w = wrap_text(&ab.full_text, 40);
+                                                let w = wrap_ability_text(&ab.full_text, 40);
                                                 unsafe {
                                                     _3ds_text_add_top(
                                                         format!("{}\n\0", w).as_ptr(),
@@ -2792,7 +2852,7 @@ fn main() {
                                         );
                                     }
                                     for ab in card.resolved_abilities() {
-                                        let w = wrap_text(&ab.full_text, 34);
+                                        let w = wrap_ability_text(&ab.full_text, 34);
                                         unsafe {
                                             _3ds_text_add_top(format!("{}\n\0", w).as_ptr());
                                         }
@@ -2802,7 +2862,7 @@ fn main() {
                                     }
                                 }
                             } else if let Some(entry) = gs.ability_queue.current_entry() {
-                                let ab_text = wrap_text(&entry.ability.full_text, 36);
+                                let ab_text = wrap_ability_text(&entry.ability.full_text, 36);
                                 unsafe {
                                     _3ds_text_add_top(
                                         format!(
@@ -2968,7 +3028,7 @@ fn main() {
                                     .and_then(|cid| gs.card_database.get_card(cid))
                                     .and_then(|card| card.resolved_abilities().next())
                                     .map(|ab| {
-                                        wrap_text(&ab.full_text, 34)
+                                        wrap_ability_text(&ab.full_text, 34)
                                             .lines()
                                             .next()
                                             .unwrap_or("")
@@ -3241,7 +3301,7 @@ fn main() {
                                         );
                                         let mut ty = 86.0;
                                         for ab in card.resolved_abilities() {
-                                            let w = wrap_text(&ab.full_text, 38);
+                                            let w = wrap_ability_text(&ab.full_text, 38);
                                             for line in w.lines() {
                                                 if ty < 190.0 {
                                                     _3ds_top_queue_text(
@@ -3350,7 +3410,7 @@ fn main() {
                                         );
                                         let mut ty = 86.0;
                                         for ab in card.resolved_abilities() {
-                                            let w = wrap_text(&ab.full_text, 45);
+                                            let w = wrap_ability_text(&ab.full_text, 45);
                                             for line in w.lines() {
                                                 if ty < 232.0 {
                                                     _3ds_top_queue_text(
@@ -3451,7 +3511,7 @@ fn main() {
                                             .as_ptr(),
                                         );
                                         if let Some(ab) = card.resolved_abilities().next() {
-                                            let first_line = wrap_text(&ab.full_text, 50)
+                                            let first_line = wrap_ability_text(&ab.full_text, 50)
                                                 .lines()
                                                 .next()
                                                 .unwrap_or("")
@@ -3469,7 +3529,7 @@ fn main() {
                                 content_y = 126.0;
                             } else if let Some(entry) = gs.ability_queue.current_entry() {
                                 // Ability queue overlay with full text
-                                let ab_lines: Vec<String> = wrap_text(&entry.ability.full_text, 50)
+                                let ab_lines: Vec<String> = wrap_ability_text(&entry.ability.full_text, 50)
                                     .lines()
                                     .take(4)
                                     .map(|l| l.to_string())
