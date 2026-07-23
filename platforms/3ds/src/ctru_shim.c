@@ -838,10 +838,11 @@ void _3ds_swap_buffers() {
             } else if (draw_op_types[i] == OP_TEXT) {
                 C2D_TextFontParse(&tmp_text_obj, f, tmp_text_buf, draw_ops[i].text);
                 C2D_TextOptimize(&tmp_text_obj);
-                C2D_DrawText(&tmp_text_obj, C2D_WithColor,
+                C2D_DrawText(&tmp_text_obj, C2D_WithColor | C2D_WordWrap,
                     draw_ops[i].x, draw_ops[i].y, 0.5f,
                     draw_ops[i].scale, draw_ops[i].scale,
-                    draw_ops[i].color);
+                    draw_ops[i].color,
+                    390.0f);
             }
         }
     }

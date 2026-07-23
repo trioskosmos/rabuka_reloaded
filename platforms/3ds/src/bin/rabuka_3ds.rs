@@ -380,39 +380,7 @@ const COL_PINK: u32 = 0xFFAA55FF; // c2d(255,85,170,255) pink accent text
 /// Phase-aware multiplayer turn check.
 /// Returns true if the given player (0=P1, 1=P2) should be able to act.
 fn mp_can_act(gs: &GameState, player_id: i32) -> bool {
-    use rabuka_engine::core::game_state::Phase;
-    let pid_str = || if player_id == 0 { "p1" } else { "p2" };
-    if gs.has_pending_choice() {
-        if let Some(cpid) = gs.get_pending_choice_player_id() {
-            return cpid == pid_str();
-        }
-    }
-    match gs.current_phase {
-        Phase::RockPaperScissors => {
-            if player_id == 0 {
-                gs.player1_rps_choice.is_none()
-            } else {
-                gs.player2_rps_choice.is_none()
-            }
-        }
-        Phase::ChooseFirstAttacker => gs.rps_winner == Some(if player_id == 0 { 1 } else { 2 }),
-        Phase::MulliganFirstAttacker
-        | Phase::LiveCardSetFirstAttacker
-        | Phase::FirstAttackerPerformance => {
-            (gs.player1.is_first_attacker && player_id == 0)
-                || (!gs.player1.is_first_attacker && player_id == 1)
-        }
-        Phase::MulliganSecondAttacker
-        | Phase::LiveCardSetSecondAttacker
-        | Phase::SecondAttackerPerformance => {
-            (gs.player1.is_first_attacker && player_id == 1)
-                || (!gs.player1.is_first_attacker && player_id == 0)
-        }
-        _ => {
-            let active = gs.active_player();
-            (active.id == gs.player1.id) == (player_id == 0)
-        }
-    }
+    gs.can_player_act(player_id)
 }
 
 #[cfg(feature = "3ds")]
@@ -1737,26 +1705,6 @@ fn main() {
                             break;
                         }
                     }
-                    let mut seen: Vec<(String, Vec<usize>)> = Vec::new();
-                    for (i, act) in acts_cache.iter().enumerate() {
-                        if act.action_type == game_setup::ActionType::PlayMemberToStage {
-                            let cn = act
-                                .parameters
-                                .as_ref()
-                                .and_then(|p| p.card_no.clone())
-                                .unwrap_or_default();
-                            if let Some(e) = seen.iter_mut().find(|(c, _)| *c == cn) {
-                                e.1.push(i);
-                            } else {
-                                seen.push((cn, vec![i]));
-                            }
-                        }
-                    }
-                    for (_, indices) in &seen {
-                        for &ai in indices {
-                            order.push(ai);
-                        }
-                    }
                     for (i, act) in acts_cache.iter().enumerate() {
                         if act.action_type == game_setup::ActionType::UseAbility {
                             order.push(i);
@@ -1764,7 +1712,6 @@ fn main() {
                     }
                     for (i, act) in acts_cache.iter().enumerate() {
                         if act.action_type != game_setup::ActionType::Pass
-                            && act.action_type != game_setup::ActionType::PlayMemberToStage
                             && act.action_type != game_setup::ActionType::UseAbility
                         {
                             order.push(i);
@@ -1772,53 +1719,6 @@ fn main() {
                     }
                     order
                 };
-                // For PlayMemberToStage: map display_pos → [flat indices for each area]
-                let mut group_areas: Vec<Vec<usize>> = Vec::new();
-                // group_sel: which area (0=L,1=C,2=R) is selected within current group
-                let mut group_sel: usize = 0;
-                {
-                    let mut i = 0usize;
-                    while i < display_order.len() {
-                        let fi = display_order[i];
-                        let act = &acts_cache[fi];
-                        if act.action_type == game_setup::ActionType::PlayMemberToStage {
-                            let cn = act
-                                .parameters
-                                .as_ref()
-                                .and_then(|p| p.card_no.clone())
-                                .unwrap_or_default();
-                            let mut group = vec![fi];
-                            let mut j = i + 1;
-                            while j < display_order.len() {
-                                let fj = display_order[j];
-                                let a2 = &acts_cache[fj];
-                                if a2.action_type != game_setup::ActionType::PlayMemberToStage {
-                                    break;
-                                }
-                                let cn2 = a2
-                                    .parameters
-                                    .as_ref()
-                                    .and_then(|p| p.card_no.clone())
-                                    .unwrap_or_default();
-                                if cn2 != cn {
-                                    break;
-                                }
-                                group.push(fj);
-                                j += 1;
-                            }
-                            // Remove all but first entry from display_order
-                            for _ in i + 1..j {
-                                // Remove subsequent entries (j-1 down to i+1)
-                                let remove_at = i + 1;
-                                display_order.remove(remove_at);
-                            }
-                            group_areas.push(group);
-                        } else {
-                            group_areas.push(vec![fi]);
-                        }
-                        i += 1;
-                    }
-                }
                 let mut display_pos = display_order.iter().position(|&fi| fi == cur).unwrap_or(0);
 
                 // Input handling
@@ -1837,44 +1737,15 @@ fn main() {
                         }
                     }
                 } else {
-                    // Navigate in display space (grouped order)
+                    // Navigate in display space
                     if keys & 0x00000040 != 0 && display_pos > 0 {
                         display_pos -= 1;
                         cur = display_order[display_pos];
-                        group_sel = group_areas
-                            .get(display_pos)
-                            .and_then(|g| g.iter().position(|&fi| fi == cur))
-                            .unwrap_or(0);
                         redraw = true;
                     } else if keys & 0x00000080 != 0 && display_pos + 1 < display_order.len() {
                         display_pos += 1;
                         cur = display_order[display_pos];
-                        group_sel = group_areas
-                            .get(display_pos)
-                            .and_then(|g| g.iter().position(|&fi| fi == cur))
-                            .unwrap_or(0);
                         redraw = true;
-                    }
-                }
-
-                // L/R shoulder buttons: cycle area selection within a PlayMemberToStage group
-                {
-                    let cur_group = display_pos < group_areas.len() && group_areas.len() > 0;
-                    let has_areas = cur_group && group_areas[display_pos].len() > 1;
-                    if has_areas && (keys & 0x00000100 != 0) {
-                        // L: previous area
-                        if group_sel > 0 {
-                            group_sel -= 1;
-                            cur = group_areas[display_pos][group_sel];
-                            redraw = true;
-                        }
-                    } else if has_areas && (keys & 0x00000200 != 0) {
-                        // R: next area
-                        if group_sel + 1 < group_areas[display_pos].len() {
-                            group_sel += 1;
-                            cur = group_areas[display_pos][group_sel];
-                            redraw = true;
-                        }
                     }
                 }
 
@@ -1916,10 +1787,17 @@ fn main() {
                     }
                 }
 
-                // X toggles card detail mode on top screen
+                // X toggles card detail mode + narrows action list to selected card
                 if keys & 0x00000400 != 0 {
                     detail_mode = !detail_mode;
-                    if !detail_mode {
+                    if detail_mode && cur < acts_cache.len() {
+                        if let Some(cid) =
+                            acts_cache[cur].parameters.as_ref().and_then(|p| p.card_id)
+                        {
+                            viewing_card = Some(cid);
+                        }
+                    } else if !detail_mode {
+                        viewing_card = None;
                         unsafe {
                             _3ds_text_set_scroll_y(0);
                         }
@@ -2000,112 +1878,120 @@ fn main() {
                         }
                     }
                 }
-                // If waiting for opponent, skip local input after processing
-                if is_multiplayer && waiting_for_opponent {
+                // If waiting for opponent or it's the AI's turn, skip local input
+                if (is_multiplayer && waiting_for_opponent) || (*vs_ai && !mp_can_act(&gs, 0)) {
                     // Don't process local input while waiting
                 } else
-                // A button executes selected action.
-                // cur is always the correct flat action index (mapped from display_pos).
+                // A button executes selected action (skip disabled actions).
                 if keys & 0x00000001 != 0 && cur < acts_cache.len() {
-                    let action = acts_cache[cur].clone();
-                    let p = action.parameters.clone();
-                    let result = turn::TurnEngine::execute_main_phase_action(
-                        &mut gs,
-                        &action.action_type,
-                        p.as_ref().and_then(|x| x.card_id),
-                        p.as_ref().and_then(|x| x.card_indices.clone()),
-                        p.as_ref()
-                            .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
-                        p.as_ref().and_then(|x| x.use_baton_touch),
-                    );
-                    if let Err(ref e) = result {
-                        unsafe {
-                            _3ds_debug_print(format!("[ERR] {}\n\0", e).as_ptr());
-                        }
-                    }
-                    gs.reset_loop_detection();
-                    // In VS AI mode, after human picks RPS for P1, AI auto-picks for P2
-                    if *vs_ai
-                        && !*ai_vs_ai
-                        && gs.current_phase == Phase::RockPaperScissors
-                        && gs.player1_rps_choice.is_some()
-                        && gs.player2_rps_choice.is_none()
-                    {
-                        let ai_choice = (unsafe { _3ds_system_tick() } as usize) % 3;
-                        let ai_action = match ai_choice {
-                            0 => game_setup::ActionType::RockChoice,
-                            1 => game_setup::ActionType::PaperChoice,
-                            _ => game_setup::ActionType::ScissorsChoice,
-                        };
-                        let _ = turn::TurnEngine::execute_main_phase_action(
-                            &mut gs, &ai_action, None, None, None, None,
+                    let is_disabled = acts_cache[cur]
+                        .parameters
+                        .as_ref()
+                        .and_then(|p| p.disabled)
+                        .unwrap_or(false);
+                    if is_disabled {
+                        // Do nothing — disabled actions are not selectable
+                    } else {
+                        let action = acts_cache[cur].clone();
+                        let p = action.parameters.clone();
+                        let result = turn::TurnEngine::execute_main_phase_action(
+                            &mut gs,
+                            &action.action_type,
+                            p.as_ref().and_then(|x| x.card_id),
+                            p.as_ref().and_then(|x| x.card_indices.clone()),
+                            p.as_ref()
+                                .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
+                            p.as_ref().and_then(|x| x.use_baton_touch),
                         );
-                        gs.reset_loop_detection();
-                        // If both choices are None again, it was a draw
-                        if gs.player1_rps_choice.is_none() && gs.player2_rps_choice.is_none() {
-                            dprintln!("DRAW! Same choice — pick again.\n");
+                        if let Err(ref e) = result {
+                            unsafe {
+                                _3ds_debug_print(format!("[ERR] {}\n\0", e).as_ptr());
+                            }
                         }
-                    }
-                    // Multiplayer: Send action to opponent
-                    if is_multiplayer {
-                        let my_player_id = if is_host { 0 } else { 1 };
-                        let action_tag = match action.action_type {
-                            game_setup::ActionType::RockChoice => 0u16,
-                            game_setup::ActionType::PaperChoice => 1,
-                            game_setup::ActionType::ScissorsChoice => 2,
-                            game_setup::ActionType::ChooseFirstAttacker => 3,
-                            game_setup::ActionType::ChooseSecondAttacker => 16,
-                            game_setup::ActionType::SelectMulligan => 4,
-                            game_setup::ActionType::SkipMulligan => 5,
-                            game_setup::ActionType::ConfirmMulligan => 17,
-                            game_setup::ActionType::PlayMemberToStage => 6,
-                            game_setup::ActionType::SetLiveCard => 7,
-                            game_setup::ActionType::FinishLiveCardSet => 8,
-                            game_setup::ActionType::EnergyCharge => 9,
-                            game_setup::ActionType::ChoiceDecision => 10,
-                            game_setup::ActionType::ChoiceSelect => 11,
-                            game_setup::ActionType::ChoiceSkip => 12,
-                            game_setup::ActionType::ChoiceOption => 13,
-                            game_setup::ActionType::ChoicePosition => 14,
-                            game_setup::ActionType::UseAbility => 15,
-                            game_setup::ActionType::SelectLiveCard => 18,
-                            game_setup::ActionType::ConfirmLiveCardSet => 19,
-                            game_setup::ActionType::SkipLiveCardSet => 20,
-                            game_setup::ActionType::PassRemaining => 21,
-                            game_setup::ActionType::Pass => 22,
-                            _ => 0,
-                        };
-                        let stage_area = match p
-                            .as_ref()
-                            .and_then(|x| x.stage_area.as_ref())
-                            .map(|s| s.as_str())
+                        gs.reset_loop_detection();
+                        // In VS AI mode, after human picks RPS for P1, AI auto-picks for P2
+                        if *vs_ai
+                            && !*ai_vs_ai
+                            && gs.current_phase == Phase::RockPaperScissors
+                            && gs.player1_rps_choice.is_some()
+                            && gs.player2_rps_choice.is_none()
                         {
-                            Some("left") => 1u8,
-                            Some("center") => 2,
-                            Some("right") => 3,
-                            _ => 0,
-                        };
-                        let sync = uds::ActionSync {
-                            action_tag,
-                            card_id: p.as_ref().and_then(|x| x.card_id),
-                            card_indices: p
+                            let ai_choice = (unsafe { _3ds_system_tick() } as usize) % 3;
+                            let ai_action = match ai_choice {
+                                0 => game_setup::ActionType::RockChoice,
+                                1 => game_setup::ActionType::PaperChoice,
+                                _ => game_setup::ActionType::ScissorsChoice,
+                            };
+                            let _ = turn::TurnEngine::execute_main_phase_action(
+                                &mut gs, &ai_action, None, None, None, None,
+                            );
+                            gs.reset_loop_detection();
+                            // If both choices are None again, it was a draw
+                            if gs.player1_rps_choice.is_none() && gs.player2_rps_choice.is_none() {
+                                dprintln!("DRAW! Same choice — pick again.\n");
+                            }
+                        }
+                        // Multiplayer: Send action to opponent
+                        if is_multiplayer {
+                            let my_player_id = if is_host { 0 } else { 1 };
+                            let action_tag = match action.action_type {
+                                game_setup::ActionType::RockChoice => 0u16,
+                                game_setup::ActionType::PaperChoice => 1,
+                                game_setup::ActionType::ScissorsChoice => 2,
+                                game_setup::ActionType::ChooseFirstAttacker => 3,
+                                game_setup::ActionType::ChooseSecondAttacker => 16,
+                                game_setup::ActionType::SelectMulligan => 4,
+                                game_setup::ActionType::SkipMulligan => 5,
+                                game_setup::ActionType::ConfirmMulligan => 17,
+                                game_setup::ActionType::PlayMemberToStage => 6,
+                                game_setup::ActionType::SetLiveCard => 7,
+                                game_setup::ActionType::FinishLiveCardSet => 8,
+                                game_setup::ActionType::EnergyCharge => 9,
+                                game_setup::ActionType::ChoiceDecision => 10,
+                                game_setup::ActionType::ChoiceSelect => 11,
+                                game_setup::ActionType::ChoiceSkip => 12,
+                                game_setup::ActionType::ChoiceOption => 13,
+                                game_setup::ActionType::ChoicePosition => 14,
+                                game_setup::ActionType::UseAbility => 15,
+                                game_setup::ActionType::SelectLiveCard => 18,
+                                game_setup::ActionType::ConfirmLiveCardSet => 19,
+                                game_setup::ActionType::SkipLiveCardSet => 20,
+                                game_setup::ActionType::PassRemaining => 21,
+                                game_setup::ActionType::Pass => 22,
+                                _ => 0,
+                            };
+                            let stage_area = match p
                                 .as_ref()
-                                .and_then(|x| x.card_indices.clone())
-                                .unwrap_or_default(),
-                            stage_area,
-                            use_baton_touch: p
-                                .as_ref()
-                                .and_then(|x| x.use_baton_touch)
-                                .unwrap_or(false),
-                            ability_index: None,
-                        };
-                        let data = sync.to_bytes();
-                        let _ = uds::uds_send(&data);
-                        waiting_for_opponent = !mp_can_act(&gs, my_player_id);
-                    }
-                    cur = 0;
-                    dirty = true;
-                    redraw = true;
+                                .and_then(|x| x.stage_area.as_ref())
+                                .map(|s| s.as_str())
+                            {
+                                Some("left") => 1u8,
+                                Some("center") => 2,
+                                Some("right") => 3,
+                                _ => 0,
+                            };
+                            let sync = uds::ActionSync {
+                                action_tag,
+                                card_id: p.as_ref().and_then(|x| x.card_id),
+                                card_indices: p
+                                    .as_ref()
+                                    .and_then(|x| x.card_indices.clone())
+                                    .unwrap_or_default(),
+                                stage_area,
+                                use_baton_touch: p
+                                    .as_ref()
+                                    .and_then(|x| x.use_baton_touch)
+                                    .unwrap_or(false),
+                                ability_index: None,
+                            };
+                            let data = sync.to_bytes();
+                            let _ = uds::uds_send(&data);
+                            waiting_for_opponent = !mp_can_act(&gs, my_player_id);
+                        }
+                        cur = 0;
+                        dirty = true;
+                        redraw = true;
+                    } // closes else block (disabled action skip)
                 }
 
                 let n2 = acts_cache.len();
@@ -2116,7 +2002,8 @@ fn main() {
                 // AI: auto-pick when it's the AI's turn (before human input, covers all phases)
                 // Skip when dirty=true: acts_cache is stale from a just-executed human action.
                 // In multiplayer: opponent's turn is handled via UDS receive, not AI
-                let is_ai_turn = *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
+                // Uses mp_can_act(gs, 0) which correctly handles pending choices (choice_player_id).
+                let is_ai_turn = *ai_vs_ai || (*vs_ai && !mp_can_act(&gs, 0));
                 if is_ai_turn && !dirty {
                     if acts_cache.len() > 0 {
                         let ai_idx = (unsafe { _3ds_system_tick() } as usize) % acts_cache.len();
@@ -2272,11 +2159,20 @@ fn main() {
                             if let Some(cid) = tapped {
                                 if Some(cid) == viewing_card {
                                     viewing_card = None;
+                                    detail_mode = false;
                                 } else {
                                     viewing_card = Some(cid);
+                                    detail_mode = true;
+                                    // Navigate cursor to the first action referencing this card
+                                    if !acts_cache.is_empty() {
+                                        if let Some(pos) = acts_cache.iter().position(|act| {
+                                            act.parameters.as_ref().and_then(|p| p.card_id)
+                                                == Some(cid)
+                                        }) {
+                                            cur = pos;
+                                        }
+                                    }
                                 }
-                                // Force redraw so the top-screen card-detail panel
-                                // appears (game mode) or text updates (CLI mode).
                                 redraw = true;
                             } else {
                                 viewing_card = None;
@@ -2297,26 +2193,6 @@ fn main() {
                                 break;
                             }
                         }
-                        let mut seen: Vec<(String, Vec<usize>)> = Vec::new();
-                        for (i, act) in acts_cache.iter().enumerate() {
-                            if act.action_type == game_setup::ActionType::PlayMemberToStage {
-                                let cn = act
-                                    .parameters
-                                    .as_ref()
-                                    .and_then(|p| p.card_no.clone())
-                                    .unwrap_or_default();
-                                if let Some(e) = seen.iter_mut().find(|(c, _)| *c == cn) {
-                                    e.1.push(i);
-                                } else {
-                                    seen.push((cn, vec![i]));
-                                }
-                            }
-                        }
-                        for (_, indices) in &seen {
-                            for &ai in indices {
-                                order.push(ai);
-                            }
-                        }
                         for (i, act) in acts_cache.iter().enumerate() {
                             if act.action_type == game_setup::ActionType::UseAbility {
                                 order.push(i);
@@ -2324,7 +2200,6 @@ fn main() {
                         }
                         for (i, act) in acts_cache.iter().enumerate() {
                             if act.action_type != game_setup::ActionType::Pass
-                                && act.action_type != game_setup::ActionType::PlayMemberToStage
                                 && act.action_type != game_setup::ActionType::UseAbility
                             {
                                 order.push(i);
@@ -2332,6 +2207,15 @@ fn main() {
                         }
                         order
                     };
+                    // When viewing a specific card, filter to actions linked to that card
+                    if let Some(vcid) = viewing_card {
+                        display_order.retain(|&fi| {
+                            acts_cache[fi].parameters.as_ref().and_then(|p| p.card_id) == Some(vcid)
+                        });
+                        if !display_order.contains(&cur) {
+                            cur = display_order.first().copied().unwrap_or(0);
+                        }
+                    }
                     display_pos = display_order.iter().position(|&fi| fi == cur).unwrap_or(0);
 
                     let p1 = &gs.player1;
@@ -2570,7 +2454,7 @@ fn main() {
                                         gs.current_phase,
                                         ap_label,
                                         touch_indicator,
-                                        touch_tap_count
+                                        touch_tap_count,
                                     )
                                     .as_ptr(),
                                 );
@@ -2834,31 +2718,74 @@ fn main() {
                                 )
                                 .as_ptr(),
                             );
+                            let p1_blade: u32 = gs
+                                .player1
+                                .stage
+                                .stage
+                                .iter()
+                                .filter_map(|&cid| {
+                                    if cid == -1 {
+                                        return None;
+                                    }
+                                    let card = gs.card_database.get_card(cid)?;
+                                    let is_wait = gs
+                                        .mods
+                                        .orientation_modifiers
+                                        .get(&cid)
+                                        .map(|o| o.as_str() == "wait")
+                                        .unwrap_or(false);
+                                    if is_wait {
+                                        return Some(0u32);
+                                    }
+                                    let m = gs.mods.blade_modifiers.get(&cid);
+                                    let total = if let Some(e) = m {
+                                        if e.set != 0 {
+                                            e.total().max(0) as u32
+                                        } else {
+                                            (card.blade as i32 + e.total()).max(0) as u32
+                                        }
+                                    } else {
+                                        card.blade
+                                    };
+                                    Some(total)
+                                })
+                                .sum::<u32>();
                             _3ds_top_queue_text(
                                 4.0,
                                 22.0,
                                 COL_LIGHT,
                                 0.60f32,
                                 format!(
-                                    "W:{} L:{}  taps:{}\0",
+                                    "W:{} L:{}  taps:{}  BL:{}\0",
                                     p1.waitroom.cards.len(),
                                     p1.success_live_card_zone.cards.len(),
                                     touch_tap_count,
+                                    p1_blade,
                                 )
                                 .as_ptr(),
                             );
                         }
 
-                        // Content panel priority: detail_mode > viewing_card > ability_queue > action list
+                        // Content panel:
+                        //   detail_mode = full-screen card detail (blocks action list)
+                        //   viewing_card = compact card info overlay + action list below
+                        //   ability_queue = compact queue overlay + action list below
+                        //   otherwise = action list only
+                        let mut content_y: f32 = 42.0;
+
                         if detail_mode {
-                            // Detail mode: show ability text for the currently selected action's card
+                            let (rect_h, cont_y) = if viewing_card.is_some() {
+                                (110.0, 158.0)
+                            } else {
+                                (198.0, 300.0)
+                            };
                             if cur < acts_cache.len() {
                                 if let Some(ref p) = acts_cache[cur].parameters {
                                     if let Some(cid) = p.card_id {
                                         if let Some(card) = gs.card_database.get_card(cid) {
                                             unsafe {
                                                 _3ds_top_queue_rect(
-                                                    0.0, 42.0, 400.0, 198.0, COL_CARD,
+                                                    0.0, 42.0, 400.0, rect_h, COL_CARD,
                                                 );
                                                 _3ds_top_queue_text(
                                                     4.0,
@@ -2872,7 +2799,78 @@ fn main() {
                                                     )
                                                     .as_ptr(),
                                                 );
-                                                let mut ty = 66.0;
+                                                let is_tapped = gs
+                                                    .mods
+                                                    .orientation_modifiers
+                                                    .get(&cid)
+                                                    .map(|o| o.as_str() == "wait")
+                                                    .unwrap_or(false);
+                                                let base_blade = card.blade;
+                                                let blade_mod = gs
+                                                    .mods
+                                                    .blade_modifiers
+                                                    .get(&cid)
+                                                    .map(|m| m.total())
+                                                    .unwrap_or(0);
+                                                let total_blade = if is_tapped {
+                                                    0
+                                                } else {
+                                                    (base_blade as i32 + blade_mod).max(0)
+                                                };
+                                                let score = card.score.unwrap_or(0) as i32
+                                                    + gs.mods
+                                                        .score_modifiers
+                                                        .get(&cid)
+                                                        .map(|m| m.total())
+                                                        .unwrap_or(0);
+                                                let cost = card.cost.unwrap_or(0);
+                                                let heart_str = card
+                                                    .base_heart
+                                                    .as_ref()
+                                                    .map(|bh| {
+                                                        let parts: Vec<String> = bh
+                                                            .hearts
+                                                            .iter()
+                                                            .map(|(c, v)| {
+                                                                let code = c.short_label();
+                                                                let bonus = gs
+                                                                    .mods
+                                                                    .heart_modifiers
+                                                                    .get(&cid)
+                                                                    .and_then(|hm| hm.get(c))
+                                                                    .map(|m| m.total())
+                                                                    .unwrap_or(0);
+                                                                if bonus != 0 {
+                                                                    format!(
+                                                                        "{}{}+{}",
+                                                                        code, v, bonus
+                                                                    )
+                                                                } else {
+                                                                    format!("{}{}", code, v)
+                                                                }
+                                                            })
+                                                            .collect();
+                                                        parts.join(" ")
+                                                    })
+                                                    .unwrap_or_default();
+                                                let tap_str =
+                                                    if is_tapped { " [TAPPED]" } else { "" };
+                                                _3ds_top_queue_text(
+                                                    4.0,
+                                                    66.0,
+                                                    COL_LIGHT,
+                                                    0.65f32,
+                                                    format!(
+                                                        "B:{}  H:{}  S:{}  C:{}{}\0",
+                                                        total_blade,
+                                                        heart_str,
+                                                        score,
+                                                        cost,
+                                                        tap_str
+                                                    )
+                                                    .as_ptr(),
+                                                );
+                                                let mut ty = 86.0;
                                                 for ab in card.resolved_abilities() {
                                                     let w = wrap_text(&ab.full_text, 45);
                                                     for line in w.lines() {
@@ -2894,81 +2892,150 @@ fn main() {
                                     }
                                 }
                             }
-                        } else if let Some(vcid) = viewing_card {
-                            // Card tapped on board: show its abilities
-                            if let Some(card) = gs.card_database.get_card(vcid) {
+                            content_y = cont_y;
+                        } else {
+                            if let Some(vcid) = viewing_card {
+                                // Compact card info overlay with stats
+                                if let Some(card) = gs.card_database.get_card(vcid) {
+                                    let is_tapped = gs
+                                        .mods
+                                        .orientation_modifiers
+                                        .get(&vcid)
+                                        .map(|o| o.as_str() == "wait")
+                                        .unwrap_or(false);
+                                    let base_blade = card.blade;
+                                    let blade_mod = gs
+                                        .mods
+                                        .blade_modifiers
+                                        .get(&vcid)
+                                        .map(|m| m.total())
+                                        .unwrap_or(0);
+                                    let total_blade = if is_tapped {
+                                        0
+                                    } else {
+                                        (base_blade as i32 + blade_mod).max(0)
+                                    };
+                                    let score = card.score.unwrap_or(0) as i32
+                                        + gs.mods
+                                            .score_modifiers
+                                            .get(&vcid)
+                                            .map(|m| m.total())
+                                            .unwrap_or(0);
+                                    let cost = card.cost.unwrap_or(0);
+                                    let heart_str = card
+                                        .base_heart
+                                        .as_ref()
+                                        .map(|bh| {
+                                            let parts: Vec<String> = bh
+                                                .hearts
+                                                .iter()
+                                                .map(|(c, v)| {
+                                                    let code = c.short_label();
+                                                    let bonus = gs
+                                                        .mods
+                                                        .heart_modifiers
+                                                        .get(&vcid)
+                                                        .and_then(|hm| hm.get(c))
+                                                        .map(|m| m.total())
+                                                        .unwrap_or(0);
+                                                    if bonus != 0 {
+                                                        format!("{}{}+{}", code, v, bonus)
+                                                    } else {
+                                                        format!("{}{}", code, v)
+                                                    }
+                                                })
+                                                .collect();
+                                            parts.join(" ")
+                                        })
+                                        .unwrap_or_default();
+                                    unsafe {
+                                        _3ds_top_queue_rect(0.0, 42.0, 400.0, 76.0, COL_CARD);
+                                        _3ds_top_queue_text(
+                                            4.0,
+                                            44.0,
+                                            COL_BLUE,
+                                            0.75f32,
+                                            format!(
+                                                "[{}] {}\0",
+                                                card.card_no,
+                                                wrap_text(&card.name, 30)
+                                            )
+                                            .as_ptr(),
+                                        );
+                                        let tap_str = if is_tapped { " TAP" } else { "" };
+                                        _3ds_top_queue_text(
+                                            4.0,
+                                            64.0,
+                                            COL_LIGHT,
+                                            0.65f32,
+                                            format!(
+                                                "B:{}  H:{}  S:{}  C:{}{}\0",
+                                                total_blade, heart_str, score, cost, tap_str
+                                            )
+                                            .as_ptr(),
+                                        );
+                                        if let Some(ab) = card.resolved_abilities().next() {
+                                            let first_line = wrap_text(&ab.full_text, 50)
+                                                .lines()
+                                                .next()
+                                                .unwrap_or("")
+                                                .to_string();
+                                            _3ds_top_queue_text(
+                                                4.0,
+                                                82.0,
+                                                COL_LIGHT,
+                                                0.60f32,
+                                                format!("{}\0", first_line).as_ptr(),
+                                            );
+                                        }
+                                    }
+                                }
+                                content_y = 126.0;
+                            } else if let Some(entry) = gs.ability_queue.current_entry() {
+                                // Ability queue overlay with full text
+                                let ab_lines: Vec<String> = wrap_text(&entry.ability.full_text, 40)
+                                    .lines()
+                                    .take(3)
+                                    .map(|l| l.to_string())
+                                    .collect();
+                                let n_lines = ab_lines.len();
+                                let h = 22.0 + n_lines as f32 * 16.0;
                                 unsafe {
-                                    _3ds_top_queue_rect(0.0, 42.0, 400.0, 198.0, COL_CARD);
+                                    _3ds_top_queue_rect(0.0, 42.0, 400.0, h, COL_ABILITY);
                                     _3ds_top_queue_text(
                                         4.0,
                                         44.0,
-                                        COL_BLUE,
-                                        0.80f32,
-                                        format!(
-                                            "[{}] {}\0",
-                                            card.card_no,
-                                            wrap_text(&card.name, 25)
-                                        )
-                                        .as_ptr(),
+                                        COL_PINK,
+                                        0.70f32,
+                                        format!("[{}] {}\0", entry.card_no, ab_lines[0]).as_ptr(),
                                     );
-                                    let mut ty = 66.0;
-                                    for ab in card.resolved_abilities() {
-                                        let w = wrap_text(&ab.full_text, 45);
-                                        for line in w.lines() {
-                                            if ty < 232.0 {
-                                                _3ds_top_queue_text(
-                                                    4.0,
-                                                    ty,
-                                                    COL_LIGHT,
-                                                    0.65f32,
-                                                    format!("{}\0", line).as_ptr(),
-                                                );
-                                                ty += 18.0;
-                                            }
-                                        }
-                                        ty += 3.0;
-                                    }
-                                }
-                            }
-                        } else if let Some(entry) = gs.ability_queue.current_entry() {
-                            // Ability resolving: show the ability text
-                            unsafe {
-                                let ab_text = wrap_text(&entry.ability.full_text, 40);
-                                _3ds_top_queue_rect(0.0, 42.0, 400.0, 198.0, COL_ABILITY);
-                                _3ds_top_queue_text(
-                                    4.0,
-                                    44.0,
-                                    COL_PINK,
-                                    0.75f32,
-                                    format!(
-                                        "[{}] {}\0",
-                                        entry.card_no,
-                                        ab_text.lines().next().unwrap_or("")
-                                    )
-                                    .as_ptr(),
-                                );
-                                let mut ty = 64.0;
-                                for line in ab_text.lines().skip(1) {
-                                    if ty < 232.0 {
+                                    for (li, line) in ab_lines.iter().enumerate().skip(1) {
                                         _3ds_top_queue_text(
-                                            4.0,
-                                            ty,
+                                            8.0,
+                                            44.0 + li as f32 * 16.0,
                                             COL_LIGHT,
-                                            0.65f32,
+                                            0.60f32,
                                             format!("{}\0", line).as_ptr(),
                                         );
-                                        ty += 18.0;
                                     }
                                 }
+                                content_y = 42.0 + h + 6.0;
                             }
-                        } else {
+                        }
+
+                        // Action list (always renders unless detail_mode blocks it)
+                        {
                             // Action list on top screen (was previously on bottom overlay).
                             let is_ai_turn =
                                 *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
                             let is_opponent_turn_mp =
                                 is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 });
-                            if !is_ai_turn && !is_opponent_turn_mp && !display_order.is_empty() {
-                                let mut ty = 44.0f32;
+                            if !is_ai_turn
+                                && !is_opponent_turn_mp
+                                && !display_order.is_empty()
+                                && content_y < 240.0
+                            {
+                                let mut ty = content_y;
                                 let max_vis = 10usize;
                                 let half = max_vis / 2;
                                 let n = display_order.len();
@@ -2997,76 +3064,56 @@ fn main() {
                                     let fi = display_order[di];
                                     let act = &acts_cache[fi];
                                     let is_sel = di == display_pos;
-                                    let prefix = if is_sel { "> " } else { "  " };
+                                    let is_disabled = act
+                                        .parameters
+                                        .as_ref()
+                                        .and_then(|p| p.disabled)
+                                        .unwrap_or(false);
+                                    let prefix = if is_disabled {
+                                        "· "
+                                    } else if is_sel {
+                                        "> "
+                                    } else {
+                                        "  "
+                                    };
                                     if ty > 230.0 {
                                         break;
                                     }
                                     let line = match act.action_type {
                                         game_setup::ActionType::Pass => "Pass".into(),
                                         game_setup::ActionType::PlayMemberToStage => {
+                                            let cn = cn_or_empty(act);
                                             let name = act
                                                 .parameters
                                                 .as_ref()
                                                 .and_then(|p| p.card_name.clone())
                                                 .unwrap_or_default();
-                                            let areas =
-                                                group_areas.get(di).cloned().unwrap_or_default();
-                                            if areas.len() > 1 {
-                                                let area_labels = ["L", "C", "R"];
-                                                let mut s = format!("{} ", name);
-                                                for (ai, afi) in areas.iter().enumerate() {
-                                                    let act2 = &acts_cache[*afi];
-                                                    let a = act2
-                                                        .parameters
+                                            let area = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.stage_area.clone())
+                                                .unwrap_or_default();
+                                            let area_cost = act
+                                                .parameters
+                                                .as_ref()
+                                                .and_then(|p| p.available_areas.as_ref())
+                                                .and_then(|aa| {
+                                                    aa.iter()
+                                                        .find(|x| x.area == area)
+                                                        .map(|x| x.cost)
+                                                })
+                                                .or_else(|| {
+                                                    act.parameters
                                                         .as_ref()
-                                                        .and_then(|p| p.stage_area.clone())
-                                                        .unwrap_or_default();
-                                                    let area_cost = act2
-                                                        .parameters
-                                                        .as_ref()
-                                                        .and_then(|p| p.available_areas.as_ref())
-                                                        .and_then(|aa| {
-                                                            aa.iter()
-                                                                .find(|x| x.area == a)
-                                                                .map(|x| x.cost)
-                                                        })
-                                                        .or_else(|| {
-                                                            act2.parameters
-                                                                .as_ref()
-                                                                .and_then(|p| p.base_cost)
-                                                        })
-                                                        .unwrap_or(0);
-                                                    let bracket =
-                                                        if ai == group_sel { '[' } else { ' ' };
-                                                    let close =
-                                                        if ai == group_sel { ']' } else { ' ' };
-                                                    s.push_str(&format!(
-                                                        "{}{}:{}{} ",
-                                                        bracket, area_labels[ai], area_cost, close
-                                                    ));
-                                                }
-                                                s
+                                                        .and_then(|p| p.base_cost)
+                                                })
+                                                .unwrap_or(0);
+                                            if !cn.is_empty() {
+                                                format!(
+                                                    "[{}] {} {} c:{}",
+                                                    cn, name, area, area_cost
+                                                )
                                             } else {
-                                                let area = act
-                                                    .parameters
-                                                    .as_ref()
-                                                    .and_then(|p| p.stage_area.clone())
-                                                    .unwrap_or_default();
-                                                let area_cost = act
-                                                    .parameters
-                                                    .as_ref()
-                                                    .and_then(|p| p.available_areas.as_ref())
-                                                    .and_then(|aa| {
-                                                        aa.iter()
-                                                            .find(|x| x.area == area)
-                                                            .map(|x| x.cost)
-                                                    })
-                                                    .or_else(|| {
-                                                        act.parameters
-                                                            .as_ref()
-                                                            .and_then(|p| p.base_cost)
-                                                    })
-                                                    .unwrap_or(0);
                                                 format!("{} {} c:{}", name, area, area_cost)
                                             }
                                         }
@@ -3132,22 +3179,35 @@ fn main() {
                                                 .to_string();
                                             if !cn.is_empty() && !name.is_empty() {
                                                 format!("[{}] {} {}", cn, name, desc)
+                                            } else if !cn.is_empty() {
+                                                format!("[{}] {}", cn, desc)
                                             } else {
                                                 desc
                                             }
                                         }
                                     };
-                                    let color = if is_sel { COL_GOLD } else { COL_LIGHT };
+                                    let color = if is_disabled {
+                                        COL_MED
+                                    } else if is_sel {
+                                        COL_GOLD
+                                    } else {
+                                        COL_LIGHT
+                                    };
                                     let scale = if is_sel { 0.70f32 } else { 0.65f32 };
-                                    unsafe {
-                                        _3ds_top_queue_text(
-                                            4.0,
-                                            ty,
-                                            color,
-                                            scale,
-                                            format!("{}{}\0", prefix, wrap_text(&line, 42))
-                                                .as_ptr(),
-                                        );
+                                    for (li, l) in wrap_text(&line, 55).lines().enumerate() {
+                                        if ty > 230.0 {
+                                            break;
+                                        }
+                                        let pfx = if li == 0 { prefix } else { "   " };
+                                        unsafe {
+                                            _3ds_top_queue_text(
+                                                4.0,
+                                                ty,
+                                                color,
+                                                scale,
+                                                format!("{}{}\0", pfx, l).as_ptr(),
+                                            );
+                                        }
                                         ty += 20.0;
                                     }
                                 }

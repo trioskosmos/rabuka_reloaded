@@ -8,6 +8,7 @@ rabuka_engine = { path = "../../engine", default-features = false, features = ["
 hashbrown = { version = "0.14", default-features = false }
 log = { version = "0.4", default-features = false }
 
+
 [profile.release]
 opt-level = "z"
 panic = "abort"

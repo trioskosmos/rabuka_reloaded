@@ -4,6 +4,7 @@
 #include <nds/arm9/background.h>
 #include <calico/system/irq.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define REG_TM0DATA  (*(vu16*)0x04000100)
 #define REG_TM0CNT   (*(vu16*)0x04000102)

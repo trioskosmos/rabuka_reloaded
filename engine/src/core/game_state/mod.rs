@@ -210,6 +210,61 @@ pub struct GameState {
 }
 
 impl GameState {
+    /// Check if the given player (0=P1, 1=P2) can act right now.
+    /// Accounts for pending choices (including SelectAutoAbility/SelectLiveSuccess),
+    /// phase-specific rules, and active player checks.
+    pub fn can_player_act(&self, player_id: i32) -> bool {
+        use crate::ability::types::Choice;
+        let pid_str = || if player_id == 0 { "p1" } else { "p2" };
+        if self.has_pending_choice() {
+            if let Some(cpid) = self.get_pending_choice_player_id() {
+                return cpid == pid_str();
+            }
+            if let Some(choice) = self.get_pending_choice() {
+                match choice {
+                    Choice::SelectAutoAbility {
+                        player_id: cpid, ..
+                    }
+                    | Choice::SelectLiveSuccess {
+                        player_id: cpid, ..
+                    } => {
+                        return *cpid == pid_str();
+                    }
+                    _ => {}
+                }
+            }
+        }
+        match self.current_phase {
+            Phase::RockPaperScissors => {
+                if player_id == 0 {
+                    self.player1_rps_choice.is_none()
+                } else {
+                    self.player2_rps_choice.is_none()
+                }
+            }
+            Phase::ChooseFirstAttacker => {
+                let winner_idx = self.rps_winner;
+                winner_idx == Some(if player_id == 0 { 1 } else { 2 })
+            }
+            Phase::MulliganFirstAttacker
+            | Phase::LiveCardSetFirstAttacker
+            | Phase::FirstAttackerPerformance => {
+                (self.player1.is_first_attacker && player_id == 0)
+                    || (!self.player1.is_first_attacker && player_id == 1)
+            }
+            Phase::MulliganSecondAttacker
+            | Phase::LiveCardSetSecondAttacker
+            | Phase::SecondAttackerPerformance => {
+                (self.player1.is_first_attacker && player_id == 1)
+                    || (!self.player1.is_first_attacker && player_id == 0)
+            }
+            _ => {
+                let active = self.active_player();
+                (active.id == self.player1.id) == (player_id == 0)
+            }
+        }
+    }
+
     pub fn phase_invariant(&self) -> bool {
         if matches!(
             self.current_phase,

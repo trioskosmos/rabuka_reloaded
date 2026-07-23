@@ -3,9 +3,6 @@
 
 extern crate alloc;
 
-use core::alloc::{GlobalAlloc, Layout};
-use core::sync::atomic::{AtomicUsize, Ordering};
-
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -30,46 +27,186 @@ use rabuka_engine::rng;
 use rabuka_engine::turn::TurnEngine;
 
 extern "C" {
-    static __heap_start_ntr: u8;
     fn nds_init();
     fn nds_get_tick() -> u64;
     fn nds_wait_vblank();
 }
 
-const HEAP_END: usize = 0x023B_0000;
+use core::alloc::{GlobalAlloc, Layout};
+use core::cell::UnsafeCell;
+use core::ptr;
+
+extern "C" {
+    static __heap_start_ntr: u8;
+}
+
+const HEAP_END: usize = 0x0240_0000;
+const ALIGN: usize = 8;
+const MIN_BLOCK: usize = 8;
+
+#[repr(C, align(8))]
+struct FreeNode {
+    next: *mut FreeNode,
+    size: usize,
+}
 
 struct DsAllocator {
-    next: AtomicUsize,
+    head: UnsafeCell<*mut FreeNode>,
+    init_done: UnsafeCell<bool>,
+    oom_count: UnsafeCell<u32>,
+}
+
+unsafe impl Sync for DsAllocator {}
+
+impl DsAllocator {
+    const fn new() -> Self {
+        DsAllocator {
+            head: UnsafeCell::new(ptr::null_mut()),
+            init_done: UnsafeCell::new(false),
+            oom_count: UnsafeCell::new(0),
+        }
+    }
+
+    fn oom(&self) -> u32 {
+        unsafe { *self.oom_count.get() }
+    }
+
+    unsafe fn alloc_size(layout: &Layout) -> usize {
+        align_up(layout.size(), ALIGN).max(MIN_BLOCK)
+    }
+
+    unsafe fn ensure_init(&self) {
+        if *self.init_done.get() {
+            return;
+        }
+        let start = &__heap_start_ntr as *const u8 as usize;
+        let aligned = align_up(start, ALIGN);
+        let total = HEAP_END.saturating_sub(aligned);
+        if total >= MIN_BLOCK {
+            let node = aligned as *mut FreeNode;
+            (*node).next = ptr::null_mut();
+            (*node).size = total;
+            *self.head.get() = node;
+        }
+        *self.init_done.get() = true;
+    }
+}
+
+fn align_up(x: usize, a: usize) -> usize {
+    (x + a - 1) & !(a - 1)
 }
 
 unsafe impl GlobalAlloc for DsAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        let size = layout.size();
-        let align = layout.align().max(4);
-        loop {
-            let curr = self.next.load(Ordering::SeqCst);
-            let aligned = (curr + align - 1) & !(align - 1);
-            let new_next = aligned + size;
-            if new_next > HEAP_END {
-                return core::ptr::null_mut();
+        self.ensure_init();
+        let alloc_size = Self::alloc_size(&layout);
+        let head = self.head.get();
+        let mut node = *head;
+        let mut prev: *mut FreeNode = ptr::null_mut();
+        while !node.is_null() {
+            let block_size = (*node).size;
+            if block_size >= alloc_size {
+                let remaining = block_size - alloc_size;
+                if remaining >= MIN_BLOCK {
+                    let new_node = (node as usize + alloc_size) as *mut FreeNode;
+                    (*new_node).next = (*node).next;
+                    (*new_node).size = remaining;
+                    if prev.is_null() {
+                        *head = new_node;
+                    } else {
+                        (*prev).next = new_node;
+                    }
+                } else {
+                    if prev.is_null() {
+                        *head = (*node).next;
+                    } else {
+                        (*prev).next = (*node).next;
+                    }
+                }
+                return node as *mut u8;
             }
-            if self
-                .next
-                .compare_exchange_weak(curr, new_next, Ordering::SeqCst, Ordering::SeqCst)
-                .is_ok()
-            {
-                return aligned as *mut u8;
+            prev = node;
+            node = (*node).next;
+        }
+        *self.oom_count.get() += 1;
+        ptr::null_mut()
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        if ptr.is_null() {
+            return;
+        }
+        let size = Self::alloc_size(&layout);
+        let node = ptr as *mut FreeNode;
+        (*node).next = ptr::null_mut();
+        (*node).size = size;
+        let head = self.head.get();
+        let mut prev: *mut FreeNode = ptr::null_mut();
+        let mut curr = *head;
+        while !curr.is_null() && curr < node {
+            if (curr as usize) + (*curr).size == node as usize {
+                (*curr).size += size;
+                let next = (*curr).next;
+                if !next.is_null() && (curr as usize) + (*curr).size == next as usize {
+                    (*curr).size += (*next).size;
+                    (*curr).next = (*next).next;
+                }
+                return;
+            }
+            prev = curr;
+            curr = (*curr).next;
+        }
+        if !curr.is_null() && (node as usize) + size == curr as usize {
+            (*node).size += (*curr).size;
+            (*node).next = (*curr).next;
+        } else {
+            (*node).next = curr;
+        }
+        if !prev.is_null() && (prev as usize) + (*prev).size == node as usize {
+            (*prev).size += (*node).size;
+            (*prev).next = (*node).next;
+        } else {
+            if prev.is_null() {
+                *head = node;
+            } else {
+                (*prev).next = node;
             }
         }
     }
 
-    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {}
+    unsafe fn realloc(&self, ptr: *mut u8, old_layout: Layout, new_size: usize) -> *mut u8 {
+        if ptr.is_null() {
+            return self.alloc(Layout::from_size_align_unchecked(
+                new_size,
+                old_layout.align(),
+            ));
+        }
+        let old_alloc = Self::alloc_size(&old_layout);
+        let new_alloc = align_up(new_size, ALIGN).max(MIN_BLOCK);
+        if new_alloc <= old_alloc {
+            return ptr;
+        }
+        let new_layout = Layout::from_size_align_unchecked(new_size, old_layout.align());
+        let new_ptr = self.alloc(new_layout);
+        if !new_ptr.is_null() {
+            ptr::copy_nonoverlapping(ptr, new_ptr, old_alloc);
+            self.dealloc(ptr, old_layout);
+        }
+        new_ptr
+    }
+
+    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+        let ptr = self.alloc(layout);
+        if !ptr.is_null() {
+            let sz = Self::alloc_size(&layout);
+            ptr::write_bytes(ptr, 0, sz);
+        }
+        ptr
+    }
 }
 
 #[global_allocator]
-static ALLOCATOR: DsAllocator = DsAllocator {
-    next: AtomicUsize::new(0),
-};
+static ALLOCATOR: DsAllocator = DsAllocator::new();
 
 #[derive(Default, Clone, Copy)]
 struct DsHasher(u64);
@@ -338,19 +475,12 @@ fn truncate_chars(s: &str, max_chars: usize) -> &str {
 #[no_mangle]
 pub extern "C" fn main() {
     unsafe {
-        ALLOCATOR
-            .next
-            .store(&__heap_start_ntr as *const u8 as usize, Ordering::SeqCst);
         nds_init();
     }
 
     let mut display = Display::new();
     let mut input = Input::new();
     init_rng();
-
-    display.clear();
-    display.println("Loading...");
-    display.swap_buffers();
 
     let card_db = DsCardDb::new(CARDS_DB);
 
@@ -453,6 +583,7 @@ pub extern "C" fn main() {
     display.println(&format!("game ready: {:?}", gs.current_phase));
     display.swap_buffers();
 
+    let mut frame_count = 0u32;
     loop {
         TurnEngine::check_victory_condition(&mut gs);
         if gs.game_result != GameResult::Ongoing {
@@ -466,8 +597,13 @@ pub extern "C" fn main() {
             break;
         }
 
+        let is_current_player_ai = ai_vs_ai || (vs_ai && gs.active_player().id != gs.player1.id);
+
         if gs.has_pending_choice() {
-            if !handle_choice(&mut display, &mut input, &mut gs) {
+            if is_current_player_ai {
+                // AI: auto-pick first option on pending choices
+                TurnEngine::resume_with_choice(&mut gs, Some(0), None).ok();
+            } else if !handle_choice(&mut display, &mut input, &mut gs) {
                 break;
             }
             continue;
@@ -477,15 +613,36 @@ pub extern "C" fn main() {
 
         if actions.is_empty() {
             TurnEngine::advance_phase(&mut gs);
+            // Note: auto-phase settling handled by settle_auto() at top and bottom of loop
             continue;
         }
 
-        let is_ai = ai_vs_ai || (vs_ai && gs.active_player().id != gs.player1.id);
-
-        if is_ai {
-            let idx = rng::rand_range(actions.len());
+        if is_current_player_ai {
+            let idx = if ai_vs_ai {
+                0
+            } else {
+                rng::rand_range(actions.len())
+            };
             if !execute_action(&mut gs, &actions[idx]) {
                 break;
+            }
+            frame_count += 1;
+            // Settle auto phases (same pattern as test_ai_vs_ai_ds)
+            let mut sa = 0u32;
+            while gs.game_result == GameResult::Ongoing
+                && game_setup::is_automatic_phase(&gs)
+                && sa < 500
+            {
+                TurnEngine::advance_phase(&mut gs);
+                sa += 1;
+            }
+            if ai_vs_ai {
+                display.clear();
+                display.println(&format!("Turn {} frame {}", gs.turn_number, frame_count));
+                display.println(&format!("Phase: {:?}", gs.current_phase));
+                display.println(&format!("TP: {}", gs.current_turn_phase));
+                display_heap_stats(&mut display);
+                display.swap_buffers();
             }
         } else {
             let ok = human_turn(&mut display, &mut input, &mut gs, &actions);
@@ -493,6 +650,18 @@ pub extern "C" fn main() {
                 break;
             }
             wait_frames(8);
+        }
+
+        // After human picks in RPS, let AI pick for P2
+        if gs.current_phase == Phase::RockPaperScissors
+            && gs.player1_rps_choice.is_some()
+            && gs.player2_rps_choice.is_none()
+        {
+            let ai_actions = game_setup::generate_possible_actions(&gs);
+            if !ai_actions.is_empty() {
+                let idx = rng::rand_range(ai_actions.len());
+                let _ = execute_action(&mut gs, &ai_actions[idx]);
+            }
         }
 
         settle_auto(&mut gs);
@@ -547,6 +716,7 @@ fn run_on_device_tests_ds(display: &mut Display, input: &mut Input, card_db: &Ds
     } else {
         failed += 1;
     }
+    display_heap_stats(display);
     display.swap_buffers();
     wait_frames(20);
 
@@ -565,6 +735,7 @@ fn run_on_device_tests_ds(display: &mut Display, input: &mut Input, card_db: &Ds
                 failed += 1;
             }
         }
+        display_heap_stats(display);
         display.swap_buffers();
         wait_frames(30);
     }
@@ -574,6 +745,7 @@ fn run_on_device_tests_ds(display: &mut Display, input: &mut Input, card_db: &Ds
         passed,
         failed
     ));
+    display_heap_stats(display);
     display.println("START=exit");
     display.swap_buffers();
     loop {
@@ -691,13 +863,18 @@ fn human_turn(
     actions: &[game_setup::Action],
 ) -> bool {
     let mut sel = 0usize;
-    const VISIBLE_ACTIONS: usize = 10;
+    const VISIBLE_ACTIONS: usize = 9;
     loop {
         display.clear();
+        let oom = ALLOCATOR.oom();
         display.println(&alloc::format!(
-            "Turn {} | {:?}",
+            "T{} {} oom:{}",
             gs.turn_number,
-            gs.current_phase
+            format!("{:?}", gs.current_phase)
+                .chars()
+                .take(5)
+                .collect::<String>(),
+            oom
         ));
         let p1 = &gs.player1;
         let p2 = &gs.player2;
@@ -721,11 +898,17 @@ fn human_turn(
         for i in 0..end {
             let p = if i == sel { ">" } else { " " };
             let line = actions[i].description.lines().next().unwrap_or("");
-            display.println(&alloc::format!("{p}[{}] {}", i, line));
+            let id = actions[i]
+                .parameters
+                .as_ref()
+                .and_then(|p| p.card_no.as_deref())
+                .unwrap_or("");
+            display.println(&alloc::format!("{p}[{}] {} {}", i, id, line));
         }
         if actions.len() > end {
             display.println(&alloc::format!("  .. {} more", actions.len() - end));
         }
+        display.println(&alloc::format!("oom:{} A=sel", oom));
         display.swap_buffers();
         wait_frames(2);
         input.poll();
@@ -1029,6 +1212,11 @@ fn show_result(display: &mut Display, input: &mut Input, gs: &GameState) {
         }
         wait_frames(2);
     }
+}
+
+fn display_heap_stats(display: &mut Display) {
+    let oom = ALLOCATOR.oom();
+    display.println(&alloc::format!("oom:{}", oom));
 }
 
 fn init_rng() {
