@@ -508,12 +508,10 @@ fn main() {
                                 _3ds_clear_top();
                                 _3ds_text_add_top("SELECT MODE\n\0".as_ptr());
                                 for (i, m) in [
-                                    "Sandbox (2 players)",
                                     "VS AI",
-                                    "AI vs AI",
-                                    "Run Tests",
+                                    "Sandbox (2 players)",
+                                    "QR Scan",
                                     "Local Multiplayer",
-                                    "QR (3DS etc.)",
                                 ]
                                 .iter()
                                 .enumerate()
@@ -534,16 +532,9 @@ fn main() {
                                     0.85f32,
                                     "SELECT MODE\0".as_ptr(),
                                 );
-                                for (i, m) in [
-                                    "Sandbox",
-                                    "VS AI",
-                                    "AI vs AI",
-                                    "Run Tests",
-                                    "Local MP",
-                                    "QR Scan",
-                                ]
-                                .iter()
-                                .enumerate()
+                                for (i, m) in ["VS AI", "Sandbox", "QR Scan", "Local MP"]
+                                    .iter()
+                                    .enumerate()
                                 {
                                     let y = 40.0 + i as f32 * 38.0;
                                     let bg = if i == cur { COL_SEL } else { COL_DIM };
@@ -590,7 +581,7 @@ fn main() {
                                 SetupPhase::PickMode(cur - 1),
                                 true,
                             )
-                        } else if keys & 0x00000080 != 0 && cur + 1 < 5 {
+                        } else if keys & 0x00000080 != 0 && cur + 1 < 4 {
                             Step::Setup(
                                 cards.clone(),
                                 decks.clone(),
@@ -598,10 +589,10 @@ fn main() {
                                 true,
                             )
                         } else if keys & 0x00000001 != 0 {
-                            if cur == 3 {
-                                // "Run Tests" — skip deck selection
-                                Step::Setup(cards.clone(), decks.clone(), SetupPhase::Testing, true)
-                            } else if cur == 4 {
+                            if cur == 2 {
+                                // "QR Scan"
+                                Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan, true)
+                            } else if cur == 3 {
                                 // "Local Multiplayer" — pick deck then connect
                                 Step::Setup(
                                     cards.clone(),
@@ -609,16 +600,13 @@ fn main() {
                                     SetupPhase::MultiplayerDeck(0),
                                     true,
                                 )
-                            } else if cur == 5 {
-                                // "QR (3DS etc.)" — scan QR code
-                                Step::Setup(cards.clone(), decks.clone(), SetupPhase::QrScan, true)
                             } else if n == 0 {
                                 Step::Done(Err("No decks!".into()))
                             } else {
                                 Step::Setup(
                                     cards.clone(),
                                     decks.clone(),
-                                    SetupPhase::PickDeck(0, cur == 1 || cur == 2, false),
+                                    SetupPhase::PickDeck(0, cur == 0, false),
                                     true,
                                 )
                             }
