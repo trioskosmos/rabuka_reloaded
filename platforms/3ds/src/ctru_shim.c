@@ -719,8 +719,8 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
             _3ds_draw_border(hx, hand_y + 2, h_slot_w, hand_card_h, COL_SEL, 2);
         }
         if (pb->hand[i].active) _3ds_draw_card_at(&pb->hand[i], hx, hand_y + 2, h_slot_w, hand_card_h);
-        hx += h_slot_w + 2;
-        if (hx > W - M - h_slot_w) break;
+        hx += h_slot_w + 1;
+        if (hx > W - M) break;
     }
     // Hand scroll indicator: ◀/▶ arrows + range "off+1-off+vis/total"
     // Shown at the right side of the hand zone, above any overflow

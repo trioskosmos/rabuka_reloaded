@@ -33,7 +33,6 @@ extern "C" {
 }
 
 use core::alloc::{GlobalAlloc, Layout};
-use core::cell::UnsafeCell;
 use core::ptr;
 
 extern "C" {
@@ -42,11 +41,16 @@ extern "C" {
 
 const HEAP_END: usize = 0x0240_0000;
 const ALIGN: usize = 8;
+use core::cell::UnsafeCell;
 use linked_list_allocator::Heap;
 
 struct DsAllocator {
-    inner: core::cell::UnsafeCell<Option<Heap>>,
-    oom_count: core::cell::UnsafeCell<u32>,
+    inner: UnsafeCell<Option<Heap>>,
+    oom_count: UnsafeCell<u32>,
+}
+
+fn align_up(x: usize, a: usize) -> usize {
+    (x + a - 1) & !(a - 1)
 }
 
 unsafe impl Sync for DsAllocator {}
@@ -54,8 +58,8 @@ unsafe impl Sync for DsAllocator {}
 impl DsAllocator {
     const fn new() -> Self {
         DsAllocator {
-            inner: core::cell::UnsafeCell::new(None),
-            oom_count: core::cell::UnsafeCell::new(0),
+            inner: UnsafeCell::new(None),
+            oom_count: UnsafeCell::new(0),
         }
     }
 
@@ -72,14 +76,13 @@ impl DsAllocator {
         let aligned = align_up(start, ALIGN);
         let size = HEAP_END.saturating_sub(aligned);
         if size > 0 {
+            // Pre-fill the heap region with zeros before passing to linked_list_allocator
+            // to ensure the initial free node sees clean memory.
+            ptr::write_bytes(aligned as *mut u8, 0, size);
             let heap = Heap::new(aligned as *mut u8, size);
             *inner = Some(heap);
         }
     }
-}
-
-fn align_up(x: usize, a: usize) -> usize {
-    (x + a - 1) & !(a - 1)
 }
 
 unsafe impl GlobalAlloc for DsAllocator {
@@ -132,183 +135,6 @@ unsafe impl GlobalAlloc for DsAllocator {
         let ptr = self.alloc(layout);
         if !ptr.is_null() {
             ptr::write_bytes(ptr, 0, layout.size());
-        }
-        ptr
-    }
-}
-
-#[repr(C)]
-struct FreeNode {
-    next: *mut FreeNode,
-    size: usize,
-}
-
-const MIN_BLOCK: usize = core::mem::size_of::<FreeNode>();
-
-unsafe impl Sync for DsAllocator {}
-
-impl DsAllocator {
-    const fn new() -> Self {
-        DsAllocator {
-            head: UnsafeCell::new(ptr::null_mut()),
-            oom_count: UnsafeCell::new(0),
-        }
-    }
-
-    fn oom(&self) -> u32 {
-        unsafe { *self.oom_count.get() }
-    }
-
-    unsafe fn alloc_size(layout: &Layout) -> usize {
-        // Round up to ALIGN and ensure at least MIN_BLOCK
-        let s = align_up(layout.size(), ALIGN);
-        if s < MIN_BLOCK {
-            MIN_BLOCK
-        } else {
-            s
-        }
-    }
-
-    unsafe fn ensure_init(&self) {
-        let head = self.head.get();
-        if *head != ptr::null_mut() {
-            return;
-        }
-        let start = &__heap_start_ntr as *const u8 as usize;
-        let aligned = align_up(start, ALIGN);
-        let total = HEAP_END.saturating_sub(aligned);
-        if total >= MIN_BLOCK {
-            let node = aligned as *mut FreeNode;
-            (*node).next = ptr::null_mut();
-            (*node).size = total;
-            *head = node;
-        }
-    }
-}
-
-fn align_up(x: usize, a: usize) -> usize {
-    (x + a - 1) & !(a - 1)
-}
-
-unsafe impl GlobalAlloc for DsAllocator {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        self.ensure_init();
-        let alloc_size = Self::alloc_size(&layout);
-        let head = self.head.get();
-        let mut node = *head;
-        let mut prev: *mut FreeNode = ptr::null_mut();
-        while !node.is_null() {
-            let block_size = (*node).size;
-            if block_size >= alloc_size {
-                let remaining = block_size - alloc_size;
-                if remaining >= MIN_BLOCK {
-                    // Split: remaining stays as free node
-                    let new_node = (node as usize + alloc_size) as *mut FreeNode;
-                    (*new_node).next = (*node).next;
-                    (*new_node).size = remaining;
-                    if prev.is_null() {
-                        *head = new_node;
-                    } else {
-                        (*prev).next = new_node;
-                    }
-                } else {
-                    // Give the whole block (remaining < MIN_BLOCK)
-                    if prev.is_null() {
-                        *head = (*node).next;
-                    } else {
-                        (*prev).next = (*node).next;
-                    }
-                }
-                return node as *mut u8;
-            }
-            prev = node;
-            node = (*node).next;
-        }
-        *self.oom_count.get() += 1;
-        ptr::null_mut()
-    }
-
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        if ptr.is_null() {
-            return;
-        }
-        let size = Self::alloc_size(&layout);
-        let node = ptr as *mut FreeNode;
-        (*node).next = ptr::null_mut();
-        (*node).size = size;
-        // Guard: if the address already exists in free list, skip (double-free protection)
-        {
-            let mut c = *self.head.get();
-            while !c.is_null() {
-                if c == node {
-                    return; // Already freed, skip
-                }
-                c = (*c).next;
-            }
-        }
-        let head = self.head.get();
-        let mut prev: *mut FreeNode = ptr::null_mut();
-        let mut curr = *head;
-        // Walk to find insertion point (sorted by address)
-        while !curr.is_null() && (curr as usize) < (node as usize) {
-            // Check if curr ends where node starts → merge into curr
-            if (curr as usize) + (*curr).size == node as usize {
-                // Merge node INTO curr
-                (*curr).size += size;
-                // Also merge with next if adjacent
-                let nxt = (*curr).next;
-                if !nxt.is_null() && (curr as usize) + (*curr).size == nxt as usize {
-                    (*curr).size += (*nxt).size;
-                    (*curr).next = (*nxt).next;
-                }
-                return;
-            }
-            prev = curr;
-            curr = (*curr).next;
-        }
-        // Insert node between prev and curr
-        // Check merge with curr (node ends where curr starts)
-        if !curr.is_null() && (node as usize) + size == curr as usize {
-            (*node).size += (*curr).size;
-            (*node).next = (*curr).next;
-        } else {
-            (*node).next = curr;
-        }
-        // Link prev → node
-        if prev.is_null() {
-            *head = node;
-        } else {
-            // Check merge with prev (prev ends where node starts)
-            if (prev as usize) + (*prev).size == node as usize {
-                // Merge node INTO prev
-                (*prev).size += (*node).size;
-                (*prev).next = (*node).next;
-            } else {
-                (*prev).next = node;
-            }
-        }
-    }
-
-    unsafe fn realloc(&self, ptr: *mut u8, old_layout: Layout, new_size: usize) -> *mut u8 {
-        let old_alloc = Self::alloc_size(&old_layout);
-        let new_alloc = align_up(new_size, ALIGN).max(MIN_BLOCK);
-        if new_alloc <= old_alloc {
-            return ptr;
-        }
-        let new_layout = Layout::from_size_align_unchecked(new_size, old_layout.align());
-        let new_ptr = self.alloc(new_layout);
-        if !new_ptr.is_null() {
-            ptr::copy_nonoverlapping(ptr, new_ptr, old_alloc);
-            self.dealloc(ptr, old_layout);
-        }
-        new_ptr
-    }
-
-    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
-        let ptr = self.alloc(layout);
-        if !ptr.is_null() {
-            let sz = Self::alloc_size(&layout);
-            ptr::write_bytes(ptr, 0, sz);
         }
         ptr
     }

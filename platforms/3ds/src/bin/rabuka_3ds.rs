@@ -2363,8 +2363,14 @@ fn main() {
                             }
                             let ec = &pb.energy_zone.cards;
                             let ecount = ec.len().min(30);
+                            let e_active = pb.energy_zone.active_count();
                             unsafe {
                                 $ecount_fn(ecount as i32);
+                            }
+                            for (i, cid) in ec.iter().enumerate() {
+                                // Energy cards: tapped if position >= active_count (front = active)
+                                let tapped = i >= e_active;
+                                set_slot($energy_fn, i as i32, *cid, false, tapped);
                             }
                             for (i, cid) in ec.iter().enumerate().take(30) {
                                 set_slot($energy_fn, i as i32, *cid, false, is_tapped(*cid));
@@ -3486,11 +3492,11 @@ fn find_card_zone_slot(gs: &GameState, cid: i16) -> Option<(i32, i32)> {
 
 #[cfg(feature = "3ds")]
 fn visible_hand_slots() -> usize {
-    let hand_h = 240.0 * 0.42;
-    let card_h = hand_h - 4.0;
+    let hand_h = unsafe { _3ds_board_get_zone_h(3) as f32 };
+    let card_h = (hand_h - 4.0).max(1.0);
     let hsw = card_h * 0.711;
-    let stride = hsw + 2.0;
-    let count = ((314.0 - hsw) / stride) as usize + 1;
+    let stride = hsw + 1.0;
+    let count = ((316.0 - hsw) / stride) as usize + 1;
     count.max(1).min(15)
 }
 
