@@ -103,7 +103,13 @@ unsafe impl GlobalAlloc for DsAllocator {
         let head = self.head.get();
         let mut node = *head;
         let mut prev: *mut FreeNode = ptr::null_mut();
+        let mut walk_guard = 0usize;
         while !node.is_null() {
+            walk_guard += 1;
+            if walk_guard > 1000000 {
+                // Free list likely has a cycle — abort
+                break;
+            }
             let block_size = (*node).size;
             if block_size >= alloc_size {
                 let remaining = block_size - alloc_size;
@@ -619,7 +625,86 @@ pub extern "C" fn main() {
 
         if is_current_player_ai {
             let idx = rng::rand_range(actions.len());
+            if ai_vs_ai {
+                display.clear();
+                display.println(&alloc::format!(
+                    "f{} act[{}] {}",
+                    frame_count,
+                    idx,
+                    actions[idx].action_type
+                ));
+                display.println(&alloc::format!(
+                    "desc:{}",
+                    actions[idx]
+                        .description
+                        .chars()
+                        .take(40)
+                        .collect::<String>()
+                ));
+                display.println(&alloc::format!("P:{:?}", gs.current_phase));
+                display.swap_buffers();
+            }
             let p = actions[idx].parameters.clone();
+            if ai_vs_ai && actions[idx].action_type == game_setup::ActionType::PlayMemberToStage {
+                display.clear();
+                display.println(">>> BEFORE PLAY_MEMBER <<<");
+                display.println(&alloc::format!(
+                    "cid:{:?}",
+                    p.as_ref().and_then(|x| x.card_id)
+                ));
+                display.println(&alloc::format!(
+                    "cn:{:?}",
+                    p.as_ref().and_then(|x| x.card_no.as_deref())
+                ));
+                display.println(&alloc::format!(
+                    "area:{:?}",
+                    p.as_ref().and_then(|x| x.stage_area.as_deref())
+                ));
+                display.println(&alloc::format!(
+                    "bt:{:?}",
+                    p.as_ref().and_then(|x| x.use_baton_touch)
+                ));
+                display.swap_buffers();
+                let _ = TurnEngine::execute_main_phase_action(
+                    &mut gs,
+                    &actions[idx].action_type,
+                    p.as_ref().and_then(|x| x.card_id),
+                    p.as_ref().and_then(|x| x.card_indices.clone()),
+                    p.as_ref()
+                        .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
+                    p.as_ref().and_then(|x| x.use_baton_touch),
+                );
+                display.clear();
+                display.println(">>> AFTER PLAY_MEMBER <<<");
+                let pc = gs.has_pending_choice();
+                display.println(&alloc::format!("pc:{} oom:{}", pc, ALLOCATOR.oom()));
+                display.println(&alloc::format!("P:{:?}", gs.current_phase));
+                display.swap_buffers();
+            } else {
+                let _ = TurnEngine::execute_main_phase_action(
+                    &mut gs,
+                    &actions[idx].action_type,
+                    p.as_ref().and_then(|x| x.card_id),
+                    p.as_ref().and_then(|x| x.card_indices.clone()),
+                    p.as_ref()
+                        .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
+                    p.as_ref().and_then(|x| x.use_baton_touch),
+                );
+            }
+            gs.reset_loop_detection();
+            frame_count += 1;
+            if ai_vs_ai {
+                display.clear();
+                display.println(&alloc::format!(
+                    "f{} P:{:?} oom:{}",
+                    frame_count,
+                    gs.current_phase,
+                    ALLOCATOR.oom()
+                ));
+                display.println(&alloc::format!("pc:{}", gs.has_pending_choice()));
+                display_heap_stats(&mut display);
+                display.swap_buffers();
+            }
             let _ = TurnEngine::execute_main_phase_action(
                 &mut gs,
                 &actions[idx].action_type,
@@ -629,6 +714,14 @@ pub extern "C" fn main() {
                     .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
                 p.as_ref().and_then(|x| x.use_baton_touch),
             );
+            if ai_vs_ai {
+                display.clear();
+                display.println(">>> AFTER ACTION <<<");
+                display.println(&alloc::format!("P:{:?}", gs.current_phase));
+                display.println(&alloc::format!("pc:{}", gs.has_pending_choice()));
+                display_heap_stats(&mut display);
+                display.swap_buffers();
+            }
             gs.reset_loop_detection();
             frame_count += 1;
             // Settle auto phases (matching 3DS settle_3ds: check pending choice before each)
