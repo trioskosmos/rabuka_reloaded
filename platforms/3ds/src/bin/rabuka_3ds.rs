@@ -111,7 +111,8 @@ fn cn_or_empty(act: &game_setup::Action) -> String {
 
 /// Render text with inline `{{icon.png|label}}` icon images.
 /// Uses _3ds_top_queue_card to render the actual icon T3X files.
-fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32, icon_h: f32) {
+fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32) {
+    let icon_h = (scale * 16.0).max(11.0);
     let mut cx = x;
     let mut rest = text;
     while let Some(start) = rest.find("{{") {
@@ -3321,9 +3322,7 @@ fn main() {
                                             let w = wrap_ability_text(&ab.full_text, 38);
                                             for line in w.lines() {
                                                 if ty < 190.0 {
-                                                    render_text_with_icons(
-                                                        44.0, ty, line, COL_LIGHT, 0.55, 14.0,
-                                                    );
+                                                    render_text_with_icons(44.0, ty, line, COL_LIGHT, 0.55);
                                                     ty += 16.0;
                                                 }
                                             }
@@ -3426,9 +3425,7 @@ fn main() {
                                             let w = wrap_ability_text(&ab.full_text, 45);
                                             for line in w.lines() {
                                                 if ty < 232.0 {
-                                                    render_text_with_icons(
-                                                        4.0, ty, line, COL_LIGHT, 0.65, 14.0,
-                                                    );
+                                                    render_text_with_icons(4.0, ty, line, COL_LIGHT, 0.65);
                                                     ty += 18.0;
                                                 }
                                             }
@@ -3525,14 +3522,7 @@ fn main() {
                                                 .next()
                                                 .unwrap_or("")
                                                 .to_string();
-                                            render_text_with_icons(
-                                                4.0,
-                                                82.0,
-                                                &first_line,
-                                                COL_LIGHT,
-                                                0.60,
-                                                14.0,
-                                            );
+                                            render_text_with_icons(4.0, 82.0, &first_line, COL_LIGHT, 0.60);
                                         }
                                     }
                                 }
@@ -3549,23 +3539,9 @@ fn main() {
                                 let h = 22.0 + n_lines as f32 * 14.0;
                                 unsafe {
                                     _3ds_top_queue_rect(0.0, 42.0, 400.0, h, COL_ABILITY);
-                                    render_text_with_icons(
-                                        4.0,
-                                        44.0,
-                                        &format!("[{}] {}", entry.card_no, ab_lines[0]),
-                                        COL_LIGHT,
-                                        0.65,
-                                        14.0,
-                                    );
+                                    render_text_with_icons(4.0, 44.0, &format!("[{}] {}", entry.card_no, ab_lines[0]), COL_LIGHT, 0.65);
                                     for (li, line) in ab_lines.iter().enumerate().skip(1) {
-                                        render_text_with_icons(
-                                            8.0,
-                                            44.0 + li as f32 * 14.0,
-                                            line,
-                                            COL_LIGHT,
-                                            0.65,
-                                            14.0,
-                                        );
+                                        render_text_with_icons(8.0, 44.0 + li as f32 * 14.0, line, COL_LIGHT, 0.65);
                                     }
                                 }
                                 content_y = 42.0 + h + 6.0;
@@ -3708,9 +3684,7 @@ fn main() {
                                             let pfx = if di == display_pos { "> " } else { "  " };
                                             let txt = format!("{}{}", pfx, desc);
                                             if txt.contains("{{") {
-                                                render_text_with_icons(
-                                                    4.0, ty, &txt, c, 0.65, 14.0,
-                                                );
+                                                render_text_with_icons(4.0, ty, &txt, c, 0.65);
                                             } else {
                                                 unsafe {
                                                     _3ds_top_queue_text(
@@ -4037,9 +4011,7 @@ fn main() {
                                                 let pfx = if li == 0 { prefix } else { "   " };
                                                 let txt = format!("{}{}", pfx, l);
                                                 if txt.contains("{{") {
-                                                    render_text_with_icons(
-                                                        4.0, ty, &txt, color, scale, 14.0,
-                                                    );
+                                                    render_text_with_icons(4.0, ty, &txt, color, scale);
                                                 } else {
                                                     unsafe {
                                                         _3ds_top_queue_text(
