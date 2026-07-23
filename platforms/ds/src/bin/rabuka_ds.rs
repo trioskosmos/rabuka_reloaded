@@ -76,8 +76,6 @@ impl DsAllocator {
         let aligned = align_up(start, ALIGN);
         let size = HEAP_END.saturating_sub(aligned);
         if size > 0 {
-            // Pre-fill the heap region with zeros before passing to linked_list_allocator
-            // to ensure the initial free node sees clean memory.
             ptr::write_bytes(aligned as *mut u8, 0, size);
             let heap = Heap::new(aligned as *mut u8, size);
             *inner = Some(heap);

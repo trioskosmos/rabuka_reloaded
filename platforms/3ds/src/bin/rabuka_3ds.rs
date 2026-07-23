@@ -3068,13 +3068,13 @@ fn main() {
                                 content_y = 126.0;
                             } else if let Some(entry) = gs.ability_queue.current_entry() {
                                 // Ability queue overlay with full text
-                                let ab_lines: Vec<String> = wrap_text(&entry.ability.full_text, 40)
+                                let ab_lines: Vec<String> = wrap_text(&entry.ability.full_text, 50)
                                     .lines()
-                                    .take(3)
+                                    .take(4)
                                     .map(|l| l.to_string())
                                     .collect();
                                 let n_lines = ab_lines.len();
-                                let h = 22.0 + n_lines as f32 * 16.0;
+                                let h = 22.0 + n_lines as f32 * 14.0;
                                 unsafe {
                                     _3ds_top_queue_rect(0.0, 42.0, 400.0, h, COL_ABILITY);
                                     _3ds_top_queue_text(
@@ -3098,7 +3098,7 @@ fn main() {
                             }
                         }
 
-                        // Action list (hidden in image mode when a choice is pending)
+                        // Choice image mode: show card images (with text fallback for non-card actions)
                         let is_image_choice = choice_image_mode && gs.has_pending_choice();
                         {
                             // Action list on top screen (was previously on bottom overlay).
@@ -3106,8 +3106,77 @@ fn main() {
                                 *ai_vs_ai || (*vs_ai && gs.active_player().id != gs.player1.id);
                             let is_opponent_turn_mp =
                                 is_multiplayer && !mp_can_act(&gs, if is_host { 0 } else { 1 });
-                            if !is_image_choice
-                                && !is_ai_turn
+                            if is_image_choice {
+                                // Image mode: render choice cards on the top screen
+                                let mut ix = 4.0f32;
+                                let iy = 42.0f32;
+                                let iw = 88.0f32;
+                                let ih = 124.0f32;
+                                let mut has_non_card = false;
+                                for &fi in &display_order {
+                                    let act = &acts_cache[fi];
+                                    if let Some(cid) =
+                                        act.parameters.as_ref().and_then(|p| p.card_id)
+                                    {
+                                        if let Some(cn) = card_no(cid) {
+                                            if let Some((atl, idx)) = atlas.lookup(cn.as_str()) {
+                                                let c_str = std::ffi::CString::new(atl.as_bytes())
+                                                    .unwrap_or_default();
+                                                unsafe {
+                                                    _3ds_top_queue_rect(ix, iy, iw, ih, COL_CARD);
+                                                    _3ds_top_queue_card(
+                                                        c_str.as_ptr(),
+                                                        *idx as i32,
+                                                        ix + 2.0,
+                                                        iy + 2.0,
+                                                        iw - 4.0,
+                                                        ih - 24.0,
+                                                    );
+                                                    _3ds_top_queue_text(
+                                                        ix + 2.0,
+                                                        iy + ih - 20.0,
+                                                        COL_LIGHT,
+                                                        0.55f32,
+                                                        format!("{}\0", cn).as_ptr(),
+                                                    );
+                                                }
+                                                ix += iw + 4.0;
+                                                if ix + iw > 400.0 {
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        has_non_card = true;
+                                    }
+                                }
+                                if has_non_card {
+                                    // Render non-card actions (skip, etc.) as text below the cards
+                                    let mut ty = iy + ih + 8.0;
+                                    for &fi in &display_order {
+                                        let act = &acts_cache[fi];
+                                        if act.parameters.as_ref().and_then(|p| p.card_id).is_none()
+                                        {
+                                            let desc = act
+                                                .description
+                                                .lines()
+                                                .next()
+                                                .unwrap_or("")
+                                                .to_string();
+                                            unsafe {
+                                                _3ds_top_queue_text(
+                                                    4.0,
+                                                    ty,
+                                                    COL_LIGHT,
+                                                    0.65f32,
+                                                    format!("{}\0", desc).as_ptr(),
+                                                );
+                                            }
+                                            ty += 18.0;
+                                        }
+                                    }
+                                }
+                            } else if !is_ai_turn
                                 && !is_opponent_turn_mp
                                 && !display_order.is_empty()
                                 && content_y < 240.0
@@ -3625,6 +3694,7 @@ extern "C" {
     fn _3ds_top_clear();
     fn _3ds_top_queue_rect(x: f32, y: f32, w: f32, h: f32, color: u32);
     fn _3ds_top_queue_text(x: f32, y: f32, color: u32, scale: f32, text: *const u8);
+    fn _3ds_top_queue_card(atlas: *const u8, idx: i32, x: f32, y: f32, w: f32, h: f32);
 
     // Board HUD
     fn _3ds_board_set_hud(turn: i32, phase: *const u8, player: *const u8);

@@ -106,9 +106,12 @@ typedef struct {
     u32 color;
     float scale;
     const char *text;  // points into string_pool — no per-op buffer needed
+    const char *atlas; // atlas name for card images
+    int   atlas_idx;
 } DrawOp;
 #define OP_RECT 0
 #define OP_TEXT 1
+#define OP_CARD 2
 static DrawOp draw_ops[MAX_DRAW_OPS];
 static int   draw_op_count = 0;
 static int   draw_op_types[MAX_DRAW_OPS];
@@ -362,6 +365,24 @@ void _3ds_top_queue_text(float x, float y, u32 color, float scale, const char* t
     draw_ops[i].x = x; draw_ops[i].y = y;
     draw_ops[i].color = color; draw_ops[i].scale = scale;
     draw_ops[i].text = pool_strdup(text);
+}
+
+void _3ds_top_queue_card(const char* atlas, int idx, float x, float y, float w, float h) {
+    if (!atlas || draw_op_count >= MAX_DRAW_OPS) return;
+    int i = draw_op_count++;
+    draw_op_types[i] = OP_CARD;
+    draw_ops[i].x = x; draw_ops[i].y = y; draw_ops[i].w = w; draw_ops[i].h = h;
+    draw_ops[i].atlas = pool_strdup(atlas);
+    draw_ops[i].atlas_idx = idx;
+}
+
+static C2D_Image _atlas_get_image(const char* atlas, int idx) {
+    for (int i = 0; i < atlas_count; i++) {
+        if (strcmp(atlases[i].name, atlas) == 0)
+            return C2D_SpriteSheetGetImage(atlases[i].sheet, (size_t)idx);
+    }
+    C2D_Image img = {0};
+    return img;
 }
 
 // ---- Board HUD ----
@@ -857,6 +878,13 @@ void _3ds_swap_buffers() {
                     draw_ops[i].scale, draw_ops[i].scale,
                     draw_ops[i].color,
                     390.0f);
+            } else if (draw_op_types[i] == OP_CARD) {
+                C2D_Image img = _atlas_get_image(draw_ops[i].atlas, draw_ops[i].atlas_idx);
+                if (img.tex != NULL) {
+                    float sx = draw_ops[i].w / (float)img.subtex->width;
+                    float sy = draw_ops[i].h / (float)img.subtex->height;
+                    C2D_DrawImageAt(img, draw_ops[i].x, draw_ops[i].y, 0.5f, NULL, sx, sy);
+                }
             }
         }
     }
