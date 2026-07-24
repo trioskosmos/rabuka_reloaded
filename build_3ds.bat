@@ -92,18 +92,15 @@ if errorlevel 1 echo [6/7] build_romfs failed -- trying makerom without it.
 > "%RSF_FILE%" echo BasicInfo:
 >>"%RSF_FILE%" echo   Title: "Rabuka Reloaded"
 >>"%RSF_FILE%" echo   CompanyCode: "01"
->>"%RSF_FILE%" echo   ProductCode: "CTR-P-RABU"
+>>"%RSF_FILE%" echo   ProductCode: "CTR-P-RLDD"
 >>"%RSF_FILE%" echo   ContentType: Application
 >>"%RSF_FILE%" echo .
 >>"%RSF_FILE%" echo AccessControlInfo:
 >>"%RSF_FILE%" echo   CoreVersion: 2
+>>"%RSF_FILE%" echo   Priority: 16
 >>"%RSF_FILE%" echo.
 >>"%RSF_FILE%" echo SystemControlInfo:
 >>"%RSF_FILE%" echo   StackSize: 0x10000
->>"%RSF_FILE%" echo   SaveDataSize: 0x100000
->>"%RSF_FILE%" echo.
->>"%RSF_FILE%" echo Cci:
->>"%RSF_FILE%" echo   NoRomFs: false
 if exist "%ROMFS_BIN%" (
     makerom -f cia -o "%OUT_CIA%" -elf "%SRC_ELF%" -romfs "%ROMFS_BIN%" -rsf "%RSF_FILE%"
 ) else (

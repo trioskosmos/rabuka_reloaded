@@ -95,6 +95,10 @@ static void gx_init(void) {
 static void sjis_to_gx(const char *utf8) {
     if (!fontdata) return;
     f32 pen_x = cur_x * CELL_W, pen_y = cur_y * CELL_H;
+
+    GX_SetTevOp(GX_TEVSTAGE0, GX_MODULATE);
+    GX_SetVtxDesc(GX_VA_TEX0, GX_DIRECT);
+
     const u8 *p = (const u8*)utf8;
     while (*p) {
         if (*p == '\n') { pen_x = 0; pen_y += CELL_H; cur_y++; p++; continue; }
@@ -107,12 +111,7 @@ static void sjis_to_gx(const char *utf8) {
             cp = ((*p & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F); p += 3;
         } else { cp = '?'; p++; }
 
-        int sjis = (cp < 0x80) ? cp : 0;
-        if (sjis == 0) {
-            // SJIS lookup would go here - simplified for now, use cp as fallback
-            sjis = cp;
-        }
-
+        int sjis = (cp < 0x80) ? cp : (cp & 0xFFFF);
         void *img; s32 tx, ty, tw;
         SYS_GetFontTexture(sjis, &img, &tx, &ty, &tw);
         if (img && tw > 0) {
@@ -127,8 +126,6 @@ static void sjis_to_gx(const char *utf8) {
                 fontdata->sheet_width, fontdata->sheet_height,
                 fontdata->sheet_format, GX_CLAMP, GX_CLAMP, GX_FALSE);
             GX_LoadTexObj(&fonttex, GX_TEXMAP0);
-            GX_SetTevOp(GX_TEVSTAGE0, GX_MODULATE);
-            GX_SetVtxDesc(GX_VA_TEX0, GX_DIRECT);
 
             GX_Begin(GX_QUADS, GX_VTXFMT0, 4);
                 GX_Position3f32(pen_x, pen_y, 0); GX_Color1u32(0xFFFFFFFF); GX_TexCoord2f32(s1, t1);
@@ -137,13 +134,13 @@ static void sjis_to_gx(const char *utf8) {
                 GX_Position3f32(pen_x, y2, 0); GX_Color1u32(0xFFFFFFFF); GX_TexCoord2f32(s1, t2);
             GX_End();
 
-            GX_SetTevOp(GX_TEVSTAGE0, GX_PASSCLR);
-            GX_SetVtxDesc(GX_VA_TEX0, GX_NONE);
-
             pen_x += tw;
             cur_x++;
         }
     }
+
+    GX_SetTevOp(GX_TEVSTAGE0, GX_PASSCLR);
+    GX_SetVtxDesc(GX_VA_TEX0, GX_NONE);
 }
 
 void display_init(void) {
