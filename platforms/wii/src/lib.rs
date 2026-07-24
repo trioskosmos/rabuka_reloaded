@@ -412,13 +412,8 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
                     for i in 0..card_ids.len() {
                         let prefix = if i == sel { " >" } else { "  " };
                         let cid = card_ids[i];
-                        let no_s = alloc::format!("{}", cid);
-                        let sjis = card_name_sjis(&no_s);
-                        if !sjis.is_empty() {
-                            display.print_card_item_no_idx(prefix, sjis);
-                        } else {
-                            display.println(&format!("{prefix} #{}", cid));
-                        }
+                        let name = card_name(&gs, cid);
+                        display.println(&format!("{prefix} {name}"));
                     }
                     if allow_skip {
                         let prefix = if sel == card_ids.len() { " >" } else { "  " };
@@ -449,16 +444,10 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
                     display.println(&description);
                     for i in 0..card_ids.len() {
                         let cid = card_ids[i];
-                        let no_s = alloc::format!("{}", cid);
-                        let sjis = card_name_sjis(&no_s);
+                        let name = card_name(&gs, cid);
                         let check = if selected.contains(&i) { "[X]" } else { "[ ]" };
                         let ptr = if i == multi_sel { " >" } else { "  " };
-                        let prefix = alloc::format!("{ptr}{check}");
-                        if !sjis.is_empty() {
-                            display.print_card_item_no_idx(&prefix, sjis);
-                        } else {
-                            display.println(&format!("{prefix} #{}", cid));
-                        }
+                        display.println(&format!("{ptr}{check} {name}"));
                     }
                     display.println(&format!(
                         "Selected: {}/{}  (A=toggle, B=done)",
@@ -607,8 +596,13 @@ fn init_rng() {
     rng::seed(if tick == 0 { 1 } else { tick as u32 });
 }
 
-// Include the generated Shift-JIS lookup table
-include!(concat!(env!("OUT_DIR"), "/sjis_table.rs"));
+fn card_name(gs: &GameState, cid: i16) -> String {
+    if let Some(c) = gs.card_database.get_card(cid) {
+        c.name.to_string()
+    } else {
+        format!("#{}", cid)
+    }
+}
 
 extern "C" {
     fn SYS_Time() -> u64;

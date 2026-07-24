@@ -3,22 +3,31 @@
 
 extern crate alloc;
 
-use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::hash::{BuildHasher, Hasher};
+
+// Debug output on bottom screen rows 22-23 — writes directly to tile map, bypassing console
+fn dbg_row(row: i32, text: &str) {
+    let mut s = alloc::string::String::from(text);
+    // Pad/truncate to 32 chars
+    while s.len() < 32 {
+        s.push(' ');
+    }
+    s.truncate(32);
+    s.push('\0');
+    unsafe {
+        nds_dbg_direct(row, s.as_ptr());
+    }
+}
 
 use rabuka_ds::display::Display;
 use rabuka_ds::input::{Button, Input};
 
-use rabuka_engine::ability::ability_store::AbilityRef;
-use rabuka_engine::card::{
-    BaseHeart, BladeHeart, Card, CardDatabase, CardType, HeartColor, HeartMap, SpecialHeart,
-};
-use rabuka_engine::core::types::ArcStr;
+use rabuka_engine::card::{Card, CardDatabase};
+use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::game::deck_builder;
 use rabuka_engine::game_setup;
 use rabuka_engine::game_state::{GameResult, GameState, Phase};
@@ -30,6 +39,7 @@ extern "C" {
     fn nds_init();
     fn nds_get_tick() -> u64;
     fn nds_wait_vblank();
+    fn nds_dbg_direct(row: i32, text: *const u8);
 }
 
 use core::alloc::{GlobalAlloc, Layout};
@@ -89,260 +99,48 @@ unsafe impl GlobalAlloc for DsAllocator {
 #[global_allocator]
 static ALLOCATOR: DsAllocator = DsAllocator::new();
 
-#[derive(Default, Clone, Copy)]
-struct DsHasher(u64);
+const DECKS_JSON: &str = include_str!("../../../psp/baked/decks.json");
 
-impl Hasher for DsHasher {
-    fn write(&mut self, bytes: &[u8]) {
-        for &b in bytes {
-            self.0 = self.0.wrapping_mul(131).wrapping_add(b as u64);
-        }
-    }
-    fn finish(&self) -> u64 {
-        self.0
-    }
+const DECK_CARD_FILES: &[&str] = &[
+    include_str!("../../../psp/baked/deck_0_cards.json"),
+    include_str!("../../../psp/baked/deck_1_cards.json"),
+    include_str!("../../../psp/baked/deck_2_cards.json"),
+    include_str!("../../../psp/baked/deck_3_cards.json"),
+    include_str!("../../../psp/baked/deck_4_cards.json"),
+    include_str!("../../../psp/baked/deck_5_cards.json"),
+    include_str!("../../../psp/baked/deck_6_cards.json"),
+    include_str!("../../../psp/baked/deck_7_cards.json"),
+    include_str!("../../../psp/baked/deck_8_cards.json"),
+    include_str!("../../../psp/baked/deck_9_cards.json"),
+    include_str!("../../../psp/baked/deck_10_cards.json"),
+    include_str!("../../../psp/baked/deck_11_cards.json"),
+    include_str!("../../../psp/baked/deck_12_cards.json"),
+    include_str!("../../../psp/baked/deck_13_cards.json"),
+    include_str!("../../../psp/baked/deck_14_cards.json"),
+    include_str!("../../../psp/baked/deck_15_cards.json"),
+];
+
+#[derive(serde::Deserialize)]
+struct DeckEntry {
+    name: String,
+    cards: Vec<String>,
 }
 
-impl BuildHasher for DsHasher {
-    type Hasher = DsHasher;
-    fn build_hasher(&self) -> DsHasher {
-        DsHasher(0)
-    }
-}
+fn load_two_decks(deck1_idx: usize, deck2_idx: usize) -> Vec<Card> {
+    let json1 = DECK_CARD_FILES[deck1_idx];
+    let mut merged: Vec<Card> = serde_json::from_str(json1).unwrap_or_default();
 
-// Flat binary card database (zero-copy, no heap allocation for parsing)
-const CARDS_DB: &[u8] = include_bytes!("../../../../output/cards_database.bin");
-
-struct DsCardDb<'a> {
-    data: &'a [u8],
-    card_count: u16,
-    deck_count: u16,
-    str_table_offset: usize,
-    deck_index_offset: usize,
-}
-
-impl<'a> DsCardDb<'a> {
-    fn new(data: &'a [u8]) -> Self {
-        assert!(data.len() >= 12);
-        assert!(&data[0..4] == b"RBCD");
-        let card_count = u16::from_le_bytes([data[4], data[5]]);
-        let deck_count = u16::from_le_bytes([data[6], data[7]]);
-        let str_table_size = u32::from_le_bytes([data[8], data[9], data[10], data[11]]) as usize;
-        let str_table_offset = 12 + card_count as usize * 20;
-        let deck_index_offset = str_table_offset + str_table_size;
-        Self {
-            data,
-            card_count,
-            deck_count,
-            str_table_offset,
-            deck_index_offset,
+    if deck1_idx != deck2_idx && deck2_idx < DECK_CARD_FILES.len() {
+        let json2 = DECK_CARD_FILES[deck2_idx];
+        let cards2: Vec<Card> = serde_json::from_str(json2).unwrap_or_default();
+        for c in cards2 {
+            if !merged.iter().any(|m| m.card_no == c.card_no) {
+                merged.push(c);
+            }
         }
     }
 
-    fn card_count(&self) -> u16 {
-        self.card_count
-    }
-
-    fn deck_count(&self) -> u16 {
-        self.deck_count
-    }
-
-    fn str_at(&self, offset: u16) -> &str {
-        let start = self.str_table_offset + offset as usize;
-        let end = self.data[start..].iter().position(|&b| b == 0).unwrap_or(0);
-        core::str::from_utf8(&self.data[start..start + end]).unwrap_or("")
-    }
-
-    fn card_no(&self, card_idx: u16) -> &str {
-        let rec = 12 + card_idx as usize * 20;
-        let off = u16::from_le_bytes([self.data[rec], self.data[rec + 1]]);
-        self.str_at(off)
-    }
-
-    #[allow(dead_code)]
-    fn card_type(&self, card_idx: u16) -> u8 {
-        self.data[12 + card_idx as usize * 20 + 4]
-    }
-
-    #[allow(dead_code)]
-    fn card_cost(&self, card_idx: u16) -> u8 {
-        self.data[12 + card_idx as usize * 20 + 5]
-    }
-
-    #[allow(dead_code)]
-    fn card_blade(&self, card_idx: u16) -> u8 {
-        self.data[12 + card_idx as usize * 20 + 6]
-    }
-
-    #[allow(dead_code)]
-    fn card_score(&self, card_idx: u16) -> u8 {
-        self.data[12 + card_idx as usize * 20 + 7]
-    }
-
-    #[allow(dead_code)]
-    fn card_ability_ref(&self, card_idx: u16) -> u16 {
-        let rec = 12 + card_idx as usize * 20 + 14;
-        u16::from_le_bytes([self.data[rec], self.data[rec + 1]])
-    }
-
-    fn deck_start_offset(&self, deck_idx: usize) -> usize {
-        let mut offset = self.deck_index_offset;
-        for _ in 0..deck_idx {
-            let cc = u16::from_le_bytes([self.data[offset + 2], self.data[offset + 3]]) as usize;
-            offset += 4 + cc * 2;
-        }
-        offset
-    }
-
-    fn deck_name(&self, deck_idx: usize) -> &str {
-        let offset = self.deck_start_offset(deck_idx);
-        let off = u16::from_le_bytes([self.data[offset], self.data[offset + 1]]);
-        self.str_at(off)
-    }
-
-    fn deck_card_count(&self, deck_idx: usize) -> u16 {
-        let offset = self.deck_start_offset(deck_idx);
-        u16::from_le_bytes([self.data[offset + 2], self.data[offset + 3]])
-    }
-
-    fn deck_card_index(&self, deck_idx: usize, i: usize) -> u16 {
-        let offset = self.deck_start_offset(deck_idx);
-        let cc = u16::from_le_bytes([self.data[offset + 2], self.data[offset + 3]]) as usize;
-        if i >= cc {
-            return 0;
-        }
-        let idx_off = offset + 4 + i * 2;
-        u16::from_le_bytes([self.data[idx_off], self.data[idx_off + 1]])
-    }
-
-    fn build_card(&self, card_idx: u16) -> Card {
-        let rec = 12 + card_idx as usize * 20;
-        let card_no_off = u16::from_le_bytes([self.data[rec], self.data[rec + 1]]);
-        let name_off = u16::from_le_bytes([self.data[rec + 2], self.data[rec + 3]]);
-        let card_type_val = self.data[rec + 4];
-        let cost_val = self.data[rec + 5];
-        let blade_val = self.data[rec + 6];
-        let score_val = self.data[rec + 7];
-        let base_heart_val = self.data[rec + 8];
-        let group_val = self.data[rec + 9];
-        let series_val = self.data[rec + 10];
-        let unit_val = self.data[rec + 11];
-        let blade_heart_val = self.data[rec + 12];
-        let special_heart_val = self.data[rec + 13];
-        let ability_ref_val = u16::from_le_bytes([self.data[rec + 14], self.data[rec + 15]]);
-        // Note: ability_ref_val may be stale if RBCD was baked with old abilities_gen.rs.
-        // If the index is >= NUM_ABILITIES, get_ability returns None and unwrap_or_default()
-        // creates a default Ability (no triggers). Re-run `cargo run --release -- ds` in
-        // tools/bake to regenerate the RBCD with current ability indices.
-
-        let ct = match card_type_val {
-            1 => CardType::Live,
-            2 => CardType::Energy,
-            _ => CardType::Member,
-        };
-
-        let base_heart = make_base_heart_from_u8(base_heart_val);
-        let blade_heart = make_blade_heart_from_u8(blade_heart_val);
-        let special_heart = make_special_heart_from_u8(special_heart_val);
-        let abilities = if ability_ref_val > 0 {
-            vec![AbilityRef::index(ability_ref_val)]
-        } else {
-            vec![]
-        };
-
-        Card {
-            card_no: String::from(self.str_at(card_no_off)).into(),
-            name: String::from(self.str_at(name_off)).into(),
-            card_type: ct,
-            series: series_from_u8(series_val),
-            group: group_from_u8(group_val),
-            unit: if unit_val != 0 {
-                Some(ArcStr::from(""))
-            } else {
-                None
-            },
-            cost: if cost_val > 0 {
-                Some(cost_val as u32)
-            } else {
-                None
-            },
-            base_heart,
-            blade_heart,
-            blade: blade_val as u32,
-            score: if score_val > 0 {
-                Some(score_val as u32)
-            } else {
-                None
-            },
-            need_heart: None,
-            special_heart,
-            abilities,
-        }
-    }
-}
-
-fn make_base_heart_from_u8(v: u8) -> Option<BaseHeart> {
-    let color = match v {
-        1 => HeartColor::Heart01,
-        2 => HeartColor::Heart02,
-        3 => HeartColor::Heart03,
-        4 => HeartColor::Heart04,
-        5 => HeartColor::Heart05,
-        _ => return None,
-    };
-    let mut hearts = HeartMap::new();
-    hearts.insert(color, 1);
-    Some(BaseHeart { hearts })
-}
-
-fn make_blade_heart_from_u8(v: u8) -> Option<BladeHeart> {
-    let color = match v {
-        1 => HeartColor::Heart01,
-        2 => HeartColor::Heart02,
-        3 => HeartColor::Heart03,
-        4 => HeartColor::Heart04,
-        5 => HeartColor::Heart05,
-        _ => return None,
-    };
-    let mut hearts = HeartMap::new();
-    hearts.insert(color, 1);
-    Some(BladeHeart { hearts })
-}
-
-fn make_special_heart_from_u8(v: u8) -> Option<SpecialHeart> {
-    let color = match v {
-        1 => HeartColor::Heart01,
-        2 => HeartColor::Heart02,
-        3 => HeartColor::Heart03,
-        4 => HeartColor::Heart04,
-        5 => HeartColor::Heart05,
-        _ => return None,
-    };
-    let mut hearts = HeartMap::new();
-    hearts.insert(color, 1);
-    Some(SpecialHeart { hearts })
-}
-
-fn series_from_u8(v: u8) -> Box<str> {
-    match v {
-        1 => Box::from("ラブライブ！"),
-        2 => Box::from("ラブライブ！サンシャイン!!"),
-        3 => Box::from("ラブライブ！虹ヶ咲学園スクールアイドル同好会"),
-        4 => Box::from("ラブライブ！スーパースター!!"),
-        5 => Box::from("蓮ノ空女学院スクールアイドルクラブ"),
-        _ => Box::from(""),
-    }
-}
-
-fn group_from_u8(v: u8) -> Box<str> {
-    match v {
-        1 => Box::from("μ's"),
-        2 => Box::from("Aqours"),
-        3 => Box::from("虹ヶ咲"),
-        4 => Box::from("Liella!"),
-        5 => Box::from("蓮ノ空"),
-        _ => Box::from(""),
-    }
+    merged
 }
 
 #[no_mangle]
@@ -355,7 +153,11 @@ pub extern "C" fn main() {
     let mut input = Input::new();
     init_rng();
 
-    let card_db = DsCardDb::new(CARDS_DB);
+    dbg_row(0, "STARTED                       ");
+    dbg_row(1, "abcdefghijklmnopqrstuvwxyz01234");
+
+    let decks: Vec<DeckEntry> = serde_json::from_str(DECKS_JSON).expect("Failed to parse decks");
+    let deck_names: Vec<&str> = decks.iter().map(|d| d.name.as_str()).collect();
 
     let modes = ["VS AI", "2 Player", "AI vs AI", "Run Tests"];
     let mode_idx = select(&mut display, &mut input, &modes, "Mode");
@@ -364,19 +166,13 @@ pub extern "C" fn main() {
     let run_tests = mode_idx == 3;
 
     if run_tests {
-        run_on_device_tests_ds(&mut display, &mut input, &card_db);
+        run_on_device_tests_ds(&mut display, &mut input);
         return;
-    }
-
-    let deck_count = card_db.deck_count() as usize;
-    let mut deck_names: Vec<&str> = Vec::new();
-    for i in 0..deck_count {
-        deck_names.push(card_db.deck_name(i));
     }
 
     let deck1_idx = select(&mut display, &mut input, &deck_names, "Your Deck");
     let deck2_idx = if vs_ai || ai_vs_ai {
-        rng::rand_range(deck_count)
+        rng::rand_range(decks.len())
     } else {
         select(&mut display, &mut input, &deck_names, "P2 Deck")
     };
@@ -385,49 +181,22 @@ pub extern "C" fn main() {
     display.println("Loading...");
     display.swap_buffers();
 
-    // Collect unique cards from both decks and build Card structs from binary
-    let mut seen: hashbrown::HashSet<u16, DsHasher> = hashbrown::HashSet::with_hasher(DsHasher(0));
-    let mut cards: Vec<Card> = Vec::new();
-    let mut nums1: Vec<String> = Vec::new();
-    let mut nums2: Vec<String> = Vec::new();
-
-    let cc1 = card_db.deck_card_count(deck1_idx) as usize;
-    for i in 0..cc1 {
-        let ci = card_db.deck_card_index(deck1_idx, i);
-        nums1.push(String::from(card_db.card_no(ci)));
-        if seen.insert(ci) {
-            cards.push(card_db.build_card(ci));
-        }
-    }
-    display.println(&format!("1: {} cards", nums1.len()));
+    display.println("Loading deck cards...");
     display.swap_buffers();
+    let mut all_cards = load_two_decks(deck1_idx, deck2_idx);
 
-    let cc2 = card_db.deck_card_count(deck2_idx) as usize;
-    for i in 0..cc2 {
-        let ci = card_db.deck_card_index(deck2_idx, i);
-        nums2.push(String::from(card_db.card_no(ci)));
-        if seen.insert(ci) {
-            cards.push(card_db.build_card(ci));
-        }
-    }
-    display.println(&format!("2: {} cards", nums2.len()));
+    display.println("Attaching abilities...");
     display.swap_buffers();
+    CardLoader::attach_abilities(&mut all_cards);
 
-    let mut card_map: hashbrown::HashMap<String, Card, DsHasher> =
-        hashbrown::HashMap::with_hasher(DsHasher(0));
-    for c in cards.into_iter() {
-        let key = c.card_no.to_string();
-        if !card_map.contains_key(&key) {
-            card_map.insert(key, c);
-        }
-    }
-    display.println(&format!("map: {}", card_map.len()));
+    display.println("Building database...");
     display.swap_buffers();
+    let mut db = Arc::new(CardDatabase::load_or_create(all_cards));
 
-    let cards: Vec<Card> = card_map.into_values().collect();
-    let mut db = Arc::new(CardDatabase::load_or_create(cards));
-    display.println(&format!("db ok"));
+    display.println("Building decks...");
     display.swap_buffers();
+    let nums1: Vec<String> = decks[deck1_idx].cards.clone();
+    let nums2: Vec<String> = decks[deck2_idx].cards.clone();
 
     let mut pd1 = deck_builder::DeckBuilder::build_deck_from_database(&mut db, nums1)
         .expect("Failed to build P1 deck");
@@ -456,210 +225,119 @@ pub extern "C" fn main() {
     display.println(&format!("game ready: {:?}", gs.current_phase));
     display.swap_buffers();
 
-    let mut frame_count = 0u32;
     loop {
+        dbg_row(
+            0,
+            &alloc::format!(
+                "TOP ph={:?} t={}           ",
+                gs.current_phase,
+                gs.turn_number
+            ),
+        );
         TurnEngine::check_victory_condition(&mut gs);
         if gs.game_result != GameResult::Ongoing {
             show_result(&mut display, &mut input, &gs);
             break;
         }
 
+        dbg_row(
+            1,
+            &alloc::format!(
+                "TOP2 pc={} ph={:?}              ",
+                gs.has_pending_choice(),
+                gs.current_phase
+            ),
+        );
+
         settle_auto(&mut display, &mut gs);
         if gs.game_result != GameResult::Ongoing {
             show_result(&mut display, &mut input, &gs);
             break;
         }
 
-        let is_current_player_ai = ai_vs_ai || (vs_ai && gs.active_player().id != gs.player1.id);
-
-        if gs.has_pending_choice() {
-            if is_current_player_ai {
-                // AI: auto-pick first option on pending choices
-                TurnEngine::resume_with_choice(&mut gs, Some(0), None).ok();
-            } else {
-                // Auto-resolve SelectAutoAbility when only one option exists
-                // (no meaningful user choice to make). This avoids stalling the
-                // game loop waiting for input when the engine has already determined
-                // the only valid ability order.
-                use rabuka_engine::ability::types::Choice;
-                let auto_resolved = if let Some(c) = gs.get_pending_choice() {
-                    if let Choice::SelectAutoAbility { ref options, .. } = c.clone() {
-                        if options.len() <= 1 {
-                            TurnEngine::resume_with_choice(&mut gs, Some(0), None).ok();
-                            true
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                };
-                if !auto_resolved {
-                    if !handle_choice(&mut display, &mut input, &mut gs) {
-                        break;
-                    }
-                }
-            }
-            continue;
-        }
-
         let actions = game_setup::generate_possible_actions(&gs);
+        dbg_row(
+            23,
+            &alloc::format!(
+                "a={} pc={}              ",
+                actions.len(),
+                gs.has_pending_choice()
+            ),
+        );
 
         if actions.is_empty() {
             TurnEngine::advance_phase(&mut gs);
-            // Note: auto-phase settling handled by settle_auto() at top and bottom of loop
+            wait_frames(10);
             continue;
         }
 
-        if is_current_player_ai {
-            let idx = rng::rand_range(actions.len());
-            if ai_vs_ai {
-                display.clear();
-                display.println(&alloc::format!(
-                    "f{} act[{}] {}",
-                    frame_count,
-                    idx,
-                    actions[idx].action_type
-                ));
-                display.println(&alloc::format!(
-                    "desc:{}",
-                    actions[idx]
-                        .description
-                        .chars()
-                        .take(40)
-                        .collect::<String>()
-                ));
-                display.println(&alloc::format!("P:{:?}", gs.current_phase));
-                display.swap_buffers();
-            }
-            let p = actions[idx].parameters.clone();
-            let _ = TurnEngine::execute_main_phase_action(
-                &mut gs,
-                &actions[idx].action_type,
-                p.as_ref().and_then(|x| x.card_id),
-                p.as_ref().and_then(|x| x.card_indices.clone()),
-                p.as_ref()
-                    .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
-                p.as_ref().and_then(|x| x.use_baton_touch),
-            );
-            if ai_vs_ai {
-                display.clear();
-                display.println(">>> AFTER ACTION <<<");
-                display.println(&alloc::format!("P:{:?}", gs.current_phase));
-                display.println(&alloc::format!("pc:{}", gs.has_pending_choice()));
-                display_heap_stats(&mut display);
-                display.swap_buffers();
-            }
-            gs.reset_loop_detection();
-            frame_count += 1;
-            // Settle auto phases — yield VBlank every 8 iters to prevent DS stall
-            {
-                let mut sa = 0u32;
-                while gs.game_result == GameResult::Ongoing
-                    && !gs.has_pending_choice()
-                    && game_setup::is_automatic_phase(&gs)
-                    && sa < 500
-                {
-                    sa += 1;
-                    if sa % 8 == 0 {
-                        unsafe { nds_wait_vblank() };
-                    }
-                    TurnEngine::advance_phase(&mut gs);
+        if gs.has_pending_choice() {
+            let is_current_player_ai =
+                ai_vs_ai || (vs_ai && gs.active_player().id != gs.player1.id);
+            if is_current_player_ai {
+                TurnEngine::resume_with_choice(&mut gs, Some(0), None).ok();
+            } else {
+                if !handle_choice(&mut display, &mut input, &mut gs) {
+                    break;
                 }
             }
-            if ai_vs_ai {
-                display.clear();
-                display.println(&format!("Turn {} frame {}", gs.turn_number, frame_count));
-                display.println(&format!("Phase: {:?}", gs.current_phase));
-                display.println(&format!("TP: {}", gs.current_turn_phase));
-                display_heap_stats(&mut display);
-                display.swap_buffers();
-            }
-            // Let loop continue to RPS auto-pick + bottom settle_auto
+            continue;
+        }
+
+        let is_current_player_ai = ai_vs_ai || (vs_ai && gs.active_player().id != gs.player1.id);
+        let ok = if is_current_player_ai {
+            ai_turn(&mut display, &mut gs, &actions)
         } else {
-            let ok = human_turn(&mut display, &mut input, &mut gs, &actions);
-            if !ok {
+            human_turn(&mut display, &mut input, &mut gs, &actions)
+        };
+        dbg_row(
+            22,
+            &alloc::format!(
+                "ht={} ai={} ph={:?}             ",
+                ok,
+                is_current_player_ai,
+                gs.current_phase
+            ),
+        );
+        if !ok {
+            if !is_current_player_ai {
                 break;
             }
-            wait_frames(8);
         }
-
-        // AI auto-pick for P2 in RPS: always pick the winning response
-        if gs.current_phase == Phase::RockPaperScissors
-            && gs.player1_rps_choice.is_some()
-            && gs.player2_rps_choice.is_none()
-        {
-            let ai_actions = game_setup::generate_possible_actions(&gs);
-            // P2 always picks the winning move — no ties possible
-            let rps_idx: usize = match gs.player1_rps_choice {
-                Some(0) => 1, // P1 Rock → P2 Paper (beats Rock)
-                Some(1) => 2, // P1 Paper → P2 Scissors (beats Paper)
-                _ => 0,       // P1 Scissors → P2 Rock (beats Scissors)
-            };
-            if rps_idx < ai_actions.len() {
-                let act = ai_actions[rps_idx].clone();
-                let p = act.parameters.clone();
-                let _ = TurnEngine::execute_main_phase_action(
-                    &mut gs,
-                    &act.action_type,
-                    p.as_ref().and_then(|x| x.card_id),
-                    p.as_ref().and_then(|x| x.card_indices.clone()),
-                    p.as_ref()
-                        .and_then(|x| x.stage_area.as_ref().and_then(|s| s.parse().ok())),
-                    p.as_ref().and_then(|x| x.use_baton_touch),
-                );
-                gs.reset_loop_detection();
-            }
-            if ai_vs_ai {
-                display.clear();
-                display.println(&alloc::format!(
-                    "P2 act={} ph={:?}",
-                    rps_idx,
-                    gs.current_phase
-                ));
-                display.println(&alloc::format!(
-                    "p1:{:?} p2:{:?} w:{:?}",
-                    gs.player1_rps_choice,
-                    gs.player2_rps_choice,
-                    gs.rps_winner
-                ));
-                display.swap_buffers();
-            }
-            if gs.current_phase == Phase::RockPaperScissors {
-                panic!("RPS STUCK");
-            }
-        }
-
+        dbg_row(
+            22,
+            &alloc::format!(
+                "sa_bot ph={:?} pc={}            ",
+                gs.current_phase,
+                gs.has_pending_choice()
+            ),
+        );
         settle_auto(&mut display, &mut gs);
+        dbg_row(
+            22,
+            &alloc::format!(
+                "sa_done ph={:?} pc={}           ",
+                gs.current_phase,
+                gs.has_pending_choice()
+            ),
+        );
     }
 }
 
 // ── DS On-Device Tests ──────────────────────────────────────────
 
-fn run_on_device_tests_ds(display: &mut Display, input: &mut Input, card_db: &DsCardDb) {
+fn run_on_device_tests_ds(display: &mut Display, input: &mut Input) {
     display.clear();
     display.println("=== DS ON-DEVICE TESTS ===");
     display.swap_buffers();
     wait_frames(20);
 
+    let decks: Vec<DeckEntry> = serde_json::from_str(DECKS_JSON).expect("Failed to parse decks");
     let mut passed = 0u32;
     let mut failed = 0u32;
 
-    // Test 1: Card count from binary DB
-    let cc = card_db.card_count();
-    display.println(&alloc::format!("CARDS: {} in RBCD", cc));
-    if cc > 0 {
-        passed += 1;
-    } else {
-        failed += 1;
-    }
-    display.swap_buffers();
-    wait_frames(20);
-
-    // Test 2: Deck count
-    let dc = card_db.deck_count();
+    // Test 1: Deck count from JSON
+    let dc = decks.len();
     display.println(&alloc::format!("DECKS: {}", dc));
     if dc >= 2 {
         passed += 1;
@@ -670,15 +348,24 @@ fn run_on_device_tests_ds(display: &mut Display, input: &mut Input, card_db: &Ds
     display.swap_buffers();
     wait_frames(20);
 
-    // Test 3: Verify ability refs on first few cards
-    let mut ab_count = 0u32;
-    for i in 0..cc.min(50) {
-        let c = card_db.build_card(i);
-        if !c.abilities.is_empty() {
-            ab_count += 1;
-        }
+    // Test 2: Load cards from first two decks and verify abilities
+    let all_cards = load_two_decks(0, 1.min(dc.saturating_sub(1)));
+    let cc = all_cards.len();
+    let ab_count = all_cards.iter().filter(|c| !c.abilities.is_empty()).count();
+    display.println(&alloc::format!(
+        "CARDS: {}, with abilities: {}",
+        cc,
+        ab_count
+    ));
+    if cc > 0 {
+        passed += 1;
+    } else {
+        failed += 1;
     }
-    display.println(&alloc::format!("ABILITIES: {} cards (of 50)", ab_count));
+    display.swap_buffers();
+    wait_frames(20);
+
+    // Test 3: Verify ability count after attaching
     if ab_count > 0 {
         passed += 1;
     } else {
@@ -688,12 +375,12 @@ fn run_on_device_tests_ds(display: &mut Display, input: &mut Input, card_db: &Ds
     display.swap_buffers();
     wait_frames(20);
 
-    // Test 4: AI vs AI (5 turns) if enough decks
+    // Test 4: AI vs AI if enough decks
     if dc >= 2 {
         display.println("AI PLAY: 5 turns...");
         display.swap_buffers();
         wait_frames(10);
-        match test_ai_vs_ai_ds(card_db, 0, 1) {
+        match test_ai_vs_ai_ds(0, 1) {
             Ok(n) => {
                 display.println(&alloc::format!("AI PLAY: {} actions (OK)", n));
                 passed += 1;
@@ -725,29 +412,14 @@ fn run_on_device_tests_ds(display: &mut Display, input: &mut Input, card_db: &Ds
     }
 }
 
-fn test_ai_vs_ai_ds(card_db: &DsCardDb, d1: u16, d2: u16) -> Result<usize, alloc::string::String> {
-    let mut seen: hashbrown::HashSet<u16, DsHasher> = hashbrown::HashSet::with_hasher(DsHasher(0));
-    let mut cards: Vec<Card> = Vec::new();
-    let mut nums1: Vec<String> = Vec::new();
-    let mut nums2: Vec<String> = Vec::new();
-    let cc1 = card_db.deck_card_count(d1 as usize) as usize;
-    for i in 0..cc1 {
-        let ci = card_db.deck_card_index(d1 as usize, i);
-        nums1.push(String::from(card_db.card_no(ci)));
-        if seen.insert(ci) {
-            cards.push(card_db.build_card(ci));
-        }
-    }
-    let cc2 = card_db.deck_card_count(d2 as usize) as usize;
-    for i in 0..cc2 {
-        let ci = card_db.deck_card_index(d2 as usize, i);
-        nums2.push(String::from(card_db.card_no(ci)));
-        if seen.insert(ci) {
-            cards.push(card_db.build_card(ci));
-        }
-    }
+fn test_ai_vs_ai_ds(d1: usize, d2: usize) -> Result<usize, alloc::string::String> {
+    let decks: Vec<DeckEntry> = serde_json::from_str(DECKS_JSON).expect("Failed to parse decks");
+    let mut all_cards = load_two_decks(d1, d2);
+    CardLoader::attach_abilities(&mut all_cards);
 
-    let mut db = Arc::new(CardDatabase::load_or_create(cards));
+    let mut db = Arc::new(CardDatabase::load_or_create(all_cards));
+    let nums1: Vec<String> = decks[d1].cards.clone();
+    let nums2: Vec<String> = decks[d2].cards.clone();
     let mut pd1 = deck_builder::DeckBuilder::build_deck_from_database(&mut db, nums1)
         .map_err(|e| alloc::format!("D1:{}", e))?;
     deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
@@ -819,12 +491,39 @@ fn select(display: &mut Display, input: &mut Input, items: &[&str], title: &str)
     }
 }
 
+fn ai_turn(_display: &mut Display, gs: &mut GameState, actions: &[game_setup::Action]) -> bool {
+    let idx = rng::rand_range(actions.len());
+    execute_action(gs, &actions[idx])
+}
+
+fn execute_action(gs: &mut GameState, action: &game_setup::Action) -> bool {
+    let params = action.parameters.clone();
+    let action_type = &action.action_type;
+    TurnEngine::execute_main_phase_action(
+        gs,
+        action_type,
+        params.as_ref().and_then(|p| p.card_id),
+        params.as_ref().and_then(|p| p.card_indices.clone()),
+        params
+            .as_ref()
+            .and_then(|p| p.stage_area.as_ref().and_then(|s| s.parse().ok())),
+        params.as_ref().and_then(|p| p.use_baton_touch),
+    )
+    .ok();
+    gs.reset_loop_detection();
+    true
+}
+
 fn human_turn(
     display: &mut Display,
     input: &mut Input,
     gs: &mut GameState,
     actions: &[game_setup::Action],
 ) -> bool {
+    dbg_row(
+        0,
+        &alloc::format!("HT_IN phase={:?}              ", gs.current_phase),
+    );
     let mut sel = 0usize;
     const VISIBLE_ACTIONS: usize = 9;
     loop {
@@ -886,22 +585,6 @@ fn human_turn(
             return false;
         }
     }
-}
-
-fn execute_action(gs: &mut GameState, action: &game_setup::Action) -> bool {
-    let params = action.parameters.clone();
-    let result = TurnEngine::execute_main_phase_action(
-        gs,
-        &action.action_type,
-        params.as_ref().and_then(|p| p.card_id),
-        params.as_ref().and_then(|p| p.card_indices.clone()),
-        params
-            .as_ref()
-            .and_then(|p| p.stage_area.as_ref().and_then(|s| s.parse().ok())),
-        params.as_ref().and_then(|p| p.use_baton_touch),
-    );
-    gs.reset_loop_detection();
-    result.is_ok()
 }
 
 fn menu_select(
@@ -1135,24 +818,8 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
     }
 }
 
-fn settle_auto(display: &mut Display, gs: &mut GameState) {
-    let mut iters = 0u32;
-    loop {
-        iters += 1;
-        if iters % 4 == 0 {
-            display.clear();
-            display.println(&format!("Settling... [{}]", iters));
-            display.println(&format!("Phase: {:?}", gs.current_phase));
-            display.println(&format!("Pending: {}", gs.has_pending_choice()));
-            display.swap_buffers();
-        }
-        if iters > 500 {
-            display.clear();
-            display.println("ERROR: Settle timeout (>500 iters)");
-            display.swap_buffers();
-            wait_frames(60);
-            break;
-        }
+fn settle_auto(_display: &mut Display, gs: &mut GameState) {
+    for _ in 0..500 {
         if gs.has_pending_choice() || gs.game_result != GameResult::Ongoing {
             break;
         }

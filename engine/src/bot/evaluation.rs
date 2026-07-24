@@ -1,4 +1,4 @@
-use crate::game_setup::{Action, ActionType};
+use crate::game_setup::Action;
 use crate::game_state::GameState;
 
 /// Pick rollout action by success_delta / turns (clone-and-eval each action).

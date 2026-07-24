@@ -19,9 +19,9 @@ set DEVKITPRO=C:\devkitPro
 set DEVKITARM=%DEVKITPRO%\devkitARM
 set TARGET_DIR=C:\rust_targets\armv5te-nintendo-ds\release
 
-echo [1/3] Baking card database (DS only)...
+echo [1/3] Baking card data (generating PSP JSONs for DS)...
 cd /d "%~dp0tools\bake"
-call cargo run --release -- ds
+call cargo run --release -- psp
 cd /d "%~dp0"
 if %ERRORLEVEL% neq 0 (
     echo [FAIL] Bake failed.

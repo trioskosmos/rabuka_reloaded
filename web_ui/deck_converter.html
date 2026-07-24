@@ -224,7 +224,10 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { normalizeCode, extractCardId } from './js/card_utils.js';
+        window.normalizeCode = normalizeCode;
+        window.extractCardId = extractCardId;
         const input = document.getElementById('input');
         const output1 = document.getElementById('output1');
         const output2 = document.getElementById('output2');
@@ -238,21 +241,6 @@
 
         function clearError() {
             errorEl.style.display = 'none';
-        }
-
-        function normalizeCode(code) {
-            if (!code) return "";
-            return code.replace(/＋/g, "+").replace(/－/g, "-").replace(/ー/g, "-").trim().toUpperCase();
-        }
-
-        function extractCardId(title) {
-            // Pattern from decklog: "PL!-bp3-012-RM : Card Name"
-            // The ID is before " : " separator
-            const parts = title.split(/\s*:\s*/);
-            if (parts.length >= 1) {
-                return normalizeCode(parts[0]);
-            }
-            return normalizeCode(title);
         }
 
         function process() {

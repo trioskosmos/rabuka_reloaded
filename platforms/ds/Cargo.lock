@@ -51,9 +51,10 @@ dependencies = [
 name = "rabuka_ds"
 version = "0.1.0"
 dependencies = [
- "hashbrown",
  "log",
  "rabuka_engine",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

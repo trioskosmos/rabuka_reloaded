@@ -119,7 +119,6 @@ void nds_init(void) {
     if (con) {
         _tile_map = con->fontBgMap;
     } else {
-        // Fallback: sub BG0 after consoleInit(..., mapBase=22)
         _tile_map = bgGetMapPtr(4);
     }
     iprintf("\x1b[2J");
@@ -138,6 +137,23 @@ void nds_print(const char* text) {
 
 void nds_println(const char* text) {
     iprintf("%s\n", text);
+}
+
+// Direct tile map write for debug — bypasses console completely
+// row: 0-23, text: up to 32 chars, palette: 0xF000 for white
+void nds_dbg_direct(int row, const char* text) {
+    u16* map = _tile_map;
+    if (!map) return;
+    int base = row * 32;
+    int i = 0;
+    while (text[i] && i < 32) {
+        map[base + i] = 0xF000 | (unsigned char)text[i];
+        i++;
+    }
+    while (i < 32) {
+        map[base + i] = 0xF000 | 0x20; // space
+        i++;
+    }
 }
 
 void nds_clear_line(int row) {
@@ -169,6 +185,21 @@ void nds_write_tile_row(int row, const u16* tiles) {
     for (int i = 0; i < 32; i++) {
         map[base + i] = tiles[i];
     }
+}
+
+// Write text to the top screen using its console (avoids Display buffer issues)
+void nds_top_print(const char* text) {
+    PrintConsole* old = consoleGetDefault();
+    consoleSelect(&_top_console);
+    iprintf("%s", text);
+    consoleSelect(old);
+}
+
+void nds_top_clear(void) {
+    PrintConsole* old = consoleGetDefault();
+    consoleSelect(&_top_console);
+    iprintf("\x1b[2J");
+    consoleSelect(old);
 }
 
 // Clear one tile map row

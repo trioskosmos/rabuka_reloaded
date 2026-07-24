@@ -1,6 +1,6 @@
-use std::ffi::{c_char, c_int, CStr};
-use std::format;
-use std::string::ToString;
+use alloc::format;
+use alloc::string::{String, ToString};
+use core::ffi::{c_char, c_int};
 
 extern "C" {
     fn vid_set_mode(dm: c_int, pm: c_int);
@@ -105,7 +105,7 @@ impl Display {
         self.println(&"-".repeat(COLUMNS as usize));
         for (i, item) in items.iter().enumerate() {
             let prefix = if i == selected { " >" } else { "  " };
-            let line = std::format!("{prefix} {item}");
+            let line = alloc::format!("{prefix} {item}");
             self.println(&line);
         }
     }

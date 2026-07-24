@@ -162,10 +162,13 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
 
 <!-- QR Code Modal -->
 <div id="qr-modal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:999;">
-  <div style="background:#1a1a2e;padding:20px;border-radius:8px;text-align:center;border:1px solid #0f3460;">
+  <div style="background:#fff;padding:24px;border-radius:8px;text-align:center;">
     <div id="qr-canvas" style="margin:0 auto;"></div>
-    <p style="margin-top:8px;font-size:12px;color:#8888a0;word-break:break-all;max-width:300px;" id="qr-deck-name"></p>
-    <button id="qr-close" class="primary" style="margin-top:12px;padding:6px 24px;cursor:pointer;">Close</button>
+    <p style="margin-top:8px;font-size:12px;color:#333;word-break:break-all;max-width:300px;" id="qr-deck-name"></p>
+    <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
+      <button id="qr-download" style="padding:6px 16px;background:#333;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;">Download</button>
+      <button id="qr-close" style="padding:6px 16px;background:#ccc;color:#333;border:none;border-radius:4px;font-size:11px;cursor:pointer;">Close</button>
+    </div>
   </div>
 </div>
 
@@ -676,7 +679,8 @@ const POINT_MAP = {
 };
 
 function deckCardLookup(cardNo) {
-  return allCardsArr.find(c => c.card_no === cardNo) || null;
+  const target = normalizeCode(cardNo);
+  return allCardsArr.find(c => normalizeCode(c.card_no) === target) || null;
 }
 
 function addToDeck(cardNo) {
@@ -733,66 +737,48 @@ function exportDeck() {
     toast(`Exported ${deckState.cards.size} card types`);
   });
 }
-function normalizeCode(code) {
-  if (!code) return '';
-  return code.replace(/＋/g, '+').replace(/－/g, '-').replace(/ー/g, '-').trim().toUpperCase();
-}
-function extractCardId(title) {
-  const parts = title.split(/\s*:\s*/);
-  return normalizeCode(parts[0]);
+function addImportedCard(map, cardNo, qty) {
+  if (!cardNo) return false;
+  const card = deckCardLookup(cardNo);
+  if (!card) return false;
+  const existing = map.get(cardNo);
+  map.set(cardNo, { card, qty: (existing ? existing.qty : 0) + qty });
+  return true;
 }
 function importDeckText(text) {
   const newCards = new Map();
   let imported = 0;
+  const add = (id, qty) => { if (addImportedCard(newCards, id, qty)) imported++; };
 
-  // Try Deck Log HTML format first (<span title="ID : Name">...<span class="num">QTY</span>)
+  // 1. Deck Log HTML: <span title="ID : Name"></span><span class="num">QTY</span>
   const decklogRe = /<span\s+title="([^"]*)"[^>]*>\s*<\/span>\s*<span[^>]*class\s*=\s*["']num["'][^>]*>(\d+)<\/span>/gi;
-  let m, htmlMatch = false;
+  let m;
   while ((m = decklogRe.exec(text)) !== null) {
-    const cardId = normalizeCode(extractCardId(m[1]));
-    const qty = parseInt(m[2], 10);
-    const card = deckCardLookup(cardId);
-    if (cardId && qty > 0 && card) {
-      newCards.set(cardId, { card, qty: (newCards.get(cardId)?.qty || 0) + qty });
-      imported++; htmlMatch = true;
-    }
+    add(normalizeCode(extractCardId(m[1])), parseInt(m[2], 10));
   }
 
-  // Also try alternative HTML format: <img ... title="ID" ...>
-  if (!htmlMatch) {
-    const altRe = /<img[^>]+title\s*=\s*["']([^"']+)["'][^>]*>/gi;
-    while ((m = altRe.exec(text)) !== null) {
-      const cardId = normalizeCode(m[1]);
-      const card = deckCardLookup(cardId);
-      if (cardId && card && !newCards.has(cardId)) {
-        newCards.set(cardId, { card, qty: 1 });
-        imported++; htmlMatch = true;
-      }
-    }
+  // 2. Alternative HTML: <img title="ID">
+  const altRe = /<img[^>]+title\s*=\s*["']([^"']+)["'][^>]*>/gi;
+  while ((m = altRe.exec(text)) !== null) {
+    const cardId = normalizeCode(m[1]);
+    if (!newCards.has(cardId)) add(cardId, 1);
   }
 
-  // Fallback: plain text per-line
-  if (!htmlMatch) {
-    for (let raw of text.split('\n')) {
-      raw = raw.trim();
-      if (!raw || raw.startsWith('//')) continue;
-      let cardNo, qty = 1;
-      const parts = raw.split(/\s*[x×]\s*/i);
-      if (parts.length >= 2) {
-        const a = parts[0].trim(), b = parts[parts.length - 1].trim();
-        if (/^\d+$/.test(a)) { qty = parseInt(a, 10); cardNo = normalizeCode(b); }
-        else if (/^\d+$/.test(b)) { qty = parseInt(b, 10); cardNo = normalizeCode(a); }
-        else { cardNo = normalizeCode(raw); }
-      } else {
-        cardNo = normalizeCode(raw);
-      }
-      if (!cardNo) continue;
-      const card = deckCardLookup(cardNo);
-      if (!card) continue;
-      const existing = newCards.get(cardNo);
-      newCards.set(cardNo, { card, qty: (existing ? existing.qty : 0) + qty });
-      imported++;
+  // 3. Plain text per-line: "cardNo x qty" or just "cardNo"
+  for (let raw of text.split('\n')) {
+    raw = raw.trim();
+    if (!raw || raw.startsWith('//')) continue;
+    let cardNo, qty = 1;
+    const parts = raw.split(/\s*[x×]\s*/i);
+    if (parts.length >= 2) {
+      const a = parts[0].trim(), b = parts[parts.length - 1].trim();
+      if (/^\d+$/.test(a)) { qty = parseInt(a, 10); cardNo = normalizeCode(b); }
+      else if (/^\d+$/.test(b)) { qty = parseInt(b, 10); cardNo = normalizeCode(a); }
+      else { cardNo = normalizeCode(raw); }
+    } else {
+      cardNo = normalizeCode(raw);
     }
+    add(cardNo, qty);
   }
 
   if (imported === 0) { toast('No valid cards found in import'); return; }
@@ -847,6 +833,7 @@ const DECK_CHECKS = [
       const violations = [];
       const baseMap = new Map();
       for (const [cardNo, entry] of deckState.cards) {
+        if (entry.card.type === 'エネルギー') continue;
         const base = getBaseCardNo(cardNo);
         baseMap.set(base, (baseMap.get(base) || 0) + entry.qty);
       }
@@ -1109,20 +1096,30 @@ function showQR() {
   }
   const text = lines.join('\n');
   document.getElementById('qr-deck-name').textContent = name;
-  document.getElementById('qr-canvas').innerHTML = '';
-  new QRCode(document.getElementById('qr-canvas'), {
+  const canvas = document.getElementById('qr-canvas');
+  canvas.innerHTML = '';
+  new QRCode(canvas, {
     text: text,
     width: 200,
     height: 200,
-    colorDark: '#e94560',
-    colorLight: '#1a1a2e',
+    colorDark: '#000000',
+    colorLight: '#ffffff',
     correctLevel: QRCode.CorrectLevel.M
   });
   document.getElementById('qr-modal').classList.remove('hidden');
 }
+document.getElementById('qr-download')?.addEventListener('click', function() {
+  const canvas = document.querySelector('#qr-canvas canvas');
+  if (!canvas) return;
+  const link = document.createElement('a');
+  link.download = (document.getElementById('deck-name').value || 'deck') + '-qr.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
 
 // Load i18n then init
 (async () => {
+  try { const { normalizeCode: nc, extractCardId: ec } = await import('./js/card_utils.js'); window.normalizeCode = nc; window.extractCardId = ec; } catch (e) { console.warn('card_utils:', e); }
   try { await loadCbLang(cbLang); } catch (e) { console.warn('i18n:', e); }
   try { const mod = await import('./js/i18n/translator.js'); window._cbUi = mod.getCurrentTranslations()?.ui || {}; } catch (e) { console.warn('translator:', e); }
   try { await init(); } catch (e) { console.error('init:', e); }

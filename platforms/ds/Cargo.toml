@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rabuka_engine = { path = "../../engine", default-features = false, features = ["ds"] }
-hashbrown = { version = "0.14", default-features = false }
+rabuka_engine = { path = "../../engine", default-features = false, features = ["no_std", "once_cell", "bytecode_abilities"] }
 log = { version = "0.4", default-features = false }
+serde = { version = "=1.0.228", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "=1.0.99", default-features = false, features = ["alloc"] }
 
 
 

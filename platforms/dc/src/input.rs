@@ -1,5 +1,5 @@
-use std::ffi::c_int;
-use std::ffi::c_void;
+use core::ffi::c_int;
+use core::ffi::c_void;
 
 #[repr(C)]
 struct MapleDevice {

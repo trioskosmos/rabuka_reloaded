@@ -3,8 +3,6 @@ setlocal enabledelayedexpansion
 
 echo === Rabuka Dreamcast Build Script ===
 echo.
-echo NOTE: Requires WSL2 Ubuntu with the dreamcast-rs toolchain.
-echo.
 
 echo [1/3] Verifying baked card data...
 if not exist "%~dp0platforms\psp\baked\decks.json" (
@@ -23,8 +21,8 @@ if not exist "%~dp0platforms\psp\baked\decks.json" (
 echo [1/3] Done.
 echo.
 
-echo [2/3] Building Dreamcast binary in WSL...
-wsl -d Ubuntu -u root bash -c "source /root/.cargo/env && . /opt/toolchains/dc/rust/misc/environ.sh 2>/dev/null && export CARGO_TARGET_DIR=/tmp/dc_build && cd /mnt/c/Users/trios/OneDrive/Documents/rabuka_reloaded/platforms/dc && kos-cargo build --release"
+echo [2/3] Building Dreamcast staticlib + linking in WSL...
+wsl -d Ubuntu -u root bash -c "source /root/.cargo/env && source /opt/toolchains/dc/rust/misc/environ.sh 2>/dev/null && export CARGO_TARGET_DIR=/tmp/dc_build && export OUTPUT_DIR=/mnt/c/Users/trios/OneDrive/Documents/rabuka_reloaded/output_dc && mkdir -p $OUTPUT_DIR && cd /mnt/c/Users/trios/OneDrive/Documents/rabuka_reloaded/platforms/dc && kos-cargo build --release 2>&1 && echo '=== COMPILATION DONE ===' && sh-elf-gcc -c entry.c -o /tmp/dc_build/entry.o -I${KOS_BASE}/include -I${KOS_BASE}/kernel/arch/dreamcast/include && echo '=== ENTRY COMPILED ===' && sh-elf-gcc /tmp/dc_build/entry.o /tmp/dc_build/sh-elf/release/librabuka_dc.a -Wl,--gc-sections -T${KOS_BASE}/utils/ldscripts/shlelf.xc -nodefaultlibs -L${KOS_BASE}/lib/dreamcast -L${KOS_BASE}/addons/lib/dreamcast -L${KOS_PORTS}/lib -Wl,--start-group -lkallisti -lm -lc -lgcc -Wl,--end-group -o $OUTPUT_DIR/rabuka_dc.elf && echo '=== LINKING DONE ===' && ${KOS_OBJCOPY} -R .stack -O binary $OUTPUT_DIR/rabuka_dc.elf $OUTPUT_DIR/disc/1ST_READ.BIN && echo '=== BINARY CREATED ==='"
 if %ERRORLEVEL% neq 0 (
     echo [FAIL] Dreamcast build failed.
     pause
@@ -34,11 +32,11 @@ echo [2/3] Done.
 echo.
 
 echo [3/3] Copying output...
-wsl -d Ubuntu -u root bash -c "find /tmp/dc_build -name 'rabuka_dc.elf' -exec cp {} /mnt/c/Users/trios/OneDrive/Documents/rabuka_reloaded/output_dc/rabuka_dc.elf \;"
-if exist "%~dp0output_dc\rabuka_dc.elf" (
+if exist "%~dp0output_dc\disc\1ST_READ.BIN" (
+    echo 1ST_READ.BIN created successfully.
     echo Output: output_dc\rabuka_dc.elf
 ) else (
-    echo [WARN] ELF not found.
+    echo [WARN] 1ST_READ.BIN not found. Build may have failed.
 )
 echo [3/3] Done.
 echo.

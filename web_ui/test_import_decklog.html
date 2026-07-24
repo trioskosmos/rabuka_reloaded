@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Deck Log Import Regex Test</title>
+<style>
+  body { font-family: monospace; margin: 20px; background: #1e1e1e; color: #d4d4d4; }
+  h1 { color: #569cd6; }
+  h2 { color: #4ec9b0; border-bottom: 1px solid #444; padding-bottom: 4px; }
+  .pass { color: #4caf50; font-weight: bold; }
+  .fail { color: #f44336; font-weight: bold; }
+  table { border-collapse: collapse; margin: 10px 0; width: 100%; }
+  th, td { border: 1px solid #444; padding: 4px 8px; text-align: left; font-size: 13px; }
+  th { background: #2d2d2d; }
+  .summary-box { background: #2d2d2d; padding: 12px; margin: 10px 0; border-left: 4px solid #569cd6; }
+  .match-row { background: #1a1a2e; }
+  pre { background: #111; padding: 10px; overflow-x: auto; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>Deck Log Import Regex Test</h1>
+<div id="output"></div>
+
+<script>
+const FIXTURE_URLS = [
+  { url: 'test_fixtures/decklog_2YC2K.html', label: 'Clean card section' },
+  { url: 'test_fixtures/decklog_fullpage.html', label: 'Full Deck Log page' },
+];
+
+function normalizeCode(code) {
+  if (!code) return '';
+  return code.replace(/＋/g, '+').replace(/－/g, '-').replace(/ー/g, '-').trim().toUpperCase();
+}
+
+function extractCardId(title) {
+  const parts = title.split(/\s*:\s*/);
+  return normalizeCode(parts[0]);
+}
+
+function log(msg) {
+  console.log(msg);
+  const el = document.getElementById('output');
+  el.innerHTML += msg + '\n';
+  // also create a pre for rich output
+}
+
+function renderHtml(html) {
+  const el = document.getElementById('output');
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  el.appendChild(div);
+}
+
+function renderTable(headers, rows) {
+  let h = '<table><tr>';
+  headers.forEach(hdr => h += `<th>${hdr}</th>`);
+  h += '</tr>';
+  rows.forEach(row => {
+    h += '<tr>';
+    row.forEach(cell => h += `<td>${cell}</td>`);
+    h += '</tr>';
+  });
+  h += '</table>';
+  return h;
+}
+
+async function runFixture(fixtureUrl, fixtureLabel) {
+  renderHtml(`<h1 style="margin-top:20px;border-top:2px solid #569cd6;padding-top:10px">Fixture: ${fixtureLabel}</h1>`);
+  let html;
+  try {
+    const resp = await fetch(fixtureUrl);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    html = await resp.text();
+  } catch (e) {
+    renderHtml(`<div class="fail">FAILED to fetch fixture: ${e.message}</div>`);
+    renderHtml(`<p>Make sure you opened this file from the web_ui directory, or serve it via a local server.</p>`);
+    return { unique: 0, total: 0, pass: false };
+  }
+
+  renderHtml(`<div class="summary-box">Fixture loaded: ${html.length} bytes</div>`);
+
+  // ========== REGEX 1: Deck Log HTML ==========
+  const decklogRe = /<span\s+title="([^"]*)"[^>]*>\s*<\/span>\s*<span[^>]*class\s*=\s*["']num["'][^>]*>(\d+)<\/span>/gi;
+  let match;
+  const decklogMatches = [];
+  while ((match = decklogRe.exec(html)) !== null) {
+    decklogMatches.push({ title: match[1], qty: parseInt(match[2], 10) });
+  }
+
+  renderHtml(`<h2>Regex 1: Deck Log HTML (span title + span.num)</h2>`);
+  renderHtml(`<div class="summary-box">Matches: ${decklogMatches.length}</div>`);
+
+  if (decklogMatches.length > 0) {
+    let rows = decklogMatches.map((m, i) => {
+      const cardId = extractCardId(m.title);
+      return [i + 1, m.title.replace(/\n/g, '\\n'), cardId, m.qty];
+    });
+    renderHtml(renderTable(['#', 'Title (raw)', 'Card ID (normalized)', 'Qty'], rows));
+  }
+
+  // ========== REGEX 2: Alt HTML (img title) ==========
+  const altRe = /<img[^>]+title\s*=\s*["']([^"']+)["'][^>]*>/gi;
+  const altMatches = [];
+  while ((match = altRe.exec(html)) !== null) {
+    altMatches.push({ title: match[1] });
+  }
+
+  renderHtml(`<h2>Regex 2: Alt HTML (img title)</h2>`);
+  renderHtml(`<div class="summary-box">Matches: ${altMatches.length}</div>`);
+
+  if (altMatches.length > 0) {
+    let rows = altMatches.map((m, i) => {
+      const cardId = extractCardId(m.title);
+      return [i + 1, m.title.replace(/\n/g, '\\n'), cardId];
+    });
+    renderHtml(renderTable(['#', 'Title (raw)', 'Card ID (normalized)'], rows));
+  }
+
+  // ========== REGEX 3: Plain text (not applicable for HTML fixture) ==========
+  renderHtml(`<h2>Regex 3: Plain text per-line</h2>`);
+  renderHtml(`<div class="summary-box">Skipped (fixture is HTML, not plain text)</div>`);
+
+  // ========== DEDUPLICATION (primary from regex 1) ==========
+  renderHtml(`<h2>Deduplication &amp; Final Results</h2>`);
+
+  const cardMap = {};
+
+  // Use regex 1 matches as primary source (has quantities)
+  decklogMatches.forEach(m => {
+    const cardId = extractCardId(m.title);
+    if (!cardMap[cardId]) {
+      cardMap[cardId] = { totalQty: 0, sources: [], titleExample: m.title };
+    }
+    cardMap[cardId].totalQty += m.qty;
+    cardMap[cardId].sources.push(`decklog_re1: qty=${m.qty}`);
+  });
+
+  // Also check regex 2 matches — these should all be subsets of regex 1
+  const altOnlyIds = new Set();
+  altMatches.forEach(m => {
+    const cardId = extractCardId(m.title);
+    if (!cardMap[cardId]) {
+      cardMap[cardId] = { totalQty: 0, sources: [], titleExample: m.title };
+      altOnlyIds.add(cardId);
+    }
+    cardMap[cardId].sources.push(`alt_re2: (no qty in match)`);
+  });
+
+  const uniqueTypes = Object.keys(cardMap).length;
+  const totalCards = Object.values(cardMap).reduce((sum, c) => sum + c.totalQty, 0);
+
+  // Build dedup table
+  let dedupRows = Object.entries(cardMap)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([cardId, info]) => {
+      const onlyInAlt = altOnlyIds.has(cardId);
+      return [
+        cardId,
+        info.titleExample.replace(/\n/g, '\\n'),
+        info.totalQty || '<em style="color:#888">from alt_re only</em>',
+        info.sources.join('<br>'),
+        onlyInAlt ? '<span class="fail">YES (alt only)</span>' : 'No'
+      ];
+    });
+
+  renderHtml(renderTable(
+    ['Card ID', 'Example Title', 'Total Qty', 'Source(s)', 'Alt-Only?'],
+    dedupRows
+  ));
+
+  // ========== EXPECTED VALUES ==========
+  renderHtml(`<h2>Expected Values</h2>`);
+  const EXPECTED_UNIQUE = 20;
+  const EXPECTED_TOTAL = 72;
+
+  const uniquePass = uniqueTypes === EXPECTED_UNIQUE;
+  const totalPass = totalCards === EXPECTED_TOTAL;
+
+  renderHtml(`<div class="summary-box">
+    Unique card types: <strong>${uniqueTypes}</strong> (expected <strong>${EXPECTED_UNIQUE}</strong>)
+    — <span class="${uniquePass ? 'pass' : 'fail'}">${uniquePass ? 'PASS' : 'FAIL'}</span><br>
+    Total card quantity: <strong>${totalCards}</strong> (expected <strong>${EXPECTED_TOTAL}</strong>)
+    — <span class="${totalPass ? 'pass' : 'fail'}">${totalPass ? 'PASS' : 'FAIL'}</span>
+  </div>`);
+
+  // ========== INDIVIDUAL CARD EXPECTED VALUES ==========
+  renderHtml(`<h2>Expected Per-Card Breakdown</h2>`);
+  const expected = {
+    'PL!-BP5-011-N': 2,
+    'PL!-BP5-222-R': 4,
+    'PL!HS-BP1-004-P+': 2,
+    'PL!HS-BP2-004-R': 4,
+    'PL!HS-BP2-014-N': 4,
+    'PL!HS-BP5-001-P': 2,
+    'PL!HS-BP5-002-P': 4,
+    'PL!HS-BP6-005-R+': 4,
+    'PL!HS-BP6-010-R': 4,
+    'PL!HS-BP6-013-R': 1,
+    'PL!HS-CL1-005-CL': 2,
+    'PL!HS-PB1-005-R': 4,
+    'PL!HS-PR-017-PR': 2,
+    'PL!HS-PR-026-PR': 2,
+    'PL!HS-SD1-015-SD': 3,
+    'PL!S-BP5-017-N': 4,
+    'PL!HS-BP6-029-L': 4,
+    'PL!HS-PB1-028-L': 4,
+    'PL!HS-PR-011-PR': 4,
+    'PL!HS-BP2-030-PE': 12
+  };
+
+  let perCardRows = [];
+  let allCorrect = true;
+  Object.entries(expected).sort((a, b) => a[0].localeCompare(b[0])).forEach(([expId, expQty]) => {
+    const actual = cardMap[expId];
+    const actualQty = actual ? actual.totalQty : 0;
+    const ok = actualQty === expQty;
+    if (!ok) allCorrect = false;
+    perCardRows.push([
+      expId,
+      expQty,
+      actualQty,
+      ok ? '<span class="pass">PASS</span>' : '<span class="fail">FAIL</span>'
+    ]);
+  });
+
+  // Also check for cards found but not in expected list
+  Object.entries(cardMap).forEach(([cardId, info]) => {
+    if (!(cardId in expected)) {
+      allCorrect = false;
+      perCardRows.push([
+        cardId,
+        '<em>not expected</em>',
+        info.totalQty,
+        '<span class="fail">UNEXPECTED</span>'
+      ]);
+    }
+  });
+
+  perCardRows.sort((a, b) => a[0].localeCompare(b[0]));
+  renderHtml(renderTable(['Card ID', 'Expected Qty', 'Actual Qty', 'Result'], perCardRows));
+
+  // ========== FINAL VERDICT ==========
+  renderHtml(`<h2>Final Verdict</h2>`);
+  if (uniquePass && totalPass && allCorrect) {
+    renderHtml(`<div class="summary-box pass" style="font-size:18px">
+      ALL TESTS PASSED: ${uniqueTypes} unique types, ${totalCards} total cards, all per-card quantities correct.
+    </div>`);
+    document.title = 'PASS - Deck Log Import Test';
+  } else {
+    renderHtml(`<div class="summary-box fail" style="font-size:18px">
+      TESTS FAILED: unique=${uniqueTypes}/${EXPECTED_UNIQUE}, total=${totalCards}/${EXPECTED_TOTAL}, allCorrect=${allCorrect}
+    </div>`);
+    document.title = 'FAIL - Deck Log Import Test';
+  }
+
+  // Also log to console
+  console.log('=== DECK LOG IMPORT TEST RESULTS ===');
+  console.log(`Unique types: ${uniqueTypes}/${EXPECTED_UNIQUE}`);
+  console.log(`Total cards: ${totalCards}/${EXPECTED_TOTAL}`);
+  console.log('Card map:', JSON.stringify(cardMap, null, 2));
+  console.log('All per-card correct:', allCorrect);
+
+  return { unique: uniqueTypes, total: totalCards, pass: uniquePass && totalPass && allCorrect };
+}
+
+async function run() {
+  const results = [];
+  for (const fix of FIXTURE_URLS) {
+    const r = await runFixture(fix.url, fix.label);
+    results.push({ ...fix, ...r });
+  }
+
+  renderHtml(`<h1 style="margin-top:30px;border-top:3px solid #e94560;padding-top:10px">OVERALL RESULTS</h1>`);
+  let rows = results.map(r => [
+    r.label,
+    r.unique + '/20',
+    r.total + '/72',
+    r.pass ? '<span class="pass">PASS</span>' : '<span class="fail">FAIL</span>'
+  ]);
+  renderHtml(renderTable(['Fixture', 'Unique Types', 'Total Cards', 'Verdict'], rows));
+
+  const allPass = results.every(r => r.pass);
+  renderHtml(`<div class="summary-box" style="font-size:18px;margin-top:10px">
+    <span class="${allPass ? 'pass' : 'fail'}">${allPass ? 'ALL TESTS PASSED' : 'SOME TESTS FAILED'}</span>
+  </div>`);
+  document.title = (allPass ? 'PASS' : 'FAIL') + ' - Deck Log Import Test';
+}
+
+run();
+</script>
+</body>
+</html>

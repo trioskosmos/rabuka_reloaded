@@ -3,16 +3,7 @@ import { Network } from '../network.js';
 import { Modals } from '../ui_modals.js';
 import { ModalManager } from '../utils/ModalManager.js';
 import { DOM_IDS, DISPLAY_VALUES } from '../constants_dom.js';
-
-function normalizeCode(code) {
-    if (!code) return '';
-    return code.replace(/＋/g, '+').replace(/－/g, '-').replace(/ー/g, '-').trim().toUpperCase();
-}
-
-function extractCardId(title) {
-    const parts = title.split(/\s*:\s*/);
-    return normalizeCode(parts[0]);
-}
+import { normalizeCode, extractCardId } from '../card_utils.js';
 
 function convertDecklogHtml(html) {
     const cards = {};
