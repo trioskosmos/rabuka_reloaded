@@ -1,52 +1,52 @@
-use core::ffi::c_char;
+use alloc::vec::Vec;
 
 extern "C" {
-    fn display_init();
-    fn display_clear();
-    fn display_print(s: *const c_char);
-    fn display_swap();
-    fn VIDEO_WaitVSync();
+    fn printf(fmt: *const u8, ...) -> i32;
 }
+
 pub struct Display;
 impl Display {
     pub fn new() -> Self {
-        unsafe {
-            display_init();
-        }
         Display
     }
     pub fn clear(&mut self) {
         unsafe {
-            display_clear();
+            printf("\x1b[2J\x1b[;0H\0".as_ptr());
         }
     }
     pub fn print(&mut self, text: &str) {
-        let mut b: alloc::vec::Vec<u8> = text.bytes().collect();
-        b.push(0);
+        let v = to_c(text);
         unsafe {
-            display_print(b.as_ptr() as *const c_char);
+            printf(v.as_ptr());
         }
     }
     pub fn println(&mut self, text: &str) {
-        self.print(text);
-    }
-    pub fn swap_buffers(&mut self) {
+        let s = to_c(&alloc::format!("{}\n", text));
         unsafe {
-            display_swap();
+            printf(s.as_ptr());
         }
     }
+    pub fn swap_buffers(&mut self) {}
     pub fn wait_vsync(&self) {
         unsafe {
+            extern "C" {
+                fn VIDEO_WaitVSync();
+            }
             VIDEO_WaitVSync();
         }
     }
-    pub fn draw_menu(&mut self, items: &[&str], selected: usize, title: &str) {
+    pub fn draw_menu(&mut self, items: &[&str], sel: usize, title: &str) {
         self.clear();
         self.println(title);
         self.println("-------------------");
         for (i, item) in items.iter().enumerate() {
-            let p = if i == selected { " >" } else { "  " };
+            let p = if i == sel { " >" } else { "  " };
             self.println(&alloc::format!("{p} {item}"));
         }
     }
+}
+fn to_c(s: &str) -> Vec<u8> {
+    let mut v: Vec<u8> = s.bytes().collect();
+    v.push(0);
+    v
 }

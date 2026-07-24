@@ -37,10 +37,10 @@ use rabuka_engine::turn::TurnEngine;
 
 extern "C" {
     fn nds_init();
+    fn nds_top_init();
     fn nds_get_tick() -> u64;
     fn nds_wait_vblank();
     fn nds_dbg_direct(row: i32, text: *const u8);
-    fn nds_top_print(text: *const u8);
     fn nds_top_println(text: *const u8);
     fn nds_top_clear();
 }
@@ -150,6 +150,9 @@ fn load_two_decks(deck1_idx: usize, deck2_idx: usize) -> Vec<Card> {
 pub extern "C" fn main() {
     unsafe {
         nds_init();
+    }
+    unsafe {
+        nds_top_init();
     }
     unsafe {
         nds_top_clear();
@@ -471,6 +474,8 @@ fn ai_turn(_display: &mut Display, gs: &mut GameState, actions: &[game_setup::Ac
 
 fn execute_action(gs: &mut GameState, action: &game_setup::Action) -> bool {
     let params = action.parameters.clone();
+    let desc_first_line = action.description.lines().next().unwrap_or("");
+    top_debug!("ACT: {} {:?}", desc_first_line, action.action_type);
     let result = TurnEngine::execute_main_phase_action(
         gs,
         &action.action_type,
@@ -482,8 +487,11 @@ fn execute_action(gs: &mut GameState, action: &game_setup::Action) -> bool {
         params.as_ref().and_then(|p| p.use_baton_touch),
     );
     match result {
-        Ok(_) => {}
+        Ok(_) => {
+            top_debug!("ACT OK");
+        }
         Err(ref e) => {
+            top_debug!("ACT ERR: {}", e);
             dbg_row(22, &alloc::format!("act err: {}", e));
         }
     }

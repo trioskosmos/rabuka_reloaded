@@ -12,6 +12,17 @@
 #define TIMER_ENABLE     (1<<7)
 #define TIMER_PRESCALER_64 (1<<0)
 
+// Sub engine (top screen) text mode constants
+#define SUB_TILE_VRAM    ((vu16*)0x06400000)
+#define SUB_FONT_DST     ((vu16*)0x06404000) // gfxBase=1: 0x06400000 + 1*16384
+#define SUB_MAP          ((vu16*)0x06400000) // mapBase=0: 0x06400000 + 0*2048
+#define SUB_COLS         32
+#define SUB_ROWS         24
+
+static int _sub_cursor_row = 0;
+static int _sub_cursor_col = 0;
+static int _top_initialized = 0;
+
 void __sync_synchronize_none(void) {
 }
 
@@ -111,12 +122,6 @@ unsigned char __atomic_fetch_sub_1(volatile void* ptr, unsigned char val, int me
 }
 
 static u16* _tile_map = NULL;
-PrintConsole _top_console;
-
-// Forward declarations for top-screen functions used in nds_init
-void nds_top_clear(void);
-void nds_top_print(const char* text);
-void nds_top_println(const char* text);
 
 void nds_init(void) {
     videoSetMode(MODE_0_2D);
@@ -132,36 +137,102 @@ void nds_init(void) {
     } else {
         _tile_map = bgGetMapPtr(4);
     }
-
-    consoleInit(&_top_console, 1, BgType_Text4bpp, BgSize_T_256x256, 0, 2, false, true);
-
     iprintf("\x1b[2J");
-    nds_top_clear();
-
     REG_TM0CNT = 0;
     REG_TM0DATA = 0;
     REG_TM0CNT = TIMER_ENABLE | TIMER_PRESCALER_64;
 }
 
+void nds_top_init(void) {
+    if (_top_initialized) return;
+    // Copy font tiles from main engine (0x06000000) to sub engine tile VRAM
+    // Main font: 256 tiles * 32 bytes at BG_TILE_BASE(0) = 0x06000000
+    const vu16* src = (const vu16*)0x06000000;
+    vu16* dst = SUB_FONT_DST;
+    for (int i = 0; i < 256 * 16; i++) {
+        dst[i] = src[i];
+    }
+    // Configure sub BG0 for text mode
+    REG_BG0CNT_SUB = BG_32x32 | BG_COLOR_256 | BG_MAP_BASE(0) | BG_TILE_BASE(1);
+    // Enable BG0 on sub engine
+    REG_DISPCNT_SUB |= DISPLAY_BG0_ACTIVE;
+    // Clear top screen
+    for (int i = 0; i < SUB_COLS * SUB_ROWS; i++) {
+        SUB_MAP[i] = 0xF000 | 0x20;
+    }
+    _sub_cursor_row = 0;
+    _sub_cursor_col = 0;
+    _top_initialized = 1;
+}
+
 void nds_top_clear(void) {
-    PrintConsole* old = consoleGetDefault();
-    consoleSelect(&_top_console);
-    iprintf("\x1b[2J");
-    consoleSelect(old);
+    if (!_top_initialized) return;
+    _sub_cursor_row = 0;
+    _sub_cursor_col = 0;
+    for (int i = 0; i < SUB_COLS * SUB_ROWS; i++) {
+        SUB_MAP[i] = 0xF000 | 0x20;
+    }
 }
 
 void nds_top_print(const char* text) {
-    PrintConsole* old = consoleGetDefault();
-    consoleSelect(&_top_console);
-    iprintf("%s", text);
-    consoleSelect(old);
+    if (!_top_initialized) return;
+    for (int i = 0; text[i]; i++) {
+        char ch = text[i];
+        if (ch == '\n') {
+            _sub_cursor_row++;
+            _sub_cursor_col = 0;
+            if (_sub_cursor_row >= SUB_ROWS) {
+                for (int r = 0; r < SUB_ROWS - 1; r++) {
+                    for (int c = 0; c < SUB_COLS; c++) {
+                        SUB_MAP[r * SUB_COLS + c] = SUB_MAP[(r + 1) * SUB_COLS + c];
+                    }
+                }
+                for (int c = 0; c < SUB_COLS; c++) {
+                    SUB_MAP[(SUB_ROWS - 1) * SUB_COLS + c] = 0xF000 | 0x20;
+                }
+                _sub_cursor_row = SUB_ROWS - 1;
+            }
+            continue;
+        }
+        if (ch < 0x20 || ch > 0x7E) ch = 0x20;
+        if (_sub_cursor_col >= SUB_COLS) {
+            _sub_cursor_row++;
+            _sub_cursor_col = 0;
+            if (_sub_cursor_row >= SUB_ROWS) {
+                for (int r = 0; r < SUB_ROWS - 1; r++) {
+                    for (int c = 0; c < SUB_COLS; c++) {
+                        SUB_MAP[r * SUB_COLS + c] = SUB_MAP[(r + 1) * SUB_COLS + c];
+                    }
+                }
+                for (int c = 0; c < SUB_COLS; c++) {
+                    SUB_MAP[(SUB_ROWS - 1) * SUB_COLS + c] = 0xF000 | 0x20;
+                }
+                _sub_cursor_row = SUB_ROWS - 1;
+            }
+        }
+        if (_sub_cursor_row < SUB_ROWS && _sub_cursor_col < SUB_COLS) {
+            SUB_MAP[_sub_cursor_row * SUB_COLS + _sub_cursor_col] = 0xF000 | (unsigned char)ch;
+            _sub_cursor_col++;
+        }
+    }
 }
 
 void nds_top_println(const char* text) {
-    PrintConsole* old = consoleGetDefault();
-    consoleSelect(&_top_console);
-    iprintf("%s\n", text);
-    consoleSelect(old);
+    if (!_top_initialized) return;
+    nds_top_print(text);
+    _sub_cursor_row++;
+    _sub_cursor_col = 0;
+    if (_sub_cursor_row >= SUB_ROWS) {
+        for (int r = 0; r < SUB_ROWS - 1; r++) {
+            for (int c = 0; c < SUB_COLS; c++) {
+                SUB_MAP[r * SUB_COLS + c] = SUB_MAP[(r + 1) * SUB_COLS + c];
+            }
+        }
+        for (int c = 0; c < SUB_COLS; c++) {
+            SUB_MAP[(SUB_ROWS - 1) * SUB_COLS + c] = 0xF000 | 0x20;
+        }
+        _sub_cursor_row = SUB_ROWS - 1;
+    }
 }
 
 void nds_console_clear(void) {

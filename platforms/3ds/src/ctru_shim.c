@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
 #include <3ds.h>
 #include <citro2d.h>
 #include <errno.h>
@@ -829,6 +830,19 @@ void _3ds_render_board() {
     }
 }
 
+// ---- Text measurement ----
+float _3ds_measure_text_width(const char* text, float scale) {
+    if (!text || !text[0]) return 0.0f;
+    C2D_Font f = custom_font ? custom_font : NULL;
+    C2D_Text tmp;
+    C2D_TextFontParse(&tmp, f, tmp_text_buf, text);
+    C2D_TextOptimize(&tmp);
+    float w, h;
+    C2D_TextGetDimensions(&tmp, scale, scale, &w, &h);
+    C2D_TextBufClear(tmp_text_buf);
+    return w;
+}
+
 // ---- Main render ----
 void _3ds_swap_buffers() {
     // Re-parse top text
@@ -873,11 +887,12 @@ void _3ds_swap_buffers() {
             } else if (draw_op_types[i] == OP_TEXT) {
                 C2D_TextFontParse(&tmp_text_obj, f, tmp_text_buf, draw_ops[i].text);
                 C2D_TextOptimize(&tmp_text_obj);
+                float max_w = fmaxf(390.0f - draw_ops[i].x, 0.0f);
                 C2D_DrawText(&tmp_text_obj, C2D_WithColor | C2D_WordWrap,
                     draw_ops[i].x, draw_ops[i].y, 0.5f,
                     draw_ops[i].scale, draw_ops[i].scale,
                     draw_ops[i].color,
-                    390.0f);
+                    max_w);
             } else if (draw_op_types[i] == OP_CARD) {
                 C2D_Image img = _3ds_get_card_image(draw_ops[i].atlas, draw_ops[i].atlas_idx);
                 if (img.tex != NULL) {

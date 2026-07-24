@@ -1,7 +1,11 @@
 #![no_std]
-
 extern crate alloc;
 
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::sync::Arc;
+use alloc::vec;
+use alloc::vec::Vec;
 use core::alloc::{GlobalAlloc, Layout};
 
 extern "C" {
@@ -11,36 +15,25 @@ extern "C" {
 }
 
 struct WiiAllocator;
-
 unsafe impl Sync for WiiAllocator {}
-
 unsafe impl GlobalAlloc for WiiAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         malloc(layout.size())
     }
-
     unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
         if !ptr.is_null() {
             free(ptr);
         }
     }
-
-    unsafe fn realloc(&self, ptr: *mut u8, _old_layout: Layout, new_size: usize) -> *mut u8 {
-        realloc(ptr, new_size)
+    unsafe fn realloc(&self, ptr: *mut u8, _old: Layout, new: usize) -> *mut u8 {
+        realloc(ptr, new)
     }
 }
-
 #[global_allocator]
 static ALLOCATOR: WiiAllocator = WiiAllocator;
 
-pub mod display;
-pub mod input;
-
-use alloc::format;
-use alloc::string::{String, ToString};
-use alloc::sync::Arc;
-use alloc::vec;
-use alloc::vec::Vec;
+mod display;
+mod input;
 
 use display::Display;
 use input::{Button, Input};
@@ -53,7 +46,6 @@ use rabuka_engine::rng;
 use rabuka_engine::turn::TurnEngine;
 
 const DECKS_JSON: &str = include_str!("../../psp/baked/decks.json");
-
 const DECK_CARD_FILES: &[&str] = &[
     include_str!("../../psp/baked/deck_0_cards.json"),
     include_str!("../../psp/baked/deck_1_cards.json"),
@@ -83,12 +75,11 @@ fn run_game() {
     let mut input = Input::new();
     init_rng();
 
-    let decks: Vec<DeckEntry> = serde_json::from_str(DECKS_JSON).expect("Failed to parse decks");
+    let decks: Vec<DeckEntry> = serde_json::from_str(DECKS_JSON).expect("parse decks");
     let deck_names: Vec<&str> = decks.iter().map(|d| d.name.as_str()).collect();
 
     let mode_idx = select(&mut display, &mut input, &deck_names, "Mode");
     let vs_ai = mode_idx == 0;
-
     let deck1_idx = select(&mut display, &mut input, &deck_names, "Your Deck");
     let deck2_idx = if vs_ai {
         rng::rand_range(decks.len())
@@ -97,32 +88,27 @@ fn run_game() {
     };
 
     display.println("Loading...");
-    display.swap_buffers();
+    let cards1: Vec<Card> = serde_json::from_str(DECK_CARD_FILES[deck1_idx]).expect("cards");
+    let cards2: Vec<Card> = serde_json::from_str(DECK_CARD_FILES[deck2_idx]).expect("cards");
 
-    let cards1: Vec<Card> =
-        serde_json::from_str(DECK_CARD_FILES[deck1_idx]).expect("Failed to parse deck cards");
-    let cards2: Vec<Card> =
-        serde_json::from_str(DECK_CARD_FILES[deck2_idx]).expect("Failed to parse deck cards");
-
-    let mut card_map: hashbrown::HashMap<String, Card> = hashbrown::HashMap::new();
-    for c in cards1.into_iter().chain(cards2.into_iter()) {
-        let key = c.card_no.to_string();
-        if !card_map.contains_key(&key) {
-            card_map.insert(key, c);
+    let mut cmap: hashbrown::HashMap<String, Card> = hashbrown::HashMap::new();
+    for c in cards1.into_iter().chain(cards2) {
+        let k = c.card_no.to_string();
+        if !cmap.contains_key(&k) {
+            cmap.insert(k, c);
         }
     }
-
-    let mut cards: Vec<Card> = card_map.into_values().collect();
+    let mut cards: Vec<Card> = cmap.into_values().collect();
     rabuka_engine::card_loader::CardLoader::attach_abilities(&mut cards);
     let mut db = Arc::new(rabuka_engine::card::CardDatabase::load_or_create(cards));
 
     let nums1: Vec<String> = decks[deck1_idx].cards.clone();
     let nums2: Vec<String> = decks[deck2_idx].cards.clone();
 
-    let mut pd1 = deck_builder::DeckBuilder::build_deck_from_database(&mut db, nums1)
-        .expect("Failed to build P1 deck");
-    let mut pd2 = deck_builder::DeckBuilder::build_deck_from_database(&mut db, nums2)
-        .expect("Failed to build P2 deck");
+    let mut pd1 =
+        deck_builder::DeckBuilder::build_deck_from_database(&mut db, nums1).expect("deck");
+    let mut pd2 =
+        deck_builder::DeckBuilder::build_deck_from_database(&mut db, nums2).expect("deck");
     deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut pd1, &mut db).ok();
     deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut pd2, &mut db).ok();
     pd1.shuffle_main_deck();
@@ -146,27 +132,23 @@ fn run_game() {
             show_result(&mut display, &mut input, &gs);
             break;
         }
-
         settle_auto(&mut gs);
         if gs.game_result != GameResult::Ongoing {
             show_result(&mut display, &mut input, &gs);
             break;
         }
-
         let actions = game_setup::generate_possible_actions(&gs);
         if actions.is_empty() {
             TurnEngine::advance_phase(&mut gs);
             wait_vsync();
             continue;
         }
-
         if gs.has_pending_choice() {
             if !handle_choice(&mut display, &mut input, &mut gs) {
                 break;
             }
             continue;
         }
-
         let is_ai = vs_ai && gs.active_player().id != gs.player1.id;
         let ok = if is_ai {
             ai_turn(&mut gs, &actions)
@@ -186,171 +168,155 @@ struct DeckEntry {
     cards: Vec<String>,
 }
 
-fn select(display: &mut Display, input: &mut Input, items: &[&str], title: &str) -> usize {
-    let mut sel = 0usize;
+fn select(d: &mut Display, i: &mut Input, items: &[&str], title: &str) -> usize {
+    let mut sel = 0;
     loop {
-        display.draw_menu(items, sel, title);
-        display.swap_buffers();
+        d.draw_menu(items, sel, title);
+        d.swap_buffers();
         wait_vsync();
-        input.poll();
-        if input.just_pressed(Button::Down) {
-            sel = (sel + 1).min(items.len().saturating_sub(1));
-        } else if input.just_pressed(Button::Up) {
+        i.poll();
+        if i.just_pressed(Button::Down) {
+            sel = (sel + 1).min(items.len() - 1);
+        } else if i.just_pressed(Button::Up) {
             sel = sel.saturating_sub(1);
-        } else if input.just_pressed(Button::A) {
+        } else if i.just_pressed(Button::A) {
             return sel;
         }
     }
 }
 
-fn ai_turn(gs: &mut GameState, actions: &[game_setup::Action]) -> bool {
-    let idx = rng::rand_range(actions.len());
-    execute_action(gs, &actions[idx])
+fn ai_turn(gs: &mut GameState, acts: &[game_setup::Action]) -> bool {
+    execute_action(gs, &acts[rng::rand_range(acts.len())])
 }
 
 fn human_turn(
-    display: &mut Display,
-    input: &mut Input,
+    d: &mut Display,
+    i: &mut Input,
     gs: &mut GameState,
-    actions: &[game_setup::Action],
+    acts: &[game_setup::Action],
 ) -> bool {
-    let mut sel = 0usize;
-    let mut scroll_offset = 0usize;
-    const VISIBLE: usize = 12;
+    let mut sel = 0;
+    let mut scroll = 0;
+    const VIS: usize = 12;
     loop {
-        display.clear();
-        display.println(&format!("Turn {} | {:?}", gs.turn_number, gs.current_phase));
-
+        d.clear();
+        d.println(&format!("Turn {} | {:?}", gs.turn_number, gs.current_phase));
         let p1 = &gs.player1;
         let p2 = &gs.player2;
         let is_p1 = gs.active_player().id == "p1";
         let tag = |a: bool| if a { ">>" } else { "  " };
-        display.println(&format!(
+        d.println(&format!(
             "{} P1 h:{} e:{} dk:{}",
             tag(is_p1),
             p1.hand.cards.len(),
             p1.energy_zone.active_count(),
             p1.main_deck.cards.len()
         ));
-        display.println(&format!(
+        d.println(&format!(
             "{} P2 h:{} e:{} dk:{}",
             tag(!is_p1),
             p2.hand.cards.len(),
             p2.energy_zone.active_count(),
             p2.main_deck.cards.len()
         ));
-
-        if sel < scroll_offset {
-            scroll_offset = sel;
+        if sel < scroll {
+            scroll = sel;
         }
-        if sel >= scroll_offset + VISIBLE {
-            scroll_offset = sel + 1 - VISIBLE;
+        if sel >= scroll + VIS {
+            scroll = sel + 1 - VIS;
         }
-
-        let end = (scroll_offset + VISIBLE).min(actions.len());
-        for i in scroll_offset..end {
-            let p = if i == sel { " >" } else { "  " };
-            let line = actions[i].description.lines().next().unwrap_or("");
-            let card_tag = match &actions[i].parameters {
-                Some(ref params) => params
+        let end = (scroll + VIS).min(acts.len());
+        for a in scroll..end {
+            let p = if a == sel { " >" } else { "  " };
+            let line = acts[a].description.lines().next().unwrap_or("");
+            let tag = match &acts[a].parameters {
+                Some(p) => p
                     .card_no
                     .as_ref()
-                    .map(|no| format!(" [{}]", no))
+                    .map(|n| format!(" [{}]", n))
                     .unwrap_or_default(),
                 None => String::new(),
             };
-            display.println(&format!("{p}[{i}] {line}{card_tag}"));
+            d.println(&format!("{p}[{a}] {line}{tag}"));
         }
-        if actions.len() > end {
-            display.println(&format!("  .. {} more", actions.len() - end));
+        if acts.len() > end {
+            d.println(&format!("  .. {} more", acts.len() - end));
         }
-        display.swap_buffers();
+        d.swap_buffers();
         wait_vsync();
-
-        input.poll();
-        if input.just_pressed(Button::Down) {
-            sel = (sel + 1).min(actions.len().saturating_sub(1));
-        } else if input.just_pressed(Button::Up) {
+        i.poll();
+        if i.just_pressed(Button::Down) {
+            sel = (sel + 1).min(acts.len() - 1);
+        } else if i.just_pressed(Button::Up) {
             sel = sel.saturating_sub(1);
-        } else if input.just_pressed(Button::A) {
-            return execute_action(gs, &actions[sel]);
-        } else if input.just_pressed(Button::B) || input.just_pressed(Button::Start) {
+        } else if i.just_pressed(Button::A) {
+            return execute_action(gs, &acts[sel]);
+        } else if i.just_pressed(Button::B) {
             return false;
         }
     }
 }
 
-fn execute_action(gs: &mut GameState, action: &game_setup::Action) -> bool {
-    let params = action.parameters.clone();
-    let result = TurnEngine::execute_main_phase_action(
+fn execute_action(gs: &mut GameState, act: &game_setup::Action) -> bool {
+    let p = act.parameters.clone();
+    TurnEngine::execute_main_phase_action(
         gs,
-        &action.action_type,
-        params.as_ref().and_then(|p| p.card_id),
-        params.as_ref().and_then(|p| p.card_indices.clone()),
-        params
-            .as_ref()
+        &act.action_type,
+        p.as_ref().and_then(|p| p.card_id),
+        p.as_ref().and_then(|p| p.card_indices.clone()),
+        p.as_ref()
             .and_then(|p| p.stage_area.as_ref().and_then(|s| s.parse().ok())),
-        params.as_ref().and_then(|p| p.use_baton_touch),
-    );
-    match result {
-        Ok(_) => {
-            gs.reset_loop_detection();
-            true
-        }
-        Err(_) => {
-            gs.reset_loop_detection();
-            true
-        }
-    }
+        p.as_ref().and_then(|p| p.use_baton_touch),
+    )
+    .ok();
+    gs.reset_loop_detection();
+    true
 }
 
 fn menu_select(
-    display: &mut Display,
-    input: &mut Input,
+    d: &mut Display,
+    i: &mut Input,
     items: &[String],
     title: &str,
-    allow_skip: bool,
+    skip: bool,
 ) -> Option<usize> {
-    let total = if allow_skip {
-        items.len() + 1
-    } else {
-        items.len()
-    };
+    let total = if skip { items.len() + 1 } else { items.len() };
     if total == 0 {
         return None;
     }
-    let mut sel = 0usize;
+    let mut sel = 0;
     loop {
-        display.clear();
-        display.println(title);
-        for (i, item) in items.iter().enumerate() {
-            let prefix = if i == sel { " >" } else { "  " };
-            display.println(&format!("{prefix} {item}"));
+        d.clear();
+        d.println(title);
+        for (n, item) in items.iter().enumerate() {
+            d.println(&format!("{} {item}", if n == sel { " >" } else { "  " }));
         }
-        if allow_skip {
-            let prefix = if sel == items.len() { " >" } else { "  " };
-            display.println(&format!("{}  [Skip]", prefix));
+        if skip {
+            d.println(&format!(
+                "{}  [Skip]",
+                if sel == items.len() { " >" } else { "  " }
+            ));
         }
-        display.swap_buffers();
+        d.swap_buffers();
         wait_vsync();
-        input.poll();
-        if input.just_pressed(Button::Down) {
-            sel = (sel + 1).min(total.saturating_sub(1));
-        } else if input.just_pressed(Button::Up) {
+        i.poll();
+        if i.just_pressed(Button::Down) {
+            sel = (sel + 1).min(total - 1);
+        } else if i.just_pressed(Button::Up) {
             sel = sel.saturating_sub(1);
-        } else if input.just_pressed(Button::A) {
-            if allow_skip && sel >= items.len() {
-                return None;
-            }
-            return Some(sel);
+        } else if i.just_pressed(Button::A) {
+            return if skip && sel >= items.len() {
+                None
+            } else {
+                Some(sel)
+            };
         }
     }
 }
 
-fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -> bool {
+fn handle_choice(d: &mut Display, i: &mut Input, gs: &mut GameState) -> bool {
     use rabuka_engine::ability::types::Choice;
     use rabuka_engine::ability::util::zone_cards;
-
     let choice = match gs.get_pending_choice() {
         Some(c) => c.clone(),
         None => return true,
@@ -370,7 +336,7 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
                 TurnEngine::resume_with_choice(gs, Some(0), None).ok();
                 return true;
             }
-            let sel = menu_select(display, input, &items, &description, false).unwrap_or(0);
+            let sel = menu_select(d, i, &items, &description, false).unwrap_or(0);
             TurnEngine::resume_with_choice(gs, Some(sel as i16), None).ok();
             true
         }
@@ -397,7 +363,7 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
                 .unwrap_or_else(|| gs.active_player());
             let card_ids = zone_cards(player, &zone);
             if count <= 1 {
-                let mut sel = 0usize;
+                let mut sel = 0;
                 let total = if allow_skip {
                     card_ids.len() + 1
                 } else {
@@ -407,26 +373,25 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
                     return true;
                 }
                 loop {
-                    display.clear();
-                    display.println(&description);
-                    for i in 0..card_ids.len() {
-                        let prefix = if i == sel { " >" } else { "  " };
-                        let cid = card_ids[i];
-                        let name = card_name(&gs, cid);
-                        display.println(&format!("{prefix} {name}"));
+                    d.clear();
+                    d.println(&description);
+                    for (n, &cid) in card_ids.iter().enumerate() {
+                        d.println(&format!("{} #{}", if n == sel { " >" } else { "  " }, cid));
                     }
                     if allow_skip {
-                        let prefix = if sel == card_ids.len() { " >" } else { "  " };
-                        display.println(&format!("{}  [Skip]", prefix));
+                        d.println(&format!(
+                            "{}  [Skip]",
+                            if sel == card_ids.len() { " >" } else { "  " }
+                        ));
                     }
-                    display.swap_buffers();
+                    d.swap_buffers();
                     wait_vsync();
-                    input.poll();
-                    if input.just_pressed(Button::Down) {
-                        sel = (sel + 1).min(total.saturating_sub(1));
-                    } else if input.just_pressed(Button::Up) {
+                    i.poll();
+                    if i.just_pressed(Button::Down) {
+                        sel = (sel + 1).min(total - 1);
+                    } else if i.just_pressed(Button::Up) {
                         sel = sel.saturating_sub(1);
-                    } else if input.just_pressed(Button::A) {
+                    } else if i.just_pressed(Button::A) {
                         if allow_skip && sel >= card_ids.len() {
                             TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok();
                         } else {
@@ -437,38 +402,36 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
                     }
                 }
             } else {
-                let mut multi_sel = 0usize;
+                let mut multi_sel = 0;
                 let mut selected: Vec<usize> = Vec::new();
                 loop {
-                    display.clear();
-                    display.println(&description);
-                    for i in 0..card_ids.len() {
-                        let cid = card_ids[i];
-                        let name = card_name(&gs, cid);
-                        let check = if selected.contains(&i) { "[X]" } else { "[ ]" };
-                        let ptr = if i == multi_sel { " >" } else { "  " };
-                        display.println(&format!("{ptr}{check} {name}"));
+                    d.clear();
+                    d.println(&description);
+                    for (n, &cid) in card_ids.iter().enumerate() {
+                        let check = if selected.contains(&n) { "[X]" } else { "[ ]" };
+                        let ptr = if n == multi_sel { " >" } else { "  " };
+                        d.println(&format!("{ptr}{check} #{}", cid));
                     }
-                    display.println(&format!(
+                    d.println(&format!(
                         "Selected: {}/{}  (A=toggle, B=done)",
                         selected.len(),
                         count
                     ));
-                    display.swap_buffers();
+                    d.swap_buffers();
                     wait_vsync();
-                    input.poll();
-                    if input.just_pressed(Button::Down) {
-                        multi_sel = (multi_sel + 1).min(card_ids.len().saturating_sub(1));
-                    } else if input.just_pressed(Button::Up) {
+                    i.poll();
+                    if i.just_pressed(Button::Down) {
+                        multi_sel = (multi_sel + 1).min(card_ids.len() - 1);
+                    } else if i.just_pressed(Button::Up) {
                         multi_sel = multi_sel.saturating_sub(1);
-                    } else if input.just_pressed(Button::A) && multi_sel < card_ids.len() {
+                    } else if i.just_pressed(Button::A) && multi_sel < card_ids.len() {
                         if selected.contains(&multi_sel) {
                             selected.retain(|&x| x != multi_sel);
                         } else if selected.len() < count {
                             selected.push(multi_sel);
                         }
                     }
-                    if input.just_pressed(Button::B) || input.just_pressed(Button::Start) {
+                    if i.just_pressed(Button::B) {
                         break;
                     }
                 }
@@ -487,11 +450,10 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
             ..
         } => {
             let items: Vec<String> = match options {
-                Some(ref opts) if !opts.is_empty() => opts.clone(),
+                Some(ref o) if !o.is_empty() => o.clone(),
                 _ => (0..2).map(|i| format!("Option {}", i + 1)).collect(),
             };
-            let sel = menu_select(display, input, &items, &description, allow_skip);
-            match sel {
+            match menu_select(d, i, &items, &description, allow_skip) {
                 None => TurnEngine::resume_with_choice(gs, Some(-1), None).ok(),
                 Some(idx) => TurnEngine::resume_with_choice(gs, Some(idx as i16), None).ok(),
             };
@@ -506,8 +468,7 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
                 .iter()
                 .map(|s| s.to_string())
                 .collect();
-            let sel = menu_select(display, input, &items, &description, allow_skip);
-            match sel {
+            match menu_select(d, i, &items, &description, allow_skip) {
                 None => TurnEngine::resume_with_choice(gs, Some(-1), None).ok(),
                 Some(idx) => TurnEngine::resume_with_choice(gs, Some(idx as i16), None).ok(),
             };
@@ -518,7 +479,7 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
             description,
             ..
         } => {
-            let sel = menu_select(display, input, &options, &description, false).unwrap_or(0);
+            let sel = menu_select(d, i, &options, &description, false).unwrap_or(0);
             TurnEngine::resume_with_choice(gs, Some(sel as i16), None).ok();
             true
         }
@@ -527,7 +488,7 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
             description,
             ..
         } => {
-            let sel = menu_select(display, input, &options, &description, false).unwrap_or(0);
+            let sel = menu_select(d, i, &options, &description, false).unwrap_or(0);
             TurnEngine::resume_with_choice(gs, Some(sel as i16), None).ok();
             true
         }
@@ -541,7 +502,7 @@ fn handle_choice(display: &mut Display, input: &mut Input, gs: &mut GameState) -
                 TurnEngine::resume_with_choice(gs, None, Some(Vec::new())).ok();
                 return true;
             }
-            let sel = menu_select(display, input, &items, &description, false).unwrap_or(0);
+            let sel = menu_select(d, i, &items, &description, false).unwrap_or(0);
             TurnEngine::resume_with_choice(gs, None, Some(vec![sel])).ok();
             true
         }
@@ -566,26 +527,26 @@ fn settle_auto(gs: &mut GameState) {
     }
 }
 
-fn show_result(display: &mut Display, input: &mut Input, gs: &GameState) {
+fn show_result(d: &mut Display, i: &mut Input, gs: &GameState) {
     loop {
-        display.clear();
-        display.println("=== GAME OVER ===");
-        display.println(&format!("{:?}", gs.game_result));
-        display.println(&format!(
+        d.clear();
+        d.println("=== GAME OVER ===");
+        d.println(&format!("{:?}", gs.game_result));
+        d.println(&format!(
             "P1 success:{} wait:{}",
             gs.player1.success_live_card_zone.cards.len(),
             gs.player1.waitroom.cards.len()
         ));
-        display.println(&format!(
+        d.println(&format!(
             "P2 success:{} wait:{}",
             gs.player2.success_live_card_zone.cards.len(),
             gs.player2.waitroom.cards.len()
         ));
-        display.println("Press A to exit");
-        display.swap_buffers();
+        d.println("Press A to exit");
+        d.swap_buffers();
         wait_vsync();
-        input.poll();
-        if input.just_pressed(Button::A) || input.just_pressed(Button::Start) {
+        i.poll();
+        if i.just_pressed(Button::A) {
             break;
         }
     }
@@ -595,23 +556,12 @@ fn init_rng() {
     let tick = get_system_tick();
     rng::seed(if tick == 0 { 1 } else { tick as u32 });
 }
-
-fn card_name(gs: &GameState, cid: i16) -> String {
-    if let Some(c) = gs.card_database.get_card(cid) {
-        c.name.to_string()
-    } else {
-        format!("#{}", cid)
-    }
-}
-
 extern "C" {
     fn SYS_Time() -> u64;
 }
-
 fn get_system_tick() -> u64 {
     unsafe { SYS_Time() }
 }
-
 fn wait_vsync() {
     unsafe {
         extern "C" {
@@ -622,13 +572,8 @@ fn wait_vsync() {
 }
 
 #[panic_handler]
-fn panic(info: &core::panic::PanicInfo) -> ! {
+fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {
-        unsafe {
-            extern "C" {
-                fn VIDEO_WaitVSync();
-            }
-            VIDEO_WaitVSync();
-        }
+        wait_vsync();
     }
 }

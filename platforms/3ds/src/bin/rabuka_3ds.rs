@@ -112,6 +112,7 @@ fn cn_or_empty(act: &game_setup::Action) -> String {
 
 /// Render text with inline `{{icon.png|label}}` icon images.
 /// Uses _3ds_top_queue_card to render the actual icon T3X files.
+/// Uses _3ds_measure_text_width (citro2d C2D_TextGetDimensions) for exact pixel positioning.
 fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32) {
     let text_h = scale * 30.0;
     let icon_h = (scale * 16.0).max(11.0);
@@ -129,8 +130,8 @@ fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32) {
                     format!("{}\0", &rest[..start]).as_ptr(),
                 );
             }
-            let chars_before = rest[..start].chars().count();
-            cx += chars_before as f32 * scale * 11.0;
+            let text_seg = std::ffi::CString::new(&rest[..start]).unwrap_or_default();
+            cx += unsafe { _3ds_measure_text_width(text_seg.as_ptr() as *const u8, scale) };
         }
         let after = &rest[start + 2..];
         if let Some(end) = after.find("}}") {
@@ -291,10 +292,10 @@ fn segment_text(s: &str) -> Vec<TextSeg> {
     segs
 }
 
-/// Calculate icon width in character-equivalent units at given scale.
+/// Convert icon pixel width to character-equivalent units for wrapping.
 fn icon_char_width(file: &str, scale: f32) -> f32 {
     let icon_h = (scale * 16.0).max(11.0);
-    let char_w = scale * 11.0;
+    let char_w = scale * 9.0;
     if char_w <= 0.0 {
         return 2.0;
     }
@@ -4148,9 +4149,15 @@ fn main() {
                                                 .and_then(|p| p.base_cost)
                                                 .unwrap_or(0);
                                             let hdr = if !cn.is_empty() {
-                                                format!("[{}] {} c:{}", cn, name, base_cost)
+                                                format!(
+                                                    "[{}] {} {{{{icon_energy.png|E}}}}{}",
+                                                    cn, name, base_cost
+                                                )
                                             } else {
-                                                format!("{} c:{}", name, base_cost)
+                                                format!(
+                                                    "{} {{{{icon_energy.png|E}}}}{}",
+                                                    name, base_cost
+                                                )
                                             };
                                             let mut areas = String::new();
                                             for i in di..ge {
@@ -4188,27 +4195,33 @@ fn main() {
                                                 if ty > 230.0 {
                                                     break;
                                                 }
-                                                unsafe {
-                                                    _3ds_top_queue_text(
-                                                        4.0,
-                                                        ty,
-                                                        line_color,
-                                                        line_scale,
-                                                        format!(
-                                                            "{}{}\0",
-                                                            if li == 0 {
-                                                                if is_sel {
-                                                                    "> "
-                                                                } else {
-                                                                    "  "
-                                                                }
-                                                            } else {
-                                                                "   "
-                                                            },
-                                                            l
-                                                        )
-                                                        .as_ptr(),
+                                                let txt = format!(
+                                                    "{}{}",
+                                                    if li == 0 {
+                                                        if is_sel {
+                                                            "> "
+                                                        } else {
+                                                            "  "
+                                                        }
+                                                    } else {
+                                                        "   "
+                                                    },
+                                                    l
+                                                );
+                                                if txt.contains("{{") {
+                                                    render_text_with_icons(
+                                                        4.0, ty, &txt, line_color, line_scale,
                                                     );
+                                                } else {
+                                                    unsafe {
+                                                        _3ds_top_queue_text(
+                                                            4.0,
+                                                            ty,
+                                                            line_color,
+                                                            line_scale,
+                                                            format!("{}\0", txt).as_ptr(),
+                                                        );
+                                                    }
                                                 }
                                                 ty += 20.0;
                                             }
@@ -4266,9 +4279,15 @@ fn main() {
                                                         .and_then(|p| p.base_cost)
                                                         .unwrap_or(0);
                                                     if !cn.is_empty() {
-                                                        format!("[{}] {} c:{}", cn, name, base_cost)
+                                                        format!(
+                                                            "[{}] {} {{{{icon_energy.png|E}}}}{}",
+                                                            cn, name, base_cost
+                                                        )
                                                     } else {
-                                                        format!("{} c:{}", name, base_cost)
+                                                        format!(
+                                                            "{} {{{{icon_energy.png|E}}}}{}",
+                                                            name, base_cost
+                                                        )
                                                     }
                                                 }
                                                 game_setup::ActionType::UseAbility => {
@@ -4735,6 +4754,7 @@ extern "C" {
     fn _3ds_top_queue_rect(x: f32, y: f32, w: f32, h: f32, color: u32);
     fn _3ds_top_queue_text(x: f32, y: f32, color: u32, scale: f32, text: *const u8);
     fn _3ds_top_queue_card(atlas: *const u8, idx: i32, x: f32, y: f32, w: f32, h: f32);
+    fn _3ds_measure_text_width(text: *const u8, scale: f32) -> f32;
 
     // Board HUD
     fn _3ds_board_set_hud(turn: i32, phase: *const u8, player: *const u8);
