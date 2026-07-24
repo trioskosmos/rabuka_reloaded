@@ -411,3 +411,40 @@ Two paths to finish:
 - **A**: Patch KOS libc to include missing types → std `fn main()` works
 - **B**: Fix rustc_codegen_gcc symbol emission for no_std (upstream fix)
 
+---
+
+## Wii Port — **Done, awaiting build** (Jul 2026)
+
+Status: **Code complete in `platforms/wii/`**. 88MB RAM → Path A (JSON interpreter, std mode, no engine changes).
+
+### Files
+| File | Purpose |
+|------|---------|
+| `Cargo.toml` | Depends on `rabuka_engine` with `bytecode_abilities` (std mode) |
+| `powerpc-unknown-eabi.json` | Target spec from `rust-wii/testing-project` |
+| `.cargo/config.toml` | Empty rustflags for the target |
+| `src/display.rs` | libogc `VIDEO_Init` + `CON_InitEx` → text console via `printf` |
+| `src/input.rs` | Both GameCube (`PAD`) and Wii Remote (`WPAD`) input in one poll |
+| `src/lib.rs` | Re-exports display + input modules |
+| `src/bin/rabuka_wii.rs` | Game loop — identical logic to DC port, adapted for libogc |
+| `build_wii.bat` | Build script: `cargo +nightly build -Z build-std=std,panic_abort` |
+
+### Build
+```bash
+# Requires: devkitPPC, nightly Rust, rust-src component
+cargo +nightly build -Z build-std=std,panic_abort --target powerpc-unknown-eabi.json --release
+powerpc-eabi-objcopy -O binary rabuka_wii rabuka_wii.dol
+```
+
+### Reference material
+Saved to `research/wii/KEY_REFERENCE.md`:
+- `rust-wii/ogc-rs` — safe Rust bindings for libogc (79 stars, active)
+- `rust-wii/testing-project` — minimal no_std template (archived but target spec is correct)
+- `ogc-engine` — game engine built on ogc-rs (6 stars)
+
+### Design decisions
+- **No `ogc-rs` dependency**: Using inline FFI extern blocks instead, following the same pattern as the DC port. Avoids the `no_std` requirement of `ogc-rs`.
+- **Path A (std mode)**: The Wii has 88MB RAM — no bytecode VM or no_std migration needed.
+- **PSP baked data**: Points to `psp/baked/` JSON decks (same as DC), embedded at compile time via `include_str!`.
+- **Dual input**: `Input::poll()` scans both `PAD_ScanPads` (GameCube) and `WPAD_ScanPads` (Wii Remote) — whichever you press, it works.
+

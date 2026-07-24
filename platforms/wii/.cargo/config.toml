@@ -1,0 +1,6 @@
+[target.powerpc-unknown-eabi]
+linker = "C:\\devkitPro\\devkitPPC\\bin\\powerpc-eabi-gcc.exe"
+rustflags = [
+    "-C", "link-arg=-nostartfiles",
+    "-C", "link-arg=-Wl,--start-group,-logc,-lc,-lm,-lgcc,--end-group",
+]

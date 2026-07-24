@@ -29,6 +29,9 @@ ports/3ds/romfs/cards/*.png
 
 output_3ds/
 
+# Wii build output
+output_wii/
+
 # Dreamcast toolchain build artifacts
 dc-toolchain/
 output_dc/
@@ -38,6 +41,9 @@ a.out
 binutils-2.44.tar.xz
 cards/_probe.txt
 clean_gcc.ps1
+
+# Research / reference material (downloaded third-party code, experiments)
+research/
 
 # Old port directory (replaced by ports/ds/)
 engine_ds/

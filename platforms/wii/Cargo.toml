@@ -1,0 +1,21 @@
+[package]
+name = "rabuka_wii"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[dependencies]
+rabuka_engine = { path = "../../engine", default-features = false, features = ["wii"] }
+hashbrown = { version = "0.14" }
+log = { version = "0.4", default-features = false }
+serde = { version = "=1.0.228", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "=1.0.99", default-features = false, features = ["alloc"] }
+
+[lib]
+crate-type = ["staticlib"]
+
+[profile.release]
+codegen-units = 1
+lto = false
+opt-level = 2
+panic = "abort"
