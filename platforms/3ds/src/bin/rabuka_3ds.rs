@@ -126,7 +126,8 @@ fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32) {
                     format!("{}\0", &rest[..start]).as_ptr(),
                 );
             }
-            cx += start as f32 * scale * 8.0;
+            let chars_before = rest[..start].chars().count();
+            cx += chars_before as f32 * scale * 11.0;
         }
         let after = &rest[start + 2..];
         if let Some(end) = after.find("}}") {

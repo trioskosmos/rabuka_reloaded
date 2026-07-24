@@ -136,7 +136,7 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
       <div class="deck-stats" id="deck-stats"></div>
       <div id="checklist"><div class="checklist-title" data-i18n="validation">Validation</div></div>
       <div class="deck-card-section">
-        <div class="deck-list-title" data-i18n="cards_label">Cards (<span id="deck-total">0</span>)</div>
+        <div class="deck-list-title"><span data-i18n="cards_label">Cards</span> (<span id="deck-total">0</span>)</div>
         <div id="deck-card-list"></div>
       </div>
       <div class="deck-actions">
@@ -171,19 +171,6 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Noto Sans JP', system-ui, s
 
 <script src="js/qrcode.min.js"></script>
 <script>
-document.title = document.title + ' [JS running]';
-(function(){
-  console.log('DEBUG: script executing');
-  var e = document.getElementById('result-count');
-  console.log('DEBUG: result-count element:', e);
-  if(e) {
-    e.textContent = '✓ script loaded at ' + new Date().toLocaleTimeString();
-  } else {
-    // Try to find it differently
-    var all = document.querySelectorAll('[id]');
-    console.log('DEBUG: all ids:', Array.from(all).map(function(el){ return el.id; }));
-  }
-})();
 // ── i18n ──
 let cbLang = localStorage.getItem('card_browser_lang') || 'en';
 async function loadCbLang(lang) {
@@ -203,11 +190,8 @@ async function loadCbLang(lang) {
     });
     const btn = document.getElementById('lang-btn-cb');
     if (btn) btn.textContent = lang === 'jp' ? 'English' : '日本語';
-    var e = document.getElementById('result-count');
-    if (e) e.textContent += ' | i18n OK';
   } catch (err) {
-    var e = document.getElementById('result-count');
-    if (e) e.textContent += ' | i18n FAIL: ' + err.message;
+    console.warn('loadCbLang:', err);
   }
 }
 document.getElementById('lang-btn-cb')?.addEventListener('click', () => loadCbLang(cbLang === 'jp' ? 'en' : 'jp'));
@@ -985,14 +969,7 @@ function renderDeckStats(data) {
 function renderDeckList() {
   const el = document.getElementById('deck-card-list');
   const totalEl = document.getElementById('deck-total');
-  if (!totalEl) {
-    console.error('deck-total element not found');
-    // Check if parent containers exist
-    console.error('deck-panel:', document.getElementById('deck-panel'));
-    console.error('deck-card-list:', document.getElementById('deck-card-list'));
-    console.error('All elements with id containing deck:', Array.from(document.querySelectorAll('[id*="deck"]')).map(function(e){ return e.id; }));
-    return;
-  }
+  if (!totalEl) return;
   const entries = [...deckState.cards.entries()].sort((a, b) => {
     const order = { 'メンバー': 0, 'ライブ': 1, 'エネルギー': 2 };
     const ta = order[a[1].card.type] || 9, tb = order[b[1].card.type] || 9;
@@ -1146,32 +1123,10 @@ function showQR() {
 
 // Load i18n then init
 (async () => {
-  var _s = function(msg){ var e = document.getElementById('result-count'); if(e) e.textContent += ' | ' + msg; };
-  _s('IIFE start');
-  try {
-    await loadCbLang(cbLang);
-  } catch (e) {
-    _s('loadCbLang ERR: ' + e.message);
-  }
-  try {
-    const mod = await import('./js/i18n/translator.js');
-    window._cbUi = mod.getCurrentTranslations()?.ui || {};
-    _s('import OK');
-  } catch (e) {
-    _s('import FAIL: ' + e.message);
-  }
-  try {
-    await init();
-    _s('init OK');
-  } catch (e) {
-    _s('init FAIL: ' + e.message);
-  }
-  try {
-    initDeckCreator();
-    _s('deckCreator OK');
-  } catch (e) {
-    _s('deckCreator FAIL: ' + e.message);
-  }
+  try { await loadCbLang(cbLang); } catch (e) { console.warn('i18n:', e); }
+  try { const mod = await import('./js/i18n/translator.js'); window._cbUi = mod.getCurrentTranslations()?.ui || {}; } catch (e) { console.warn('translator:', e); }
+  try { await init(); } catch (e) { console.error('init:', e); }
+  try { initDeckCreator(); } catch (e) { console.error('deckCreator:', e); }
 })();
 </script>
 </body>
