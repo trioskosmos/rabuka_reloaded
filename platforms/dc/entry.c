@@ -1,11 +1,8 @@
 extern int rabuka_main(void);
 
-void _arch_main(void) {
-    rabuka_main();
-}
-
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
+    rabuka_main();
     return 0;
 }
 
