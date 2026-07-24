@@ -82,21 +82,47 @@ set "SRC_ELF=C:\rust_targets\armv6k-nintendo-3ds\release\rabuka_3ds.elf"
 set "SRC_SMDH=C:\rust_targets\armv6k-nintendo-3ds\release\rabuka_3ds.smdh"
 set "OUT_CIA=%~dp0output_3ds\rabuka_3ds.cia"
 
-if exist "%DEVKITPRO%\tools\bin\makerom.exe" (
-    if not exist "%SRC_SMDH%" (
-        echo [6/7] SMDH not found at %SRC_SMDH% -- skipping CIA.
-    ) else (
-        makerom -f cia -o "%OUT_CIA%" -elf "%SRC_ELF%" -smdh "%SRC_SMDH%"
-        if errorlevel 1 (
-            echo [6/7] makerom failed -- skipping CIA.
-        ) else (
-            echo [6/7] CIA: output_3ds\rabuka_3ds.cia (install via FBI)
-        )
-    )
+if not exist "%DEVKITPRO%\tools\bin\makerom.exe" goto :skip_cia
+if not exist "%SRC_ELF%" goto :skip_cia
+echo [6/7] Building RomFS binary...
+set "ROMFS_BIN=%~dp0output_3ds\_romfs.bin"
+set "RSF_FILE=%~dp0output_3ds\_rabuka.rsf"
+"%DEVKITPRO%\tools\bin\build_romfs.exe" "%~dp0platforms\3ds\romfs" "%ROMFS_BIN%" >nul 2>&1
+if errorlevel 1 echo [6/7] build_romfs failed -- trying makerom without it.
+> "%RSF_FILE%" echo BasicInfo:
+>>"%RSF_FILE%" echo   Title: "Rabuka Reloaded"
+>>"%RSF_FILE%" echo   CompanyCode: "01"
+>>"%RSF_FILE%" echo   ProductCode: "CTR-P-RABU"
+>>"%RSF_FILE%" echo   ContentType: Application
+>>"%RSF_FILE%" echo .
+>>"%RSF_FILE%" echo AccessControlInfo:
+>>"%RSF_FILE%" echo   CoreVersion: 2
+>>"%RSF_FILE%" echo.
+>>"%RSF_FILE%" echo SystemControlInfo:
+>>"%RSF_FILE%" echo   StackSize: 0x10000
+>>"%RSF_FILE%" echo   SaveDataSize: 0x100000
+>>"%RSF_FILE%" echo.
+>>"%RSF_FILE%" echo Cci:
+>>"%RSF_FILE%" echo   NoRomFs: false
+if exist "%ROMFS_BIN%" (
+    makerom -f cia -o "%OUT_CIA%" -elf "%SRC_ELF%" -romfs "%ROMFS_BIN%" -rsf "%RSF_FILE%"
 ) else (
-    echo [6/7] makerom not found -- skipping CIA.
-    echo        3DSX file is ready for use via 3dslink or SD card.
+    makerom -f cia -o "%OUT_CIA%" -elf "%SRC_ELF%" -rsf "%RSF_FILE%"
 )
+if errorlevel 1 (
+    echo [6/7] CIA creation failed. Use 3DSX instead.
+) else (
+    echo [6/7] CIA: output_3ds\rabuka_3ds.cia (install via FBI)
+)
+if exist "%RSF_FILE%" del "%RSF_FILE%" >nul 2>&1
+if exist "%ROMFS_BIN%" del "%ROMFS_BIN%" >nul 2>&1
+goto :cia_done
+
+:skip_cia
+echo [6/7] makerom/ELF not found -- skipping CIA.
+echo        3DSX file is ready for use via 3dslink or SD card.
+
+:cia_done
 
 echo.
 echo === Build Complete ===
