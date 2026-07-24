@@ -4,6 +4,11 @@ void _arch_main(void) {
     rabuka_main();
 }
 
+int main(int argc, char* argv[]) {
+    (void)argc; (void)argv;
+    return 0;
+}
+
 void library_init(void) {}
 void library_shutdown(void) {}
 void export_init(void) {}

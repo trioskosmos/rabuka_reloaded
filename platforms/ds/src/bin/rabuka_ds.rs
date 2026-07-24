@@ -10,6 +10,19 @@ use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 
+macro_rules! top_debug {
+    ($($arg:tt)*) => {
+        {
+            let s = alloc::format!($($arg)*);
+            unsafe {
+                if let Ok(c) = alloc::ffi::CString::new(&s[..]) {
+                    nds_top_println(c.as_ptr() as *const u8);
+                }
+            }
+        }
+    };
+}
+
 use rabuka_ds::display::Display;
 use rabuka_ds::input::{Button, Input};
 
@@ -27,6 +40,9 @@ extern "C" {
     fn nds_get_tick() -> u64;
     fn nds_wait_vblank();
     fn nds_dbg_direct(row: i32, text: *const u8);
+    fn nds_top_print(text: *const u8);
+    fn nds_top_println(text: *const u8);
+    fn nds_top_clear();
 }
 
 use core::alloc::{GlobalAlloc, Layout};
@@ -135,13 +151,21 @@ pub extern "C" fn main() {
     unsafe {
         nds_init();
     }
+    unsafe {
+        nds_top_clear();
+    }
+
+    top_debug!("=== Rabuka DS ===");
+    top_debug!("Init...");
 
     let mut display = Display::new();
     let mut input = Input::new();
     init_rng();
 
+    top_debug!("Parsing decks...");
     let decks: Vec<DeckEntry> = serde_json::from_str(DECKS_JSON).expect("Failed to parse decks");
     let deck_names: Vec<&str> = decks.iter().map(|d| d.name.as_str()).collect();
+    top_debug!("{} decks loaded", decks.len());
 
     let modes = ["VS AI", "2 Player", "AI vs AI", "Run Tests"];
     let mode_idx = select(&mut display, &mut input, &modes, "Mode");
@@ -154,31 +178,38 @@ pub extern "C" fn main() {
         return;
     }
 
+    top_debug!("Selecting decks...");
     let deck1_idx = select(&mut display, &mut input, &deck_names, "Your Deck");
     let deck2_idx = if vs_ai || ai_vs_ai {
         rng::rand_range(decks.len())
     } else {
         select(&mut display, &mut input, &deck_names, "P2 Deck")
     };
+    top_debug!("Deck1={} Deck2={}", deck1_idx, deck2_idx);
 
     display.clear();
     display.println("Loading...");
     display.swap_buffers();
 
-    display.println("Loading deck cards...");
-    display.swap_buffers();
+    top_debug!("Loading cards from JSON...");
     let mut all_cards = load_two_decks(deck1_idx, deck2_idx);
+    top_debug!("{} unique cards loaded", all_cards.len());
 
     display.println("Attaching abilities...");
     display.swap_buffers();
+    top_debug!("Attaching abilities...");
     CardLoader::attach_abilities(&mut all_cards);
+    let ab_count = all_cards.iter().filter(|c| !c.abilities.is_empty()).count();
+    top_debug!("{} cards w/ abilities", ab_count);
 
     display.println("Building database...");
     display.swap_buffers();
+    top_debug!("Building card DB...");
     let mut db = Arc::new(CardDatabase::load_or_create(all_cards));
 
     display.println("Building decks...");
     display.swap_buffers();
+    top_debug!("Building player decks...");
     let nums1: Vec<String> = decks[deck1_idx].cards.clone();
     let nums2: Vec<String> = decks[deck2_idx].cards.clone();
 
@@ -193,6 +224,7 @@ pub extern "C" fn main() {
     pd2.shuffle_main_deck();
     pd2.shuffle_energy_deck();
 
+    top_debug!("Creating players...");
     let mut p1 = Player::new("p1".into(), "Player 1".into(), true);
     p1.set_main_deck(pd1.main_deck);
     p1.set_energy_deck(pd1.energy_deck);
@@ -200,10 +232,24 @@ pub extern "C" fn main() {
     p2.set_main_deck(pd2.main_deck);
     p2.set_energy_deck(pd2.energy_deck);
 
+    top_debug!("Creating GameState...");
     let mut gs = GameState::new(p1, p2, db);
+    top_debug!("setup_game...");
     game_setup::setup_game(&mut gs);
+    top_debug!("Game started! Phase={:?}", gs.current_phase);
 
+    let mut loop_count = 0u32;
     loop {
+        loop_count += 1;
+        if loop_count % 10 == 0 {
+            top_debug!(
+                "=== Loop {} Phase={:?} oom={} ===",
+                loop_count,
+                gs.current_phase,
+                ALLOCATOR.oom()
+            );
+        }
+
         TurnEngine::check_victory_condition(&mut gs);
         if gs.game_result != GameResult::Ongoing {
             show_result(&mut display, &mut input, &gs);
@@ -218,6 +264,7 @@ pub extern "C" fn main() {
 
         let actions = game_setup::generate_possible_actions(&gs);
         if actions.is_empty() {
+            top_debug!("No actions, advance phase from {:?}", gs.current_phase);
             TurnEngine::advance_phase(&mut gs);
             wait_frames(10);
             continue;
@@ -226,6 +273,7 @@ pub extern "C" fn main() {
         if gs.has_pending_choice() {
             let is_current_player_ai =
                 ai_vs_ai || (vs_ai && gs.active_player().id != gs.player1.id);
+            top_debug!("Choice pending, ai={}", is_current_player_ai);
             if is_current_player_ai {
                 TurnEngine::resume_with_choice(&mut gs, Some(0), None).ok();
             } else {
@@ -249,6 +297,8 @@ pub extern "C" fn main() {
         }
         settle_auto(&mut display, &mut gs);
     }
+
+    top_debug!("Game ended. result={:?}", gs.game_result);
 }
 
 // ── DS On-Device Tests ──────────────────────────────────────────
@@ -819,20 +869,23 @@ fn wait_frames(n: u32) {
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     unsafe {
-        nds_init();
-        extern "C" {
-            fn iprintf(fmt: *const u8, ...) -> i32;
-        }
-        let msg_buf;
-        if let Some(msg) = info.message().as_str() {
-            msg_buf = format!("PANIC: {}\0", msg);
-        } else {
-            msg_buf = format!("PANIC: {:?}\0", info.message());
-        }
-        iprintf(msg_buf.as_ptr());
-        if let Some(loc) = info.location() {
-            let loc_buf = format!(" at {}:{}\0", loc.file(), loc.line());
-            iprintf(loc_buf.as_ptr());
+        nds_top_clear();
+    }
+    let line1 = alloc::format!("PANIC: {}", info);
+    let c1 = CString::new(&line1[..]).unwrap_or_default();
+    unsafe {
+        nds_top_println(c1.as_ptr() as *const u8);
+    }
+    let line2 = alloc::format!("OOM: {}", ALLOCATOR.oom());
+    let c2 = CString::new(&line2[..]).unwrap_or_default();
+    unsafe {
+        nds_top_println(c2.as_ptr() as *const u8);
+    }
+    if let Some(loc) = info.location() {
+        let line3 = alloc::format!("at {}:{}", loc.file(), loc.line());
+        let c3 = CString::new(&line3[..]).unwrap_or_default();
+        unsafe {
+            nds_top_println(c3.as_ptr() as *const u8);
         }
     }
     loop {

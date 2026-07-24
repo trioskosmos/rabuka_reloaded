@@ -21,8 +21,8 @@ if not exist "%~dp0platforms\psp\baked\decks.json" (
 echo [1/3] Done.
 echo.
 
-echo [2/3] Building Dreamcast staticlib + linking in WSL...
-wsl -d Ubuntu -u root bash -c "source /root/.cargo/env && source /opt/toolchains/dc/rust/misc/environ.sh 2>/dev/null && export CARGO_TARGET_DIR=/tmp/dc_build && export OUTPUT_DIR=/mnt/c/Users/trios/OneDrive/Documents/rabuka_reloaded/output_dc && mkdir -p $OUTPUT_DIR && cd /mnt/c/Users/trios/OneDrive/Documents/rabuka_reloaded/platforms/dc && kos-cargo build --release 2>&1 && echo '=== COMPILATION DONE ===' && sh-elf-gcc -c entry.c -o /tmp/dc_build/entry.o -I${KOS_BASE}/include -I${KOS_BASE}/kernel/arch/dreamcast/include && echo '=== ENTRY COMPILED ===' && sh-elf-gcc /tmp/dc_build/entry.o /tmp/dc_build/sh-elf/release/librabuka_dc.a -Wl,--gc-sections -T${KOS_BASE}/utils/ldscripts/shlelf.xc -nodefaultlibs -L${KOS_BASE}/lib/dreamcast -L${KOS_BASE}/addons/lib/dreamcast -L${KOS_PORTS}/lib -Wl,--start-group -lkallisti -lm -lc -lgcc -Wl,--end-group -o $OUTPUT_DIR/rabuka_dc.elf && echo '=== LINKING DONE ===' && ${KOS_OBJCOPY} -R .stack -O binary $OUTPUT_DIR/rabuka_dc.elf $OUTPUT_DIR/disc/1ST_READ.BIN && echo '=== BINARY CREATED ==='"
+echo [2/3] Building Dreamcast in WSL...
+wsl -d Ubuntu -u root bash -c "source /root/.cargo/env && source /opt/toolchains/dc/rust/misc/environ.sh 2>/dev/null && export CARGO_TARGET_DIR=/opt/toolchains/dc/rust/build_target && export OUT=/mnt/c/Users/trios/OneDrive/Documents/rabuka_reloaded/output_dc && mkdir -p $OUT && cd /mnt/c/Users/trios/OneDrive/Documents/rabuka_reloaded/platforms/dc && kos-cargo build --release 2>&1 && echo '=== STATICLIB DONE ===' && PATH=/opt/toolchains/dc/rust/sh-elf/bin:/opt/toolchains/dc/rust/kos/utils/build_wrappers:/opt/toolchains/dc/rust/bin:/usr/bin:/bin && sh-elf-gcc -c entry.c -o /opt/toolchains/dc/rust/build_target/entry.o -I/opt/toolchains/dc/rust/kos/include -I/opt/toolchains/dc/rust/kos/kernel/arch/dreamcast/include -ffunction-sections -fdata-sections && sh-elf-gcc /opt/toolchains/dc/rust/build_target/entry.o /opt/toolchains/dc/rust/build_target/sh-elf/release/librabuka_dc.a -Wl,--undefined=_rabuka_main -Wl,--gc-sections -T/opt/toolchains/dc/rust/kos/utils/ldscripts/shlelf.xc -nodefaultlibs -L/opt/toolchains/dc/rust/kos/lib/dreamcast -L/opt/toolchains/dc/rust/kos/addons/lib/dreamcast -L/opt/toolchains/dc/rust/kos-ports/lib -Wl,--start-group -lkallisti -lkallisti_arch -lm -lc -lgcc -Wl,--end-group -o $OUT/rabuka_dc.elf && echo '=== LINK DONE ===' && mkdir -p $OUT/disc && sh-elf-objcopy -R .stack -O binary $OUT/rabuka_dc.elf $OUT/disc/1ST_READ.BIN && echo '=== BINARY DONE ==='"
 if %ERRORLEVEL% neq 0 (
     echo [FAIL] Dreamcast build failed.
     pause
@@ -31,17 +31,25 @@ if %ERRORLEVEL% neq 0 (
 echo [2/3] Done.
 echo.
 
-echo [3/3] Copying output...
+echo [3/3] Verifying output...
 if exist "%~dp0output_dc\disc\1ST_READ.BIN" (
-    echo 1ST_READ.BIN created successfully.
-    echo Output: output_dc\rabuka_dc.elf
+    echo.
+    echo ========================================
+    echo  Dreamcast build successful!
+    echo  ELF: output_dc\rabuka_dc.elf
+    echo  1ST_READ.BIN: output_dc\disc\1ST_READ.BIN
+    echo ========================================
+    echo.
+    echo To create a CD image, use:
+    echo   wsl -d Ubuntu sh-elf-objcopy ... (or use a tool like cdirip)
 ) else (
-    echo [WARN] 1ST_READ.BIN not found. Build may have failed.
+    if exist "%~dp0output_dc\rabuka_dc.elf" (
+        echo [OK] rabuka_dc.elf created but 1ST_READ.BIN may need manual step.
+    ) else (
+        echo [WARN] Output not found. Build may have failed.
+    )
 )
 echo [3/3] Done.
 echo.
 
-echo === Build Complete ===
-echo File: output_dc\rabuka_dc.elf
-echo.
 pause

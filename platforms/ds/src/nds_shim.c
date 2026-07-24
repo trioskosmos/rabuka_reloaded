@@ -111,25 +111,57 @@ unsigned char __atomic_fetch_sub_1(volatile void* ptr, unsigned char val, int me
 }
 
 static u16* _tile_map = NULL;
+PrintConsole _top_console;
+
+// Forward declarations for top-screen functions used in nds_init
+void nds_top_clear(void);
+void nds_top_print(const char* text);
+void nds_top_println(const char* text);
 
 void nds_init(void) {
     videoSetMode(MODE_0_2D);
     videoSetModeSub(MODE_0_2D);
     vramSetBankC(VRAM_C_SUB_BG);
-    
+
     irqSet(IRQ_VBLANK, NULL);
     irqEnable(IRQ_VBLANK);
-    
+
     PrintConsole* con = consoleDemoInit();
     if (con) {
         _tile_map = con->fontBgMap;
     } else {
         _tile_map = bgGetMapPtr(4);
     }
+
+    consoleInit(&_top_console, 1, BgType_Text4bpp, BgSize_T_256x256, 0, 2, false, true);
+
     iprintf("\x1b[2J");
+    nds_top_clear();
+
     REG_TM0CNT = 0;
     REG_TM0DATA = 0;
     REG_TM0CNT = TIMER_ENABLE | TIMER_PRESCALER_64;
+}
+
+void nds_top_clear(void) {
+    PrintConsole* old = consoleGetDefault();
+    consoleSelect(&_top_console);
+    iprintf("\x1b[2J");
+    consoleSelect(old);
+}
+
+void nds_top_print(const char* text) {
+    PrintConsole* old = consoleGetDefault();
+    consoleSelect(&_top_console);
+    iprintf("%s", text);
+    consoleSelect(old);
+}
+
+void nds_top_println(const char* text) {
+    PrintConsole* old = consoleGetDefault();
+    consoleSelect(&_top_console);
+    iprintf("%s\n", text);
+    consoleSelect(old);
 }
 
 void nds_console_clear(void) {
