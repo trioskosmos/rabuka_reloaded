@@ -1,6 +1,6 @@
 use alloc::format;
-use alloc::string::{String, ToString};
-use core::ffi::{c_char, c_int};
+use alloc::string::ToString;
+use core::ffi::c_int;
 
 extern "C" {
     fn vid_set_mode(dm: c_int, pm: c_int);

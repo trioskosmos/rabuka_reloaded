@@ -28,7 +28,6 @@ for fpath in sorted(glob.glob(os.path.join(baked_dir, "deck_*_cards.json"))):
             if isinstance(faq, str):
                 all_names.add(faq)
 
-# Collect all unique non-ASCII codepoints
 codepoints = set()
 for name in all_names:
     for ch in name:
@@ -36,9 +35,9 @@ for name in all_names:
         if cp >= 0x80:
             codepoints.add(cp)
 
-# Build UTF-32 -> SJIS map
+sorted_cps = sorted(codepoints)
 entries = []
-for cp in sorted(codepoints):
+for cp in sorted_cps:
     ch = chr(cp)
     try:
         sjis = ch.encode("cp932", errors="replace")
@@ -51,19 +50,39 @@ for cp in sorted(codepoints):
     except:
         entries.append((cp, 0, ord("?")))
 
-# Write binary map: 6 bytes per entry = u32le(codepoint) + u8(sjis_hi) + u8(sjis_lo)
+# Write binary map (for Rust)
 bin_path = os.path.join(out_dir, "sjis_map.bin")
 with open(bin_path, "wb") as f:
     for cp, hi, lo in entries:
         f.write(struct.pack("<I", cp))
         f.write(struct.pack("BB", hi, lo))
 
-# Also generate the Rust name lookup function (for exact card name SJIS bytes)
+# Write C header with embedded map
+h_path = os.path.join(out_dir, "sjis_map.h")
+with open(h_path, "w", encoding="utf-8") as f:
+    f.write("// Auto-generated UTF-32 -> Shift-JIS map\n")
+    f.write(f"// {len(entries)} entries\n\n")
+    f.write("#ifndef SJIS_MAP_H\n#define SJIS_MAP_H\n\n")
+    f.write("#include <stddef.h>\n")
+    f.write("#include <stdint.h>\n\n")
+    f.write(f"#define SJIS_MAP_ENTRIES {len(entries)}\n\n")
+    f.write("static const uint8_t sjis_map_data[] = {\n")
+    for i, (cp, hi, lo) in enumerate(entries):
+        comma = "," if i < len(entries) - 1 else ""
+        # Write as uint8_t LE bytes: cp[0..3], hi, lo
+        b0 = cp & 0xFF
+        b1 = (cp >> 8) & 0xFF
+        b2 = (cp >> 16) & 0xFF
+        b3 = (cp >> 24) & 0xFF
+        f.write(f"  {b0},{b1},{b2},{b3},{hi},{lo}{comma}\n")
+    f.write("};\n\n")
+    f.write("#endif\n")
+
+# Write Rust name table
 rs_path = os.path.join(out_dir, "sjis_table.rs")
 lines = []
 lines.append("pub fn card_name_sjis(card_no: &str) -> &'static [u8] {")
 lines.append("    match card_no {")
-
 for no in unique:
     name = None
     for fpath in sorted(glob.glob(os.path.join(baked_dir, "deck_*_cards.json"))):
@@ -84,12 +103,10 @@ for no in unique:
             lines.append(f'        "{no}" => b"",')
     else:
         lines.append(f'        "{no}" => b"",')
-
 lines.append('        _ => b"",')
 lines.append("    }")
 lines.append("}")
-
 with open(rs_path, "w", encoding="utf-8") as f:
     f.write("\n".join(lines))
 
-print(f"Generated SJIS map: {len(entries)} codepoints, {len(unique)} card names")
+print(f"Generated: {len(entries)} SJIS codepoints, {len(unique)} card names")

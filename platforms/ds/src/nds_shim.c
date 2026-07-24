@@ -20,86 +20,93 @@ int* __errno(void) {
     return &_calico_errno;
 }
 
-int __atomic_fetch_add_4(int* ptr, int val, int memorder) {
+unsigned int __atomic_fetch_add_4(volatile void* ptr, unsigned int val, int memorder) {
     (void)memorder;
-    int tmp = *ptr;
-    *ptr = tmp + val;
+    unsigned int* p = (unsigned int*)ptr;
+    unsigned int tmp = *p;
+    *p = tmp + val;
     return tmp;
 }
 
-int __atomic_fetch_sub_4(int* ptr, int val, int memorder) {
+unsigned int __atomic_fetch_sub_4(volatile void* ptr, unsigned int val, int memorder) {
     (void)memorder;
-    int tmp = *ptr;
-    *ptr = tmp - val;
+    unsigned int* p = (unsigned int*)ptr;
+    unsigned int tmp = *p;
+    *p = tmp - val;
     return tmp;
 }
 
-void __atomic_store_4(int* ptr, int val, int memorder) {
+void __atomic_store_4(volatile void* ptr, unsigned int val, int memorder) {
     (void)memorder;
-    *ptr = val;
+    *(unsigned int*)ptr = val;
 }
 
-int __atomic_load_4(int* ptr, int memorder) {
+unsigned int __atomic_load_4(const volatile void* ptr, int memorder) {
     (void)memorder;
-    return *ptr;
+    return *(const unsigned int*)ptr;
 }
 
-int __atomic_compare_exchange_4(int* ptr, int* expected, int desired, int weak, int success_memorder, int failure_memorder) {
+_Bool __atomic_compare_exchange_4(volatile void* ptr, void* expected, unsigned int desired, _Bool weak, int success_memorder, int failure_memorder) {
     (void)weak;
     (void)success_memorder;
     (void)failure_memorder;
-    int cur = *ptr;
-    if (cur == *expected) {
-        *ptr = desired;
+    unsigned int cur = *(unsigned int*)ptr;
+    unsigned int* exp = (unsigned int*)expected;
+    if (cur == *exp) {
+        *(unsigned int*)ptr = desired;
         return 1;
     } else {
-        *expected = cur;
+        *exp = cur;
         return 0;
     }
 }
 
-unsigned char __atomic_load_1(unsigned char* ptr, int memorder) {
+unsigned char __atomic_load_1(const volatile void* ptr, int memorder) {
     (void)memorder;
-    return *ptr;
+    return *(const unsigned char*)ptr;
 }
 
-void __atomic_store_1(unsigned char* ptr, unsigned char val, int memorder) {
+void __atomic_store_1(volatile void* ptr, unsigned char val, int memorder) {
     (void)memorder;
-    *ptr = val;
+    *(unsigned char*)ptr = val;
 }
 
-unsigned char __atomic_exchange_1(unsigned char* ptr, unsigned char val, int memorder) {
+unsigned char __atomic_exchange_1(volatile void* ptr, unsigned char val, int memorder) {
     (void)memorder;
-    unsigned char tmp = *ptr;
-    *ptr = val;
+    unsigned char* p = (unsigned char*)ptr;
+    unsigned char tmp = *p;
+    *p = val;
     return tmp;
 }
 
-int __atomic_compare_exchange_1(unsigned char* ptr, unsigned char* expected, unsigned char desired, int weak, int success_memorder, int failure_memorder) {
+_Bool __atomic_compare_exchange_1(volatile void* ptr, void* expected, unsigned char desired, _Bool weak, int success_memorder, int failure_memorder) {
     (void)weak;
     (void)success_memorder;
     (void)failure_memorder;
-    unsigned char cur = *ptr;
-    if (cur == *expected) {
-        *ptr = desired;
+    unsigned char cur = *(unsigned char*)ptr;
+    unsigned char* exp = (unsigned char*)expected;
+    if (cur == *exp) {
+        *(unsigned char*)ptr = desired;
         return 1;
     } else {
-        *expected = cur;
+        *exp = cur;
         return 0;
     }
 }
 
-int __atomic_fetch_add_1(unsigned char* ptr, unsigned char val, int memorder) {
+unsigned char __atomic_fetch_add_1(volatile void* ptr, unsigned char val, int memorder) {
     (void)memorder;
-    unsigned char tmp = *ptr;
-    *ptr = tmp + val;
+    unsigned char* p = (unsigned char*)ptr;
+    unsigned char tmp = *p;
+    *p = tmp + val;
     return tmp;
 }
 
-int __atomic_fetch_sub_1(unsigned char* ptr, unsigned char val, int memorder) {
+unsigned char __atomic_fetch_sub_1(volatile void* ptr, unsigned char val, int memorder) {
     (void)memorder;
-    unsigned char tmp = *ptr;
-    *ptr = tmp - val;
+    unsigned char* p = (unsigned char*)ptr;
+    unsigned char tmp = *p;
+    *p = tmp - val;
     return tmp;
 }
 
@@ -113,8 +120,6 @@ void nds_init(void) {
     irqSet(IRQ_VBLANK, NULL);
     irqEnable(IRQ_VBLANK);
     
-    // consoleDemoInit returns the ACTIVE console (not the static default),
-    // which has fontBgMap correctly set after bgInit.
     PrintConsole* con = consoleDemoInit();
     if (con) {
         _tile_map = con->fontBgMap;
@@ -139,8 +144,6 @@ void nds_println(const char* text) {
     iprintf("%s\n", text);
 }
 
-// Direct tile map write for debug — bypasses console completely
-// row: 0-23, text: up to 32 chars, palette: 0xF000 for white
 void nds_dbg_direct(int row, const char* text) {
     u16* map = _tile_map;
     if (!map) return;
@@ -151,7 +154,7 @@ void nds_dbg_direct(int row, const char* text) {
         i++;
     }
     while (i < 32) {
-        map[base + i] = 0xF000 | 0x20; // space
+        map[base + i] = 0xF000 | 0x20;
         i++;
     }
 }
@@ -167,17 +170,14 @@ void nds_set_cursor(int row, int col) {
     iprintf("\x1b[%d;%dH", row + 1, col + 1);
 }
 
-// Access to console tile map for direct rendering
 u16* nds_get_tilemap(void) {
     return _tile_map;
 }
 
 u16* nds_get_tilegfx(void) {
-    // The default console's fontBgGfx is also 0 — not currently used.
     return NULL;
 }
 
-// Write a row of 32 tile indices directly to the tile map (flicker-free)
 void nds_write_tile_row(int row, const u16* tiles) {
     u16* map = nds_get_tilemap();
     if (!map) return;
@@ -187,22 +187,6 @@ void nds_write_tile_row(int row, const u16* tiles) {
     }
 }
 
-// Write text to the top screen using its console (avoids Display buffer issues)
-void nds_top_print(const char* text) {
-    PrintConsole* old = consoleGetDefault();
-    consoleSelect(&_top_console);
-    iprintf("%s", text);
-    consoleSelect(old);
-}
-
-void nds_top_clear(void) {
-    PrintConsole* old = consoleGetDefault();
-    consoleSelect(&_top_console);
-    iprintf("\x1b[2J");
-    consoleSelect(old);
-}
-
-// Clear one tile map row
 void nds_clear_tile_row(int row) {
     u16* map = nds_get_tilemap();
     if (!map) return;
@@ -228,13 +212,11 @@ unsigned long long nds_get_tick(void) {
     return (unsigned long long)REG_TM0DATA;
 }
 
-// newlib heap: _sbrk + malloc/free/realloc wrappers
 extern char __heap_start_ntr;
 static char* _brk = &__heap_start_ntr;
 
 void* _sbrk(int incr) {
     char* prev = _brk;
-    // HEAP_END = 0x02400000
     if ((unsigned int)(_brk + incr) > 0x02400000) {
         return (void*)-1;
     }
@@ -245,5 +227,3 @@ void* _sbrk(int incr) {
 void* ds_malloc(unsigned int size) { return malloc(size); }
 void ds_free(void* ptr) { free(ptr); }
 void* ds_realloc(void* ptr, unsigned int size) { return realloc(ptr, size); }
-
-

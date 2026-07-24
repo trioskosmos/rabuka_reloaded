@@ -144,7 +144,7 @@ fn render_text_with_icons(x: f32, y: f32, text: &str, color: u32, scale: f32) {
                 unsafe {
                     _3ds_top_queue_card(c_str.as_ptr() as *const u8, 0, cx, icon_y, iw, icon_h);
                 }
-                cx += iw + 2.0;
+                cx += iw + scale * 6.0;
             }
             rest = &after[end + 2..];
         } else {
@@ -186,12 +186,18 @@ fn icon_width_for(file: &str, h: f32) -> f32 {
     h * w / ih
 }
 
-/// Convert heart label like "h06" to icon marker string "{{heart_06.png|h06}}"
+/// Convert heart label like "h061+1" to icon + count: "{{heart_06.png|h06}} 1+1"
 fn heart_label_to_icon(s: &str) -> String {
-    if let Some(num) = s.strip_prefix("h") {
-        if let Ok(n) = num.parse::<u8>() {
+    if s.len() >= 3 && s.as_bytes()[0] == b'h' {
+        if let Ok(n) = s[1..3].parse::<u8>() {
             if n <= 6 {
-                return format!("{{{{heart_{:02}.png|{}}}}}", n, s);
+                let rest = &s[3..];
+                let count_str = if rest.is_empty() {
+                    String::new()
+                } else {
+                    format!(" {}", rest)
+                };
+                return format!("{{{{heart_{:02}.png|{}}}}}{}", n, &s[..3], count_str);
             }
         }
     }
@@ -205,23 +211,45 @@ fn heart_label_to_icon(s: &str) -> String {
 }
 
 /// Build stat line with texticons for card detail.
-/// Converts "B:5 H:h06 h04 S:2 C:1" into icon-based string.
-fn card_stat_line(blade: i32, heart_str: &str, score: i32, cost: u32, tapped: bool) -> String {
+/// Shows only relevant stats for the card type (no blade on live, no score on members).
+fn card_stat_line(
+    blade: i32,
+    heart_str: &str,
+    score: i32,
+    cost: u32,
+    tapped: bool,
+    variant: &str,
+) -> String {
     let mut s = String::new();
-    s.push_str(&format!("{{{{icon_blade.png|BLADE}}}}{}  ", blade));
+    let can_have_blade = variant == "member_card";
+    let can_have_score = variant == "live_card";
+    if can_have_blade && (blade > 0 || cost > 0) {
+        s.push_str(&format!("{{{{icon_blade.png|BLADE}}}}{}  ", blade));
+    }
     for part in heart_str.split_whitespace() {
-        s.push_str(&heart_label_to_icon(part));
+        let converted = heart_label_to_icon(part);
+        if !converted.starts_with("{{") && heart_str.len() <= 3 {
+            continue;
+        }
+        s.push_str(&converted);
         s.push(' ');
     }
     if !heart_str.is_empty() {
-        // remove trailing space and add proper separator
-        s.pop();
-        s.push_str("  ");
+        let trimmed = s.trim_end().to_string();
+        s = trimmed;
+        if !can_have_blade || blade <= 0 || cost == 0 {
+            s.push(' ');
+        } else {
+            s.push_str("  ");
+        }
     }
-    s.push_str(&format!(
-        "{{{{icon_score.png|SCORE}}}}{}  {{{{icon_energy.png|E}}}}{}",
-        score, cost
-    ));
+    if can_have_score && score > 0 {
+        s.push_str(&format!("{{{{icon_score.png|SCORE}}}}{}  ", score));
+    }
+    let show_cost = cost > 0 || can_have_blade;
+    if show_cost {
+        s.push_str(&format!("{{{{icon_energy.png|E}}}}{}", cost));
+    }
     if tapped {
         s.push_str(" [TAPPED]");
     }
@@ -3603,7 +3631,14 @@ fn main() {
                                         render_text_with_icons(
                                             44.0,
                                             66.0,
-                                            &card_stat_line(tb, &hr, sc, co, is_tapped),
+                                            &card_stat_line(
+                                                tb,
+                                                &hr,
+                                                sc,
+                                                co,
+                                                is_tapped,
+                                                card.card_type.as_card_str(),
+                                            ),
                                             COL_LIGHT,
                                             0.60f32,
                                         );
@@ -3710,16 +3745,13 @@ fn main() {
                                                 score,
                                                 cost,
                                                 is_tapped,
+                                                card.card_type.as_card_str(),
                                             ),
                                             COL_LIGHT,
                                             0.65f32,
                                         );
                                         let mut ty = 86.0;
-                                        let ability_cap = if cont_y - 12.0 < 172.0 {
-                                            cont_y - 12.0
-                                        } else {
-                                            172.0
-                                        };
+                                        let ability_cap = (cont_y as f32 - 12.0).min(172.0);
                                         for ab in card.resolved_abilities() {
                                             let w = wrap_ability_text(&ab.full_text, 45, 0.65);
                                             for line in w.lines() {
@@ -3819,6 +3851,7 @@ fn main() {
                                                 score,
                                                 cost,
                                                 is_tapped,
+                                                card.card_type.as_card_str(),
                                             ),
                                             COL_LIGHT,
                                             0.65f32,

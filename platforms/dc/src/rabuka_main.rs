@@ -1,6 +1,7 @@
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
+use alloc::vec;
 use alloc::vec::Vec;
 use core::hash::{BuildHasher, Hasher};
 
@@ -18,9 +19,6 @@ extern "C" {
     fn timer_ms_gettime64() -> u64;
     fn thd_sleep(duration: i32);
 }
-
-#[no_mangle]
-extern "C" fn library_shutdown() {}
 
 #[derive(Default, Clone, Copy)]
 struct DcHasher(u64);
@@ -45,7 +43,7 @@ impl BuildHasher for DcHasher {
 
 macro_rules! deck_cards {
     ($n:literal) => {
-        include_str!(concat!("../../../psp/baked/deck_", $n, "_cards.json"))
+        include_str!(concat!("../../psp/baked/deck_", $n, "_cards.json"))
     };
 }
 
@@ -67,7 +65,7 @@ const DECK_CARDS: &[&str] = &[
     deck_cards!("14"),
     deck_cards!("15"),
 ];
-const DECKS_JSON: &str = include_str!("../../../psp/baked/decks.json");
+const DECKS_JSON: &str = include_str!("../../psp/baked/decks.json");
 
 #[no_mangle]
 pub extern "C" fn rabuka_main() {
@@ -101,7 +99,7 @@ pub extern "C" fn rabuka_main() {
     for c in cards1.into_iter().chain(cards2.into_iter()) {
         let key = c.card_no.to_string();
         if !card_map.contains_key(&key) {
-            let mut card = c;
+            let card = c;
             card_map.insert(key, card);
         }
     }
@@ -291,7 +289,7 @@ fn execute_action(gs: &mut GameState, action: &game_setup::Action) -> bool {
             gs.reset_loop_detection();
             true
         }
-        Err(e) => {
+        Err(_) => {
             gs.reset_loop_detection();
             true
         }

@@ -3,25 +3,12 @@
 
 extern crate alloc;
 
+use alloc::ffi::CString;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
-
-// Debug output on bottom screen rows 22-23 — writes directly to tile map, bypassing console
-fn dbg_row(row: i32, text: &str) {
-    let mut s = alloc::string::String::from(text);
-    // Pad/truncate to 32 chars
-    while s.len() < 32 {
-        s.push(' ');
-    }
-    s.truncate(32);
-    s.push('\0');
-    unsafe {
-        nds_dbg_direct(row, s.as_ptr());
-    }
-}
 
 use rabuka_ds::display::Display;
 use rabuka_ds::input::{Button, Input};
@@ -153,9 +140,6 @@ pub extern "C" fn main() {
     let mut input = Input::new();
     init_rng();
 
-    dbg_row(0, "STARTED                       ");
-    dbg_row(1, "abcdefghijklmnopqrstuvwxyz01234");
-
     let decks: Vec<DeckEntry> = serde_json::from_str(DECKS_JSON).expect("Failed to parse decks");
     let deck_names: Vec<&str> = decks.iter().map(|d| d.name.as_str()).collect();
 
@@ -208,8 +192,6 @@ pub extern "C" fn main() {
     pd1.shuffle_energy_deck();
     pd2.shuffle_main_deck();
     pd2.shuffle_energy_deck();
-    display.println(&format!("decks built"));
-    display.swap_buffers();
 
     let mut p1 = Player::new("p1".into(), "Player 1".into(), true);
     p1.set_main_deck(pd1.main_deck);
@@ -217,37 +199,16 @@ pub extern "C" fn main() {
     let mut p2 = Player::new("p2".into(), "Player 2".into(), false);
     p2.set_main_deck(pd2.main_deck);
     p2.set_energy_deck(pd2.energy_deck);
-    display.println(&format!("players ready"));
-    display.swap_buffers();
 
     let mut gs = GameState::new(p1, p2, db);
     game_setup::setup_game(&mut gs);
-    display.println(&format!("game ready: {:?}", gs.current_phase));
-    display.swap_buffers();
 
     loop {
-        dbg_row(
-            0,
-            &alloc::format!(
-                "TOP ph={:?} t={}           ",
-                gs.current_phase,
-                gs.turn_number
-            ),
-        );
         TurnEngine::check_victory_condition(&mut gs);
         if gs.game_result != GameResult::Ongoing {
             show_result(&mut display, &mut input, &gs);
             break;
         }
-
-        dbg_row(
-            1,
-            &alloc::format!(
-                "TOP2 pc={} ph={:?}              ",
-                gs.has_pending_choice(),
-                gs.current_phase
-            ),
-        );
 
         settle_auto(&mut display, &mut gs);
         if gs.game_result != GameResult::Ongoing {
@@ -256,15 +217,6 @@ pub extern "C" fn main() {
         }
 
         let actions = game_setup::generate_possible_actions(&gs);
-        dbg_row(
-            23,
-            &alloc::format!(
-                "a={} pc={}              ",
-                actions.len(),
-                gs.has_pending_choice()
-            ),
-        );
-
         if actions.is_empty() {
             TurnEngine::advance_phase(&mut gs);
             wait_frames(10);
@@ -290,37 +242,12 @@ pub extern "C" fn main() {
         } else {
             human_turn(&mut display, &mut input, &mut gs, &actions)
         };
-        dbg_row(
-            22,
-            &alloc::format!(
-                "ht={} ai={} ph={:?}             ",
-                ok,
-                is_current_player_ai,
-                gs.current_phase
-            ),
-        );
         if !ok {
             if !is_current_player_ai {
                 break;
             }
         }
-        dbg_row(
-            22,
-            &alloc::format!(
-                "sa_bot ph={:?} pc={}            ",
-                gs.current_phase,
-                gs.has_pending_choice()
-            ),
-        );
         settle_auto(&mut display, &mut gs);
-        dbg_row(
-            22,
-            &alloc::format!(
-                "sa_done ph={:?} pc={}           ",
-                gs.current_phase,
-                gs.has_pending_choice()
-            ),
-        );
     }
 }
 
@@ -336,7 +263,6 @@ fn run_on_device_tests_ds(display: &mut Display, input: &mut Input) {
     let mut passed = 0u32;
     let mut failed = 0u32;
 
-    // Test 1: Deck count from JSON
     let dc = decks.len();
     display.println(&alloc::format!("DECKS: {}", dc));
     if dc >= 2 {
@@ -348,7 +274,6 @@ fn run_on_device_tests_ds(display: &mut Display, input: &mut Input) {
     display.swap_buffers();
     wait_frames(20);
 
-    // Test 2: Load cards from first two decks and verify abilities
     let all_cards = load_two_decks(0, 1.min(dc.saturating_sub(1)));
     let cc = all_cards.len();
     let ab_count = all_cards.iter().filter(|c| !c.abilities.is_empty()).count();
@@ -365,7 +290,6 @@ fn run_on_device_tests_ds(display: &mut Display, input: &mut Input) {
     display.swap_buffers();
     wait_frames(20);
 
-    // Test 3: Verify ability count after attaching
     if ab_count > 0 {
         passed += 1;
     } else {
@@ -375,7 +299,6 @@ fn run_on_device_tests_ds(display: &mut Display, input: &mut Input) {
     display.swap_buffers();
     wait_frames(20);
 
-    // Test 4: AI vs AI if enough decks
     if dc >= 2 {
         display.println("AI PLAY: 5 turns...");
         display.swap_buffers();
@@ -498,18 +421,22 @@ fn ai_turn(_display: &mut Display, gs: &mut GameState, actions: &[game_setup::Ac
 
 fn execute_action(gs: &mut GameState, action: &game_setup::Action) -> bool {
     let params = action.parameters.clone();
-    let action_type = &action.action_type;
-    TurnEngine::execute_main_phase_action(
+    let result = TurnEngine::execute_main_phase_action(
         gs,
-        action_type,
+        &action.action_type,
         params.as_ref().and_then(|p| p.card_id),
         params.as_ref().and_then(|p| p.card_indices.clone()),
         params
             .as_ref()
             .and_then(|p| p.stage_area.as_ref().and_then(|s| s.parse().ok())),
         params.as_ref().and_then(|p| p.use_baton_touch),
-    )
-    .ok();
+    );
+    match result {
+        Ok(_) => {}
+        Err(ref e) => {
+            dbg_row(22, &alloc::format!("act err: {}", e));
+        }
+    }
     gs.reset_loop_detection();
     true
 }
@@ -520,11 +447,8 @@ fn human_turn(
     gs: &mut GameState,
     actions: &[game_setup::Action],
 ) -> bool {
-    dbg_row(
-        0,
-        &alloc::format!("HT_IN phase={:?}              ", gs.current_phase),
-    );
     let mut sel = 0usize;
+    let mut scroll_offset = 0usize;
     const VISIBLE_ACTIONS: usize = 9;
     loop {
         display.clear();
@@ -556,8 +480,16 @@ fn human_turn(
             p2.main_deck.cards.len()
         ));
         display.println("--------------------------------");
-        let end = actions.len().min(VISIBLE_ACTIONS);
-        for i in 0..end {
+
+        if sel < scroll_offset {
+            scroll_offset = sel;
+        }
+        if sel >= scroll_offset + VISIBLE_ACTIONS {
+            scroll_offset = sel + 1 - VISIBLE_ACTIONS;
+        }
+
+        let end = (scroll_offset + VISIBLE_ACTIONS).min(actions.len());
+        for i in scroll_offset..end {
             let p = if i == sel { ">" } else { " " };
             let line = actions[i].description.lines().next().unwrap_or("");
             let id = actions[i]
@@ -823,7 +755,12 @@ fn settle_auto(_display: &mut Display, gs: &mut GameState) {
         if gs.has_pending_choice() || gs.game_result != GameResult::Ongoing {
             break;
         }
-        if game_setup::is_automatic_phase(gs) {
+        if game_setup::is_automatic_phase(gs)
+            || matches!(
+                gs.current_phase,
+                Phase::RockPaperScissors | Phase::ChooseFirstAttacker
+            )
+        {
             TurnEngine::advance_phase(gs);
         } else {
             break;
@@ -859,6 +796,13 @@ fn show_result(display: &mut Display, input: &mut Input, gs: &GameState) {
 fn display_heap_stats(display: &mut Display) {
     let oom = ALLOCATOR.oom();
     display.println(&alloc::format!("oom:{}", oom));
+}
+
+fn dbg_row(row: i32, text: &str) {
+    let c_str = CString::new(text).unwrap_or_default();
+    unsafe {
+        nds_dbg_direct(row, c_str.as_ptr());
+    }
 }
 
 fn init_rng() {
