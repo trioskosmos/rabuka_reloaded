@@ -30,9 +30,14 @@ impl GameState {
             log::debug!("[SZ_DEBUG] recalculate_constants ENTERED");
         }
         tdbg!("RC:1 ATOMIC_LOAD_OK");
-        let entries = self.collect_constant_stage_effects();
+        let entries = self.collect_constant_stage_effect_ids();
         tdbg!("RC:2 COLLECT_EFFECTS_OK len={}", entries.len());
         self.mods.constant_score_sources.clear();
+
+        // Clone the Arc once (cheap: atomic increment) — all effect lookups
+        // go through this local reference instead of self.card_database,
+        // avoiding 152B × N AbilityEffect clones per recalculation.
+        let card_db = self.card_database.clone();
 
         // Reuse pre-allocated scratch buffers to avoid allocation storm
         let mut exp_blade = core::mem::take(&mut self.scratch_exp_blade);
@@ -65,26 +70,36 @@ impl GameState {
         }
         tdbg!("RC:4 ENTRY_POSITIONS_DONE count={}", entry_positions.len());
 
-        for (card_id, effect) in &entries {
+        for &(card_id, ability_idx) in &entries {
             tdbg!("RC:5_LOOP card_id={}", card_id);
+            // Re-lookup effect through the local Arc clone — avoids 152B clone.
+            // The reference borrows card_db (not self), so there's no borrow
+            // conflict with &mut self operations later in this iteration.
+            let ability = match GameState::resolve_constant_ability(&card_db, card_id, ability_idx)
+            {
+                Some(a) => a,
+                None => continue,
+            };
+            let Some(ref effect) = ability.effect else {
+                continue;
+            };
             // Set activating_card so condition evaluators (e.g. exclude_self in
             // location_condition) know which card is "self" for this entry.
             let prev_activating = self.activating_card;
-            self.activating_card = Some(*card_id);
+            self.activating_card = Some(card_id);
             // Capture card info and owner for jyouji status tracking before the ctx borrow
-            let status_card_name = self
-                .card_database
-                .get_card(*card_id)
+            let status_card_name = card_db
+                .get_card(card_id)
                 .map(|c| c.name.to_string())
                 .unwrap_or_default();
-            let status_owner = if self.player1.stage.stage.contains(card_id) {
+            let status_owner = if self.player1.stage.stage.contains(&card_id) {
                 self.player1.id.clone()
             } else {
                 self.player2.id.clone()
             };
 
             {
-                let self_player = if self.player1.stage.stage.contains(card_id) {
+                let self_player = if self.player1.stage.stage.contains(&card_id) {
                     Some(&self.player1)
                 } else {
                     Some(&self.player2)
@@ -99,7 +114,7 @@ impl GameState {
                 // Check effect-level position requirement
                 let pos_ok = if let Some(ref pos) = effect.position_any() {
                     let pos_str = pos.get_position();
-                    let card_pos = entry_positions.get(card_id).copied().flatten();
+                    let card_pos = entry_positions.get(&card_id).copied().flatten();
                     matches!(
                         (pos_str, card_pos),
                         (Some("center"), Some(1))
@@ -120,7 +135,7 @@ impl GameState {
                     if cond_met {
                         // Record jyouji status for this card
                         jyouji_statuses.push(crate::types::ConstantAbilityStatus {
-                            card_id: *card_id,
+                            card_id: card_id,
                             card_name: status_card_name.clone(),
                             owner: status_owner.clone(),
                             zone: "stage".to_string(),
@@ -137,7 +152,7 @@ impl GameState {
                                     "blade" | "ブレード" => {
                                         let n = if effect.per_unit_any().unwrap_or(false) {
                                             let player =
-                                                if self.player1.stage.stage.contains(card_id) {
+                                                if self.player1.stage.stage.contains(&card_id) {
                                                     &self.player1
                                                 } else {
                                                     &self.player2
@@ -148,7 +163,7 @@ impl GameState {
                                                 loc_b.or(per_b).unwrap_or(Zone::Hand.to_str());
                                             let mut filter = effect.filter_subset();
                                             if filter.exclude_self == Some(-1) {
-                                                filter.exclude_self = Some(*card_id);
+                                                filter.exclude_self = Some(card_id);
                                             }
                                             let per_count =
                                                 crate::ability::util::resolve_per_unit_count(
@@ -183,12 +198,12 @@ impl GameState {
                                                 .unwrap_or(effect.count_any().unwrap_or(1))
                                                 as i32
                                         };
-                                        *exp_blade.entry(*card_id).or_insert(0) += n;
+                                        *exp_blade.entry(card_id).or_insert(0) += n;
                                     }
                                     "heart" | "ハート" => {
                                         let n = if effect.per_unit_any().unwrap_or(false) {
                                             let player =
-                                                if self.player1.stage.stage.contains(card_id) {
+                                                if self.player1.stage.stage.contains(&card_id) {
                                                     &self.player1
                                                 } else {
                                                     &self.player2
@@ -199,7 +214,7 @@ impl GameState {
                                                 loc_b.or(per_b).unwrap_or(Zone::Hand.to_str());
                                             let mut filter = effect.filter_subset();
                                             if filter.exclude_self == Some(-1) {
-                                                filter.exclude_self = Some(*card_id);
+                                                filter.exclude_self = Some(card_id);
                                             }
                                             let per_count =
                                                 crate::ability::util::resolve_per_unit_count(
@@ -226,14 +241,14 @@ impl GameState {
                                         };
                                         if effect.heart_type_any().as_deref() == Some("all") {
                                             *exp_heart
-                                                .entry(*card_id)
+                                                .entry(card_id)
                                                 .or_default()
                                                 .entry("heart00".to_string())
                                                 .or_insert(0) += n;
                                         } else {
                                             for hc in effect.heart_colors_any() {
                                                 *exp_heart
-                                                    .entry(*card_id)
+                                                    .entry(card_id)
                                                     .or_default()
                                                     .entry(hc.clone())
                                                     .or_insert(0) += n;
@@ -245,24 +260,24 @@ impl GameState {
                             }
                             crate::ability::enums::ActionType::ModifyScore => {
                                 let sv = effect.value_any().unwrap_or(0) as i32;
-                                *exp_score.entry(*card_id).or_insert(0) += sv;
+                                *exp_score.entry(card_id).or_insert(0) += sv;
                                 if sv != 0 {
                                     self.mods.constant_score_sources.push((
-                                        *card_id,
+                                        card_id,
                                         effect.text.to_string(),
                                         sv,
                                     ));
                                 }
                             }
                             crate::ability::enums::ActionType::ModifyCost => {
-                                *exp_cost.entry(*card_id).or_insert(0) +=
+                                *exp_cost.entry(card_id).or_insert(0) +=
                                     effect.value_any().unwrap_or(0) as i32;
                             }
                             crate::ability::enums::ActionType::Restriction => {
                                 if let Some(rt) = effect.restriction_type_any() {
                                     let card_name = self
                                         .card_database
-                                        .get_card(*card_id)
+                                        .get_card(card_id)
                                         .map(|c| c.name.to_string())
                                         .unwrap_or_default();
                                     // Do NOT push `cannot_activate` to prohibition_effects:
@@ -330,14 +345,14 @@ impl GameState {
                                 {
                                     // All-heart: store as single "all" entry (HeartColor::All)
                                     *exp_heart
-                                        .entry(*card_id)
+                                        .entry(card_id)
                                         .or_default()
                                         .entry("all".to_string())
                                         .or_insert(0) += 1i32;
                                 } else if let Some(gain_text) = effect.ability_gain_any().as_deref()
                                 {
                                     // Determine which player this card belongs to
-                                    let belongs_to_p1 = self.player1.stage.stage.contains(card_id);
+                                    let belongs_to_p1 = self.player1.stage.stage.contains(&card_id);
                                     let bonus_target = if belongs_to_p1 {
                                         &mut p1_constant_score_bonus
                                     } else {
@@ -345,7 +360,7 @@ impl GameState {
                                     };
 
                                     // Record the gained ability for tracking
-                                    self.add_gained_ability(*card_id, gain_text.to_string());
+                                    self.add_gained_ability(card_id, gain_text.to_string());
 
                                     // Use gained_effect if available (structured data from parser)
                                     if let Some(ref gained) = effect.gained_effect_any() {
@@ -357,7 +372,7 @@ impl GameState {
                                             *bonus_target += val;
                                             if val != 0 {
                                                 self.mods.constant_score_sources.push((
-                                                    *card_id,
+                                                    card_id,
                                                     gain_text.to_string(),
                                                     val,
                                                 ));
@@ -370,7 +385,7 @@ impl GameState {
                                             // constant evaluation time.  Store them for later
                                             // evaluation during execute_live_victory_determination.
                                             self.delayed_gained_effects
-                                                .push((*card_id, *(*gained).clone()));
+                                                .push((card_id, *(*gained).clone()));
                                         }
                                     } else {
                                         // Fallback: parse value from text (legacy path)
@@ -386,7 +401,7 @@ impl GameState {
                                             *bonus_target += val;
                                             if val != 0 {
                                                 self.mods.constant_score_sources.push((
-                                                    *card_id,
+                                                    card_id,
                                                     gain_text.to_string(),
                                                     val,
                                                 ));
@@ -449,13 +464,13 @@ impl GameState {
                                                         .resource_icon_count_any()
                                                         .unwrap_or(sub.count.unwrap_or(1))
                                                         as i32;
-                                                    *exp_blade.entry(*card_id).or_insert(0) += n;
+                                                    *exp_blade.entry(card_id).or_insert(0) += n;
                                                 }
                                                 "heart" | "ハート" => {
                                                     let n = sub.count.unwrap_or(1) as i32;
                                                     for hc in sub.heart_colors_any() {
                                                         *exp_heart
-                                                            .entry(*card_id)
+                                                            .entry(card_id)
                                                             .or_default()
                                                             .entry(hc.clone())
                                                             .or_insert(0) += n;
@@ -570,7 +585,8 @@ impl GameState {
         // Also recalculate cost modifiers from hand cards (hand-based cost reductions)
         // Pass pre-collected stage effects to avoid re-scanning the stage
         tdbg!("RC:13 COST_MODIFIERS_WITH_ENTRIES");
-        self.recalculate_constant_cost_modifiers_with_entries(&entries);
+        let hand_ids = self.collect_constant_hand_effect_ids();
+        self.recalculate_constant_cost_modifiers_with_ids(&card_db, &entries, &hand_ids);
         tdbg!("RC:13b COST_MODIFIERS_DONE");
 
         // Evaluate constant abilities from success live card zone (e.g. Love wing bell)
@@ -580,22 +596,36 @@ impl GameState {
     }
 
     pub fn recalculate_constant_blade_modifiers(&mut self) {
-        let blade_abilities: Vec<(i16, crate::card::AbilityEffect)> = self
-            .collect_constant_stage_effects()
+        let card_db = self.card_database.clone();
+        let all_ids = self.collect_constant_stage_effect_ids();
+        // Filter to blade gain_resource abilities by looking up each effect
+        let blade_ids: Vec<(i16, usize)> = all_ids
             .into_iter()
-            .filter(|(_, effect)| {
-                effect.action == crate::ability::enums::ActionType::GainResource
-                    && matches!(
-                        effect.resource_any().as_deref(),
-                        Some("blade") | Some("ブレード")
-                    )
+            .filter(|&(cid, idx)| {
+                GameState::resolve_constant_ability(&card_db, cid, idx).map_or(false, |a| {
+                    a.effect.as_ref().map_or(false, |effect| {
+                        effect.action == crate::ability::enums::ActionType::GainResource
+                            && matches!(
+                                effect.resource_any().as_deref(),
+                                Some("blade") | Some("ブレード")
+                            )
+                    })
+                })
             })
             .collect();
 
         let mut expected: HashMap<i16, i32> = HashMap::default();
         {
             let ctx = crate::ability::condition::ConditionContext::new(self);
-            for &(cid, ref effect) in &blade_abilities {
+            for &(cid, ability_idx) in &blade_ids {
+                let Some(blade_ability) =
+                    GameState::resolve_constant_ability(&card_db, cid, ability_idx)
+                else {
+                    continue;
+                };
+                let Some(ref effect) = blade_ability.effect else {
+                    continue;
+                };
                 let cond_met = effect
                     .condition
                     .as_ref()
@@ -668,23 +698,35 @@ impl GameState {
     }
 
     pub fn recalculate_constant_cost_modifiers(&mut self) {
-        let entries = self.collect_constant_stage_effects();
-        self.recalculate_constant_cost_modifiers_with_entries(&entries);
+        let card_db = self.card_database.clone();
+        let stage_ids = self.collect_constant_stage_effect_ids();
+        let hand_ids = self.collect_constant_hand_effect_ids();
+        self.recalculate_constant_cost_modifiers_with_ids(&card_db, &stage_ids, &hand_ids);
     }
 
-    fn recalculate_constant_cost_modifiers_with_entries(
+    fn recalculate_constant_cost_modifiers_with_ids(
         &mut self,
-        stage_entries: &[(i16, crate::card::AbilityEffect)],
+        card_db: &crate::card::CardDatabase,
+        stage_ids: &[(i16, usize)],
+        hand_ids: &[(i16, usize)],
     ) {
         let mut expected: HashMap<i16, i32> = HashMap::default();
-        let hand_effects = self.collect_constant_hand_effects();
         {
             let ctx = crate::ability::condition::ConditionContext::new(self);
-            for &(cid, ref effect) in stage_entries
-                .iter()
-                .chain(hand_effects.iter())
-                .filter(|(_, e)| e.action == crate::ability::enums::ActionType::ModifyCost)
-            {
+            // Chain stage and hand ability IDs, look up each effect, filter to ModifyCost
+            let all_ids = stage_ids.iter().chain(hand_ids.iter());
+            for &(cid, ability_idx) in all_ids {
+                let Some(cost_ability) =
+                    GameState::resolve_constant_ability(card_db, cid, ability_idx)
+                else {
+                    continue;
+                };
+                let Some(ref effect) = cost_ability.effect else {
+                    continue;
+                };
+                if effect.action != crate::ability::enums::ActionType::ModifyCost {
+                    continue;
+                }
                 let cond_met = effect
                     .condition
                     .as_ref()

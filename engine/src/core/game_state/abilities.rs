@@ -107,8 +107,9 @@ impl GameState {
         }
     }
 
-    pub(crate) fn collect_constant_hand_effects(&self) -> Vec<(i16, crate::card::AbilityEffect)> {
-        let mut effects = Vec::new();
+    /// Like collect_constant_stage_effect_ids but for hand cards.
+    pub(crate) fn collect_constant_hand_effect_ids(&self) -> Vec<(i16, usize)> {
+        let mut ids = Vec::new();
         for cid in self
             .player1
             .hand
@@ -120,41 +121,55 @@ impl GameState {
                 Some(card) => card,
                 None => continue,
             };
-            for ar in &card.abilities {
+            for (idx, ar) in card.abilities.iter().enumerate() {
                 let ability = ar.resolve();
                 if Self::ability_matches_trigger(
                     &ability,
                     &crate::game_state::AbilityTrigger::Constant,
                 ) {
-                    if let Some(ref effect) = ability.effect {
-                        effects.push((*cid, (**effect).clone()));
+                    if ability.effect.is_some() {
+                        ids.push((*cid, idx));
                     }
                 }
             }
         }
-        effects
+        ids
     }
 
-    pub(crate) fn collect_constant_stage_effects(&self) -> Vec<(i16, crate::card::AbilityEffect)> {
-        let mut effects = Vec::new();
+    /// Collect (card_id, ability_index) pairs for constant abilities on stage.
+    /// Returns lightweight index pairs instead of cloned AbilityEffects —
+    /// callers re-lookup through the card_database Arc to avoid 152B × N clones.
+    pub(crate) fn collect_constant_stage_effect_ids(&self) -> Vec<(i16, usize)> {
+        let mut ids = Vec::new();
         for cid in self.stage_card_ids() {
             let card = match self.card_database.get_card(cid) {
                 Some(card) => card,
                 None => continue,
             };
-            for ar in &card.abilities {
+            for (idx, ar) in card.abilities.iter().enumerate() {
                 let ability = ar.resolve();
                 if Self::ability_matches_trigger(
                     &ability,
                     &crate::game_state::AbilityTrigger::Constant,
                 ) {
-                    if let Some(ref effect) = ability.effect {
-                        effects.push((cid, (**effect).clone()));
+                    if ability.effect.is_some() {
+                        ids.push((cid, idx));
                     }
                 }
             }
         }
-        effects
+        ids
+    }
+
+    /// Helper: look up and resolve a constant ability by (card_id, ability_index).
+    /// Returns the resolved Arc<Ability> so the caller can borrow effect from it.
+    pub(crate) fn resolve_constant_ability(
+        card_db: &crate::card::CardDatabase,
+        card_id: i16,
+        ability_idx: usize,
+    ) -> Option<crate::Arc<crate::card::Ability>> {
+        let ar = card_db.get_card(card_id)?.abilities.get(ability_idx)?;
+        Some(ar.resolve())
     }
 
     /// Scan a player's stage and enqueue auto abilities for that player.
