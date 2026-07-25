@@ -34,10 +34,15 @@ impl GameState {
         tdbg!("RC:2 COLLECT_EFFECTS_OK len={}", entries.len());
         self.mods.constant_score_sources.clear();
 
-        let mut exp_blade: HashMap<i16, i32> = HashMap::default();
-        let mut exp_cost: HashMap<i16, i32> = HashMap::default();
-        let mut exp_score: HashMap<i16, i32> = HashMap::default();
-        let mut exp_heart: HashMap<i16, HashMap<String, i32>> = HashMap::default();
+        // Reuse pre-allocated scratch buffers to avoid allocation storm
+        let mut exp_blade = core::mem::take(&mut self.scratch_exp_blade);
+        exp_blade.clear();
+        let mut exp_cost = core::mem::take(&mut self.scratch_exp_cost);
+        exp_cost.clear();
+        let mut exp_score = core::mem::take(&mut self.scratch_exp_score);
+        exp_score.clear();
+        let mut exp_heart = core::mem::take(&mut self.scratch_exp_heart);
+        exp_heart.clear();
         let mut exp_prohibition: Vec<String> = Vec::new();
         self.constant_cannot_activate_members.clear();
         let mut exp_global_need_heart: Vec<(i16, String, i32)> = Vec::new();
@@ -46,7 +51,8 @@ impl GameState {
         let mut jyouji_statuses: Vec<crate::types::ConstantAbilityStatus> = Vec::new();
         tdbg!("RC:3 VEC_HASHMAP_INIT_OK");
 
-        let mut entry_positions: HashMap<i16, Option<usize>> = HashMap::default();
+        let mut entry_positions = core::mem::take(&mut self.scratch_entry_positions);
+        entry_positions.clear();
         for (pos, &cid) in self.player1.stage.stage.iter().enumerate() {
             if cid != -1 {
                 entry_positions.insert(cid, Some(pos));
@@ -118,7 +124,7 @@ impl GameState {
                             card_name: status_card_name.clone(),
                             owner: status_owner.clone(),
                             zone: "stage".to_string(),
-                            ability_text: effect.text.clone(),
+                            ability_text: effect.text.to_string(),
                             all_conditions_met: pos_ok && cond_met,
                             conditions: vec![crate::types::ConditionResult {
                                 text: "条件".to_string(),
@@ -243,7 +249,7 @@ impl GameState {
                                 if sv != 0 {
                                     self.mods.constant_score_sources.push((
                                         *card_id,
-                                        effect.text.clone(),
+                                        effect.text.to_string(),
                                         sv,
                                     ));
                                 }
@@ -281,12 +287,12 @@ impl GameState {
                                         if tgt == "self" {
                                             // Per-card: only block this specific member
                                             self.constant_cannot_activate_members
-                                                .insert(card_id.to_string());
+                                                .push(card_id.to_string());
                                         } else {
                                             // Player-level: block all members of the target player
                                             let resolved =
                                                 self.resolve_target_player(tgt).id.clone();
-                                            self.constant_cannot_activate_members.insert(resolved);
+                                            self.constant_cannot_activate_members.push(resolved);
                                         }
                                     }
                                     if rt == "cannot_live" {
@@ -470,6 +476,8 @@ impl GameState {
             // Restore the previous activating_card
             self.activating_card = prev_activating;
         }
+        // Recycle entry_positions allocation into scratch buffer
+        self.scratch_entry_positions = entry_positions;
         let _jyouji_len = jyouji_statuses.len();
         self.constant_ability_statuses = jyouji_statuses.into();
         tdbg!("RC:6 MAIN_LOOP_DONE jyouji={}", _jyouji_len);
@@ -484,6 +492,7 @@ impl GameState {
             self.mods.add_blade_modifier(cid, val);
         }
         self.mods.constant_blade_bonuses = exp_blade;
+        self.scratch_exp_blade = old_blade;
 
         // Cost
         tdbg!("RC:8 COST");
@@ -495,6 +504,7 @@ impl GameState {
             self.mods.add_cost_modifier(cid, val);
         }
         self.mods.constant_cost_bonuses = exp_cost;
+        self.scratch_exp_cost = old_cost;
 
         // Score
         tdbg!("RC:9 SCORE");
@@ -506,6 +516,7 @@ impl GameState {
             self.mods.add_score_modifier(cid, val);
         }
         self.mods.constant_score_bonuses = exp_score;
+        self.scratch_exp_score = old_score;
 
         // Per-player global score bonus (from GainAbility modify_score)
         self.mods.p1_constant_total_score_bonus = p1_constant_score_bonus;
@@ -514,12 +525,15 @@ impl GameState {
         // Heart — clear old constant heart modifiers first, then re-apply new ones.
         tdbg!("RC:10 HEART");
         // Must drain the OLD map so bonuses from cards that left the stage are removed.
-        let old_heart = core::mem::take(&mut self.mods.constant_heart_bonuses);
-        for (cid, cols) in &old_heart {
-            for (color_str, &delta) in cols {
-                let hc = crate::card::parse_heart_color(color_str);
-                self.mods.remove_heart_modifier(*cid, hc, delta);
+        {
+            let old_heart = core::mem::take(&mut self.mods.constant_heart_bonuses);
+            for (cid, cols) in &old_heart {
+                for (color_str, &delta) in cols {
+                    let hc = crate::card::parse_heart_color(color_str);
+                    self.mods.remove_heart_modifier(*cid, hc, delta);
+                }
             }
+            self.scratch_exp_heart = old_heart;
         }
         for (cid, cols) in &exp_heart {
             for (color_str, delta) in cols {
@@ -829,7 +843,7 @@ impl GameState {
         }
         if !source.is_empty() {
             self.card_appearance_source
-                .insert(card_id, source.to_string());
+                .push((card_id, source.to_string()));
         }
     }
 
@@ -839,8 +853,9 @@ impl GameState {
 
     pub fn get_card_appearance_source(&self, card_id: i16) -> Option<&str> {
         self.card_appearance_source
-            .get(&card_id)
-            .map(|s| s.as_str())
+            .iter()
+            .find(|(k, _)| k == &card_id)
+            .map(|(_, v)| v.as_str())
     }
 
     pub fn clear_card_appearance_tracking(&mut self) {
@@ -952,7 +967,7 @@ impl GameState {
     }
 
     pub fn record_card_movement(&mut self, card_id: i16) {
-        self.cards_moved_this_turn.insert(card_id);
+        self.cards_moved_this_turn.push(card_id);
     }
 
     /// Push a MovementEvent recording the movement of a card, tracking what caused it.
@@ -969,8 +984,8 @@ impl GameState {
         self.movement_event_counter += 1;
         let event = crate::types::MovementEvent {
             moved_card_id,
-            source_zone: source_zone.to_string(),
-            dest_zone: dest_zone.to_string(),
+            source_zone: crate::types::ZoneId::from_str(source_zone),
+            dest_zone: crate::types::ZoneId::from_str(dest_zone),
             cause_card_id,
             cause_player_id: cause_player_id.to_string(),
             effect_only,
@@ -996,11 +1011,11 @@ impl GameState {
             self.position_change_occurred_this_turn = true;
         }
         // Track in cards_moved_this_turn for fast O(1) lookups
-        self.cards_moved_this_turn.insert(moved_card_id);
+        self.cards_moved_this_turn.push(moved_card_id);
     }
 
     pub fn has_card_moved_this_turn(&self, card_id: i16) -> bool {
-        self.cards_moved_this_turn.contains(&card_id)
+        self.cards_moved_this_turn.iter().any(|x| x == &card_id)
     }
 
     pub fn clear_card_movement_tracking(&mut self) {

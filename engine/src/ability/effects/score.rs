@@ -188,7 +188,7 @@ impl AbilityResolver {
                 gs.mods.set_score_modifier(*card_id, *delta);
                 gs.record_ability_application(
                     gs.activating_card.unwrap_or(-1),
-                    effect.text.clone(),
+                    effect.text.to_string(),
                     "score_set",
                     *card_id,
                     None,
@@ -198,7 +198,7 @@ impl AbilityResolver {
                 gs.mods.add_score_modifier(*card_id, *delta);
                 gs.record_ability_application(
                     gs.activating_card.unwrap_or(-1),
-                    effect.text.clone(),
+                    effect.text.to_string(),
                     "score_bonus",
                     *card_id,
                     None,

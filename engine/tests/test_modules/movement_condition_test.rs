@@ -59,7 +59,7 @@ fn aspire_moved_liella_gains_blade_unmoved_and_non_liella_do_not() {
     game.state.player1.stage.stage[1] = moved_liella;
     game.state.player1.stage.stage[2] = unmoved_liella;
     game.state.player2.stage.stage[0] = moved_non_liella;
-    game.state.cards_moved_this_turn.insert(moved_liella);
+    game.state.cards_moved_this_turn.push(moved_liella);
     game.state.position_change_occurred_this_turn = true;
 
     advance_to_live_start(&mut game, aspire);
@@ -88,7 +88,7 @@ fn aspire_only_non_liella_moved_no_blade() {
     let aspire = game.id("PL!SP-sd2-025-P");
     let non_liella = game.id("PL!-sd1-010-SD");
     game.state.player1.stage.stage[0] = non_liella;
-    game.state.cards_moved_this_turn.insert(non_liella);
+    game.state.cards_moved_this_turn.push(non_liella);
     game.state.position_change_occurred_this_turn = true;
 
     advance_to_live_start(&mut game, aspire);
@@ -111,8 +111,8 @@ fn aspire_liella_and_non_liella_moved_only_liella_gains_blade() {
 
     game.state.player1.stage.stage[1] = liella;
     game.state.player1.stage.stage[2] = non_liella;
-    game.state.cards_moved_this_turn.insert(liella);
-    game.state.cards_moved_this_turn.insert(non_liella);
+    game.state.cards_moved_this_turn.push(liella);
+    game.state.cards_moved_this_turn.push(non_liella);
     game.state.position_change_occurred_this_turn = true;
 
     advance_to_live_start(&mut game, aspire);
@@ -136,7 +136,7 @@ fn aspire_no_liella_on_stage_no_blade() {
     let aspire = game.id("PL!SP-sd2-025-P");
     let non_liella = game.id("PL!-sd1-010-SD");
     game.state.player1.stage.stage[0] = non_liella;
-    game.state.cards_moved_this_turn.insert(non_liella);
+    game.state.cards_moved_this_turn.push(non_liella);
     game.state.position_change_occurred_this_turn = true;
 
     advance_to_live_start(&mut game, aspire);
@@ -175,8 +175,8 @@ fn aspire_two_moved_liella_both_gain_blade() {
 
     game.state.player1.stage.stage[1] = liella_a;
     game.state.player1.stage.stage[2] = liella_b;
-    game.state.cards_moved_this_turn.insert(liella_a);
-    game.state.cards_moved_this_turn.insert(liella_b);
+    game.state.cards_moved_this_turn.push(liella_a);
+    game.state.cards_moved_this_turn.push(liella_b);
     game.state.position_change_occurred_this_turn = true;
 
     advance_to_live_start(&mut game, aspire);
@@ -332,11 +332,7 @@ fn fuyumari_appear_triggers_opponent_wait() {
     // With only 1 valid candidate and count=1, the effect auto-applies (no prompt).
     // Verify target is now in wait state.
     let ori = game.state.mods.get_orientation_modifier(target);
-    assert_eq!(
-        ori,
-        Some("wait"),
-        "Target should be in wait state"
-    );
+    assert_eq!(ori, Some("wait"), "Target should be in wait state");
 
     // Verify no re-trigger caused another choice
     assert!(
@@ -489,11 +485,7 @@ fn fuyumari_waits_only_one_member() {
     game.select_indices(&[0]);
 
     let ori_a = game.state.mods.get_orientation_modifier(target_a);
-    assert_eq!(
-        ori_a,
-        Some("wait"),
-        "Selected target should be waited"
-    );
+    assert_eq!(ori_a, Some("wait"), "Selected target should be waited");
 
     let ori_b = game.state.mods.get_orientation_modifier(target_b);
     assert!(

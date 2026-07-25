@@ -492,6 +492,124 @@ pub struct ScoreLine {
     pub value: u32,
 }
 
+/// Compact zone identifier — replaces String fields in MovementEvent to avoid
+/// heap allocations. Covers all zone names used in the game engine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ZoneId {
+    Stage,
+    Hand,
+    Deck,
+    DeckTop,
+    DeckBottom,
+    Discard,
+    Waitroom,
+    Energy,
+    EnergyZone,
+    EnergyDeck,
+    SuccessZone,
+    LiveCardZone,
+    SuccessLiveZone,
+    EmptyArea,
+    SameArea,
+    UnderMember,
+    LookedAt,
+    RevealedCards,
+    SelectedCards,
+    Resolution,
+    ExclusionZone,
+    Unknown,
+}
+
+impl ZoneId {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "stage" => ZoneId::Stage,
+            "hand" => ZoneId::Hand,
+            "deck" => ZoneId::Deck,
+            "deck_top" => ZoneId::DeckTop,
+            "deck_bottom" => ZoneId::DeckBottom,
+            "discard" => ZoneId::Discard,
+            "waitroom" => ZoneId::Waitroom,
+            "energy" | "energy_zone" => ZoneId::Energy,
+            "energy_deck" => ZoneId::EnergyDeck,
+            "success_zone" => ZoneId::SuccessZone,
+            "live_card_zone" => ZoneId::LiveCardZone,
+            "success_live_zone" | "success_live_card_zone" => ZoneId::SuccessLiveZone,
+            "empty_area" => ZoneId::EmptyArea,
+            "same_area" => ZoneId::SameArea,
+            "under_member" | "under" => ZoneId::UnderMember,
+            "looked_at" => ZoneId::LookedAt,
+            "revealed_cards" => ZoneId::RevealedCards,
+            "selected_cards" => ZoneId::SelectedCards,
+            "resolution" | "resolution_zone" => ZoneId::Resolution,
+            "exclusion_zone" => ZoneId::ExclusionZone,
+            _ => ZoneId::Unknown,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ZoneId::Stage => "stage",
+            ZoneId::Hand => "hand",
+            ZoneId::Deck => "deck",
+            ZoneId::DeckTop => "deck_top",
+            ZoneId::DeckBottom => "deck_bottom",
+            ZoneId::Discard => "discard",
+            ZoneId::Waitroom => "waitroom",
+            ZoneId::Energy => "energy",
+            ZoneId::EnergyZone => "energy_zone",
+            ZoneId::EnergyDeck => "energy_deck",
+            ZoneId::SuccessZone => "success_zone",
+            ZoneId::LiveCardZone => "live_card_zone",
+            ZoneId::SuccessLiveZone => "success_live_zone",
+            ZoneId::EmptyArea => "empty_area",
+            ZoneId::SameArea => "same_area",
+            ZoneId::UnderMember => "under_member",
+            ZoneId::LookedAt => "looked_at",
+            ZoneId::RevealedCards => "revealed_cards",
+            ZoneId::SelectedCards => "selected_cards",
+            ZoneId::Resolution => "resolution",
+            ZoneId::ExclusionZone => "exclusion_zone",
+            ZoneId::Unknown => "unknown",
+        }
+    }
+
+    /// Check zone equivalence: "discard" and "waitroom" are treated as the same zone
+    /// in many game rules (card movement between them is considered same-area).
+    pub fn equivalent(&self, other: &ZoneId) -> bool {
+        self == other
+            || (*self == ZoneId::Discard && *other == ZoneId::Waitroom)
+            || (*self == ZoneId::Waitroom && *other == ZoneId::Discard)
+            || (*self == ZoneId::Energy && *other == ZoneId::EnergyZone)
+            || (*self == ZoneId::EnergyZone && *other == ZoneId::Energy)
+    }
+}
+
+impl PartialEq<&str> for ZoneId {
+    fn eq(&self, other: &&str) -> bool {
+        *self == ZoneId::from_str(other)
+    }
+}
+
+impl PartialEq<ZoneId> for &str {
+    fn eq(&self, other: &ZoneId) -> bool {
+        ZoneId::from_str(*self) == *other
+    }
+}
+
+impl PartialEq<String> for ZoneId {
+    fn eq(&self, other: &String) -> bool {
+        *self == ZoneId::from_str(other)
+    }
+}
+
+impl PartialEq<ZoneId> for String {
+    fn eq(&self, other: &ZoneId) -> bool {
+        ZoneId::from_str(self) == *other
+    }
+}
+
 /// A structured record of a card movement event, capturing not just what moved
 /// but WHAT CAUSED the move (which card's effect/ability). Replaces the old
 /// pattern of separate tracking fields (recently_moved_cards, last_area_move_card_id,
@@ -500,10 +618,10 @@ pub struct ScoreLine {
 pub struct MovementEvent {
     /// The card that physically moved.
     pub moved_card_id: i16,
-    /// The zone the card moved FROM (e.g. "stage", "hand", "deck").
-    pub source_zone: String,
-    /// The zone the card moved TO (e.g. "waitroom", "hand", "stage").
-    pub dest_zone: String,
+    /// The zone the card moved FROM.
+    pub source_zone: ZoneId,
+    /// The zone the card moved TO.
+    pub dest_zone: ZoneId,
     /// The card whose ability/action caused the move (None = rule/cost with no source card).
     pub cause_card_id: Option<i16>,
     /// The player whose effect/action caused the move.
@@ -516,8 +634,7 @@ pub struct MovementEvent {
 
 /// A structured record of a stage-area-to-stage-area position change.
 /// Captures the old/new positions and what caused the move.
-/// Replaces the fragile snapshot-based position change detection with
-/// explicit event-based tracking.
+/// Replaces the fragile snapshot-based detection with direct event tracking.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PositionChangeEvent {
     /// The card that changed position.

@@ -380,7 +380,7 @@ impl AbilityResolver {
                     );
                     gs.record_ability_application(
                         card_id,
-                        effect.text.clone(),
+                        effect.text.to_string(),
                         "heart_bonus",
                         card_id,
                         Some(color.index()),
@@ -1055,7 +1055,7 @@ impl AbilityResolver {
                         if !area_moved_ids.is_empty() {
                             area_moved_ids.contains(&cid)
                         } else {
-                            gs.cards_moved_this_turn.contains(&cid)
+                            gs.cards_moved_this_turn.iter().any(|x| x == &cid)
                         }
                     })
                     .copied()
@@ -2526,7 +2526,7 @@ impl AbilityResolver {
         gs.trigger_auto_abilities_for_player_with_event(
             &pid,
             &crate::ability::types::TriggerEvent {
-                moved_cards: gs.recently_moved_cards.clone().unwrap_or_default(),
+                moved_cards: gs.recently_moved_cards.clone().unwrap_or_default().into(),
                 position_change_occurred: gs.position_change_occurred_this_turn,
                 ..Default::default()
             },
@@ -2915,7 +2915,7 @@ impl AbilityResolver {
             gs.trigger_auto_abilities_for_player_with_event(
                 &mover_pid,
                 &crate::ability::types::TriggerEvent {
-                    moved_cards: gs.recently_moved_cards.clone().unwrap_or_default(),
+                    moved_cards: gs.recently_moved_cards.clone().unwrap_or_default().into(),
                     position_change_occurred: gs.position_change_occurred_this_turn,
                     ..Default::default()
                 },
@@ -3013,7 +3013,7 @@ impl AbilityResolver {
                     gs.trigger_auto_abilities_for_player_with_event(
                         &mover_pid,
                         &crate::ability::types::TriggerEvent {
-                            moved_cards: gs.recently_moved_cards.clone().unwrap_or_default(),
+                            moved_cards: gs.recently_moved_cards.clone().unwrap_or_default().into(),
                             position_change_occurred: gs.position_change_occurred_this_turn,
                             ..Default::default()
                         },
@@ -3128,7 +3128,7 @@ impl AbilityResolver {
         gs.trigger_auto_abilities_for_player_with_event(
             &pid,
             &crate::ability::types::TriggerEvent {
-                moved_cards: gs.recently_moved_cards.clone().unwrap_or_default(),
+                moved_cards: gs.recently_moved_cards.clone().unwrap_or_default().into(),
                 position_change_occurred: gs.position_change_occurred_this_turn,
                 ..Default::default()
             },
@@ -3206,7 +3206,7 @@ impl AbilityResolver {
         gs.trigger_auto_abilities_for_player_with_event(
             &pid,
             &crate::ability::types::TriggerEvent {
-                moved_cards: gs.recently_moved_cards.clone().unwrap_or_default(),
+                moved_cards: gs.recently_moved_cards.clone().unwrap_or_default().into(),
                 position_change_occurred: gs.position_change_occurred_this_turn,
                 ..Default::default()
             },
@@ -3317,7 +3317,7 @@ impl AbilityResolver {
                     o.answers_any()
                         .as_ref()
                         .map(|a| a.join(", "))
-                        .unwrap_or_else(|| o.text.clone())
+                        .unwrap_or_else(|| o.text.to_string())
                 })
                 .collect::<Vec<_>>()
                 .join(" / ");
@@ -3330,7 +3330,7 @@ impl AbilityResolver {
                 options: None,
             });
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.choice_effect_text = Some(effect.text.clone());
+                entry.choice_effect_text = Some(effect.text.to_string());
             }
         } else if let Some(string_options) = choice_options {
             self.pending_choice = Some(Choice::SelectTarget {

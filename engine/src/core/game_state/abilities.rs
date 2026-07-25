@@ -103,7 +103,7 @@ impl GameState {
             triggering_member_id,
             snapshot_movements: Vec::new(),
             choice_effect_text: None,
-            condition_cache: HashMap::default(),
+            condition_cache: SmallVec::new(),
         }
     }
 
@@ -228,7 +228,7 @@ impl GameState {
     /// Legacy wrapper: calls with default event (reads flags from self).
     pub fn trigger_auto_abilities_for_player(&mut self, player_id: &str) {
         let event = crate::ability::types::TriggerEvent {
-            moved_cards: self.recently_moved_cards.clone().unwrap_or_default(),
+            moved_cards: self.recently_moved_cards.clone().unwrap_or_default().into(),
             moved_from_zone: self.recently_moved_from_zone.clone(),
             ..Default::default()
         };
@@ -605,7 +605,7 @@ impl GameState {
                 player_id_clone.clone(),
                 Some(card_no),
                 Some(stage_card_id),
-                moved.clone(),
+                moved.clone().map(|v| v.into_iter().collect()),
                 None,
             );
         }
@@ -890,7 +890,7 @@ impl GameState {
                     }
                     let watch_text = match &effect.condition {
                         Some(c) => c.get_text(),
-                        None => Some(effect.text.as_str()),
+                        None => Some(effect.text.as_ref()),
                     };
                     if !watch_text.is_some_and(|t| t.contains(trigger_substring)) {
                         continue;
@@ -1126,7 +1126,7 @@ impl GameState {
                 .map(|m| m.moved_card_id)
                 .collect();
             let event = crate::ability::types::TriggerEvent {
-                moved_cards: batch_ids,
+                moved_cards: batch_ids.into(),
                 energy_placed_by_effect: self.last_energy_placed_by_effect(),
                 ..Default::default()
             };
@@ -1535,7 +1535,7 @@ impl GameState {
                     );
                 }
                 let event = crate::ability::types::TriggerEvent {
-                    moved_cards: self.recently_moved_cards.clone().unwrap_or_default(),
+                    moved_cards: self.recently_moved_cards.clone().unwrap_or_default().into(),
                     moved_from_zone: self.recently_moved_from_zone.clone(),
                     position_change_occurred: self.position_change_occurred_this_turn,
                     energy_placed_by_effect: self.last_energy_placed_by_effect(),
@@ -1648,7 +1648,9 @@ impl GameState {
             .current_entry()
             .map(|e| {
                 e.snapshot_movements.iter().any(|m| {
-                    (m.dest_zone == "energy" || m.dest_zone == "energy_zone") && m.effect_only
+                    (m.dest_zone == crate::types::ZoneId::Energy
+                        || m.dest_zone == crate::types::ZoneId::EnergyZone)
+                        && m.effect_only
                 })
             })
             .unwrap_or(false)
@@ -1670,10 +1672,10 @@ impl GameState {
         self.ability_queue
             .current_entry()
             .and_then(|e| {
-                e.snapshot_movements
-                    .iter()
-                    .rev()
-                    .find(|m| m.source_zone == "stage" && m.dest_zone == "stage")
+                e.snapshot_movements.iter().rev().find(|m| {
+                    m.source_zone == crate::types::ZoneId::Stage
+                        && m.dest_zone == crate::types::ZoneId::Stage
+                })
             })
             .map(|m| m.moved_card_id)
     }

@@ -29,7 +29,8 @@ impl AbilityResolver {
         let mut dbg = AbDebug::new();
         log::debug!(
             "[DEBUG_EXEC] execute_effect: action={} effect_ptr={:p}",
-            effect.action, effect
+            effect.action,
+            effect
         );
         dbg.effect(effect);
         log::debug!(
@@ -55,14 +56,14 @@ impl AbilityResolver {
         // non_stackable check: skip if this effect is already active
         if effect.non_stackable.unwrap_or(false) {
             let effect_key = format!("{}:{}", effect.action, effect.text);
-            if gs.non_stackable_effects.contains(&effect_key) {
+            if gs.non_stackable_effects.iter().any(|x| x == &effect_key) {
                 log::debug!(
                     "DEBUG: non-stackable effect already active, skipping: {}",
                     effect_key
                 );
                 return Ok(());
             }
-            gs.non_stackable_effects.insert(effect_key);
+            gs.non_stackable_effects.push(effect_key);
         }
 
         // Log effect execution to rule_log
@@ -952,7 +953,7 @@ impl AbilityResolver {
             };
             #[cfg(not(feature = "no_std"))]
             crate::ability::log::push_verdict(crate::ability::log::AbilityLogItem::Effect {
-                text: effect.text.clone(),
+                text: effect.text.to_string(),
                 action: effect.action.to_string(),
                 details,
             });

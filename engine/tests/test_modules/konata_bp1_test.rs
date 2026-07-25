@@ -25,7 +25,7 @@ fn konata_q77_self_appearance_activates_energy() {
     game.give_energy(4);
 
     // Mark konata as "appeared this turn" — she's a 虹ヶ咲 member herself
-    game.state.cards_moved_this_turn.insert(konata);
+    game.state.cards_moved_this_turn.push(konata);
 
     let active_before = game.state.player1.energy_zone.active_count();
 
@@ -94,7 +94,7 @@ fn konata_use_limit_blocks_second_activation() {
     game.state.player1.hand.cards.push(filler);
     game.give_energy(6);
 
-    game.state.cards_moved_this_turn.insert(konata);
+    game.state.cards_moved_this_turn.push(konata);
 
     // First activation
     game.activate_ability(konata);

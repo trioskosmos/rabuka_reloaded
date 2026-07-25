@@ -1,5 +1,6 @@
 use crate::Arc;
 use crate::HashMap;
+use smallvec::SmallVec;
 
 use crate::ability::resolver::AbilityResolver;
 use crate::ability::types::Choice;
@@ -89,7 +90,7 @@ pub struct AbilityQueueEntry {
     /// Keyed by condition text. Populated by the first evaluation; subsequent
     /// evaluations return the cached value. The parser sets `"cache": true` on
     /// conditions that depend on mutable state (e.g. revealed_cards).
-    pub condition_cache: HashMap<String, bool>,
+    pub condition_cache: SmallVec<[(String, bool); 2]>,
 }
 
 /// Unified ability queue with proper state management
@@ -284,7 +285,7 @@ impl AbilityQueue {
                     triggering_member_id: None,
                     snapshot_movements: Vec::new(),
                     choice_effect_text: None,
-                    condition_cache: HashMap::default(),
+                    condition_cache: SmallVec::new(),
                 };
                 self.entries.push(dummy_entry);
                 self.state = QueueState::WaitingForChoice {
@@ -380,7 +381,7 @@ impl AbilityQueue {
             triggering_member_id: None,
             snapshot_movements: Vec::new(),
             choice_effect_text: None,
-            condition_cache: HashMap::default(),
+            condition_cache: SmallVec::new(),
         });
         self.state = QueueState::ExecutingEffect { entry_index: idx };
     }

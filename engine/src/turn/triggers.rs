@@ -172,7 +172,7 @@ impl super::TurnEngine {
                 player_id_clone.clone(),
                 Some(card_no),
                 Some(stage_card_id),
-                moved_snapshot.clone(),
+                moved_snapshot.clone().map(|v| v.into()),
                 None,
             );
             #[cfg(feature = "ds_debug")]
@@ -258,7 +258,9 @@ impl super::TurnEngine {
         if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
             log::debug!(
                 "[TLS_ENTER] player={} phase={:?} turn_phase={:?}",
-                player_id, game_state.current_phase, game_state.current_turn_phase
+                player_id,
+                game_state.current_phase,
+                game_state.current_turn_phase
             );
         }
         if Self::is_trigger_suppressed(game_state, player_id, "live_start") {
@@ -284,7 +286,9 @@ impl super::TurnEngine {
             if crate::ability::debug::ABILITY_DEBUG.load(core::sync::atomic::Ordering::Relaxed) {
                 log::debug!(
                     "[TLS_LIVE] player={} live_zone_cards={:?} stage={:?}",
-                    player_id, player.live_card_zone.cards, player.stage.stage
+                    player_id,
+                    player.live_card_zone.cards,
+                    player.stage.stage
                 );
             }
             for card_id in &player.live_card_zone.cards {
@@ -315,7 +319,11 @@ impl super::TurnEngine {
                         if crate::ability::debug::ABILITY_DEBUG
                             .load(core::sync::atomic::Ordering::Relaxed)
                         {
-                            log::debug!("[TLS_LIVE]   aidx={} triggers={:?}", aidx, ability.triggers);
+                            log::debug!(
+                                "[TLS_LIVE]   aidx={} triggers={:?}",
+                                aidx,
+                                ability.triggers
+                            );
                         }
                         if ability
                             .triggers

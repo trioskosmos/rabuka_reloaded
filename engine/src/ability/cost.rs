@@ -239,7 +239,7 @@ impl AbilityResolver {
                     .compound
                     .actions
                     .as_ref()
-                    .map(|o| o.iter().map(|opt| opt.text.clone()).collect())
+                    .map(|o| o.iter().map(|opt| opt.text.to_string()).collect())
                     .unwrap_or_default();
                 self.pending_choice = Some(Choice::SelectTarget {
                     target: "choice_condition".to_string(),

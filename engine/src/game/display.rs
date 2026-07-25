@@ -1827,7 +1827,11 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .cloned()
             .collect(),
         turn1_abilities_played: game_state.turn1_abilities_played.iter().cloned().collect(),
-        turn2_abilities_played: game_state.turn2_abilities_played.clone(),
+        turn2_abilities_played: game_state
+            .turn2_abilities_played
+            .iter()
+            .map(|(k, v)| (k.clone(), *v))
+            .collect(),
         card_instance_mapping: game_state
             .card_instance_mapping
             .iter()

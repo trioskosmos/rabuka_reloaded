@@ -51,7 +51,7 @@ fn q77_self_appearance_activates_energy() {
     game.state.player1.hand.cards.push(filler);
     game.state.player1.hand.cards.push(filler);
     game.give_energy(4);
-    game.state.cards_moved_this_turn.insert(konata);
+    game.state.cards_moved_this_turn.push(konata);
 
     // Burn ab#1 then fire ab#0
     activate_and_drain(&mut game, konata);
@@ -90,7 +90,7 @@ fn different_niji_member_on_turn2_activates() {
     game.give_energy(4);
 
     // Mark it as appeared this turn
-    game.state.cards_moved_this_turn.insert(niji_other);
+    game.state.cards_moved_this_turn.push(niji_other);
 
     activate_and_drain(&mut game, konata);
     activate_and_drain(&mut game, konata);
@@ -150,7 +150,7 @@ fn non_niji_member_does_not_activate() {
     game.give_energy(4);
 
     // A non-虹ヶ咲 member appeared this turn
-    game.state.cards_moved_this_turn.insert(honoka);
+    game.state.cards_moved_this_turn.push(honoka);
 
     activate_and_drain(&mut game, konata);
 
@@ -182,7 +182,7 @@ fn use_limit_blocks_both_abilities() {
     game.state.player1.hand.cards.push(filler);
     game.state.player1.hand.cards.push(filler);
     game.give_energy(6);
-    game.state.cards_moved_this_turn.insert(konata);
+    game.state.cards_moved_this_turn.push(konata);
 
     activate_and_drain(&mut game, konata); // ab#1
     activate_and_drain(&mut game, konata); // ab#0

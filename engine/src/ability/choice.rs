@@ -523,7 +523,8 @@ impl super::resolver::AbilityResolver {
             if !new_card_ids.is_empty() {
                 log::debug!(
                     "[KANAN_DEBUG] moving cards: count={} new_card_ids={:?}",
-                    count, new_card_ids
+                    count,
+                    new_card_ids
                 );
                 let player = gs.resolve_target_player_mut(&target);
                 let _ = util::move_cards(
@@ -2152,7 +2153,7 @@ impl super::resolver::AbilityResolver {
                                         o.answers_any()
                                             .as_ref()
                                             .map(|a| a.join(", "))
-                                            .unwrap_or_else(|| o.text.clone())
+                                            .unwrap_or_else(|| o.text.to_string())
                                     })
                                     .collect();
                                 self.pending_reprompt_choice = Some(Choice::SelectTarget {
@@ -2425,7 +2426,8 @@ impl super::resolver::AbilityResolver {
                                     moved_cards: gs
                                         .recently_moved_cards
                                         .clone()
-                                        .unwrap_or_default(),
+                                        .unwrap_or_default()
+                                        .into(),
                                     position_change_occurred: gs.position_change_occurred_this_turn,
                                     ..Default::default()
                                 },
@@ -2559,7 +2561,8 @@ impl super::resolver::AbilityResolver {
                                     moved_cards: gs
                                         .recently_moved_cards
                                         .clone()
-                                        .unwrap_or_default(),
+                                        .unwrap_or_default()
+                                        .into(),
                                     position_change_occurred: gs.position_change_occurred_this_turn,
                                     ..Default::default()
                                 },
@@ -2603,7 +2606,11 @@ impl super::resolver::AbilityResolver {
                         gs.trigger_auto_abilities_for_player_with_event(
                             &pid,
                             &TriggerEvent {
-                                moved_cards: gs.recently_moved_cards.clone().unwrap_or_default(),
+                                moved_cards: gs
+                                    .recently_moved_cards
+                                    .clone()
+                                    .unwrap_or_default()
+                                    .into(),
                                 position_change_occurred: gs.position_change_occurred_this_turn,
                                 ..Default::default()
                             },
@@ -2660,7 +2667,7 @@ impl super::resolver::AbilityResolver {
                 gs.trigger_auto_abilities_for_player_with_event(
                     &pid,
                     &TriggerEvent {
-                        moved_cards: gs.recently_moved_cards.clone().unwrap_or_default(),
+                        moved_cards: gs.recently_moved_cards.clone().unwrap_or_default().into(),
                         position_change_occurred: gs.position_change_occurred_this_turn,
                         ..Default::default()
                     },
@@ -2677,7 +2684,7 @@ impl super::resolver::AbilityResolver {
                     gs.trigger_auto_abilities_for_player_with_event(
                         &pid,
                         &TriggerEvent {
-                            moved_cards: gs.recently_moved_cards.clone().unwrap_or_default(),
+                            moved_cards: gs.recently_moved_cards.clone().unwrap_or_default().into(),
                             position_change_occurred: gs.position_change_occurred_this_turn,
                             ..Default::default()
                         },

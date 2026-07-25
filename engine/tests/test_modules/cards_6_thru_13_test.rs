@@ -473,7 +473,10 @@ fn c12_restriction_blocks_opponent_active() {
     // restriction stores P2 ID (opponent) in constant_cannot_activate_members
     let opp_id = &g.state.player2.id;
     assert!(
-        g.state.constant_cannot_activate_members.contains(opp_id),
+        g.state
+            .constant_cannot_activate_members
+            .iter()
+            .any(|x| x == opp_id),
         "opponent ID should be in constant_cannot_activate_members"
     );
 
@@ -517,7 +520,10 @@ fn c12_restriction_p2_owned_blocks_p1_active() {
     // resolve_target_player("opponent") should return P1 (P2's opponent)
     let p1_id = &g.state.player1.id;
     assert!(
-        g.state.constant_cannot_activate_members.contains(p1_id),
+        g.state
+            .constant_cannot_activate_members
+            .iter()
+            .any(|x| x == p1_id),
         "P1 should be in constant_cannot_activate_members (P2's opponent)"
     );
 
@@ -558,7 +564,10 @@ fn c12_restriction_does_not_block_self_active() {
     // constant_cannot_activate_members contains P2 (opponent), NOT P1
     let p1_id = &g.state.player1.id;
     assert!(
-        !g.state.constant_cannot_activate_members.contains(p1_id),
+        !g.state
+            .constant_cannot_activate_members
+            .iter()
+            .any(|x| x == p1_id),
         "P1 should NOT be in constant_cannot_activate_members (self is not opponent)"
     );
 

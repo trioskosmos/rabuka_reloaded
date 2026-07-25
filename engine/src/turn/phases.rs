@@ -131,7 +131,8 @@ impl super::TurnEngine {
                             // (per-card, e.g. "このメンバーはアクティブフェイズにアクティブにしない")
                             if game_state
                                 .constant_cannot_activate_members
-                                .contains(&cid.to_string())
+                                .iter()
+                                .any(|x| x == &cid.to_string())
                             {
                                 return None;
                             }

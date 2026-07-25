@@ -39,7 +39,8 @@ fn kanata_does_not_block_manual_ability_activation() {
     assert!(
         game.state
             .constant_cannot_activate_members
-            .contains(&kanata.to_string()),
+            .iter()
+            .any(|x| x == &kanata.to_string()),
         "Kanata should be in constant_cannot_activate_members"
     );
     game.activate_ability(other);
@@ -67,11 +68,13 @@ fn kanata_not_auto_activated_in_active_phase_but_others_are() {
     assert!(game
         .state
         .constant_cannot_activate_members
-        .contains(&kanata.to_string()));
+        .iter()
+        .any(|x| x == &kanata.to_string()));
     assert!(!game
         .state
         .constant_cannot_activate_members
-        .contains(&other_member.to_string()));
+        .iter()
+        .any(|x| x == &other_member.to_string()));
     assert!(!game
         .state
         .cannot_activate_members

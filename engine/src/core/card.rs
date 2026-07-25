@@ -786,7 +786,7 @@ impl<'de> serde::Deserialize<'de> for AbilityCost {
                     match key.as_str() {
                         "text" => {
                             if let Some(s) = value.as_str() {
-                                effect.text = s.to_string();
+                                effect.text = s.into();
                             }
                         }
                         "type" | "action" | "cost_type" => {
@@ -2110,8 +2110,8 @@ pub enum EffectKind {
 /// AbilityEffect that lost its `kind` (because kind is #[serde(skip)]).
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct AbilityEffect {
-    #[serde(default = "default_empty_string")]
-    pub text: String,
+    #[serde(default)]
+    pub text: ArcStr,
     #[serde(default)]
     pub action: ActionType,
     #[serde(default)]

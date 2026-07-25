@@ -22,7 +22,7 @@ impl AbilityResolver {
                 if effect.text.is_empty() {
                     None
                 } else {
-                    Some(effect.text.as_str())
+                    Some(effect.text.as_ref())
                 }
             })
             .unwrap_or("");

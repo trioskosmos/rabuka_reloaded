@@ -275,7 +275,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
                     )
                 }
             } else {
-                effect.text.clone()
+                effect.text.to_string()
             }
         }
 
@@ -436,7 +436,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
                     combined
                 }
             } else {
-                effect.text.clone()
+                effect.text.to_string()
             }
         }
 
@@ -477,7 +477,7 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
             .flatten()
             .collect();
             if parts.is_empty() {
-                effect.text.clone()
+                effect.text.to_string()
             } else {
                 parts.join("; then ")
             }
@@ -497,11 +497,11 @@ pub fn describe_effect_en(effect: &AbilityEffect) -> String {
                 (Some(p), Some(a)) => format!("Either: {} / Or: {}", p, a),
                 (Some(p), None) => p,
                 (None, Some(a)) => a,
-                (None, None) => effect.text.clone(),
+                (None, None) => effect.text.to_string(),
             }
         }
 
-        _ => effect.text.clone(),
+        _ => effect.text.to_string(),
     }
 }
 
@@ -888,7 +888,7 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
                     )
                 }
             } else {
-                effect.text.clone()
+                effect.text.to_string()
             }
         }
         "choice" => "1つを選ぶ".to_string(),
@@ -1019,7 +1019,7 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
                     combined
                 }
             } else {
-                effect.text.clone()
+                effect.text.to_string()
             }
         }
 
@@ -1057,7 +1057,7 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
             .flatten()
             .collect();
             if parts.is_empty() {
-                effect.text.clone()
+                effect.text.to_string()
             } else {
                 parts.join("、その後")
             }
@@ -1076,9 +1076,9 @@ pub fn describe_effect_ja(effect: &AbilityEffect) -> String {
                 (Some(p), Some(a)) => format!("どちらか：{} / または：{}", p, a),
                 (Some(p), None) => p,
                 (None, Some(a)) => a,
-                (None, None) => effect.text.clone(),
+                (None, None) => effect.text.to_string(),
             }
         }
-        _ => effect.text.clone(),
+        _ => effect.text.to_string(),
     }
 }

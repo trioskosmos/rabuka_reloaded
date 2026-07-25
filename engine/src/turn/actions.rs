@@ -964,7 +964,11 @@ impl super::TurnEngine {
                     || !game_state.recently_appeared_cards.is_empty()
                 {
                     let event = crate::ability::types::TriggerEvent {
-                        moved_cards: game_state.recently_moved_cards.clone().unwrap_or_default(),
+                        moved_cards: game_state
+                            .recently_moved_cards
+                            .clone()
+                            .unwrap_or_default()
+                            .into(),
                         moved_from_zone: game_state.recently_moved_from_zone.clone(),
                         position_change_occurred: game_state.position_change_occurred_this_turn,
                         energy_placed_by_effect: game_state.last_energy_placed_by_effect(),
@@ -994,7 +998,11 @@ impl super::TurnEngine {
                     || !game_state.recently_appeared_cards.is_empty()
                 {
                     let event = crate::ability::types::TriggerEvent {
-                        moved_cards: game_state.recently_moved_cards.clone().unwrap_or_default(),
+                        moved_cards: game_state
+                            .recently_moved_cards
+                            .clone()
+                            .unwrap_or_default()
+                            .into(),
                         moved_from_zone: game_state.recently_moved_from_zone.clone(),
                         position_change_occurred: game_state.position_change_occurred_this_turn,
                         energy_placed_by_effect: game_state.last_energy_placed_by_effect(),

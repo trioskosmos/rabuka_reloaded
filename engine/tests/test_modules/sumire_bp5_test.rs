@@ -226,7 +226,7 @@ fn test_sumire_use_limit_blocks_second() {
 
     let player_id = game.state.player1.id.clone();
     // First trigger via area move (simulated own-card-effect area move)
-    game.state.cards_moved_this_turn.insert(sumire);
+    game.state.cards_moved_this_turn.push(sumire);
     game.state
         .push_movement_event(sumire, "stage", "stage", Some(sumire), "p1", true);
     game.state.batch_movements.clear();
@@ -602,7 +602,7 @@ fn sumire_opponent_effect_move_no_trigger() {
     game.state.player1.stage.stage = [sumire, -1, -1];
 
     // Simulate opponent's card effect causing an area move
-    game.state.cards_moved_this_turn.insert(sumire);
+    game.state.cards_moved_this_turn.push(sumire);
     game.state
         .push_movement_event(sumire, "stage", "stage", Some(sumire), "p2", true);
     game.state.batch_movements.clear();
