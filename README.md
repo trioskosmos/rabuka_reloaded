@@ -16,7 +16,7 @@ A certain school idol collectible card game engine, AI, and web UI — built in 
 - **ISMCTS AI bot** — Information Set Monte Carlo Tree Search handling imperfect information (hidden cards), with a neural network evaluation function
 - **PPO training pipeline** — Proximal Policy Optimization to train the neural evaluation function; collects trajectories via self-play
 - **Web UI** — full game board, card browser, deck converter, interactive tutorial, multiplayer via SSE + chat, QR code deck sharing, i18n
-- **Memory-optimized** — 46 completed refactor tasks; AbilityEffect struct from 1,536B → 152B, Condition from 1,864B → 520B, EffectKind from 1,248B → 544B, `text` fields from String → ArcStr (~48 KB saved), 7 HashMaps/HashSets → SmallVec, recalculate_constants scratch buffers (eliminates 7 HashMap allocs per call), MovementEvent zones from String → ZoneId enum (saves 2 allocs per event), TriggerEvent moved_cards/appeared_cards → SmallVec (inline stack storage, 0 allocs), condition_cache HashMap → SmallVec (eliminates per-entry HashMap overhead). DS (4 MB) ability activation crash fixed.
+- **Memory-optimized** — 55 completed refactor tasks; AbilityEffect struct from 1,536B → 152B, Condition from 1,864B → 520B, EffectKind from 1,248B → 544B, `text` fields from String → ArcStr (~48 KB saved), 7 HashMaps/HashSets → SmallVec, recalculate_constants scratch buffers (eliminates 7 HashMap allocs per call), MovementEvent zones from String → ZoneId enum, TriggerEvent/AbilityQueueEntry fields → SmallVec, GameState Vec fields → SmallVec (recently_moved_cards, batch_movements, turn_area_movements, turn_movements, position_change_events, recently_state_changed, ability_applications), AbilityResolver fields → SmallVec, deployed_this_turn HashSet → SmallVec, BTreeMap/BTreeSet → HashMap/SmallVec. DS (4 MB) ability activation crash fixed.
 - **11 binary targets** — CLI harness, bot demo, training data generation, game tracing, profiling, REPL play, and platform-specific builds
 
 ## Target Platforms
@@ -114,7 +114,7 @@ Console build scripts are provided: `build_3ds.bat`, `build_wii.bat`, `build_ds.
 
 ## Memory Optimization
 
-The engine targets retro consoles with as little as 4 MB RAM (DS) and 16 MB (Dreamcast). A bytecode VM and 46 completed refactor tasks have reduced runtime RAM from ~3 MB to ~150-200 KB. The Dreamcast port is blocked on toolchain issues (no LLVM for SH-4), so the primary optimization target is **Nintendo DS (4 MB)**.
+The engine targets retro consoles with as little as 4 MB RAM (DS) and 16 MB (Dreamcast). A bytecode VM and 55 completed refactor tasks have reduced runtime RAM from ~3 MB to ~130-170 KB. The Dreamcast port is blocked on toolchain issues (no LLVM for SH-4), so the primary optimization target is **Nintendo DS (4 MB)**.
 
 ### DS Crash Analysis
 
@@ -160,16 +160,21 @@ To test if the DS crash is resolved, build with `build_ds.bat` and activate an a
 | MovementEvent source/dest zones | String (24 B + heap) × 2 | ZoneId enum (1 B) | ~46 B per event × ~10-20 events/turn |
 | TriggerEvent moved_cards/appeared_cards | Vec (24 B + heap) × 2 | SmallVec (inline, 0 allocs) | ~48 B per event × ~10-20 events/turn |
 | AbilityQueueEntry.condition_cache | HashMap (64+ B per entry) | SmallVec<[(String,bool); 2]> (inline) | ~64 B per queue entry |
+| recently_moved_cards | Option&lt;Vec&gt; (24 B + heap) | Option&lt;SmallVec&lt;[i16; 4]&gt;&gt; (inline) | ~500 B + 17 allocs/activation |
+| batch_movements/turn_area_movements/turn_movements | Vec × 3 (72 B + 3 heaps) | SmallVec (inline) | ~700 B per activation |
+| position_change_events | Vec (24 B + heap) | SmallVec&lt;[PositionChangeEvent; 2]&gt; | ~80 B per batch |
+| AbilityResolver small Vec fields × 5 | Vec × 5 (120 B + 5 heaps) | SmallVec (inline) | ~180 B per resolver |
+| deployed_this_turn | HashSet (24 B + heap) | SmallVec&lt;[i16; 4]&gt; | ~400 B per player |
+| BTreeMap/BTreeSet → HashMap/SmallVec | BTree nodes (~40 B each) | HashMap/SmallVec | ~150 B per call |
 
 ### Remaining Work
 
 | Optimization | Est. Saving | Effort | File | Priority |
 |-------------|------------|--------|------|----------|
 | collect_constant_stage_effects() AbilityEffect clone avoidance | 1.5–4.6 KB | High | `abilities.rs:138` | High |
-| effect.clone() in execute_effect (26 sites) | 2–5 KB | High | `resolver.rs` | High |
-| blade_modifiers + orientation_modifiers clone in perform_yell | 200–1,200 B | Low | `effects/misc.rs:3616` | Medium |
-| recently_moved_cards Vec → SmallVec (field type change) | ~150–400 B | Medium | `mod.rs:107` | Medium |
-| Vec collecting in conditions (.to_vec/.collect) | ~50-100 B per condition | Low | `condition/card.rs` | High |
+| effect.clone() in execute_effect (23 sites) | 2–5 KB | High | `resolver.rs` | High |
+| Missing scratch buffers (exp_prohibition, exp_global_need_heart, jyouji_statuses) | ~600 B per call | Low | `modifiers.rs` | Low |
+| Vec collecting in conditions (.to_vec/.collect) | ~50-100 B per condition | Low | `condition/card.rs` | Medium |
 | Remove 4 redundant flat fields from AbilityEffect | ~360 KB | Medium | `card.rs:2118-2124` | Medium |
 | Store gained abilities as AbilityRef (2 B) instead of Ability (~600 B) | ~50-100 KB | Medium | `game_state/mod.rs:77` | Medium |
 | DynamicCount/QuotedText String fields → enums | ~12 KB | Low | `card.rs:3645-3659` | Low |

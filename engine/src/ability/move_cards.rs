@@ -9,13 +9,10 @@ use crate::{HashMap, HashSet};
 #[cfg(feature = "no_std")]
 use alloc::{
     boxed::Box,
-    collections::BTreeSet,
     string::{String, ToString},
     vec::Vec,
 };
 use smallvec::SmallVec;
-#[cfg(not(feature = "no_std"))]
-use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MoveCardsTarget {
@@ -35,7 +32,7 @@ fn remove_card_from_any_zone(
     } else if let Some(pos) = player.stage.stage.iter().position(|&id| id == card_id) {
         player.stage.stage[pos] = -1;
         // Rule 9.6.2.1.2.1: Card left stage, clean up tracking.
-        player.deployed_this_turn.remove(&card_id);
+        player.deployed_this_turn.retain(|id| *id != card_id);
         *last_vacated_stage_area = Some(pos);
     } else if let Some(pos) = player
         .energy_zone
@@ -200,7 +197,9 @@ impl AbilityResolver {
                         player.stage.stage[va] = card_id;
                         if source_zone != Zone::Stage.to_str() {
                             // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
-                            player.deployed_this_turn.insert(card_id);
+                            if !player.deployed_this_turn.contains(&card_id) {
+                                player.deployed_this_turn.push(card_id);
+                            }
                         }
                         return Ok(false);
                     }
@@ -254,7 +253,9 @@ impl AbilityResolver {
                 player.stage.stage[slot] = card_id;
                 if source_zone != Zone::Stage.to_str() {
                     // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
-                    player.deployed_this_turn.insert(card_id);
+                    if !player.deployed_this_turn.contains(&card_id) {
+                        player.deployed_this_turn.push(card_id);
+                    }
                 }
                 return Ok(false);
             }
@@ -422,7 +423,7 @@ impl AbilityResolver {
             for &card_id in &selected {
                 remove_card_from_any_zone(player, &mut gs.last_vacated_stage_area, card_id);
             }
-            return Ok(selected);
+            return Ok(selected.to_vec());
         }
 
         // Handle special source identifiers before the Zone match
@@ -999,20 +1000,25 @@ impl AbilityResolver {
                     && effect.group_reference_any().as_deref() == Some("different_group_names")
                     && source_str == "discard"
                 {
-                    let mut stage_groups: BTreeSet<String> = BTreeSet::new();
+                    let mut stage_groups: SmallVec<[String; 8]> = SmallVec::new();
                     for &cid in &player.stage.stage {
                         if cid == -1 {
                             continue;
                         }
                         if let Some(card) = card_db.get_card(cid) {
                             if !card.group.is_empty() {
-                                stage_groups.insert(card.group.to_string());
+                                if !stage_groups.contains(&card.group.to_string()) {
+                                    stage_groups.push(card.group.to_string());
+                                }
                             } else {
                                 for known_group in ["μ's", "Aqours", "虹ヶ咲", "Liella!", "蓮ノ空"]
                                 {
                                     if util::card_matches_group_str(card_db, cid, Some(known_group))
                                     {
-                                        stage_groups.insert(known_group.to_string());
+                                        let s = known_group.to_string();
+                                        if !stage_groups.contains(&s) {
+                                            stage_groups.push(s);
+                                        }
                                     }
                                 }
                             }
@@ -1667,7 +1673,9 @@ impl AbilityResolver {
                                 player.stage.stage[idx] = card_id;
                                 if should_lock {
                                     // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
-                                    player.deployed_this_turn.insert(card_id);
+                                    if !player.deployed_this_turn.contains(&card_id) {
+                                        player.deployed_this_turn.push(card_id);
+                                    }
                                 }
                             }
                             match pos_idx {
@@ -1702,7 +1710,9 @@ impl AbilityResolver {
                         player.stage.stage[idx] = card_id;
                         if should_lock {
                             // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
-                            player.deployed_this_turn.insert(card_id);
+                            if !player.deployed_this_turn.contains(&card_id) {
+                                player.deployed_this_turn.push(card_id);
+                            }
                         }
                         true
                     }
@@ -1716,7 +1726,9 @@ impl AbilityResolver {
                             player.stage.stage[idx] = card_id;
                             if should_lock {
                                 // Rule 9.6.2.1.2.1: Track card deployed from non-stage.
-                                player.deployed_this_turn.insert(card_id);
+                                if !player.deployed_this_turn.contains(&card_id) {
+                                    player.deployed_this_turn.push(card_id);
+                                }
                             }
                             placed = true;
                         }
@@ -1762,7 +1774,7 @@ impl AbilityResolver {
                 ) {
                     Ok(true) => {
                         if i + 1 < remaining.len() {
-                            self.pending_stage_cards = remaining[i + 1..].to_vec();
+                            self.pending_stage_cards = remaining[i + 1..].into();
                         }
                         return Ok(());
                     }
@@ -1817,7 +1829,7 @@ impl AbilityResolver {
             gs.record_card_movement(*card_id);
         }
 
-        self.moved_cards.extend(moved_cards);
+        self.moved_cards.extend(moved_cards.iter().copied());
         {
             let cause_pid = gs
                 .ability_queue
@@ -2362,7 +2374,7 @@ impl AbilityResolver {
                         || Zone::from_str(dest) == Some(Zone::Waitroom))
                 {
                     gs.mods.last_cost_discard_count = moved.len() as u32;
-                    gs.mods.last_cost_moved_card_ids = moved.clone();
+                    gs.mods.last_cost_moved_card_ids = moved.clone().into();
                 }
             }
             Some(Zone::Stage) => {
@@ -2499,7 +2511,7 @@ impl AbilityResolver {
         );
 
         if gs.looked_at_cards.is_empty() && !self.selected_cards.is_empty() {
-            gs.looked_at_cards = self.selected_cards.clone().into();
+            gs.looked_at_cards = self.selected_cards.iter().copied().collect();
         }
 
         log::debug!(
@@ -2607,7 +2619,7 @@ impl AbilityResolver {
         for &card_id in &selected_cards {
             util::place_card_in_zone(player, card_id, &destination, None, false, 1);
         }
-        self.moved_cards.extend(selected_cards.iter());
+        self.moved_cards.extend(selected_cards.iter().copied());
 
         let any_number = select_action
             .as_ref()
@@ -2757,7 +2769,7 @@ impl AbilityResolver {
                 gs.mods.clear_all_for_card(cid);
                 gs.record_card_movement(cid);
             }
-            self.moved_cards = cids;
+            self.moved_cards = cids.into();
         } else {
             self.execute_selected_energy_zone_cards(gs, indices, count)?;
         }

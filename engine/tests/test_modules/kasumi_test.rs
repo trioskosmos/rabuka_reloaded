@@ -243,9 +243,15 @@ fn kasumi_q76_cannot_target_locked_area() {
 
     // All 3 areas have members deployed this turn
     game.state.player1.stage.stage = [filler1, filler2, filler3];
-    game.state.player1.deployed_this_turn.insert(filler1);
-    game.state.player1.deployed_this_turn.insert(filler2);
-    game.state.player1.deployed_this_turn.insert(filler3);
+    if !game.state.player1.deployed_this_turn.contains(&filler1) {
+        game.state.player1.deployed_this_turn.push(filler1);
+    }
+    if !game.state.player1.deployed_this_turn.contains(&filler2) {
+        game.state.player1.deployed_this_turn.push(filler2);
+    }
+    if !game.state.player1.deployed_this_turn.contains(&filler3) {
+        game.state.player1.deployed_this_turn.push(filler3);
+    }
 
     // Setup: Kasumi in discard with enough resources
     game.state.player1.waitroom.cards.push(kasumi);

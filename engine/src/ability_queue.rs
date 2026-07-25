@@ -69,11 +69,11 @@ pub struct AbilityQueueEntry {
     /// Card IDs that triggered this each_time auto ability (snapshot of
     /// recently_moved_cards at enqueue time). Used by source:"those_cards"
     /// to resolve to only the trigger cards, not the full discard pile.
-    pub trigger_moved_cards: Option<Vec<i16>>,
+    pub trigger_moved_cards: Option<SmallVec<[i16; 4]>>,
     /// Snapshot of batch_movements at enqueue time so the "moves" and energy
     /// conditions can see what triggered the ability even after
     /// clear_effect_tracking() clears the global batch_movements.
-    pub snapshot_movements: Vec<crate::types::MovementEvent>,
+    pub snapshot_movements: SmallVec<[crate::types::MovementEvent; 4]>,
     /// Actions queued for sequential execution after a choice round-trip.
     pub pending_actions: Vec<AbilityEffect>,
     /// Persistent ability resolver — stays alive across choice round-trips
@@ -283,7 +283,7 @@ impl AbilityQueue {
                     resolver: None,
                     trigger_moved_cards: None,
                     triggering_member_id: None,
-                    snapshot_movements: Vec::new(),
+                    snapshot_movements: SmallVec::new(),
                     choice_effect_text: None,
                     condition_cache: SmallVec::new(),
                 };
@@ -379,7 +379,7 @@ impl AbilityQueue {
             resolver: None,
             trigger_moved_cards: None,
             triggering_member_id: None,
-            snapshot_movements: Vec::new(),
+            snapshot_movements: SmallVec::new(),
             choice_effect_text: None,
             condition_cache: SmallVec::new(),
         });

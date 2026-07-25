@@ -1001,7 +1001,7 @@ impl GameState {
         if source_zone == "stage" && dest_zone != "stage" {
             self.clear_gained_abilities_for_card(moved_card_id);
         }
-        let cards = self.recently_moved_cards.get_or_insert_with(Vec::new);
+        let cards = self.recently_moved_cards.get_or_insert_with(SmallVec::new);
         cards.push(moved_card_id);
         self.recently_moved_from_zone = Some(source_zone.to_string());
         // Track turn-level area movement (stage-area-to-stage-area)

@@ -1,6 +1,7 @@
 use super::debug::AbDebug;
 #[cfg(not(feature = "no_std"))]
 use super::log::{drain_verdicts, push_verdict, AbilityLogItem};
+use smallvec::SmallVec;
 
 // PSP stubs — no debug logging on console
 #[cfg(feature = "no_std")]
@@ -42,7 +43,7 @@ use crate::HashSet;
 pub struct AbilityResolver {
     pub pending_choice: Option<Choice>,
     pub card_database: Arc<CardDatabase>,
-    pub duration_effects: Vec<(String, String)>,
+    pub duration_effects: SmallVec<[(String, String); 2]>,
     pub current_ability: Option<crate::card::Ability>,
     /// The index of `current_ability` within the card's abilities list.
     /// Stored directly (not read from queue) because the queue's current entry
@@ -52,9 +53,9 @@ pub struct AbilityResolver {
     pub execution_context: ExecutionContext,
     pub current_effect: Option<AbilityEffect>,
     pub is_reveal_cost: bool,
-    pub selected_cards: Vec<i16>,
+    pub selected_cards: SmallVec<[i16; 4]>,
     pub selected_area: Option<String>,
-    pub moved_cards: Vec<i16>,
+    pub moved_cards: SmallVec<[i16; 4]>,
     pub spawn_context: EffectSpawnContext,
     pub sub_choice_created: bool,
     /// Snapshot of `selected_cards.len()` taken when a choice is created
@@ -62,7 +63,7 @@ pub struct AbilityResolver {
     /// cards selected BEFORE the choice, without excluding the card selected
     /// BY the choice.
     pub selected_count_at_save: Option<usize>,
-    pub pending_stage_cards: Vec<(i16, String)>,
+    pub pending_stage_cards: SmallVec<[(i16, String); 2]>,
     pub debug_trace: bool,
     pub pipeline: EffectPipeline,
     /// Cross-step data flow machinery — see `StepState` for the per-step
@@ -82,7 +83,7 @@ pub struct AbilityResolver {
     pub log_items: Vec<AbilityLogItem>,
     /// Formation change plan: (member_id, chosen_destination) pairs accumulated
     /// across sequential choices.  All swaps execute as a batch at the end.
-    pub formation_plan: Vec<(i16, String)>,
+    pub formation_plan: SmallVec<[(i16, String); 2]>,
 }
 
 impl AbilityResolver {
@@ -90,20 +91,20 @@ impl AbilityResolver {
         AbilityResolver {
             pending_choice: None,
             card_database: card_database.clone(),
-            duration_effects: Vec::new(),
+            duration_effects: SmallVec::new(),
             current_ability: None,
             current_ability_index: None,
             activating_card_id,
             execution_context: ExecutionContext::None,
             current_effect: None,
             is_reveal_cost: false,
-            selected_cards: Vec::new(),
+            selected_cards: SmallVec::new(),
             selected_area: None,
-            moved_cards: Vec::new(),
+            moved_cards: SmallVec::new(),
             spawn_context: EffectSpawnContext::default(),
             sub_choice_created: false,
             selected_count_at_save: None,
-            pending_stage_cards: Vec::new(),
+            pending_stage_cards: SmallVec::new(),
             debug_trace: false,
             pipeline: { EffectPipeline::new() },
             step_state: StepState::new(),
@@ -113,7 +114,7 @@ impl AbilityResolver {
             pending_repeat_actions: Vec::new(),
             pending_reprompt_choice: None,
             log_items: Vec::new(),
-            formation_plan: Vec::new(),
+            formation_plan: SmallVec::new(),
         }
     }
 

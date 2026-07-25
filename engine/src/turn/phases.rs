@@ -386,7 +386,7 @@ impl super::TurnEngine {
         // (cannot_live path), set recently_moved_cards so the 8.3.13 check
         // captures auto abilities that trigger on that zone change (e.g. Riko BP6).
         if !yell_data.moved_live_card_ids.is_empty() {
-            game_state.recently_moved_cards = Some(yell_data.moved_live_card_ids.clone());
+            game_state.recently_moved_cards = Some(yell_data.moved_live_card_ids.into());
         }
 
         // Rule 8.3.13: Check timing — auto abilities fire here.
@@ -478,7 +478,7 @@ impl super::TurnEngine {
         // (requirement failure path), set recently_moved_cards and re-check
         // auto abilities so zone-change triggers fire (e.g. Riko BP6).
         if !perf_data.moved_live_card_ids.is_empty() {
-            game_state.recently_moved_cards = Some(perf_data.moved_live_card_ids.clone());
+            game_state.recently_moved_cards = Some(perf_data.moved_live_card_ids.clone().into());
             game_state.trigger_auto_abilities_for_player(&performer_id);
             game_state.process_pending_auto_abilities(&performer_id);
         }
@@ -543,7 +543,7 @@ impl super::TurnEngine {
                 other_apps.push(app);
             }
         }
-        game_state.ability_applications = other_apps;
+        game_state.ability_applications = other_apps.into();
         crate::turn::live::enrich_from_applications(
             &mut mc,
             &mut bd,
@@ -1050,7 +1050,9 @@ impl super::TurnEngine {
             player.stage.stage[area as usize] = card_id;
             // Rule 9.6.2.1.2.1: Card came from hand (non-stage), track it.
             // remove_member_from_stage_with_recycling already cleaned up the old card IDs.
-            player.deployed_this_turn.insert(card_id);
+            if !player.deployed_this_turn.contains(&card_id) {
+                player.deployed_this_turn.push(card_id);
+            }
             // Record 2 baton touches
             for _ in 0..2 {
                 game_state.record_baton_touch(&player_id, Some(card_id));

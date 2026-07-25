@@ -52,7 +52,7 @@ fn rurino_discard_triggers_heart_and_blade() {
     let rurino = setup_rurino(&mut v);
     let filler = v.id("PL!-sd1-010-SD");
 
-    v.state.recently_moved_cards = Some(vec![filler]);
+    v.state.recently_moved_cards = Some(vec![filler].into());
 
     trigger_auto(&mut v);
 
@@ -90,7 +90,7 @@ fn rurino_empty_recently_moved_no_trigger() {
     let mut v = TestGame::new(db);
     let rurino = setup_rurino(&mut v);
 
-    v.state.recently_moved_cards = Some(vec![]);
+    v.state.recently_moved_cards = Some(vec![].into());
 
     trigger_auto(&mut v);
 
@@ -115,7 +115,7 @@ fn rurino_q241_multiple_cards_discarded_fires_once() {
     let f1 = v.id("PL!-sd1-010-SD");
     let f2 = v.id("PL!-sd1-010-SD");
 
-    v.state.recently_moved_cards = Some(vec![f1, f2]);
+    v.state.recently_moved_cards = Some(vec![f1, f2].into());
 
     trigger_auto(&mut v);
 
@@ -136,12 +136,12 @@ fn rurino_use_limit_blocks_second_same_turn() {
     let rurino = setup_rurino(&mut v);
 
     // First trigger
-    v.state.recently_moved_cards = Some(vec![v.id("PL!-sd1-010-SD")]);
+    v.state.recently_moved_cards = Some(vec![v.id("PL!-sd1-010-SD")].into());
     trigger_auto(&mut v);
     assert_eq!(heart01_mod(&v, rurino), 1, "first: heart01=1");
 
     // Second trigger — use_limit=2 blocks enqueue at scan time
-    v.state.recently_moved_cards = Some(vec![v.id("PL!-sd1-010-SD")]);
+    v.state.recently_moved_cards = Some(vec![v.id("PL!-sd1-010-SD")].into());
     // The scan's trigger_auto_ability function checks the use_limit
     // before enqueuing. With 1 use consumed, 1 remains. Second trigger
     // from a different pending_commands source should still work.

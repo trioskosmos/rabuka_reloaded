@@ -15,6 +15,7 @@ use alloc::{
     vec::Vec,
 };
 use core::sync::atomic::Ordering;
+use smallvec::SmallVec;
 
 pub(crate) struct SelectionContext {
     #[allow(dead_code)]
@@ -536,7 +537,9 @@ impl super::resolver::AbilityResolver {
                     &card_db,
                 );
                 gs.mods.last_cost_discard_count += new_card_ids.len() as u32;
-                gs.mods.last_cost_moved_card_ids.extend(&new_card_ids);
+                gs.mods
+                    .last_cost_moved_card_ids
+                    .extend(new_card_ids.iter().copied());
                 for &cid in &new_card_ids {
                     self.moved_cards.push(cid);
                     if !self.selected_cards.contains(&cid) {
@@ -850,7 +853,7 @@ impl super::resolver::AbilityResolver {
                     self.selected_cards,
                     indices
                 );
-                let mut cards = Vec::new();
+                let mut cards = SmallVec::new();
                 for &i in indices.iter() {
                     if i < self.selected_cards.len() {
                         cards.push(self.selected_cards[i]);
@@ -914,7 +917,7 @@ impl super::resolver::AbilityResolver {
                                 self.selected_cards.push(cid);
                             }
                         }
-                        gs.recently_moved_cards = Some(card_ids.to_vec());
+                        gs.recently_moved_cards = Some(card_ids.into());
                         gs.recently_moved_from_zone = Some(Zone::LiveCardZone.to_string());
                     }
                 }
@@ -940,11 +943,11 @@ impl super::resolver::AbilityResolver {
                     &tgt,
                 )?;
                 if !moved.is_empty() {
-                    self.moved_cards.extend(&moved);
+                    self.moved_cards.extend(moved.iter().copied());
                     // Accumulate across any_number re-prompts unconditionally
                     // (same card ID can appear multiple times under a member).
-                    let combined = gs.recently_moved_cards.get_or_insert_with(Vec::new);
-                    combined.extend(&moved);
+                    let combined = gs.recently_moved_cards.get_or_insert_with(SmallVec::new);
+                    combined.extend(moved.iter().copied());
                 }
                 // any_number re-prompt: after each selection, show remaining cards
                 // Empty indices = player chose to stop selecting (skip).
@@ -1396,7 +1399,7 @@ impl super::resolver::AbilityResolver {
         }
         // Track moved cards so preceding_moved conditions on the same
         // ability (e.g. conditional_on_result) can see them.
-        self.moved_cards.extend(&moved);
+        self.moved_cards.extend(moved.iter().copied());
         // Apply resource_on_select if present — grants resource (e.g. blade)
         // automatically when a card is selected from revealed_cards.
         let res = self
@@ -1470,8 +1473,8 @@ impl super::resolver::AbilityResolver {
                     &card_db,
                 );
                 if mc > 0 {
-                    self.moved_cards = valid_ids.clone();
-                    gs.recently_moved_cards = Some(valid_ids);
+                    self.moved_cards = valid_ids.clone().into();
+                    gs.recently_moved_cards = Some(valid_ids.into());
                     gs.recently_moved_from_zone = Some(Zone::SuccessLiveZone.to_str().to_string());
                 }
             }
@@ -1698,7 +1701,7 @@ impl super::resolver::AbilityResolver {
         if ctx.is_select_action {
             if ctx.indices.is_empty() {
                 gs.ability_queue.take_pending_actions();
-                self.selected_cards = vec![];
+                self.selected_cards = SmallVec::new();
                 log::debug!("[SELECT_STAGE] no selection: cleared pending commands");
             }
             let stage_indices = ctx.mfi(&ctx.indices);
@@ -1771,9 +1774,9 @@ impl super::resolver::AbilityResolver {
                 if let Some(pos) = last_vacated {
                     gs.last_vacated_stage_area = Some(pos);
                 }
-                self.selected_cards = valid_ids.clone();
-                self.moved_cards = valid_ids.clone();
-                gs.recently_moved_cards = Some(valid_ids);
+                self.selected_cards = valid_ids.clone().into();
+                self.moved_cards = valid_ids.clone().into();
+                gs.recently_moved_cards = Some(valid_ids.into());
                 gs.recently_moved_from_zone = Some("stage".to_string());
             }
         }
@@ -2895,13 +2898,13 @@ impl super::resolver::AbilityResolver {
             p1.waitroom.add_card(old_id);
             p1.stage.stage[idx1] = -1;
             // Rule 9.6.2.1.2.1: Card left stage, clean up tracking (member-based, not area-based).
-            p1.deployed_this_turn.remove(&old_id);
+            p1.deployed_this_turn.retain(|id| *id != old_id);
         }
         if idx2 < 3 && p1.stage.stage[idx2] != -1 {
             let old_id = p1.stage.stage[idx2];
             p1.waitroom.add_card(old_id);
             p1.stage.stage[idx2] = -1;
-            p1.deployed_this_turn.remove(&old_id);
+            p1.deployed_this_turn.retain(|id| *id != old_id);
         }
         let p1_id = gs.player1.id.clone();
         // For double baton via choice, the arriving card has already been placed on stage

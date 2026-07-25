@@ -102,9 +102,9 @@ pub struct GameState {
     /// Cards revealed by a re-yell (set after perform_yell draws new cards).
     pub re_yell_revealed_cards: SmallVec<[i16; 8]>,
     pub looked_at_cards: SmallVec<[i16; 8]>,
-    pub ability_applications: Vec<crate::types::AbilityApplication>,
+    pub ability_applications: SmallVec<[crate::types::AbilityApplication; 4]>,
     /// Synced from batch_movements by push_movement_event().
-    pub recently_moved_cards: Option<Vec<i16>>,
+    pub recently_moved_cards: Option<SmallVec<[i16; 4]>>,
     pub recently_appeared_cards: SmallVec<[i16; 4]>,
     pub recently_moved_from_zone: Option<String>,
     /// Explicit per-batch event log of stage-area-to-stage-area position changes.
@@ -112,20 +112,20 @@ pub struct GameState {
     /// Replaces the fragile snapshot-based detection with direct event tracking.
     /// Cleared at the end of each ability batch process (after post-loop TAS scan
     /// in process_player_abilities), NOT in clear_effect_tracking.
-    pub position_change_events: Vec<crate::types::PositionChangeEvent>,
+    pub position_change_events: SmallVec<[crate::types::PositionChangeEvent; 2]>,
 
     /// Detailed event log for per-batch tracking: cards moved in the current
     /// cost/effect batch, what caused the move (cause_card_id), etc.
     /// recently_moved_cards/from_zone are synced from this vec.
-    pub batch_movements: Vec<MovementEvent>,
+    pub batch_movements: SmallVec<[MovementEvent; 4]>,
     /// Turn-level record of stage-area-to-stage-area movements.
     /// Used by conditions checking "this member has moved areas this turn".
-    pub turn_area_movements: Vec<MovementEvent>,
+    pub turn_area_movements: SmallVec<[MovementEvent; 4]>,
     /// Turn-level record of ALL zone-to-zone movements.
     /// Accumulated across the entire turn (not cleared between ability batches).
     /// Used by movement conditions with source+destination zones
     /// (e.g. "member card went from live_card_zone to discard this turn").
-    pub turn_movements: Vec<MovementEvent>,
+    pub turn_movements: SmallVec<[MovementEvent; 8]>,
     /// Counter for assigning unique timestamps to MovementEvents within a turn.
     pub movement_event_counter: u32,
     /// Snapshot of target cards' orientations taken before a change_state
@@ -134,7 +134,7 @@ pub struct GameState {
     pub state_snapshot_before_change: Option<HashMap<i16, Option<CardOrientation>>>,
     /// After a change_state effect executes, records what actually changed:
     /// (card_id, from_state, to_state). Cleared after post-resolution TAS scan.
-    pub recently_state_changed: Vec<(i16, String, String)>,
+    pub recently_state_changed: SmallVec<[(i16, String, String); 2]>,
     pub debut_ability_triggers: SmallVec<[(String, i16); 4]>,
     pub last_vacated_stage_area: Option<usize>,
     // --- 4-byte aligned (u32, Option<i32>) ---
@@ -357,17 +357,17 @@ impl GameState {
             initial_yell_revealed_cards: SmallVec::new(),
             re_yell_revealed_cards: SmallVec::new(),
             looked_at_cards: SmallVec::new(),
-            ability_applications: Vec::new(),
+            ability_applications: SmallVec::new(),
             recently_moved_cards: None,
             recently_appeared_cards: SmallVec::new(),
             recently_moved_from_zone: None,
-            position_change_events: Vec::new(),
-            batch_movements: Vec::new(),
-            turn_area_movements: Vec::new(),
-            turn_movements: Vec::new(),
+            position_change_events: SmallVec::new(),
+            batch_movements: SmallVec::new(),
+            turn_area_movements: SmallVec::new(),
+            turn_movements: SmallVec::new(),
             movement_event_counter: 0,
             state_snapshot_before_change: None,
-            recently_state_changed: Vec::new(),
+            recently_state_changed: SmallVec::new(),
             debut_ability_triggers: SmallVec::new(),
             last_vacated_stage_area: None,
             // 4-byte aligned

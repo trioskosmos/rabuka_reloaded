@@ -903,7 +903,7 @@ impl super::TurnEngine {
         }
 
         if !moved_to_waitroom.is_empty() {
-            game_state.recently_moved_cards = Some(moved_to_waitroom);
+            game_state.recently_moved_cards = Some(moved_to_waitroom.into());
             game_state.recently_moved_from_zone = Some("live_card_zone".to_string());
 
             // Scan and queue triggers for both players
@@ -2346,7 +2346,7 @@ impl super::TurnEngine {
         };
 
         let revealed_ids: Vec<i16> = resolution_zone.cards.iter().copied().collect();
-        player.last_resolution_cards = revealed_ids.clone();
+        player.last_resolution_cards = revealed_ids.clone().into();
         // Q41: Yell-revealed cards go to waitroom during live victory determination,
         // after successful cards are placed in the success zone (Rule 8.4.7).
         for card_id in resolution_zone.cards.drain(..) {

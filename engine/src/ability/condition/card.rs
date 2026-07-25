@@ -1929,9 +1929,9 @@ impl<'a> ConditionContext<'a> {
             let event_cards: SmallVec<[i16; 8]> = if !self.moved_cards.is_empty() {
                 self.moved_cards.iter().copied().collect()
             } else if let Some(enq) = self.game_state.entry_trigger_moved_cards() {
-                SmallVec::from(enq)
+                enq.iter().copied().collect()
             } else if let Some(global) = self.game_state.recently_moved_cards.clone() {
-                SmallVec::from(global)
+                global.iter().copied().collect()
             } else {
                 SmallVec::new()
             };

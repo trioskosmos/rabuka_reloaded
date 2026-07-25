@@ -60,7 +60,7 @@ fn two_dive_retrieved_chain_still_works() {
         .retain(|c| *c != dive_a && *c != dive_b);
     g.state.player1.hand.cards.push(dive_a);
     g.state.player1.hand.cards.push(dive_b);
-    g.state.recently_moved_cards = Some(vec![dive_a, dive_b]);
+    g.state.recently_moved_cards = Some(vec![dive_a, dive_b].into());
 
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
@@ -114,7 +114,7 @@ fn only_moved_copy_triggers_static_copy_does_not() {
     // Only dive_moved moves from waitroom → hand
     g.state.player1.waitroom.cards.retain(|c| *c != dive_moved);
     g.state.player1.hand.cards.push(dive_moved);
-    g.state.recently_moved_cards = Some(vec![dive_moved]);
+    g.state.recently_moved_cards = Some(vec![dive_moved].into());
 
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
@@ -159,7 +159,7 @@ fn ab0_places_dive_ab1_grants_blade_verify_modifier() {
 
     g.state.player1.waitroom.cards.retain(|c| *c != dive);
     g.state.player1.hand.cards.push(dive);
-    g.state.recently_moved_cards = Some(vec![dive]);
+    g.state.recently_moved_cards = Some(vec![dive].into());
 
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
@@ -206,7 +206,7 @@ fn ab0_declined_ab1_not_fired() {
 
     g.state.player1.waitroom.cards.retain(|c| *c != dive);
     g.state.player1.hand.cards.push(dive);
-    g.state.recently_moved_cards = Some(vec![dive]);
+    g.state.recently_moved_cards = Some(vec![dive].into());
 
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
@@ -290,7 +290,7 @@ fn two_dive_live_zone_two_blade_grants() {
 
     g.state.player1.live_card_zone.cards.push(dive_a);
     g.state.player1.live_card_zone.cards.push(dive_b);
-    g.state.recently_moved_cards = Some(vec![dive_a, dive_b]);
+    g.state.recently_moved_cards = Some(vec![dive_a, dive_b].into());
     g.state.player1.stage.stage = [-1, niji_a, niji_b];
     g.state.player1.hand.cards.push(filler);
     for _ in 0..10 {
@@ -326,7 +326,7 @@ fn ab1_no_niji_target_no_crash() {
     let filler = g.id("PL!-sd1-010-SD");
 
     g.state.player1.live_card_zone.cards.push(dive);
-    g.state.recently_moved_cards = Some(vec![dive]);
+    g.state.recently_moved_cards = Some(vec![dive].into());
     g.state.player1.stage.stage = [-1, filler, -1]; // filler is NOT Niji
     g.state.player1.hand.cards.push(filler);
     for _ in 0..10 {
@@ -363,7 +363,7 @@ fn ab0_does_not_fire_outside_main_phase() {
 
     g.state.player1.waitroom.cards.retain(|c| *c != dive);
     g.state.player1.hand.cards.push(dive);
-    g.state.recently_moved_cards = Some(vec![dive]);
+    g.state.recently_moved_cards = Some(vec![dive].into());
 
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
@@ -408,7 +408,7 @@ fn two_static_one_moved_only_one_trigger() {
     // Only dive_moved moves from waitroom → hand
     g.state.player1.waitroom.cards.retain(|c| *c != dive_moved);
     g.state.player1.hand.cards.push(dive_moved);
-    g.state.recently_moved_cards = Some(vec![dive_moved]);
+    g.state.recently_moved_cards = Some(vec![dive_moved].into());
 
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
@@ -459,7 +459,7 @@ fn ab0_placement_reduces_live_card_set_limit() {
     // Move DIVE! from waitroom → hand, trigger ab#0
     g.state.player1.waitroom.cards.retain(|c| *c != dive);
     g.state.player1.hand.cards.push(dive);
-    g.state.recently_moved_cards = Some(vec![dive]);
+    g.state.recently_moved_cards = Some(vec![dive].into());
 
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
@@ -514,7 +514,7 @@ fn skip_placement_then_new_retrieval_still_triggers() {
     g.state.player1.waitroom.cards.push(dive_a);
     g.state.player1.waitroom.cards.retain(|c| *c != dive_a);
     g.state.player1.hand.cards.push(dive_a);
-    g.state.recently_moved_cards = Some(vec![dive_a]);
+    g.state.recently_moved_cards = Some(vec![dive_a].into());
 
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
@@ -534,7 +534,7 @@ fn skip_placement_then_new_retrieval_still_triggers() {
     g.state.player1.waitroom.cards.push(dive_b);
     g.state.player1.waitroom.cards.retain(|c| *c != dive_b);
     g.state.player1.hand.cards.push(dive_b);
-    g.state.recently_moved_cards = Some(vec![dive_b]);
+    g.state.recently_moved_cards = Some(vec![dive_b].into());
 
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);
     g.state.process_pending_auto_abilities(&pid);

@@ -496,8 +496,8 @@ impl AbilityResolver {
         base_count: u32,
         per_unit_type_str: Option<&str>,
         target: &str,
-        recently_moved: &Option<Vec<i16>>,
-        entry_snapshot: &Option<Vec<i16>>,
+        recently_moved: &Option<SmallVec<[i16; 4]>>,
+        entry_snapshot: &Option<SmallVec<[i16; 4]>>,
         last_energy: u32,
         last_discard_count: u32,
         orientation_modifiers: &HashMap<i16, crate::core::game_modifiers::CardOrientation>,
@@ -875,7 +875,7 @@ impl AbilityResolver {
         let recently_moved = gs.recently_moved_cards.clone();
         let entry_snapshot = gs.entry_trigger_moved_cards();
         let last_cost_moved = gs.mods.last_cost_moved_card_ids.clone();
-        let preceding_moved: Option<Vec<i16>> = entry_snapshot
+        let preceding_moved: Option<SmallVec<[i16; 4]>> = entry_snapshot
             .clone()
             .or_else(|| {
                 let rm = recently_moved.clone()?;
@@ -3615,12 +3615,7 @@ impl AbilityResolver {
     pub(crate) fn execute_perform_yell(&mut self, gs: &mut GameState, count: u32, target: &str) {
         let card_db = gs.card_database.clone();
         let bm = gs.mods.blade_modifiers.clone();
-        let om: HashMap<i16, crate::core::game_modifiers::CardOrientation> = gs
-            .mods
-            .orientation_modifiers
-            .iter()
-            .map(|(k, v)| (*k, *v))
-            .collect();
+        let om = gs.mods.orientation_modifiers.clone();
         for _ in 0..count {
             let total_blade = {
                 let player = gs.resolve_target_player_mut(target);

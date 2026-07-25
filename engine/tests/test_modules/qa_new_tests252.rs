@@ -37,7 +37,7 @@ fn setup_riko_and_filler(game: &mut TestGame, cards_in_waitroom: &[i16]) -> i16 
         game.state.player1.waitroom.add_card(cid);
     }
     // Simulate engine tracking: these cards were just moved from live_card_zone
-    game.state.recently_moved_cards = Some(cards_in_waitroom.to_vec());
+    game.state.recently_moved_cards = Some(cards_in_waitroom.to_vec().into());
     game.state.current_phase = rabuka_engine::game_state::Phase::Main;
     riko
 }
@@ -177,7 +177,7 @@ fn test_q252_use_limit() {
 
     // Second trigger — blocked by use_limit=1
     game.state.player1.waitroom.add_card(live2);
-    game.state.recently_moved_cards = Some(vec![live2]);
+    game.state.recently_moved_cards = Some(vec![live2].into());
     trigger_riko_auto(&mut game);
     assert!(
         !game.has_pending_choice(),

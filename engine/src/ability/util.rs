@@ -8,6 +8,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use smallvec::SmallVec;
 #[cfg(not(feature = "no_std"))]
 use std::borrow::Cow;
 
@@ -1743,7 +1744,9 @@ pub fn place_card_in_zone(
             if let Some(pos) = stage_first_empty(&player.stage.stage) {
                 player.stage.stage[pos] = card_id;
                 // Rule 9.6.2.1.2.1: Card deployed to stage, track it.
-                player.deployed_this_turn.insert(card_id);
+                if !player.deployed_this_turn.contains(&card_id) {
+                    player.deployed_this_turn.push(card_id);
+                }
             } else {
                 // Stage full — return card to discard instead of hand
                 player.waitroom.add_card(card_id);
@@ -1787,16 +1790,22 @@ pub fn place_card_in_zone(
             if let Some(pos) = vacated_stage_area {
                 if pos < 3 && player.stage.stage[pos] == -1 {
                     player.stage.stage[pos] = card_id;
-                    player.deployed_this_turn.insert(card_id);
+                    if !player.deployed_this_turn.contains(&card_id) {
+                        player.deployed_this_turn.push(card_id);
+                    }
                 } else if let Some(ep) = stage_first_empty(&player.stage.stage) {
                     player.stage.stage[ep] = card_id;
-                    player.deployed_this_turn.insert(card_id);
+                    if !player.deployed_this_turn.contains(&card_id) {
+                        player.deployed_this_turn.push(card_id);
+                    }
                 } else {
                     player.hand.add_card(card_id);
                 }
             } else if let Some(ep) = stage_first_empty(&player.stage.stage) {
                 player.stage.stage[ep] = card_id;
-                player.deployed_this_turn.insert(card_id);
+                if !player.deployed_this_turn.contains(&card_id) {
+                    player.deployed_this_turn.push(card_id);
+                }
             } else {
                 player.hand.add_card(card_id);
             }
@@ -1866,7 +1875,7 @@ pub fn area_to_index(area: &crate::zones::MemberArea) -> Option<usize> {
 /// This is the correct behavior for both draw and gain_resource — they should
 /// count only cards moved by the current cost/effect batch, not the full waitroom.
 pub fn resolve_discard_per_unit_count(
-    recently_moved: Option<&Vec<i16>>,
+    recently_moved: Option<&SmallVec<[i16; 4]>>,
     last_discard_count: u32,
     card_db: &CardDatabase,
     filter: &CardFilter,

@@ -7,12 +7,13 @@ use crate::zones::{
 use crate::card::CardDatabase;
 use crate::core::game_modifiers::ModifierEntry;
 
-use crate::{HashMap, HashSet, VecDeque};
+use crate::{HashMap, VecDeque};
 #[cfg(feature = "no_std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use smallvec::SmallVec;
 
 #[derive(Debug, Clone)]
 
@@ -48,7 +49,7 @@ pub struct Player {
     //   - R4 (11.10) may position-change the card to a different area
     //   - R3 (4.1.4 exclusion) confirms member-area movement preserves card identity
     //   - R1 checks "メンバーカードのあるエリア" = current location of the card
-    pub deployed_this_turn: HashSet<i16>,
+    pub deployed_this_turn: SmallVec<[i16; 4]>,
 
     pub stage_hearts: Option<crate::card::BaseHeart>,
 
@@ -58,7 +59,7 @@ pub struct Player {
 
     pub live_card_set_limit_reduction: u32,
 
-    pub last_resolution_cards: Vec<i16>,
+    pub last_resolution_cards: SmallVec<[i16; 4]>,
 }
 
 impl Player {
@@ -88,7 +89,7 @@ impl Player {
 
             exclusion_zone: ExclusionZone::new(),
 
-            deployed_this_turn: HashSet::default(),
+            deployed_this_turn: SmallVec::new(),
 
             stage_hearts: None,
 
@@ -98,7 +99,7 @@ impl Player {
 
             live_card_set_limit_reduction: 0,
 
-            last_resolution_cards: Vec::new(),
+            last_resolution_cards: SmallVec::new(),
         }
     }
 
@@ -167,7 +168,7 @@ impl Player {
         };
         let (member_under, energy_under) = self.stage.recycle_under_cards(area, card_db);
         // Rule 9.6.2.1.2.1: Card is no longer on stage, clean up tracking.
-        self.deployed_this_turn.remove(&card_id);
+        self.deployed_this_turn.retain(|id| *id != card_id);
         for cid in member_under {
             self.waitroom.add_card(cid);
         }
@@ -382,7 +383,9 @@ impl Player {
 
             self.stage.stage[index] = card_id;
             // Rule 9.6.2.1.2.1: Card moved from hand (non-stage) to stage, track it.
-            self.deployed_this_turn.insert(card_id);
+            if !self.deployed_this_turn.contains(&card_id) {
+                self.deployed_this_turn.push(card_id);
+            }
 
             // Rule 9.6.2.3.2.1: If baton touch performed, trigger 'baton touch' event
 

@@ -637,7 +637,7 @@ fn riko_bp6_live_start_three_slots_all_aqours_passes() {
 // =========================================================================
 
 fn trigger_riko_auto(game: &mut TestGame, moved_cards: Vec<i16>) {
-    game.state.recently_moved_cards = Some(moved_cards);
+    game.state.recently_moved_cards = Some(moved_cards.into());
     game.state
         .trigger_auto_abilities_for_player(&game.state.player1.id.clone());
     game.state
@@ -928,7 +928,7 @@ fn riko_bp6_auto_turn_limit_blocks_second_trigger_exact() {
 
     // --- Second trigger (same turn) ---
     game.state.player1.waitroom.cards.push(live_b);
-    game.state.recently_moved_cards = Some(vec![live_b]);
+    game.state.recently_moved_cards = Some(vec![live_b].into());
     game.state
         .trigger_auto_abilities_for_player(&game.state.player1.id.clone());
     game.state

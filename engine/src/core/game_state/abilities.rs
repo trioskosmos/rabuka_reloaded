@@ -72,7 +72,7 @@ impl GameState {
         card_id: Option<i16>,
         player_id: String,
         trigger_type: AbilityTrigger,
-        trigger_moved_cards: Option<Vec<i16>>,
+        trigger_moved_cards: Option<SmallVec<[i16; 4]>>,
         triggering_member_id: Option<i16>,
     ) -> crate::ability_queue::AbilityQueueEntry {
         use crate::ability_queue::{AbilityId, AbilityQueueEntry};
@@ -101,7 +101,7 @@ impl GameState {
             resolver: None,
             trigger_moved_cards,
             triggering_member_id,
-            snapshot_movements: Vec::new(),
+            snapshot_movements: SmallVec::new(),
             choice_effect_text: None,
             condition_cache: SmallVec::new(),
         }
@@ -605,7 +605,7 @@ impl GameState {
                 player_id_clone.clone(),
                 Some(card_no),
                 Some(stage_card_id),
-                moved.clone().map(|v| v.into_iter().collect()),
+                moved.clone(),
                 None,
             );
         }
@@ -684,7 +684,7 @@ impl GameState {
         player_id: String,
         source_card_id: Option<String>,
         explicit_card_id: Option<i16>,
-        trigger_moved_cards: Option<Vec<i16>>,
+        trigger_moved_cards: Option<SmallVec<[i16; 4]>>,
         triggering_member_id: Option<i16>,
     ) {
         #[cfg(feature = "ds_debug")]
@@ -1056,7 +1056,7 @@ impl GameState {
             // batch movements (look_and_select, etc.) that finalize card
             // movement outside individual ability resolution.
             if had_recent_moves {
-                self.recently_moved_cards = Some(Vec::new());
+                self.recently_moved_cards = Some(SmallVec::new());
             }
             if had_recent_appearances {
                 self.recently_appeared_cards.push(-1);
@@ -1349,7 +1349,7 @@ impl GameState {
             let saved_target = r.spawn_context.target.clone();
             r.spawn_context = crate::ability::types::EffectSpawnContext::default();
             r.spawn_context.target = saved_target;
-            r.pending_stage_cards = Vec::new();
+            r.pending_stage_cards = SmallVec::new();
             r.execution_context = crate::ability::types::ExecutionContext::None;
             // Clear pending_choice: the previous call stored it in the queue,
             // and it must not block re-execution of the effect on the next pass.
@@ -1634,7 +1634,7 @@ impl GameState {
     /// Read trigger_moved_cards from the current queue entry (snapshot of
     /// recently_moved_cards at enqueue time). Used by source:"those_cards"
     /// in batch conditions to resolve to only the trigger cards.
-    pub fn entry_trigger_moved_cards(&self) -> Option<Vec<i16>> {
+    pub fn entry_trigger_moved_cards(&self) -> Option<SmallVec<[i16; 4]>> {
         self.ability_queue
             .current_entry()
             .and_then(|e| e.trigger_moved_cards.clone())
@@ -1822,7 +1822,7 @@ impl GameState {
                             Some(Zone::SelectedCards) => entry
                                 .resolver
                                 .as_ref()
-                                .map(|r| r.selected_cards.clone())
+                                .map(|r| r.selected_cards.to_vec())
                                 .unwrap_or_default(),
                             _ => Vec::new(),
                         };

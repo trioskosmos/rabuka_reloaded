@@ -452,7 +452,7 @@ impl AbilityResolver {
                 .collect(),
             Some(Zone::LookedAt) => gs.looked_at_cards.to_vec(),
             Some(Zone::LiveCardZone) => player.live_card_zone.cards.iter().copied().collect(),
-            Some(Zone::SelectedCards) => self.selected_cards.clone(),
+            Some(Zone::SelectedCards) => self.selected_cards.to_vec(),
             Some(Zone::RevealedCards) => gs.revealed_cards.to_vec(),
             _ => vec![],
         };

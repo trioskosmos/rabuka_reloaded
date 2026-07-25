@@ -66,7 +66,10 @@ fn test_named_baton_touch_mia() {
     // Also remove Center card from deployed_this_turn (simulating it wasn't deployed this turn).
     let center_card = game.state.player1.stage.stage[1];
     game.state.player1.stage.stage[1] = -1;
-    game.state.player1.deployed_this_turn.remove(&center_card);
+    game.state
+        .player1
+        .deployed_this_turn
+        .retain(|id| *id != center_card);
     game.add_to_stage(MemberArea::Center, kasumi);
     game.state.player1.hand.cards.push(mia2);
 
@@ -520,11 +523,7 @@ fn test_honoka_change_state_with_valid_targets() {
     assert_eq!(p2_center, Some(target1), "Target should remain on stage");
 
     let target1_ori = g.state.mods.get_orientation_modifier(target1);
-    assert_eq!(
-        target1_ori,
-        Some("wait"),
-        "Target should be in wait state"
-    );
+    assert_eq!(target1_ori, Some("wait"), "Target should be in wait state");
 
     // Verify target2 is unchanged
     let target2_ori = g.state.mods.get_orientation_modifier(target2);

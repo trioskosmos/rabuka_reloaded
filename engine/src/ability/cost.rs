@@ -5,14 +5,12 @@ use super::types::{Choice, ChoiceRoute};
 use super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
+use crate::HashMap;
 #[cfg(feature = "no_std")]
 use alloc::{
-    collections::BTreeMap,
     string::{String, ToString},
     vec::Vec,
 };
-#[cfg(not(feature = "no_std"))]
-use std::collections::BTreeMap;
 
 impl AbilityResolver {
     /// Pay all deferred costs that were stored during sequential_cost handler.
@@ -468,7 +466,7 @@ impl AbilityResolver {
                         let player_ref = gs.resolve_target_player(target);
                         let hand_cards = &player_ref.hand.cards;
                         // Group hand cards by unit name
-                        let mut unit_groups: BTreeMap<String, Vec<i16>> = BTreeMap::new();
+                        let mut unit_groups: HashMap<String, Vec<i16>> = HashMap::new();
                         for &cid in hand_cards {
                             if filter.matches(card_db, cid, false) {
                                 let unit = card_db

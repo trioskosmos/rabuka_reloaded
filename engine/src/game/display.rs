@@ -1759,12 +1759,12 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         last_area_move_card_id: game_state.last_area_move_card_id(),
         last_area_move_by_player: game_state.last_area_move_by_player().map(|s| s.to_string()),
         last_energy_placed_by_effect: game_state.last_energy_placed_by_effect(),
-        batch_movements: game_state.batch_movements.clone(),
+        batch_movements: game_state.batch_movements.to_vec(),
         last_energy_placed_by_player: game_state
             .last_energy_placed_by_player()
             .map(|s| s.to_string()),
         position_change_occurred_this_turn: game_state.position_change_occurred_this_turn,
-        position_changes: game_state.position_change_events.clone(),
+        position_changes: game_state.position_change_events.to_vec(),
         position_changes_by_card: {
             let mut map = HashMap::default();
             for event in &game_state.position_change_events {
@@ -1838,7 +1838,11 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             .map(|(k, v)| (k.to_string(), *v))
             .collect(),
         card_instance_counter: game_state.card_instance_counter,
-        recently_moved_cards: game_state.recently_moved_cards.clone().unwrap_or_default(),
+        recently_moved_cards: game_state
+            .recently_moved_cards
+            .clone()
+            .unwrap_or_default()
+            .to_vec(),
         recently_moved_from_zone: game_state.recently_moved_from_zone.clone(),
         last_vacated_stage_area: last_vacated,
         debut_ability_triggers: debut_triggers,

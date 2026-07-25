@@ -18,7 +18,7 @@ fn dive_live_zone_only_ab1_triggers() {
     let niji = g.id("PL!N-PR-003-PR");
 
     g.state.player1.live_card_zone.cards.push(dive);
-    g.state.recently_moved_cards = Some(vec![dive]);
+    g.state.recently_moved_cards = Some(vec![dive].into());
     g.state.player1.stage.stage = [-1, niji, -1];
 
     let pid = g.state.player1.id.clone();
@@ -67,7 +67,7 @@ fn dive_no_niji_no_target() {
     let dive = g.id("PL!N-bp4-026-L");
 
     g.state.player1.live_card_zone.cards.push(dive);
-    g.state.recently_moved_cards = Some(vec![dive]);
+    g.state.recently_moved_cards = Some(vec![dive].into());
 
     let pid = g.state.player1.id.clone();
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut g.state, &pid);

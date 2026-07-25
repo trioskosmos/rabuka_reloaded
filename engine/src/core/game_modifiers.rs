@@ -3,6 +3,7 @@ use crate::types::AbilityApplication;
 use crate::HashMap;
 #[cfg(feature = "no_std")]
 use alloc::{string::String, vec::Vec};
+use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum CardOrientation {
@@ -77,7 +78,7 @@ pub struct GameModifiers {
     /// Number of cards moved from hand to discard by the most recent cost payment.
     pub last_cost_discard_count: u32,
     /// Card IDs moved from hand to discard by the most recent cost payment.
-    pub last_cost_moved_card_ids: Vec<i16>,
+    pub last_cost_moved_card_ids: SmallVec<[i16; 4]>,
     /// Number of energy cards paid by the most recent cost payment.
     pub last_cost_energy_count: u32,
     /// Per-card delayed "cannot activate" flags. Card_id → remaining turns of
@@ -124,7 +125,7 @@ impl GameModifiers {
             constant_score_sources: Vec::new(),
             heart_color_multiplier: HashMap::default(),
             last_cost_discard_count: 0,
-            last_cost_moved_card_ids: Vec::new(),
+            last_cost_moved_card_ids: SmallVec::new(),
             last_cost_energy_count: 0,
             delayed_cannot_active: HashMap::default(),
             last_surplus_loss_count: 0,
@@ -145,7 +146,7 @@ impl GameModifiers {
         &mut self,
         card_id: i16,
         delta: i32,
-        trace: &mut Vec<AbilityApplication>,
+        trace: &mut SmallVec<[AbilityApplication; 4]>,
         source_card_id: i16,
         ability_text: &str,
     ) {
@@ -219,7 +220,7 @@ impl GameModifiers {
         card_id: i16,
         color: HeartColor,
         delta: i32,
-        trace: &mut Vec<AbilityApplication>,
+        trace: &mut SmallVec<[AbilityApplication; 4]>,
         source_card_id: i16,
         ability_text: &str,
     ) {

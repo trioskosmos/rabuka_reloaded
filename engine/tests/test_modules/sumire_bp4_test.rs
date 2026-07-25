@@ -204,7 +204,9 @@ fn sumire_q194_locked_member_excluded_from_double_baton() {
 
     // Lock LeftSide AFTER advance (which clears deployed_this_turn)
     // Simulate liella1 being deployed this turn by adding its card ID to the tracking set.
-    game.state.player1.deployed_this_turn.insert(liella1);
+    if !game.state.player1.deployed_this_turn.contains(&liella1) {
+        game.state.player1.deployed_this_turn.push(liella1);
+    }
 
     TurnEngine::execute_main_phase_action(
         &mut game.state,

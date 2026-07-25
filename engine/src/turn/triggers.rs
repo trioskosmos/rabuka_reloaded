@@ -172,7 +172,7 @@ impl super::TurnEngine {
                 player_id_clone.clone(),
                 Some(card_no),
                 Some(stage_card_id),
-                moved_snapshot.clone().map(|v| v.into()),
+                moved_snapshot.clone(),
                 None,
             );
             #[cfg(feature = "ds_debug")]
