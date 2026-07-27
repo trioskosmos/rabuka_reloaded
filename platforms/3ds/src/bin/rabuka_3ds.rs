@@ -556,6 +556,7 @@ enum Step {
         bool,                       // choice_image_mode
         bool,                       // choice_subview (false=choices grid, true=text overlay)
         usize,                      // text_page (current page index in text subview)
+        usize,                      // choice_grid_offset (scroll offset for choice image grid)
         usize,                      // hand_offset (P1)
         usize,                      // hand_offset_p2
         u32,                        // touch_tap_count
@@ -1367,10 +1368,11 @@ fn main() {
                                     true,  // choice_image_mode
                                     false, // choice_subview (false=choices grid)
                                     0,     // text_page
-                                    0,
-                                    0,
-                                    0,
-                                    None,
+                                    0,     // choice_grid_offset
+                                    0,     // hand_offset
+                                    0,     // hand_offset_p2
+                                    0,     // touch_tap_count
+                                    None,  // viewing_card
                                     None,  // zone_viewer
                                     0,     // zone_viewer_offset
                                     false, // was_touching
@@ -2151,17 +2153,18 @@ fn main() {
                                     true,
                                     true,
                                     atlas,
-                                    false, // vs_ai (this is multiplayer)
-                                    false, // ai_vs_ai
-                                    false, // cli_mode (start in game mode)
-                                    false, // detail_mode
-                                    true,  // choice_image_mode
-                                    false, // choice_subview (false=choices grid)
-                                    0,     // text_page
-                                    0,
-                                    0,
-                                    0,
-                                    None,
+                                    false,    // vs_ai (this is multiplayer)
+                                    false,    // ai_vs_ai
+                                    false,    // cli_mode (start in game mode)
+                                    false,    // detail_mode
+                                    true,     // choice_image_mode
+                                    false,    // choice_subview (false=choices grid)
+                                    0,        // text_page
+                                    0,        // choice_grid_offset
+                                    0,        // hand_offset
+                                    0,        // hand_offset_p2
+                                    0,        // touch_tap_count
+                                    None,     // viewing_card
                                     None,     // zone_viewer
                                     0,        // zone_viewer_offset
                                     false,    // was_touching
@@ -2191,6 +2194,7 @@ fn main() {
                 mut choice_image_mode,
                 mut choice_subview,
                 mut text_page,
+                mut choice_grid_offset,
                 mut hand_offset,
                 mut hand_offset_p2,
                 mut touch_tap_count,
@@ -2410,32 +2414,45 @@ fn main() {
                         let n = display_order.len();
                         if n > 0 {
                             if keys & 0x00000040 != 0 {
-                                if display_pos > 0 {
-                                    display_pos -= 1;
+                                // UP: move back by one row (5 items)
+                                let row = 5usize;
+                                if display_pos >= row {
+                                    display_pos -= row;
                                 } else {
-                                    display_pos = n - 1;
+                                    display_pos = 0;
+                                }
+                                if display_pos < choice_grid_offset {
+                                    choice_grid_offset = display_pos / row * row;
                                 }
                                 cur = display_order[display_pos];
                                 redraw = true;
                             }
                             if keys & 0x00000080 != 0 {
-                                display_pos = if display_pos + 1 < n {
-                                    display_pos + 1
-                                } else {
-                                    0
-                                };
+                                // DOWN: move forward by one row (5 items)
+                                let row = 5usize;
+                                display_pos = (display_pos + row).min(n - 1);
+                                let visible_end = choice_grid_offset + 10;
+                                if display_pos >= visible_end {
+                                    choice_grid_offset = (display_pos / row) * row;
+                                    choice_grid_offset = choice_grid_offset.saturating_sub(row);
+                                }
                                 cur = display_order[display_pos];
                                 redraw = true;
                             }
                             if keys & 0x00000020 != 0 {
-                                display_pos = if display_pos > 0 { display_pos - 1 } else { 0 };
+                                // LEFT: move back by 1, don't cross row boundary
+                                let row_start = choice_grid_offset;
+                                if display_pos > row_start {
+                                    display_pos -= 1;
+                                }
                                 cur = display_order[display_pos];
                                 redraw = true;
                             }
                             if keys & 0x00000010 != 0 {
-                                display_pos = display_pos + 1;
-                                if display_pos >= n {
-                                    display_pos = 0;
+                                // RIGHT: move forward by 1, don't cross row boundary
+                                let row_end = (choice_grid_offset + 5).min(n);
+                                if display_pos + 1 < row_end {
+                                    display_pos += 1;
                                 }
                                 cur = display_order[display_pos];
                                 redraw = true;
@@ -3420,6 +3437,7 @@ fn main() {
 
                 if dirty || redraw {
                     acts_cache = game_setup::generate_possible_actions(&gs);
+                    choice_grid_offset = 0;
 
                     // Rebuild display order from freshly generated acts_cache.
                     display_order = {
@@ -3535,13 +3553,10 @@ fn main() {
                             unsafe {
                                 $ecount_fn(ecount as i32);
                             }
-                            for (i, cid) in ec.iter().enumerate() {
+                            for (i, cid) in ec.iter().enumerate().take(30) {
                                 // Energy cards: tapped if position >= active_count (front = active)
                                 let tapped = i >= e_active;
                                 set_slot($energy_fn, i as i32, *cid, false, tapped);
-                            }
-                            for (i, cid) in ec.iter().enumerate().take(30) {
-                                set_slot($energy_fn, i as i32, *cid, false, is_tapped(*cid));
                             }
                             let hc = &pb.hand.cards;
                             let vis = visible_hand_slots();
@@ -4532,7 +4547,7 @@ fn main() {
                                         render_text_with_icons(
                                             4.0,
                                             44.0,
-                                            ab_lines[0],
+                                            &ab_lines[0],
                                             COL_LIGHT,
                                             0.65,
                                         );
@@ -4577,17 +4592,24 @@ fn main() {
                                     let cw = 72.0f32;
                                     let ch = cw / 0.711;
                                     let gap = 4.0f32;
+                                    let cols = 5usize;
                                     let iy = 42.0f32;
-                                    let mut ty = iy;
-                                    for (di, &fi) in display_order.iter().enumerate().take(5) {
+                                    let grid_start = choice_grid_offset;
+                                    let grid_len =
+                                        display_order.len().saturating_sub(grid_start).min(10);
+                                    for gi in 0..grid_len {
+                                        let fi = display_order[grid_start + gi];
+                                        let di = grid_start + gi;
                                         let act = &acts_cache[fi];
                                         let is_disabled = act
                                             .parameters
                                             .as_ref()
                                             .and_then(|p| p.disabled)
                                             .unwrap_or(false);
-                                        let ix = 4.0 + di as f32 * (cw + gap);
-                                        let iy_card = iy;
+                                        let col = gi % cols;
+                                        let row = gi / cols;
+                                        let ix = 4.0 + col as f32 * (cw + gap);
+                                        let iy_card = iy + row as f32 * (ch + 20.0 + gap);
                                         if iy_card + ch + 20.0 > 230.0 {
                                             break;
                                         }
@@ -4629,14 +4651,13 @@ fn main() {
                                                 let txt = format!("{}{}", pfx, desc);
                                                 unsafe {
                                                     _3ds_top_queue_text(
-                                                        4.0,
-                                                        ty,
+                                                        ix + 1.0,
+                                                        iy_card + 1.0,
                                                         c,
-                                                        0.65f32,
+                                                        0.55f32,
                                                         format!("{}\0", txt).as_ptr(),
                                                     );
                                                 }
-                                                ty += 18.0;
                                             }
                                             continue;
                                         }
@@ -4693,7 +4714,6 @@ fn main() {
                                                             format!("{}\0", cn).as_ptr(),
                                                         );
                                                     }
-                                                    ty = iy_card + ch + 20.0 + gap;
                                                     continue;
                                                 }
                                             }
@@ -4716,19 +4736,24 @@ fn main() {
                                             let pfx = if di == display_pos { "> " } else { "  " };
                                             let txt = format!("{}{}", pfx, desc);
                                             if txt.contains("{{") {
-                                                render_text_with_icons(4.0, ty, &txt, c, 0.65);
+                                                render_text_with_icons(
+                                                    ix + 1.0,
+                                                    iy_card + 1.0,
+                                                    &txt,
+                                                    c,
+                                                    0.55,
+                                                );
                                             } else {
                                                 unsafe {
                                                     _3ds_top_queue_text(
-                                                        4.0,
-                                                        ty,
+                                                        ix + 1.0,
+                                                        iy_card + 1.0,
                                                         c,
-                                                        0.65f32,
+                                                        0.55f32,
                                                         format!("{}\0", txt).as_ptr(),
                                                     );
                                                 }
                                             }
-                                            ty += 18.0;
                                         }
                                     }
                                     // Hint: L opens text
@@ -4740,6 +4765,21 @@ fn main() {
                                             0.45f32,
                                             format!("{}\0", tl("L=text")).as_ptr(),
                                         );
+                                    }
+                                    // Page indicator when more choices than visible
+                                    if display_order.len() > 10 {
+                                        let page = grid_start / 10 + 1;
+                                        let total_p = (display_order.len() + 9) / 10;
+                                        unsafe {
+                                            _3ds_top_queue_text(
+                                                300.0,
+                                                228.0,
+                                                COL_MED,
+                                                0.45f32,
+                                                format!("{}\0", format!("{}/{}", page, total_p))
+                                                    .as_ptr(),
+                                            );
+                                        }
                                     }
                                     // Text overlay on top of choices grid
                                     if choice_subview {
@@ -4769,7 +4809,7 @@ fn main() {
                                                     44.0,
                                                     COL_BLUE,
                                                     0.70f32,
-                                                    format!("[{}]\0", entry.card_no).as_ptr(),
+                                                    format!("{}\0", tl("Ability")).as_ptr(),
                                                 );
                                             }
                                             let mut oy = 64.0;
@@ -5026,15 +5066,21 @@ fn main() {
                                                         .as_ref()
                                                         .and_then(|p| p.base_cost)
                                                         .unwrap_or(0);
+                                                    let area = act
+                                                        .parameters
+                                                        .as_ref()
+                                                        .and_then(|p| p.stage_area.clone())
+                                                        .unwrap_or_default();
+                                                    let area_label = tl_area(&area);
                                                     if !cn.is_empty() {
                                                         format!(
-                                                            "[{}] {} {{{{icon_energy.png|E}}}}{}",
-                                                            cn, name, base_cost
+                                                            "[{}] {} {{{{icon_energy.png|E}}}}{} {}",
+                                                            cn, name, base_cost, area_label
                                                         )
                                                     } else {
                                                         format!(
-                                                            "{} {{{{icon_energy.png|E}}}}{}",
-                                                            name, base_cost
+                                                            "{} {{{{icon_energy.png|E}}}}{} {}",
+                                                            name, base_cost, area_label
                                                         )
                                                     }
                                                 }
@@ -5217,7 +5263,7 @@ fn main() {
                                                 _ => continue,
                                             };
                                             unsafe {
-                                                _3ds_board_set_action_highlight(1, slot);
+                                                _3ds_board_set_action_highlight(1, slot, false);
                                             }
                                         }
                                     }
@@ -5233,7 +5279,7 @@ fn main() {
                                                 _ => continue,
                                             };
                                             unsafe {
-                                                _3ds_board_set_action_highlight(1, slot);
+                                                _3ds_board_set_action_highlight(1, slot, false);
                                             }
                                         }
                                     }
@@ -5244,7 +5290,7 @@ fn main() {
                                         p.card_indices.as_ref().and_then(|v| v.first())
                                     {
                                         unsafe {
-                                            _3ds_board_set_action_highlight(3, *hidx as i32);
+                                            _3ds_board_set_action_highlight(3, *hidx as i32, false);
                                         }
                                     }
                                 }
@@ -5254,7 +5300,7 @@ fn main() {
                                         p.card_indices.as_ref().and_then(|v| v.first())
                                     {
                                         unsafe {
-                                            _3ds_board_set_action_highlight(3, *hidx as i32);
+                                            _3ds_board_set_action_highlight(3, *hidx as i32, false);
                                         }
                                     }
                                 }
@@ -5269,11 +5315,13 @@ fn main() {
                                         )
                                     {
                                         if let Some(cid) = p.card_id {
-                                            if let Some((zone, slot)) =
+                                            if let Some((zone, slot, opp)) =
                                                 find_card_zone_slot(&gs, cid)
                                             {
                                                 unsafe {
-                                                    _3ds_board_set_action_highlight(zone, slot);
+                                                    _3ds_board_set_action_highlight(
+                                                        zone, slot, opp,
+                                                    );
                                                 }
                                             }
                                         }
@@ -5288,11 +5336,13 @@ fn main() {
                                 if let Choice::SelectAutoAbility { options, .. } = c {
                                     for opt in options {
                                         if let Some(cid) = opt.card_id {
-                                            if let Some((zone, slot)) =
+                                            if let Some((zone, slot, opp)) =
                                                 find_card_zone_slot(&gs, cid)
                                             {
                                                 unsafe {
-                                                    _3ds_board_set_action_highlight(zone, slot);
+                                                    _3ds_board_set_action_highlight(
+                                                        zone, slot, opp,
+                                                    );
                                                 }
                                             }
                                         }
@@ -5640,6 +5690,7 @@ fn main() {
                     choice_image_mode,
                     choice_subview,
                     text_page,
+                    choice_grid_offset,
                     hand_offset,
                     hand_offset_p2,
                     touch_tap_count,
@@ -5716,13 +5767,14 @@ fn settle_3ds(gs: &mut GameState) {
 }
 
 #[cfg(feature = "3ds")]
-fn find_card_zone_slot(gs: &GameState, cid: i16) -> Option<(i32, i32)> {
-    for p in [&gs.player1, &gs.player2] {
+fn find_card_zone_slot(gs: &GameState, cid: i16) -> Option<(i32, i32, bool)> {
+    for (pi, p) in [&gs.player1, &gs.player2].iter().enumerate() {
+        let opp = pi == 1;
         if let Some(idx) = p.stage.stage.iter().position(|&id| id == cid) {
-            return Some((1, idx as i32));
+            return Some((1, idx as i32, opp));
         }
         if let Some(idx) = p.hand.cards.iter().position(|&id| id == cid) {
-            return Some((3, idx as i32));
+            return Some((3, idx as i32, opp));
         }
         if let Some(idx) = p
             .success_live_card_zone
@@ -5730,10 +5782,10 @@ fn find_card_zone_slot(gs: &GameState, cid: i16) -> Option<(i32, i32)> {
             .iter()
             .position(|&id| id == cid)
         {
-            return Some((0, idx as i32));
+            return Some((0, idx as i32, opp));
         }
         if let Some(idx) = p.energy_zone.cards.iter().position(|&id| id == cid) {
-            return Some((2, idx as i32));
+            return Some((2, idx as i32, opp));
         }
     }
     None
@@ -5755,7 +5807,7 @@ fn step_name(s: &Step) -> &'static str {
         Step::ReadCardsBin => "ReadCards",
         Step::ParseCards(_) => "ParseCards",
         Step::Setup(_, _, _, _) => "Setup",
-        Step::Play(_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => {
+        Step::Play(_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _) => {
             "Play"
         }
         Step::Done(_) => "Done",
@@ -5884,7 +5936,7 @@ extern "C" {
     fn _3ds_board_set_active_player(is_p1: bool);
 
     // Action highlight on board slots
-    fn _3ds_board_set_action_highlight(zone: i32, slot: i32);
+    fn _3ds_board_set_action_highlight(zone: i32, slot: i32, opponent: bool);
     fn _3ds_board_clear_action_highlight();
 
     // Action overlay (Phase 2: actions on bottom screen, safe per-line copy)

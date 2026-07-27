@@ -149,6 +149,7 @@ static bool active_is_p1 = true;
 static int hl_count = 0;
 static int hl_zones[MAX_HIGHLIGHTS];
 static int hl_slots[MAX_HIGHLIGHTS];
+static bool hl_opponent[MAX_HIGHLIGHTS];
 
 // ---- Action overlay (Phase 2: show actions on bottom screen) ----
 #define MAX_OVERLAY_LINES 16
@@ -399,17 +400,18 @@ void _3ds_board_set_hud(int turn, const char* phase, const char* player) {
 void _3ds_board_set_active_player(bool is_p1) { active_is_p1 = is_p1; }
 
 // ---- Action highlight ----
-void _3ds_board_set_action_highlight(int zone, int slot) {
+void _3ds_board_set_action_highlight(int zone, int slot, bool opponent) {
     if (hl_count < MAX_HIGHLIGHTS) {
         hl_zones[hl_count] = zone;
         hl_slots[hl_count] = slot;
+        hl_opponent[hl_count] = opponent;
         hl_count++;
     }
 }
 void _3ds_board_clear_action_highlight() { hl_count = 0; }
-static bool _is_highlighted(int zone, int slot) {
+static bool _is_highlighted(int zone, int slot, bool opponent) {
     for (int i = 0; i < hl_count; i++) {
-        if (hl_zones[i] == zone && hl_slots[i] == slot) return true;
+        if (hl_zones[i] == zone && hl_slots[i] == slot && hl_opponent[i] == opponent) return true;
     }
     return false;
 }
@@ -665,7 +667,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float live_slot_w = live_card_h * LANDSCAPE;
     for (int i = 0; i < 3; i++) {
         _3ds_draw_rect(lx, live_y + 1, live_slot_w, live_card_h, 0x33000000);
-        if (!cli_mode && _is_highlighted(0, i)) {
+        if (!cli_mode && _is_highlighted(0, i, opponent)) {
             _3ds_draw_border(lx, live_y + 1, live_slot_w, live_card_h, COL_SEL, 2);
         }
         if (pb->live[i].active) _3ds_draw_card_at(&pb->live[i], lx, live_y + 1, live_slot_w, live_card_h);
@@ -685,7 +687,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
         // Portrait card slot (solid border, centered)
         float psx = st_x + st_pad_x;
         _3ds_draw_border(psx, sy + st_pad_y, st_card_w, st_slot_h - 2, COL_BLUE, 1);
-        if (!cli_mode && _is_highlighted(1, si)) {
+        if (!cli_mode && _is_highlighted(1, si, opponent)) {
             _3ds_draw_border(st_x, sy, st_slot_w, st_slot_h, COL_SEL, 2);
         }
         if (pb->stage[si].active) {
@@ -724,7 +726,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float e_sz = energy_h - 4;
     for (int i = 0; i < pb->energy_count && i < MAX_SLOTS; i++) {
         float e_w = e_sz * LANDSCAPE;
-        if (!cli_mode && _is_highlighted(2, i)) {
+        if (!cli_mode && _is_highlighted(2, i, opponent)) {
             _3ds_draw_border(ex, energy_y + 2, e_w, e_sz, COL_SEL, 2);
         }
         if (pb->energy[i].active) _3ds_draw_card_at(&pb->energy[i], ex, energy_y + 2, e_w, e_sz);
@@ -740,7 +742,7 @@ static void draw_section(PlayerBoard* pb, float y0, float h, bool opponent, bool
     float hand_card_h = hand_h - 4;
     float h_slot_w = hand_card_h * PORTRAIT;
     for (int i = 0; i < pb->hand_count && i < MAX_SLOTS; i++) {
-        if (!cli_mode && _is_highlighted(3, i)) {
+        if (!cli_mode && _is_highlighted(3, i, opponent)) {
             _3ds_draw_border(hx, hand_y + 2, h_slot_w, hand_card_h, COL_SEL, 2);
         }
         if (pb->hand[i].active) _3ds_draw_card_at(&pb->hand[i], hx, hand_y + 2, h_slot_w, hand_card_h);
@@ -1139,6 +1141,8 @@ int _3ds_uds_is_connected() {
 static bool cam_running = false;
 static Handle cam_event = 0;
 static u8 *cam_buf = NULL;
+static struct quirc *qr = NULL;
+static u8 *gray = NULL;
 
 int _3ds_qr_start(void) {
     if (cam_running) return 0;
@@ -1166,6 +1170,13 @@ int _3ds_qr_start(void) {
     r = CAMU_StartCapture(SELECT_OUT1);
     if (R_FAILED(r)) { svcCloseHandle(cam_event); cam_event = 0; linearFree(cam_buf); cam_buf = NULL; camExit(); return -9; }
 
+    gray = (u8*)linearAlloc(400 * 240);
+    if (!gray) { linearFree(cam_buf); cam_buf = NULL; camExit(); return -10; }
+
+    qr = quirc_new();
+    if (!qr) { linearFree(gray); gray = NULL; linearFree(cam_buf); cam_buf = NULL; camExit(); return -11; }
+    if (quirc_resize(qr, 400, 240) < 0) { quirc_destroy(qr); qr = NULL; linearFree(gray); gray = NULL; linearFree(cam_buf); cam_buf = NULL; camExit(); return -12; }
+
     cam_running = true;
     return 0;
 }
@@ -1181,6 +1192,8 @@ void _3ds_qr_stop(void) {
     CAMU_ClearBuffer(SELECT_OUT1);
     CAMU_Activate(SELECT_NONE);
     camExit();
+    if (qr) { quirc_destroy(qr); qr = NULL; }
+    if (gray) { linearFree(gray); gray = NULL; }
     if (cam_buf) { linearFree(cam_buf); cam_buf = NULL; }
     if (cam_event) { svcCloseHandle(cam_event); cam_event = 0; }
 }
@@ -1198,8 +1211,6 @@ int _3ds_qr_poll(char *out_text, unsigned int out_max) {
 
     int w = 400, h = 240;
     size_t gsz = (size_t)(w * h);
-    u8 *gray = (u8*)linearAlloc(gsz);
-    if (!gray) { cam_running = false; return -13; }
 
     for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++) {
@@ -1208,10 +1219,11 @@ int _3ds_qr_poll(char *out_text, unsigned int out_max) {
             gray[y * w + x] = (r_ * 77 + g_ * 150 + b_ * 29) >> 8;
         }
 
-    struct quirc *qr = quirc_new();
     int result = 0;
-    if (!qr) { linearFree(gray); cam_running = false; return -14; }
-    quirc_resize(qr, w, h);
+    if (quirc_resize(qr, w, h) < 0) {
+        CAMU_SetReceiving(&cam_event, cam_buf, SELECT_OUT1, 400 * 240 * 2, -1);
+        return -15;
+    }
     memcpy(quirc_begin(qr, NULL, NULL), gray, gsz);
     quirc_end(qr);
 
@@ -1227,9 +1239,6 @@ int _3ds_qr_poll(char *out_text, unsigned int out_max) {
             result = len;
         } else { result = -5; }
     } else { result = -6; }
-
-    quirc_destroy(qr);
-    linearFree(gray);
 
     // Re-arm for next frame
     CAMU_SetReceiving(&cam_event, cam_buf, SELECT_OUT1, 400 * 240 * 2, -1);
